@@ -1,0 +1,44 @@
+{
+  "name": "iphoneduo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./serve.ts",
+    "build": "bun ./build.ts && cp -r public/. dist/",
+    "typecheck": "tsc --noEmit",
+    "format": "biome check --write .",
+    "format:check": "biome check .",
+    "lint": "biome lint .",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build",
+    "icons": "bash scripts/icons.sh",
+    "prepare": "simple-git-hooks"
+  },
+  "dependencies": {
+    "@stylexjs/stylex": "0.19.0",
+    "@tauri-apps/api": "^2.11.1",
+    "react": "^19",
+    "react-dom": "^19",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7",
+    "@biomejs/biome": "^2.5.13",
+    "@stylexjs/babel-plugin": "0.19.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/babel__core": "^7.20.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.185.4",
+    "lint-staged": "^17.5.1",
+    "puppeteer-core": "^25.10.0",
+    "simple-git-hooks": "^2.14.0",
+    "typescript": "^7.0.2"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bunx lint-staged"
+  },
+  "lint-staged": {
+    "*": "biome check --write --files-ignore-unknown=true --no-errors-on-unmatched"
+  }
+}

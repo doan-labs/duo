@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "blender": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["--directory", "/Users/minhthanh/blender_mcp/mcp", "run", "blender-mcp"],
+      "env": {}
+    }
+  }
+}

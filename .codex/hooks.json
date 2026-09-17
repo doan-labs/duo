@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" || exit 2; out=$(bunx biome check --write --files-ignore-unknown=true --no-errors-on-unmatched . 2>&1) || { printf '%s\\n' \"$out\" >&2; exit 2; }",
+            "timeout": 30,
+            "statusMessage": "Formatting and checking with Biome"
+          }
+        ]
+      }
+    ]
+  }
+}

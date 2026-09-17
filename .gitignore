@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.cache/
+.DS_Store
+
+# Apple's iPhone Duo model, fetched per clone: python3 scripts/prepare-model.py
+public/model/
+
+# Blender scratch output
+design/blender/tex/
+design/blender/render/
+design/blender/*.blend1
+
+# Tauri regenerates these on every build
+src/desktop/gen/

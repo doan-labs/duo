@@ -1,0 +1,3 @@
+# Keep Rust build output out of src/. Paths here are relative to the repo root.
+[build]
+target-dir = ".cache/cargo"
