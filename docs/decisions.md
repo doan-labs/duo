@@ -247,9 +247,9 @@ iframe loads twice, and what you do on the display in use is not reflected in
 the copy: scroll a page on the cover while closed and the inner display opens on
 the copy's own scroll position. `arg` does not travel to the copy. An app is
 told which instance it is (`os.mirror`) and the copy must start no sound — a
-video embed that autoplayed on mount played twice from 90° down until tv.tsx
-and youtube.tsx checked it; what should play once lives at module level, as
-music.tsx's `deck()` already did. The cover
+video embed that autoplayed on mount played twice from 90° down until tv/index.tsx
+and youtube/index.tsx checked it; what should play once lives at module level, as
+music/index.tsx's `deck()` already did. The cover
 cannot split (21), so it mirrors the first app whole, and when the lead passes
 to it below 40° the inner display's split collapses to that one app, quietly, on
 the 9% of it still showing.
@@ -270,13 +270,13 @@ Nothing on the panel is decorative any more, which is the point of the change:
   a panel's `useState`. Both displays run their own `<SpringBoard>`, so per-panel
   state would let the cover be in airplane mode while the inner display still had
   bars. The status stack draws them on both.
-- Now Playing drives the Music app's deck, hoisted in `apps/music.tsx` from one
+- Now Playing drives the Music app's deck, hoisted in `apps/music/index.tsx` from one
   per component to one per device. A track started in Control Center is the one
   the app opens on, and closing the app no longer stops the audio.
 - The power glyph opens the shell's slide-to-power-off sheet, the same one the
   side button reaches; `+` puts the grid in edit mode.
 
-Costs: `springboard/` now imports an app file directly (`apps/music.tsx`) and not
+Costs: `springboard/` now imports an app file directly (`apps/music/index.tsx`) and not
 only `apps/index.ts` — the direction is still shell → app, but the surface is
 wider. The deck's clock is a 4 Hz `setInterval` that outlives every listener,
 because audio has to keep time with nothing mounted; it returns immediately while
@@ -380,7 +380,7 @@ inner display is 790 × 555 px — an iPad mini's shape — so Notes now draws w
 iPadOS draws at that size: a folder sidebar, the note list, the note, and the
 pencil palette floating over all three. It picks the layout off its own box with
 a ResizeObserver, not off the display, so a split half of the inner panel gets
-the phone's one-column Notes like the cover does (the same rule camera.tsx
+the phone's one-column Notes like the cover does (the same rule camera/index.tsx
 follows). Folders and tags are Apple's sample set and filter nothing; the list
 is the ten notes the app ships with, and its titles and previews are read back
 out of the text, so an edit retitles a row as it is typed.
@@ -408,7 +408,7 @@ lifts: nothing opens it any more, so the animation went with the Touch ID hook.
 
 ## 32. Notes shares persisted text, while navigation stays local
 2026-09-17, accepted. Amends 16 and 30. Notes keeps its public entry in
-`apps/notes.tsx`, with its data, persistence, folders, list and editor separated
+`apps/notes/index.tsx`, with its data, persistence, folders, list and editor separated
 under `apps/notes/`. Both editor presentations use the same controlled textarea.
 `useSyncExternalStore` reads the existing `duo.notes.<id>` keys; a local subscriber
 set notifies both displays after an edit, and the browser storage event handles

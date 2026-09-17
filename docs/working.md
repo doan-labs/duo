@@ -116,10 +116,11 @@ buttons. Any other app that wants a button does the same.
 
 ## Adding things
 
-**An app.** A new `src/os/apps/<name>.tsx` exporting a component
+**An app.** A new `src/os/apps/<name>/index.tsx` exporting a component
 `({ os }: { os: Os }) => JSX` (use `Nav`, `Page`, `useNav` from `uikit/nav.tsx`;
-clean up timers and media in effect cleanups; styles in a `stylex.create` at the
-bottom, shared blocks from `uikit/styles.ts`). Add `{ name, view, light? }` to
+clean up timers and media in effect cleanups; styles in a `stylex.create` in
+`<name>/styles.ts` next to it, shared blocks from `uikit/styles.ts`; anything
+else the app alone needs goes in the same folder). Add `{ name, view, light? }` to
 `LEFT`, `RIGHT` or `DOCK` in `apps/index.ts` for a tile, or to the tail of `APPS`
 for Spotlight-only. Icon: a webp in `src/icons/`, registered in
 `ICONS` by the same name. The baked home screen picks it up from the same lists.
@@ -132,17 +133,17 @@ an app is simply mounted on both displays while the phone folds — it never
 learns the angle and needs no fold code. What it must survive is being two
 instances at once: component state is per instance, module state is shared.
 So anything that must be one — a track playing, a recording, a Bluetooth
-switch — lives at module level (`deck()` in music.tsx, `toggles.ts`) and both
+switch — lives at module level (`deck()` in music/index.tsx, `toggles.ts`) and both
 instances draw it; anything that must not happen twice checks `os.mirror`, true
-in the copy, and the copy starts no sound of its own (tv.tsx and youtube.tsx
+in the copy, and the copy starts no sound of its own (tv/index.tsx and youtube/index.tsx
 embed with `autoplay=0` there). An app that autoplays on mount without that
 check plays twice from about 90° down. It also lays out in both widths, wide
 and narrow, since the cover copy is narrow; `Nav`/`Page` already do. An app is
 not told which display it is on, and a split half on the wide one is narrow too,
-so an app that needs its own layout measures its box: camera.tsx watches its
+so an app that needs its own layout measures its box: camera/index.tsx watches its
 root with a ResizeObserver and goes landscape (Apple's rail: shutter and mode
 dial stood up along the right edge) when wider than tall, iPhone-portrait
-otherwise; notes.tsx watches the same way and gives a box wider than 600 px
+otherwise; notes/index.tsx watches the same way and gives a box wider than 600 px
 iPadOS's three columns — folders, list, note — and anything narrower the phone's
 list with the note on a pushed page.
 
@@ -152,7 +153,7 @@ and run it (macOS, Xcode, `brew install webp`); register the webp in `SYM` in
 to the real ones.
 
 **A widget on the home screen.** It ships inside the app that owns it, as
-WidgetKit does: a second export from `apps/<name>.tsx` taking
+WidgetKit does: a second export from `apps/<name>/index.tsx` taking
 `{ onOpen }: { onOpen: (from: HTMLElement) => void }`, drawn with `shared.widget`
 and `shared.widgetLabel`, calling `onOpen` with the element the app should zoom
 out of. Mount it in a `<WidgetTile>` in `springboard/home-screen.tsx`

@@ -14,7 +14,7 @@
 
 import * as stylex from '@stylexjs/stylex'
 import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
-import { CalendarWidget } from '../apps/calendar.tsx'
+import { CalendarWidget } from '../apps/calendar/index.tsx'
 import { byName, DOCK, LEFT, RIGHT } from '../apps/index.ts'
 import { WeatherWidget } from '../apps/weather/index.tsx'
 import { shared } from '../uikit/styles.ts'

@@ -35,7 +35,7 @@ src/
   shaders/     GLSL, as TS template strings
   hud.tsx      the floating HUD under the device
   os/          the fake iOS drawn on the displays
-    os.tsx     shell; apps/ one file per app, index.ts the home grid; styles/ tokens and shared blocks
+    os.tsx     shell; apps/ one folder per app (index.tsx, styles.ts), index.ts the home grid; styles/ tokens and shared blocks
   icons/       app icons imported by code
   desktop/     Tauri crate: main.rs wires, commands/ per feature, platform/ per OS
 public/        served verbatim; model/ is gitignored, fetched by script

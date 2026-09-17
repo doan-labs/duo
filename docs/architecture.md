@@ -16,11 +16,11 @@ The file tree is in the README; this page is about responsibilities.
 | `src/os/os.tsx` | boot, and nothing else: builds one display's root element, styles it by hand because CSS3DObject gets it before React has run, and renders `<SpringBoard>` into it |
 | `src/os/device.ts` | the device the frame buttons see: `lockState`, `device` (sleep and wake, volume, screenshot, power), `active.wide` and the `follow()` that makes the other display mirror the one in use every frame, and the display registry `addDisplay()` keeps. No React and no StyleX, so `src/buttons.ts` and `main.ts` reach the hardware side of iOS without pulling in the UI |
 | `src/os/springboard/` | the shell one display runs. `springboard.tsx` is the layer stack and the state that outlives any one layer; each layer is its own file (`home-screen`, `home-bar`, `lock-screen`, `status-bar`, `spotlight`, `control-center`, `power`, `system-hud`, `tile`). `scenes.ts` owns the open apps, `gestures.ts` the scrubber and the zoom geometry, `clock.ts` the minute, `toggles.ts` the switches. React renders structure; WAAPI scrubbing and zooms stay imperative on refs |
-| `src/os/springboard/control-center.tsx` | Control Center, iOS 26: three pages on one rail — the tile grid, the Now Playing card, the connectivity list — a right panel unfolded, full width folded. Volume writes `device.level`, brightness sets the shell's veil, the transport drives the deck in `apps/music.tsx`, the power glyph opens the shell's sheet, `+` is edit mode. `springboard.tsx` owns the pull strip and the open/close animations |
+| `src/os/springboard/control-center.tsx` | Control Center, iOS 26: three pages on one rail — the tile grid, the Now Playing card, the connectivity list — a right panel unfolded, full width folded. Volume writes `device.level`, brightness sets the shell's veil, the transport drives the deck in `apps/music/index.tsx`, the power glyph opens the shell's sheet, `+` is edit mode. `springboard.tsx` owns the pull strip and the open/close animations |
 | `src/os/springboard/toggles.ts` | the switches Control Center flips (airplane, the three radios, AirDrop, hotspot, rotation lock, mirroring, focus, torch), device-wide rather than per panel, plus `useToggles()` and the plain `toggles` object for code with no render to hook. `status-bar.tsx` is the other reader: what is on shows in the stack on both displays. The torch has two more: `lock-screen.tsx` flips it and `main.ts` lights the LED |
 | `src/os/buttons.ts` | what a press means: click, hold, double, chord, with iOS timings |
-| `src/os/apps/` | one entry component per app; `index.ts` is the home grid (`LEFT`, `RIGHT`, `DOCK`, `APPS`) and `byName()`; `shared.ts` helpers. A widget ships in the app that owns it, as WidgetKit does (`WeatherWidget`, `CalendarWidget`) |
-| `src/os/apps/notes/` | Notes internals: `data.ts` owns the sample notes and groups, `store.ts` owns persisted text and subscriptions, `folders.tsx` the decorative sidebar, `note-list.tsx` the subscribed rows, and `editor.tsx` both editor presentations and the shared textarea. `apps/notes.tsx` owns width selection and navigation; view styles stay with their components |
+| `src/os/apps/` | a folder per app: `<name>/index.tsx` is the entry component, `<name>/styles.ts` its `stylex.create`, anything else the app alone needs sits beside them. `index.ts` is the home grid (`LEFT`, `RIGHT`, `DOCK`, `APPS`) and `byName()`; `shared.ts` helpers and `rings.tsx` the activity rings Fitness, Health and Watch share. A widget ships in the app that owns it, as WidgetKit does (`WeatherWidget`, `CalendarWidget`) |
+| `src/os/apps/notes/` | Notes internals: `data.ts` owns the sample notes and groups, `store.ts` owns persisted text and subscriptions, `folders.tsx` the decorative sidebar, `note-list.tsx` the subscribed rows, and `editor.tsx` both editor presentations and the shared textarea. `apps/notes/index.tsx` owns width selection and navigation; view styles stay with their components |
 | `src/os/uikit/` | what the apps link against: `app.ts` (the `App`/`Os`/`CameraHooks` types, zero runtime), `nav.tsx` (`Nav`/`useNav`/`Page`), `sym.tsx` (`Sym`), `styles.ts` (blocks and keyframes more than one file uses, glass included), `tokens.stylex.ts` (colours, fonts, per-app surface, grid geometry, easings) |
 | `stylex-plugin.ts`, `build.ts`, `bunfig.toml` | StyleX compile step for Bun: dev injects rules at runtime, build writes `dist/stylex.css` |
 | `src/os/screen.ts` | the same shell baked to canvas textures, for the fold |
@@ -32,7 +32,7 @@ Inside `src/os/` the imports run one way, and that direction is the point of the
 shape: `apps/` sees `uikit/` and nothing else, never the shell and never the
 device; `springboard/` sees `uikit/`, `device.ts` and `apps/` — `index.ts` for
 the grid, and an app file directly when the shell has to show what that app is
-doing, which today is only Control Center reading the deck in `apps/music.tsx`;
+doing, which today is only Control Center reading the deck in `apps/music/index.tsx`;
 `device.ts` sees only the types in `uikit/app.ts`. So an app file knows nothing
 about the shell it is drawn in, and the hardware path (`src/buttons.ts` →
 `src/os/buttons.ts` → `device`) reaches iOS without touching React. An import
@@ -139,7 +139,7 @@ Where the numbers come from:
   lock texture and rebakes the lock texture on the minute.
 - **Switches and the deck** are device-wide too, and neither is React state:
   `springboard/toggles.ts` holds Control Center's switches behind
-  `useSyncExternalStore`, `nowPlaying` in `apps/music.tsx` holds the one
+  `useSyncExternalStore`, `nowPlaying` in `apps/music/index.tsx` holds the one
   `<audio>`. Both displays' panels and status stacks subscribe, so a switch
   flipped on the cover is flipped when the phone opens, and a track started in
   Control Center is the one the Music app shows. The baked textures do not draw

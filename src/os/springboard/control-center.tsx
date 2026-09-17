@@ -12,7 +12,7 @@
 
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, type PointerEvent as ReactPointerEvent, type Ref, useState } from 'react'
-import { useNowPlaying } from '../apps/music.tsx'
+import { useNowPlaying } from '../apps/music/index.tsx'
 import { art, mmss } from '../apps/shared.ts'
 import { Sym } from '../uikit/sym.tsx'
 import { colors, easing } from '../uikit/tokens.stylex.ts'

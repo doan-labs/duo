@@ -55,7 +55,8 @@ src/
       sym.tsx           Sym, the SF Symbol glyphs
       styles.ts         the blocks more than one file uses, glass included
       tokens.stylex.ts  colours, fonts, per-app surface, grid geometry, easings
-    apps/           one React component per app and its widget; index.ts is the home grid
+    apps/           a folder per app: index.tsx the component and its widget, styles.ts its styles;
+                    index.ts is the home grid
   icons/            app icons imported by code
   desktop/          Tauri shell, one crate
     main.rs         wires only
