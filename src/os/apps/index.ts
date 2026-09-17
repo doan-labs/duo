@@ -40,7 +40,7 @@ import { Tv } from './tv.tsx'
 import { IN_FOLDER, Utilities } from './utilities.tsx'
 import { Wallet } from './wallet.tsx'
 import { Watch } from './watch.tsx'
-import { Weather } from './weather.tsx'
+import { Weather } from './weather/index.tsx'
 import { YouTube } from './youtube.tsx'
 
 /** Left half — the cover display, rows 3 to 6. */
@@ -63,7 +63,7 @@ export const LEFT: App[] = [
 
 /** Right half — only on the inner display, rows 1 to 6. */
 export const RIGHT: App[] = [
-  { name: 'Weather', view: Weather },
+  { name: 'Weather', view: Weather, edge: true },
   { name: 'Stocks', view: Stocks },
   { name: 'Find My', light: true, view: FindMy },
   { name: 'Home', view: Home },

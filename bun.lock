@@ -5,6 +5,7 @@
     "": {
       "name": "iphoneduo",
       "dependencies": {
+        "@sfinterface/numbers": "^0.3.4",
         "@stylexjs/stylex": "0.19.0",
         "@tauri-apps/api": "^2.11.1",
         "react": "^19",
@@ -93,6 +94,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@puppeteer/browsers": ["@puppeteer/browsers@3.2.2", "", { "dependencies": { "modern-tar": "^0.8.4", "yargs": "^18.0.0" }, "peerDependencies": { "proxy-agent": ">=8.0.1", "yauzl": "^2.10.0 || ^3.4.0" }, "optionalPeers": ["proxy-agent", "yauzl"], "bin": { "browsers": "lib/main-cli.js" } }, "sha512-q2BU4YfO9h/Wt7IcWPcggpOOqLk2Tbs1hDwolvKZrweRjy751OJBKMN9zO5bfD0pzU7X/tvKw/exQds4pM/LOg=="],
+
+    "@sfinterface/numbers": ["@sfinterface/numbers@0.3.4", "", { "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "sha512-ygLERcykGMQTaRoFcy7oE1LfW65wLlPpB3WVgK71rbUQUYOX0sjm5/o15r2zP0q36jFxrGSHwjhRLOvIlXm5kQ=="],
 
     "@stylexjs/babel-plugin": ["@stylexjs/babel-plugin@0.19.0", "", { "dependencies": { "@babel/core": "^7.26.8", "@babel/helper-module-imports": "^7.25.9", "@babel/traverse": "^7.26.8", "@babel/types": "^7.26.8", "@dual-bundle/import-meta-resolve": "^4.1.0", "@stylexjs/shared": "0.19.0", "@stylexjs/stylex": "0.19.0", "postcss-value-parser": "^4.1.0" } }, "sha512-2SnVZIl047TtqKW0nRTn7Irz0kmoot1bxdGDE/HwfwfF7dJYHqwkIFg92s87v3hj7zxJobrHWwDx1p3qvQXW4g=="],
 

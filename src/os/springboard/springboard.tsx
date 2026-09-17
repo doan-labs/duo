@@ -267,6 +267,7 @@ export function SpringBoard({ w, hgt, wall, boot, shots }: SpringBoardProps) {
               }}
               {...stylex.props(
                 styles.app,
+                !e.a.edge && styles.appPad,
                 e.side === 'left' && styles.appLeft,
                 e.side === 'right' && styles.appRight,
                 drop?.id === e.id && styles.appDrag,
@@ -342,9 +343,10 @@ const styles = stylex.create({
     backgroundColor: app.bg,
     color: app.fg,
     zIndex: 2,
-    paddingTop: 40,
     overflow: 'hidden'
   },
+  // Room for the status stack. `edge` apps skip it and run under the clock like Apple's footage.
+  appPad: { paddingTop: 40 },
   // Split at the hinge, as Apple's footage shows: no seam, the two just meet.
   appLeft: { right: '50%' },
   appRight: { left: '50%' },

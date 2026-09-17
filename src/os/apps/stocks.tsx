@@ -1,6 +1,7 @@
 // Stocks: a watchlist with sparklines, and a detail page whose chart draws itself in.
 import * as stylex from '@stylexjs/stylex'
 import { Nav, Page, useNav } from '../uikit/nav.tsx'
+import { Num } from '../uikit/num.tsx'
 import { shared } from '../uikit/styles.ts'
 import { Sym } from '../uikit/sym.tsx'
 import { colors } from '../uikit/tokens.stylex.ts'
@@ -44,7 +45,8 @@ const pct = (t: string) => {
   const pts = walk(t, 34)
   return (pts[pts.length - 1]! - pts[0]!) / 12
 }
-const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
+const two = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+const signed = { ...two, signDisplay: 'exceptZero' as const }
 
 const List = () => {
   const { push } = useNav()
@@ -64,8 +66,12 @@ const List = () => {
             </div>
             <Spark t={t} w={64} ht={30} />
             <div {...stylex.props(styles.right)}>
-              <div {...stylex.props(styles.price)}>{base.toFixed(2)}</div>
-              <div {...stylex.props(styles.chip, d < 0 && styles.dn)}>{signed(d)}%</div>
+              <div {...stylex.props(styles.price)}>
+                <Num value={base} format={two} />
+              </div>
+              <div {...stylex.props(styles.chip, d < 0 && styles.dn)}>
+                <Num value={d} format={signed} suffix="%" />
+              </div>
             </div>
           </div>
         )
@@ -95,9 +101,11 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
         <div {...stylex.props(styles.quote)}>
           <div {...stylex.props(styles.ticker)}>{t}</div>
           <div {...stylex.props(shared.sub)}>{name}</div>
-          <div {...stylex.props(styles.bigPrice)}>{base.toFixed(2)}</div>
+          <div {...stylex.props(styles.bigPrice)}>
+            <Num value={base} format={two} />
+          </div>
           <div {...stylex.props(styles.delta, d < 0 && styles.deltaDn)}>
-            {signed((base * d) / 100)} ({d.toFixed(2)}%)
+            <Num value={(base * d) / 100} format={signed} /> (<Num value={d} format={two} suffix="%" />)
           </div>
         </div>
         <div {...stylex.props(styles.chart)}>
@@ -114,7 +122,9 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
           {stats.map(([k, v]) => (
             <div key={k} {...stylex.props(shared.row, styles.darkRow)}>
               {k}
-              <span {...stylex.props(shared.rowR, styles.white)}>{v.toFixed(2)}</span>
+              <span {...stylex.props(shared.rowR, styles.white)}>
+                <Num value={v} format={two} />
+              </span>
             </div>
           ))}
         </div>

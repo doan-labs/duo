@@ -423,3 +423,49 @@ Cost: more files to navigate, synchronous localStorage reads, and last write win
 if two displays or tabs edit the same note. Storage failures are not handled;
 selection, scroll, pencil and colour are still local UI state, not persisted or
 mirrored. This is a text synchronization fix, not a new navigation handover.
+
+## 33. Weather uses real forecasts with explicit failure states
+2026-09-17, accepted. Weather replaces its five-day San Francisco-only feed and
+fabricated fallback with Open-Meteo current conditions, hourly forecasts, ten
+daily forecasts and geocoding. Requests are deduplicated by location, time out
+after 15 seconds, and refresh every ten minutes while mounted. A failed refresh
+retains the last successful in-memory result with an error banner; a cold
+failure shows unavailable values and Retry. No generated weather is presented
+as an observation. The data is explicitly labelled as model estimates.
+
+Saved places, selected location and Celsius/Fahrenheit are stored under
+`duo.weather.v1`, shared across the two displays and browser tabs. Storage
+failure falls back to session state. Geolocation is requested only from its
+button; denied/unavailable access leaves city search usable. Location-local
+dates and times use the provider's IANA timezone and Unix timestamps, including
+the chart and day details. Weather updates also rebake the home widget.
+
+Cost: internet access and provider availability are required; forecast caches
+are not persisted across reloads. Search and scroll remain per-display. This
+is not an Apple WeatherKit client and does not implement radar, severe-weather
+alerts or notification delivery. Every displayed control operates on real
+forecast data or saved settings; metric cards are informational.
+
+## 34. Weather surfaces are one glass recipe, blurred per element
+2026-09-17, accepted. Every Weather surface (toolbar capsules, cards, the search
+field, location tiles, search results, the notice and the day-detail sheet)
+shares one material in `weather/styles.ts`: a thin white fill over
+`backdrop-filter: blur(24px) saturate(170%)`, a 1 px top highlight and a
+half-pixel rim as inset shadows, and a soft drop. Controls add hover/active
+fills and a press scale; the search field replaces the browser focus ring with
+a brighter rim. Toolbar glyphs are SF Symbols through `Sym`, not text.
+
+Unlike Control Center (decision 28), each card blurs on its own rather than
+sitting on a pre-blurred scrim, because the cards scroll over live clouds and
+have to read as glass wherever they land. Cost: the day-detail sheet is also a
+blurred layer, so its cards are nested backdrop filters. Chromium composites
+this correctly; WebKit's nested backdrop-filter inside a clipped layer has not
+been checked here, and the fallback is to drop the sheet's blur, not the cards'.
+
+## 35. Apps run under the status stack when they say so
+
+2026-09-17. The shell used to pad every app 40 px from the top and paint its own background there, so a gradient app like Weather showed a black band under the clock. Apple's Duo footage has no band: Mail, Voice Memos, everything runs edge to edge and the time floats over it. An app now sets `edge: true` in the registry to skip the shell padding and pad its own top; Weather does. Cost: an `edge` app owns the status-stack clearance and its light/dark contrast under the clock. Light apps keep the shell padding because it is invisible against their grey.
+
+## 36. Numbers roll through @sfinterface/numbers
+
+2026-09-17. Every displayed number (Weather values, Stocks prices, Calculator output, Camera zoom) renders through `Num` in `src/os/uikit/num.tsx`, a thin wrapper over the library's `Numbers`: undefined draws the em dash, whole numbers by default, leading suffix space to NBSP. Formatting stays `Intl.NumberFormat`. Strings for non-React surfaces (the baked widget in `screen.ts`, SVG chart labels, aria-labels) keep the old helpers. Cost: one dependency and 96 extra DOM nodes on the Weather screen; reduced motion turns the roll off.

@@ -374,3 +374,41 @@ on port 3011 by the local `serve-dist.ts`. It repeats the four captures and
 behavior checks, plus mouse focus followed by real keyboard typing, an empty
 string surviving reload, and Enter activating a note row. Both
 `bun run typecheck` and `bun run build` passed; scoped Biome checks passed too.
+
+## 7. Weather rebuild verification (2026-09-17)
+
+Scratch checks and screenshots use `.cache/debug/weather-*`. `weather-check.mjs`
+exercises actual Open-Meteo forecasts and Tokyo geocoding, city save/removal,
+Celsius/Fahrenheit persistence, daily details, the hourly chart, Escape,
+reload and folded layout. `weather-edge.mjs` checks a deliberately blocked
+forecast request, retaining the last successful result, retry recovery and a
+cold offline start with no fabricated readings. Geolocation callbacks are
+stubbed for denied and successful permission paths; the successful London
+coordinates still fetch a real forecast. These tests do not validate the
+operating system's permission prompt.
+
+`weather-production.mjs` runs against `dist/` served on port 3011, checking
+keyboard focus and tab trapping, live fold/open, unit handover and cross-tab
+storage. When driving the React hinge input, use the native input value setter
+before dispatching an input event: assigning `input.value` normally updates
+React's tracker and causes the synthetic event to be ignored. Do not finish
+infinite cloud animations in headless tests; finish only finite shell animations.
+
+The folded scene may retain a hidden inner Weather instance. Count or target
+the visible display rather than assuming each weather selector occurs once.
+All visual/runtime checks here are headless Chromium; native WKWebView parity
+is not established. Source lint passes, but the automatic formatting hook was
+inactive in this session, so the formatter check still reports pending formatting.
+
+For Weather scrollbar checks, run `.cache/debug/weather-scrollbar.mjs`. It
+launches Chrome with `ignoreDefaultArgs: ['--hide-scrollbars']`, checks the computed thumb skin,
+exercises horizontal and vertical scrolling through real wheel events, and captures
+`.cache/debug/weather-scrollbar.png`. The usual screenshot launch flag hides
+the exact UI under test. Puppeteer also adds it by default in headless mode,
+so merely omitting it from `args` is insufficient.
+
+`weather-glass.mjs` captures the four Weather surfaces (main, locations with the
+search field focused, search results, day detail) cropped to `[data-weather]` at
+2x into `.cache/debug/glass-*.png`. Under SwiftShader the four 2x captures take
+over five minutes; run it in the background. The Fog condition title shows a
+grey square: that is Apple's 🌫️ emoji, not a missing glyph.

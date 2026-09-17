@@ -304,3 +304,30 @@ remounts the layout, and selecting a different note resets the pen but retains
 the wide layout's ink colour. Folders, tags, compose, sharing, search and most
 toolbar icons remain decorative. No note creation, deletion or folder filtering
 is implemented by this rebuild.
+
+## Weather maintenance
+
+Weather uses the keyless Open-Meteo forecast and geocoding endpoints. The API's
+default metric units are kept internally; the temperature toggle converts
+only temperature, with wind, rain and pressure explicitly labelled in metric
+units. Forecast timestamps are Unix seconds, formatted in the city's timezone.
+Use the location ID plus coordinates for geolocation entries so moving to a
+new position cannot reuse the previous position's cached forecast.
+
+`duo.weather.v1` stores places, selected place and temperature units. Clear that
+key to reset. Forecasts are cached only in memory for ten minutes. A failed
+request must never fall back to fabricated measurements. A reload while
+offline deliberately shows an unavailable state. Browser location access needs
+a secure context (localhost qualifies) and permission; native location access
+depends on the webview environment. Search remains available if it is denied.
+
+The cards grid responds to its own container width, so cover and split displays
+use one column. Keep actionable buttons out of the bottom-centre home-bar
+region; the saved-city Remove control sits at the right edge for that reason.
+The baked home widget also reads weather data and is rebaked on snapshot changes.
+
+Weather's scroll areas use `styles.scrollbar`: a rounded translucent native
+thumb with a subtle track and hover/pressed feedback. Keep `scrollbar-width`
+and `scrollbar-color` at `auto` in engines supporting `::-webkit-scrollbar`;
+non-auto standard values override that detailed skin in Chromium. Engines
+without those pseudo-elements use the thin, tinted standard-property fallback.

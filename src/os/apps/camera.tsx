@@ -11,6 +11,7 @@ import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ICONS, type SYM } from '../../icons/index.ts'
 import type { Os } from '../uikit/app.ts'
+import { Num } from '../uikit/num.tsx'
 import { shared } from '../uikit/styles.ts'
 import { Sym } from '../uikit/sym.tsx'
 import { colors } from '../uikit/tokens.stylex.ts'
@@ -159,7 +160,6 @@ export const Camera = ({ os }: { os: Os }) => {
     }
   }, [])
 
-  const zl = `${z.toFixed(1).replace('.0', '')}×`
   const dial = (
     <div role="tablist" {...stylex.props(styles.dial, land && styles.dialLand)}>
       {MODES.map((m) => (
@@ -204,7 +204,7 @@ export const Camera = ({ os }: { os: Os }) => {
   const liveBtn = <Tog sym="live" label="Live Photo" on={tog.live} onClick={() => flip('live')} />
   const zoomChip = (
     <button type="button" data-zoom {...stylex.props(styles.zl)} onClick={() => zoom(z >= 2 ? 1 : z * 2)}>
-      {zl}
+      <Num value={z} format={{ maximumFractionDigits: 1 }} suffix="×" />
     </button>
   )
 

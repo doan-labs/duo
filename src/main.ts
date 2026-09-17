@@ -7,6 +7,7 @@ import { buttons } from './buttons.ts'
 import { mountHud } from './hud.tsx'
 import { loadIcons, WALLPAPER } from './icons/index.ts'
 import { isDesktop } from './native.ts'
+import { subscribe as subscribeWeather, widgetSnapshot } from './os/apps/weather/data.ts'
 import { press } from './os/buttons.ts'
 import { busy, device, follow, goHome, lockState } from './os/device.ts'
 import { os } from './os/os.tsx'
@@ -97,7 +98,17 @@ const bake = (lock: boolean) => {
   t.inner.anisotropy = t.outer.anisotropy = maxAniso
   return t
 }
-const home = bake(false)
+let home = bake(false)
+let weatherSnapshot = JSON.stringify(widgetSnapshot())
+subscribeWeather(() => {
+  const next = JSON.stringify(widgetSnapshot())
+  if (next === weatherSnapshot) return
+  weatherSnapshot = next
+  const previous = home
+  home = bake(false)
+  previous.inner.dispose()
+  previous.outer.dispose()
+})
 let lockshot = bake(true)
 const screens = {
   inner: screenMaterial(home.inner, INNER, [0.5, 0]),

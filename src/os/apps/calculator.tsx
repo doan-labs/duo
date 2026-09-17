@@ -2,6 +2,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { Os } from '../uikit/app.ts'
+import { Num } from '../uikit/num.tsx'
 import { shared } from '../uikit/styles.ts'
 import { colors } from '../uikit/tokens.stylex.ts'
 
@@ -38,7 +39,9 @@ export const Calculator = (_: { os: Os }) => {
   return (
     <div {...stylex.props(shared.body, styles.body)}>
       <div {...stylex.props(styles.calc)}>
-        <div {...stylex.props(styles.out)}>{Number(s.cur).toLocaleString('en', { maximumFractionDigits: 8 })}</div>
+        <div {...stylex.props(styles.out)}>
+          <Num value={Number(s.cur)} locale="en" format={{ maximumFractionDigits: 8 }} />
+        </div>
         {KEYS.map((k) => (
           <button
             type="button"

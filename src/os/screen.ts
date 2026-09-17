@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { WALL_KEY } from '../icons/index.ts'
 import { DOCK, LEFT, RIGHT } from './apps/index.ts'
+import { widgetSnapshot } from './apps/weather/data.ts'
 
 // Scene units are metres; PX converts a millimetre to canvas pixels.
 const PX = 12
@@ -402,17 +403,18 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
   const wx = (i: number) => x0 + i * 2 * u(CELL) + (2 * u(CELL) - wsize) / 2
 
   // Weather widget.
-  glass(ctx, blur, wx(0), wtop, wsize, wsize, u(23), ['#3f8ff5', '#1e5fd8'])
+  const weather = widgetSnapshot()
+  glass(ctx, blur, wx(0), wtop, wsize, wsize, u(23), ['#377aaf', '#20395b'])
   ctx.textAlign = 'left'
   ctx.fillStyle = '#fff'
   ctx.font = `600 ${u(11)}px ${FONT}`
-  ctx.fillText('San Francisco', wx(0) + u(12), wtop + u(12))
+  ctx.fillText(weather.name, wx(0) + u(12), wtop + u(12), wsize - u(24))
   ctx.font = `300 ${u(34)}px ${FONT}`
-  ctx.fillText('12°', wx(0) + u(10), wtop + u(26))
+  ctx.fillText(weather.temperature, wx(0) + u(12), wtop + u(26))
   ctx.font = `600 ${u(11)}px ${FONT}`
-  ctx.fillText('⛅️ Partly Cloudy', wx(0) + u(12), wtop + wsize - u(34))
+  ctx.fillText(weather.condition, wx(0) + u(12), wtop + wsize - u(34))
   ctx.fillStyle = 'rgba(255,255,255,0.72)'
-  ctx.fillText('H:18°  L:11°', wx(0) + u(12), wtop + wsize - u(19))
+  ctx.fillText(weather.range, wx(0) + u(12), wtop + wsize - u(19))
   label(ctx, 'Weather', wx(0) + wsize / 2, wtop + wsize + u(4))
 
   // Calendar widget, matching the live one in os.ts.

@@ -1,5 +1,5 @@
 // Helpers more than one app reaches for: generated artwork, deterministic
-// charts, a WebAudio beep, and the weather feed the home widget also shows.
+// charts and a WebAudio beep.
 
 /** Deterministic hue from a string, so generated artwork is stable per title. */
 export const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)
@@ -41,47 +41,3 @@ export function beep(freqs: number[], dur = 0.14, vol = 0.11) {
     o.stop(ac.currentTime + dur + 0.2)
   }
 }
-
-// ---------- Weather (shared with the home-screen widget) ----------
-
-export const forecast = (async () => {
-  const r = await fetch(
-    'https://api.open-meteo.com/v1/forecast?latitude=37.77&longitude=-122.42&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=5'
-  )
-  const j = await r.json()
-  return {
-    t: Math.round(j.current.temperature_2m),
-    code: j.current.weather_code as number,
-    days: (j.daily.time as string[]).map((d, i) => ({
-      d,
-      hi: Math.round(j.daily.temperature_2m_max[i]),
-      lo: Math.round(j.daily.temperature_2m_min[i]),
-      code: j.daily.weather_code[i] as number
-    }))
-  }
-})().catch(() => ({
-  t: 12,
-  code: 2,
-  days: [0, 1, 2, 3, 4].map((i) => ({
-    d: new Date(Date.now() + i * 864e5).toISOString(),
-    hi: 18 + i,
-    lo: 11,
-    code: [0, 2, 3, 61, 0][i]!
-  }))
-}))
-
-export const wx = (c: number) =>
-  c === 0
-    ? ['☀️', 'Clear']
-    : c < 4
-      ? ['⛅️', 'Partly Cloudy']
-      : c < 50
-        ? ['🌫️', 'Fog']
-        : c < 70
-          ? ['🌧️', 'Rain']
-          : c < 80
-            ? ['❄️', 'Snow']
-            : c < 95
-              ? ['🌦️', 'Showers']
-              : ['⛈️', 'Thunderstorms']
-export const day = (iso: string) => new Date(iso).toLocaleDateString('en', { weekday: 'short' })

@@ -39,6 +39,17 @@ about the shell it is drawn in, and the hardware path (`src/buttons.ts` →
 that runs the other way is the sign a responsibility has landed in the wrong
 file.
 
+## Weather data and widget
+
+`apps/weather/data.ts` owns Open-Meteo forecasts, geocoding, persisted locations
+and units, subscriptions and the widget snapshot. `weather/styles.ts` owns
+presentation; `temperature-chart.tsx` draws actual hourly temperatures.
+`apps/weather/index.tsx` owns location management and daily-detail navigation.
+Both displays and the widget share the selected city and forecast cache;
+search, scroll and detail navigation remain local to each app instance.
+`screen.ts` reads the widget snapshot; `main.ts` rebakes home textures only
+when that snapshot changes and disposes the previous textures.
+
 ## Units and camera
 
 Scene units are centimetres. Apple's USDZ is metres, scaled by 100 and dropped
