@@ -1,0 +1,19 @@
+{
+  "name": "@doan-labs/ipduo-app-settings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.tsx",
+    "./*": "./*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@doan-labs/ipduo-sdk": "workspace:*",
+    "@doan-labs/ipduo-uikit": "workspace:*",
+    "@stylexjs/stylex": "0.19.0",
+    "react": "^19"
+  }
+}

@@ -1,7 +1,7 @@
-// Dev server. Bun's plain `bun ./index.html` answers every unknown path with
+// Dev server. Bun's plain HTML entry server answers every unknown path with
 // the page itself, which turns the USD model into HTML; this serves public/
 // as real files, the way `bun build` and Tauri ship it.
-import index from './index.html'
+import index from './packages/shell/index.html'
 
 const port = Number(process.env.PORT ?? 3000)
 Bun.serve({

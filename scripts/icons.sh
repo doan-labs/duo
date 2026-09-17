@@ -1,11 +1,11 @@
 #!/bin/bash
-# Re-extracts the icon set in src/icons from this Mac: real Apple app artwork
+# Re-extracts the icon set in public/icons from this Mac: real Apple app artwork
 # out of /System/Applications, and real SF Symbols out of AppKit. Needs Xcode's
 # swift and cwebp (brew install webp). macOS only.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 A=/System/Applications
-out=src/icons
+out=public/icons
 mkdir -p "$out/sym"
 
 xcrun swift scripts/appicons.swift "$out" 192 \

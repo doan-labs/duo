@@ -12,4 +12,4 @@ design/blender/render/
 design/blender/*.blend1
 
 # Tauri regenerates these on every build
-src/desktop/gen/
+packages/shell/desktop/gen/

@@ -469,3 +469,21 @@ been checked here, and the fallback is to drop the sheet's blur, not the cards'.
 ## 36. Numbers roll through @sfinterface/numbers
 
 2026-09-17. Every displayed number (Weather values, Stocks prices, Calculator output, Camera zoom) renders through `Num` in `src/os/uikit/num.tsx`, a thin wrapper over the library's `Numbers`: undefined draws the em dash, whole numbers by default, leading suffix space to NBSP. Formatting stays `Intl.NumberFormat`. Strings for non-React surfaces (the baked widget in `screen.ts`, SVG chart labels, aria-labels) keep the old helpers. Cost: one dependency and 96 extra DOM nodes on the Weather screen; reduced motion turns the roll off.
+
+## 37. Workspace extraction preserves the baked runtime at the migration gate
+
+2026-09-17. Bun workspaces separate the shell, existing apps, UI kit and SDK.
+CLI and web are private scaffolds. Root tooling, public assets, build output
+and Cargo cache stay at the root; the shell page and Tauri crate move together
+under `packages/shell`. App imports use package exports, never another app or
+shell internals. Shared rings, icon catalog and sample tracks join the existing
+UI helpers in the kit. SDK `legacy.ts` owns the existing host-only types; the
+React `App` adapter stays in the kit.
+
+Cost: all current apps still execute as trusted baked components. This gate
+neither implements nor claims the future downloadable-app isolation boundary.
+Manifest, SDK protocol, UI harvest, CLI commands, website and publishing remain
+separate workstreams. Packages are private at 0.0.0. Root-relative icon URLs
+preserve current browser/native delivery; isolated releases will need their
+own asset distribution design before publication. Storage keys, app names,
+seed positions and renderer behavior are unchanged.

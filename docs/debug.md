@@ -162,7 +162,7 @@ Buttons at yaw 0, 818×664: side (644, 234), Camera Control (642, 390), volume
 up (547, 75), volume down (497, 75). These hold at the home view only — `frame()`
 shrinks the phone as the view turns, so recompute with the snippet above after
 turning the camera, or after touching the bands in `main.ts` or `PAD` in
-`src/buttons.ts`.
+`packages/shell/buttons.ts`.
 
 ### Looking at things
 
@@ -223,7 +223,7 @@ EOF
 
 Units come out in metres. Scene cm = m × 100, and y is dropped by 5.8974 in
 `main.ts`. Small meshes on the frame edges are buttons; a thin shell at the
-same spot is the cap (two ids per edge button in `src/buttons.ts`).
+same spot is the cap (two ids per edge button in `packages/shell/buttons.ts`).
 
 ### What the phone actually paints
 
@@ -412,3 +412,25 @@ search field focused, search results, day detail) cropped to `[data-weather]` at
 2x into `.cache/debug/glass-*.png`. Under SwiftShader the four 2x captures take
 over five minutes; run it in the background. The Fog condition title shows a
 grey square: that is Apple's 🌫️ emoji, not a missing glyph.
+
+## 8. Monorepo migration gate (2026-09-17)
+
+See [migration.md](platform/progress/migration.md) for commands, results and remaining review
+items. Evidence files are `.cache/debug/monorepo-*`. `monorepo-check.mjs`
+accepts a phase name and optional base URL; it captures home, open Notes and
+closed Notes. `monorepo-serve-dist.ts` serves the production output on port 3011.
+The production integration script repeats the existing Notes integration
+against that origin, with a fresh isolated Chrome profile.
+
+Run screenshot-heavy SwiftShader checks serially. The concurrent capture in
+this migration stalled while native compilation was consuming CPU; stopping
+that capture and rerunning the integration alone passed. A successful DOM
+probe before a stalled screenshot does not mean the capture finished.
+
+Native release verification launched `.cache/cargo/release/iphoneduo` after
+stopping Tauri dev, proving assets came from the embedded production build.
+The raw executable may not appear in the Codex computer-use app inventory;
+Orca resolved it by process name. Inspect native screenshots as well as AX:
+hidden mirrored scenes can appear in the accessibility tree. Synthetic HUD
+dragging did not move the window in this session and is not a verified drag test.
+The user subsequently confirmed native dragging works, closing that review item.

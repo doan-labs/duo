@@ -12,5 +12,6 @@
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx"
   },
-  "include": ["src"]
+  "include": ["packages"],
+  "exclude": ["packages/shell/desktop"]
 }

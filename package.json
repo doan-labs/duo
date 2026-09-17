@@ -9,18 +9,10 @@
     "format": "biome check --write .",
     "format:check": "biome check .",
     "lint": "biome lint .",
-    "desktop": "tauri dev",
-    "desktop:build": "tauri build",
+    "desktop": "cd packages/shell && tauri dev",
+    "desktop:build": "cd packages/shell && tauri build",
     "icons": "bash scripts/icons.sh",
     "prepare": "simple-git-hooks"
-  },
-  "dependencies": {
-    "@sfinterface/numbers": "^0.3.4",
-    "@stylexjs/stylex": "0.19.0",
-    "@tauri-apps/api": "^2.11.1",
-    "react": "^19",
-    "react-dom": "^19",
-    "three": "^0.186.0"
   },
   "devDependencies": {
     "@babel/core": "^7",
@@ -41,5 +33,9 @@
   },
   "lint-staged": {
     "*": "biome check --write --files-ignore-unknown=true --no-errors-on-unmatched"
-  }
+  },
+  "workspaces": [
+    "packages/*",
+    "packages/apps/*"
+  ]
 }

@@ -17,7 +17,7 @@ StyleX has no Bun integration of its own, so `stylex-plugin.ts` runs the StyleX
 Babel plugin in a Bun `onLoad` hook. `bunfig.toml` hands it to the dev server
 (rules injected at runtime, so HMR and Fast Refresh keep working); `build.ts`
 hands it to `Bun.build` and writes the collected rules as one static sheet.
-The plugin only transforms files under `src/` that import `@stylexjs/stylex`.
+The plugin transforms application source and installed `@doan-labs` packages that import `@stylexjs/stylex`, excluding other dependencies. Token imports use exported `@doan-labs/ipduo-uikit/tokens.stylex.ts`.
 
 First clone: `pip install usd-core && python3 scripts/prepare-model.py`.
 
@@ -92,8 +92,8 @@ See the [official hooks documentation](https://learn.chatgpt.com/docs/hooks).
 ## Buttons on the frame
 
 Click a cap in the scene (they are padded 1.5 mm, so the sliver visible from
-the front is enough) or use the keys above. `src/buttons.ts` is the hardware:
-mesh ids, hit boxes, cap travel, the body rocking, the click. `src/os/buttons.ts`
+the front is enough) or use the keys above. `packages/shell/buttons.ts` is the hardware:
+mesh ids, hit boxes, cap travel, the body rocking, the click. `packages/shell/device-buttons.ts`
 is iOS: what a click, a hold, a double-click and a chord do. Behaviours and
 timings are Apple's for a side button plus Camera Control:
 
@@ -110,21 +110,21 @@ timings are Apple's for a side button plus Camera Control:
 | Camera Control slide | zoom, ×2 per centimetre along the cap |
 
 The Camera app publishes `shoot`, `record`, `zoom` on `os.camera` (`CameraHooks`
-in `uikit/app.ts`) from an effect and clears it on unmount; `cam()` in
+in `packages/sdk/legacy.ts`) from an effect and clears it on unmount; `cam()` in
 `springboard/scenes.ts` reads it off the open app and `device.ts` hands it to the
 buttons. Any other app that wants a button does the same.
 
 ## Adding things
 
-**An app.** A new `src/os/apps/<name>/index.tsx` exporting a component
-`({ os }: { os: Os }) => JSX` (use `Nav`, `Page`, `useNav` from `uikit/nav.tsx`;
+**An app.** A new `packages/apps/<name>/index.tsx` exporting a component
+`({ os }: { os: Os }) => JSX` (use `Nav`, `Page`, `useNav` from `@doan-labs/ipduo-uikit/nav.tsx`;
 clean up timers and media in effect cleanups; styles in a `stylex.create` in
-`<name>/styles.ts` next to it, shared blocks from `uikit/styles.ts`; anything
+`<name>/styles.ts` next to it, shared blocks from `@doan-labs/ipduo-uikit/styles.ts`; anything
 else the app alone needs goes in the same folder). Add `{ name, view, light? }` to
-`LEFT`, `RIGHT` or `DOCK` in `apps/index.ts` for a tile, or to the tail of `APPS`
-for Spotlight-only. Icon: a webp in `src/icons/`, registered in
+`LEFT`, `RIGHT` or `DOCK` in `packages/shell/apps.ts` for a tile, or to the tail of `APPS`
+for Spotlight-only. Icon: a webp in `public/icons/`, registered in
 `ICONS` by the same name. The baked home screen picks it up from the same lists.
-An app file imports `uikit/` and nothing else of the OS: not the shell, not
+Declare a private workspace manifest and extend the root tsconfig, then add its workspace dependency to the shell. An app imports the SDK host types and UI kit exports: not the shell, not
 `device.ts`, and never another app except through `os.open(name)`.
 
 **Every app folds the same way, and gets it for nothing.** The fold is the
@@ -149,7 +149,7 @@ list with the note on a pushed page.
 
 **An SF Symbol.** Add the name to the `symbols.swift` line in `scripts/icons.sh`
 and run it (macOS, Xcode, `brew install webp`); register the webp in `SYM` in
-`src/icons/index.ts` and use `<Sym name>`. A glyph drawn by hand looks wrong next
+`packages/uikit/icons/index.ts` and use `<Sym name>`. A glyph drawn by hand looks wrong next
 to the real ones.
 
 **A widget on the home screen.** It ships inside the app that owns it, as
@@ -161,11 +161,11 @@ out of. Mount it in a `<WidgetTile>` in `springboard/home-screen.tsx`
 top-left before the icons start; a third pushes a row off. The baked home screen
 draws its own copy by hand, in `screen.ts`.
 
-**A shell layer.** A file in `src/os/springboard/`, exporting the component and
+**A shell layer.** A file in `packages/shell/springboard/`, exporting the component and
 whatever hook it needs (`system-hud.tsx` is the pattern: the overlays and their
 `use*` in one file), mounted in `springboard.tsx` in z-order. State that
 outlives the layer stays in `springboard.tsx`; everything else belongs in the
-new file. It may import `uikit/`, `device.ts`, `apps/index.ts` and its siblings.
+new file. It may import `uikit/`, `device.ts`, `packages/shell/apps.ts` and its siblings.
 Anything a finger scrubs goes through `swipe()` and `settle()` in `gestures.ts`
 rather than new pointer bookkeeping, and keyframes it animates with are declared
 in the file itself even when `uikit/styles.ts` already has the same frames
@@ -182,8 +182,8 @@ which closes the panel first. A whole new page is a fourth child of
 `styles.track` plus a glyph in the rail; widen `styles.track` to match.
 
 **A native command.** A `#[tauri::command]` fn in a new file under
-`src/desktop/commands/`, listed in `commands/mod.rs`; a wrapper in
-`src/native.ts` that returns a default when `!isDesktop`. Anything OS-specific
+`packages/shell/desktop/commands/`, listed in `commands/mod.rs`; a wrapper in
+`packages/shell/native.ts` that returns a default when `!isDesktop`. Anything OS-specific
 goes behind the `Platform` trait in `platform/`, never in the command.
 
 **A layout constant.** Change it in `uikit/tokens.stylex.ts` (`layout`) or the
@@ -261,7 +261,7 @@ The full procedure, scripts and known false alarms are in `docs/debug.md`. In sh
 
 ## Gotchas
 
-- All CSS is StyleX except the `@layer reset` block in `index.html`. Anything
+- All CSS is StyleX except the `@layer reset` block in `packages/shell/index.html`. Anything
   unlayered added there beats every StyleX rule regardless of specificity, so
   new global CSS goes inside that layer or nowhere.
 - StyleX has no descendant selectors. `.parent:active .child` becomes `:active`
@@ -332,3 +332,11 @@ thumb with a subtle track and hover/pressed feedback. Keep `scrollbar-width`
 and `scrollbar-color` at `auto` in engines supporting `::-webkit-scrollbar`;
 non-auto standard values override that detailed skin in Chromium. Engines
 without those pseudo-elements use the thin, tinted standard-property fallback.
+
+## Monorepo migration gate
+
+Root commands remain the entry points. Bun workspaces own runtime dependencies; root owns build and verification tools. Each package has its own typecheck configuration. `bun run --filter '@doan-labs/*' typecheck` checks all packages. `cargo shell-check` checks the relocated native crate from the root. Tauri commands run from `packages/shell`, with frontend hooks explicitly running at the repository root. `dist/`, `public/`, model preparation and the shared Cargo cache stay at the root.
+
+App imports use SDK and UI kit package exports, never another app or shell internals. The shell seed registry is `packages/shell/apps.ts`. The SDK exports only existing transitional baked-app host types; the UI kit owns the React `App` adapter. All packages remain private at version 0.0.0. CLI and website are empty scaffolds; manifests, sandboxing, component harvest, publication and update features are not implemented at this gate.
+
+The icon catalog now lives in `packages/uikit/icons/index.ts` and serves assets from `public/icons/`; the extraction script writes there. Publishing an isolated UI kit consumer will need its own asset distribution contract. No publishable package claim is made by this migration.

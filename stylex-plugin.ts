@@ -12,7 +12,8 @@ export function stylexPlugin(dev: boolean) {
   const plugin: BunPlugin = {
     name: 'stylex',
     setup(build) {
-      build.onLoad({ filter: /\/src\/.*\.tsx?$/ }, async (args) => {
+      build.onLoad({ filter: /\.tsx?$/ }, async (args) => {
+        if (args.path.includes('/node_modules/') && !args.path.includes('/node_modules/@doan-labs/')) return undefined
         const source = await Bun.file(args.path).text()
         if (!source.includes('@stylexjs/stylex')) return undefined
         const out = await transformAsync(source, {

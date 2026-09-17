@@ -21,9 +21,9 @@ page.on('requestfailed', (r) => console.log('[reqfail]', r.url()))
 await page.goto(url!, { waitUntil: 'load', timeout: 120000 })
 const t0 = Date.now()
 try {
-  await page.waitForSelector('.os', { timeout: 60000 })
+  await page.waitForSelector('[data-os]', { timeout: 60000 })
 } catch {
-  console.log('[timeout] .os never appeared')
+  console.log('[timeout] [data-os] never appeared')
 }
 console.log('[ready]', Date.now() - t0, 'ms')
 await new Promise((r) => setTimeout(r, +wait))

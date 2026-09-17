@@ -28,20 +28,7 @@ Fresh clone also needs the model, once: `pip install usd-core && python3 scripts
 
 ## Structure
 
-```
-src/
-  main.ts      scene, model, fold, render loop
-  native.ts    the only bridge between web and Rust
-  shaders/     GLSL, as TS template strings
-  hud.tsx      the floating HUD under the device
-  os/          the fake iOS drawn on the displays
-    os.tsx     shell; apps/ one folder per app (index.tsx, styles.ts), index.ts the home grid; styles/ tokens and shared blocks
-  icons/       app icons imported by code
-  desktop/     Tauri crate: main.rs wires, commands/ per feature, platform/ per OS
-public/        served verbatim; model/ is gitignored, fetched by script
-scripts/       run by a human, never imported
-design/        Blender sources, not part of the build
-```
+The authoritative file tree is in [README.md](README.md).
 
 ## Docs
 
@@ -73,10 +60,10 @@ headless Chromium results do not establish native WebKit parity.
 
 ## Conventions
 
-- One responsibility per file, named after it. New feature the web can call: a file in `src/desktop/commands/`. New OS-specific code: behind the `Platform` trait in `src/desktop/platform/`. Never inline either in `main.rs`.
-- `src/native.ts` owns every Tauri check. The rest of the web code never touches `window.__TAURI__`.
+- One responsibility per file, named after it. New feature the web can call: a file in `packages/shell/desktop/commands/`. New OS-specific code: behind the `Platform` trait in `packages/shell/desktop/platform/`. Never inline either in `main.rs`.
+- `packages/shell/native.ts` owns every Tauri check. The rest of the web code never touches `window.__TAURI__`.
 - Shaders are TS modules exporting a string, not `.glsl` files — the bundler treats those as assets.
-- UI is React function components styled with StyleX: `stylex.create` at the bottom of the file, longhand properties only, pseudo-classes and media queries as nested values, no descendant selectors, never `className` or `style` next to `stylex.props`. Colours and easings come from `src/os/styles/tokens.stylex.ts`. The only plain CSS is the `@layer reset` block in `index.html`.
+- UI is React function components styled with StyleX: `stylex.create` at the bottom of the file, longhand properties only, pseudo-classes and media queries as nested values, no descendant selectors, never `className` or `style` next to `stylex.props`. Colours and easings come from `packages/uikit/tokens.stylex.ts`. The only plain CSS is the `@layer reset` block in `packages/shell/index.html`.
 - Assets belong in `public/`, imported by URL. Apple's model is not redistributable, so it stays out of git.
 - Units are centimetres. The camera is fixed at z=40 and the screen shader projects from that eye; moving it breaks the projection.
 - Biome owns formatting and lint: single quotes, no semicolons, 2-space indent, 120 columns. Matching edits are formatted by the PostToolUse hook in `.codex/hooks.json`, and staged files again on pre-commit. Codex hooks require user trust before running; see docs/working.md. Use `apply_patch` for Codex edits so the hook runs; shell-written files do not trigger this matcher. Never hand-format or run `biome check --write` or `bun run format` yourself. If the hook is inactive, report it rather than assuming formatting ran. Lint errors are handed back to fix.
