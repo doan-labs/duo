@@ -1,5 +1,5 @@
 {
-  "name": "iphoneduo",
+  "name": "@doanlabs/iphoneduo",
   "private": true,
   "type": "module",
   "scripts": {
