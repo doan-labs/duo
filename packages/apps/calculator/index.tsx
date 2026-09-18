@@ -1,8 +1,8 @@
+import { Screen } from '@doan-labs/ipduo-uikit'
 // The iOS calculator: one pending operator, immediate evaluation on the next.
 
 import type { Os } from '@doan-labs/ipduo-sdk'
 import { Num } from '@doan-labs/ipduo-uikit/num.tsx'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { styles } from './styles.ts'
@@ -38,7 +38,7 @@ function press(s: State, k: string): State {
 export const Calculator = (_: { os: Os }) => {
   const [s, setS] = useState<State>({ acc: 0, op: '', cur: '0', fresh: true })
   return (
-    <div {...stylex.props(shared.body, styles.body)}>
+    <Screen xstyle={[styles.body]}>
       <div {...stylex.props(styles.calc)}>
         <div {...stylex.props(styles.out)}>
           <Num value={Number(s.cur)} locale="en" format={{ maximumFractionDigits: 8 }} />
@@ -59,6 +59,6 @@ export const Calculator = (_: { os: Os }) => {
           </button>
         ))}
       </div>
-    </div>
+    </Screen>
   )
 }

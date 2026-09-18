@@ -1,4 +1,5 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/ipduo-uikit'
 import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
 import { art } from '@doan-labs/ipduo-uikit/shared.ts'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
@@ -59,14 +60,14 @@ const Act = ({ label, glyph, onClick }: { label: string; glyph: string; onClick:
 }
 
 const Detail = ({ name, tel, back, os }: { name: string; tel: string; back: () => void; os: Os }) => (
-  <div {...stylex.props(shared.column)}>
-    <div {...stylex.props(shared.hdr, styles.hdr17)}>
+  <VStack>
+    <Title xstyle={[styles.hdr17]}>
       <button type="button" {...stylex.props(shared.bk)} onClick={back}>
         <Sym name="back" size={20} />
         Contacts
       </button>
-    </div>
-    <div {...stylex.props(shared.body)}>
+    </Title>
+    <Screen>
       <div {...stylex.props(styles.head)}>
         <Mono name={name} size={88} font={30} />
         <div {...stylex.props(styles.name)}>{name}</div>
@@ -77,33 +78,37 @@ const Detail = ({ name, tel, back, os }: { name: string; tel: string; back: () =
         <Act label="video" glyph="🎥" onClick={() => os.open('FaceTime')} />
         <Act label="mail" glyph="✉️" onClick={() => os.open('Mail')} />
       </div>
-      <div {...stylex.props(shared.grp, styles.white)}>
-        <div {...stylex.props(shared.row)}>
+      <Section xstyle={[styles.white]}>
+        <Row>
           <div>
-            <div {...stylex.props(shared.sub)}>mobile</div>
+            <Text as="div" size="caption">
+              mobile
+            </Text>
             <div {...stylex.props(styles.blue)}>{tel}</div>
           </div>
-        </div>
-        <div {...stylex.props(shared.row)}>
+        </Row>
+        <Row>
           <div>
-            <div {...stylex.props(shared.sub)}>email</div>
+            <Text as="div" size="caption">
+              email
+            </Text>
             <div {...stylex.props(styles.blue)}>{`${name.split(' ')[0]!.toLowerCase()}@icloud.com`}</div>
           </div>
-        </div>
-      </div>
-      <div {...stylex.props(shared.grp, styles.white)}>
-        <div {...stylex.props(shared.row)}>
+        </Row>
+      </Section>
+      <Section xstyle={[styles.white]}>
+        <Row>
           Send Message
           <span {...stylex.props(shared.rowR)}>›</span>
-        </div>
-        <div {...stylex.props(shared.row)}>
+        </Row>
+        <Row>
           Share Contact
           <span {...stylex.props(shared.rowR)}>›</span>
-        </div>
-        <div {...stylex.props(shared.row, styles.red)}>Block this Caller</div>
-      </div>
-    </div>
-  </div>
+        </Row>
+        <Row xstyle={[styles.red]}>Block this Caller</Row>
+      </Section>
+    </Screen>
+  </VStack>
 )
 
 const List = ({ os }: { os: Os }) => {
@@ -121,15 +126,11 @@ const List = ({ os }: { os: Os }) => {
       )
     }
     rows.push(
-      <div
-        key={name}
-        {...stylex.props(shared.row)}
-        onClick={() => push((b) => <Detail name={name} tel={tel} back={b} os={os} />)}
-      >
+      <Row key={name} onClick={() => push((b) => <Detail name={name} tel={tel} back={b} os={os} />)}>
         <Mono name={name} size={34} font={13} />
         <span {...stylex.props(styles.rowName)}>{name}</span>
         <span {...stylex.props(shared.rowR)}>›</span>
-      </div>
+      </Row>
     )
   }
   return <Page title="Contacts">{rows}</Page>

@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -15,11 +15,11 @@ export const styles = stylex.create({
   mark: {
     paddingBlock: 6,
     paddingInline: 12,
-    borderRadius: 14,
+    borderRadius: appAppearance.musicBorderRadius,
     backgroundColor: colors.white,
-    fontSize: 12,
+    fontSize: appAppearance.calendarFontSize2,
     whiteSpace: 'nowrap',
-    boxShadow: '0 1px 2px rgba(0,0,0,.1)',
+    boxShadow: appAppearance.safariBoxShadow,
     color: colors.black
   },
   url: {
@@ -35,12 +35,12 @@ export const styles = stylex.create({
   input: {
     flexGrow: 1,
     borderWidth: 0,
-    borderRadius: 11,
+    borderRadius: appAppearance.musicFontSize3,
     paddingBlock: 9,
     paddingInline: 12,
     backgroundColor: colors.white,
-    boxShadow: '0 1px 3px rgba(0,0,0,.12)',
-    fontSize: 14,
+    boxShadow: appAppearance.safariBoxShadow2,
+    fontSize: appAppearance.musicBorderRadius,
     textAlign: 'center',
     color: colors.black,
     outline: 0

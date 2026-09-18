@@ -1,7 +1,9 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { LargeTitle, Screen, Text } from '@doan-labs/ipduo-uikit'
 import { Bars, card } from '@doan-labs/ipduo-uikit/rings.tsx'
 import { poly, walk } from '@doan-labs/ipduo-uikit/shared.ts'
 import { delay, shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { styles } from './styles.ts'
@@ -48,24 +50,24 @@ const Line = ({ seed, colour }: { seed: string; colour: string }) => (
 )
 
 export const Health = (_: { os: Os }) => (
-  <div {...stylex.props(shared.body)}>
-    <div {...stylex.props(shared.hero)}>Summary</div>
-    <div {...stylex.props(shared.sub, styles.date)}>
+  <Screen>
+    <LargeTitle>Summary</LargeTitle>
+    <Text as="div" size="caption" xstyle={[styles.date]}>
       {new Date().toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' })}
-    </div>
+    </Text>
     <div {...stylex.props(card.cols)}>
-      <Card cap="👟 Steps" colour="#ff9500" val="8,412" unit="steps" i={0}>
-        <Bars seed="health-steps" colour="#ff9500" />
+      <Card cap="👟 Steps" colour={appAppearance.healthColor} val="8,412" unit="steps" i={0}>
+        <Bars seed="health-steps" colour={appAppearance.healthColor} />
       </Card>
-      <Card cap="❤️ Heart Rate" colour="#ff375f" val="62" unit="BPM" i={1}>
-        <Line seed="health-hr" colour="#ff375f" />
+      <Card cap="❤️ Heart Rate" colour={appAppearance.healthColor2} val="62" unit="BPM" i={1}>
+        <Line seed="health-hr" colour={appAppearance.healthColor2} />
       </Card>
-      <Card cap="🛏 Sleep" colour="#5e5ce6" val="7h 12m" unit="last night" i={2}>
-        <Bars seed="health-sleep" colour="#5e5ce6" />
+      <Card cap="🛏 Sleep" colour={appAppearance.healthColor3} val="7h 12m" unit="last night" i={2}>
+        <Bars seed="health-sleep" colour={appAppearance.healthColor3} />
       </Card>
-      <Card cap="🫁 Respiratory" colour="#00c7be" val="14" unit="br/min" i={3}>
-        <Line seed="health-resp" colour="#00c7be" />
+      <Card cap="🫁 Respiratory" colour={appAppearance.healthColor4} val="14" unit="br/min" i={3}>
+        <Line seed="health-resp" colour={appAppearance.healthColor4} />
       </Card>
     </div>
-  </div>
+  </Screen>
 )

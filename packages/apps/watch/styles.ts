@@ -1,13 +1,13 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
   face: {
     width: 132,
     height: 162,
-    borderRadius: 38,
+    borderRadius: appAppearance.watchBorderRadius,
     backgroundColor: colors.black,
-    boxShadow: '0 0 0 5px #6e6e73,0 16px 34px rgba(0,0,0,.45)',
+    boxShadow: appAppearance.watchBoxShadow,
     marginTop: 14,
     marginInline: 'auto',
     marginBottom: 6,
@@ -18,11 +18,25 @@ export const styles = stylex.create({
     gap: 2,
     color: colors.white
   },
-  date: { fontSize: 11, color: colors.orange, fontWeight: 600, letterSpacing: 0.6 },
-  time: { fontWeight: 600, fontSize: 30, lineHeight: 1, fontFamily: '-apple-system,system-ui', letterSpacing: -1 },
+  date: {
+    fontSize: appAppearance.musicFontSize3,
+    color: colors.orange,
+    fontWeight: appAppearance.musicFontWeight2,
+    letterSpacing: 0.6
+  },
+  time: {
+    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: appAppearance.musicFontSize4,
+    lineHeight: 1,
+    fontFamily: appAppearance.watchFontFamily,
+    letterSpacing: -1
+  },
   mini: { transform: 'scale(.42)', marginBlock: -26 },
   center: { textAlign: 'center' },
-  name: { fontWeight: 600 },
-  hdrSm: { fontSize: 18, marginTop: 10 },
-  darkRow: { backgroundColor: 'rgba(255,255,255,.07)', borderBottomColor: 'rgba(255,255,255,.08)' }
+  name: { fontWeight: appAppearance.musicFontWeight2 },
+  hdrSm: { fontSize: appAppearance.musicFontSize5, marginTop: 10 },
+  darkRow: {
+    backgroundColor: appAppearance.memosBackgroundColor,
+    borderBottomColor: appAppearance.musicBorderBottomColor
+  }
 })

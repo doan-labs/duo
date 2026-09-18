@@ -1,3 +1,4 @@
+import { Row, Screen, Section, Text, Title } from '@doan-labs/ipduo-uikit'
 // Music: a now-playing card over the queue, driven by one <audio> and a clock.
 
 import type { Os } from '@doan-labs/ipduo-sdk'
@@ -118,12 +119,14 @@ export const Music = (_: { os: Os }) => {
   const d = useNowPlaying()
   const [n, ar] = d.now
   return (
-    <div {...stylex.props(shared.body, styles.flush)}>
+    <Screen xstyle={[styles.flush]}>
       <div {...stylex.props(styles.np)}>
         <div {...stylex.props(styles.art, styles.cover, styles.bg(art(n)))}>{n}</div>
         <div {...stylex.props(styles.center)}>
           <div {...stylex.props(styles.title)}>{n}</div>
-          <div {...stylex.props(shared.sub)}>{ar}</div>
+          <Text as="div" size="caption">
+            {ar}
+          </Text>
         </div>
         <div
           {...stylex.props(styles.scrub)}
@@ -155,12 +158,12 @@ export const Music = (_: { os: Os }) => {
         </div>
         <Eq live={d.playing} />
       </div>
-      <div {...stylex.props(shared.hdr, styles.hdr)}>Up Next</div>
-      <div {...stylex.props(shared.grp, styles.queue)}>
+      <Title xstyle={[styles.hdr]}>Up Next</Title>
+      <Section xstyle={[styles.queue]}>
         {TRACKS.map(([name, who], k) => (
-          <div
+          <Row
             key={name}
-            {...stylex.props(shared.row, styles.qrow)}
+            xstyle={[styles.qrow]}
             onClick={() => {
               d.load(k)
               if (!d.playing) d.toggle()
@@ -169,12 +172,14 @@ export const Music = (_: { os: Os }) => {
             <div {...stylex.props(styles.thumb, styles.bg(art(name)))} />
             <div>
               <div {...stylex.props(styles.name)}>{name}</div>
-              <div {...stylex.props(shared.sub)}>{who}</div>
+              <Text as="div" size="caption">
+                {who}
+              </Text>
             </div>
             <span {...stylex.props(shared.rowR, styles.go)}>▶</span>
-          </div>
+          </Row>
         ))}
-      </div>
-    </div>
+      </Section>
+    </Screen>
   )
 }

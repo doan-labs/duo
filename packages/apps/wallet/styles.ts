@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared's; StyleX only resolves keyframes defined in the file that uses them.
@@ -13,7 +13,7 @@ export const styles = stylex.create({
     maxWidth: 340,
     transitionProperty: 'height',
     transitionDuration: '.45s',
-    transitionTimingFunction: 'cubic-bezier(.3,.9,.3,1)'
+    transitionTimingFunction: appAppearance.healthAnimationTimingFunction
   },
   height: (px: number) => ({ height: px }),
   // A tap only ever changes the translate and z-index; the transition does the rest.
@@ -22,28 +22,28 @@ export const styles = stylex.create({
     left: 0,
     right: 0,
     height: 158,
-    borderRadius: 17,
+    borderRadius: appAppearance.messagesFontSize,
     paddingTop: 15,
     paddingBottom: 15,
     paddingInline: 15,
     cursor: 'pointer',
-    boxShadow: '0 -1px 0 rgba(255,255,255,.25) inset,0 14px 30px rgba(0,0,0,.4)',
+    boxShadow: appAppearance.walletBoxShadow,
     transitionProperty: 'transform',
     transitionDuration: '.45s',
-    transitionTimingFunction: 'cubic-bezier(.3,.9,.3,1)',
+    transitionTimingFunction: appAppearance.healthAnimationTimingFunction,
     display: 'flex',
     flexDirection: 'column'
   },
   look: (bg: string, fg: string) => ({ backgroundImage: bg, color: fg }),
   place: (y: number, z: number) => ({ transform: `translateY(${y}px)`, zIndex: z }),
-  nm: { fontWeight: 600, fontSize: 14 },
-  kind: { fontSize: 11, opacity: 0.65 },
+  nm: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicBorderRadius },
+  kind: { fontSize: appAppearance.musicFontSize3, opacity: 0.65 },
   no: {
     marginTop: 'auto',
-    fontWeight: 500,
-    fontSize: 15,
+    fontWeight: appAppearance.musicFontWeight3,
+    fontSize: appAppearance.musicFontSize,
     lineHeight: 1,
-    fontFamily: 'ui-monospace,SFMono-Regular,monospace',
+    fontFamily: appAppearance.walletFontFamily,
     letterSpacing: 1.5
   },
   payWrap: { textAlign: 'center', paddingTop: 18, paddingBottom: 8 },
@@ -53,12 +53,12 @@ export const styles = stylex.create({
     paddingTop: 9,
     paddingBottom: 9,
     paddingInline: 20,
-    fontSize: 14
+    fontSize: appAppearance.musicBorderRadius
   },
   pay: {
     position: 'absolute',
     inset: 0,
-    backgroundColor: 'rgba(0,0,0,.55)',
+    backgroundColor: appAppearance.tvBackgroundColor,
     backdropFilter: 'blur(14px)',
     display: 'flex',
     flexDirection: 'column',
@@ -70,18 +70,18 @@ export const styles = stylex.create({
     animationName: pop,
     animationDuration: '.35s'
   },
-  payHint: { fontSize: 15, opacity: 0.7 },
-  payTitle: { fontSize: 19, fontWeight: 600 },
+  payHint: { fontSize: appAppearance.musicFontSize, opacity: 0.7 },
+  payTitle: { fontSize: appAppearance.musicFontSize2, fontWeight: appAppearance.musicFontWeight2 },
   mono: {
     width: 74,
     height: 74,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     backgroundColor: colors.white,
     color: colors.white,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 32,
-    fontWeight: 500,
+    fontSize: appAppearance.walletFontSize,
+    fontWeight: appAppearance.musicFontWeight3,
     flexShrink: 0
   }
 })

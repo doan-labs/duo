@@ -1,3 +1,4 @@
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
 // Podcasts: shows on a shelf, episodes below, and a mini player that appears
 // once something has been started.
 
@@ -101,20 +102,22 @@ export const Podcasts = (_: { os: Os }) => {
   }
   const [n] = d.now
   return (
-    <div {...stylex.props(shared.body, styles.root)}>
-      <div {...stylex.props(shared.body)}>
-        <div {...stylex.props(shared.hero)}>Listen Now</div>
+    <Screen xstyle={[styles.root]}>
+      <Screen>
+        <LargeTitle>Listen Now</LargeTitle>
         <div {...stylex.props(styles.shelf)}>
           {SHOWS.map(([s, w], si) => (
             <div key={s} {...stylex.props(styles.poster)} onClick={() => start(FIRST[si]!)}>
               <div {...stylex.props(styles.im, styles.bg(art(s)))}>{s}</div>
-              <div {...stylex.props(shared.sub, styles.posterSub)}>{w}</div>
+              <Text as="div" size="caption" xstyle={[styles.posterSub]}>
+                {w}
+              </Text>
             </div>
           ))}
         </div>
         {SHOWS.map(([s, , list], si) => (
           <div key={s}>
-            <div {...stylex.props(shared.hdr, styles.hdr)}>{s}</div>
+            <Title xstyle={[styles.hdr]}>{s}</Title>
             <div>
               {list.map((t, ei) => (
                 <div key={t} {...stylex.props(styles.li)} onClick={() => start(FIRST[si]! + ei)}>
@@ -130,7 +133,7 @@ export const Podcasts = (_: { os: Os }) => {
             </div>
           </div>
         ))}
-      </div>
+      </Screen>
       <div {...stylex.props(styles.mini, !d.loaded && shared.hide)}>
         <div {...stylex.props(styles.art, styles.bg(art(n)))} />
         <div {...stylex.props(styles.title)}>{n}</div>
@@ -141,6 +144,6 @@ export const Podcasts = (_: { os: Os }) => {
           <i {...stylex.props(styles.fill, styles.w(`${(d.at / d.dur) * 100}%`))} />
         </div>
       </div>
-    </div>
+    </Screen>
   )
 }

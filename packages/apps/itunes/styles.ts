@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -16,17 +16,23 @@ export const styles = stylex.create({
   poster: {
     flexShrink: 0,
     width: 126,
-    borderRadius: 12,
+    borderRadius: appAppearance.calendarFontSize2,
     overflow: 'hidden',
     cursor: 'pointer',
     transitionProperty: 'transform',
     transitionDuration: '.2s',
     transform: { default: null, ':active': 'scale(.95)' }
   },
-  cover: { aspectRatio: 1, borderRadius: 9 },
-  posterTitle: { fontSize: 12, fontWeight: 600, paddingTop: 6, paddingInline: 2, paddingBottom: 0 },
-  posterArtist: { fontSize: 11, paddingInline: 2 },
-  hdr18: { fontSize: 18 },
+  cover: { aspectRatio: 1, borderRadius: appAppearance.itunesBorderRadius },
+  posterTitle: {
+    fontSize: appAppearance.calendarFontSize2,
+    fontWeight: appAppearance.musicFontWeight2,
+    paddingTop: 6,
+    paddingInline: 2,
+    paddingBottom: 0
+  },
+  posterArtist: { fontSize: appAppearance.musicFontSize3, paddingInline: 2 },
+  hdr18: { fontSize: appAppearance.musicFontSize5 },
   rank: {
     display: 'flex',
     alignItems: 'center',
@@ -37,21 +43,21 @@ export const styles = stylex.create({
     cursor: 'pointer',
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: 'rgba(60,60,67,.14)'
+    borderBottomColor: appAppearance.messagesBorderBottomColor
   },
-  n: { width: 18, textAlign: 'center', color: colors.grey, fontSize: 13, flexShrink: 0 },
-  co: { width: 52, height: 52, borderRadius: 8, flexShrink: 0 },
+  n: { width: 18, textAlign: 'center', color: colors.grey, fontSize: appAppearance.musicFontSize6, flexShrink: 0 },
+  co: { width: 52, height: 52, borderRadius: appAppearance.cameraBorderRadius, flexShrink: 0 },
   grow: { flexGrow: 1, minWidth: 0 },
-  song: { fontWeight: 600, fontSize: 14 },
+  song: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicBorderRadius },
   buy: {
     paddingTop: 5,
     paddingBottom: 5,
     paddingInline: 14,
-    borderRadius: 13,
+    borderRadius: appAppearance.musicFontSize6,
     backgroundColor: colors.fill,
     color: colors.blue,
-    fontSize: 12,
-    fontWeight: 700,
+    fontSize: appAppearance.calendarFontSize2,
+    fontWeight: appAppearance.musicFontWeight,
     flexShrink: 0,
     transitionProperty: 'background-color, color, transform',
     transitionDuration: '.25s, .25s, .15s',
@@ -61,10 +67,10 @@ export const styles = stylex.create({
   ring: {
     width: 22,
     height: 22,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     borderWidth: 2.5,
     borderStyle: 'solid',
-    borderColor: 'rgba(10,124,255,.22)',
+    borderColor: appAppearance.appstoreBorderColor,
     borderTopColor: colors.blueDark
   }
 })

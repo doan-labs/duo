@@ -1,4 +1,4 @@
-import { colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Local copies of shared's `pop` and `rip`: StyleX only resolves imported
@@ -13,14 +13,14 @@ export const styles = stylex.create({
   panes: { flexGrow: 1, minHeight: 0, position: 'relative' },
   pane: { position: 'absolute', inset: 0, overflow: 'auto' },
   recents: { marginTop: 6 },
-  dark: { backgroundColor: colors.darkElevated, borderBottomColor: '#2c2c2e', cursor: 'pointer' },
-  name: { fontWeight: 600, color: colors.white },
+  dark: { backgroundColor: colors.darkElevated, borderBottomColor: appAppearance.notesColor6, cursor: 'pointer' },
+  name: { fontWeight: appAppearance.musicFontWeight2, color: colors.white },
   missed: { color: colors.redBright },
   keypad: { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' },
   dial: {
     textAlign: 'center',
-    fontSize: 36,
-    fontWeight: 300,
+    fontSize: appAppearance.phoneFontSize,
+    fontWeight: appAppearance.homeFontWeight,
     letterSpacing: 1,
     minHeight: 48,
     paddingTop: 10,
@@ -40,35 +40,42 @@ export const styles = stylex.create({
   key: {
     width: 76,
     height: 76,
-    borderRadius: '50%',
-    backgroundColor: { default: 'rgba(255,255,255,.12)', ':active': 'rgba(255,255,255,.4)' },
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: { default: appAppearance.homeColor3, ':active': appAppearance.phoneBackgroundColor },
     display: 'grid',
     placeItems: 'center',
     alignContent: 'center',
-    fontSize: 32,
-    fontWeight: 300,
+    fontSize: appAppearance.walletFontSize,
+    fontWeight: appAppearance.homeFontWeight,
     lineHeight: 1,
     transitionProperty: 'background-color, transform',
     transitionDuration: '.12s',
     transform: { default: null, ':active': 'scale(.93)' }
   },
-  keySub: { textDecoration: 'none', fontSize: 9, letterSpacing: 2, fontWeight: 600, opacity: 0.65, marginTop: 3 },
+  keySub: {
+    textDecoration: 'none',
+    fontSize: appAppearance.itunesBorderRadius,
+    letterSpacing: 2,
+    fontWeight: appAppearance.musicFontWeight2,
+    opacity: 0.65,
+    marginTop: 3
+  },
   grn: {
     width: 76,
     height: 76,
     flexShrink: 0,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     backgroundColor: colors.greenBright,
     display: 'grid',
     placeItems: 'center',
     marginInline: 'auto',
-    fontSize: 30,
+    fontSize: appAppearance.musicFontSize4,
     transitionProperty: 'transform',
     transitionDuration: '.15s',
     transform: { default: null, ':active': 'scale(.9)' }
   },
   red: { backgroundColor: colors.redBright },
-  dialBtn: { marginBottom: 20, fontSize: 28 },
+  dialBtn: { marginBottom: 20, fontSize: appAppearance.stocksFontSize },
   hangUp: { marginTop: 26 },
   bar: {
     display: 'flex',
@@ -91,7 +98,7 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundImage: 'linear-gradient(#3a3a3c,#101012)',
+    backgroundImage: appAppearance.phoneBackgroundImage,
     zIndex: 5,
     animationName: pop,
     animationDuration: '.4s',
@@ -104,36 +111,36 @@ export const styles = stylex.create({
     position: 'relative',
     width: 104,
     height: 104,
-    borderRadius: '50%',
-    backgroundColor: '#5a5a5e',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.phoneBackgroundColor2,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 40,
-    fontWeight: 300,
+    fontSize: appAppearance.calculatorBorderRadius,
+    fontWeight: appAppearance.homeFontWeight,
     marginBottom: 10
   },
   rip: {
     position: 'absolute',
     inset: -4,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     borderWidth: 2,
     borderStyle: 'solid',
-    borderColor: 'rgba(255,255,255,.45)',
+    borderColor: appAppearance.phoneBorderColor,
     animationName: rip,
     animationDuration: '2.2s',
-    animationTimingFunction: 'ease-out',
+    animationTimingFunction: appAppearance.phoneAnimationTimingFunction,
     animationIterationCount: 'infinite'
   },
-  who: { fontSize: 27, fontWeight: 500 },
-  state: { opacity: 0.65, fontSize: 15, letterSpacing: 0.5 },
+  who: { fontSize: appAppearance.phoneFontSize2, fontWeight: appAppearance.musicFontWeight3 },
+  state: { opacity: 0.65, fontSize: appAppearance.musicFontSize, letterSpacing: 0.5 },
   ctl: { display: 'flex', gap: 22, marginTop: 26 },
   ctlBtn: {
     width: 62,
     height: 62,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(255,255,255,.16)',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.phoneBackgroundColor3,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 20
+    fontSize: appAppearance.podcastsFontSize
   }
 })

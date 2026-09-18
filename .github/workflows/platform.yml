@@ -1,0 +1,20 @@
+name: Developer platform
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - run: bun scripts/check-platform.ts

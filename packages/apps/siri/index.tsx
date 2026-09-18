@@ -1,6 +1,6 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Button, Screen } from '@doan-labs/ipduo-uikit'
 import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -74,7 +74,7 @@ export const Siri = ({ os }: { os: Os }) => {
   }
 
   return (
-    <div {...stylex.props(shared.body, styles.body)}>
+    <Screen xstyle={[styles.body]}>
       <div {...stylex.props(styles.grow)} />
       <div
         ref={orb}
@@ -91,11 +91,11 @@ export const Siri = ({ os }: { os: Os }) => {
       </div>
       <div {...stylex.props(styles.chips)}>
         {ASKS.map((qa) => (
-          <button key={qa[0]} type="button" {...stylex.props(shared.pill, styles.chip)} onClick={() => ask(qa)}>
+          <Button key={qa[0]} type="button" xstyle={[styles.chip]} onClick={() => ask(qa)}>
             {qa[0]}
-          </button>
+          </Button>
         ))}
       </div>
-    </div>
+    </Screen>
   )
 }

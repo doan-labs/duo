@@ -1,3 +1,4 @@
+import { Placeholder, Screen } from '@doan-labs/ipduo-uikit'
 // Camera. Also driven by Camera Control and the volume buttons through the
 // hooks it publishes on `os.camera` while open (see os/buttons.ts).
 //
@@ -48,10 +49,10 @@ function useWebcam(facing: Facing = 'user') {
 }
 
 const Unavailable = () => (
-  <div {...stylex.props(shared.ph, styles.msg)}>
+  <Placeholder xstyle={[styles.msg]}>
     <img src={ICONS.Camera} alt="" {...stylex.props(shared.phImg)} />
     Camera unavailable. Allow access and reopen.
-  </div>
+  </Placeholder>
 )
 
 const two = (n: number) => String(Math.floor(n)).padStart(2, '0')
@@ -210,7 +211,7 @@ export const Camera = ({ os }: { os: Os }) => {
   )
 
   return (
-    <div ref={root} data-recording={recing || undefined} {...stylex.props(shared.body, styles.root)}>
+    <Screen ref={root} data-recording={recing || undefined} xstyle={[styles.root]}>
       <div
         {...stylex.props(
           styles.frame,
@@ -273,6 +274,6 @@ export const Camera = ({ os }: { os: Os }) => {
           </div>
         </>
       )}
-    </div>
+    </Screen>
   )
 }

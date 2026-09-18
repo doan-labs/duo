@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const RAIL = 156
@@ -34,8 +34,7 @@ export const styles = stylex.create({
     position: 'absolute',
     inset: 0,
     pointerEvents: 'none',
-    backgroundImage:
-      'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))'
+    backgroundImage: appAppearance.cameraBackgroundImage
   },
   flash: {
     position: 'absolute',
@@ -56,10 +55,10 @@ export const styles = stylex.create({
     paddingRight: 10,
     paddingBottom: 3,
     paddingLeft: 10,
-    borderRadius: 10,
+    borderRadius: appAppearance.calendarFontSize4,
     backgroundColor: colors.red,
-    fontSize: 13,
-    fontWeight: 600,
+    fontSize: appAppearance.musicFontSize6,
+    fontWeight: appAppearance.musicFontWeight2,
     fontVariantNumeric: 'tabular-nums'
   },
 
@@ -68,8 +67,8 @@ export const styles = stylex.create({
     height: 36,
     display: 'grid',
     placeItems: 'center',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(0,0,0,.4)',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.cameraBackgroundColor,
     color: colors.white,
     cursor: 'pointer',
     flexShrink: 0
@@ -135,25 +134,25 @@ export const styles = stylex.create({
     paddingRight: 11,
     paddingBottom: 5,
     paddingLeft: 11,
-    borderRadius: 14,
-    fontSize: 12,
-    fontWeight: 600,
+    borderRadius: appAppearance.musicBorderRadius,
+    fontSize: appAppearance.calendarFontSize2,
+    fontWeight: appAppearance.musicFontWeight2,
     letterSpacing: 0.6,
     color: colors.white,
     cursor: 'pointer'
   },
   modeBtnLand: { writingMode: 'vertical-rl', transform: 'rotate(180deg)' },
-  modeOn: { color: colors.yellow, backgroundColor: 'rgba(255,255,255,.14)' },
+  modeOn: { color: colors.yellow, backgroundColor: appAppearance.cameraBackgroundColor2 },
 
   zl: {
     width: 34,
     height: 34,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(0,0,0,.45)',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.cameraBackgroundColor3,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 12,
-    fontWeight: 600,
+    fontSize: appAppearance.calendarFontSize2,
+    fontWeight: appAppearance.musicFontWeight2,
     color: colors.yellow,
     cursor: 'pointer',
     flexShrink: 0
@@ -162,7 +161,7 @@ export const styles = stylex.create({
     width: 64,
     height: 64,
     flexShrink: 0,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     backgroundColor: colors.white,
     borderWidth: 4,
     borderStyle: 'solid',
@@ -174,12 +173,12 @@ export const styles = stylex.create({
     transform: { default: null, ':active': 'scale(.9)' }
   },
   shutterVideo: { backgroundColor: colors.red },
-  shutterRec: { backgroundColor: colors.red, borderRadius: 12, transform: 'scale(.6)' },
+  shutterRec: { backgroundColor: colors.red, borderRadius: appAppearance.calendarFontSize2, transform: 'scale(.6)' },
   thumb: {
     width: 40,
     height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,.12)',
+    borderRadius: appAppearance.cameraBorderRadius,
+    backgroundColor: appAppearance.homeColor3,
     overflow: 'hidden',
     cursor: 'pointer',
     flexShrink: 0

@@ -1,3 +1,4 @@
+import { Row, Screen, Section, Title } from '@doan-labs/ipduo-uikit'
 // World clock: local time large, six cities below, ticking once a second.
 
 import type { Os } from '@doan-labs/ipduo-sdk'
@@ -23,17 +24,17 @@ export const Clock = (_: { os: Os }) => {
     return () => clearInterval(t)
   }, [])
   return (
-    <div {...stylex.props(shared.body)}>
-      <div {...stylex.props(shared.hdr)}>World Clock</div>
+    <Screen>
+      <Title>World Clock</Title>
       <div {...stylex.props(shared.big)}>{fmt(now)}</div>
-      <div {...stylex.props(shared.grp)}>
+      <Section>
         {ZONES.map(([n, tz]) => (
-          <div key={tz} {...stylex.props(shared.row, styles.row)}>
+          <Row key={tz} xstyle={[styles.row]}>
             <span>{n}</span>
             <span {...stylex.props(shared.rowR, styles.time)}>{fmt(now, tz)}</span>
-          </div>
+          </Row>
         ))}
-      </div>
-    </div>
+      </Section>
+    </Screen>
   )
 }

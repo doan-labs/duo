@@ -1,8 +1,8 @@
+import { Screen, Title } from '@doan-labs/ipduo-uikit'
 // A feed of thumbnails; tapping one opens the privacy-enhanced embed above it.
 
 import type { Os } from '@doan-labs/ipduo-sdk'
 import { ICONS } from '@doan-labs/ipduo-uikit/icons/index.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
@@ -19,15 +19,15 @@ const VIDEOS: [string, string, string][] = [
 export const YouTube = ({ os }: { os: Os }) => {
   const [playing, setPlaying] = useState<string | null>(null)
   return (
-    <div {...stylex.props(shared.body, styles.body)}>
-      <div {...stylex.props(shared.hdr)}>
+    <Screen xstyle={[styles.body]}>
+      <Title>
         <img {...stylex.props(styles.logo)} src={ICONS.YouTube} alt="" />
         YouTube
-        <span {...stylex.props(shared.hdrSm, styles.sm)}>
+        <Title as="span" variant="accessory" xstyle={[styles.sm]}>
           <Sym name="search" size={20} />
           <Sym name="person" size={22} />
-        </span>
-      </div>
+        </Title>
+      </Title>
       {playing && (
         <div {...stylex.props(styles.player)}>
           <iframe
@@ -38,7 +38,7 @@ export const YouTube = ({ os }: { os: Os }) => {
           />
         </div>
       )}
-      <div {...stylex.props(shared.body)}>
+      <Screen>
         {VIDEOS.map(([id, t, c]) => (
           <div key={id} {...stylex.props(styles.vid)} onClick={() => setPlaying(id)}>
             <img
@@ -53,7 +53,7 @@ export const YouTube = ({ os }: { os: Os }) => {
             </div>
           </div>
         ))}
-      </div>
-    </div>
+      </Screen>
+    </Screen>
   )
 }

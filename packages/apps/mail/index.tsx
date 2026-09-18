@@ -1,3 +1,4 @@
+import { Screen, Text, Title, VStack } from '@doan-labs/ipduo-uikit'
 // Mail. A fixed inbox; each message opens on a pushed page.
 
 import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
@@ -50,35 +51,39 @@ const MAIL: Message[] = [
 
 /** Hand-rolled rather than `Page`: the back button carries the "Inbox" label and the header is a size smaller. */
 const Read = ({ m: [who, subj, body, when], back }: { m: Message; back: () => void }) => (
-  <div {...stylex.props(shared.column)}>
-    <div {...stylex.props(shared.hdr, styles.hdrMd)}>
+  <VStack>
+    <Title xstyle={[styles.hdrMd]}>
       <button type="button" {...stylex.props(shared.bk)} onClick={back}>
         <Sym name="back" size={20} />
         Inbox
       </button>
-      <span {...stylex.props(shared.hdrSm, styles.actions)}>
+      <Title as="span" variant="accessory" xstyle={[styles.actions]}>
         <Sym name="share" size={19} />
         <Sym name="more" size={19} />
-      </span>
-    </div>
-    <div {...stylex.props(shared.body)}>
+      </Title>
+    </Title>
+    <Screen>
       <div {...stylex.props(styles.head)}>
         <div {...stylex.props(styles.subject)}>{subj}</div>
         <div {...stylex.props(styles.from)}>
           <div {...stylex.props(styles.avatar, styles.tint(art(who)))}>{who[0]}</div>
           <div>
             <div {...stylex.props(styles.name)}>{who}</div>
-            <div {...stylex.props(shared.sub)}>to me</div>
+            <Text as="div" size="caption">
+              to me
+            </Text>
           </div>
-          <span {...stylex.props(shared.sub, styles.when)}>{when}</span>
+          <Text size="caption" xstyle={[styles.when]}>
+            {when}
+          </Text>
         </div>
       </div>
       <div {...stylex.props(styles.artTxt)}>
         <p {...stylex.props(styles.para)}>{body}</p>
         <p {...stylex.props(styles.para)}>Sent from my iPhone Duo — both panels, one wallpaper.</p>
       </div>
-    </div>
-  </div>
+    </Screen>
+  </VStack>
 )
 
 const Inbox = () => {
@@ -95,7 +100,9 @@ const Inbox = () => {
               <div {...stylex.props(styles.subj)}>{subj}</div>
               <p {...stylex.props(styles.preview)}>{body}</p>
             </div>
-            <span {...stylex.props(shared.sub, styles.noShrink)}>{when} ›</span>
+            <Text size="caption" xstyle={[styles.noShrink]}>
+              {when} ›
+            </Text>
           </div>
         )
       })}
@@ -104,13 +111,15 @@ const Inbox = () => {
 }
 
 export const Mail = () => (
-  <div {...stylex.props(shared.column, styles.rel)}>
+  <VStack xstyle={[styles.rel]}>
     <Nav>
       <Page
         title={
           <>
             Inbox
-            <span {...stylex.props(shared.hdrSm)}>{MAIL.length} messages</span>
+            <Title as="span" variant="accessory">
+              {MAIL.length} messages
+            </Title>
           </>
         }
       >
@@ -120,5 +129,5 @@ export const Mail = () => (
     <button type="button" {...stylex.props(shared.fab)} onClick={() => beep([880, 1200], 0.07, 0.05)}>
       <Sym name="plus" size={22} />
     </button>
-  </div>
+  </VStack>
 )

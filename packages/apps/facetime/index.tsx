@@ -1,3 +1,4 @@
+import { Placeholder, Row, Screen, Section, Text, Title } from '@doan-labs/ipduo-uikit'
 // FaceTime. Tapping a contact rings a generated far end; after a beat they
 // "answer" and your own webcam sits in the corner, as on a real call.
 
@@ -52,10 +53,10 @@ const Webcam = ({ facing = 'user' }: { facing?: 'user' | 'environment' }) => {
     <>
       <video ref={video} autoPlay playsInline muted />
       {failed && (
-        <div {...stylex.props(shared.ph, styles.camMsg)}>
+        <Placeholder xstyle={[styles.camMsg]}>
           <img src={ICONS.Camera} alt="" {...stylex.props(shared.phImg)} />
           Camera unavailable. Allow access and reopen.
-        </div>
+        </Placeholder>
       )}
     </>
   )
@@ -110,31 +111,33 @@ export const FaceTime = ({ os }: { os: Os }) => {
     return () => cancelAnimationFrame(raf)
   }, [who])
   return (
-    <div {...stylex.props(shared.body, styles.flush)}>
-      <div {...stylex.props(shared.body)}>
-        <div {...stylex.props(shared.hdr)}>
+    <Screen xstyle={[styles.flush]}>
+      <Screen>
+        <Title>
           FaceTime
-          <span {...stylex.props(shared.hdrSm, styles.newBtn)}>
+          <Title as="span" variant="accessory" xstyle={[styles.newBtn]}>
             <Sym name="plus" size={18} />
             New
-          </span>
-        </div>
-        <div {...stylex.props(shared.grp)}>
+          </Title>
+        </Title>
+        <Section>
           {PEOPLE.map((name) => (
-            <div key={name} {...stylex.props(shared.row, styles.person)} onClick={() => setCall(name)}>
+            <Row key={name} xstyle={[styles.person]} onClick={() => setCall(name)}>
               <div {...stylex.props(styles.avatar, styles.tint(art(name)))}>{name[0]}</div>
               <div>
                 <div {...stylex.props(styles.name)}>{name}</div>
-                <div {...stylex.props(shared.sub)}>Video · yesterday</div>
+                <Text as="div" size="caption">
+                  Video · yesterday
+                </Text>
               </div>
               <span {...stylex.props(shared.rowR, styles.blue)}>
                 <Sym name="person" size={22} />
               </span>
-            </div>
+            </Row>
           ))}
-        </div>
-      </div>
+        </Section>
+      </Screen>
       <div {...stylex.props(styles.stage)}>{call && <Call who={call} onEnd={() => setCall(null)} />}</div>
-    </div>
+    </Screen>
   )
 }

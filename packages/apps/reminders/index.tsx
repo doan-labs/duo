@@ -1,7 +1,7 @@
+import { Row, Screen, Section, Title } from '@doan-labs/ipduo-uikit'
 // Reminders. A checklist kept in localStorage, so it survives a reload.
 
 import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type KeyboardEvent, useState } from 'react'
 import { styles } from './styles.ts'
@@ -38,20 +38,22 @@ export const Reminders = () => {
     setDraft('')
   }
   return (
-    <div {...stylex.props(shared.body)}>
-      <div {...stylex.props(shared.hdr, styles.blue)}>
+    <Screen>
+      <Title xstyle={[styles.blue]}>
         Reminders
-        <span {...stylex.props(shared.hdrSm)}>{items.filter((i) => !i.done).length} open</span>
-      </div>
-      <div {...stylex.props(shared.grp, styles.white)}>
+        <Title as="span" variant="accessory">
+          {items.filter((i) => !i.done).length} open
+        </Title>
+      </Title>
+      <Section xstyle={[styles.white]}>
         {items.map((task, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: tasks are only ever appended, never reordered or removed
-          <div key={i} {...stylex.props(shared.row)} onClick={() => flip(i)}>
+          <Row key={i} onClick={() => flip(i)}>
             <span {...stylex.props(styles.chk, task.done && styles.chkOn)} />
             <span {...stylex.props(styles.label, task.done && styles.done)}>{task.t}</span>
-          </div>
+          </Row>
         ))}
-        <div {...stylex.props(shared.row)}>
+        <Row>
           <span {...stylex.props(styles.chk, styles.dim)} />
           <input
             {...stylex.props(styles.input)}
@@ -60,8 +62,8 @@ export const Reminders = () => {
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={add}
           />
-        </div>
-      </div>
-    </div>
+        </Row>
+      </Section>
+    </Screen>
   )
 }

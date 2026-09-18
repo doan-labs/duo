@@ -1,4 +1,5 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Row as KitRow, Screen, Section, Text, Title, Toggle } from '@doan-labs/ipduo-uikit'
 import { Rings } from '@doan-labs/ipduo-uikit/rings.tsx'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -14,10 +15,10 @@ const now = () => {
 }
 
 const Row = ({ name, right }: { name: string; right: ReactNode }) => (
-  <div {...stylex.props(shared.row, styles.darkRow)}>
+  <KitRow xstyle={[styles.darkRow]}>
     {name}
     <span {...stylex.props(shared.rowR)}>{right}</span>
-  </div>
+  </KitRow>
 )
 
 export const Watch = (_: { os: Os }) => {
@@ -27,7 +28,7 @@ export const Watch = (_: { os: Os }) => {
     return () => clearInterval(iv)
   }, [])
   return (
-    <div {...stylex.props(shared.body)}>
+    <Screen>
       <div {...stylex.props(styles.face)}>
         <div {...stylex.props(styles.date)}>{clock.d}</div>
         <div {...stylex.props(styles.time)}>{clock.t}</div>
@@ -37,16 +38,18 @@ export const Watch = (_: { os: Os }) => {
       </div>
       <div {...stylex.props(styles.center)}>
         <div {...stylex.props(styles.name)}>Apple Watch Ultra</div>
-        <div {...stylex.props(shared.sub)}>Connected · 78%</div>
+        <Text as="div" size="caption">
+          Connected · 78%
+        </Text>
       </div>
-      <div {...stylex.props(shared.hdr, styles.hdrSm)}>My Watch</div>
-      <div {...stylex.props(shared.grp)}>
+      <Title xstyle={[styles.hdrSm]}>My Watch</Title>
+      <Section>
         <Row name="Notifications" right="›" />
         <Row name="App Layout" right="Grid ›" />
         <Row name="Complications" right="4 ›" />
-        <Row name="Wrist Detection" right={<input type="checkbox" defaultChecked {...stylex.props(shared.sw)} />} />
-        <Row name="Theatre Mode" right={<input type="checkbox" {...stylex.props(shared.sw)} />} />
-      </div>
-    </div>
+        <Row name="Wrist Detection" right={<Toggle aria-label="Wrist Detection" defaultChecked />} />
+        <Row name="Theatre Mode" right={<Toggle aria-label="Theatre Mode" />} />
+      </Section>
+    </Screen>
   )
 }

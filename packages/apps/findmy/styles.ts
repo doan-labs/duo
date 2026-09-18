@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const rip = stylex.keyframes({ to: { transform: 'scale(2.3)', opacity: 0 } })
@@ -14,28 +14,33 @@ export const styles = stylex.create({
     height: 18,
     marginTop: -9,
     marginLeft: -9,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     backgroundColor: colors.blueBright,
     borderWidth: 2.5,
     borderStyle: 'solid',
     borderColor: colors.white,
-    boxShadow: '0 2px 8px rgba(0,0,0,.4)',
+    boxShadow: appAppearance.findmyBoxShadow,
     zIndex: 2,
     '::before': {
       content: '""',
       position: 'absolute',
       inset: -6,
-      borderRadius: '50%',
-      backgroundColor: 'rgba(10,124,255,.35)',
+      borderRadius: appAppearance.settingsBorderRadius,
+      backgroundColor: appAppearance.findmyBackgroundColor,
       animationName: rip,
       animationDuration: '2.4s',
-      animationTimingFunction: 'ease-out',
+      animationTimingFunction: appAppearance.phoneAnimationTimingFunction,
       animationIterationCount: 'infinite'
     }
   },
   white: { backgroundColor: colors.white },
-  selected: { backgroundColor: '#eaf3ff' },
-  devIc: (bg: string) => ({ backgroundImage: bg, width: 36, height: 36, borderRadius: 9 }),
+  selected: { backgroundColor: appAppearance.findmyBackgroundColor2 },
+  devIc: (bg: string) => ({
+    backgroundImage: bg,
+    width: 36,
+    height: 36,
+    borderRadius: appAppearance.itunesBorderRadius
+  }),
   grow: { flexGrow: 1 },
-  name: { fontWeight: 600 }
+  name: { fontWeight: appAppearance.musicFontWeight2 }
 })

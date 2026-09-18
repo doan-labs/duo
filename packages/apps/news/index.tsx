@@ -1,3 +1,4 @@
+import { Placeholder, Screen, Text, Title, VStack } from '@doan-labs/ipduo-uikit'
 // News. Hacker News' front page dressed as Apple News: the stories are live,
 // the artwork is generated from their titles so nothing else needs a round-trip.
 
@@ -41,7 +42,7 @@ const Comments = ({ id }: { id: string }) => {
           </div>
         ))
       ) : (
-        <div {...stylex.props(shared.ph, styles.pad20)}>Loading comments…</div>
+        <Placeholder xstyle={[styles.pad20]}>Loading comments…</Placeholder>
       )}
     </div>
   )
@@ -49,8 +50,8 @@ const Comments = ({ id }: { id: string }) => {
 
 /** Hand-rolled rather than `Page`: the back button carries the "Today" label and there is an Open action. */
 const StoryPage = ({ s, back, os }: { s: Story; back: () => void; os: Os }) => (
-  <div {...stylex.props(shared.column)}>
-    <div {...stylex.props(shared.hdr, styles.hdrMd)}>
+  <VStack>
+    <Title xstyle={[styles.hdrMd]}>
       <button type="button" {...stylex.props(shared.bk)} onClick={back}>
         <Sym name="back" size={20} />
         Today
@@ -60,19 +61,19 @@ const StoryPage = ({ s, back, os }: { s: Story; back: () => void; os: Os }) => (
           Open
         </button>
       )}
-    </div>
-    <div {...stylex.props(shared.body)}>
+    </Title>
+    <Screen>
       <div {...stylex.props(styles.hero, styles.tint(art(s.title, 46)))} />
       <div {...stylex.props(styles.head)}>
         <div {...stylex.props(styles.storyTitle)}>{s.title}</div>
-        <div {...stylex.props(shared.sub, styles.mt8)}>
+        <Text as="div" size="caption" xstyle={[styles.mt8]}>
           {s.author} · {s.points} points · {s.num_comments} comments
-        </div>
+        </Text>
       </div>
-      <div {...stylex.props(shared.hdr, styles.hdr18)}>Discussion</div>
+      <Title xstyle={[styles.hdr18]}>Discussion</Title>
       <Comments id={s.objectID} />
-    </div>
-  </div>
+    </Screen>
+  </VStack>
 )
 
 const Feed = ({ os }: { os: Os }) => {
@@ -88,8 +89,8 @@ const Feed = ({ os }: { os: Os }) => {
       })
     return () => ac.abort()
   }, [])
-  if (!hits) return <div {...stylex.props(shared.ph)}>Loading Today…</div>
-  if (hits === 'error') return <div {...stylex.props(shared.ph)}>Could not reach the news service.</div>
+  if (!hits) return <Placeholder>Loading Today…</Placeholder>
+  if (hits === 'error') return <Placeholder>Could not reach the news service.</Placeholder>
   const [lead, ...rest] = hits
   const open = (s: Story) => push((back) => <StoryPage s={s} back={back} os={os} />)
   return (
@@ -124,9 +125,9 @@ export const News = ({ os }: { os: Os }) => (
       title={
         <>
           Today
-          <span {...stylex.props(shared.hdrSm)}>
+          <Title as="span" variant="accessory">
             {new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </span>
+          </Title>
         </>
       }
     >

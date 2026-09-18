@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared.ts's. StyleX resolves a keyframe name at compile time, so one
@@ -11,10 +11,17 @@ export const styles = stylex.create({
   flush: { paddingBottom: 0 },
   stage: { position: 'absolute', inset: 0 },
   newBtn: { opacity: 1, color: colors.blueDark },
-  person: { backgroundColor: colors.darkElevated, borderBottomColor: '#2c2c2e', cursor: 'pointer' },
-  avatar: { width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center' },
+  person: { backgroundColor: colors.darkElevated, borderBottomColor: appAppearance.notesColor6, cursor: 'pointer' },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: appAppearance.settingsBorderRadius,
+    flexShrink: 0,
+    display: 'grid',
+    placeItems: 'center'
+  },
   tint: (bg: string) => ({ backgroundImage: bg }),
-  name: { fontWeight: 600 },
+  name: { fontWeight: appAppearance.musicFontWeight2 },
   blue: { color: colors.blueDark },
   ft: { position: 'absolute', inset: 0, backgroundColor: colors.black },
   remote: { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' },
@@ -23,24 +30,24 @@ export const styles = stylex.create({
     position: 'relative',
     width: 104,
     height: 104,
-    borderRadius: '50%',
-    backgroundColor: '#5a5a5e',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.phoneBackgroundColor2,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 40,
-    fontWeight: 300,
+    fontSize: appAppearance.calculatorBorderRadius,
+    fontWeight: appAppearance.homeFontWeight,
     marginBottom: 10
   },
   rip: {
     position: 'absolute',
     inset: -4,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     borderWidth: 2,
     borderStyle: 'solid',
-    borderColor: 'rgba(255,255,255,.45)',
+    borderColor: appAppearance.phoneBorderColor,
     animationName: rip,
     animationDuration: '2.2s',
-    animationTimingFunction: 'ease-out',
+    animationTimingFunction: appAppearance.phoneAnimationTimingFunction,
     animationIterationCount: 'infinite'
   },
   label: {
@@ -49,20 +56,28 @@ export const styles = stylex.create({
     right: 0,
     top: 58,
     textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 500,
-    textShadow: '0 1px 8px rgba(0,0,0,.6)'
+    fontSize: appAppearance.podcastsFontSize,
+    fontWeight: appAppearance.musicFontWeight3,
+    textShadow: appAppearance.facetimeTextShadow
   },
-  state: { position: 'absolute', left: 0, right: 0, top: 86, textAlign: 'center', fontSize: 13, opacity: 0.7 },
+  state: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 86,
+    textAlign: 'center',
+    fontSize: appAppearance.musicFontSize6,
+    opacity: 0.7
+  },
   pip: {
     position: 'absolute',
     right: 12,
     top: 56,
     width: 96,
     height: 132,
-    borderRadius: 14,
+    borderRadius: appAppearance.musicBorderRadius,
     overflow: 'hidden',
-    boxShadow: '0 8px 22px rgba(0,0,0,.6)',
+    boxShadow: appAppearance.facetimeBoxShadow,
     zIndex: 3,
     animationName: pop,
     animationDuration: '.5s'
@@ -79,11 +94,11 @@ export const styles = stylex.create({
   ctlBtn: {
     width: 62,
     height: 62,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(255,255,255,.16)',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.phoneBackgroundColor3,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 20
+    fontSize: appAppearance.podcastsFontSize
   },
   hang: { backgroundColor: colors.redBright },
   camMsg: { position: 'absolute', inset: 0, backgroundColor: colors.black }

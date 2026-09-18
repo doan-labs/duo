@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -23,9 +23,9 @@ export const styles = stylex.create({
     gap: 9,
     paddingBlock: 9,
     paddingInline: 13,
-    borderRadius: 24,
-    backgroundColor: 'rgba(250,250,252,.9)',
-    boxShadow: '0 8px 22px rgba(0,0,0,.2)',
+    borderRadius: appAppearance.appstoreFontSize,
+    backgroundColor: appAppearance.freeformBackgroundColor,
+    boxShadow: appAppearance.freeformBoxShadow,
     zIndex: 3,
     backdropFilter: 'blur(14px)'
   },
@@ -34,18 +34,22 @@ export const styles = stylex.create({
     height: 26,
     paddingBlock: 0,
     paddingInline: 0,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     borderWidth: 2,
     borderStyle: 'solid',
     borderColor: colors.white,
-    boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+    boxShadow: appAppearance.freeformBoxShadow2,
     transitionProperty: 'transform',
     transitionDuration: '.18s'
   },
   tint: (c: string) => ({ backgroundColor: c }),
   on: { transform: 'scale(1.24)' },
   glyph: { display: 'grid', placeItems: 'center', color: colors.black },
-  width: { backgroundColor: colors.white, fontSize: 13, fontWeight: 700 },
-  undo: { backgroundColor: colors.trackLight, fontSize: 14 },
+  width: {
+    backgroundColor: colors.white,
+    fontSize: appAppearance.musicFontSize6,
+    fontWeight: appAppearance.musicFontWeight
+  },
+  undo: { backgroundColor: colors.trackLight, fontSize: appAppearance.musicBorderRadius },
   clear: { backgroundColor: colors.red, color: colors.white }
 })

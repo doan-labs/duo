@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -13,23 +13,29 @@ export const styles = stylex.create({
   },
   key: {
     aspectRatio: 1,
-    borderRadius: '50%',
-    backgroundColor: '#333',
-    fontSize: 26,
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.calculatorBackgroundColor,
+    fontSize: appAppearance.calculatorFontSize,
     color: colors.white,
     transitionProperty: 'transform, filter',
     transitionDuration: '.1s',
     transform: { default: null, ':active': 'scale(.93)' },
     filter: { default: null, ':active': 'brightness(1.5)' }
   },
-  g: { backgroundColor: '#a5a5a5', color: colors.black },
+  g: { backgroundColor: appAppearance.calculatorBackgroundColor2, color: colors.black },
   o: { backgroundColor: colors.orange },
-  z: { gridColumn: 'span 2', aspectRatio: 'auto', borderRadius: 40, textAlign: 'left', paddingLeft: 28 },
+  z: {
+    gridColumn: 'span 2',
+    aspectRatio: 'auto',
+    borderRadius: appAppearance.calculatorBorderRadius,
+    textAlign: 'left',
+    paddingLeft: 28
+  },
   out: {
     gridColumn: 'span 4',
     textAlign: 'right',
-    fontSize: 56,
-    fontWeight: 300,
+    fontSize: appAppearance.calculatorFontSize2,
+    fontWeight: appAppearance.homeFontWeight,
     paddingInline: 10,
     paddingBottom: 4,
     minHeight: 70,

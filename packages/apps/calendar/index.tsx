@@ -1,3 +1,4 @@
+import { Row, Screen, Section, Text, Title, WidgetLabel } from '@doan-labs/ipduo-uikit'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useRef } from 'react'
@@ -24,11 +25,13 @@ export const Calendar = () => {
   // Leading blanks are the non-positive numbers, so every cell has a distinct key.
   const days = Array.from({ length: first + n }, (_, i) => i + 1 - first)
   return (
-    <div {...stylex.props(shared.body, styles.root)}>
-      <div {...stylex.props(shared.hdr, styles.hdr)}>
+    <Screen xstyle={[styles.root]}>
+      <Title xstyle={[styles.hdr]}>
         {now.toLocaleDateString('en', { month: 'long' })}
-        <span {...stylex.props(shared.hdrSm)}>{y}</span>
-      </div>
+        <Title as="span" variant="accessory">
+          {y}
+        </Title>
+      </Title>
       <div {...stylex.props(styles.cal)}>
         {WEEKDAYS.map(([k, d]) => (
           <span key={k} {...stylex.props(styles.cell, styles.wd)}>
@@ -41,16 +44,18 @@ export const Calendar = () => {
           </span>
         ))}
       </div>
-      <div {...stylex.props(shared.grp, styles.events)}>
-        <div {...stylex.props(shared.row, styles.event)}>
+      <Section xstyle={[styles.events]}>
+        <Row xstyle={[styles.event]}>
           <div {...stylex.props(styles.tag)} />
           <div>
             <div {...stylex.props(styles.title)}>iPhone Duo keynote</div>
-            <div {...stylex.props(shared.sub)}>Apple Park · 10:00</div>
+            <Text as="div" size="caption">
+              Apple Park · 10:00
+            </Text>
           </div>
-        </div>
-      </div>
-    </div>
+        </Row>
+      </Section>
+    </Screen>
   )
 }
 
@@ -59,7 +64,7 @@ export function CalendarWidget({ onOpen }: { onOpen: (from: HTMLElement) => void
   const today = new Date()
   return (
     <div ref={el} {...stylex.props(shared.glass, shared.widget, styles.calWidget)} onClick={() => onOpen(el.current!)}>
-      <b {...stylex.props(shared.widgetLabel, styles.calDay)}>{today.toLocaleDateString('en', { weekday: 'long' })}</b>
+      <WidgetLabel xstyle={[styles.calDay]}>{today.toLocaleDateString('en', { weekday: 'long' })}</WidgetLabel>
       <div {...stylex.props(styles.calNum)}>{today.getDate()}</div>
       {/* Short enough for one line each: screen.ts bakes the same widget on canvas,
           which does not wrap, and a line that wraps here would not wrap there. */}

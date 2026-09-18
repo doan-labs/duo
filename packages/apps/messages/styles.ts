@@ -1,4 +1,4 @@
-import { colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Local copies of the shared keyframes: StyleX only resolves imports from
@@ -22,28 +22,34 @@ export const styles = stylex.create({
     backgroundColor: { default: colors.white, ':active': colors.fillThin },
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: 'rgba(60,60,67,.14)',
+    borderBottomColor: appAppearance.messagesBorderBottomColor,
     cursor: 'pointer',
     alignItems: 'flex-start',
     transitionProperty: 'background-color',
     transitionDuration: '.15s'
   },
   tx: { minWidth: 0, flexGrow: 1, flexBasis: 0 },
-  txB: { display: 'block', fontSize: 15, fontWeight: 600 },
-  txP: { fontSize: 13, color: colors.grey, lineHeight: 1.35, maxHeight: '2.7em', overflow: 'hidden' },
+  txB: { display: 'block', fontSize: appAppearance.musicFontSize, fontWeight: appAppearance.musicFontWeight2 },
+  txP: {
+    fontSize: appAppearance.musicFontSize6,
+    color: colors.grey,
+    lineHeight: 1.35,
+    maxHeight: '2.7em',
+    overflow: 'hidden'
+  },
   avatar: {
     width: 44,
     height: 44,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     flexShrink: 0,
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
-    fontSize: 18,
-    fontWeight: 500
+    fontSize: appAppearance.musicFontSize5,
+    fontWeight: appAppearance.musicFontWeight3
   },
   bg: (image: string) => ({ backgroundImage: image }),
-  hdr: { fontSize: 17, justifyContent: 'center', position: 'relative' },
+  hdr: { fontSize: appAppearance.messagesFontSize, justifyContent: 'center', position: 'relative' },
   bkAbs: { position: 'absolute', left: 16 },
   ft: { position: 'absolute', right: 16, color: colors.blueBright },
   flush: { paddingBottom: 0 },
@@ -62,8 +68,8 @@ export const styles = stylex.create({
     paddingRight: 13,
     paddingBottom: 8,
     paddingLeft: 13,
-    borderRadius: 19,
-    fontSize: 15,
+    borderRadius: appAppearance.musicFontSize2,
+    fontSize: appAppearance.musicFontSize,
     lineHeight: 1.34,
     alignSelf: 'flex-start',
     backgroundColor: colors.trackLight,
@@ -75,7 +81,7 @@ export const styles = stylex.create({
   me: {
     alignSelf: 'flex-end',
     backgroundColor: colors.blueBright,
-    backgroundImage: 'linear-gradient(#2ca5ff,#0a7cff)',
+    backgroundImage: appAppearance.messagesBackgroundImage,
     color: colors.white
   },
   /** A bubble that changes sender gets a little air before it. */
@@ -88,14 +94,14 @@ export const styles = stylex.create({
     paddingRight: 15,
     paddingBottom: 13,
     paddingLeft: 15,
-    borderRadius: 19,
+    borderRadius: appAppearance.musicFontSize2,
     backgroundColor: colors.trackLight
   },
   dot: {
     width: 8,
     height: 8,
-    borderRadius: '50%',
-    backgroundColor: '#8a8a8e',
+    borderRadius: appAppearance.settingsBorderRadius,
+    backgroundColor: appAppearance.messagesBackgroundColor,
     animationName: bob,
     animationDuration: '.95s',
     animationIterationCount: 'infinite'
@@ -109,30 +115,30 @@ export const styles = stylex.create({
     paddingRight: 12,
     paddingBottom: 8,
     paddingLeft: 12,
-    backgroundColor: 'rgba(249,249,249,.94)',
+    backgroundColor: appAppearance.messagesBackgroundColor2,
     borderTopWidth: 1,
     borderTopStyle: 'solid',
-    borderTopColor: '#d7d7dc'
+    borderTopColor: appAppearance.messagesBorderTopColor
   },
   input: {
     flexGrow: 1,
     flexBasis: 0,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#d7d7dc',
-    borderRadius: 17,
+    borderColor: appAppearance.messagesBorderTopColor,
+    borderRadius: appAppearance.messagesFontSize,
     paddingTop: 8,
     paddingRight: 14,
     paddingBottom: 8,
     paddingLeft: 14,
     backgroundColor: colors.white,
     outline: 0,
-    fontSize: 15
+    fontSize: appAppearance.musicFontSize
   },
   send: {
     width: 32,
     height: 32,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     backgroundColor: colors.blueBright,
     color: colors.white,
     display: 'grid',

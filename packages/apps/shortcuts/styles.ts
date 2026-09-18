@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -11,7 +11,7 @@ export const styles = stylex.create({
   },
   sc: {
     position: 'relative',
-    borderRadius: 17,
+    borderRadius: appAppearance.messagesFontSize,
     paddingTop: 13,
     paddingRight: 13,
     paddingBottom: 13,
@@ -29,19 +29,19 @@ export const styles = stylex.create({
     transform: { default: null, ':active': 'scale(.95)' }
   },
   bg: (img: string) => ({ backgroundImage: img }),
-  glyph: { fontSize: 22 },
-  name: { fontSize: 14, fontWeight: 600 },
+  glyph: { fontSize: appAppearance.mailFontSize },
+  name: { fontSize: appAppearance.musicBorderRadius, fontWeight: appAppearance.musicFontWeight2 },
   ok: {
     position: 'absolute',
     inset: 0,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(0,0,0,.45)',
-    fontSize: 34,
+    backgroundColor: appAppearance.cameraBackgroundColor3,
+    fontSize: appAppearance.shortcutsFontSize,
     opacity: 0,
     transitionProperty: 'opacity',
     transitionDuration: '.25s'
   },
   okOn: { opacity: 1 },
-  hdrSm: { fontSize: 18 }
+  hdrSm: { fontSize: appAppearance.musicFontSize5 }
 })

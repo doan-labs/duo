@@ -1,3 +1,5 @@
+import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/ipduo-uikit'
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 // Stocks: a watchlist with sparklines, and a detail page whose chart draws itself in.
 
 import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
@@ -31,7 +33,7 @@ const Spark = ({ t, w, ht, animate = false }: { t: string; w: number; ht: number
         fill="none"
         strokeWidth={1.8}
         strokeLinejoin="round"
-        stroke={pts[pts.length - 1]! >= pts[0]! ? '#31d158' : '#ff453a'}
+        stroke={pts[pts.length - 1]! >= pts[0]! ? appAppearance.stocksColor : appAppearance.memosColor}
         {...stylex.props(animate && styles.draw)}
       />
     </svg>
@@ -59,7 +61,9 @@ const List = () => {
           >
             <div {...stylex.props(styles.nm)}>
               <b {...stylex.props(styles.symbol)}>{t}</b>
-              <div {...stylex.props(shared.sub)}>{name}</div>
+              <Text as="div" size="caption">
+                {name}
+              </Text>
             </div>
             <Spark t={t} w={64} ht={30} />
             <div {...stylex.props(styles.right)}>
@@ -87,17 +91,19 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
     ['P/E', 29.4]
   ]
   return (
-    <div {...stylex.props(shared.column)}>
-      <div {...stylex.props(shared.hdr, styles.hdr17)}>
+    <VStack>
+      <Title xstyle={[styles.hdr17]}>
         <button type="button" {...stylex.props(shared.bk)} onClick={back}>
           <Sym name="back" size={20} />
           Stocks
         </button>
-      </div>
-      <div {...stylex.props(shared.body)}>
+      </Title>
+      <Screen>
         <div {...stylex.props(styles.quote)}>
           <div {...stylex.props(styles.ticker)}>{t}</div>
-          <div {...stylex.props(shared.sub)}>{name}</div>
+          <Text as="div" size="caption">
+            {name}
+          </Text>
           <div {...stylex.props(styles.bigPrice)}>
             <Num value={base} format={two} />
           </div>
@@ -115,18 +121,18 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
             </span>
           ))}
         </div>
-        <div {...stylex.props(shared.grp)}>
+        <Section>
           {stats.map(([k, v]) => (
-            <div key={k} {...stylex.props(shared.row, styles.darkRow)}>
+            <Row key={k} xstyle={[styles.darkRow]}>
               {k}
               <span {...stylex.props(shared.rowR, styles.white)}>
                 <Num value={v} format={two} />
               </span>
-            </div>
+            </Row>
           ))}
-        </div>
-      </div>
-    </div>
+        </Section>
+      </Screen>
+    </VStack>
   )
 }
 
@@ -136,9 +142,9 @@ export const Stocks = () => (
       title={
         <>
           Stocks
-          <span {...stylex.props(shared.hdrSm)}>
+          <Title as="span" variant="accessory">
             {new Date().toLocaleDateString('en', { month: 'long', day: 'numeric' })}
-          </span>
+          </Title>
         </>
       }
     >

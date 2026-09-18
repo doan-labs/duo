@@ -1,12 +1,20 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Screen } from '@doan-labs/ipduo-uikit'
 import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent, useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
 
-export const INKS = ['#1c1c1e', '#ff3b30', '#ff9f0a', '#34c759', '#0a7cff', '#af52de']
+export const INKS = [
+  appAppearance.notesColor10,
+  appAppearance.freeformColor,
+  appAppearance.homeColor2,
+  appAppearance.notesColor8,
+  appAppearance.freeformColor2,
+  appAppearance.freeformColor3
+]
 
 const ctx = (c: HTMLCanvasElement) => c.getContext('2d')!
 
@@ -74,7 +82,7 @@ export const Freeform = (_: { os: Os }) => {
   }
 
   return (
-    <div {...stylex.props(shared.body, styles.flush)}>
+    <Screen xstyle={[styles.flush]}>
       <canvas
         ref={cv}
         {...stylex.props(styles.pad)}
@@ -125,6 +133,6 @@ export const Freeform = (_: { os: Os }) => {
           <Sym name="close" size={12} />
         </button>
       </div>
-    </div>
+    </Screen>
   )
 }

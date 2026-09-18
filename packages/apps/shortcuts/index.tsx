@@ -1,4 +1,5 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { LargeTitle, Row, Screen, Section, Title } from '@doan-labs/ipduo-uikit'
 import { art, beep } from '@doan-labs/ipduo-uikit/shared.ts'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -25,8 +26,8 @@ const Card = ({ name, glyph, act }: { name: string; glyph: string; act: () => vo
 }
 
 export const Shortcuts = ({ os }: { os: Os }) => (
-  <div {...stylex.props(shared.body)}>
-    <div {...stylex.props(shared.hero)}>Shortcuts</div>
+  <Screen>
+    <LargeTitle>Shortcuts</LargeTitle>
     <div {...stylex.props(styles.scs)}>
       <Card
         name="Open Wikipedia"
@@ -41,17 +42,17 @@ export const Shortcuts = ({ os }: { os: Os }) => (
       <Card name="Start Sketch" glyph="✏️" act={() => os.open('Freeform')} />
       <Card name="Go Home" glyph="🏠" act={() => os.home()} />
     </div>
-    <div {...stylex.props(shared.hdr, styles.hdrSm)}>Automations</div>
-    <div {...stylex.props(shared.grp)}>
-      <div {...stylex.props(shared.row)}>
+    <Title xstyle={[styles.hdrSm]}>Automations</Title>
+    <Section>
+      <Row>
         When the phone unfolds<span {...stylex.props(shared.rowR)}>Open Freeform ›</span>
-      </div>
-      <div {...stylex.props(shared.row)}>
+      </Row>
+      <Row>
         At sunset<span {...stylex.props(shared.rowR)}>Dim Key Light ›</span>
-      </div>
-      <div {...stylex.props(shared.row)}>
+      </Row>
+      <Row>
         When a render finishes<span {...stylex.props(shared.rowR)}>Play sound ›</span>
-      </div>
-    </div>
-  </div>
+      </Row>
+    </Section>
+  </Screen>
 )

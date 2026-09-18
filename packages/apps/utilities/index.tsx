@@ -1,4 +1,5 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Screen } from '@doan-labs/ipduo-uikit'
 import { ICONS } from '@doan-labs/ipduo-uikit/icons/index.ts'
 import { delay, shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -8,7 +9,7 @@ export const IN_FOLDER = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 
 
 /** The folder's own screen: the icons it holds, at home-screen size. */
 export const Utilities = ({ os }: { os: Os }) => (
-  <div {...stylex.props(shared.body, styles.body)}>
+  <Screen xstyle={[styles.body]}>
     <div {...stylex.props(styles.title)}>Utilities</div>
     <div {...stylex.props(styles.grid)}>
       {IN_FOLDER.map((name, i) => (
@@ -22,5 +23,5 @@ export const Utilities = ({ os }: { os: Os }) => (
         </div>
       ))}
     </div>
-  </div>
+  </Screen>
 )

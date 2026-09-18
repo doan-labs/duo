@@ -1,4 +1,5 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Button, Row, Screen, Section, Text, Title, Toggle } from '@doan-labs/ipduo-uikit'
 import { art, beep } from '@doan-labs/ipduo-uikit/shared.ts'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
@@ -20,44 +21,45 @@ export const FindMy = (_: { os: Os }) => {
   const [sel, setSel] = useState(0)
   const [, , lat, lon] = DEVICES[sel]!
   return (
-    <div {...stylex.props(shared.body, shared.column, styles.flush)}>
+    <Screen xstyle={[shared.column, styles.flush]}>
       <div {...stylex.props(styles.mapw)}>
         <iframe title="map" src={osm(lat, lon)} />
         <div {...stylex.props(styles.pin)} />
       </div>
-      <div {...stylex.props(shared.body)}>
-        <div {...stylex.props(shared.hdr)}>Devices</div>
-        <div {...stylex.props(shared.grp, styles.white)}>
+      <Screen>
+        <Title>Devices</Title>
+        <Section xstyle={[styles.white]}>
           {DEVICES.map(([name, where], i) => (
-            <div key={name} {...stylex.props(shared.row, i === sel && styles.selected)} onClick={() => setSel(i)}>
+            <Row key={name} xstyle={[i === sel && styles.selected]} onClick={() => setSel(i)}>
               <span {...stylex.props(shared.rowIc, styles.devIc(art(name)))}>
                 <Sym name="iphone" size={20} />
               </span>
               <div {...stylex.props(styles.grow)}>
                 <div {...stylex.props(styles.name)}>{name}</div>
-                <div {...stylex.props(shared.sub)}>{where}</div>
+                <Text as="div" size="caption">
+                  {where}
+                </Text>
               </div>
-              <button
+              <Button
                 type="button"
-                {...stylex.props(shared.pill)}
                 onClick={(e) => {
                   e.stopPropagation()
                   beep([1046, 1568, 2093], 0.5, 0.07)
                 }}
               >
                 Play Sound
-              </button>
-            </div>
+              </Button>
+            </Row>
           ))}
-        </div>
-        <div {...stylex.props(shared.grp)}>
-          <div {...stylex.props(shared.row)}>
+        </Section>
+        <Section>
+          <Row>
             <Sym name="location" size={18} />
             Share My Location
-            <input type="checkbox" defaultChecked {...stylex.props(shared.sw)} />
-          </div>
-        </div>
-      </div>
-    </div>
+            <Toggle aria-label="Share My Location" defaultChecked />
+          </Row>
+        </Section>
+      </Screen>
+    </Screen>
   )
 }

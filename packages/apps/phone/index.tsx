@@ -1,3 +1,4 @@
+import { Row, Screen, Section, Text, Title } from '@doan-labs/ipduo-uikit'
 import { beep, mmss } from '@doan-labs/ipduo-uikit/shared.ts'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
@@ -106,26 +107,26 @@ export const Phone = () => {
   }
 
   return (
-    <div {...stylex.props(shared.body, styles.root)}>
+    <Screen xstyle={[styles.root]}>
       <div {...stylex.props(styles.panes)}>
-        <div {...stylex.props(shared.body, styles.pane, tab !== 0 && shared.hide)}>
-          <div {...stylex.props(shared.hdr)}>Recents</div>
-          <div {...stylex.props(shared.grp, styles.recents)}>
+        <Screen xstyle={[styles.pane, tab !== 0 && shared.hide]}>
+          <Title>Recents</Title>
+          <Section xstyle={[styles.recents]}>
             {PEOPLE.map(([name, num], i) => (
-              <div key={name} {...stylex.props(shared.row, styles.dark)} onClick={() => call(name)}>
+              <Row key={name} xstyle={[styles.dark]} onClick={() => call(name)}>
                 <div>
                   <div {...stylex.props(styles.name, i % 3 === 0 && styles.missed)}>{name}</div>
-                  <div {...stylex.props(shared.sub)}>
+                  <Text as="div" size="caption">
                     {i % 2 ? 'mobile' : 'iPhone'} · {num}
-                  </div>
+                  </Text>
                 </div>
                 <span {...stylex.props(shared.rowR)}>
                   <Sym name="more" size={20} />
                 </span>
-              </div>
+              </Row>
             ))}
-          </div>
-        </div>
+          </Section>
+        </Screen>
         <div {...stylex.props(styles.pane, tab !== 1 && shared.hide)}>
           {/* No handset in the SF Symbols pulled off this Mac, so the call keys use the
               emoji rather than ship a near-miss glyph. */}
@@ -160,6 +161,6 @@ export const Phone = () => {
       {calls.map((c) => (
         <CallScreen key={c.id} who={c.who} off={c.off} onEnd={() => hangUp(c.id)} />
       ))}
-    </div>
+    </Screen>
   )
 }

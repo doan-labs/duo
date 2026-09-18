@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -15,26 +15,26 @@ export const styles = stylex.create({
   },
   tip: {
     marginBottom: 14,
-    borderRadius: 18,
+    borderRadius: appAppearance.musicFontSize5,
     overflow: 'hidden',
     backgroundColor: colors.white,
-    boxShadow: '0 6px 18px rgba(0,0,0,.1)',
+    boxShadow: appAppearance.tipsBoxShadow,
     cursor: 'pointer'
   },
-  im: { height: 150, display: 'grid', placeItems: 'center', fontSize: 52 },
+  im: { height: 150, display: 'grid', placeItems: 'center', fontSize: appAppearance.notesFontSize },
   tx: { paddingTop: 13, paddingBottom: 13, paddingInline: 15 },
-  title: { fontWeight: 600, fontSize: 15 },
-  hint: { fontSize: 12, marginTop: 2 },
+  title: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicFontSize },
+  hint: { fontSize: appAppearance.calendarFontSize2, marginTop: 2 },
   more: {
-    fontSize: 14,
+    fontSize: appAppearance.musicBorderRadius,
     lineHeight: 1.5,
-    color: '#3c3c43',
+    color: appAppearance.appstoreColor,
     maxHeight: 0,
     marginTop: 0,
     overflow: 'hidden',
     transitionProperty: 'max-height, margin',
     transitionDuration: '.4s, .4s',
-    transitionTimingFunction: 'cubic-bezier(.3,.9,.3,1), ease'
+    transitionTimingFunction: appAppearance.tipsTransitionTimingFunction
   },
   moreOpen: { maxHeight: 160, marginTop: 8 }
 })

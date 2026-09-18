@@ -1,14 +1,15 @@
+import { Button, LargeTitle, Screen } from '@doan-labs/ipduo-uikit'
 import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
 
 const PASSES: [string, string, string][] = [
-  ['Apple Card', 'linear-gradient(150deg,#f5f5f7,#c9c9ce)', '#1c1c1e'],
-  ['Duo Transit', 'linear-gradient(150deg,#0a84ff,#5e5ce6)', '#fff'],
-  ['Apple Park Badge', 'linear-gradient(150deg,#1c1c1e,#3a3a3c)', '#fff'],
-  ['WWDC Pass', 'linear-gradient(150deg,#ff375f,#ff9f0a)', '#fff']
+  ['Apple Card', appAppearance.walletAppleCard, appAppearance.notesColor10],
+  ['Duo Transit', appAppearance.walletTransit, appAppearance.walletColor],
+  ['Apple Park Badge', appAppearance.walletBadge, appAppearance.walletColor],
+  ['WWDC Pass', appAppearance.walletPass, appAppearance.walletColor]
 ]
 
 // The stack shows the top STEP px of each card behind, so it has to clear the
@@ -30,8 +31,8 @@ export const Wallet = () => {
   }
   const height = (top < 0 ? (PASSES.length - 1) * STEP : (PASSES.length - 2) * STEP + 178) + 158
   return (
-    <div {...stylex.props(shared.body)}>
-      <div {...stylex.props(shared.hero)}>Wallet</div>
+    <Screen>
+      <LargeTitle>Wallet</LargeTitle>
       <div {...stylex.props(styles.cards, styles.height(height))}>
         {PASSES.map(([name, bg, fg], i) => {
           // Pulled-out card sits at the top and everything under it drops clear.
@@ -50,9 +51,9 @@ export const Wallet = () => {
         })}
       </div>
       <div {...stylex.props(styles.payWrap)}>
-        <button type="button" {...stylex.props(shared.pill, styles.payBtn)} onClick={pay}>
+        <Button type="button" xstyle={[styles.payBtn]} onClick={pay}>
           Apple Pay
-        </button>
+        </Button>
       </div>
       {paying && (
         <div {...stylex.props(styles.pay)}>
@@ -61,6 +62,6 @@ export const Wallet = () => {
           <div {...stylex.props(styles.payTitle)}>Hold Near Reader</div>
         </div>
       )}
-    </div>
+    </Screen>
   )
 }

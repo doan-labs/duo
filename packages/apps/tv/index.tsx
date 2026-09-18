@@ -1,8 +1,8 @@
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
 // TV. Shelves of posters generated from their titles; opening one plays a real trailer embed.
 
 import type { Os } from '@doan-labs/ipduo-sdk'
 import { art, hue } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { Fragment, useState } from 'react'
@@ -27,18 +27,18 @@ const Show = ({ title, mirror, onClose }: { title: string; mirror?: boolean; onC
           allowFullScreen
         />
       </div>
-      <div {...stylex.props(shared.body)}>
-        <div {...stylex.props(shared.hdr)}>{title}</div>
-        <div {...stylex.props(shared.sub, styles.meta)}>
+      <Screen>
+        <Title>{title}</Title>
+        <Text as="div" size="caption" xstyle={[styles.meta]}>
           {2018 + (hue(title) % 8)} · {1 + (hue(title) % 4)} seasons · Apple TV+
-        </div>
+        </Text>
         <div {...stylex.props(styles.artTxt)}>
           <p {...stylex.props(styles.para)}>
             Sample catalogue entry. The trailer above is a real embed; artwork is generated from the title so nothing
             here needs a network round-trip to look designed.
           </p>
         </div>
-      </div>
+      </Screen>
     </div>
     <button type="button" {...stylex.props(styles.close)} onClick={onClose}>
       <Sym name="close" size={14} />
@@ -49,12 +49,12 @@ const Show = ({ title, mirror, onClose }: { title: string; mirror?: boolean; onC
 export const Tv = ({ os }: { os: Os }) => {
   const [show, setShow] = useState<string | null>(null)
   return (
-    <div {...stylex.props(shared.body, styles.flush)}>
-      <div {...stylex.props(shared.body)}>
-        <div {...stylex.props(shared.hero)}>Watch Now</div>
+    <Screen xstyle={[styles.flush]}>
+      <Screen>
+        <LargeTitle>Watch Now</LargeTitle>
         {SHELVES.map(([name, titles]) => (
           <Fragment key={name}>
-            <div {...stylex.props(shared.hdr, styles.hdr18)}>{name}</div>
+            <Title xstyle={[styles.hdr18]}>{name}</Title>
             <div {...stylex.props(styles.shelf)}>
               {titles.map((t) => (
                 <div key={t} {...stylex.props(styles.poster)} onClick={() => setShow(t)}>
@@ -64,8 +64,8 @@ export const Tv = ({ os }: { os: Os }) => {
             </div>
           </Fragment>
         ))}
-      </div>
+      </Screen>
       {show && <Show title={show} mirror={os.mirror} onClose={() => setShow(null)} />}
-    </div>
+    </Screen>
   )
 }

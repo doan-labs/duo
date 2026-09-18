@@ -1,3 +1,4 @@
+import { Placeholder, Row, Text } from '@doan-labs/ipduo-uikit'
 import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -53,18 +54,26 @@ const Node = ({ node, back }: { node: Node_; back: () => void }) => {
             <div key={k.n} {...stylex.props(styles.f)} onClick={() => push((b) => <Node node={k} back={b} />)}>
               <i {...stylex.props(styles.fIcon)}>{k.i}</i>
               <span>{k.n}</span>
-              {k.size && <span {...stylex.props(shared.sub, styles.size)}>{k.size}</span>}
+              {k.size && (
+                <Text size="caption" xstyle={[styles.size]}>
+                  {k.size}
+                </Text>
+              )}
             </div>
           ))}
         </div>
       ) : (
-        <div {...stylex.props(shared.ph)}>
+        <Placeholder>
           {node.size ? <div {...stylex.props(styles.bigIcon)}>{node.i}</div> : ''}
           {node.size ?? 'Empty'}
-        </div>
+        </Placeholder>
       )}
       {kids.length ? (
-        <div {...stylex.props(shared.sub, styles.count)}>{`${kids.length} item${kids.length > 1 ? 's' : ''}`}</div>
+        <Text
+          as="div"
+          size="caption"
+          xstyle={[styles.count]}
+        >{`${kids.length} item${kids.length > 1 ? 's' : ''}`}</Text>
       ) : null}
     </Page>
   )
@@ -76,11 +85,11 @@ const Browse = () => {
     <Page title="Browse">
       <div {...stylex.props(styles.sec)}>LOCATIONS</div>
       {FILES.map((f) => (
-        <div key={f.n} {...stylex.props(shared.row)} onClick={() => push((b) => <Node node={f} back={b} />)}>
+        <Row key={f.n} onClick={() => push((b) => <Node node={f} back={b} />)}>
           <span {...stylex.props(styles.locIcon)}>{f.i}</span>
           {f.n}
           <span {...stylex.props(shared.rowR)}>›</span>
-        </div>
+        </Row>
       ))}
     </Page>
   )

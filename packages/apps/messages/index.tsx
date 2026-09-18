@@ -1,3 +1,4 @@
+import { Screen, Text, Title } from '@doan-labs/ipduo-uikit'
 // Messages: a chat list, and threads that answer back. The reply is what sells
 // it: a pause, three bouncing dots, then a bubble.
 
@@ -51,7 +52,7 @@ function Chats({ os }: { os: Os }) {
               <b {...stylex.props(styles.txB)}>{who}</b>
               <p {...stylex.props(styles.txP)}>{msgs[msgs.length - 1]}</p>
             </div>
-            <span {...stylex.props(shared.sub)}>{WHEN[i]}</span>
+            <Text size="caption">{WHEN[i]}</Text>
           </div>
         ))}
       </div>
@@ -99,7 +100,7 @@ function Thread({ os, who, seed, back }: { os: Os; who: string; seed: string[]; 
 
   return (
     <>
-      <div {...stylex.props(shared.hdr, styles.hdr)}>
+      <Title xstyle={[styles.hdr]}>
         <button type="button" {...stylex.props(shared.bk, styles.bkAbs)} onClick={back}>
           <Sym name="back" size={20} />
         </button>
@@ -107,8 +108,8 @@ function Thread({ os, who, seed, back }: { os: Os; who: string; seed: string[]; 
         <button type="button" {...stylex.props(styles.ft)} onClick={() => os.open('FaceTime', who)}>
           <Sym name="person" size={22} />
         </button>
-      </div>
-      <div ref={body} {...stylex.props(shared.body, styles.flush)}>
+      </Title>
+      <Screen ref={body} xstyle={[styles.flush]}>
         <div {...stylex.props(styles.thread)}>
           {log.map((b, i) => (
             <div
@@ -126,7 +127,7 @@ function Thread({ os, who, seed, back }: { os: Os; who: string; seed: string[]; 
             </div>
           ))}
         </div>
-      </div>
+      </Screen>
       <div {...stylex.props(styles.compose)}>
         <input
           {...stylex.props(styles.input)}

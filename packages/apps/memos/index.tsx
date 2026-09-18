@@ -1,6 +1,8 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { Button, Placeholder, Row, Screen, Section, Text, Title } from '@doan-labs/ipduo-uikit'
 import { mmss } from '@doan-labs/ipduo-uikit/shared.ts'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -24,23 +26,19 @@ const stopRec = (live: Live, clock: HTMLDivElement | null) => {
 const MemoRow = ({ memo, n }: { memo: Memo; n: number }) => {
   const a = useRef<HTMLAudioElement>(null)
   return (
-    <div {...stylex.props(shared.row, styles.darkRow)}>
+    <Row xstyle={[styles.darkRow]}>
       <div {...stylex.props(styles.grow)}>
         <div {...stylex.props(styles.name)}>Recording {n}</div>
-        <div {...stylex.props(shared.sub)}>
+        <Text as="div" size="caption">
           {memo.at.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })} · {mmss(memo.len)}
-        </div>
+        </Text>
       </div>
       {/* biome-ignore lint/a11y/useMediaCaption: a voice memo has no transcript */}
       <audio ref={a} src={memo.url} />
-      <button
-        type="button"
-        {...stylex.props(shared.pill)}
-        onClick={() => (a.current!.paused ? a.current!.play() : a.current!.pause())}
-      >
+      <Button type="button" onClick={() => (a.current!.paused ? a.current!.play() : a.current!.pause())}>
         ▶ Play
-      </button>
-    </div>
+      </Button>
+    </Row>
   )
 }
 
@@ -81,7 +79,7 @@ export const Memos = (_: { os: Os }) => {
       }
       g.setTransform(2, 0, 0, 2, 0, 0)
       g.clearRect(0, 0, w, ht)
-      g.fillStyle = '#ff453a'
+      g.fillStyle = appAppearance.memosColor
       hist.current.forEach((v, i) => {
         const bh = Math.max(2, v * ht * 0.92)
         g.fillRect(i * 3, (ht - bh) / 2, 2, bh)
@@ -134,8 +132,8 @@ export const Memos = (_: { os: Os }) => {
   }
 
   return (
-    <div {...stylex.props(shared.body)}>
-      <div {...stylex.props(shared.hdr)}>Voice Memos</div>
+    <Screen>
+      <Title>Voice Memos</Title>
       <div {...stylex.props(styles.deck)}>
         <canvas ref={cv} {...stylex.props(styles.wave)} />
         <div ref={clock} {...stylex.props(styles.clock)}>
@@ -144,16 +142,14 @@ export const Memos = (_: { os: Os }) => {
         <button type="button" {...stylex.props(styles.rec)} onClick={toggle}>
           <i {...stylex.props(styles.dot, on && styles.dotOn)} />
         </button>
-        {denied && (
-          <div {...stylex.props(shared.ph, styles.note)}>Microphone unavailable. Allow access and reopen.</div>
-        )}
+        {denied && <Placeholder xstyle={[styles.note]}>Microphone unavailable. Allow access and reopen.</Placeholder>}
       </div>
-      <div {...stylex.props(shared.hdr, styles.hdrSm)}>All Recordings</div>
-      <div {...stylex.props(shared.grp)}>
+      <Title xstyle={[styles.hdrSm]}>All Recordings</Title>
+      <Section>
         {list.map((m, i) => (
           <MemoRow key={m.url} memo={m} n={list.length - i} />
         ))}
-      </div>
-    </div>
+      </Section>
+    </Screen>
   )
 }

@@ -1,3 +1,4 @@
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
 import { art, beep } from '@doan-labs/ipduo-uikit/shared.ts'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -33,31 +34,37 @@ const Buy = ({ label }: { label: string }) => {
 }
 
 export const Itunes = () => (
-  <div {...stylex.props(shared.body)}>
-    <div {...stylex.props(shared.hero)}>Music</div>
+  <Screen>
+    <LargeTitle>Music</LargeTitle>
     <div {...stylex.props(styles.shelf)}>
       {CHART.slice(0, 4).map(([t, a]) => (
         <div key={t} {...stylex.props(styles.poster)}>
           <div {...stylex.props(styles.cover, styles.bg(art(t)))} />
           <div {...stylex.props(styles.posterTitle)}>{t}</div>
-          <div {...stylex.props(shared.sub, styles.posterArtist)}>{a}</div>
+          <Text as="div" size="caption" xstyle={[styles.posterArtist]}>
+            {a}
+          </Text>
         </div>
       ))}
     </div>
-    <div {...stylex.props(shared.hdr, styles.hdr18)}>
+    <Title xstyle={[styles.hdr18]}>
       Top Songs
-      <span {...stylex.props(shared.hdrSm)}>See All</span>
-    </div>
+      <Title as="span" variant="accessory">
+        See All
+      </Title>
+    </Title>
     {CHART.map(([t, a, p], i) => (
       <div key={t} {...stylex.props(styles.rank)}>
         <span {...stylex.props(styles.n)}>{String(i + 1)}</span>
         <div {...stylex.props(styles.co, styles.bg(art(t)))} />
         <div {...stylex.props(styles.grow)}>
           <div {...stylex.props(styles.song)}>{t}</div>
-          <div {...stylex.props(shared.sub)}>{a}</div>
+          <Text as="div" size="caption">
+            {a}
+          </Text>
         </div>
         <Buy label={p} />
       </div>
     ))}
-  </div>
+  </Screen>
 )

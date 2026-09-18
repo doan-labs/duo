@@ -1,3 +1,4 @@
+import { Text, Title } from '@doan-labs/ipduo-uikit'
 // Books: a shelf of covers, and a reader that pages through the text.
 
 import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
@@ -55,7 +56,9 @@ const Shelf = () => {
         <div key={t} onClick={() => push((back) => <Reader i={i} back={back} />)}>
           <div {...stylex.props(styles.cov, styles.bg(art(t, 40)))}>{t}</div>
           <div {...stylex.props(styles.title)}>{t}</div>
-          <div {...stylex.props(shared.sub, styles.who)}>{who}</div>
+          <Text as="div" size="caption" xstyle={[styles.who]}>
+            {who}
+          </Text>
         </div>
       ))}
     </div>
@@ -87,12 +90,12 @@ const Reader = ({ i, back }: { i: number; back: () => void }) => {
   const go = (d: number) => setAt((a) => Math.min(pages - 1, Math.max(0, a + d)))
   return (
     <>
-      <div {...stylex.props(shared.hdr, styles.readHdr)}>
+      <Title xstyle={[styles.readHdr]}>
         <button type="button" {...stylex.props(shared.bk)} onClick={back}>
           <Sym name="back" size={18} />
           Library
         </button>
-      </div>
+      </Title>
       <div {...stylex.props(styles.read)}>
         <div ref={col} {...stylex.props(styles.col, w > 0 && styles.colW(w), styles.shift(-at * (w + GAP)))}>
           {paras.map((p) => (

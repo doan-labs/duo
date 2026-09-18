@@ -1,0 +1,108 @@
+{
+  "package": "@doan-labs/ipduo-uikit",
+  "version": "0.1.0",
+  "components": [
+    {
+      "name": "Button",
+      "description": "Native button with the existing tinted capsule or filled/plain variants. Icon-only buttons need aria-label.",
+      "props": "type ButtonProps = PrimitiveProps<'button'> & { variant?: 'filled' | 'tinted' | 'plain' }",
+      "source": "packages/uikit/button.tsx"
+    },
+    {
+      "name": "Hero",
+      "description": "Large introductory title; shares the established large-title typography.",
+      "props": "type HeroProps<T extends ElementType = 'div'> = LargeTitleProps<T>",
+      "source": "packages/uikit/hero.tsx"
+    },
+    {
+      "name": "LargeTitle",
+      "description": "The existing 34-point large app title. It wraps naturally at cover width.",
+      "props": "type LargeTitleProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
+      "source": "packages/uikit/large-title.tsx"
+    },
+    {
+      "name": "List",
+      "description": "Semantic list. Use Row as=\"li\" for direct children, or place Sections inside list items.",
+      "props": "type ListProps<T extends ElementType = 'ul'> = PrimitiveProps<T>",
+      "source": "packages/uikit/list.tsx"
+    },
+    {
+      "name": "NavigationLink",
+      "description": "Keyboard-accessible push navigation. The destination renders inside a page with a back button.",
+      "props": "type NavigationLinkProps = Omit<ButtonProps, 'onClick' | 'ref'> & { title: string; destination: ReactNode }",
+      "source": "packages/uikit/navigation-link.tsx"
+    },
+    {
+      "name": "NavigationStack",
+      "description": "Push navigation retaining the established Nav transition and useNavigation contract.",
+      "props": "type NavigationStackProps = { children: ReactNode }",
+      "source": "packages/uikit/navigation-stack.tsx"
+    },
+    {
+      "name": "Placeholder",
+      "description": "Centred empty, unavailable or loading content harvested from five existing apps.",
+      "props": "type PlaceholderProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
+      "source": "packages/uikit/placeholder.tsx"
+    },
+    {
+      "name": "Row",
+      "description": "Grouped row with optional leading icon and trailing detail. Use as=\"button\" for an action.",
+      "props": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}",
+      "source": "packages/uikit/row.tsx"
+    },
+    {
+      "name": "Screen",
+      "description": "Scrolling app content. Exposes display metadata without opening a bridge or starting effects.",
+      "props": "type ScreenProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
+      "source": "packages/uikit/screen.tsx"
+    },
+    {
+      "name": "Section",
+      "description": "Inset rounded group of rows, retaining the original grouped-list geometry.",
+      "props": "type SectionProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
+      "source": "packages/uikit/section.tsx"
+    },
+    {
+      "name": "Symbol",
+      "description": "Decorative symbol inheriting text colour. Name the enclosing button when it is the only content.",
+      "props": "type SymbolProps = ComponentProps<typeof Sym>",
+      "source": "packages/uikit/symbol.tsx"
+    },
+    {
+      "name": "Text",
+      "description": "Inline text or formatted animated number. Caption reproduces the harvested secondary label.",
+      "props": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: 'body' | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}",
+      "source": "packages/uikit/text.tsx"
+    },
+    {
+      "name": "Title",
+      "description": "Fixed app header, or its compact trailing accessories. Use as=\"h1\" for a semantic heading.",
+      "props": "type TitleProps<T extends ElementType = 'div'> = PrimitiveProps<T> & { variant?: 'header' | 'accessory' }",
+      "source": "packages/uikit/title.tsx"
+    },
+    {
+      "name": "Toggle",
+      "description": "Native checkbox styled as the existing iOS switch. Supply a visible label or aria-label.",
+      "props": "type ToggleProps = Omit<PrimitiveProps<'input'>, 'type' | 'as'>",
+      "source": "packages/uikit/toggle.tsx"
+    },
+    {
+      "name": "VStack",
+      "description": "A shrinking vertical stack that fills its flex parent, including the cover display.",
+      "props": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
+      "source": "packages/uikit/v-stack.tsx"
+    },
+    {
+      "name": "Widget",
+      "description": "Host-rendered declarative snapshot. Refresh remains the app owner's responsibility.",
+      "props": "type WidgetProps = {\n  snapshot: WidgetSnapshot\n  updatedAt: number\n  onOpen: (element: HTMLElement, arg?: string) => void\n}",
+      "source": "packages/uikit/widget.tsx"
+    },
+    {
+      "name": "WidgetLabel",
+      "description": "Passive text label using existing widget typography; never fetches or schedules refreshes.",
+      "props": "type WidgetLabelProps<T extends ElementType = 'b'> = PrimitiveProps<T>",
+      "source": "packages/uikit/widget-label.tsx"
+    }
+  ]
+}

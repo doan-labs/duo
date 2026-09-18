@@ -1,8 +1,14 @@
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
   body: { paddingTop: 20 },
-  title: { textAlign: 'center', fontSize: 20, fontWeight: 600, paddingBottom: 18 },
+  title: {
+    textAlign: 'center',
+    fontSize: appAppearance.podcastsFontSize,
+    fontWeight: appAppearance.musicFontWeight2,
+    paddingBottom: 18
+  },
   // iOS centres the icons rather than filling the width.
   grid: {
     display: 'grid',
@@ -19,7 +25,7 @@ export const styles = stylex.create({
     display: 'grid',
     justifyItems: 'center',
     gap: 6,
-    fontSize: 11,
+    fontSize: appAppearance.musicFontSize3,
     textAlign: 'center',
     cursor: 'pointer',
     transitionProperty: 'transform',

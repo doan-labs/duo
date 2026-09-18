@@ -1,7 +1,8 @@
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
+import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 // Home, the HomeKit app: accessory tiles that light up, and a thermostat dial you drag.
 
 import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent, useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -9,12 +10,12 @@ import { styles } from './styles.ts'
 type Acc = { name: string; room: string; on: boolean; glow: string; kind?: 'fan' }
 
 const ACCS: Acc[] = [
-  { name: 'Desk Lamp', room: 'Studio', on: true, glow: 'rgba(255,206,110,.7)' },
-  { name: 'Key Light', room: 'Studio', on: true, glow: 'rgba(255,255,255,.6)' },
-  { name: 'Rim Lights', room: 'Studio', on: false, glow: 'rgba(150,200,255,.6)' },
-  { name: 'Front Door', room: 'Entry', on: false, glow: 'rgba(120,255,170,.6)' },
-  { name: 'Fan', room: 'Studio', on: false, glow: 'rgba(150,220,255,.6)', kind: 'fan' },
-  { name: 'Speaker', room: 'Living', on: true, glow: 'rgba(255,140,200,.6)' }
+  { name: 'Desk Lamp', room: 'Studio', on: true, glow: appAppearance.homeGlow },
+  { name: 'Key Light', room: 'Studio', on: true, glow: appAppearance.homeGlow2 },
+  { name: 'Rim Lights', room: 'Studio', on: false, glow: appAppearance.homeGlow3 },
+  { name: 'Front Door', room: 'Entry', on: false, glow: appAppearance.homeGlow4 },
+  { name: 'Fan', room: 'Studio', on: false, glow: appAppearance.homeGlow5, kind: 'fan' },
+  { name: 'Speaker', room: 'Living', on: true, glow: appAppearance.homeGlow6 }
 ]
 
 const glyph = (a: Acc) =>
@@ -85,11 +86,11 @@ const Thermostat = ({ temp, onChange }: { temp: number; onChange: (t: number) =>
       <svg viewBox="0 0 130 130" {...stylex.props(styles.dialSvg)}>
         <defs>
           <linearGradient id="hg" x1={0} y1={0} x2={1} y2={1}>
-            <stop offset={0} stopColor="#59c8ff" />
-            <stop offset={1} stopColor="#ff9f0a" />
+            <stop offset={0} stopColor={appAppearance.homeColor} />
+            <stop offset={1} stopColor={appAppearance.homeColor2} />
           </linearGradient>
         </defs>
-        <Ring stroke="rgba(255,255,255,.12)" dash={C * 0.75} />
+        <Ring stroke={appAppearance.homeColor3} dash={C * 0.75} />
         <Ring stroke="url(#hg)" dash={C * 0.75 * ((temp - 12) / 18)} />
       </svg>
       <b {...stylex.props(styles.read)}>{temp}°</b>
@@ -100,18 +101,20 @@ const Thermostat = ({ temp, onChange }: { temp: number; onChange: (t: number) =>
 export const Home = () => {
   const [temp, setTemp] = useState(21)
   return (
-    <div {...stylex.props(shared.body)}>
-      <div {...stylex.props(shared.hero)}>My Home</div>
+    <Screen>
+      <LargeTitle>My Home</LargeTitle>
       <div {...stylex.props(styles.center)}>
         <Thermostat temp={temp} onChange={setTemp} />
-        <div {...stylex.props(shared.sub, styles.caption)}>Thermostat · Heating to {temp}°</div>
+        <Text as="div" size="caption" xstyle={[styles.caption]}>
+          Thermostat · Heating to {temp}°
+        </Text>
       </div>
-      <div {...stylex.props(shared.hdr, styles.hdr18)}>Favourites</div>
+      <Title xstyle={[styles.hdr18]}>Favourites</Title>
       <div {...stylex.props(styles.accs)}>
         {ACCS.map((a) => (
           <Tile key={a.name} a={a} />
         ))}
       </div>
-    </div>
+    </Screen>
   )
 }

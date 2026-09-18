@@ -1,3 +1,4 @@
+import { Screen } from '@doan-labs/ipduo-uikit'
 // A real browser in an iframe. Sites that refuse to be framed show blank; the
 // bookmarks are ones that don't.
 
@@ -49,7 +50,7 @@ export const Safari = ({ os }: { os: Os }) => {
     setText(host(url))
   }
   return (
-    <div {...stylex.props(shared.body, styles.body)}>
+    <Screen xstyle={[styles.body]}>
       <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" />
       <div {...stylex.props(styles.marks, !marks && shared.hide)}>
         {MARKS.map(([n, u]) => (
@@ -93,6 +94,6 @@ export const Safari = ({ os }: { os: Os }) => {
           <Sym name="tabs" size={22} />
         </button>
       </div>
-    </div>
+    </Screen>
   )
 }

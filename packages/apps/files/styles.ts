@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -6,8 +6,8 @@ export const styles = stylex.create({
     paddingTop: 3,
     paddingBottom: 3,
     paddingInline: 16,
-    fontWeight: 700,
-    fontSize: 12,
+    fontWeight: appAppearance.musicFontWeight,
+    fontSize: appAppearance.calendarFontSize2,
     lineHeight: 1.7,
     backgroundColor: colors.fillThin,
     color: colors.grey2,
@@ -15,7 +15,7 @@ export const styles = stylex.create({
     top: 0,
     zIndex: 1
   },
-  locIcon: { fontSize: 20 },
+  locIcon: { fontSize: appAppearance.podcastsFontSize },
   dz: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill,minmax(92px,1fr))',
@@ -29,15 +29,15 @@ export const styles = stylex.create({
     display: 'grid',
     justifyItems: 'center',
     gap: 6,
-    fontSize: 11,
+    fontSize: appAppearance.musicFontSize3,
     textAlign: 'center',
     cursor: 'pointer',
     transitionProperty: 'transform',
     transitionDuration: '.15s',
     transform: { default: null, ':active': 'scale(.92)' }
   },
-  fIcon: { fontSize: 44, lineHeight: 1 },
-  size: { fontSize: 10 },
-  bigIcon: { fontSize: 64 },
+  fIcon: { fontSize: appAppearance.filesFontSize, lineHeight: 1 },
+  size: { fontSize: appAppearance.calendarFontSize4 },
+  bigIcon: { fontSize: appAppearance.filesFontSize2 },
   count: { textAlign: 'center', paddingBlock: 6, paddingInline: 6 }
 })

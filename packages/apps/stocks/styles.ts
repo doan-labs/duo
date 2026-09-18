@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Local, not shared's: the StyleX compiler only follows keyframes imported from
@@ -14,21 +14,21 @@ export const styles = stylex.create({
     paddingInline: 16,
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: 'rgba(255,255,255,.08)',
+    borderBottomColor: appAppearance.musicBorderBottomColor,
     cursor: 'pointer'
   },
   nm: { flexGrow: 1, minWidth: 0 },
-  symbol: { fontSize: 16, fontWeight: 600, display: 'block' },
+  symbol: { fontSize: appAppearance.calendarFontSize, fontWeight: appAppearance.musicFontWeight2, display: 'block' },
   right: { textAlign: 'right', width: 78 },
-  price: { fontWeight: 600 },
+  price: { fontWeight: appAppearance.musicFontWeight2 },
   chip: {
     textAlign: 'center',
     paddingBlock: 2,
     paddingInline: 6,
     marginTop: 2,
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: 600,
+    borderRadius: appAppearance.musicBorderRadius4,
+    fontSize: appAppearance.calendarFontSize2,
+    fontWeight: appAppearance.musicFontWeight2,
     color: colors.white,
     backgroundColor: colors.greenBright,
     flexShrink: 0
@@ -41,18 +41,21 @@ export const styles = stylex.create({
     strokeDashoffset: '2400',
     animationName: draw,
     animationDuration: '1.2s',
-    animationTimingFunction: 'cubic-bezier(.3,.9,.3,1)',
+    animationTimingFunction: appAppearance.healthAnimationTimingFunction,
     animationFillMode: 'forwards'
   },
-  hdr17: { fontSize: 17 },
+  hdr17: { fontSize: appAppearance.messagesFontSize },
   quote: { paddingInline: 18, paddingBottom: 6 },
-  ticker: { fontSize: 28, fontWeight: 700 },
-  bigPrice: { fontSize: 40, fontWeight: 300, marginTop: 10 },
-  delta: { color: colors.greenBright, fontWeight: 600 },
+  ticker: { fontSize: appAppearance.stocksFontSize, fontWeight: appAppearance.musicFontWeight },
+  bigPrice: { fontSize: appAppearance.calculatorBorderRadius, fontWeight: appAppearance.homeFontWeight, marginTop: 10 },
+  delta: { color: colors.greenBright, fontWeight: appAppearance.musicFontWeight2 },
   deltaDn: { color: colors.redBright },
   chart: { paddingBlock: 14, paddingInline: 12 },
   ranges: { display: 'flex', justifyContent: 'space-around', paddingInline: 12, paddingBottom: 16 },
   pillOn: { backgroundColor: colors.blueDark, color: colors.white },
-  darkRow: { backgroundColor: 'rgba(255,255,255,.06)', borderBottomColor: 'rgba(255,255,255,.08)' },
+  darkRow: {
+    backgroundColor: appAppearance.musicBackgroundColor3,
+    borderBottomColor: appAppearance.musicBorderBottomColor
+  },
   white: { color: colors.white }
 })
