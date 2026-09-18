@@ -1,6 +1,7 @@
 {
   "name": "@doan-labs/duo",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "BUN_JSC_useFTLJIT=false bun ./serve.ts",
