@@ -28,7 +28,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Duo — Apple’s folding iPhone, simulated, that you can build apps for' },
+      { title: 'Duo - Apple’s folding iPhone, simulated, that you can build apps for' },
       {
         name: 'description',
         content:

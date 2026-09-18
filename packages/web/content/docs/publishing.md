@@ -24,7 +24,7 @@ Lane is a review status, not a capability. An official app has exactly the same 
 
 The curated catalog is built from source in the repository. An app is a folder under `community-apps/<app-slug>/` holding its manifest, source, icon, screenshots, readme, changelog and MIT licence, plus an entry in `community-apps/registry.json` naming the GitHub accounts allowed to maintain it.
 
-You add that folder in a pull request opened with the `app-submission` template. CI runs `bun scripts/check-submissions.ts` over it; a passing check means the submission is eligible for review, not that it is accepted. Merging is acceptance. After the merge, the publish workflow builds the immutable release and writes it to the catalog hosted at `https://duo.doan-labs.com/catalog/index.json` — the app is live only once that run succeeds.
+You add that folder in a pull request opened with the `app-submission` template. CI runs `bun scripts/check-submissions.ts` over it; a passing check means the submission is eligible for review, not that it is accepted. Merging is acceptance. After the merge, the publish workflow builds the immutable release and writes it to the catalog hosted at `https://duo.doan-labs.com/catalog/index.json` - the app is live only once that run succeeds.
 
 The full guide, including the first launch's acceptance rules, is at [/publish](/publish).
 

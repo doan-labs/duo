@@ -58,7 +58,7 @@ page.on('request', (r) => (r.frame() !== page.mainFrame() ? r.abort() : r.contin
 
 // Runs in the page: WCAG contrast of an element's text against the first
 // ancestor that actually paints a background. Transparency is walked through,
-// not blended — an element over a translucent layer reads the layer below it.
+// not blended - an element over a translucent layer reads the layer below it.
 const PROBE = () => {
   const rgb = (s) => (s.match(/[\d.]+/g) ?? []).map(Number)
   const lum = ([r, g, b]) =>
@@ -240,7 +240,7 @@ const still = await page.evaluate(() => {
   const v = document.querySelector('video')
   return { hidden: hidden.slice(0, 5), count: hidden.length, video: v && { paused: v.paused, autoplay: v.autoplay } }
 })
-if (still.count) fail(`reduced motion: ${still.count} element(s) in main at opacity 0 — ${still.hidden.join(', ')}`)
+if (still.count) fail(`reduced motion: ${still.count} element(s) in main at opacity 0 - ${still.hidden.join(', ')}`)
 if (still.video && !still.video.paused && still.video.autoplay) fail('reduced motion: hero video is playing')
 console.log('reduced motion ok: nothing hidden, hero video still')
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }])

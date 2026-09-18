@@ -75,9 +75,11 @@ headless Chromium results do not establish native WebKit parity.
 
 ## Conventions
 
+- Hard rule: em dashes (U+2014) are banned throughout the repository. Use only the normal ASCII dash (`-`, U+002D) instead.
+
 - One responsibility per file, named after it. New feature the web can call: a file in `packages/shell/desktop/commands/`. New OS-specific code: behind the `Platform` trait in `packages/shell/desktop/platform/`. Never inline either in `main.rs`.
 - `packages/shell/native.ts` owns every Tauri check. The rest of the web code never touches `window.__TAURI__`.
-- Shaders are TS modules exporting a string, not `.glsl` files — the bundler treats those as assets.
+- Shaders are TS modules exporting a string, not `.glsl` files - the bundler treats those as assets.
 - UI is React function components styled with StyleX: `stylex.create` at the bottom of the file, longhand properties only, pseudo-classes and media queries as nested values, no descendant selectors, never `className` or `style` next to `stylex.props`. Colours and easings come from `packages/uikit/tokens.stylex.ts`. The only plain CSS is the `@layer reset` block in `packages/shell/index.html`.
 - Assets belong in `public/`, imported by URL. Apple's model is not redistributable, so it stays out of git.
 - Units are centimetres. The camera is fixed at z=40 and the screen shader projects from that eye; moving it breaks the projection.

@@ -30,7 +30,7 @@ function Page() {
         </Button>
       </div>
       <p {...stylex.props(styles.note)}>
-        The button opens GitHub's compare view with the submission template selected — that is what{' '}
+        The button opens GitHub's compare view with the submission template selected - that is what{' '}
         <Code>?template=app-submission.md</Code> in the URL does. Push a branch with your app on it first; the compare
         view cannot create the source for you.
       </p>
@@ -233,7 +233,7 @@ bun run check                            # import boundaries, strict TypeScript,
           </Table>
           <p {...stylex.props(styles.p)}>
             To ship an update, bump <Code>version</Code>, add a changelog entry, and open a new pull request. If a
-            publish fails, the reason is in that workflow run. To have an app removed from the catalog, open an issue —
+            publish fails, the reason is in that workflow run. To have an app removed from the catalog, open an issue -
             delisting stops new installs; it does not uninstall the app from anyone's phone and does not delete their
             data.
           </p>

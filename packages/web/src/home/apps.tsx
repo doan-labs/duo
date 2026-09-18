@@ -184,10 +184,10 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
               <td {...stylex.props(styles.td)}>
                 <StatusChip status={a.status} />
               </td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.release?.version ?? '—'}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.release?.version ?? '-'}</td>
               <td {...stylex.props(styles.td)}>{a.release ? <Permissions app={a.release} /> : <Dash />}</td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.created) : '—'}</td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.updated) : '—'}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.created) : '-'}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.updated) : '-'}</td>
             </tr>
           ))}
         </tbody>
@@ -239,7 +239,7 @@ function Name({ entry, row = false }: { entry: Entry; row?: boolean }) {
   )
 }
 
-const Dash = () => <span {...stylex.props(styles.mono)}>—</span>
+const Dash = () => <span {...stylex.props(styles.mono)}>-</span>
 
 function StatusChip({ status }: { status: Status }) {
   return (

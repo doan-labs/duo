@@ -47,7 +47,7 @@ export const api: ApiEntry[] = [
     "file": "packages/sdk/legacy.ts",
     "line": 10,
     "doc": "",
-    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own — shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
+    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
     "members": [
       {
         "name": "store",
@@ -83,7 +83,7 @@ export const api: ApiEntry[] = [
         "name": "mirror",
         "type": "boolean",
         "optional": true,
-        "doc": "This instance is the copy the other display holds while the phone folds\n(docs/decisions.md 24); the one in use is running too. A copy draws\neverything and starts no sound of its own — shared playback (music.tsx's\n`deck`) is module state and already plays once."
+        "doc": "This instance is the copy the other display holds while the phone folds\n(docs/decisions.md 24); the one in use is running too. A copy draws\neverything and starts no sound of its own - shared playback (music.tsx's\n`deck`) is module state and already plays once."
       },
       {
         "name": "camera",
