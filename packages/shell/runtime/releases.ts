@@ -53,6 +53,8 @@ export async function download(
 ): Promise<StoredRelease> {
   const url = new URL(base, location.href)
   if (!url.pathname.endsWith('/')) url.pathname += '/'
+  // Static hosts canonicalise a raw `+` to `%2B` with a redirect, which `redirect: 'error'` refuses.
+  url.pathname = url.pathname.replaceAll('+', '%2B')
   const metadata = await boundedFetch(new URL('release.json', url).href, 64 * 1024)
   if (listed && (await digest(metadata)) !== listed.sha256) throw new Error('Release metadata hash mismatch')
   const parsed: unknown = JSON.parse(new TextDecoder().decode(metadata))
