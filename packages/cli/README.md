@@ -33,8 +33,8 @@ App Store to clear it. Device permissions remain deferred for previews.
 
 `serve` provides loopback static hosting with CORS. Load its `/index.json` URL
 in App Store, then GET/OPEN. Explicit Refresh uses the selected catalog; no
-background catalog polling is enabled. Stage 3 supersedes the initial MVP
-deferral; see [its evidence](../../docs/platform/progress/stage-3.md).
+background catalog polling is enabled. See [the review guide](../../docs/platform/review.md)
+for reproduction and verification scope.
 
 `bun scripts/check-platform.ts` runs the corresponding repository/CI gate,
 including SDK tests, generated API freshness and the opaque-frame UI gallery.

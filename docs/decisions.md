@@ -545,7 +545,7 @@ host-mediated media contract; the sandbox does not gain `allow-same-origin`.
 
 ## 43. Stage 2 launches at the four-outcome MVP gate
 
-2026-09-18. The user's [scope amendment](platform/stage-2-mvp.md) supersedes
+2026-09-18. The user's scope amendment supersedes
 the broader stage 2 completion matrix, including decision 42's requirement
 to finish additional permissions for launch. Capture stays denied. Keep core
 infrastructure and existing lifecycle safeguards; optional live development
@@ -606,3 +606,21 @@ and code after validation. Same-release loads reuse the URL; replacement/removal
 revoke it under the existing app lock. Storage namespace, SDK protocol, opaque
 sandbox and generation rules are unchanged. Cost: one in-memory document copy
 per loaded developer app and a required `blob:` allowance in shell frame CSP.
+
+## 50. Current guidance, roadmap and evidence have separate homes
+
+2026-09-18. The documentation index routes tasks to current maintainer/platform guides.
+The accepted contract moves out of progress; completed reports, original proposals and
+superseded scope instructions remain dated archives. Current references incorporate explicit
+amendments; the roadmap owns deferred work. This supersedes instructions to append completed
+workstreams to a live progress folder, not runtime decisions or safety requirements.
+Cost: moved links and website consumers need checking. The root README remains the only
+repository tree; generated API data stays at its existing path and is never hand-edited.
+
+## 51. Remove documentation archives after the restructure
+
+2026-09-18. At the user's request, remove both documentation archive directories as well
+as the empty progress directory. Supersedes decision 50's archive-retention policy.
+Current guides retain the accepted contract, launch scope and verification limitations;
+committed history remains available through Git. Do not recreate archive/progress folders.
+Cost: old proposals and checkpoint narratives are no longer browsable as current files.

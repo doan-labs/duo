@@ -18,7 +18,8 @@ bun run desktop:build        # .app / .exe / .AppImage
 [Developer platform review](docs/platform/review.md): create an external app,
 install it without rebuilding the simulator, and reproduce stages 2–5 evidence.
 
-`docs/architecture.md` how it fits together, `docs/decisions.md` why, `docs/working.md` how to add things and what is known broken, `docs/debug.md` how to drive and verify it from a terminal.
+[Documentation index](docs/README.md): architecture, working guide, debugging, decisions,
+current platform references, roadmap and verification guidance.
 
 ## Layout
 
@@ -44,7 +45,9 @@ stylex-plugin.ts    shared Bun StyleX compilation
 bunfig.toml         development plugin registration
 tsconfig.json       shared strict TypeScript configuration
 .cargo/             shared Rust cache configuration and shell-check alias
-docs/               architecture, decisions, workflow, debug and platform plan
+docs/               maintainer guides and documentation index
+  platform/         current platform references, roadmap, publication/website plans
+    api/            generated UI-kit API data
 scripts/            model preparation, asset extraction, screenshots
   build-app.ts      isolated document builder and local release catalog
   build-preinstalled.ts  bundled Notes and Weather releases

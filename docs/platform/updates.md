@@ -1,29 +1,21 @@
-# Updates
+# App updates and recovery
 
-The [stage 2 MVP amendment](stage-2-mvp.md) defers native shell updating and
-advanced app-update recovery from the launch gate. Existing basic lifecycle
-code is retained only with its documented verification scope.
-
-**Implemented:** the app update flow and recovery below (download as install,
-`candidate`, lease-gated activation, checkpoint, `trial`, `failedVersion`,
-Restore/Retry) in `packages/shell/runtime/lifecycle.ts`. **Not implemented:**
-CI publication, the Tauri updater, `update.*` in `native.ts`, the Software
-Update screen, badges and boot/daily checks. Those sections are the original plan.
-
-Two paths because two different things change at two different speeds.
+Implemented in `packages/shell/runtime/lifecycle.ts`; the [contract](contract.md) owns
+its invariants. Updates are explicitly requested through Store and bound to the original
+catalog origin. There is no periodic catalog polling or automatic shell updater.
 
 ## Apps, over the CDN
 
 App updates need no shell restart. The Store downloads and verifies the new
 release exactly as an install does, records it as `candidate`, and activates
-it when no tab holds a session lease for the app (progress/contract.md §4.5).
+it when no tab holds a session lease for the app (contract.md §4.5).
 Activation checkpoints the app's data and widget snapshots in the same
 transaction that flips `current`, marks the release `trial` until its first
 `ready`, and delivers the migration context to the owner view once before
 secondary views mount. It never tears down a running view and never imports
 app code into the shell.
 
-Recovery (progress/contract.md §4.6): the device keeps one known-good pair,
+Recovery (contract.md §4.6): the device keeps one known-good pair,
 the previous release's bytes and the data checkpoint taken at activation, and
 replaces that pair only when the next candidate proves itself with `ready`. A
 release that fails to start twice, counted per launch attempt, offers
@@ -35,42 +27,21 @@ migration context and a schema marker; the host records completion on
 `ready`. Repointing the catalog to an older version is not a mechanism; the
 on-device recovery pair is.
 
-Publishing an update is a PR that bumps `version` in the manifest and adds a
-line to the app's `CHANGELOG.md`. CI builds the bundle, uploads under the new
-version folder, then publishes `index.json`. A rebuild after a shared dependency
-change must not overwrite previously published release bytes.
+## Authoring an update
 
-## Shell, over Tauri's updater
+Bump the authored manifest version, document it in CHANGELOG, check/build, then serve
+the catalog from the same origin. Store Refresh offers the candidate. Public CI uploads,
+release governance and npm publication are separate [publishing plans](publishing.md).
+Release bytes are immutable, including shared-dependency rebuilds.
 
-Use Tauri 2's separately installed `tauri-plugin-updater`. Its update signatures
-are distinct from operating-system code signing and notarization. Plugin setup,
-signing credentials, and updater artifacts are implementation prerequisites.
+## Retained safeguards and remaining work
 
-- CI signs the build with the updater keypair and uploads `shell/latest.json`
-  plus platform-specific updater artifacts and installers. macOS updater
-  downloads use the signed app archive, not the DMG download itself.
-- `native.ts` exposes `update.check()`, `update.download(onProgress)`,
-  `update.install()`. Browser builds report native updating as not applicable,
-  rather than claiming to have checked the current web deployment.
-- Settings → General → Software Update is the real screen: version, release
-  notes from the shell's `CHANGELOG.md`, Download and Install, a progress bar,
-  then Restart Now. The badge on Settings comes from the same check.
+Locks, generation checks, leases, checkpoints, trial/recovery state and reconciliation
+remain enabled even when optional entry points are unavailable. Disabling them could
+strand durable state. [current platform verification](review.md) records actual verification; full
+native update/recovery parity is not claimed.
 
-The native shell checks on boot and daily. Web deployment and native updating
-are separate: an already-open tab can retain an older shell. Web reload and
-cache behavior need an explicit policy before promising it is up to date.
-
-## What ties them together
-
-The SDK's host contract. Runtime requirements determine app compatibility;
-a shell update may supply the required API or protocol support. The app's
-bundled UI kit has its own version and does not gate host compatibility.
-The store's "Requires a newer platform version" row links to Software Update when a shell
-update that would satisfy it is waiting.
-
-## Skipped
-
-Delta updates and staged rollouts remain outside the initial proposal. Bundle
-sizes and release cadence must be measured. Installed-app revocation, artifact
-verification/signing, and recovery remain open. Hiding a Store listing is not
-equivalent to preventing an installed release from running.
+Native shell updating, Software Update UI, updater signing/plugin configuration, badges,
+boot/daily update checks, advanced recovery UI, revocation and staged rollouts remain
+[roadmap](roadmap.md). An open web tab also needs an explicit deployment freshness policy;
+a native updater would not make it current. No updater dependency has been added.

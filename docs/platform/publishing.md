@@ -1,82 +1,42 @@
-# Publishing
+# Publication plan and current validation
 
-The [2026-09-18 scope amendment](stage-2-mvp.md) allows a separately authored,
-separately built developer catalog for the launch proof. The in-repo PR/CI
-workflow below remains a curated-catalog roadmap and does not block this gate.
+Status: local validation exists; public package/catalog publication is not implemented.
+Use [development](dev.md) and [the local review guide](review.md) to distribute a separately
+built developer catalog today. Apps do not need to contribute source to this repository
+for that workflow. Public release requires separate authorization and release decisions.
 
-**Implemented:** the per-app `check` rules (lane, CHANGELOG, caps, icon, import
-boundary, strict types, tokens) and `.github/workflows/platform.yml`, which runs
-`scripts/check-platform.ts` only. **Not implemented:** published `npx` packages,
-merge-triggered catalog builds and uploads, id uniqueness and version-bump
-checks, PR comments, icon variants, per-submission Puppeteer isolation runs.
+## Implemented checks
 
-Every app is a folder under `packages/apps/`, MIT, in this repo. Publishing is
-a pull request.
+CLI check validates manifest metadata, lane membership, CHANGELOG, icon, strict types,
+import boundaries, tokens and bundle size. `official` is checked against `OFFICIAL.txt`.
+The document hard cap is 4 MiB; runtime release download caps are 8 MiB. Isolation is
+provided by the sandbox and bridge, not static source checks.
 
-## Lanes
+`.github/workflows/platform.yml` runs `scripts/check-platform.ts`: types, SDK tests,
+API freshness, token/negative validation checks, app/shell builds and the isolated gallery.
+The gate passed locally; a remote CI pass is not claimed by the implementation reports.
 
-| | Official | Community |
-| --- | --- | --- |
-| Who | The maintainer, or promoted from community | Anyone |
-| Downloadable runtime | Sandboxed bundle | Sandboxed bundle |
-| Direct `native.ts` access | No; baked shell components are a separate boundary | No |
-| Cover display | Required of every app, verified by contract check F | Same |
-| Review | Maintainer | Maintainer, with author participation |
-| Store | No ribbon | Community ribbon, author shown |
+## Proposed curated catalog
 
-Lane is set in the manifest but enforced by CI: `official` outside
-`OFFICIAL.txt` at the repo root fails the build. Promotion is a one-line PR to
-that file. Promotion changes maintenance/review status, not execution privileges.
-Protect the trust list and publishing configuration with maintainer review;
-CODEOWNERS listing multiple people does not require approval from each of them.
+A reviewed source-in-repository workflow remains proposed for the curated catalog:
+MIT apps, maintainer-controlled official/community lanes, reviewed dependencies,
+inner/cover screenshots and explicit permission review. Lane is maintenance status,
+never permission to execute in the shell. Protect trust lists and release configuration.
 
-## The PR
+Before enabling merge-to-publication, implement and verify id uniqueness/version-bump
+checks, per-submission isolation tests, immutable artifact upload followed by catalog
+publication, release metadata and failure handling. Every app supports the cover;
+there is no `cover` flag. Icon variants and PR comments remain unimplemented.
 
-1. `npx @doan-labs/ipduo create` or copy an existing folder.
-2. `npx @doan-labs/ipduo check` locally.
-3. Open the PR. The template asks for a screenshot on the inner display and,
-   if `cover: true`, one on the cover display.
-4. CI runs the checks below. Human review covers code and behavior as well as
-   icon, name, and summary. Static checks do not prove arbitrary code safe.
-5. Merge publishes: CI builds the immutable bundle from reviewed source,
-   uploads the complete release, and publishes `index.json` afterward.
+Public SDK/kit/CLI distribution needs versions, provenance and credentials. Use the existing
+local toolchain; no published `npx` workflow is promised. Catalog hashes are not signatures.
+Publisher authentication and signing remain separate design/release decisions.
 
-## What CI checks
+## Removal and privacy decisions
 
-Everything a machine can decide, so the human review stays short:
+Delisting a catalog entry, disabling an installed app and deleting its data are different
+actions. Existing user uninstall is implemented; maintainer revocation and distribution
+recovery policy remain open. Do not treat a removed listing as revoked execution authority.
 
-- Manifest matches the schema. `id` is reverse-DNS and unique. `license` is MIT.
-  `permissions` names rows of the SDK permission table; the PR comment lists
-  them in words ("Can use: Location, Photos") so the reviewer's approval is
-  the grant (progress/contract.md §6).
-- `version` increased if any file in the folder changed.
-- `CHANGELOG.md` has a line for that version.
-- Build succeeds with declared SDK and kit dependencies. Host compatibility
-  is checked separately through the SDK contract.
-- Measure the full bundle, including runtime dependencies and assets. The
-  earlier 100 KB JS / 20 KB CSS proposal needs reevaluation for isolated apps;
-  final limits and override policy remain open.
-- No native API imports or direct host-internal access in downloadable apps.
-  The SDK owns parent-window messaging. Network declarations and static checks
-  aid review but do not provide runtime isolation.
-- No hex colours or font literals; tokens only.
-- `icon.png` is 1024 square. CI generates every variant.
-- Typecheck passes against SDK and kit exports.
-- The app mounts as a mirror without throwing and without starting audio
-  (a Puppeteer smoke run, `docs/debug.md` already drives the shell headless).
-  Explicitly check isolation, sender validation, teardown, and native IPC denial;
-  a successful mount is not evidence of those properties.
-
-## Removal
-
-An author may remove their app by PR. The maintainer may remove an app that
-breaks the rules above after merge; the folder goes, the CDN keeps old
-versions, and `index.json` drops the listing. Delisting, disabling an installed
-app, and deleting its data are separate actions. Installed-app revocation and
-recovery behavior remain open decisions.
-
-## Telemetry
-
-The shell already reports to PostHog. For apps it reports open and close by id
-and nothing from inside the app. Iframe apps cannot be observed further by
-construction. This sentence appears on the Developers page.
+Any public telemetry statement must be checked against actual instrumentation and approved
+before publication. This document makes no new claim about deployed analytics. See [roadmap](roadmap.md) for outstanding release work.

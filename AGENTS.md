@@ -32,18 +32,32 @@ The authoritative file tree is in [README.md](README.md).
 
 ## Docs
 
-`docs/` is the memory of this project. Read before changing anything non-trivial:
+`docs/` is the memory of this project. Start with the [documentation index](docs/README.md),
+then read the pages relevant to the task before changing anything non-trivial:
 
-- `docs/architecture.md` when touching main.ts, os/, shaders/ or desktop/.
-- `docs/working.md` for commands, debug hooks, how to add an app or a command, and known limits.
-- `docs/decisions.md` before reversing something that looks odd; it is usually there on purpose.
-- `docs/debug.md` before verifying anything: how to drive headless Chrome and the desktop
-  window from a terminal, the state probe, and the false alarms already run into.
+| Task | Read |
+| --- | --- |
+| Scene, fold, displays, SpringBoard or native shell | [Architecture](docs/architecture.md), [working guide](docs/working.md) |
+| SDK, sandbox, app sessions, storage or lifecycle | [Platform overview](docs/platform/README.md), [accepted contract and amendments](docs/platform/contract.md), [runtime](docs/platform/runtime.md), [security](docs/platform/security.md); [manifest](docs/platform/manifest.md) or [updates](docs/platform/updates.md) as relevant |
+| App authoring, CLI, UI kit or Store | [Development](docs/platform/dev.md), the relevant package README, [UI kit](docs/platform/uikit.md) or [Store](docs/platform/store.md); distinguish trusted baked apps from sandboxed apps |
+| Verification, website integration or release preparation | [Debugging](docs/debug.md) before verification, [local review](docs/platform/review.md) for reproducible platform checks for measured limits; [website handoff](docs/platform/website-integration.md), [website plan](docs/platform/web.md) and [publishing](docs/platform/publishing.md) when relevant |
+| Scope or design changes | [Project decisions](docs/decisions.md), [roadmap](docs/platform/roadmap.md), [current scope](docs/platform/README.md) |
 
-Update them in the same change: a new constraint or gotcha goes in working.md, a design
-choice with a cost goes in decisions.md as a new numbered entry (never edit history; supersede),
-a moved responsibility goes in architecture.md, a new way to observe or a new false alarm goes
-in debug.md. The README's file tree is the only file tree.
+Current platform references describe enabled behavior; the roadmap separates deferred work.
+The contract governs enabled safety guarantees. Resolve apparent code/contract conflicts
+explicitly; do not silently weaken the contract to match code. Verification claims belong
+in the current review guide with their limits. Chromium evidence is not native parity,
+publication or deployment evidence. Do not recreate progress or archive folders; Git history
+retains committed historical documents.
+
+Update the owning guide in the same change: constraints and gotchas in working.md,
+responsibilities in architecture.md, observation procedures and false alarms in debug.md.
+Append numbered design decisions to decisions.md; preserve history and explicitly supersede
+conflicting entries. Update platform references for SDK/runtime changes and regenerate
+`docs/platform/api/uikit.json` through `scripts/generate-kit-docs.ts`, never by hand.
+Keep [the documentation index](docs/README.md) and this task routing current when pages move;
+fix inbound links and check website doc consumers. The root README remains the only repository
+file tree.
 
 ## Verification
 

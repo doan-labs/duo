@@ -1,50 +1,30 @@
-# Runtime contract (stage 2 gate), revision 2
+# Runtime contract
 
-**Scope superseded 2026-09-18:** [stage 2 MVP amendment](../stage-2-mvp.md)
-replaces the all-steps/all-checks launch gate with four outcomes. This contract
-continues to govern safety and behavior of enabled capabilities; optional
-roadmap checks do not block the revised review. Historical sections are retained.
+Accepted design for enabled SDK/runtime capabilities, incorporating the implemented scope
+amendments through 2026-09-18. The SDK source owns exact public types; code sketches here
+explain invariants and are not an independently maintained API declaration. A discrepancy
+between implementation and an invariant needs an explicit resolution, not silent weakening.
 
-2026-09-17. The contract the SDK, the shell and the first sandboxed app are
-built against. Accepted for implementation at the start of stage 2, with the
-launch-generation clarification below decided during implementation.
-Publishing and deployment remain outside this stage.
+Numbered sections remain stable for existing references. “Accepted”, “Settled” and
+“Recommended” inside inherited design sections describe design provenance, not a passed test.
 
-Revision 1 was reviewed the same day: 5 recommendations accepted, 9 changed,
-5 prose recommendations given verdicts, and five amendment groups R1 to R5.
-The review is kept verbatim in [contract-review-1.md](contract-review-1.md).
-This revision incorporates every amendment into the types, the lifecycle
-algorithms, the checks and the companion documents. The appendix maps each
-verdict to the section that resolves it.
+Launch acceptance covers an independent app, isolation, visible fold/display use and
+installation without simulator rebuild. Stages 3–5 subsequently enabled verified previews
+and updates and completed the kit/audit. [The roadmap](roadmap.md) owns remaining work;
+[the review guide](review.md) records measured coverage and explicit native limitations.
 
-Amendment, same day, accepted in discussion: **permissions ship on day one**
-for browser features and host services, with review as the grant (§6). This
-supersedes "permissions are reserved and empty in v1". Native services stay
-reserved. Amendment accepted 2026-09-18 during implementation: camera and
-microphone capture are deferred until a host-mediated media contract exists.
-They are always denied in the iframe policy and rejected as manifest permissions.
-Geolocation, clipboard and photos remain in scope. See [stage-2.md](stage-2.md)
-for the opaque-origin capture experiment.
-
-Labels: **Settled** follows from decisions.md or from how the shell already
-works. **Accepted** was approved in review as a design direction, not as a
-passed runtime check. **Recommended** is this revision's answer to a required
-change; adopting it is the review's call. **Open** needs a measurement or a
-runtime check, named next to it.
-
-What the current shell already fixes, and this contract keeps: an open app has
-a live instance on both displays at every hinge angle (`follow()` in device.ts
-runs every frame; the cover copy exists at 180° and is hidden there), scenes
-are per display with `side` for a split half, the inner display's split
-collapses to the first app when the lead passes 40°, and the home screen is
-baked to canvas while the fold moves.
+Current amendments: development src executes verified Blob bytes; app code calls ready
+(the kit is passive); external catalogs and previews accept no device permissions;
+camera/microphone are always refused. Updates bind to the installed catalog origin.
+No periodic catalog polling or automatic native updater is enabled. These scope limits
+preserve the sandbox, generation, session, transaction and lifecycle safeguards below.
 
 ## 1. Manifest and compatibility
 
 ### 1.1 Authored manifest
 
 One `manifest.json` per app folder. The author writes this and nothing else
-about the release; everything derived is written by CI.
+about the release; everything derived is written by the builder. Curated CI publication remains planned.
 
 ```ts
 /** packages/sdk/manifest.ts */
@@ -53,10 +33,10 @@ export type Manifest = {
   id: string
   /** Home screen label and store title. ≤ 12 characters. */
   name: string
-  /** Release version, strict semver without build metadata. Must increase in every PR touching the folder. */
+  /** Release version, strict semver without build metadata. Use a new version for an authored update. */
   version: string
   lane: 'official' | 'community'
-  /** Source entry CI builds, relative to the app folder. */
+  /** Source entry the builder consumes, relative to the app folder. */
   entry: string
   /** 1024 px square PNG, relative to the app folder. */
   icon: string
@@ -71,7 +51,7 @@ export type Manifest = {
    * scheme, host, optional port; no paths, wildcards or CSP keywords (§2.6).
    */
   network?: string[]
-  /** Names from the SDK permission table (§6). Review is the grant; undeclared means refused. */
+  /** Names from the SDK permission table (§6); subject to enabled-source restrictions. */
   permissions?: PermissionName[]
   author: string
   repo: string
@@ -92,7 +72,7 @@ Loopback HTTP origins are accepted only by the `?dev=` loader (§2.7).
 
 ### 1.2 Built release
 
-CI turns the manifest and the entry into an immutable release. The shell, the
+The builder turns the manifest and the entry into an immutable release. The shell, the
 store and the loader read `release.json`, never the authored manifest.
 
 ```ts
@@ -119,7 +99,7 @@ export type ReleaseId = `${string}+${string}`   // `${manifest.version}+${build.
 
 Recommended (R4): the **release identity is `version+hash`**. A shared-code
 change that alters bytes produces a new identity under the same authored
-version; CI never writes into an existing identity's folder, so no immutable
+version; the builder never writes into an existing identity's folder, so no immutable
 URL is ever overwritten. The store shows `version`; the shell, the index and
 the CDN path use the identity. Semver build metadata is legal and ignored by
 precedence, so no author workflow changes. Alternative rejected: forcing a
@@ -180,8 +160,8 @@ A latest-only catalog cannot implement the shelf rule above. See store.md.
 
 ### 2.1 App document
 
-Implementation clarification (2026-09-18, stage-5 audit): the direct developer
-server navigation below is superseded by decision 49. Development still uses
+Implementation clarification (2026-09-18, stage-5 audit): direct developer
+server navigation was superseded by decision 49. Development still uses
 `iframe.src`, but its Blob URL contains the exact downloaded and verified HTML.
 The developer origin remains the storage namespace and release source. No SDK,
 sandbox, ownership or generation contract changes.
@@ -189,7 +169,7 @@ sandbox, ownership or generation contract changes.
 Accepted: a release's app document is one file, `app.html`, with its script
 and styles inline and its assets as data URIs. Installed apps load through
 `iframe.srcdoc` from the stored string; `?dev=` apps load through `iframe.src`
-from the developer's server. The complete builder and both loaders are proven
+from an owned Blob URL of verified downloaded HTML. The complete builder and both loaders are proven
 in Chromium and WKWebView by experiment E0 before anything depends on them
 (§5).
 
@@ -259,7 +239,7 @@ host                                          app document (SDK)
    (a duplicate hello here is an idempotent retry: fresh welcome, fresh port)
                                                on welcome: keep port, post ack over the port
  on ack over port: state = connected; further hellos for this generation → refuse + revoke
-                                               render, then os.ready() → {ev:'ready'}
+                                               render, then app calls os.ready() → {ev:'ready'}
  on ready: state = ready, T_ready cleared
 ```
 
@@ -300,6 +280,7 @@ export type Evt =
   | { ev: 'arg'; p: { arg: string; argSeq: number } }
   | { ev: 'owner'; p: { epoch: number } | null }
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
+  | { ev: 'command-result'; p: { cmdId: string } }
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }
 export type AppEvt =
   | { ev: 'ack' } | { ev: 'ready' }
@@ -378,18 +359,18 @@ write failed. `open` and `home` are never retried.
 | Request rate per view | 200 per second sustained, burst 400 (token bucket) | `E_RATE`, with `retryAfterMs` in `msg` |
 
 Sizes are bytes, not characters; the envelope limit is the value limit plus
-headroom for the frame. The SDK enforces the same limits locally first. Values
-are provisional until Notes and Weather are measured (open).
+headroom for the frame. The SDK enforces the same limits locally first. These are the current SDK limits in `packages/sdk/protocol.ts`. Document caps are
+1 MiB soft / 4 MiB hard; complete release downloads are capped at 8 MiB.
 
 ### 2.6 App document policy
 
-Accepted with change (R2): CI writes a `<meta http-equiv="Content-Security-Policy">`
+Accepted with change (R2): the builder writes a `<meta http-equiv="Content-Security-Policy">`
 as the first child of `<head>`, before any script or style:
 
 ```
 default-src 'none';
 script-src 'sha256-<inline script>';
-style-src 'sha256-<inline style>' 'unsafe-hashes' 'sha256-<each dynamic style attribute CI can enumerate>';
+style-src 'sha256-<inline style>';        includes the builder-authorized CSSOM stylesheet
 img-src data:;
 font-src data:;
 connect-src <network origins>;        omitted when network is empty, which is 'none' under default-src
@@ -401,15 +382,14 @@ What this enforces, stated exactly: `connect-src` bounds `fetch`, XHR,
 WebSocket, EventSource and beacons. It is not a general egress control. A
 document can still navigate itself to a URL (the sandbox prevents navigating
 anything else), and a request already sent before teardown has been sent.
-CI's static checks and review read the same short `network` list; the CSP is
+Static checks and review read the same short `network` list; the CSP is
 the runtime bound on connections, and that is all it claims.
 
-StyleX emits static rules, so the inline style hash covers them. Dynamic
-styles (`stylex.props` with runtime values writes `style` attributes) need
-`'unsafe-hashes'` and the enumerated attribute hashes, or a builder that
-lifts them into classes; E0 decides which and the builder is corrected before
-Notes is built. The kit's icon and font URLs are rewritten to data URIs by the
-builder; an app document has no shell-relative asset.
+The builder hashes static styles and lifts dynamic StyleX values into CSSOM classes in
+an initially empty, hash-authorized stylesheet. Runtime values are parsed as individual
+properties, not interpolated as stylesheet source. Kit icons/fonts are embedded as data
+URIs; documents have no shell-relative asset dependency. The earlier hashes-versus-classes
+experiment is resolved by [project decision 38](../decisions.md#38-isolated-documents-carry-assets-and-lift-dynamic-styles-into-classes).
 
 Requests from an opaque origin carry `Origin: null`; the API must answer with
 `Access-Control-Allow-Origin: *` and the app must not send credentials. This
@@ -463,7 +443,7 @@ A sandboxed app document must observe all of these, from `srcdoc` and from
 export const os: {
   /** Resolves after welcome and ack. Call before rendering. */
   connect(): Promise<void>
-  /** First frame painted. The kit's <Screen> calls it once. */
+  /** App signals its first painted frame after initialization/migration; the kit does not call this. */
   ready(): void
   view: ViewInfo
   onView(cb: (v: ViewInfo) => void): () => void
@@ -612,9 +592,9 @@ What the host does not and cannot guarantee: that a non-owner view never calls
 `fetch` or `setInterval`. Ownership is cooperative; it tells a well-behaved
 app which of its documents should act. The platform therefore promises
 **at-most-one designated owner**, not exactly-once effects. Apps make their
-effects idempotent; the kit's `useOwnerEffect(fn, deps)` runs `fn` only while
-owner and re-runs it on gaining ownership, and its cleanup cannot recall a
-request already sent.
+effects idempotent; apps subscribe to `os.onOwner`, start effects only while designated owner, and clean
+up on revocation. Cleanup cannot recall a request already sent. A public
+`useOwnerEffect` helper is not promised by the current kit.
 
 Timers: browsers throttle timers in hidden and background frames, and no CSS
 change alters that. The contract asks apps to schedule by **deadline**
@@ -771,10 +751,9 @@ transaction's `complete` event; `E_STORAGE` is raised on `error`, `abort` or
 `QuotaExceededError`, the working release is left untouched, and the sheet
 says so.
 
-Open (check H): IndexedDB under `tauri://localhost` in WKWebView, including a
-1 MiB string round trip across an app restart and eviction behaviour. Fallback
-if it fails: a native filesystem command behind `native.ts`, a new plugin that
-needs asking.
+Measured: native IndexedDB persisted a 1 MiB value across process restart; Web Locks
+and holder destruction were verified. See [the review guide](review.md). This is not complete eviction or
+native recovery parity. No filesystem fallback or new plugin was introduced.
 
 ### 4.2 Cross-tab coordination
 
@@ -782,8 +761,8 @@ Recommended (R4): lifecycle operations for one app (install, activation,
 migration, rollback, removal, orphan sweep) run under
 `navigator.locks.request('ipduo:app:<id>', { mode: 'exclusive' })`. Web Locks
 are held by a tab and released when it dies, which is the crash behaviour a
-database flag cannot give. Check H2 verifies the API in WKWebView; the
-fallback is a `locks` record with a 15 s heartbeat and takeover after 45 s.
+database flag cannot give. Check H2 verified the API in WKWebView; no fallback was required. The historical
+heartbeat-lock proposal is not a second enabled coordinator.
 
 Sessions are counted with **leases**: a tab writes `leases[[id, tabId]]` with
 its view count and a heartbeat every 10 s and deletes it when the session
@@ -799,6 +778,10 @@ updated elsewhere). Tab B cannot recreate data after tab A uninstalls: B's
 write transaction rereads the record and aborts.
 
 ### 4.3 Sources
+
+Updates must come from the origin recorded at initial install. Legacy records without
+provenance accept only the shell origin. A different unsigned catalog cannot take over
+an existing id and inherit its data; catalog signing remains future work.
 
 Settled: one install path, two sources. The store installs from the CDN
 (`apps/<id>/<ReleaseId>/`). The desktop bundle ships preinstalled releases
@@ -842,7 +825,7 @@ sweep from deleting what another tab is between steps 5 and 6 of.
 ### 4.5 Update activation
 
 ```
-UPDATE pressed (or auto-update)
+UPDATE explicitly requested
   1. steps 1–5 of install for the new ReleaseId
   2. transaction: releases.put(candidate); installed.candidate = new; generation unchanged
   3. wait until no fresh lease for id in any tab            row: "Updates when Notes closes"
@@ -962,71 +945,34 @@ current meaning through the adapter.
 
 ### 5.2 Experiments before dependent work
 
-Committed under `scripts/checks/stage2/` and run before steps 4 onward. Their
-artifacts go to `.cache/debug/`; the scripts do not.
-
-| # | Experiment | Passes when |
-| --- | --- | --- |
-| E0 | Document builder and both loaders | A built Notes `app.html` renders from `srcdoc` and from a dev `src` in Chromium and WKWebView: inline script, compiled StyleX, dynamic style attributes under the chosen CSP strategy, kit icons and fonts as data URIs, no request to the shell's origin, `meta` CSP first in head, Open-Meteo `fetch` succeeds from `Origin: null` with no credentials, undeclared origin refused |
-| E1 | Storage engine and locks in WKWebView | Check H and H2 below pass in the Tauri window |
-| E2 | Owner lifecycle | Checks G and G2 below run in both runtimes and their results are recorded, whatever they are |
+Committed document, storage, ownership and permission probes remain under `scripts/checks/`.
+Screenshots/logs are local, gitignored artifacts. The [review guide](review.md) provides
+current reproduction commands and measured limits.
 
 ### 5.3 Implementation sequence
 
-Estimates are rough and unmeasured; they are a
-plan, not acceptance evidence, and they do not displace the kit harvest, app
-migration or website in the one-day target.
-
-| # | Step | Where | Done when | Est. |
-| --- | --- | --- | --- | --- |
-| 1 | SDK contract | `packages/sdk/{manifest,compat,protocol,permissions,index,react}.ts` + `*.test.ts` | Types above; `compatible()` with the R1 cases as unit tests; the permission table and its validator; guards; `os` client with retry-by-id, revisions, `useKV`, `photos`; `bun test` passes | 2.5 h |
-| 2 | App builder | `scripts/build-app.ts` | Writes `app.html` with CSP, `release.json` with `hash`, icons into `dist/cdn/apps/<id>/<ReleaseId>/`; `index.json` with release history; refuses to overwrite an identity; Notes measured | 1.5 h |
-| 3 | E0 | `scripts/checks/stage2/e0-document.mjs` | Passes in both runtimes; CSP strategy for dynamic styles fixed in the builder | 1 h |
-| 4 | Host: database and registry | `packages/shell/runtime/{db,registry,locks}.ts` + tests | Stores of §4.1, generation checks, leases, locks, boot sweep, cache; E1 passes | 2 h |
-| 5 | Host: bridge and sessions | `packages/shell/runtime/{bridge,session,services}.ts` + tests | Launch records, nonce bootstrap, state machine, dedupe, limits, rate, revisions, commands, owner epochs, `view` derivation from main.ts writes, Escape; `allow` built from the table; service gate and the `photos` handler over the existing shots list | 3 h |
-| 6 | Notes as a sandboxed app | `packages/apps/notes/{manifest.json,main.tsx,store.ts,index.tsx}` | `useKV` store, session navigation, save state; legacy migration table entry | 1.5 h |
-| 7 | Launch screen and sheets | `packages/shell/springboard/sandboxed.tsx` | Icon until ready; failure sheet with Restore previous / Try again / Close; Requires a newer platform version; E2 recorded | 1 h |
-| 8 | `?dev=` | `main.ts`, registry, loader | Refuses documents without `release.json`; `dev:` namespace; DEV tile | 45 min |
-| 9 | Store | `packages/apps/appstore` | Apps tab from release history; GET with progress; Updates with "Updates when closed" and "Retry update"; Remove on the installed row | 2 h |
-| 10 | CLI `create` and `dev` | `packages/cli/index.ts` | `create` scaffolds; `dev` runs the builder in watch mode, serves `app.html`, `manifest.json`, `release.json`, prints the link | 1 h |
-| 11 | Checks A–M | `scripts/checks/stage2/*.mjs` | Every check passes in headless Chromium; B, F, G, G2, H, H2, I, J, L, M also in the Tauri window | 3 h |
+Stages 2–5 are complete within their recorded scope. The broader one-day target is not
+an outstanding instruction; [roadmap.md](roadmap.md) separates remaining work.
 
 ### 5.4 Acceptance checks
 
-Each is a committed Puppeteer script against `?debug`, asserting state then
-pixels, as docs/debug.md prescribes. Native rows repeat the same steps in the
-visible Tauri window. A check that is recorded rather than thresholded says so.
-
-| # | Flow step | Check | Observable |
-| --- | --- | --- | --- |
-| A | create | `bun packages/cli/index.ts create tides` in a temp dir, then `dev` | Folder has `manifest.json`, `icon.png`, `main.tsx`; `dev` serves `app.html`, `manifest.json`, `release.json` and prints the `?dev=` link; the shell shows a DEV tile and opens it with `&app=dev.example.tides`; its data lands under `dev:<origin>:dev.example.tides` |
-| B | isolation | Notes via `?dev=` and Notes installed | Every bullet of §2.8, from `src` and from `srcdoc`, in both runtimes. Plus: repeated `hello` before ack gets a fresh welcome; `hello` after ack revokes; a request on a revoked port gets nothing; a write whose ack is delayed past 5 s is retried by id and executes once |
-| C | GET | Store Apps tab lists Notes from release history; press GET | Progress reaches 1; `releases` has the identity; hashes match; `installed` has `state: 'ready'`, `generation: 1`; tile appears; OPEN shows the app within 10 s |
-| C2 | GET, interrupted | Abort the `app.html` fetch at 50 %; then corrupt one byte; then oversize the response | Nothing committed in each case, row shows GET with the reason. Then write an orphan `releases` record dated 11 minutes ago and one dated now: the sweep deletes the first and keeps the second |
-| D | fold | Open Notes flat, type, drive the hinge to 0°, type on the cover, open to 180° | Both edits in both views by `rev`; `visible` on the cover view is true exactly when main.ts has `outerLive.visible && opacity > 0` and false at 180°; `active` flips at 40°; hello count per view is 1; owner epoch unchanged |
-| D2 | split | Notes and Weather in halves, fold past 40° | Cover shows Notes full; inner collapses to a new Notes view that restores the pushed page from `session.snapshot()`; owner epoch incremented once and granted to the cover view; no `E_STALE` from the surviving view |
-| E | persist | Seed `duo.notes.egg` in `localStorage`; install; open | The sandboxed Notes shows that text; `appdata` has the key; `legacy` has the snapshot; `marks.migrated`; the legacy key is gone. Reload: the edit is there. Set the note to the empty string: it persists as empty, not as reset. Reset restores the shipped body. Type during hydration: nothing is lost |
-| E2 | two tabs | Two shell tabs, edit the same note in both | Each tab converges on the higher `rev`; a snapshot taken during a burst of writes misses none (event revs contiguous from the snapshot's); tab B's write after tab A's uninstall aborts with `E_GONE` and B's view is revoked |
-| F | cover | At 0°, tap the cover view's list, push a note, type, press Escape | Push and text appear on the cover; focus stays in the textarea through the fold; Escape goes home on both displays; screenshots at 0°, 120°, 180° inspected. Both runtimes |
-| G | owner timers | A `?dev=` test app schedules by deadline and logs wall-clock drift while owner is hidden through fold, split collapse, tab background, minimize and sleep/wake | Drift per state is recorded for both runtimes and written into working.md as the limit; duplicate effects are zero because the second view never acts |
-| G2 | audio activation | A `?dev=` test app: Play tapped in the visible non-owner view, command to the hidden owner, owner calls `play()` | Recorded per runtime: plays, or is refused by autoplay policy. Refusal blocks audio-app migration and opens the media contract |
-| H | storage engine | Tauri window | `indexedDB.open('ipduo')` succeeds; a 1 MiB string round-trips across an app restart; a simulated `QuotaExceededError` surfaces `E_STORAGE` and the working release still launches |
-| H2 | locks | Tauri window and two Chromium tabs | `navigator.locks.request` serializes two concurrent installs of the same id; killing the holder releases the lock |
-| I | update | Publish Notes `v+1`; open Updates while Notes is open on both displays | Row reads "Updates when Notes closes"; `candidate` set; close: checkpoint written, `current` flipped, `state: 'trial'`, `recovery` set; relaunch delivers `migration.from` to the owner only and the cover waits for its ready; after ready the older pair is gone and `state: 'ready'` |
-| I2 | rollback | Publish `v+2` that writes a new key then throws before ready | Two launches: sheet offers Restore previous; taking it puts `v+2`'s data into `recovery`, restores the checkpoint, `failedVersion = v+2`; the Updates tab shows "Retry update"; closing and reopening does **not** reactivate `v+2`; a host restart keeps all of this |
-| I3 | interrupted lifecycle | Kill the page between each numbered step of §4.4, §4.5, §4.8, §4.9 | Boot reconciles to the last committed state; no half-migrated data, no orphan that is referenced, no `removing` entry left behind |
-| J | uninstall | Remove Notes while open on both displays and in a second tab | All views get `bye` or `E_GONE`; every store's range for the ns is empty; `marks.migrated` remains; reinstall on desktop works offline and starts with the shipped notes without reimporting legacy data |
-| K | compatibility | Unit tests plus a shelf with releases built on 0.0.1, 0.1.0, 0.1.1, 1.0.0, 1.0.1 against hosts 0.0.1, 0.1.0, 1.0.0 | Exactly the `^` rule's pass/fail matrix; the row text for no match is "Requires a newer platform version"; a hello claiming a lower `sdk` than the release is `E_PROTOCOL` |
-| L | Weather (second app) | Weather installed, both runtimes | Real forecast from `Origin: null` without credentials; undeclared origin refused; only the owner fetches (request count 1 per refresh across two views); "refresh now" from the non-owner view arrives as a command and is acked once; widget shows data, then "Updated N ago" with the clock advanced, then the offline state with the network blocked; dev and installed Weather have disjoint data |
-| M | permissions | A `?dev=` test app declaring `geolocation` and `photos`; a second declaring nothing; both runtimes | Declared: `getCurrentPosition` reaches the browser's own prompt and resolves with a mocked position; `photos.list()` returns the shots the Camera app took and `photos.add()` shows up in Photos. Undeclared: `getCurrentPosition` rejects with a permissions error, `photos.list()` is `E_DENIED`, `getUserMedia` rejects. A manifest naming an unknown permission fails `check` and is refused at install with "Requires a newer platform version" |
+The four launch outcomes are an independent app, isolation, visible fold/display behavior
+and installation without rebuilding the simulator. The review guide records their proof
+and the broader lifecycle/kit checks. Full native permissions, background-media and
+update/recovery parity remain unverified. Historical check identifiers elsewhere in this
+contract refer to these areas: B isolation; F cover; G/G2 owner timers/audio; H/H2 native
+storage/locks; I updates/recovery; J uninstall; L Weather; M permissions. They are requirement
+identifiers, not a claim that every check passed. Run the corresponding committed scripts
+and record the actual runtime and coverage when extending verification.
 
 ## 6. Permissions
 
-Accepted in discussion after review: **permissions ship on day one** for two
-kinds of capability. The review team is the grant; there is no runtime prompt
-and no Settings → Privacy screen. Browsers and macOS still show their own
-location prompts, which is enough consent. Camera and microphone are deferred
-by the 2026-09-18 amendment and cannot be declared by sandboxed apps.
+The retained permission design covers browser features and host services. Enabled
+scope is narrower than the original day-one proposal: previews and external developer
+catalogs reject all device permissions. Trusted bundled releases may declare supported
+permissions, as Weather declares geolocation. Camera/microphone cannot be declared.
+Browser/OS permission prompts are additional to host authorization; no new runtime
+permission UI or broad native/browser support is claimed.
 
 ### 6.1 One table
 
@@ -1046,27 +992,25 @@ export const PERMISSIONS = {
 } as const
 ```
 
-The table drives everything: CI validation of `manifest.permissions`, the
-store row ("Can use: Location, Photos"), the iframe `allow` attribute (§2.1),
-the host's method gate, and the docs page. Adding a capability is one row,
-plus one handler and one guard for a service. Nothing else changes: not the
-sandbox, not `PROTOCOL`, not the app format.
+The table drives manifest validation, Store permission labels, the iframe `allow`
+attribute (§2.1) and the host method gate. New capabilities require explicit scope,
+security and compatibility review, with implementation and verification for their
+handlers and guards. The table is not authorization to expand the current permission set.
 
 ### 6.2 Rules
 
 - **Undeclared means refused.** A feature not declared is `'none'` in `allow`;
   a service method not declared answers `E_DENIED` before any argument is read.
-- **Review is the grant.** CI checks the names exist and shows the list on the
-  PR; the reviewer approves. The store row shows the same list. Nothing is
-  asked of the user at runtime.
+- **Publication review is planned.** The SDK validates permission names and the host
+  gates methods. A future curated publication flow must review grants; external catalog
+  selection does not authorize permissions. Browser/OS prompts still apply.
 - **Fixed per document.** `allow` is set when the iframe is created, from the
   installed release's manifest. Without runtime prompts, a grant never changes
   while a view runs, so this costs nothing.
 - **Mutating service methods are owner-only** (`photos.add` carries the epoch,
   §3.4); reads are any view.
-- **Dev apps** get exactly what their `release.json` declares, under their own
-  namespace; `photos.add` from a dev app writes to the same camera roll, which
-  is the point of testing it.
+- **Dev apps** and external developer catalogs accept no device permissions. A
+  nonempty declaration is refused before a preview launches or an external app installs.
 - **Versioning.** Table membership is part of the SDK version. A manifest that
   names a permission the host's table lacks fails `check` in CI and, if it
   reaches an older shell, is refused at install with "Requires a newer platform
@@ -1077,10 +1021,10 @@ sandbox, not `PROTOCOL`, not the app format.
 
 ### 6.3 Day-one services
 
-`photos` is the only service on day one because the data already exists: the
+`photos` is the retained host-service adapter because the data already exists: the
 shell keeps the stills the Camera app takes (`shots`). The host handler lists
 them, returns one as a Blob over the port, and appends one. Files, contacts
-and notifications have no shell data yet and get rows when an app needs them.
+and notifications have no enabled host-service contract; they remain roadmap work.
 
 ```ts
 export type Photo = { id: string; takenAt: number; width: number; height: number }
@@ -1095,43 +1039,9 @@ the Chromium experiment returned SecurityError for an opaque origin even with
 camera policy and browser permission granted. The sandbox remains unchanged;
 camera and microphone need a separately reviewed host-mediated media contract.
 
-## Appendix: review disposition
+## Current verification limits
 
-Every verdict from [contract-review-1.md](contract-review-1.md) and where
-this revision resolves it.
-
-| Decision | Verdict | Resolved in |
-| --- | --- | --- |
-| Compatibility | Change | §1.3 full caret with 0.x rules and prerelease exclusion; §1.4 evaluated per host, text "Requires a newer platform version"; §1.5 release history; hello `sdk` must equal release metadata; check K |
-| App document | Accept | §2.1; E0 proves builder and both loaders before dependent steps |
-| Bridge transport | Change | §2.2 launch record, nonce in `window.name`, idempotent hello, ack, no rebootstrap; §2.4 state machine and revocation order; §2.5 retry by id with host dedupe; check B |
-| Network policy | Change | §1.1 exact HTTPS origins; §2.6 scope stated, `media-src`, opaque-origin CORS; §2.7 dev-only loopback and policy-bearing dev documents; E0, check L |
-| Effect ownership | Change | §3.4 at-most-one owner with epochs, handover order, no exactly-once or timer or audio promise; deadline scheduling; checks G, G2 recorded |
-| State sync | Change | §2.3 complete method list incl. `session.keys`; §3.3 revisions, snapshot plus cursor, ordering, quota in-transaction, BroadcastChannel as invalidation; §3.7 async adapter; §3.5 commands; §3.8 open/home, arg delivery, Escape; §5.1 Notes navigation change recorded |
-| Widgets | Accept | §3.6 bounded text, owner epoch on `widget.set`, `updatedAt` shown, no background refresh |
-| Storage engine | Change | §4.1 IndexedDB authoritative, localStorage as cache only, generation check in every transaction, `complete` awaited, `E_STORAGE`; §4.2 locks, leases, cross-tab reconciliation; checks E2, H, H2, I3 |
-| Release history | Change | §4.5 recovery pair of release plus checkpoint, replaced only by the next proven candidate, `trial` state, disk accounting |
-| Rollback trigger | Change | §4.6 attempts per launch attempt, `failedVersion` never auto-activated, Restore restores code and data together, newer data kept in `recovery`; check I2 |
-| Legacy data | Change | §4.8 snapshot, transactional import with marker, verify, conditional delete, `legacy` copy, old-tab limit stated, uninstall keeps the marker; checks E, J |
-| `cover` field | Accept | §1.1; check F; no restriction restored on failure |
-| `allow-forms` | Accept | §2.1; explicit `allow` denials instead of an empty attribute |
-| First app | Accept | §5.1 Notes then Weather; check L exercises Weather's real API and widget |
-| Launch screen | Accept | §2.1 and §2.4: failed start revokes; inspection is `?debug`-only |
-| Limits | Change | §2.5 bytes, envelope headroom, pagination, rate and concurrency |
-| Display, placement, active, visible | Accept | §3.2 `visible` derived from render-loop writes; `focused` added |
-| Fold angle in events | Accept | §3.2 coalesced, changed-only, backlog bound, layout hooks ignore angle |
-| CI-generated CSP | Change | §2.6 placement, dynamic-style strategy, `media-src`, tested by behaviour in E0 |
-| R5 evidence | Change | §5.2 experiments first; checks committed under `scripts/checks/stage2/`; A–L extended with B, C2, E2, G, G2, H2, I2, I3, K, L; D's visibility corrected; estimates labelled as plan only |
-| Permissions (post-review discussion) | Accepted for day one | §6 table of browser features and host services, review as grant, `allow` built from the table, `E_DENIED` gate, `photos` service, native reserved; check M |
-
-**Open, with the check that closes each**
-
-- Timer behaviour of hidden owner views: recorded by G, becomes a documented limit.
-- Audio activation through a command to a hidden owner: G2; failure opens the media contract.
-- IndexedDB and Web Locks under `tauri://localhost`: H, H2; fallbacks named in §4.1, §4.2.
-- CSP strategy for dynamic style attributes: E0 decides hashes versus lifted classes.
-- Bundle size cap: measure Notes in step 2, then set a soft cap (starting point 1 MiB) and a hard cap.
-- Limits in §2.5 are provisional until Notes and Weather are measured.
-- Shell CSP directives and the `Permissions-Policy` header under Tauri's protocol: check B.
-- Permissions Policy delegation of geolocation from an opaque-origin frame in both runtimes: check M. Capture is deferred.
-- Index signing, native signing, CDN host and publishing access remain external dependencies.
+Hidden-owner timing/audio, full native permission/recovery coverage, deployment headers
+and signing remain unverified or deferred as listed in [roadmap.md](roadmap.md). Native
+storage/locks, CSSOM dynamic styles and bundle caps were measured and implemented.
+See [the review guide](review.md) for reproduction and bounded verification claims.

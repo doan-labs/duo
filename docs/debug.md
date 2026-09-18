@@ -1,65 +1,28 @@
-# Debugging without a human
+# Debugging
 
-Platform checks are reproducible from `scripts/check-platform.ts` (local/CI),
-`scripts/checks/stage3/workflow.mjs` (external packages and actual Store), and
-`scripts/checks/stage4/apps.mjs <tag> [App names...]` (built simulator pixels at
-inner/cover widths). `APP_DIST` freezes a baseline independently of source edits;
-`APP_PORT` avoids conflicts. Gallery tests use real opaque sandbox documents but
-no 3D model. `CHROME_BIN` selects the installed browser in CI. Headless pixel
-review caught a missing gallery navigation theme even when DOM checks passed:
-set the public `app` token theme on the root, not only its background colour.
-
-Run full SwiftShader simulator tests serially. Concurrent software-GPU renderers
-can starve sandbox first-paint callbacks beyond the existing ready deadline;
-record the failure and rerun alone before diagnosing a lifecycle regression.
-Do not lengthen safety deadlines to make an overloaded test pass.
-
-Native raw debug binaries can share WKWebView storage despite different Tauri
-identifiers. The platform native harness now sets an explicit random window
-`dataStoreIdentifier`, requiring macOS 14+ for isolated persistent test storage.
-Rebuild once and restart that same binary to test persistence in that store.
-Production storage settings are unchanged. Earlier stage-2 native checks did
-not use this partition and are not evidence of test-profile isolation.
-
-How to drive, observe and verify this app from a terminal: headless Chrome for
-logic and layout, the real Tauri window for anything a GPU or WKWebView changes.
-Every snippet here has been run. Mac only, like the rest of working.md.
+Use headless Chromium/Puppeteer for routine behavior and screenshots; use visible Tauri
+for native integration, window behavior, WebKit/GPU differences or an explicit request.
+Assert state, then inspect pixels. Chromium results do not establish native parity.
+[The review guide](platform/review.md) owns platform commands and measured coverage.
 
 ## 0. Ground rules
 
-- **Headless first; no visible app required.** Use the installed `puppeteer-core`
-  to run Chrome against the local web server for routine UI, interaction,
-  persistence, and screenshot checks. It renders the actual React, CSS3D and
-  WebGL page without opening a visible window. Do not require the user to launch
-  the desktop app for these checks. Use an isolated browser profile so tests do
-  not change the user's saved app data.
-- **Use the desktop for desktop-specific evidence.** Launch the visible Tauri
-  window for native integration, window behavior, WKWebView rendering, or
-  GPU/timing issues that remain uncertain headless, and when explicitly requested.
-  State what was tested and what remains unverified; Chromium screenshots alone
-  do not prove WebKit parity.
-- **Assert on state, then look at pixels.** DOM and `__duo` tell you what
-  happened; a screenshot tells you whether it looked right. Do both, in that order.
-- **Timings are iOS's, so waits must be too.** A side click sleeps only after
-  the 300 ms double-click window; a swipe unlock animates out for 420 ms. Wait
-  ≥ 1 s before asserting an unlock.
-- **Scratch scripts live in `.cache/debug/`.** Gitignored, and module
-  resolution walks up to the repo's `node_modules`, so `puppeteer-core` (a
-  devDependency) resolves. A script in `/tmp` will not find it.
-- **Never edit source while a headless run is loading.** Bun rebundles on save;
-  a page that loads mid-rebuild times out on `.os` and looks like a bug.
+1. Use isolated test storage, never the user's saved data. Native store isolation needs
+   an explicit WebKit dataStoreIdentifier; a different Tauri identifier alone is insufficient.
+2. Keep scratch scripts in `.cache/debug/` so repository dependencies resolve. Cache scripts
+   and captures are local conveniences, not committed fixtures guaranteed on a fresh clone.
+3. Freeze source while loading/capturing. Restart task-owned processes after relevant HMR
+   or checkout changes; do not terminate unrelated listeners to free a port.
+4. Run heavy SwiftShader checks serially. Keep preview iframes onscreen so first-paint
+   callbacks run. Rerun overloaded failures alone; never extend safety deadlines to pass.
+5. Record the tested runtime and limits. Wait ≥1 s for unlock (420 ms animation); side-click
+   handling includes a 300 ms double-click window. Inspect screenshots after compositing settles.
 
 ## 1. Headless Chrome
 
-For an app's visual baseline, open `?debug&app=Notes&deg=180` for unfolded
-and `?debug&app=Notes&deg=0` for folded (substitute the app name). Capture before
-editing source, repeat the same viewport and state afterwards, and inspect the
-saved PNGs. Use `deviceScaleFactor: 2` for crisp captures and crop to the display
-as described below. For live fold handover, omit `deg` and drive the hinge
-control instead. Puppeteer can also click, type, drag, reload and assert DOM or
-storage state in the same session; screenshots are only one part of the check.
-
-Dev server first: `lsof -tiTCP:3000 -sTCP:LISTEN || bun run dev &`. Then:
+Start `bun run dev` on a free port. For a quick capture:
+`bun scripts/shot.ts <url> <out.png>`. For interaction, save this as `.cache/debug/run.mjs`
+and run it with Bun. Puppeteer creates a temporary profile by default.
 
 ```js
 // .cache/debug/run.mjs  —  bun .cache/debug/run.mjs
@@ -82,44 +45,22 @@ await wait(2500) // model, textures, first frames
 await browser.close()
 ```
 
-818×664 matches the desktop window, so viewport coordinates found here are
-window coordinates there (section 3).
+Use identical state/viewports before and after a change. 818×664 matches the native window;
+use deviceScaleFactor 2 for detail and crop rather than shrink. Baselines use
+`?debug&app=Notes&deg=180` and `deg=0`; use 120 for clipping. Live fold tests must omit the
+pinned `deg` parameter and drive the hinge control. `CHROME_BIN` selects Chrome in platform checks.
 
 ### The state probe
 
-StyleX hashes every class name, so probes hook on `data-*` attributes the shell
-sets for this purpose: `data-os`, `data-lock` (`data-hidden` while an app covers
-it), `data-torch` on the lock screen's
-torch button, `data-hud="vol|thumb|poff|flash|torch|cc|dim"` (`data-on` while
-the volume HUD shows, or while the torch is on), `data-boot`, `data-pages`, `data-app`
-(with `data-side="left|right"` on a half-width app, absent full-screen), and
-`data-drop="left|right|none"` on the drop zones while an app is on a finger.
-Control Center is `data-cc` (also `data-hud="cc"`), its sliders
-`data-cc-slider="bright|volume"`, the strip that opens it `data-cc-pull`
-(absent while it is open); `data-hud="dim"` is the brightness veil, read its
-computed opacity. To open it headless, drag with `page.mouse` from
-`(rect.right - 60, rect.top + 8)` down ~190 px in ten steps, where `rect` is the
-display's `getBoundingClientRect()` (flat at yaw 0), then wait ≥ 1.5 s. Which
-page is up is `data-cc-page="0|1|2"` on the track's viewport. Nothing inside the
-panel carries an attribute of its own, so reach a control by walking children
-from `[data-cc]`: `[1,0,0,0,0]` is `+`, `[1,0,0,0,1]` power, `[1,0,1,i]` the
-rail's three pips, `[1,0,0,1,0,0,0,n]` the nth grid cell (`,0` its tile, `,1`
-its minus badge in edit mode), `[1,0,0,1,0,0,0,0,0,j]` the jth radio.
-`.cache/debug/cc.mjs <deg> <tag>` walks all of it: open, the three pages, play,
-edit, drop a tile, power.
-To split headless: mouse down on the bar (display bottom − 8 px, x at the
-app's centre), eight moves of 14 px up with 25 ms waits, wait 1.5 s (SwiftShader
-paints late), move sideways to the target half, wait, up. `.cache/debug/split.mjs`
-does the whole sequence: split, open a second app, swap, close one.
-The orbit minimap is `data-hud="orbit"` with `data-on` while the view is off its
-default pose; its caption is `[data-cap]` (`"−36° · −7°"`, az · el) and the pill's
-Reset is `button[title="Reset view"]`, `disabled` at the default pose. Under
-SwiftShader the homing lerp and yaw unwind run at a few frames per second, so
-allow 8 s after Reset before asserting `data-on` is gone.
+StyleX classes are unstable; use shell data attributes:
 
-One `evaluate` that returns everything worth asserting. Extend it, do not
-replace it; a probe that prints the same shape every step is what makes a log
-readable after the fact.
+| Area | Selectors/state |
+| --- | --- |
+| Display/app | data-os; data-app; data-side=left/right; data-lock/data-hidden; data-pages |
+| HUD/hardware | data-hud=vol/thumb/poff/flash/torch/cc/dim/orbit; data-on; data-torch; data-boot |
+| Control Center | data-cc; data-cc-slider=bright/volume; data-cc-pull; data-cc-page=0/1/2 |
+| Split | data-drop=left/right/none |
+| Sandbox | data-view/session/generation/state/owner; select frames by data-view, never frame-list order |
 
 ```js
 const st = () => page.evaluate(() => ({
@@ -133,29 +74,39 @@ const st = () => page.evaluate(() => ({
 }))
 ```
 
-`closest('[data-os]').offsetWidth` is `790` for the inner display and `387` for
-the cover: the only cheap way to tell which instance an element belongs to. The
-inline `style.width` the older probe read is empty since StyleX took the root
-over — it sets the size through a class.
+Visible display offsetWidth is 790 inner / 387 cover; hidden panels may report 0.
+StyleX sets width through classes, not inline style. Both roots stay attached, so check
+computed display/opacity/clip and SDK visibility rather than DOM presence. A screenshot
+thumbnail clones the display and can double data-app matches.
 
-The other display mirrors the one in use (decisions.md 24), so that number is
-what says the mirror worked: open an app, click `button[title="Close"]`, and
-the same `data-app` should turn up under `387` — with `getAnimations()` empty
-on it, since a mirror's open has no zoom. The inner copy's node is the same
-one the whole way down and back (`.cache/debug/fold-mirror.mjs` marks it and
-checks). The hinge eases asymptotically and SwiftShader gives few frames a
-second, so poll `__duo.bend.value` until the angle is under 1° rather than
-waiting a fixed time — a fold takes ~10 s headless against ~1 s on a GPU.
+For fold continuity, mark nodes/view IDs and assert identity through close/open. Poll the
+actual bend angle instead of fixed waits; SwiftShader may need ~10 s. Do not reparent a
+frame to expose it: that reloads the document. Puppeteer frame evaluation is privileged
+test inspection, not an installed-app capability.
 
-A `.thumb` holds a clone of the whole display, so `[data-app]` counts double
-while a screenshot thumbnail is showing.
+### Gestures and focus
+
+| Action | Probe |
+| --- | --- |
+| Open Control Center | At flat yaw 0, drag from display rect.right−60, rect.top+10 down ~190 px; wait ≥1.5 s |
+| Split | Mouse down at app centre/display bottom−8; move up, hold 1.5 s for slow rendering, move to half, release |
+| Flick home | Use one move without a pause; slow CDP calls can cross the 220 ms split threshold |
+| Reset orbit | Click button[title="Reset view"]; allow ~8 s under SwiftShader before asserting orbit data-on is gone |
+| Type | Click/focus the actual field, check document.activeElement, then type/paste; AX set-value may not trigger React |
+
+For scripted React range changes, use the native input value setter before dispatching
+input; direct assignment can update React's tracker without notifying its handler.
+For layout checks, finish only finite shell animations, never infinite app animations.
+Control Center child paths, when needed: + `[1,0,0,0,0]`, power `[1,0,0,0,1]`, rail
+`[1,0,1,i]`, grid `[1,0,0,1,0,0,0,n]` (tile child 0, minus child 1), radio
+`[1,0,0,1,0,0,0,0,0,j]`; recheck against current DOM before relying on them.
 
 ### Pressing buttons
 
-Two paths, test both:
+Exercise both logic and hardware hit testing:
 
 ```js
-// Logic path: skips the raycast, exercises os/buttons.ts and device.
+// Logic path: skips the raycast, exercises device-buttons.ts and device.
 const press = (b, ms = 80) => page.evaluate(async (b, ms) => {
   __duo.press(b, true); await new Promise((r) => setTimeout(r, ms)); __duo.press(b, false)
 }, b, ms)
@@ -176,59 +127,13 @@ await page.evaluate(() => document.querySelector('canvas').style.cursor) // 'poi
 await page.mouse.down(); await wait(120); await page.mouse.up()
 ```
 
-Do not take a screenshot between `mouse.down` and `mouse.up`: under
-SwiftShader a screenshot takes 0.3–6 s and the press becomes a hold.
-
-Buttons at yaw 0, 818×664: side (644, 234), Camera Control (642, 390), volume
-up (547, 75), volume down (497, 75). These hold at the home view only — `frame()`
-shrinks the phone as the view turns, so recompute with the snippet above after
-turning the camera, or after touching the bands in `main.ts` or `PAD` in
-`packages/shell/buttons.ts`.
-
-### Looking at things
-
-- Crop, do not shrink: `page.screenshot({ path, clip: { x: 160, y: 140, width: 640, height: 480 } })`
-  keeps the display legible. `deviceScaleFactor: 2` for the frame's edges.
-- `?yaw=-1.2` shows the right edge and its two buttons; `?yaw=-1.5708` is
-  edge-on. Cap travel is 2 px from the front; the body tilt is what you will
-  see in a still. Compare against an idle shot of the same clip.
-- `?deg=0` is the cover, `?deg=120` mid-fold. **Above about 90° mid-fold,
-  neither `.os` is in the DOM**: CSS3DRenderer only appends a panel once it is
-  visible, the inner one is hidden off flat and the cover one still faces away.
-  `waitForSelector('[data-os]')` times out; use `bun scripts/shot.ts <url>
-  <out.png>` (its wait is try/caught) or wait a fixed 3 s instead. **With no app
-  up, no panel is live between 1° and 179°** and the bake draws both displays
-  with their fold; `?deg=60` has an empty `[data-os]` list. With an app up the
-  cover panel is live wherever it faces the camera, mirroring the inner one from
-  about 90° down — `?debug&app=Safari&deg=30` is the pose to look at
-  (`.cache/debug/cover-ramp.mjs` probes it), and
-  `.cache/debug/fold-live.mjs` walks the whole sweep. With an app up the inner
-  panel is in the DOM at every angle, clipped:
-  `getComputedStyle(os).clipPath` reads `inset(0px 0px 0px 28.77%)` at
-  `?deg=110`, 67.87% at 73° and 100% by 20°, and
-  `__duo.screens.inner.material.color.r` is 0 because the bake under it is off.
-  The clip follows the camera, so moving `__duo.camera.position` changes it
-  without touching the hinge (`.cache/debug/orbit-fold.mjs`). The fold's blur and
-  darkening are bare `div`s appended after React's children — one gradient and
-  six `backdrop-filter` layers — found with
-  `os.querySelectorAll('div[style*="backdrop-filter"]')`; they carry no filter
-  until the first frame that wants one, so a flat pose has none.
-  `.cache/debug/keep-state.mjs` proves the app is not remounted by a partial
-  fold (it marks the element and looks for the mark afterwards) and
-  `.cache/debug/fold-real.mjs` walks the real flow: tap the icon on the inner
-  display, fold to closed, open again. A hidden panel stays in the DOM with
-  `display: none`, so `offsetWidth` is 0: check it before trusting a query.
-- Transient UI (volume HUD, thumbnail) may be gone or not yet faded in by the
-  time SwiftShader delivers a screenshot. Read the class and the computed style
-  (`getComputedStyle(el).opacity`) instead of trusting the pixels; if the
-  class is on and opacity is `0` at 150 ms, the compositor is starved, not
-  the CSS. Confirm such things on the desktop (section 3).
-- Webcam is absent headless: Camera shows its fallback and `shoot()` is a
-  no-op (no `videoWidth`). Test recording and zoom UI, not stills.
+Do not capture between mouse-down and mouse-up: a 0.3–6 s screenshot turns a click into
+a hold. Recompute projected coordinates after orbit, fit-band or hit-box changes. At default
+818×664/yaw 0 only: side (644,234), Camera Control (642,390), volume up/down (547,75)/(497,75).
 
 ## 2. Reading the model
 
-System `python3` has no `pxr`; run USD tooling through uv:
+Use USD tooling when system Python lacks pxr:
 
 ```sh
 uv run --quiet --with usd-core python - <<'EOF'
@@ -242,17 +147,9 @@ for p in s.Traverse():
 EOF
 ```
 
-Units come out in metres. Scene cm = m × 100, and y is dropped by 5.8974 in
-`main.ts`. Small meshes on the frame edges are buttons; a thin shell at the
-same spot is the cap (two ids per edge button in `packages/shell/buttons.ts`).
-
-### What the phone actually paints
-
-Mesh bounds are not the silhouette: one mesh is 6.1 cm deep and paints nothing
-at any pose (`PHANTOM` in `main.ts`, verified by hiding it and diffing the
-buffer), and mid-fold the near half is magnified by perspective. Read the alpha
-of the drawing buffer instead, and step `bend.value` yourself — the fold lives
-in the vertex shader, so a CPU box never sees it.
+Model units are metres; scene units are centimetres with y offset −5.8974. Mesh bounds are
+not the rendered silhouette: the invisible PHANTOM proxy is 6.1 cm deep, and the vertex
+shader fold is absent from CPU bounds. Measure alpha in the drawing buffer:
 
 ```js
 __duo.bend.value = ((180 - deg) / 180) * Math.PI
@@ -263,269 +160,84 @@ gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.U
 // ... box of every pixel with alpha ≥ 8; readPixels is bottom-up
 ```
 
-Measured at 37 px/cm: 16.6 × 11.8 cm flat, 16.9 wide at 170°, 14.4 tall at 90°.
-Turning the view is worth far more than folding — 19.8 cm tall and 18.7 wide at
-the extremes, because edge-on the near half is 8 cm closer to the camera — which
-is why `frame()` fits the phone to the window rather than the window to the
-phone (decisions 26).
+Render/read in the same tick: the render loop otherwise overwrites bend.value. Use a large
+viewport with camera.clearViewOffset(), reject edge-touching bounds, and account for
+bottom-up pixels. At 37 px/cm, measured bounds were 16.6×11.8 cm flat, 16.9 cm wide at 170°
+and 14.4 cm tall at 90°; orbit extremes reached 19.8 cm tall/18.7 cm wide.
 
-Two false alarms, both of which cost an afternoon:
-
-- **Measuring in the app's own window caps the reading.** A silhouette that runs
-  off the window is truncated by it, so every clipped pose reports the same
-  number and it looks like a constant. Measure in a window far bigger than the
-  real one, with `camera.clearViewOffset()`, and flag any box that touches an
-  edge as unusable.
-- **The fold does not survive a frame.** The render loop rewrites `bend.value`
-  from the slider every tick, so setting it and then awaiting a frame silently
-  gives you 180° again. Read it back in the same tick, or pin the fold with
-  `?deg=` and reload.
-
-`.cache/debug/framecheck.mjs` is the whole check: it drives the real controls
-through 24 azimuths × 15 tilts per fold, then reports the tightest clearance
-against the bands and how far the phone was shrunk. Nothing should come back
-negative by more than a pixel or two of antialias fringe.
-
-```sh
-bun .cache/debug/framecheck.mjs 818x664 180,120,90,0
-# deg 180: tightest az15 el0 — clear l59 t63 r162 b143 ...; smallest az90 el45 at 25.8 px/cm (70%)
-```
+If available locally, `bun .cache/debug/framecheck.mjs 818x664 180,120,90,0` sweeps 24 azimuths
+×15 tilts per pose. Otherwise reproduce that sweep with the probe above. Check clearance
+against all HUD bands; tolerate only 1–2 px antialias fringe. Changing bands must not clip
+the device or silently reduce its intended face-on scale.
 
 ## 3. The desktop window
 
-Clean start, always. HMR swaps modules without re-running `main.ts`, so a
-window that has been open across edits has stale listeners and doubled state.
+Start `bun run desktop`, wait for the actual window, and read its position before input:
 
 ```sh
-pkill -f "cargo/debug/iphoneduo"; pkill -f "tauri dev"; lsof -tiTCP:3000 -sTCP:LISTEN | xargs kill
-(nohup bun run desktop > /tmp/desktop.log 2>&1 &); sleep 45; tail -3 /tmp/desktop.log
 osascript -e 'tell application "System Events" to set frontmost of first process whose name is "iphoneduo" to true'
 osascript -e 'tell application "System Events" to tell process "iphoneduo" to get {position, size} of window 1'
+screencapture -x /tmp/duo-screen.png
 ```
 
-**Always read the window position.** It is 818×664 and centred by Tauri, but the
-menu bar shifts the centring down: a 960×760 window on the 1920×1080 desktop here
-reported `480, 175`, not the 160 you would compute. Window coordinates = viewport
-coordinates + that origin. A click that misses by 15 px misses the volume buttons
-entirely (their hit box is 19 px tall).
+Screen points = viewport coordinates + measured window origin. Do not infer origin from
+centring: menu bars shift it. Use real pointer events for dragging; synthetic AX drags
+were inconclusive. Focus the app and field before input. `cliclick t:` types but cannot
+hold ordinary keys; use a real key plus mouse for chords, or test logic via __duo.press.
 
-```sh
-# Real mouse: click, and press-hold-release. Coordinates in screen points.
-cliclick c:1195,456                      # side button (644+551, 233+223): origin read, not computed
-cliclick dd:1195,456 w:800 du:1195,456   # hold 800 ms → Siri
-cliclick kd:cmd ... # modifiers only; for L/C/arrow keys use `cliclick t:l` (types, no hold)
-# Capture the window at 2x, crop, shrink for viewing.
-cap() { screencapture -x /tmp/full.png && sips -c 1328 1636 --cropOffset 446 1102 /tmp/full.png --out /tmp/$1.png >/dev/null && sips -Z 960 /tmp/$1.png >/dev/null; }
-cap d1
-```
+For a 2× capture, sips cropOffset is y,x in doubled pixels; scale the measured origin and
+window size accordingly. AX trees include hidden mirrored DOM, so inspect screenshots
+and state. Recompute click coordinates after pose changes to avoid orbiting the canvas.
 
-`--cropOffset` is `y x` in 2x pixels: window origin × 2. Hold a chord on the
-desktop with the keyboard focused in the window: `cliclick t:` cannot hold a
-key, so for side+volume use the mouse on one button and a real key on the
-other, or verify chords headless via `__duo.press`.
+Native persistence tests use the copied harness crate with an explicit dataStoreIdentifier
+(macOS 14+); restart the same binary to reuse that test store. Production storage is unchanged.
+The Tauri config generator/adapter workaround and bounded native coverage are in
+[the review guide](platform/review.md#verification-scope-and-limits).
 
-Accessibility trees (orca `get-app-state`, `list-windows`) list hidden DOM as
-if visible. Trust screenshots and `st()`, not tree text. `cliclick t:` types
-into whatever is frontmost; set frontmost first and click inside the window once.
+## Known false alarms
 
-## 4. Known false alarms
-
-| Symptom | Cause |
+| Symptom | Check / correction |
 | --- | --- |
-| `waitForSelector('[data-os]')` times out at `?deg=120` | panels never appended while hidden (see 1) |
-| Same at `?deg=0` or `?debug`, once | page loaded during a rebundle; rerun |
-| `.vol.on` true, nothing in the screenshot | SwiftShader starved the transition; check computed opacity or use the desktop |
-| Two `Camera` entries in `[data-app]` | screenshot thumbnail clone |
-| `[data-app]` empty mid-fold, the app "lost" | with no app up neither panel is in the DOM off flat; CSS3DRenderer appends a panel only once it faces the camera, so the cover's copy is queryable only from where the cover shows |
-| `__duo.device.wallet()` opened nothing | use the hardware path, a side double-click via `__duo.press('side', …)` twice; `.cache/debug/mirror-close2.mjs` does |
-| The fold ramp missing from the panel's children | it is appended on the first frame that wants it, and React's first commit clears the container — check again a frame later, not once |
-| `[data-torch]` null at `?yaw=3.1416` | same as the mid-fold case: a panel facing away is not in the DOM. Flip the torch from the front, then turn with `button[title="Flip"]` and wait for the yaw to unwind (~9 s under SwiftShader); `.cache/debug/torch.mjs` does |
-| The flashlight card measures `opacity: 1` but is not in the screenshot | it holds 1.8 s and a SwiftShader screenshot takes longer than that. Stub the page's `setTimeout` for that one delay before the flip, or check the computed style and trust it |
-| A `[data-os]` found but `offsetWidth` 0 | CSS3DRenderer leaves a hidden panel in the DOM as `display: none` |
-| Wallet opens while typing into a field | the field never took focus, so the letters went to the frame's keys (`l` is the side button; `hello` is a double-click). Check `document.activeElement` after the click; if it is `BODY`, something cancelled the pointerdown — an `on*` handler returning `false` does, silently, and `preventDefault` never shows up in a trace |
-| `[data-app]` at icon size, `getAnimations()` `running` at `t=0` for seconds | headless only: the open zoom does not tick under SwiftShader; `finish()` it before measuring or clicking |
-| Side click opened Siri | the run held it > 500 ms (a screenshot in between) |
-| Volume click did nothing on the desktop | window origin assumed, not read (y is 175 here) |
-| `bun run desktop` → EADDRINUSE | old dev server on 3000; kill it first |
-| `python3 … ModuleNotFoundError: pxr` | use `uv run --with usd-core` |
-| The Control Center drag opened nothing | the pull strip is 26 px of `disp`, which is inset 11, and the projected panel is ~0.72 of CSS size: start at `rect.top + 10`, not + 6 |
-| The panel's tiles look washed out at a gap | they are not; the wallpaper's own gradient is lighter there. Sample the PNG before believing a screenshot's contrast |
-| A flick on the home bar split the screen instead of closing | each `page.mouse.move` is a slow CDP round trip under SwiftShader, so a gap ≥ 220 ms between moves reads as the hold; flick with one move, hold with a `wait` |
-| The fold's ramp is in the DOM with the right styles but not in the picture | it is under the app: `[data-app]` is `z-index: 2` and the OS stacks up to 10, so an overlay at `z-index: auto` loses. The ramp sits at 11 |
-| The whole cover is blurred under a `mask-image` that fades to nothing | Chrome ignores `mask-image` on a `backdrop-filter`'s output; cut one with `clip-path` |
-| The cover looks sharp mid-fold where the bake is blurred | a live panel is over the bake; with no app up none should be (`[data-os]` empty between 1° and 179°) |
-| A window that worked now runs old code: the baked clock is stale and the fold behaves like a commit ago | `git stash`/`checkout` under a running dev server reloads every open window with that tree, and the reload after `stash pop` a second later can be missed. Never swap the tree under an open window; restart it (section 3) before believing what it shows |
+| Timeout during load | Source may have rebundled; rerun against stable output. For ready failures, check SwiftShader contention and offscreen frames |
+| Hidden root or app seems absent | Roots stay attached; inspect display/clip/opacity, readiness and the intended view |
+| HUD missing from screenshot | Transient lifetime may be shorter than capture; inspect computed opacity, then verify on native GPU |
+| Wallet opens while typing | Field lacks focus; frame shortcuts received the text |
+| App stays at icon size | SwiftShader stalled finite launch animation; finish it before layout measurement |
+| Side click opens Siri | Input lasted >500 ms; never screenshot during the press |
+| Desktop input misses / EADDRINUSE | Measure window origin / identify listener ownership before restarting |
+| Ramp missing or behind content | Wait for its first render; ramp z-index is 11, OS layers ≤10 |
+| Cover fully blurred under a fading mask | Chromium does not taper backdrop-filter output with mask-image; use clipped layers |
+| Cover looks sharp mid-fold | Check whether live DOM incorrectly overlays the bake; attached does not mean visible |
+| Control Center drag does nothing | Account for panel inset/projection; start near rect.top+10 |
+| Tiles appear washed out | Compare source pixels; wallpaper gradients affect perceived contrast |
+| Scrollbar skin absent | Use ignoreDefaultArgs: ['--hide-scrollbars']; Puppeteer adds hiding even when omitted from args |
+| Camera cannot shoot headless | No videoWidth without a webcam; test fallback/UI, not real still capture |
+| Gallery navigation has wrong colors | Apply the app token theme to its root, not only background color |
+| Old code after checkout/stash/HMR | Restart the task-owned test window/server before trusting results |
 
-## 5. Open thread
+## Platform checks
 
-Where the last session stopped: every button behaviour passes headless via
-`__duo.press` and via the mouse on the side and Camera Control caps; on the
-desktop, side click / hold / Camera Control were confirmed by screenshot, and
-the one volume click was aimed at y = 324 with the window actually at y = 175
-(so 339 was needed). Next: rerun `cliclick c:1168,337` on the desktop, capture
-within a second, expect the HUD under the volume buttons.
+[The review recipe](platform/review.md) prepares private archives and lists complete commands.
+Use committed scripts, not assumed cache files:
 
-## 6. Notes rebuild verification (2026-09-17)
+| Check | Purpose / prerequisite |
+| --- | --- |
+| `bun scripts/check-platform.ts` | Local/CI types, SDK, API freshness, token/import checks, builds and gallery |
+| `bun scripts/checks/stage2/mvp.mjs` | Frozen simulator + external catalog; GET/OPEN, isolation, fold/persist and unchanged dist hashes; build first, supply PLATFORM_ARTIFACTS |
+| `bun scripts/checks/stage2/runtime.mjs` | Adversarial bridge/storage/lifecycle matrix |
+| `bun scripts/checks/stage3/workflow.mjs` | Public external-package and real Store lifecycle flow |
+| `bun scripts/checks/stage3/development.mjs` | Verified preview bytes, namespace isolation and teardown |
+| `bun scripts/checks/stage4/apps.mjs <tag> [App names...]` | Both-width app captures; APP_DIST freezes baseline, APP_PORT avoids conflicts |
+| `bun scripts/checks/stage2/notes.mjs` / `weather.mjs` | Real shell on port 3110: edits/reload; owner refresh/network denial |
+| `bun scripts/checks/stage2/e0-document.mjs` | Builder/src/srcdoc engine probe with a memory-store fixture; cannot prove persistence or integrated bridge authority |
+| `bun scripts/checks/stage2/m-permissions.mjs` | Mocked geolocation/fake-device feature probe; not actual native consent or integrated photos verification |
 
-The local evidence is under `.cache/debug/astra-notes/` (gitignored). With the
-web server on port 3000, `bun .cache/debug/astra-notes/check.mjs after` captures
-four 2× crops at an 818×664 viewport: unfolded handwriting, unfolded plain text,
-folded list and folded editor. `before-*` was captured before the rebuild.
-The same run asserts edits, live row titles, reload persistence, restore-to-shipped
-key removal, narrow back navigation and Escape returning home. It uses an
-isolated browser profile, not the user's stored notes.
+MVP `--serve` leaves its servers running for native checks. Inspect 180/120/0 captures;
+partial clipping at 120° is expected. Gallery tests need no model; full simulator tests do.
+Install archives into external fixtures before checking them, avoiding accidental global
+Bun cache resolution. The default archive manifest is `.cache/platform-packages/final/artifacts.json`;
+override with PLATFORM_ARTIFACTS and use a fresh directory when repacking unchanged versions.
 
-`bun .cache/debug/astra-notes/integration.mjs` checks palette colour, a real
-fold/open cycle, retaining the inner scene node, cover edits updating the open
-inner editor, a real cross-tab storage event, and a home-bar hold/drop into the
-left split followed by opening its narrow editor. Do not use a pinned `?deg=`
-for the live fold test; drive the hinge slider and poll the actual angle.
-
-The four before/after crops have zero pixels differing by more than 8/255 per
-channel after excluding their top 80 image pixels (the shell's changing clock).
-The two folded crops are pixel-identical in that region. Compare the actual
-PNGs as well as the numeric diff. Keep source edits out of a running capture:
-Bun HMR can destroy its execution context during a reload, requiring a fresh run.
-
-These are Chromium/SwiftShader checks. The Tauri WKWebView, native GPU rendering,
-and non-Mac handwriting fallbacks were not verified in this rebuild.
-
-Production was checked separately with `production.mjs` against `dist/` served
-on port 3011 by the local `serve-dist.ts`. It repeats the four captures and
-behavior checks, plus mouse focus followed by real keyboard typing, an empty
-string surviving reload, and Enter activating a note row. Both
-`bun run typecheck` and `bun run build` passed; scoped Biome checks passed too.
-
-## 7. Weather rebuild verification (2026-09-17)
-
-Scratch checks and screenshots use `.cache/debug/weather-*`. `weather-check.mjs`
-exercises actual Open-Meteo forecasts and Tokyo geocoding, city save/removal,
-Celsius/Fahrenheit persistence, daily details, the hourly chart, Escape,
-reload and folded layout. `weather-edge.mjs` checks a deliberately blocked
-forecast request, retaining the last successful result, retry recovery and a
-cold offline start with no fabricated readings. Geolocation callbacks are
-stubbed for denied and successful permission paths; the successful London
-coordinates still fetch a real forecast. These tests do not validate the
-operating system's permission prompt.
-
-`weather-production.mjs` runs against `dist/` served on port 3011, checking
-keyboard focus and tab trapping, live fold/open, unit handover and cross-tab
-storage. When driving the React hinge input, use the native input value setter
-before dispatching an input event: assigning `input.value` normally updates
-React's tracker and causes the synthetic event to be ignored. Do not finish
-infinite cloud animations in headless tests; finish only finite shell animations.
-
-The folded scene may retain a hidden inner Weather instance. Count or target
-the visible display rather than assuming each weather selector occurs once.
-All visual/runtime checks here are headless Chromium; native WKWebView parity
-is not established. Source lint passes, but the automatic formatting hook was
-inactive in this session, so the formatter check still reports pending formatting.
-
-For Weather scrollbar checks, run `.cache/debug/weather-scrollbar.mjs`. It
-launches Chrome with `ignoreDefaultArgs: ['--hide-scrollbars']`, checks the computed thumb skin,
-exercises horizontal and vertical scrolling through real wheel events, and captures
-`.cache/debug/weather-scrollbar.png`. The usual screenshot launch flag hides
-the exact UI under test. Puppeteer also adds it by default in headless mode,
-so merely omitting it from `args` is insufficient.
-
-`weather-glass.mjs` captures the four Weather surfaces (main, locations with the
-search field focused, search results, day detail) cropped to `[data-weather]` at
-2x into `.cache/debug/glass-*.png`. Under SwiftShader the four 2x captures take
-over five minutes; run it in the background. The Fog condition title shows a
-grey square: that is Apple's 🌫️ emoji, not a missing glyph.
-
-## 8. Monorepo migration gate (2026-09-17)
-
-See [migration.md](platform/progress/migration.md) for commands, results and remaining review
-items. Evidence files are `.cache/debug/monorepo-*`. `monorepo-check.mjs`
-accepts a phase name and optional base URL; it captures home, open Notes and
-closed Notes. `monorepo-serve-dist.ts` serves the production output on port 3011.
-The production integration script repeats the existing Notes integration
-against that origin, with a fresh isolated Chrome profile.
-
-Run screenshot-heavy SwiftShader checks serially. The concurrent capture in
-this migration stalled while native compilation was consuming CPU; stopping
-that capture and rerunning the integration alone passed. A successful DOM
-probe before a stalled screenshot does not mean the capture finished.
-
-Native release verification launched `.cache/cargo/release/iphoneduo` after
-stopping Tauri dev, proving assets came from the embedded production build.
-The raw executable may not appear in the Codex computer-use app inventory;
-Orca resolved it by process name. Inspect native screenshots as well as AX:
-hidden mirrored scenes can appear in the accessibility tree. Synthetic HUD
-dragging did not move the window in this session and is not a verified drag test.
-The user subsequently confirmed native dragging works, closing that review item.
-
-## 9. Stage 2 document and engine experiments
-
-`bun scripts/checks/stage2/e0-document.mjs` builds a real Notes document with
-an explicit memory-store fixture, serves installed-style `srcdoc` and dev-style
-`src` frames, and asserts their probes in an isolated Chromium instance. It
-also exercises actual Open-Meteo requests, denied origins, IndexedDB and Web
-Locks. `--serve` leaves the harness running for the visible native recipe in
-[stage-2.md](platform/progress/stage-2.md). Native builds use the separate
-`com.mnismt.iphoneduo.stage2` identifier and embedded harness assets; regular
-app data is not a test fixture.
-
-The harness records `window.results`, with a `loader` discriminator, and
-writes received native probe JSON into `.cache/debug/stage2/native-*.json`.
-These are experiment probes, not new shell `data-*` hooks. The memory-store
-fixture deliberately cannot establish persistence or bridge acceptance.
-
-`bun scripts/checks/stage2/m-permissions.mjs` runs the feature portion of M
-using Chromium's fake media device and mocked geolocation. A failed declared
-camera result is a real API refusal, not missing headless hardware. Photos and
-the host permission gate require the integrated runtime and are separate.
-
-The first native harness capture appeared black because default black text
-was drawn over a transparent window, with the Notes frames below a long
-results block. The harness now uses an opaque background and collapsed
-results. Inspect screenshots after the view settles; an immediate screenshot
-after a synthetic scroll can contain only partial composited layers. A
-successful accessibility probe alone does not establish the captured pixels.
-
-## 10. Stage 2 integrated MVP checks
-
-Prepare local archives with `bun scripts/package-platform.ts .cache/platform-packages/final`
-when absent, then run `bun run build` and `bun scripts/checks/stage2/mvp.mjs`. The script copies
-Fold Compass outside the repository, builds with public SDK/kit imports, serves
-the frozen simulator on 3111 and a separate app catalog on 3112, and drives
-real Store GET/OPEN. It checks isolation, app-private persistence, 180/120/0
-degree SDK layouts, stable frame IDs and relaunch. It hashes every simulator
-dist file before the separate build and after install/fold/reload. Evidence and
-pixels live under `.cache/debug/stage2/mvp/`. Inspect the three fold captures;
-partial clipping at 120 degrees is the real folded device, not a layout failure.
-`--serve` leaves both servers running for native UI verification.
-
-`bun scripts/checks/stage2/runtime.mjs` exercises the real host with probe apps:
-policy tampering, migration, quota abort, owner and nonowner commands, handover,
-trial activation/restoration, two-tab removal and old-generation rejection
-after reinstall. These fixture-only update calls verify retained safeguards.
-Stage 3's Store workflow separately verifies the subsequently enabled entry points.
-
-`bun scripts/checks/stage2/notes.mjs` and `weather.mjs` use the real shell on
-port 3110 (`PORT=3110 bun run dev`). Notes verifies SDK edits/reload; Weather
-checks one owner fetch across two views, command refresh and denied network.
-Sandbox frames expose `data-view`, `data-session`, `data-generation`,
-`data-state` and `data-owner` for test observation. Puppeteer frame evaluation
-is privileged test inspection, not an API available to an installed app.
-
-Both display roots must already be in CSS3DRenderer's camera container when
-iframes load. A detached hidden cover never connected; moving it from body
-into the renderer on its first visible frame reloaded it. Checking only
-`ready` at 180 degrees misses this failure; assert unchanged view IDs after
-folding through the cover transition.
-
-Stage-5 development probes need a viewport that keeps every iframe onscreen.
-Cross-origin frames below the viewport may suspend requestAnimationFrame, so
-an app that calls ready after its first paint can time out in an undersized
-test harness. This is separate from parallel SwiftShader contention; neither
-justifies weakening the host deadline. Select frames by `data-view`, not by
-Puppeteer's frame-list order. Maps' blank external embed was present in both
-the frozen pre-migration baseline and final headless captures.
-
-MVP checks consume `.cache/platform-packages/final/artifacts.json` (override with
-`PLATFORM_ARTIFACTS`) in the external test project. A naked temporary source
-folder can make Bun resolve React from its global cache without transitive
-dependencies. Installing the prepared archives first verifies the actual
-developer setup and avoids relying on that cache fallback.
+Full native permission/background-media/update-recovery parity and exhaustive app interactions
+remain unverified. Keep these limits explicit; successful builds or Chromium screenshots do
+not close them. No progress/archive documentation directories are maintained.

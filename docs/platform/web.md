@@ -1,4 +1,8 @@
-# Website
+# Website and deployment plan
+
+Status: separate website workstream; the requirements below are a plan, not deployment
+evidence. Public packages remain unpublished. Use [local development](dev.md) today and
+[the integration guide](website-integration.md) for existing API/catalog interfaces.
 
 `packages/web`, same repo, same build, deploys with the rest. Its advantage over
 any other platform's docs: the simulator is a web page, so the site embeds the
@@ -52,7 +56,7 @@ compatibility have already been verified.
 
 1. **Home.** The device, folding on scroll. Download links for the dmg, msi,
    AppImage, and Open in Browser.
-2. **Get started.** `npx @doan-labs/ipduo create`, `npx @doan-labs/ipduo dev`, and the `?dev=`
+2. **Get started (after publication).** `npx @doan-labs/ipduo create`, `npx @doan-labs/ipduo dev`, and the `?dev=`
    link. Target: an app on the home screen in five minutes. The embedded
    simulator targets the reader's localhost app document, subject to browser
    network permissions and CORS. Development uses the production sandbox and SDK.
@@ -70,7 +74,8 @@ compatibility have already been verified.
 
 ## Rules
 
-- Docs live next to code. The site renders `docs/platform/*.md` and the kit's
-  TSDoc; it does not have its own copies.
+- Docs live next to code. The site selects current platform references and generated
+  kit API data explicitly; it does not copy them or automatically publish archives,
+  roadmap pages or maintainer reports as user instructions.
 - No blog, no accounts, no forum. GitHub Discussions link in the footer.
 - Ships after the kit exists. Building it earlier means writing it twice.

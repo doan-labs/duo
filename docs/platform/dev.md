@@ -1,112 +1,79 @@
 # Developing an app
 
-## Current stage 3 workflow
+Current local workflow. SDK/CLI 0.0.0 and kit 0.1.0 are private previews, not published
+npm packages. Start with [the review guide](review.md) for the complete external-project
+recipe and [the CLI reference](../../packages/cli/README.md) for command options.
 
-Stage 3 lifted the stage-2 deferral of local development and explicit updates
-after their safety checks passed ([stage 3](progress/stage-3.md)).
-CLI `create`, `check`, `build`, `serve`, `dev` and `preview` now exist. Package
-local artifacts with `bun scripts/package-platform.ts`; use create's `--packages`
-option while these versions remain unpublished. The builder consumes installed
-SDK/kit packages from an external project. `dev` prints a `?dev=` URL and watches
-source; `preview` serves one build. Reload explicitly after changes. Remove the
-DEV row in Store to clear its private data. No device permissions in previews.
-See the [CLI reference](../../packages/cli/README.md) and [stage 3 evidence](progress/stage-3.md).
+## Packages and commands
 
-The remaining sections preserve the broader plan. Published `npx` packages and
-hosted-shell development are not claimed; the fully local workflow is verified.
-The implemented dev server uses immutable release paths under `/apps/`; plain
-Vite or an arbitrary framed URL is not a compatible development server.
-Stage-5 clarification: the shell downloads and validates that document once,
-then gives its verified bytes a Blob URL for iframe `src`. It never trusts a
-second server navigation response. This supersedes direct server-src wording
-below while preserving the original developer-origin namespace.
+`bun scripts/package-platform.ts <output-directory>` prepares local archives and
+`artifacts.json`. Pass that file to CLI `create --packages`; install the resulting
+project's dependencies before running its scripts. External projects consume installed
+SDK/kit exports and do not need workspace source aliases or a source contribution here.
+Use a new output directory when repacking unchanged private versions to avoid stale caches.
 
-The simulator is a web page, so it is also the dev environment. The CLI provides
-local build tools; developers do not need the native shell to start.
+| Command | Purpose |
+| --- | --- |
+| `create` | Manifest, React entry, changelog, placeholder icon and package dependencies |
+| `check` | Metadata, lane/import/type/token checks and bundle validation |
+| `build` | Immutable release and catalog in the output directory |
+| `serve` | Serve an existing catalog with CORS for Store installation |
+| `dev` / `preview` | Build and serve policy-bearing previews; dev also watches source |
 
-## `?dev=`
+Strict source/import validation and the 4 MiB document cap apply to external consumers.
+An immutable release URL is never overwritten. Placeholder icons/metadata need attention
+before any public release; current validation is not a full publication pipeline.
 
-1. Serve the app however you like on localhost. Vite, `bun --hot`, anything.
-2. Open the simulator on `https://duo.doan-labs.com` with
-   `?dev=http://localhost:5173` appended to its URL. The simulator's final
-   public path is still to be selected; do not assume the website root is it.
-3. The shell fetches `http://localhost:5173/release.json`, verifies the release
-   it names, puts the app on the
-   inner home screen with a DEV badge, and opens it if `&app=<id>` is present.
+## Isolated preview
 
-The dev server is the CLI's `dev` command running the same builder CI runs:
-it serves `manifest.json`, `release.json` and a policy-bearing `app.html`. The
-shell loads it with `iframe.src` into the same `sandbox="allow-scripts"`
-frame, the same explicit `allow` denials and the same nonce handshake an
-installed release gets from `srcdoc` (progress/contract.md §2.7), and refuses
-a document without `release.json` or with a `network` entry that is not an
-HTTPS or loopback origin. Framing an arbitrary URL is not development mode.
-A development app's storage, session and widgets live under
-`dev:<origin>:<id>`, disjoint from an installed app with the same id, and dev
-loading never runs a migration. Hosted-shell access to localhost and CORS on
-`manifest.json` need browser verification (progress/contract.md check B).
+Run the simulator locally, then run the external app's CLI dev command with
+`--simulator http://localhost:3000`. Open its printed `?dev=` URL. The supported server
+is the CLI serving the same builder's immutable output, manifest and release metadata;
+a plain Vite page or arbitrary URL is not a compatible preview document.
 
-Keep a fully local simulator plus app-server workflow available if the hosted
-page cannot reach localhost. The canonical domain alone does not establish
-that browser network permissions, CORS and the development loader work there.
+The host verifies the selected release and document, then loads an owned Blob URL of
+those verified bytes in an opaque iframe. No second remote navigation response is trusted.
+Explicitly reload the simulator to select a rebuild. An already-running frame keeps its
+release. Ctrl-C closes the watcher/server and removes owned temporary build output.
 
-Frame buttons, the fold, both displays, Camera Control, all come from the
-hosted shell. Browser devtools inspect the iframe like any page.
+Data is persisted under `dev:<origin>:<id>`, separate from installed data and other preview
+origins. Removing `?dev=` forgets the view, not its data; remove the Store DEV row to clear
+that namespace and revoke its frames. Device permissions are refused in previews. There
+is no automatic browser reload or catalog polling.
 
-## CLI
+Hosted-shell access to localhost remains deployment/browser verification work, including
+CORS and local-network permissions. The fully local path remains supported.
 
-Package `packages/cli` (`@doan-labs/ipduo`, private and unpublished; run it from
-the repo or from local archives), on purpose tiny. Full reference:
-[packages/cli/README.md](../../packages/cli/README.md).
-
-- `create <name>`: writes `manifest.json`, `CHANGELOG.md`, `icon.png` placeholder,
-  `main.tsx` using the kit's `Nav`/`Page`, and a `package.json` that depends on
-  the SDK and kit, plus their required React runtime dependencies.
-- `check`: import-boundary rules, strict TypeScript and bundle validation; the
-  same per-app step CI runs (publishing.md).
-- `build`: writes an immutable release and `index.json` under `dist/`.
-- `dev`: builds `entry` with the StyleX plugin in watch mode, serves the build
-  output, prints the `?dev=` link with the port filled in.
-- `preview`: one build, served without watching. `serve <dir>`: serves a built
-  catalog with CORS.
-
-## SDK
-
-`@doan-labs/ipduo-sdk` owns the host API, protocol, and manifest schema for all
-downloadable apps. Usage (implemented in `packages/sdk/client.ts`; progress/contract.md §2.7):
+## SDK use
 
 ```ts
 import { os } from '@doan-labs/ipduo-sdk'
-await os.connect()                               // hello(nonce) → welcome → ack; before rendering
-os.ready()                                       // first frame painted; the kit's <Screen> calls it
-const { rev } = await os.storage.set('lastTab', 'today')   // durable when the ack arrives
-const snap = await os.storage.snapshot()         // { rev, entries }, then
-os.storage.watch(snap.rev, (e) => ...)           // ordered events; a rev gap means resnapshot
-await os.session.set('note', id)                 // ephemeral, shared by this session's views
-os.view                                          // { display, placement, width, height, visible, active, focused, angle }
-os.owner                                         // { epoch } while this view is the designated owner, else null
-os.commands.send('refresh', '')                  // any view; resolves when the owner acknowledged
-os.commands.onCommand(async (c) => ...)          // owner only
-os.widget.set('small', { lines: [...] })         // owner only; declarative snapshot the shell renders
-os.open('labs.doan.ipduo.maps', 'q=tides')
 
-import { useKV } from '@doan-labs/ipduo-sdk/react'
-const { value, set, status } = useKV(os.storage, 'lastTab')   // hydrating | ready | saving | error
+await os.connect()
+// Render the app and finish any owner migration, then signal its first painted frame:
+os.ready()
+
+await os.storage.set('lastTab', 'today') // durable after acknowledgment
+await os.session.set('selectedNote', 'field-note') // shared within this session
+const view = os.view // display, placement, width, height, visible, active, focused, angle
+const stop = os.onView((next) => console.log(next.display, next.angle))
+// Call stop() when this subscription is no longer needed.
 ```
 
-The SDK implements the bridge from runtime.md: connection lifecycle,
-validation, ordered requests, retry by id after a timeout, revisions, errors
-and limits. Its host contract is versioned independently of the kit, and
-`build.sdk` in a release is the host requirement under full caret semantics;
-while the SDK is 0.x, every published version is its own host contract and
-prereleases run only under `?dev=`. The kit owns components and design tokens; apps bundle it
-inside their document. No downloadable app receives shell objects as React
-props; the legacy `{ os }` prop is for baked apps only.
+The app owns connect/ready and effect cleanup. The kit's `Screen` and `useDisplay` only
+subscribe; they do not connect or signal readiness. Use `useKV` from
+`@doan-labs/ipduo-sdk/react` for hydration, optimistic edits, ordered writes and visible
+saving/error states. A timeout does not prove a write failed. See [the SDK reference](../../packages/sdk/README.md)
+and [contract](contract.md) for snapshot/watch, retries, ownership and commands.
 
-## Dev mode safety
+Each iframe is a separate document. Share persistence through `os.storage`, navigation
+through `os.session`, and nonowner intent through acknowledged commands. Ownership is
+sticky across folding; it does not follow the active display. Apps remain responsible
+for idempotent effects and cleanup. `os.open` uses app ids; Escape is forwarded by the SDK.
 
-A `?dev=` app has the same sandbox as any iframe app and is never written to
-the installed registry. Closing the tab forgets the view. The DEV badge is not
-removable. Its storage is real but separate: writes land under
-`dev:<origin>:<id>`, never under the installed app's namespace, and Remove App
-on the DEV tile clears them.
+## Install and update
+
+Serve a built catalog, select its `index.json` in Store, then GET/OPEN. External catalogs
+accept no device permissions. Refresh and updates are explicit; an update must come from
+the installed app's source origin. Running sessions retain their release until activation
+is safe. See [Store](store.md), [updates](updates.md) and the [review guide](review.md).

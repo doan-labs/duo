@@ -3,7 +3,7 @@
 Private SDK at 0.0.0. `legacy.ts` remains the host-only API for baked apps.
 The sandbox API exports `os` from `index.ts` and the async `useKV` adapter from
 `react.ts`. The shell host is integrated under `packages/shell/runtime/`;
-verification is recorded in `docs/platform/progress/stage-2.md`.
+verification scope and reproduction are documented in `docs/platform/review.md`.
 
 The host must satisfy the full caret range of the exact SDK version recorded
 in the app release. While 0.x, every published SDK version is its own host

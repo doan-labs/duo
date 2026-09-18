@@ -1,11 +1,11 @@
-# Handoff for the website owner
+# Website integration
 
-This work does not edit `packages/web` or its separate worktree, merge that
-worktree or wait for it. Public hosting remains static at duo.doan-labs.com.
-There is no custom backend and no deployment in this task.
+The website consumes the platform documents and generated API, not copied specifications.
+The accepted public origin is duo.doan-labs.com on static hosting. Provider, routes and
+deployment verification remain in the [website plan](web.md); no deployment is claimed here.
 
 - SDK preview version: 0.0.0, protocol 1. The accepted runtime contract remains
-  `progress/contract.md`; capture and extra device permissions remain deferred.
+  `contract.md`; capture and extra device permissions remain deferred.
 - UI-kit preview version: 0.1.0. Generated `api/uikit.json` contains package
   version, descriptions, exported prop declarations and source links. Generate
   with `bun scripts/generate-kit-docs.ts`; CI checks freshness. Compatibility and
@@ -26,5 +26,5 @@ There is no custom backend and no deployment in this task.
 
 Before public npm distribution or deployment, the owner must choose release
 versions/provenance, replace placeholder app metadata/icons where appropriate,
-and authorize publication. Accounts, payments, ranking, reviews and expanded
+and obtain authorization for publication. Accounts, payments, ranking, reviews and expanded
 store features are not prerequisites for the developer workflow.
