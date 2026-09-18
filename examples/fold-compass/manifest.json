@@ -1,0 +1,11 @@
+{
+  "id": "dev.independent.fold-compass",
+  "name": "Fold Compass",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "Independent demo author",
+  "repo": "https://example.com/fold-compass",
+  "license": "MIT"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@independent/fold-compass",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@doan-labs/ipduo-sdk": "0.0.0",
+    "@doan-labs/ipduo-uikit": "0.1.0",
+    "@stylexjs/stylex": "0.19.0",
+    "react": "^19",
+    "react-dom": "^19"
+  }
+}
