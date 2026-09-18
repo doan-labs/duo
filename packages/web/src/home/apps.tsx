@@ -1,8 +1,10 @@
 // The apps, from two build-time sources (src/generated/catalog.ts): the curated catalog
 // (published releases with icon, version, permissions and dates) and the shell's own
-// home screen (every official app, working in the simulator or still a mockup). The
-// home page shows a grid; /apps adds the lane filter, status groups and a list layout.
+// home screen (every official app, working in the simulator or still a mockup, dated by
+// the commits on its package). The home page shows a grid; /apps adds the lane filter,
+// status groups and a list layout.
 import * as stylex from '@stylexjs/stylex'
+import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
 import { color, font } from '../tokens.stylex'
@@ -14,7 +16,19 @@ const SMALL = '@media (max-width: 734px)'
 type Lane = CatalogApp['lane']
 type Status = 'published' | 'working' | 'mockup'
 type Layout = 'grid' | 'list'
-type Entry = { key: string; name: string; icon: string; author: string; status: Status; release?: CatalogApp }
+type Perm = { name: string; label: string }
+type Entry = {
+  key: string
+  name: string
+  icon: string
+  author: string
+  status: Status
+  version?: string
+  permissions: Perm[]
+  created?: string
+  updated?: string
+  release?: CatalogApp
+}
 
 const STATUS: Record<Status, { label: string; text: string }> = {
   published: { label: 'Published', text: 'In the catalog. Installs through the Store on any Duo.' },
@@ -26,6 +40,19 @@ const STATUS: Record<Status, { label: string; text: string }> = {
 }
 const ORDER: Status[] = ['published', 'working', 'mockup']
 
+/** What the simulator-only apps reach for. Baked into the shell, so nothing sandboxes them:
+ *  this is what they actually use, not a grant the runtime enforces. */
+const USES: Record<string, Perm[]> = {
+  Camera: [{ name: 'camera', label: 'Camera' }],
+  Maps: [{ name: 'network', label: 'Network' }],
+  Safari: [
+    { name: 'network', label: 'Network' },
+    { name: 'clipboard-write', label: 'Write clipboard' }
+  ],
+  'Voice Memos': [{ name: 'microphone', label: 'Microphone' }],
+  YouTube: [{ name: 'network', label: 'Network' }]
+}
+
 const OFFICIAL: Entry[] = [
   ...SHELL.map((s): Entry => {
     const release = CATALOG.find((c) => c.lane === 'official' && c.name === s.name)
@@ -35,6 +62,10 @@ const OFFICIAL: Entry[] = [
       icon: release?.icon ?? s.icon,
       author: release?.author ?? 'Doan Labs',
       status: release ? 'published' : s.mock ? 'mockup' : 'working',
+      version: release?.version,
+      permissions: release?.permissions ?? USES[s.name] ?? [],
+      created: release?.created ?? s.created,
+      updated: release?.updated ?? s.updated,
       release
     }
   }),
@@ -42,7 +73,18 @@ const OFFICIAL: Entry[] = [
 ].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name))
 const COMMUNITY: Entry[] = CATALOG.filter((c) => c.lane === 'community').map(fromRelease)
 function fromRelease(c: CatalogApp): Entry {
-  return { key: c.id, name: c.name, icon: c.icon, author: c.author, status: 'published', release: c }
+  return {
+    key: c.id,
+    name: c.name,
+    icon: c.icon,
+    author: c.author,
+    status: 'published',
+    version: c.version,
+    permissions: c.permissions,
+    created: c.created,
+    updated: c.updated,
+    release: c
+  }
 }
 
 const LANES: { key: Lane; label: string; text: string; apps: Entry[] }[] = [
@@ -187,10 +229,12 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
               <td {...stylex.props(styles.td)}>
                 <StatusChip status={a.status} />
               </td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.release?.version ?? '-'}</td>
-              <td {...stylex.props(styles.td)}>{a.release ? <Permissions app={a.release} /> : <Dash />}</td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.created) : '-'}</td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.updated) : '-'}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.version ?? '-'}</td>
+              <td {...stylex.props(styles.td)}>
+                <Permissions perms={a.permissions} />
+              </td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.created ? date(a.created) : '-'}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.updated ? date(a.updated) : '-'}</td>
             </tr>
           ))}
         </tbody>
@@ -209,18 +253,16 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
                 </h4>
                 <p {...stylex.props(styles.meta)}>
                   {a.author}
-                  {a.release && ` · v${a.release.version}`}
+                  {a.version && ` · v${a.version}`}
                   {a.release && a.release.releases > 1 && ` · ${a.release.releases} releases`}
                   {a.status === 'mockup' && ` · ${STATUS[a.status].label.toLowerCase()}`}
                 </p>
-                {a.release && (
-                  <>
-                    <Permissions app={a.release} />
-                    <p {...stylex.props(styles.dates)}>
-                      <span>Created {date(a.release.created)}</span>
-                      <span>Updated {date(a.release.updated)}</span>
-                    </p>
-                  </>
+                <Permissions perms={a.permissions} />
+                {a.created && a.updated && (
+                  <p {...stylex.props(styles.dates)}>
+                    <span>Created {date(a.created)}</span>
+                    <span>Updated {date(a.updated)}</span>
+                  </p>
                 )}
               </div>
             </article>
@@ -238,11 +280,12 @@ function Name({ entry, row = false }: { entry: Entry; row?: boolean }) {
       {entry.name}
     </a>
   ) : (
-    <span {...stylex.props(style)}>{entry.name}</span>
+    // Nothing to link to on GitHub: baked apps only exist inside the simulator.
+    <Link to="/simulator" {...stylex.props(style)}>
+      {entry.name}
+    </Link>
   )
 }
-
-const Dash = () => <span {...stylex.props(styles.mono)}>-</span>
 
 function StatusChip({ status }: { status: Status }) {
   return (
@@ -253,16 +296,16 @@ function StatusChip({ status }: { status: Status }) {
   )
 }
 
-function Permissions({ app }: { app: CatalogApp }) {
+function Permissions({ perms }: { perms: readonly Perm[] }) {
   return (
     <ul {...stylex.props(styles.chips)} aria-label="Permissions">
-      {app.permissions.length === 0 ? (
+      {perms.length === 0 ? (
         <li {...stylex.props(styles.chip, styles.chipNone)}>
           <Glyph name="none" />
           No permissions
         </li>
       ) : (
-        app.permissions.map((p) => (
+        perms.map((p) => (
           <li key={p.name} {...stylex.props(styles.chip)} title={p.name}>
             <Glyph name={p.name} />
             {p.label}
@@ -291,6 +334,12 @@ const GLYPHS: Record<string, string> = {
     'M5.5 3H4a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-1.5M5.5 2h5v2h-5zM6 11l4.5-4.5 1 1L7 12H6z',
   photos:
     'M2.5 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1zM3 11l3-3 2 2 2-2 3 3M10.5 6.5a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4z',
+  camera:
+    'M2.5 5.8a1 1 0 0 1 1-1h1.6l1-1.6h3.8l1 1.6h1.6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1zM8 11.2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+  microphone:
+    'M8 2.2a1.8 1.8 0 0 1 1.8 1.8v3.6a1.8 1.8 0 0 1-3.6 0V4A1.8 1.8 0 0 1 8 2.2zM4.2 7.6a3.8 3.8 0 0 0 7.6 0M8 11.4v2.2M6 13.6h4',
+  network:
+    'M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM2.3 8h11.4M8 2c1.5 1.7 2.3 3.7 2.3 6S9.5 12.3 8 14C6.5 12.3 5.7 10.3 5.7 8S6.5 3.7 8 2z',
   none: 'M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM3.8 3.8l8.4 8.4',
   published: 'M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM5.2 8.2l1.9 1.9 3.7-3.9',
   working: 'M3 4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM6 13.5h4M8 11.5v2',

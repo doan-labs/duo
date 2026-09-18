@@ -59,9 +59,24 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
 // with a catalog release above are published; the rest are working in the simulator
 // or, when the shell marks them `mock`, still in development behind a static screen.
 const shellSource = readFileSync(`${root}packages/shell/apps.ts`, 'utf8')
+// Which package each baked app renders from, so its dates can come off the source tree.
+const dirs = new Map<string, string>()
+for (const [, names = '', dir = ''] of shellSource.matchAll(
+  /import \{([^}]+)\} from '@doan-labs\/duo-app-([a-z-]+)\//g
+))
+  for (const name of names.split(',')) dirs.set(name.trim(), dir)
+/** First and last commit that touched the package: the site's Created and Updated. */
+const dates = (dir: string) => {
+  const log = spawnSync('git', ['log', '--format=%aI', '--', `packages/apps/${dir}`], { cwd: root, encoding: 'utf8' })
+  const all = log.stdout.split('\n').filter(Boolean)
+  return { created: all.at(-1), updated: all[0] }
+}
 const seen = new Set<string>()
-const shell = [...shellSource.matchAll(/\{ name: '([^']+)'(?:, mock: (true))?/g)]
-  .map((m) => ({ name: m[1] ?? '', icon: ICONS[m[1] ?? ''] ?? '', mock: m[2] === 'true' }))
+const shell = [...shellSource.matchAll(/\{ name: '([^']+)'(.*)$/gm)]
+  .map(([, name = '', rest = '']) => {
+    const dir = [...dirs].find(([component]) => new RegExp(`\\b${component}\\b`).test(rest))?.[1]
+    return { name, icon: ICONS[name] ?? '', mock: rest.includes('mock: true'), ...(dir ? dates(dir) : {}) }
+  })
   // Folders (Utilities) have no app icon and are not apps.
   .filter(({ name, icon }) => name && icon && !seen.has(name) && seen.add(name))
 const generated = `${here}src/generated/catalog.ts`
@@ -83,8 +98,10 @@ writeFileSync(
     '  icon: string',
     '}',
     `export const CATALOG: CatalogApp[] = ${JSON.stringify(shelf, null, 2)}`,
-    '/** Official apps built into the simulator; `mock` marks a static screen still in development. */',
-    `export const SHELL: { name: string; icon: string; mock: boolean }[] = ${JSON.stringify(shell, null, 2)}`,
+    '/** Official apps built into the simulator; `mock` marks a static screen still in development.',
+    ' *  Baked apps carry no release, so their dates are the first and last commit on their package. */',
+    'export const SHELL: { name: string; icon: string; mock: boolean; created?: string; updated?: string }[] =',
+    `  ${JSON.stringify(shell, null, 2)}`,
     ''
   ].join('\n')
 )
