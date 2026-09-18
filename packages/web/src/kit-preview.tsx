@@ -1,4 +1,4 @@
-import { app, colors, fonts } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type ComponentType, useState } from 'react'
 import { Line } from './highlight'

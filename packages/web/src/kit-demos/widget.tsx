@@ -1,5 +1,5 @@
-import { VStack, Widget } from '@doan-labs/ipduo-uikit'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { VStack, Widget } from '@doan-labs/duo-uikit'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 

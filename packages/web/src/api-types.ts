@@ -9,7 +9,7 @@ export type ApiMember = {
 }
 
 export type ApiEntry = {
-  pkg: '@doan-labs/ipduo-sdk' | '@doan-labs/ipduo-uikit'
+  pkg: '@doan-labs/duo-sdk' | '@doan-labs/duo-uikit'
   name: string
   kind: 'component' | 'hook' | 'function' | 'class' | 'type' | 'value'
   /** Repository path of the declaration. */

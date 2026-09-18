@@ -18,12 +18,6 @@ Assert state, then inspect pixels. Chromium results do not establish native pari
 5. Record the tested runtime and limits. Wait ≥1 s for unlock (420 ms animation); side-click
    handling includes a 300 ms double-click window. Inspect screenshots after compositing settles.
 
-- **`Encountered two children with the same key` on a `/kit/Nav` pop is not
-  the site's.** `packages/uikit/nav.tsx` calls `setLeaving` inside the
-  `setStack` updater; React dev double-invokes updaters, so the leaving entry
-  is queued twice. It is a dev-only warning in the kit, seen wherever `Nav`
-  pops under a development build.
-
 ## 1. Headless Chrome
 
 Start `bun run dev` on a free port. For a quick capture:
@@ -244,164 +238,14 @@ Install archives into external fixtures before checking them, avoiding accidenta
 Bun cache resolution. The default archive manifest is `.cache/platform-packages/final/artifacts.json`;
 override with PLATFORM_ARTIFACTS and use a fresh directory when repacking unchanged versions.
 
-`bun .cache/debug/astra-notes/integration.mjs` checks palette colour, a real
-fold/open cycle, retaining the inner scene node, cover edits updating the open
-inner editor, a real cross-tab storage event, and a home-bar hold/drop into the
-left split followed by opening its narrow editor. Do not use a pinned `?deg=`
-for the live fold test; drive the hinge slider and poll the actual angle.
+Full native permission/background-media/update-recovery parity and exhaustive app interactions
+remain unverified. Keep these limits explicit; successful builds or Chromium screenshots do
+not close them. No progress/archive documentation directories are maintained.
 
-The four before/after crops have zero pixels differing by more than 8/255 per
-channel after excluding their top 80 image pixels (the shell's changing clock).
-The two folded crops are pixel-identical in that region. Compare the actual
-PNGs as well as the numeric diff. Keep source edits out of a running capture:
-Bun HMR can destroy its execution context during a reload, requiring a fresh run.
-
-These are Chromium/SwiftShader checks. The Tauri WKWebView, native GPU rendering,
-and non-Mac handwriting fallbacks were not verified in this rebuild.
-
-Production was checked separately with `production.mjs` against `dist/` served
-on port 3011 by the local `serve-dist.ts`. It repeats the four captures and
-behavior checks, plus mouse focus followed by real keyboard typing, an empty
-string surviving reload, and Enter activating a note row. Both
-`bun run typecheck` and `bun run build` passed; scoped Biome checks passed too.
-
-## 7. Weather rebuild verification (2026-09-17)
-
-Scratch checks and screenshots use `.cache/debug/weather-*`. `weather-check.mjs`
-exercises actual Open-Meteo forecasts and Tokyo geocoding, city save/removal,
-Celsius/Fahrenheit persistence, daily details, the hourly chart, Escape,
-reload and folded layout. `weather-edge.mjs` checks a deliberately blocked
-forecast request, retaining the last successful result, retry recovery and a
-cold offline start with no fabricated readings. Geolocation callbacks are
-stubbed for denied and successful permission paths; the successful London
-coordinates still fetch a real forecast. These tests do not validate the
-operating system's permission prompt.
-
-`weather-production.mjs` runs against `dist/` served on port 3011, checking
-keyboard focus and tab trapping, live fold/open, unit handover and cross-tab
-storage. When driving the React hinge input, use the native input value setter
-before dispatching an input event: assigning `input.value` normally updates
-React's tracker and causes the synthetic event to be ignored. Do not finish
-infinite cloud animations in headless tests; finish only finite shell animations.
-
-The folded scene may retain a hidden inner Weather instance. Count or target
-the visible display rather than assuming each weather selector occurs once.
-All visual/runtime checks here are headless Chromium; native WKWebView parity
-is not established. Source lint passes, but the automatic formatting hook was
-inactive in this session, so the formatter check still reports pending formatting.
-
-For Weather scrollbar checks, run `.cache/debug/weather-scrollbar.mjs`. It
-launches Chrome with `ignoreDefaultArgs: ['--hide-scrollbars']`, checks the computed thumb skin,
-exercises horizontal and vertical scrolling through real wheel events, and captures
-`.cache/debug/weather-scrollbar.png`. The usual screenshot launch flag hides
-the exact UI under test. Puppeteer also adds it by default in headless mode,
-so merely omitting it from `args` is insufficient.
-
-`weather-glass.mjs` captures the four Weather surfaces (main, locations with the
-search field focused, search results, day detail) cropped to `[data-weather]` at
-2x into `.cache/debug/glass-*.png`. Under SwiftShader the four 2x captures take
-over five minutes; run it in the background. The Fog condition title shows a
-grey square: that is Apple's 🌫️ emoji, not a missing glyph.
-
-## 8. Monorepo migration gate (2026-09-17)
-
-See [migration.md](platform/progress/migration.md) for commands, results and remaining review
-items. Evidence files are `.cache/debug/monorepo-*`. `monorepo-check.mjs`
-accepts a phase name and optional base URL; it captures home, open Notes and
-closed Notes. `monorepo-serve-dist.ts` serves the production output on port 3011.
-The production integration script repeats the existing Notes integration
-against that origin, with a fresh isolated Chrome profile.
-
-Run screenshot-heavy SwiftShader checks serially. The concurrent capture in
-this migration stalled while native compilation was consuming CPU; stopping
-that capture and rerunning the integration alone passed. A successful DOM
-probe before a stalled screenshot does not mean the capture finished.
-
-Native release verification launched `.cache/cargo/release/iphoneduo` after
-stopping Tauri dev, proving assets came from the embedded production build.
-The raw executable may not appear in the Codex computer-use app inventory;
-Orca resolved it by process name. Inspect native screenshots as well as AX:
-hidden mirrored scenes can appear in the accessibility tree. Synthetic HUD
-dragging did not move the window in this session and is not a verified drag test.
-The user subsequently confirmed native dragging works, closing that review item.
-
-## 9. Stage 2 document and engine experiments
-
-`bun scripts/checks/stage2/e0-document.mjs` builds a real Notes document with
-an explicit memory-store fixture, serves installed-style `srcdoc` and dev-style
-`src` frames, and asserts their probes in an isolated Chromium instance. It
-also exercises actual Open-Meteo requests, denied origins, IndexedDB and Web
-Locks. `--serve` leaves the harness running for the visible native recipe in
-[stage-2.md](platform/progress/stage-2.md). Native builds use the separate
-`com.mnismt.iphoneduo.stage2` identifier and embedded harness assets; regular
-app data is not a test fixture.
-
-The harness records `window.results`, with a `loader` discriminator, and
-writes received native probe JSON into `.cache/debug/stage2/native-*.json`.
-These are experiment probes, not new shell `data-*` hooks. The memory-store
-fixture deliberately cannot establish persistence or bridge acceptance.
-
-`bun scripts/checks/stage2/m-permissions.mjs` runs the feature portion of M
-using Chromium's fake media device and mocked geolocation. A failed declared
-camera result is a real API refusal, not missing headless hardware. Photos and
-the host permission gate require the integrated runtime and are separate.
-
-The first native harness capture appeared black because default black text
-was drawn over a transparent window, with the Notes frames below a long
-results block. The harness now uses an opaque background and collapsed
-results. Inspect screenshots after the view settles; an immediate screenshot
-after a synthetic scroll can contain only partial composited layers. A
-successful accessibility probe alone does not establish the captured pixels.
-
-## 10. Stage 2 integrated MVP checks
-
-Prepare local archives with `bun scripts/package-platform.ts .cache/platform-packages/final`
-when absent, then run `bun run build` and `bun scripts/checks/stage2/mvp.mjs`. The script copies
-Fold Compass outside the repository, builds with public SDK/kit imports, serves
-the frozen simulator on 3111 and a separate app catalog on 3112, and drives
-real Store GET/OPEN. It checks isolation, app-private persistence, 180/120/0
-degree SDK layouts, stable frame IDs and relaunch. It hashes every simulator
-dist file before the separate build and after install/fold/reload. Evidence and
-pixels live under `.cache/debug/stage2/mvp/`. Inspect the three fold captures;
-partial clipping at 120 degrees is the real folded device, not a layout failure.
-`--serve` leaves both servers running for native UI verification.
-
-`bun scripts/checks/stage2/runtime.mjs` exercises the real host with probe apps:
-policy tampering, migration, quota abort, owner and nonowner commands, handover,
-trial activation/restoration, two-tab removal and old-generation rejection
-after reinstall. These fixture-only update calls verify retained safeguards.
-Stage 3's Store workflow separately verifies the subsequently enabled entry points.
-
-`bun scripts/checks/stage2/notes.mjs` and `weather.mjs` use the real shell on
-port 3110 (`PORT=3110 bun run dev`). Notes verifies SDK edits/reload; Weather
-checks one owner fetch across two views, command refresh and denied network.
-Sandbox frames expose `data-view`, `data-session`, `data-generation`,
-`data-state` and `data-owner` for test observation. Puppeteer frame evaluation
-is privileged test inspection, not an API available to an installed app.
-
-Both display roots must already be in CSS3DRenderer's camera container when
-iframes load. A detached hidden cover never connected; moving it from body
-into the renderer on its first visible frame reloaded it. Checking only
-`ready` at 180 degrees misses this failure; assert unchanged view IDs after
-folding through the cover transition.
-
-Stage-5 development probes need a viewport that keeps every iframe onscreen.
-Cross-origin frames below the viewport may suspend requestAnimationFrame, so
-an app that calls ready after its first paint can time out in an undersized
-test harness. This is separate from parallel SwiftShader contention; neither
-justifies weakening the host deadline. Select frames by `data-view`, not by
-Puppeteer's frame-list order. Maps' blank external embed was present in both
-the frozen pre-migration baseline and final headless captures.
-
-MVP checks consume `.cache/platform-packages/final/artifacts.json` (override with
-`PLATFORM_ARTIFACTS`) in the external test project. A naked temporary source
-folder can make Bun resolve React from its global cache without transitive
-dependencies. Installing the prepared archives first verifies the actual
-developer setup and avoids relying on that cache fallback.
-## 11. Website verification (2026-09-18)
+## Website verification (2026-09-18)
 
 `bun packages/web/scripts/check.mjs [url]` is the committed check for
-`packages/web`: thirteen routes at 1440, 820 and 390 px, in light and dark, page and console errors,
+`packages/web`: fourteen routes at 1440, 820 and 390 px, in light and dark, page and console errors,
 horizontal overflow, the nav's desktop list versus mobile `<details>` menu,
 tables and code on the platform docs, every internal link, and a nav click
 that routes without a document reload. It blocks the simulator frame so a

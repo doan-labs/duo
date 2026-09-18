@@ -1,6 +1,6 @@
 # CLI
 
-`@doan-labs/ipduo`, a small Bun tool. Until it is published, run it from the repository as `bun packages/cli/index.mjs <command>`, or through the scripts `create` writes into your app's `package.json`.
+`@doan-labs/duo-cli`, a small Bun tool. Until it is published, run it from the repository as `bun packages/cli/index.mjs <command>`, or through the scripts `create` writes into your app's `package.json`.
 
 ```sh
 bun scripts/package-platform.ts                  # archives + artifacts.json into .cache/platform-packages/

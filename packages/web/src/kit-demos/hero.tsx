@@ -1,4 +1,4 @@
-import { Hero, Row, Section, Text } from '@doan-labs/ipduo-uikit'
+import { Hero, Row, Section, Text } from '@doan-labs/duo-uikit'
 
 export default function Demo() {
   return (

@@ -1,4 +1,4 @@
-import { Placeholder, Row, Section, Title, VStack } from '@doan-labs/ipduo-uikit'
+import { Placeholder, Row, Section, Title, VStack } from '@doan-labs/duo-uikit'
 
 export default function Demo() {
   return (

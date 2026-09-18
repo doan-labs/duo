@@ -30,7 +30,7 @@ Both views of an app see the same revisions, so the mirror stays current without
 ## React
 
 ```tsx
-import { useKV } from '@doan-labs/ipduo-sdk/react'
+import { useKV } from '@doan-labs/duo-sdk/react'
 
 const { value, status, error, set, del } = useKV(os.storage, 'note')
 ```

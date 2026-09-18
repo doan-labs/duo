@@ -1,4 +1,4 @@
-import { Num, Row, Section } from '@doan-labs/ipduo-uikit'
+import { Num, Row, Section } from '@doan-labs/duo-uikit'
 import { useEffect, useState } from 'react'
 
 export default function Demo() {

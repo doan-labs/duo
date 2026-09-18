@@ -24,7 +24,7 @@ function Index() {
         title="UI kit"
         lead={
           <>
-            <Code>@doan-labs/ipduo-uikit</Code>: the components and tokens every app on the phone is built from. They
+            <Code>@doan-labs/duo-uikit</Code>: the components and tokens every app on the phone is built from. They
             already know about the cover and the inner display, so a screen that reads at 387 points grows into the room
             it gets unfolded.
           </>
@@ -32,7 +32,7 @@ function Index() {
       />
       <Pre>{`import {
   Button, Row, Screen, Section, Text, Title, useDisplay
-} from '@doan-labs/ipduo-uikit'
+} from '@doan-labs/duo-uikit'
 
 function App() {
   const view = useDisplay()

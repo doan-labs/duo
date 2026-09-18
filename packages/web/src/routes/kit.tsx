@@ -2,7 +2,7 @@ import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { api } from '../generated/api'
 import { SideLink, SideList, Split } from '../layout'
 
-export const kit = api.filter((e) => e.pkg === '@doan-labs/ipduo-uikit')
+export const kit = api.filter((e) => e.pkg === '@doan-labs/duo-uikit')
 
 export const Route = createFileRoute('/kit')({ component: Layout })
 

@@ -6,16 +6,16 @@ A Duo app is a small web application. You write it in TypeScript and React, styl
 
 ## The three packages
 
-- **SDK**, `@doan-labs/ipduo-sdk`. The bridge between your app and the shell: displays, the fold, storage, commands, widgets and links. One client, `os`, plus `useKV` for React.
-- **UI kit**, `@doan-labs/ipduo-uikit`. Components and design tokens that already know about the cover and inner display: `Screen`, `NavigationStack`, `List`, `Row`, `Button`, `Toggle`, `Text` and more, plus `useDisplay`.
-- **CLI**, `@doan-labs/ipduo`. `create`, `check`, `build`, `dev`, `preview` and `serve`.
+- **SDK**, `@doan-labs/duo-sdk`. The bridge between your app and the shell: displays, the fold, storage, commands, widgets and links. One client, `os`, plus `useKV` for React.
+- **UI kit**, `@doan-labs/duo-uikit`. Components and design tokens that already know about the cover and inner display: `Screen`, `NavigationStack`, `List`, `Row`, `Button`, `Toggle`, `Text` and more, plus `useDisplay`.
+- **CLI**, `@doan-labs/duo-cli`. `create`, `check`, `build`, `dev`, `preview` and `serve`.
 
 Apps bundle the SDK and kit they compile against. The SDK version an app was built with is its host requirement; the kit version never gates anything.
 
 ## How an app runs
 
 ```
-your source → ipduo build → release.json + app.html + icon
+your source → duo build → release.json + app.html + icon
                              (script, styles and assets inline)
 
 index.json → App Store → verified download → IndexedDB

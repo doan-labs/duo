@@ -606,7 +606,35 @@ and code after validation. Same-release loads reuse the URL; replacement/removal
 revoke it under the existing app lock. Storage namespace, SDK protocol, opaque
 sandbox and generation rules are unchanged. Cost: one in-memory document copy
 per loaded developer app and a required `blob:` allowance in shell frame CSP.
-## 50. The website is a prerendered TanStack Start site styled with StyleX
+
+## 50. Current guidance, roadmap and evidence have separate homes
+
+2026-09-18. The documentation index routes tasks to current maintainer/platform guides.
+The accepted contract moves out of progress; completed reports, original proposals and
+superseded scope instructions remain dated archives. Current references incorporate explicit
+amendments; the roadmap owns deferred work. This supersedes instructions to append completed
+workstreams to a live progress folder, not runtime decisions or safety requirements.
+Cost: moved links and website consumers need checking. The root README remains the only
+repository tree; generated API data stays at its existing path and is never hand-edited.
+
+## 51. Remove documentation archives after the restructure
+
+2026-09-18. At the user's request, remove both documentation archive directories as well
+as the empty progress directory. Supersedes decision 50's archive-retention policy.
+Current guides retain the accepted contract, launch scope and verification limitations;
+committed history remains available through Git. Do not recreate archive/progress folders.
+Cost: old proposals and checkpoint narratives are no longer browsable as current files.
+
+## 52. Use the Duo package namespace before publication
+
+2026-09-18. Supersedes earlier package naming: the workspace root is `@doan-labs/duo`,
+the SDK and kit are `@doan-labs/duo-sdk` and `@doan-labs/duo-uikit`, and the CLI is
+`@doan-labs/duo-cli` with the `duo` executable. Internal packages use the `duo-` prefix.
+Update imports, tooling, templates and archives together. App ids, database/lock names,
+bridge protocol and native bundle identity remain stable to preserve installed data.
+Cost: existing local consumers must rebuild/reinstall their archives.
+
+## 53. The website is a prerendered TanStack Start site styled with StyleX
 
 2026-09-17. `packages/web` uses TanStack Start on Vite because the user asked
 for it and because file routes, `head()` per route and a prerender crawl give
@@ -627,7 +655,7 @@ TanStack's `$param` and `__root` file names and the generated route tree. The
 Markdown parser learns new syntax by hand. The site's build runs the root
 build a second time to copy the simulator under `/device/`.
 
-## 51. The launch page drives the real shell over a postMessage bridge and folds a CSS device everywhere else
+## 54. The launch page drives the real shell over a postMessage bridge and folds a CSS device everywhere else
 
 2026-09-18. The site was rewritten as a single launch story (hero, it works,
 real camera, App Store, the fold is input, build, SDK, first apps, open, go)
@@ -655,7 +683,7 @@ stylised app rather than the real OS, so those scenes show layout, not
 software. A shell rebuild (`bun scripts/simulator.ts`) is needed whenever the
 bridge changes.
 
-## 52. The page scrolls through Lenis, the camera scene asks on arrival, and the frame drops its title
+## 55. The page scrolls through Lenis, the camera scene asks on arrival, and the frame drops its title
 
 2026-09-18. Three follow-ups from the first review of the launch page.
 
@@ -665,7 +693,7 @@ with `anchors` and `stopInertiaOnNavigate` on. Root mode scrolls the real
 window, so `useScroll` in the fold scene reads the same position it always
 did, and the wrapper renders its children directly, so the server and client
 DOM match. Readers with reduced motion never get an instance: native scrolling
-wins. `lenis` is the one dependency added since decision 50, at the user's
+wins. `lenis` is the one dependency added since decision 53, at the user's
 request. Cost: Lenis puts `lenis` classes on `<html>`, which the theme check
 in `check.mjs` now ignores when it compares the class list across a reload.
 
@@ -690,7 +718,7 @@ doan-labs.com's handoff file, inlined so it takes `currentColor`) and "Made by
 Doan Labs" linking to doan-labs.com.
 
 
-## 53. The site's badges follow the progress records, not the plan files' age
+## 56. The site's badges follow the progress records, not the plan files' age
 
 2026-09-18. After the rebase onto stages 2–5, `packages/web/src/docs.ts` stopped
 treating every `docs/platform/*.md` as a planning document. The files that
@@ -706,9 +734,9 @@ the finer split, and the note under the badge points at it. Alternative
 rejected: per-section badges parsed from headings, which would put a rule in
 the site about how the plan files are written.
 
-## 54. The site's docs are written for developers, not rendered from the repository's notes
+## 57. The site's docs are written for developers, not rendered from the repository's notes
 
-2026-09-18, the same day, superseding decision 53 and the "docs live next to
+2026-09-18, the same day, superseding decision 56 and the "docs live next to
 code" rule in `docs/platform/web.md`. `/docs` no longer renders
 `docs/**/*.md`; it renders `packages/web/content/docs/*.md`, eleven pages
 written for someone building an app: Introduction, Getting started, Your first

@@ -9,7 +9,7 @@ os.view          // { display, placement, width, height, visible, active, focuse
 os.onView(cb)    // one event per frame at most, only on change
 
 // React
-const view = useDisplay()   // from @doan-labs/ipduo-uikit
+const view = useDisplay()   // from @doan-labs/duo-uikit
 ```
 
 | Field | Values | Use it for |

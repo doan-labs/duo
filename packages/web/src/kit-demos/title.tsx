@@ -1,4 +1,4 @@
-import { Row, Section, Title } from '@doan-labs/ipduo-uikit'
+import { Row, Section, Title } from '@doan-labs/duo-uikit'
 
 export default function Demo() {
   return (

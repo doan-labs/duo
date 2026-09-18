@@ -16,7 +16,7 @@ export const Route = createFileRoute('/sdk')({
 })
 
 // The host-only types the shell's own apps receive are not part of the app-facing SDK.
-const sdk = api.filter((e) => e.pkg === '@doan-labs/ipduo-sdk' && !e.file.endsWith('/legacy.ts'))
+const sdk = api.filter((e) => e.pkg === '@doan-labs/duo-sdk' && !e.file.endsWith('/legacy.ts'))
 
 const GUIDES = [
   ['Lifecycle', 'Connect, render, ready. Requests, errors and limits.', 'lifecycle'],
@@ -35,12 +35,12 @@ function Page() {
           title="SDK"
           lead={
             <>
-              <Code>@doan-labs/ipduo-sdk</Code> is how an app talks to the phone: displays and the fold, storage,
-              commands between its views, widgets and links. One client, <Code>os</Code>, and a React hook.
+              <Code>@doan-labs/duo-sdk</Code> is how an app talks to the phone: displays and the fold, storage, commands
+              between its views, widgets and links. One client, <Code>os</Code>, and a React hook.
             </>
           }
         />
-        <Pre title="app.ts">{`import { os } from '@doan-labs/ipduo-sdk'
+        <Pre title="app.ts">{`import { os } from '@doan-labs/duo-sdk'
 await os.connect()                       // handshake with the shell, before rendering
 os.ready()                               // first frame painted
 
@@ -56,7 +56,7 @@ os.commands.send('refresh', '')          // resolves when the owner acknowledged
 os.widget.set('small', { lines })        // owner only
 os.open('labs.doan.ipduo.maps', 'q=1')
 
-import { useKV } from '@doan-labs/ipduo-sdk/react'
+import { useKV } from '@doan-labs/duo-sdk/react'
 const note = useKV(os.storage, 'note')   // { value, status, set, del }`}</Pre>
 
         <h2 {...stylex.props(styles.h2)}>Guides</h2>

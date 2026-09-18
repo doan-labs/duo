@@ -28,7 +28,7 @@ the root README remains the only repository file tree.
 | Need | Read |
 | --- | --- |
 | Remaining work and verification gaps | [Roadmap](platform/roadmap.md) |
-| Future public distribution | [Publication plan](platform/publishing.md), [website/deployment plan](platform/web.md) |
+| Future public distribution | [Publication plan](platform/publishing.md), [website plan and build record](platform/web.md) |
 | Verification scope and limits | [Local review](platform/review.md) |
 
 ## Maintenance

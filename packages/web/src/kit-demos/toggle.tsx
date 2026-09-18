@@ -1,4 +1,4 @@
-import { Row, Section, Toggle } from '@doan-labs/ipduo-uikit'
+import { Row, Section, Toggle } from '@doan-labs/duo-uikit'
 import { useState } from 'react'
 
 export default function Demo() {

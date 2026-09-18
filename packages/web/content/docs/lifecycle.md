@@ -5,7 +5,7 @@ What happens between the shell creating a frame and your app's first paint, and 
 ## Connect, then render, then ready
 
 ```ts
-import { os } from '@doan-labs/ipduo-sdk'
+import { os } from '@doan-labs/duo-sdk'
 
 await os.connect()          // hello → welcome → ack; resolves with os.view, os.owner, os.session filled
 createRoot(document.body).render(<App />)

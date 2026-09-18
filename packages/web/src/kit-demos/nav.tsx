@@ -1,4 +1,4 @@
-import { Button, Nav, Page, Row, Section, useNav } from '@doan-labs/ipduo-uikit'
+import { Button, Nav, Page, Row, Section, useNav } from '@doan-labs/duo-uikit'
 
 function Root() {
   const nav = useNav()

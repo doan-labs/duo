@@ -8,8 +8,8 @@ import type { ApiEntry, ApiMember } from '../src/api-types.ts'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url))
 const PACKAGES = [
-  { pkg: '@doan-labs/ipduo-sdk', dir: 'packages/sdk' },
-  { pkg: '@doan-labs/ipduo-uikit', dir: 'packages/uikit' }
+  { pkg: '@doan-labs/duo-sdk', dir: 'packages/sdk' },
+  { pkg: '@doan-labs/duo-uikit', dir: 'packages/uikit' }
 ] as const
 
 type Node = t.Node

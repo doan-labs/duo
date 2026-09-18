@@ -3,7 +3,7 @@ import type { ApiEntry } from '../api-types'
 
 export const api: ApiEntry[] = [
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "PlatformError",
     "kind": "class",
     "file": "packages/sdk/guards.ts",
@@ -12,7 +12,7 @@ export const api: ApiEntry[] = [
     "signature": "class PlatformError extends Error"
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "CameraHooks",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
@@ -41,7 +41,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Os",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
@@ -94,7 +94,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Manifest",
     "kind": "type",
     "file": "packages/sdk/manifest.ts",
@@ -189,7 +189,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Release",
     "kind": "type",
     "file": "packages/sdk/manifest.ts",
@@ -218,7 +218,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "ReleaseId",
     "kind": "type",
     "file": "packages/sdk/manifest.ts",
@@ -227,7 +227,7 @@ export const api: ApiEntry[] = [
     "signature": "type ReleaseId = `${string}+${string}`"
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "PermissionName",
     "kind": "type",
     "file": "packages/sdk/permissions.ts",
@@ -236,7 +236,7 @@ export const api: ApiEntry[] = [
     "signature": "type PermissionName = keyof typeof PERMISSIONS"
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Photo",
     "kind": "type",
     "file": "packages/sdk/permissions.ts",
@@ -271,7 +271,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "ErrCode",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
@@ -280,7 +280,7 @@ export const api: ApiEntry[] = [
     "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'"
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "KV",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
@@ -290,7 +290,7 @@ export const api: ApiEntry[] = [
     "members": []
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Limits",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
@@ -299,7 +299,7 @@ export const api: ApiEntry[] = [
     "signature": "type Limits = typeof LIMITS"
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "ViewInfo",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
@@ -358,7 +358,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "WidgetSnapshot",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
@@ -387,7 +387,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-sdk",
+    "pkg": "@doan-labs/duo-sdk",
     "name": "os",
     "kind": "value",
     "file": "packages/sdk/index.ts",
@@ -396,7 +396,7 @@ export const api: ApiEntry[] = [
     "signature": "os = createClient()"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "AnimationName",
     "kind": "type",
     "file": "packages/uikit/animations.ts",
@@ -405,7 +405,7 @@ export const api: ApiEntry[] = [
     "signature": "type AnimationName = keyof typeof animations"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "animations",
     "kind": "value",
     "file": "packages/uikit/styles.ts",
@@ -414,7 +414,7 @@ export const api: ApiEntry[] = [
     "signature": "animations = stylex.create({\n  spin: {\n    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationTimingFunction: 'linear',\n    animationIterationCount: 'infinite'\n  },\n  rise: {\n    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.5s',\n    animationFillMode: 'backwards'\n  },\n  pop: {\n    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.4s',\n    animationTimingFunction: easing.pop\n  },\n  fade: {\n    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.25s'\n  },\n  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },\n  draw: {\n    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s'\n  },\n  bob: {\n    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationIterationCount: 'infinite'\n  },\n  glow: {\n    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '2s',\n    animationIterationCount: 'infinite'\n  }\n})"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "App",
     "kind": "type",
     "file": "packages/uikit/app.ts",
@@ -467,7 +467,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Button",
     "kind": "component",
     "file": "packages/uikit/button.tsx",
@@ -488,7 +488,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "ButtonProps",
     "kind": "type",
     "file": "packages/uikit/button.tsx",
@@ -497,7 +497,7 @@ export const api: ApiEntry[] = [
     "signature": "type ButtonProps = PrimitiveProps<'button'> & { variant?: 'filled' | 'tinted' | 'plain' }"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "useDisplay",
     "kind": "hook",
     "file": "packages/uikit/display.ts",
@@ -506,7 +506,7 @@ export const api: ApiEntry[] = [
     "signature": "function useDisplay(): ViewInfo"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Hero",
     "kind": "component",
     "file": "packages/uikit/hero.tsx",
@@ -518,7 +518,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "HeroProps",
     "kind": "type",
     "file": "packages/uikit/hero.tsx",
@@ -527,7 +527,7 @@ export const api: ApiEntry[] = [
     "signature": "type HeroProps<T extends ElementType = 'div'> = LargeTitleProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "LargeTitle",
     "kind": "component",
     "file": "packages/uikit/large-title.tsx",
@@ -539,7 +539,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "LargeTitleProps",
     "kind": "type",
     "file": "packages/uikit/large-title.tsx",
@@ -548,7 +548,7 @@ export const api: ApiEntry[] = [
     "signature": "type LargeTitleProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "List",
     "kind": "component",
     "file": "packages/uikit/list.tsx",
@@ -560,7 +560,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "ListProps",
     "kind": "type",
     "file": "packages/uikit/list.tsx",
@@ -569,7 +569,7 @@ export const api: ApiEntry[] = [
     "signature": "type ListProps<T extends ElementType = 'ul'> = PrimitiveProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Nav",
     "kind": "component",
     "file": "packages/uikit/nav.tsx",
@@ -586,7 +586,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Page",
     "kind": "function",
     "file": "packages/uikit/nav.tsx",
@@ -595,7 +595,7 @@ export const api: ApiEntry[] = [
     "signature": "const Page = ({ title, back, backRef, children }: PageProps) => ( …"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "useNav",
     "kind": "hook",
     "file": "packages/uikit/nav.tsx",
@@ -604,7 +604,7 @@ export const api: ApiEntry[] = [
     "signature": "const useNav = () => …"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "useNavigation",
     "kind": "hook",
     "file": "packages/uikit/nav.tsx",
@@ -613,7 +613,7 @@ export const api: ApiEntry[] = [
     "signature": "const useNav = () => …"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "NavigationLink",
     "kind": "component",
     "file": "packages/uikit/navigation-link.tsx",
@@ -639,7 +639,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "NavigationLinkProps",
     "kind": "type",
     "file": "packages/uikit/navigation-link.tsx",
@@ -648,7 +648,7 @@ export const api: ApiEntry[] = [
     "signature": "type NavigationLinkProps = Omit<ButtonProps, 'onClick' | 'ref'> & { title: string; destination: ReactNode }"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "NavigationStack",
     "kind": "component",
     "file": "packages/uikit/navigation-stack.tsx",
@@ -665,7 +665,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "NavigationStackProps",
     "kind": "type",
     "file": "packages/uikit/navigation-stack.tsx",
@@ -682,7 +682,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Num",
     "kind": "component",
     "file": "packages/uikit/num.tsx",
@@ -702,7 +702,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Placeholder",
     "kind": "component",
     "file": "packages/uikit/placeholder.tsx",
@@ -714,7 +714,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "PlaceholderProps",
     "kind": "type",
     "file": "packages/uikit/placeholder.tsx",
@@ -723,7 +723,7 @@ export const api: ApiEntry[] = [
     "signature": "type PlaceholderProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Row",
     "kind": "component",
     "file": "packages/uikit/row.tsx",
@@ -761,7 +761,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "RowProps",
     "kind": "type",
     "file": "packages/uikit/row.tsx",
@@ -770,7 +770,7 @@ export const api: ApiEntry[] = [
     "signature": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Screen",
     "kind": "component",
     "file": "packages/uikit/screen.tsx",
@@ -782,7 +782,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "ScreenProps",
     "kind": "type",
     "file": "packages/uikit/screen.tsx",
@@ -791,7 +791,7 @@ export const api: ApiEntry[] = [
     "signature": "type ScreenProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Section",
     "kind": "component",
     "file": "packages/uikit/section.tsx",
@@ -803,7 +803,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "SectionProps",
     "kind": "type",
     "file": "packages/uikit/section.tsx",
@@ -812,7 +812,7 @@ export const api: ApiEntry[] = [
     "signature": "type SectionProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Sym",
     "kind": "function",
     "file": "packages/uikit/sym.tsx",
@@ -821,7 +821,7 @@ export const api: ApiEntry[] = [
     "signature": "const Sym = ({ name, size = 17 }: { name: keyof typeof SYM; size?: number }) => ( …"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Symbol",
     "kind": "component",
     "file": "packages/uikit/symbol.tsx",
@@ -833,7 +833,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "SymbolProps",
     "kind": "type",
     "file": "packages/uikit/symbol.tsx",
@@ -842,7 +842,7 @@ export const api: ApiEntry[] = [
     "signature": "type SymbolProps = ComponentProps<typeof Sym>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Text",
     "kind": "component",
     "file": "packages/uikit/text.tsx",
@@ -893,7 +893,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "TextProps",
     "kind": "type",
     "file": "packages/uikit/text.tsx",
@@ -902,7 +902,7 @@ export const api: ApiEntry[] = [
     "signature": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: 'body' | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Title",
     "kind": "component",
     "file": "packages/uikit/title.tsx",
@@ -923,7 +923,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "TitleProps",
     "kind": "type",
     "file": "packages/uikit/title.tsx",
@@ -932,7 +932,7 @@ export const api: ApiEntry[] = [
     "signature": "type TitleProps<T extends ElementType = 'div'> = PrimitiveProps<T> & { variant?: 'header' | 'accessory' }"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Toggle",
     "kind": "component",
     "file": "packages/uikit/toggle.tsx",
@@ -944,7 +944,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "ToggleProps",
     "kind": "type",
     "file": "packages/uikit/toggle.tsx",
@@ -953,7 +953,7 @@ export const api: ApiEntry[] = [
     "signature": "type ToggleProps = Omit<PrimitiveProps<'input'>, 'type' | 'as'>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "VStack",
     "kind": "component",
     "file": "packages/uikit/v-stack.tsx",
@@ -965,7 +965,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "VStackProps",
     "kind": "type",
     "file": "packages/uikit/v-stack.tsx",
@@ -974,7 +974,7 @@ export const api: ApiEntry[] = [
     "signature": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Widget",
     "kind": "component",
     "file": "packages/uikit/widget.tsx",
@@ -1003,7 +1003,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "WidgetProps",
     "kind": "type",
     "file": "packages/uikit/widget.tsx",
@@ -1032,7 +1032,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "WidgetLabel",
     "kind": "component",
     "file": "packages/uikit/widget-label.tsx",
@@ -1044,7 +1044,7 @@ export const api: ApiEntry[] = [
     ]
   },
   {
-    "pkg": "@doan-labs/ipduo-uikit",
+    "pkg": "@doan-labs/duo-uikit",
     "name": "WidgetLabelProps",
     "kind": "type",
     "file": "packages/uikit/widget-label.tsx",
@@ -1057,22 +1057,22 @@ export const api: ApiEntry[] = [
 /** Package versions and changelogs, read from each package.json and CHANGELOG.md when one exists. */
 export const versions: Record<string, { name: string; version: string; changelog: string | null }> = {
   "sdk": {
-    "name": "@doan-labs/ipduo-sdk",
+    "name": "@doan-labs/duo-sdk",
     "version": "0.0.0",
     "changelog": null
   },
   "uikit": {
-    "name": "@doan-labs/ipduo-uikit",
+    "name": "@doan-labs/duo-uikit",
     "version": "0.1.0",
     "changelog": "# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
   },
   "shell": {
-    "name": "@doan-labs/ipduo-shell",
+    "name": "@doan-labs/duo-shell",
     "version": "0.0.0",
     "changelog": null
   },
   "cli": {
-    "name": "@doan-labs/ipduo",
+    "name": "@doan-labs/duo-cli",
     "version": "0.0.0",
     "changelog": null
   }

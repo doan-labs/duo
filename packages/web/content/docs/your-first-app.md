@@ -23,9 +23,9 @@ Change `id` before you share anything: it is reverse-DNS, immutable, and the key
 ## main.tsx
 
 ```tsx
-import { os } from '@doan-labs/ipduo-sdk'
-import { Nav, Page } from '@doan-labs/ipduo-uikit/nav.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { os } from '@doan-labs/duo-sdk'
+import { Nav, Page } from '@doan-labs/duo-uikit/nav.tsx'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -54,7 +54,7 @@ Colours come from the kit's tokens, never literals. The two displays have differ
 ## Reading the fold
 
 ```tsx
-import { useDisplay } from '@doan-labs/ipduo-uikit'
+import { useDisplay } from '@doan-labs/duo-uikit'
 
 function Layout() {
   const view = useDisplay()   // { display, placement, width, height, visible, active, focused, angle }
@@ -67,7 +67,7 @@ function Layout() {
 ## Remembering something
 
 ```tsx
-import { useKV } from '@doan-labs/ipduo-sdk/react'
+import { useKV } from '@doan-labs/duo-sdk/react'
 
 function Note() {
   const note = useKV(os.storage, 'field-note')   // { value, status, set, del }

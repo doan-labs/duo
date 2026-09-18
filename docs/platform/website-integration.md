@@ -1,12 +1,10 @@
 # Website integration
 
-Taken up 2026-09-18: `packages/web` now describes this state on every page;
-see [progress/web.md](progress/web.md). The constraints below still hold, in
-particular that no install command implies publication.
-
-This work does not edit `packages/web` or its separate worktree, merge that
-worktree or wait for it. Public hosting remains static at duo.doan-labs.com.
-There is no custom backend and no deployment in this task.
+The website consumes the platform documents and generated API, not copied specifications.
+The accepted public origin is duo.doan-labs.com on static hosting. Provider, routes and
+deployment verification remain in the [website plan](web.md); no deployment is claimed here.
+Taken up 2026-09-18: `packages/web` describes this state on every page; the
+[website record](web.md#build-record) has the details.
 
 - SDK preview version: 0.0.0, protocol 1. The accepted runtime contract remains
   `contract.md`; capture and extra device permissions remain deferred.

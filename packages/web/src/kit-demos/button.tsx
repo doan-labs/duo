@@ -1,4 +1,4 @@
-import { Button, Symbol as DuoSymbol, Row, Section } from '@doan-labs/ipduo-uikit'
+import { Button, Symbol as DuoSymbol, Row, Section } from '@doan-labs/duo-uikit'
 import { useState } from 'react'
 
 export default function Demo() {

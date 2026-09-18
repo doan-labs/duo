@@ -23,11 +23,10 @@ not published packages, a deployed service or evidence of a remote CI run.
 
 ## Scope and boundaries
 
-Historical plan, 2026-09-17. The original target was the full platform in one
-day of work, including the website. Stages 2–5 completed the non-website
-workstreams; the website (workstream 10) was built on its own branch against
-the handoff in [website-integration.md](website-integration.md) and is
-recorded in [progress/web.md](progress/web.md).
+The four launch outcomes remain: an independent app runs, is isolated from the shell
+and other apps, uses the display SDK visibly, and installs without source modification
+or simulator rebuild. The [review guide](review.md) records how to reproduce these
+outcomes and distinguishes measured evidence from remaining verification work.
 
 Enabled functionality retains its safety requirements: opaque frames, verified document
 bytes and policy, nonce-bound bridge authority, app-private storage, generations,
@@ -35,27 +34,11 @@ owner epochs, locks, leases, durable transitions and recovery. Narrow scope does
 remove lifecycle reconciliation or weaken these guarantees. Catalog refresh and update
 requests are explicit; there is no periodic catalog polling.
 
-| # | Workstream | Depends on |
-| --- | --- | --- |
-| 1 | Monorepo restructure | nothing |
-| 2 | UI kit harvest, rewrite official apps onto it | 1; SDK contract for host-aware components |
-| 3 | Manifest, `id`, storage namespacing, registry in the shell | 1 |
-| 4 | Immutable app bundles, dmg ships shell plus core apps | 3, iframe runtime from 7 |
-| 5 | CDN index, real App Store shelf, Updates tab | 4 |
-| 6 | Tauri updater plus real Software Update screen | native release configuration |
-| 7 | Iframe runtime, `?dev=`, SDK, CLI | 3 |
-| 8 | CI: manifest schema, bundle checks, isolation, icons | 3, 4, 7 |
-| 9 | Widgets contract, `useDisplay()`, URL scheme | 2, 3, 7 |
-| 10 | Website with embedded simulator and generated UI kit docs | 2, 7 |
-
-The create → develop → install → fold → persist → update → uninstall flow
-provides early integration evidence, verified in browser and native runtimes.
-[progress/contract.md](progress/contract.md) defines that flow for Notes, with the runtime
-contracts it exercises and the checks that prove each step; it is the stage 2
-historical broader acceptance plan; the amended launch gate is stage-2-mvp.md.
-The kit harvest and official app migration are complete (stage 4); the website
-is built and not yet deployed ([progress/web.md](progress/web.md)). Signing, npm publishing, and deployment access
-are unresolved external dependencies.
+Camera/microphone, additional device permissions, expanded widgets, native shell updating,
+advanced recovery, accounts, payments, reviews, ranking, recommendations and category
+expansion remain deferred. Public npm distribution, signing and hosting require separate
+release decisions. The accepted public origin is `https://duo.doan-labs.com` on static
+hosting; this document does not claim deployment.
 
 ## Vocabulary
 

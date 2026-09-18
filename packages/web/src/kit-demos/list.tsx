@@ -1,4 +1,4 @@
-import { Symbol as DuoSymbol, List, Row, Section } from '@doan-labs/ipduo-uikit'
+import { Symbol as DuoSymbol, List, Row, Section } from '@doan-labs/duo-uikit'
 
 export default function Demo() {
   return (

@@ -1,4 +1,4 @@
-import { NavigationLink, NavigationStack, Row, Section, Text, Title } from '@doan-labs/ipduo-uikit'
+import { NavigationLink, NavigationStack, Row, Section, Text, Title } from '@doan-labs/duo-uikit'
 
 export default function Demo() {
   return (
