@@ -11,4 +11,3 @@ for (const folder of ['packages/apps/notes', 'packages/apps/weather', 'examples/
   await run(['bun', 'packages/cli/index.mjs', 'check', folder])
 await run(['bun', 'scripts/checks/publish/publisher.mjs'])
 await run(['bun', 'run', 'build'])
-await run(['bun', 'scripts/checks/stage4/gallery.mjs'])

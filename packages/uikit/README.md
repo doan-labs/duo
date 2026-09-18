@@ -85,6 +85,6 @@ asset server is needed by an installed consumer.
 
 [Generated API data](../../docs/platform/api/uikit.json) comes from exported props
 and TSDoc (`bun scripts/generate-kit-docs.ts`).
-[Gallery verification](../../scripts/checks/stage4/gallery.mjs) covers both
-display widths, storage mirroring, keyboard input, navigation, reduced motion,
-external-request absence and teardown.
+The committed gallery check covering both display widths, storage mirroring, keyboard
+input, navigation, reduced motion, external-request absence and teardown was removed
+with its browser driver; that ground is walked with `agent-browser` now.

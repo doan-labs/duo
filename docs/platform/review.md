@@ -77,9 +77,7 @@ safeguards remain intact. Website integration remains a separate workstream.
 
 ## 5. Reproduce the automated evidence
 
-From the repository root, run heavy simulator checks serially. `notes.mjs` and
-`weather.mjs` need the simulator from step 1 on port 3110 (`PORT=3110 bun run dev`);
-the others start their own servers.
+From the repository root:
 
 ```sh
 platform_archives="$(mktemp -d -t ipduo-check-packages)"
@@ -88,13 +86,13 @@ export PLATFORM_ARTIFACTS="$platform_archives/artifacts.json"
 bun run build
 bun scripts/check-platform.ts
 bun scripts/checks/stage4/packages.mjs
-MVP_EVIDENCE_DIR=.cache/debug/stage5/mvp bun scripts/checks/stage2/mvp.mjs
-bun scripts/checks/stage2/runtime.mjs
-bun scripts/checks/stage3/development.mjs
-PLATFORM_EVIDENCE_DIR=.cache/debug/stage5/workflow bun scripts/checks/stage3/workflow.mjs
-bun scripts/checks/stage2/notes.mjs
-bun scripts/checks/stage2/weather.mjs
 ```
+
+The committed headless-Chromium drivers that used to follow (the MVP, adversarial
+runtime, developer workflow, preview teardown, Notes and Weather checks) were removed
+with their browser driver. Steps 1 to 4 above are now the way that behavior is reviewed: walk
+them by hand, or with `agent-browser` against the running simulator. Nothing automated
+replays them.
 
 The external checks create fresh projects. To prepare a new archive set, run
 `bun scripts/package-platform.ts .cache/platform-packages/review` and pass its
@@ -109,19 +107,20 @@ Versions: SDK/CLI 0.0.0, kit 0.1.0, protocol 1. These are private previews.
 ## 6. Reproduce the submission and publication checks
 
 ```sh
-bun run build                                                        # the shell the runtime probe serves
-bun scripts/check-submissions.ts community-apps/fold-compass --runtime   # PASS, evidence in .cache/submissions/
+bun scripts/check-submissions.ts community-apps/fold-compass         # PASS, evidence in .cache/submissions/
 bun scripts/checks/submission/negatives.mjs                          # nine invalid submissions fail for the stated reason
 bun scripts/checks/publish/publisher.mjs                             # sequential publish, update, retry, failure, delist
 cd packages/web && bun run build                                     # assembles public/catalog/ from dist/cdn (+ the catalog branch)
 ```
 
-The runtime probe installs the built release through the real Store from a loopback catalog
-in headless Chromium, launches it, captures `inner.png` and `cover.png` and records console
-errors and app-frame requests outside the declared origins. The example's committed
-screenshots are those captures. The publisher check runs on a scratch tree inside `.cache/`.
-`scripts/checks/store/catalog-switching.mjs` covers the default catalog, a developer catalog,
-**Back to Duo catalog** and the origin-binding refusal in Chromium.
+The submission gate is now static and build-level. Its headless-Chromium runtime probe,
+which installed the built release through the real Store from a loopback catalog and
+captured `inner.png` and `cover.png`, was removed with its browser driver; the example's
+committed screenshots came from it while it existed. Installing and launching a submission
+is now a reviewer step against a running shell. The publisher check runs on a scratch tree
+inside `.cache/`. Catalog switching (the default catalog, a developer catalog, **Back to
+Duo catalog** and the origin-binding refusal) has no committed check either and is walked
+in step 3.
 
 ## Verification scope and limits
 

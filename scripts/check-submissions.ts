@@ -1,8 +1,7 @@
 // Submission gate for community-apps/<slug>: identity and version, completeness,
-// dependencies, release validity through the real builder, and (with --runtime) a
-// headless install/launch on both displays. Writes reviewer evidence to
+// dependencies and release validity through the real builder. Writes reviewer evidence to
 // .cache/submissions/<slug>/ and a Markdown summary to $GITHUB_STEP_SUMMARY when set.
-// Usage: bun scripts/check-submissions.ts [community-apps/<slug> ...] [--runtime] [--base origin/main]
+// Usage: bun scripts/check-submissions.ts [community-apps/<slug> ...] [--base origin/main]
 import { readdir } from 'node:fs/promises'
 import { basename, join, relative, resolve } from 'node:path'
 import { semver } from '../packages/sdk/compat.ts'
@@ -23,7 +22,6 @@ const SCREENSHOTS = ['screenshots/inner.png', 'screenshots/cover.png']
 const CATALOG_URL = process.env.DUO_CATALOG_URL ?? 'https://duo.doan-labs.com/catalog'
 
 const argv = process.argv.slice(2)
-const flag = (name: string) => argv.includes(`--${name}`)
 const option = (name: string, fallback: string) => {
   const i = argv.indexOf(`--${name}`)
   return i < 0 ? fallback : (argv[i + 1] ?? fallback)
@@ -45,7 +43,6 @@ type Report = {
   network: string[]
   dependencies: { added: string[]; beyondPlatform: string[]; lockfile: boolean }
   build?: { sdk: string; kit?: string; commit: string; files: { path: string; bytes: number; sha256: string }[] }
-  runtime?: unknown
   failures: string[]
   notes: string[]
 }
@@ -174,16 +171,6 @@ async function check(folder: string, registry: Registry, evidence: string): Prom
   } catch (error) {
     fail(`Build failed: ${error instanceof Error ? error.message : String(error)}`)
     return report
-  }
-  if (flag('runtime')) {
-    const run = Bun.spawnSync(
-      ['bun', 'scripts/checks/submission/runtime.mjs', m.id, output, join(evidence, 'runtime')],
-      { cwd: root }
-    )
-    const text = run.stdout.toString()
-    const runtimeFile = Bun.file(join(evidence, 'runtime', 'runtime.json'))
-    report.runtime = (await runtimeFile.exists()) ? await runtimeFile.json() : { output: text }
-    if (run.exitCode !== 0) fail(`Runtime check failed:\n${text}${run.stderr.toString()}`.trim())
   }
   return report
 }

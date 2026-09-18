@@ -82,6 +82,6 @@ is safe. See [Store](store.md), [updates](updates.md) and the [review guide](rev
 
 To ship through the default Store, add the app under `community-apps/<app-slug>/` following
 [the directory guide](../../community-apps/README.md), run
-`bun scripts/check-submissions.ts community-apps/<app-slug> --runtime`, and open a pull
+`bun scripts/check-submissions.ts community-apps/<app-slug>`, and open a pull
 request with the app-submission template. [Publication](publishing.md) describes review,
 the CI trust boundary and how a merge becomes a live release.

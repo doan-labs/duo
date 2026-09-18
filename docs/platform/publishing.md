@@ -25,9 +25,9 @@ transfers and release approval need the listed maintainers.
 
 ## Automated checks
 
-`bun scripts/check-submissions.ts [folder] [--runtime] [--base origin/main]` checks every
+`bun scripts/check-submissions.ts [folder] [--base origin/main]` checks every
 changed folder (or the named ones) and writes `.cache/submissions/<slug>/` with
-`report.json`, the built release under `catalog/` and, with `--runtime`, `runtime/` captures.
+`report.json` and the built release under `catalog/`.
 
 | Group | Verified |
 | --- | --- |
@@ -35,12 +35,17 @@ changed folder (or the named ones) and writes `.cache/submissions/<slug>/` with
 | Completeness | Required files, PNG screenshots, MIT text, changelog entry for the version |
 | Source and dependencies | CLI `check` (imports, strict types, tokens, cap); dependencies beyond sdk/kit/stylex/react need `bun.lock` and are flagged for review |
 | Release validity | Real builder output: size, hashes, SDK/kit versions, commit, empty permissions |
-| Runtime (`--runtime`) | Store install from the built catalog in headless Chromium, launch, inner and cover captures, page errors, app-frame requests outside declared `network` origins |
+
+The gate is static and build-level. The headless-Chromium runtime probe was removed with
+its browser driver: no automated step installs, launches or captures a submission any more, so
+declared `network` origins and app-frame requests are not machine-checked. A reviewer
+installs the built release in a running shell and judges it there.
 
 Screenshot presence is automated; whether the interface is usable is review. A pass means
 eligible for review, not accepted. Reviewers weigh behavior, dependency necessity, network
-access, content rights and the captures. `scripts/checks/submission/negatives.mjs` proves
-representative invalid submissions fail for the stated reason.
+access, content rights and the contributor's screenshots.
+`scripts/checks/submission/negatives.mjs` proves representative invalid submissions fail
+for the stated reason.
 
 ## Trust boundary and workflows
 

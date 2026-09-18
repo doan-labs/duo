@@ -284,7 +284,7 @@ hairlines only where a list needs them, mono only for code and captions.
 
 ### Verification
 
-Headless Chromium (puppeteer-core, SwiftShader for WebGL), 2026-09-18, against
+Headless Chromium (SwiftShader for WebGL), 2026-09-18, against
 `dist/client` served on port 3011:
 
 | Run | Result |
@@ -386,7 +386,7 @@ block in the root route, matching the shell's convention.
 
 ### Verification
 
-The website pass (the committed `check.mjs` until puppeteer-core was removed;
+The website pass (the committed `check.mjs` until its browser driver was removed;
 drive it with `agent-browser` now) walks twelve routes at 1440, 820 and 390 px,
 blocks the simulator frame so the check is about the site, and asserts:
 HTTP 200, an `h1`, no page or console errors,

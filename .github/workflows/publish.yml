@@ -26,8 +26,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    env:
-      CHROME_BIN: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,15 +34,14 @@ jobs:
         with:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
-      - run: bun run build
       - name: Validate and build the changed submissions
         run: |
           if [ -n "${{ inputs.folder }}" ]; then
-            bun scripts/check-submissions.ts "${{ inputs.folder }}" --runtime --base "${{ github.event.before || 'HEAD~1' }}"
+            bun scripts/check-submissions.ts "${{ inputs.folder }}" --base "${{ github.event.before || 'HEAD~1' }}"
           elif [ -n "${{ inputs.delist }}" ]; then
             echo "Delist only"
           else
-            bun scripts/check-submissions.ts --runtime --base "${{ github.event.before }}"
+            bun scripts/check-submissions.ts --base "${{ github.event.before }}"
           fi
       - uses: actions/upload-artifact@v4
         with:

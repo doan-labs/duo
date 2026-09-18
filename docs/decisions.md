@@ -944,3 +944,28 @@ The generated entry reports readiness after a successful React commit, including
 mirrored displays whose paint callbacks Chromium can suspend. This explicitly amends the
 preview interpretation of first-paint readiness; visible pixels need separate checks.
 The existing startup deadline and authority gates are unchanged.
+
+## 66. The committed headless-Chromium suite is removed, not replaced
+
+2026-09-18. Decision 63 dropped `puppeteer-core` from the dependencies but left twelve
+scripts importing it, so the whole suite was dead: it could not run on a fresh clone or in
+CI, and only kept passing locally on a stale `node_modules` copy. The owner chose removal
+over restoring the dependency. Deleted: the stage2 MVP, adversarial runtime, document,
+permission, Notes and Weather drivers, the stage3 workflow and development checks, the
+stage4 app captures and component gallery, the store catalog-switching check, the
+submission runtime probe, and the six in-page probe helpers that only those drivers built.
+`notes-store.ts` stays; `scripts/build-app.ts` uses it.
+
+What this costs, stated plainly rather than implied: `check-platform.ts` no longer ends in
+a gallery run, and `check-submissions.ts` loses `--runtime`, so no automated step installs,
+launches or captures a community submission. Declared `network` origins and app-frame
+requests are no longer machine-checked before a merge; that is now a reviewer's judgement
+against a running shell. This weakens the untrusted-code gate described in decision 55 and
+amends the evidence claims in the review guide. The sandbox and lifecycle guarantees in the
+contract are unchanged - what changed is how much of them a machine re-proves per pull
+request.
+
+Behavior verification moves to `agent-browser` against a running simulator, consistent with
+decision 63 for the website. Those passes are deliberately not committed gates: an
+agent-driven walk is not a CI check, and the review and debugging guides now say so instead
+of pointing at scripts that no longer exist.

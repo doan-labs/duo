@@ -134,16 +134,14 @@ scripts/            model preparation, asset extraction, screenshots
   build-preinstalled.ts  bundled Notes and Weather releases
   package-platform.ts  private SDK/kit/CLI archives for external consumers
   check-platform.ts    local/CI platform gate
-  check-submissions.ts community-apps gate: identity, completeness, dependencies, build, runtime evidence
+  check-submissions.ts community-apps gate: identity, completeness, dependencies, build
   publish-catalog.ts   merges validated releases into the catalog tree and rewrites its index
   check-app-tokens.ts   app appearance token gate alongside Biome
   generate-kit-docs.ts  exported props and TSDoc to API data
-  checks/stage2/    document, storage, permission, lifecycle and MVP checks
-  checks/stage3/    external developer workflow and preview teardown checks
-  checks/stage4/    official app captures, component gallery and validation checks
-  checks/submission/ headless install/launch captures and the invalid-submission cases
+  checks/stage2/    native shell instrumentation and the Notes store fixture
+  checks/stage4/    source validation and external package consumption checks
+  checks/submission/ the invalid-submission cases
   checks/publish/   publisher behaviors on a scratch catalog tree
-  checks/store/     default/developer catalog switching and origin binding
 .github/
   workflows/        platform.yml validation; submissions.yml PR checks; publish.yml catalog publication
   CODEOWNERS        maintainer review for trust lists, scripts and workflows

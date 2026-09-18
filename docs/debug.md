@@ -41,7 +41,7 @@ rasterizer whenever the capture is about pixels.
 Use identical state/viewports before and after a change. 818×664 matches the native window;
 use deviceScaleFactor 2 for detail and crop rather than shrink. Baselines use
 `?debug&app=Notes&deg=180` and `deg=0`; use 120 for clipping. Live fold tests must omit the
-pinned `deg` parameter and drive the hinge control. `CHROME_BIN` selects Chrome in platform checks.
+pinned `deg` parameter and drive the hinge control.
 
 ### The state probe
 
@@ -224,18 +224,19 @@ Use committed scripts, not assumed cache files:
 
 | Check | Purpose / prerequisite |
 | --- | --- |
-| `bun scripts/check-platform.ts` | Local/CI types, SDK, API freshness, token/import checks, builds and gallery |
-| `bun scripts/checks/stage2/mvp.mjs` | Frozen simulator + external catalog; GET/OPEN, isolation, fold/persist and unchanged dist hashes; build first, supply PLATFORM_ARTIFACTS |
-| `bun scripts/checks/stage2/runtime.mjs` | Adversarial bridge/storage/lifecycle matrix |
-| `bun scripts/checks/stage3/workflow.mjs` | Public external-package and real Store lifecycle flow |
-| `bun scripts/checks/stage3/development.mjs` | Verified preview bytes, namespace isolation and teardown |
-| `bun scripts/checks/stage4/apps.mjs <tag> [App names...]` | Both-width app captures; APP_DIST freezes baseline, APP_PORT avoids conflicts |
-| `bun scripts/checks/stage2/notes.mjs` / `weather.mjs` | Real shell on port 3110: edits/reload; owner refresh/network denial |
-| `bun scripts/checks/stage2/e0-document.mjs` | Builder/src/srcdoc engine probe with a memory-store fixture; cannot prove persistence or integrated bridge authority |
-| `bun scripts/checks/stage2/m-permissions.mjs` | Mocked geolocation/fake-device feature probe; not actual native consent or integrated photos verification |
+| `bun scripts/check-platform.ts` | Local/CI types, SDK, API freshness, token/import checks and the build |
+| `bun scripts/checks/stage4/validation.mjs` | App source boundaries and strict typecheck through the CLI validator |
+| `bun scripts/checks/stage4/packages.mjs` | External consumption of the private SDK/kit/CLI archives |
+| `bun scripts/checks/submission/negatives.mjs` | Invalid submissions fail the gate for the stated reason |
+| `bun scripts/checks/publish/publisher.mjs` | Publisher behaviors on a scratch catalog tree |
 
-MVP `--serve` leaves its servers running for native checks. Inspect 180/120/0 captures;
-partial clipping at 120° is expected. Gallery tests need no model; full simulator tests do.
+These are static and build-level checks. The committed headless-Chromium suite
+(the stage2/stage3/stage4 drivers, the store catalog-switching check and the submission
+runtime probe) was removed with its browser driver. Runtime behavior - Store install and
+launch, the bridge and storage matrix, preview teardown, fold captures, permission
+prompts - is now walked with `agent-browser` against a running shell, and those passes
+are not committed gates.
+
 Install archives into external fixtures before checking them, avoiding accidental global
 Bun cache resolution. The default archive manifest is `.cache/platform-packages/final/artifacts.json`;
 override with PLATFORM_ARTIFACTS and use a fresh directory when repacking unchanged versions.
@@ -253,8 +254,8 @@ increases while the page stays still; also check page scrolling outside it.
 Its thin, transparent-track scrollbar uses theme tokens and gains contrast on
 hover or keyboard focus. Check both light and dark themes with scrollbars visible.
 
-There is no general committed website check: the puppeteer one was removed with the
-dependency. What it covered is the list to walk with `agent-browser` instead:
+There is no general committed website check: it was removed with its browser
+driver. What it covered is the list to walk with `agent-browser` instead:
 fourteen routes at 1440, 820 and 390 px, in light and dark, page and console
 errors, horizontal overflow, the nav's desktop list versus mobile `<details>`
 menu, tables and code on the platform docs, every internal link, and a nav

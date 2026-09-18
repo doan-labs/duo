@@ -14,8 +14,9 @@ IPDUO_BUILD_OUTPUT=.cache/debug/fold-catalog bun scripts/build-app.ts examples/f
 
 Serve that output directory on a separate loopback origin with CORS enabled.
 In App Store, enter its `/index.json` URL, Load catalog, GET, OPEN. No simulator
-source changes or simulator rebuild are required. The reproducible acceptance
-runner is `bun scripts/checks/stage2/mvp.mjs`.
+source changes or simulator rebuild are required. Acceptance is the manual walk in
+[the review guide](../../docs/platform/review.md); the committed runner was removed
+with its browser driver.
 
 MIT. Demo author metadata is illustrative, not a claim of an external publisher
 or an authenticated catalog.

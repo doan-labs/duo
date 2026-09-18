@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      CHROME_BIN: /usr/bin/google-chrome
       # Bun's FTL optimizer miscompiles StyleX's media-query parser: oven-sh/bun#41609.
       BUN_JSC_useFTLJIT: 'false'
     steps:

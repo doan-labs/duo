@@ -65,8 +65,8 @@ file tree.
 
 Use the `agent-browser` CLI (`.agents/skills/agent-browser`) as the default for
 web UI, behavior checks, and screenshots; load its workflow first with
-`agent-browser skills get core`. Do not reach for `puppeteer-core`, Playwright or
-any other browser driver unless the user asks for one. Follow
+`agent-browser skills get core`. Do not reach for Playwright or any other
+browser driver unless the user asks for one. Follow
 [docs/debug.md](docs/debug.md) for what to assert: run the local web server,
 exercise the real page, and inspect both state and captured pixels.
 
