@@ -12,6 +12,7 @@ the root README remains the only repository file tree.
 | Verify browser/native behavior | [Debugging](debug.md), [platform review](platform/review.md) |
 | Understand or change a design choice | [Project decisions](decisions.md); append explicit superseding entries |
 | Build on or change the developer platform | [Platform overview](platform/README.md) and the references below |
+| Add or check third-party media in the simulator | [Credits](credits.md) |
 
 ## Current platform references
 

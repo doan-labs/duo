@@ -983,3 +983,25 @@ repository as upcoming work rather than being deleted, so the next attempt start
 refined workspace instead of from zero. This supersedes the routing part of decision 65;
 its credential and preview-lifecycle guarantees still govern the parked code.
 
+
+## 68. Music plays licensed recordings instead of invented ones
+
+The Music app and Control Center's deck shared five invented titles over SoundHelix
+demo MP3s and a hashed gradient for artwork. It played, but every visible part of it
+was a placeholder, which is why the app carried the mockup pill.
+
+Both now read `packages/fixtures/tracks.ts`, five real releases from the Internet
+Archive under CC BY, CC BY-SA or CC0, with the release's own cover art. The audio is
+streamed from the archive item on first play, so the repository carries no music; the
+covers are resized into `public/covers/` and served from the site, because a card
+waiting on archive.org looks broken and a 33 KB image does not. Each track carries its
+published running time, so the scrubber reads right before the file has loaded.
+
+Attribution is at the point of use: the now-playing card names the release and the
+licence, and `docs/credits.md` carries the full table. NonCommercial and NoDerivatives
+material is excluded on purpose, since the site is public and the repository is MIT, and
+`packages/fixtures/tracks.test.ts` fails the build if a track arrives under one of them
+or names a cover with no file behind it.
+
+Music drops `mock`. The screen is no longer invented data. Podcasts keeps its invented
+shows and episode titles and so keeps the pill; only the audio underneath it is shared.

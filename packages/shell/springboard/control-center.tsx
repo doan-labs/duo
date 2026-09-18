@@ -11,7 +11,7 @@
 // shell owns the open/close animations, because a finger scrubs them.
 
 import { useNowPlaying } from '@doan-labs/duo-app-music/index.tsx'
-import { art, mmss } from '@doan-labs/duo-fixtures'
+import { mmss } from '@doan-labs/duo-fixtures'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -229,7 +229,7 @@ function Transport({ big }: { big?: boolean }) {
 /** The 2x2 Now Playing tile on the grid page. Its title opens the media page. */
 function NowTile({ onExpand }: { onExpand: () => void }) {
   const d = useNowPlaying()
-  const [name, who] = d.now
+  const { title: name, artist: who, cover } = d.now
   return (
     <div {...stylex.props(styles.tile, styles.playing)}>
       <div {...stylex.props(styles.playHead)} onClick={onExpand}>
@@ -251,11 +251,11 @@ function NowTile({ onExpand }: { onExpand: () => void }) {
 /** Page two: the deck at full size, as the cover display shows it. */
 function Media({ level, onLevel }: { level: number; onLevel: (v: number) => void }) {
   const d = useNowPlaying()
-  const [name, who] = d.now
+  const { title: name, artist: who, cover } = d.now
   return (
     <div {...stylex.props(styles.card, styles.media)}>
       {/* Artwork, and the biggest play target on the page. */}
-      <div {...stylex.props(styles.cover, d.started && styles.coverArt(art(name)))} onClick={() => d.toggle()} />
+      <div {...stylex.props(styles.cover, d.started && styles.coverArt(`url(${cover})`))} onClick={() => d.toggle()} />
       <div {...stylex.props(styles.playHead)}>
         <div {...stylex.props(styles.playText)}>
           <b {...stylex.props(styles.mTitle)}>{d.started ? name : 'Not Playing'}</b>

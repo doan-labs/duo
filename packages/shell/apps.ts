@@ -83,7 +83,7 @@ export const DOCK: App[] = [
   { name: 'Phone', mock: true, view: Phone },
   { name: 'Safari', light: true, view: Safari },
   { name: 'Messages', mock: true, light: true, view: Messages },
-  { name: 'Music', mock: true, view: Music }
+  { name: 'Music', view: Music }
 ]
 
 /** Everything openable by name, including what only lives inside Utilities. */

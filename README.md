@@ -84,6 +84,7 @@ testing scope and limitations.
 | [Working guide](docs/working.md) | Commands, controls, and contributor conventions |
 | [Debugging](docs/debug.md) | Browser and native verification |
 | [Developer platform](docs/platform/README.md) | App authoring, isolation, storage, and lifecycle |
+| [Credits](docs/credits.md) | Third-party media in the simulator and its licences |
 
 <details>
 <summary>Repository layout</summary>

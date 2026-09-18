@@ -13,23 +13,16 @@ export const styles = stylex.create({
     paddingBottom: 14,
     paddingLeft: 26
   },
+  /** Real cover art, so the card carries the artwork rather than the title over a gradient. */
   art: {
     borderRadius: appAppearance.musicBorderRadius,
     boxShadow: appAppearance.musicBoxShadow,
     aspectRatio: 1,
-    display: 'grid',
-    placeItems: 'end start',
-    paddingTop: 12,
-    paddingRight: 12,
-    paddingBottom: 12,
-    paddingLeft: 12,
-    fontWeight: appAppearance.musicFontWeight,
-    color: appAppearance.musicColor,
-    fontSize: appAppearance.musicFontSize,
-    lineHeight: 1.2,
-    textShadow: appAppearance.musicTextShadow
+    display: 'block',
+    objectFit: 'cover'
   },
   cover: { width: 'min(72%,260px)' },
+  credit: { opacity: 0.6 },
   bg: (image: string) => ({ backgroundImage: image }),
   center: { textAlign: 'center' },
   title: { fontSize: appAppearance.musicFontSize2, fontWeight: appAppearance.musicFontWeight2 },
@@ -86,7 +79,7 @@ export const styles = stylex.create({
     borderBottomColor: appAppearance.musicBorderBottomColor,
     cursor: 'pointer'
   },
-  thumb: { width: 34, height: 34, borderRadius: appAppearance.musicBorderRadius4, flexShrink: 0 },
+  thumb: { width: 34, height: 34, borderRadius: appAppearance.musicBorderRadius4, flexShrink: 0, objectFit: 'cover' },
   name: { fontWeight: appAppearance.musicFontWeight3 },
   go: { fontSize: appAppearance.musicFontSize6 }
 })

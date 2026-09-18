@@ -2,7 +2,7 @@ import { Row, Screen, Section, Text, Title } from '@doan-labs/duo-uikit'
 
 // Music: a now-playing card over the queue, driven by one <audio> and a clock.
 
-import { art, mmss } from '@doan-labs/duo-fixtures'
+import { mmss } from '@doan-labs/duo-fixtures'
 import { TRACKS, type Track } from '@doan-labs/duo-fixtures/tracks.ts'
 import type { Os } from '@doan-labs/duo-sdk'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
@@ -23,7 +23,8 @@ function deck(list: Track[]) {
   let i = 0
   let t = 0
   let on = false
-  const len = 214
+  /** The published running time, used until the file itself reports one. */
+  const len = () => list[i]!.secs
   const subs = new Set<() => void>()
   const emit = () => {
     for (const f of subs) f()
@@ -31,7 +32,7 @@ function deck(list: Track[]) {
   const load = (n: number) => {
     i = ((n % list.length) + list.length) % list.length
     t = 0
-    a.src = list[i]![2]
+    a.src = list[i]!.src
     if (on) void a.play().catch(() => {})
     emit()
   }
@@ -44,7 +45,7 @@ function deck(list: Track[]) {
     emit()
   }
   const seek = (frac: number) => {
-    t = frac * (a.duration || len)
+    t = frac * (a.duration || len())
     if (a.duration) a.currentTime = t
     emit()
   }
@@ -54,7 +55,7 @@ function deck(list: Track[]) {
   setInterval(() => {
     if (!on) return
     t = a.currentTime || t + 0.25
-    if (t >= (a.duration || len)) skip(1)
+    if (t >= (a.duration || len())) skip(1)
     else emit()
   }, 250)
   return {
@@ -65,7 +66,7 @@ function deck(list: Track[]) {
       return t
     },
     get dur() {
-      return a.duration || len
+      return a.duration || len()
     },
     get playing() {
       return on
@@ -122,15 +123,19 @@ function Eq({ live }: { live: boolean }) {
 
 export const Music = (_: { os: Os }) => {
   const d = useNowPlaying()
-  const [n, ar] = d.now
+  const now = d.now
   return (
     <Screen xstyle={[styles.flush]}>
       <div {...stylex.props(styles.np)}>
-        <div {...stylex.props(styles.art, styles.cover, styles.bg(art(n)))}>{n}</div>
+        <img src={now.cover} alt="" {...stylex.props(styles.art, styles.cover)} />
         <div {...stylex.props(styles.center)}>
-          <div {...stylex.props(styles.title)}>{n}</div>
+          <div {...stylex.props(styles.title)}>{now.title}</div>
           <Text as="div" size="caption">
-            {ar}
+            {now.artist}
+          </Text>
+          {/* The licence every one of these is here under; CC BY asks to be named where the track plays. */}
+          <Text as="div" size="caption" xstyle={[styles.credit]}>
+            {now.album} · {now.license}
           </Text>
         </div>
         <div
@@ -165,20 +170,20 @@ export const Music = (_: { os: Os }) => {
       </div>
       <Title xstyle={[styles.hdr]}>Up Next</Title>
       <Section xstyle={[styles.queue]}>
-        {TRACKS.map(([name, who], k) => (
+        {TRACKS.map((t, k) => (
           <Row
-            key={name}
+            key={t.title}
             xstyle={[styles.qrow]}
             onClick={() => {
               d.load(k)
               if (!d.playing) d.toggle()
             }}
           >
-            <div {...stylex.props(styles.thumb, styles.bg(art(name)))} />
+            <img src={t.cover} alt="" {...stylex.props(styles.thumb)} />
             <div>
-              <div {...stylex.props(styles.name)}>{name}</div>
+              <div {...stylex.props(styles.name)}>{t.title}</div>
               <Text as="div" size="caption">
-                {who}
+                {t.artist}
               </Text>
             </div>
             <span {...stylex.props(shared.rowR, styles.go)}>▶</span>

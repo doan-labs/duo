@@ -4,7 +4,7 @@ import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
 // once something has been started.
 
 import { art } from '@doan-labs/duo-fixtures'
-import { TRACKS, type Track } from '@doan-labs/duo-fixtures/tracks.ts'
+import { type Playable, TRACKS } from '@doan-labs/duo-fixtures/tracks.ts'
 import type { Os } from '@doan-labs/duo-sdk'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -16,8 +16,14 @@ const SHOWS: [string, string, string[]][] = [
   ['Accidental Tech', 'ATP', ['Anisotropy Explained', 'Hinges Are Hard', 'Why Metal Renders Black']],
   ['Blender Today', 'Blender', ['AgX and You', 'Path Tracing a Phone', '5.2 Release Notes']]
 ]
-const EPS: Track[] = SHOWS.flatMap(([show, who, list]) =>
-  list.map((t, i) => [t, `${show} · ${who}`, TRACKS[(i + show.length) % TRACKS.length]![2]] as Track)
+// Invented episodes over the real recordings in TRACKS: the shows are a mockup,
+// what comes out of the speaker is a licensed track.
+const EPS: Playable[] = SHOWS.flatMap(([show, who, list]) =>
+  list.map((t, i) => ({
+    title: t,
+    artist: `${show} · ${who}`,
+    src: TRACKS[(i + show.length) % TRACKS.length]!.src
+  }))
 )
 /** Index in EPS of each show's first episode. */
 const FIRST = SHOWS.map((_, i) => SHOWS.slice(0, i).reduce((n, [, , list]) => n + list.length, 0))
@@ -26,7 +32,7 @@ const FIRST = SHOWS.map((_, i) => SHOWS.slice(0, i).reduce((n, [, , list]) => n 
  * Music's deck without seeking: one `<audio>` and a clock that counts on its own
  * if the file never loads, so the mini player still moves offline.
  */
-function deck(list: Track[]) {
+function deck(list: Playable[]) {
   const a = new Audio()
   a.preload = 'none'
   let i = 0
@@ -37,7 +43,7 @@ function deck(list: Track[]) {
   const load = (n: number) => {
     i = ((n % list.length) + list.length) % list.length
     t = 0
-    a.src = list[i]![2]
+    a.src = list[i]!.src
     if (on) void a.play().catch(() => {})
     emit()
   }
@@ -86,7 +92,7 @@ function deck(list: Track[]) {
   }
 }
 
-function useDeck(list: Track[]) {
+function useDeck(list: Playable[]) {
   const [, bump] = useState(0)
   const ref = useRef<ReturnType<typeof deck>>(null)
   if (!ref.current) ref.current = deck(list)
@@ -101,7 +107,7 @@ export const Podcasts = (_: { os: Os }) => {
     d.load(k)
     if (!d.playing) d.toggle()
   }
-  const [n] = d.now
+  const { title: playing } = d.now
   return (
     <Screen xstyle={[styles.root]}>
       <Screen>
@@ -136,8 +142,8 @@ export const Podcasts = (_: { os: Os }) => {
         ))}
       </Screen>
       <div {...stylex.props(styles.mini, !d.loaded && shared.hide)}>
-        <div {...stylex.props(styles.art, styles.bg(art(n)))} />
-        <div {...stylex.props(styles.title)}>{n}</div>
+        <div {...stylex.props(styles.art, styles.bg(art(playing)))} />
+        <div {...stylex.props(styles.title)}>{playing}</div>
         <button type="button" {...stylex.props(styles.play)} onClick={() => d.toggle()}>
           {d.playing ? '❚❚' : '▶'}
         </button>

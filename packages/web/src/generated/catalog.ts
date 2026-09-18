@@ -349,7 +349,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
   {
     "name": "Music",
     "icon": "/icons/music.webp",
-    "mock": true,
+    "mock": false,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-18T22:56:42+07:00"
   },
