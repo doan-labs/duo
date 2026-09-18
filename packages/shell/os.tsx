@@ -9,6 +9,7 @@ import { device } from './device.ts'
 import { development } from './runtime/development.ts'
 import { shots } from './runtime/photos.ts'
 import { bootRegistry } from './runtime/registry.ts'
+import { BootScreen } from './springboard/power.tsx'
 import { SpringBoard } from './springboard/springboard.tsx'
 
 /** Builds one display's OS. `w`/`hgt` in CSS px; `wall` is a wallpaper URL. */
@@ -32,15 +33,17 @@ export function os(w: number, hgt: number, wall: string, container: HTMLElement,
   root.onpointerdown = () => {
     if (device.asleep) device.wake()
   }
-  root.textContent = 'Loading apps…'
+  // The registry boot is the long wait, so the display wears the same logo the
+  // device shows coming out of a restart until the springboard can take over.
+  const view = createRoot(root)
+  view.render(<BootScreen />)
   void bootRegistry()
     .then(() => {
-      root.textContent = ''
       const dev = [...development].find(([, value]) => value.bundle.release.manifest.id === boot)
-      createRoot(root).render(<SpringBoard w={w} hgt={hgt} wall={wall} boot={dev?.[0] ?? boot} shots={shots} />)
+      view.render(<SpringBoard w={w} hgt={hgt} wall={wall} boot={dev?.[0] ?? boot} shots={shots} />)
     })
     .catch((error) => {
-      root.textContent = `Apps unavailable: ${error.message}. Reload to retry.`
+      view.render(<BootScreen error={`Apps unavailable: ${error.message}. Reload to retry.`} />)
     })
   return root
 }

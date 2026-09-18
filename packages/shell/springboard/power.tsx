@@ -20,10 +20,21 @@ const Apple = () => (
   </svg>
 )
 
-/** The logo on black the display wears while the device boots. The caller owns when. */
-export const BootScreen = () => (
+/**
+ * The logo on black the display wears while the device boots. The caller owns
+ * when. The bar is indeterminate — nothing here knows how far along a boot is,
+ * so it eases out and crawls rather than claiming progress it can't see.
+ */
+export const BootScreen = ({ error }: { error?: string }) => (
   <div data-boot {...stylex.props(styles.boot)}>
     <Apple />
+    {error ? (
+      <p {...stylex.props(styles.bootError)}>{error}</p>
+    ) : (
+      <div {...stylex.props(styles.track)}>
+        <div {...stylex.props(styles.fill)} />
+      </div>
+    )}
   </div>
 )
 
@@ -83,14 +94,22 @@ export function PowerSheet({
 // Same frame as styles.ts's fade: StyleX only resolves keyframes defined in the
 // file that uses them or in a .stylex file, and identical frames share a name.
 const fade = stylex.keyframes({ from: { opacity: 0 } })
+// Fast at first, then a crawl: the bar is always moving and never quite lands,
+// so a slow boot reads as working rather than stuck.
+const fill = stylex.keyframes({ from: { transform: 'scaleX(0)' }, to: { transform: 'scaleX(0.96)' } })
 
 const styles = stylex.create({
   boot: {
     position: 'absolute',
     inset: 0,
     zIndex: 10,
-    display: 'grid',
-    placeItems: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 56,
+    paddingLeft: 40,
+    paddingRight: 40,
     backgroundColor: colors.black,
     borderRadius: 'inherit',
     color: colors.white,
@@ -99,6 +118,32 @@ const styles = stylex.create({
     animationName: fade,
     animationDuration: '1s',
     animationFillMode: 'both'
+  },
+  track: {
+    width: 160,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,.2)'
+  },
+  fill: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 'inherit',
+    backgroundColor: colors.white,
+    transformOrigin: 'left center',
+    animationName: fill,
+    animationDuration: '14s',
+    animationTimingFunction: 'cubic-bezier(.05,.7,.1,1)',
+    animationFillMode: 'both'
+  },
+  bootError: {
+    margin: 0,
+    maxWidth: 320,
+    fontSize: 13,
+    lineHeight: 1.4,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,.6)'
   },
 
   poff: {
