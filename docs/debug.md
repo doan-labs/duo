@@ -1,11 +1,23 @@
 # Debugging
 
-Use headless Chromium/Puppeteer for routine behavior and screenshots; use visible Tauri
-for native integration, window behavior, WebKit/GPU differences or an explicit request.
-Assert state, then inspect pixels. Chromium results do not establish native parity.
+Use the `agent-browser` CLI (`.agents/skills/agent-browser`, `agent-browser skills get core`)
+for routine behavior and screenshots; use visible Tauri for native integration, window
+behavior, WebKit/GPU differences or an explicit request. No other browser driver without
+being asked for one. Assert state, then inspect pixels. Chromium results do not establish
+native parity.
 [The review guide](platform/review.md) owns platform commands and measured coverage.
 
 ## 0. Ground rules
+
+For the built browser builder, run `bun scripts/check-builder.mjs <site-url>/build`.
+It uses agent-browser, isolated storage and fake streamed provider replies. Inspect captures
+under `.cache/debug/builder/`. This verifies real compilation/preview but not a paid provider
+call. Stop other task-owned simulator sessions before heavy render tests. Nested iframe
+buttons need fresh frame snapshot refs; the CLI's page-level eval can still target the top
+page after frame selection. Scroll a nested panel's control into view before clicking.
+Mobile builder tabs use opacity and inert input handling rather than display/visibility
+hiding: Chromium can suspend a hidden iframe's startup paint callbacks. Verify a fresh
+mobile reload on the Chat tab as well as switching tabs after a desktop launch.
 
 1. Use isolated test storage, never the user's saved data. Native store isolation needs
    an explicit WebKit dataStoreIdentifier; a different Tauri identifier alone is insufficient.
@@ -18,32 +30,13 @@ Assert state, then inspect pixels. Chromium results do not establish native pari
 5. Record the tested runtime and limits. Wait ≥1 s for unlock (420 ms animation); side-click
    handling includes a 300 ms double-click window. Inspect screenshots after compositing settles.
 
-## 1. Headless Chrome
+## 1. The browser
 
-Start `bun run dev` on a free port. For a quick capture:
-`bun scripts/shot.ts <url> <out.png>`. For interaction, save this as `.cache/debug/run.mjs`
-and run it with Bun. Puppeteer creates a temporary profile by default.
-
-```js
-// .cache/debug/run.mjs  —  bun .cache/debug/run.mjs
-import puppeteer from 'puppeteer-core'
-const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  headless: true,
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
-    '--window-size=818,664', '--hide-scrollbars']
-})
-const page = await browser.newPage()
-await page.setViewport({ width: 818, height: 664, deviceScaleFactor: 1 })
-page.on('pageerror', (e) => console.log('[pageerror]', e.message))
-page.on('console', (m) => m.type() === 'error' && console.log('[console]', m.text().slice(0, 300)))
-await page.goto('http://localhost:3000/?debug', { waitUntil: 'load', timeout: 120000 })
-await page.waitForSelector('[data-os]', { timeout: 60000 })
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-await wait(2500) // model, textures, first frames
-// ... steps ...
-await browser.close()
-```
+Start `bun run dev` on a free port, then drive the page with `agent-browser`. Load
+`agent-browser skills get core` first: the CLI serves the workflow that matches the
+installed version, so the commands here would go stale and are deliberately absent.
+The shell needs a WebGL context, so use a real Chrome window rather than a software
+rasterizer whenever the capture is about pixels.
 
 Use identical state/viewports before and after a change. 818×664 matches the native window;
 use deviceScaleFactor 2 for detail and crop rather than shrink. Baselines use
@@ -57,7 +50,7 @@ StyleX classes are unstable; use shell data attributes:
 | Area | Selectors/state |
 | --- | --- |
 | Display/app | data-os=wide/narrow; data-app; data-side=left/right; data-lock/data-hidden; data-pages; data-homebar; data-drop=left/right/none while an app is on a finger |
-| HUD/hardware | data-hud=vol/thumb/poff/flash/torch/cc/dim/orbit; data-on; data-torch; data-boot |
+| HUD/hardware | data-hud=vol/thumb/poff/flash/torch/cc/dim; data-on; data-torch; data-boot |
 | Control Center | data-cc; data-cc-slider=bright/volume; data-cc-pull; data-cc-page=0/1/2 |
 | Split | data-drop=left/right/none |
 | Sandbox | data-view/session/generation/state/owner; select frames by data-view, never frame-list order |
@@ -81,8 +74,8 @@ thumbnail clones the display and can double data-app matches.
 
 For fold continuity, mark nodes/view IDs and assert identity through close/open. Poll the
 actual bend angle instead of fixed waits; SwiftShader may need ~10 s. Do not reparent a
-frame to expose it: that reloads the document. Puppeteer frame evaluation is privileged
-test inspection, not an installed-app capability.
+frame to expose it: that reloads the document. Evaluating script inside a frame from the
+driver is privileged test inspection, not an installed-app capability.
 
 ### Gestures and focus
 
@@ -91,7 +84,7 @@ test inspection, not an installed-app capability.
 | Open Control Center | At flat yaw 0, drag from display rect.right−60, rect.top+10 down ~190 px; wait ≥1.5 s |
 | Split | Mouse down at app centre/display bottom−8; move up, hold 1.5 s for slow rendering, move to half, release |
 | Flick home | Use one move without a pause; slow CDP calls can cross the 220 ms split threshold |
-| Reset orbit | Click button[title="Reset view"]; allow ~8 s under SwiftShader before asserting orbit data-on is gone |
+| Reset orbit | Click button[title="Reset view"]; allow ~8 s under SwiftShader before asserting the button is disabled again |
 | Type | Click/focus the actual field, check document.activeElement, then type/paste; AX set-value may not trigger React |
 
 For scripted React range changes, use the native input value setter before dispatching
@@ -129,7 +122,7 @@ await page.mouse.down(); await wait(120); await page.mouse.up()
 
 Do not capture between mouse-down and mouse-up: a 0.3–6 s screenshot turns a click into
 a hold. Recompute projected coordinates after orbit, fit-band or hit-box changes. At default
-818×664/yaw 0 only: side (644,234), Camera Control (642,390), volume up/down (547,75)/(497,75).
+818×664/yaw 0 only: side (720,237), Camera Control (718,396), volume up/down (621,75)/(570,75).
 
 ## 2. Reading the model
 
@@ -163,7 +156,10 @@ gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.U
 Render/read in the same tick: the render loop otherwise overwrites bend.value. Use a large
 viewport with camera.clearViewOffset(), reject edge-touching bounds, and account for
 bottom-up pixels. At 37 px/cm, measured bounds were 16.6×11.8 cm flat, 16.9 cm wide at 170°
-and 14.4 cm tall at 90°; orbit extremes reached 19.8 cm tall/18.7 cm wide.
+and 14.4 cm tall at 90°; orbit extremes reached 19.8 cm tall/18.7 cm wide. `SWEEP` in main.ts
+rounds the fold's own extremes up to 17×14.9 cm, which is what the fit's ceiling holds: a
+frame roomier than that keeps one size through the whole fold, and the readout to check it
+is `__duo.camera.fov`, constant across the slider.
 
 If available locally, `bun .cache/debug/framecheck.mjs 818x664 180,120,90,0` sweeps 24 azimuths
 ×15 tilts per pose. Otherwise reproduce that sweep with the probe above. Check clearance
@@ -216,7 +212,7 @@ The full Linux build reproduces it; `BUN_JSC_useFTLJIT=false` fixes that reprodu
 | Cover looks sharp mid-fold | Check whether live DOM incorrectly overlays the bake; attached does not mean visible |
 | Control Center drag does nothing | Account for panel inset/projection; start near rect.top+10 |
 | Tiles appear washed out | Compare source pixels; wallpaper gradients affect perceived contrast |
-| Scrollbar skin absent | Use ignoreDefaultArgs: ['--hide-scrollbars']; Puppeteer adds hiding even when omitted from args |
+| Scrollbar skin absent | Some drivers pass `--hide-scrollbars` by default; launch the browser without it |
 | Camera cannot shoot headless | No videoWidth without a webcam; test fallback/UI, not real still capture |
 | Gallery navigation has wrong colors | Apply the app token theme to its root, not only background color |
 | Old code after checkout/stash/HMR | Restart the task-owned test window/server before trusting results |
@@ -250,6 +246,13 @@ not close them. No progress/archive documentation directories are maintained.
 
 ## Website verification (2026-09-18)
 
+The shared docs/UI-kit sidebar uses `data-lenis-prevent` so wheel and touch
+input scroll its overflow instead of the page's Lenis controller. At desktop
+width, wheel over the component links and verify the aside's `scrollTop`
+increases while the page stays still; also check page scrolling outside it.
+Its thin, transparent-track scrollbar uses theme tokens and gains contrast on
+hover or keyboard focus. Check both light and dark themes with scrollbars visible.
+
 `bun packages/web/scripts/check.mjs [url]` is the committed check for
 `packages/web`: fourteen routes at 1440, 820 and 390 px, in light and dark, page and console errors,
 horizontal overflow, the nav's desktop list versus mobile `<details>` menu,
@@ -261,13 +264,12 @@ missing shell server cannot fail the site. Screenshots land in
 (`.cache/debug/web/serve-dist.ts` serves `dist/client` on 3011, mapping a
 directory to its `index.html` like a file host).
 
-`.cache/debug/web/embed.mjs` is the one check that lets the frame load: on the
-production Simulator page it waits for `[data-os]` inside the frame, prints the
-shell's state, and clicks the site's Closed button, expecting the frame's `src`
-to carry `deg=0`. Under SwiftShader the shell takes 20 to 60 s to reach
-`[data-os]`; that is the model and textures, not a fault. The frame is
-`iframe[title="Duo simulator"]` (or `Duo running <app>`); use `contentFrame()` and the probes
-from section 1 inside it.
+The legacy website scripts describe earlier layout checks and use an older browser
+driver. Current verification uses agent-browser, including the committed builder check
+above. `/simulator` now redirects to `/build`; its phone stays mounted while folding.
+Use fresh frame snapshot refs to enter `iframe[title="Duo simulator"]`, inspect shell
+state, and operate the fold control. Under SwiftShader the shell can take 20 to 60 s
+to reach `[data-os]`; model and texture startup is separate from app readiness.
 
 False alarm: `FAIL link /device/...` from an older check meant the link
 crawler followed the "Open full size" link into the copied shell, which has no

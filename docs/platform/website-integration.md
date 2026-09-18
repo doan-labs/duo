@@ -1,10 +1,18 @@
 # Website integration
 
+The `/build` workspace combines chat and the real simulator. Provider calls and compilation
+run in the browser. `/get-started` and `/simulator` redirect there; `/device/` is unchanged.
+See [builder](builder.md) for the preview channel, assets and credential boundaries.
+
 The website consumes the platform documents and generated API, not copied specifications.
 The accepted public origin is duo.doan-labs.com on static hosting. Provider, routes and
 deployment verification remain in the [website plan](web.md); no deployment is claimed here.
 Taken up 2026-09-18: `packages/web` describes this state on every page; the
 [website record](web.md#build-record) has the details.
+
+The website's `/apps` page lists working shell apps alongside catalog releases in
+Official, with no separate Built in group. Unfinished mockups remain grouped under
+In development. This presentation does not change app execution or catalog availability.
 
 - SDK preview version: 0.0.0, protocol 1. The accepted runtime contract remains
   `contract.md`; capture and extra device permissions remain deferred.

@@ -62,6 +62,10 @@ parity has not been verified.
 
 ## Build an app
 
+The website's `/build` pairs a browser-only AI chat with the simulator. Bring an
+OpenRouter or browser-compatible API key; no local tools are needed to use it.
+See the [browser builder guide](docs/platform/builder.md) for its boundaries.
+
 Start with the [app development guide](docs/platform/dev.md), or explore the
 [Fold Compass example](examples/fold-compass/README.md). The
 [UI kit](packages/uikit/README.md) supplies shared components, while the
@@ -96,13 +100,14 @@ packages/
   cli/              create/check/build/dev/preview/serve, import and type validation
   web/              launch site and developer docs: TanStack Start, prerendered to dist/client
     src/routes/     one file per page, TanStack file routes
+    src/builder/    provider chat, browser compiler, projects and live preview client
     src/home/       the launch page, one section per file, plus parts.tsx (blocks, headlines, code)
     src/kit-demos/  one live demo per UI kit component, rendered and shown as source on /kit/<name>
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
     src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
     src/device.tsx  a CSS-3D Duo driven by a motion value, for scroll and posture scenes
     src/smooth-scroll.tsx  Lenis on the window, off under reduced motion
-    scripts/        api.ts (TSDoc → src/generated/api.ts), simulator.ts (copies the shell), check.mjs
+    scripts/        API generation, simulator copy, browser compiler assets and website checks
     video/          Remotion project for the hero loop (own bun.lock), renders to public/hero.*
     vite-stylex.ts  StyleX for Vite, same Babel plugin as the root
   apps/             one private workspace per existing app

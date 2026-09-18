@@ -89,6 +89,18 @@ export async function download(
   }
   if ((await digest(joined)).slice(0, 8) !== release.build.hash) throw new Error('Build hash mismatch')
   const html = new TextDecoder('utf-8', { fatal: true }).decode(files.get('app.html'))
+  await verifyDocument(html, release)
+  return {
+    release,
+    html,
+    icons: [...files]
+      .filter(([path]) => path !== 'app.html')
+      .map(([, data]) => new Blob([data], { type: 'image/png' })),
+    committedAt: Date.now()
+  }
+}
+
+export async function verifyDocument(html: string, release: Release) {
   const document = new DOMParser().parseFromString(html, 'text/html')
   if (document.head.firstElementChild?.getAttribute('http-equiv')?.toLowerCase() !== 'content-security-policy')
     throw new PlatformError('E_PROTOCOL', 'App document has no leading policy')
@@ -112,12 +124,4 @@ export async function download(
   )
   if (document.head.firstElementChild.getAttribute('content') !== expected)
     throw new PlatformError('E_PROTOCOL', 'Document policy does not match its declared network and content hashes')
-  return {
-    release,
-    html,
-    icons: [...files]
-      .filter(([path]) => path !== 'app.html')
-      .map(([, data]) => new Blob([data], { type: 'image/png' })),
-    committedAt: Date.now()
-  }
 }

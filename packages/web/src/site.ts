@@ -13,12 +13,12 @@ export const NAV = [
   { to: '/apps', label: 'Apps' },
   { to: '/kit', label: 'UI kit' },
   { to: '/docs', label: 'Docs' },
-  { to: '/get-started', label: 'Build an app', highlight: true }
+  { to: '/build', label: 'Build', highlight: true }
 ] as const
 
 /** Every other page, reachable from the footer so nothing is orphaned. */
 export const MORE = [
-  { to: '/simulator', label: 'Simulator' },
+  { to: '/build', label: 'Build an app' },
   { to: '/publish', label: 'Submit an app' },
   { to: '/guidelines', label: 'Guidelines' },
   { to: '/changelog', label: 'Changelog' }

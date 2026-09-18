@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { Footer } from '../footer'
 import { Button, Eyebrow } from '../layout'
@@ -44,15 +44,25 @@ export const Route = createRootRoute({
 })
 
 function Root() {
+  const builder = useRouterState({ select: (state) => state.location.pathname.replace(/\/+$/, '') === '/build' })
   return (
     <Document>
-      <SmoothScroll>
-        <Nav />
-        <main>
-          <Outlet />
-        </main>
-        <Footer />
-      </SmoothScroll>
+      {builder ? (
+        <>
+          <Nav />
+          <main>
+            <Outlet />
+          </main>
+        </>
+      ) : (
+        <SmoothScroll>
+          <Nav />
+          <main>
+            <Outlet />
+          </main>
+          <Footer />
+        </SmoothScroll>
+      )}
     </Document>
   )
 }

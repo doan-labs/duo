@@ -5,6 +5,11 @@ accepted design; [current platform verification](review.md) states what has been
 
 ## Execution boundary
 
+The web-only [browser builder](builder.md) adds verified preview bundles under
+`dev:builder:<project>` with the same opaque frames and generation-checked SDK storage.
+Its activation path checkpoints and replaces preview views without reloading the phone.
+Installed-app activation is unchanged.
+
 | Kind | Execution | Access |
 | --- | --- | --- |
 | Trusted baked component | Shell React tree | Existing shell services through `native.ts` |

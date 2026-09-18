@@ -17,6 +17,7 @@ the root README remains the only repository file tree.
 
 | Topic | Reference |
 | --- | --- |
+| Browser chat builder and preview revisions | [Builder](platform/builder.md) |
 | SDK/host invariants and execution | [Contract](platform/contract.md), [runtime](platform/runtime.md), [SDK package](../packages/sdk/README.md) |
 | App metadata and isolation | [Manifest](platform/manifest.md), [security](platform/security.md) |
 | Authoring and presentation | [Development](platform/dev.md), [CLI package](../packages/cli/README.md), [UI kit](platform/uikit.md), [kit package](../packages/uikit/README.md) |

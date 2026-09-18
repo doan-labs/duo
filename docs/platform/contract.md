@@ -19,6 +19,18 @@ camera/microphone are always refused. Updates bind to the installed catalog orig
 No periodic catalog polling or automatic native updater is enabled. These scope limits
 preserve the sandbox, generation, session, transaction and lifecycle safeguards below.
 
+Browser-builder amendment: web-only generated previews use host-derived
+`dev:builder:<project>` namespaces and independently verified Blob documents. The trusted
+entry owns SDK connect/ready. Explicit preview revisions quiesce old views, checkpoint data
+and advance generations without reloading the shell. Failure/Undo restore matching data;
+pending checkpoints recover interrupted starts. This does not alter installed-app update
+activation or grant permissions. See [builder](builder.md) and decision 63.
+
+Browser preview readiness means the generated host entry completed its first successful
+React commit, including an offscreen mirrored display. This is narrower than a visible
+paint guarantee: hidden frames can suspend animation callbacks. The existing startup
+deadline and authority checks stay unchanged; visible painting needs separate verification.
+
 ## 1. Manifest and compatibility
 
 ### 1.1 Authored manifest

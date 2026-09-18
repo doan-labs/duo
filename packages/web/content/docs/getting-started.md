@@ -1,5 +1,11 @@
 # Getting started
 
+To build entirely in your browser, open [Build](/build), connect an OpenRouter key or a
+browser-accessible OpenAI-compatible endpoint, and describe your app. No local tools are
+needed. Your provider receives requests directly; Duo does not proxy your key or prompts.
+
+The local developer workflow below remains available for full source projects and catalogs.
+
 Ten minutes: the simulator running locally, a new app on its inner home screen, then installed from a catalog like any other app.
 
 You need [Bun](https://bun.sh) and Python 3 with `pip`. The packages are not on npm yet; the repository builds local archives that the CLI resolves instead.

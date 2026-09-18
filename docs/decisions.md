@@ -847,3 +847,50 @@ developer catalog is loaded; an app installed from another origin is refused an 
 with both origins named and the supported transition (remove, then get), rather than a
 silent inheritance. The native **Submit your app** link goes through a new `open_url`
 command behind the `Platform` trait, so the web side never learns which OS opens URLs.
+
+## 62. The Reset button is the whole orbit UI, and the phone grows to the frame it is given
+2026-09-18, accepted. Supersedes 19, amends 22. The atom minimap read as a
+second device floating beside the first, and it earned its 112 px column at the
+cost of the phone's: with the card gone the right band is plain `PAD` again, the
+pill is centred under the window rather than offset, and the only thing left of
+the orbit state is the pill's Reset, which still lights up the moment the view
+leaves the front pose. The bands themselves are down from 24 px to 16 (and the
+pill sits 20 px up, not 28), and the fit's ceiling is no longer the flat 37 px/cm
+reference: it is whichever is larger of that reference and what the box leaves
+for `SWEEP`, the silhouette a whole fold paints (17 x 14.9 cm, measured off the
+drawing buffer). A frame with room to spare therefore draws the phone larger,
+682 px wide in the website's 1280 x 715 hero against 613 before, and centred
+rather than hanging left, while the native window keeps its reference size
+within a couple of percent. Folding never resizes the phone at any frame size,
+since the ceiling already holds the sweep. Costs: the camera pose is no longer
+drawn anywhere, so a turned view is read off the phone itself, and the per-pose
+click coordinates in docs/debug.md move with the bands.
+
+## 63. One browser builder replaces the two product entry pages
+
+2026-09-18. `/build` combines a bring-your-own-key chat with the real simulator;
+`/get-started` and `/simulator` redirect there. This supersedes the separate product
+pages in decision 57 and the original website page plan. CLI setup stays in developer
+docs; `/device/` stays the embedded shell. The owner selected direct browser provider
+requests over a Cloudflare Worker proxy: credentials/prompts never pass through Duo's
+servers, at the cost of requiring provider CORS. OpenRouter is the initial default;
+custom HTTPS Chat Completions endpoints and manual model IDs remain available.
+
+The owner approved esbuild-wasm and Babel standalone. A worker uses StyleX's official
+browser plugin and a precompiled, fixed React/SDK/kit runtime. No runtime npm installation
+or generated code in the trusted page. Named token imports resolve against that exact
+runtime build. Whole source revisions simplify validation and recovery. Compilation is
+not a substitute for CLI type, publication or runtime checks.
+
+Browser previews extend verified development documents with a token-bound parent channel
+and project-owned namespace. Their explicit revision activation checkpoints data, retires
+old authority and replaces app frames while keeping the phone mounted. This amends preview
+selection in decision 49, not installed update rules. Data checkpoints survive interrupted
+starts; Undo restores the corresponding data as well as code. Arbitrary React state is not
+preserved. Credentials stay in page memory, never worker/project/simulator storage. See
+the builder guide for hard limits and the review guide for measured evidence.
+
+The generated entry reports readiness after a successful React commit, including hidden
+mirrored displays whose paint callbacks Chromium can suspend. This explicitly amends the
+preview interpretation of first-paint readiness; visible pixels need separate checks.
+The existing startup deadline and authority gates are unchanged.

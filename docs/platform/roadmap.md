@@ -7,6 +7,7 @@ constitute authorization to implement, publish or deploy them. Current behavior 
 
 | Area | Status | Remaining decision or work |
 | --- | --- | --- |
+| Browser AI builder | Implemented locally | Direct browser provider calls and local compiled previews at `/build`; hosted CORS/MIME behavior and Safari need separate verification; [builder](builder.md) |
 | Curated publication | Implemented locally, 2026-09-18 / needs first remote run | Source submission under `community-apps/`, registry ownership, uniqueness/version checks, immutable publish-before-index pipeline and per-submission runtime evidence exist; the first real PR, publish run and `/catalog` deploy remain to be observed; [publication](publishing.md) |
 | Public packages | Needs release decisions | Versions, provenance, credentials and npm publication; the local archive workflow stays the documented path |
 | Permission-bearing community apps | Deferred | Curated submissions accept only empty permissions; an expansion needs its own verification and review policy |

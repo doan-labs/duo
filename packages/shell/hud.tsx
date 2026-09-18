@@ -39,36 +39,20 @@ const createStore = (initial: State) => {
 type Store = ReturnType<typeof createStore>
 
 /**
- * Everything that changes every frame bypasses React: the elements are
- * collected through refs and mutated directly.
+ * The hinge readout changes every frame, so it bypasses React: the element is
+ * collected through a ref and mutated directly.
  */
-type Live = {
-  deg: number
-  degEl: HTMLSpanElement | null
-  rings: HTMLDivElement | null
-  nucleus: HTMLDivElement | null
-  electron: HTMLDivElement | null
-  dist: HTMLDivElement | null
-  cap: HTMLSpanElement | null
-}
+type Live = { deg: number; degEl: HTMLSpanElement | null }
 const readout = (deg: number) => `${Math.round(deg)}°`
-/** Typographic minus, so "−42°" does not read as a hyphen. */
-const signed = (deg: number) => {
-  const n = Math.round(deg)
-  return `${n < 0 ? '−' : ''}${Math.abs(n)}°`
-}
 /** Shortest signed distance from a multiple of 2π. */
 const wrap = (rad: number) => Math.atan2(Math.sin(rad), Math.cos(rad))
 
 /** The default pose main.ts homes to: camera at z = 40, level, in front. */
 const HOME_DISTANCE = 40
-/** Orbit-ring radius in the minimap, px. The tilt makes three ellipses read as one gimbal. */
-const RING = 34
-const RING_TILT = (75 * Math.PI) / 180
 
 export function mountHud(events: HudEvents) {
   const store = createStore({ target: 180, yaw: 0, hint: true, spin: false, away: false })
-  const live: Live = { deg: 180, degEl: null, rings: null, nucleus: null, electron: null, dist: null, cap: null }
+  const live: Live = { deg: 180, degEl: null }
   const web = document.documentElement.classList.contains('web')
   // An embedding page has its own headline; the frame shows the device alone.
   const title = web && window.self === window.top
@@ -90,45 +74,19 @@ export function mountHud(events: HudEvents) {
     hideHint: () => store.set({ hint: false }),
     spinning: () => store.get().spin,
     /**
-     * Camera pose, every frame after controls.update(). Drives the orbit
-     * minimap through refs; React only hears about it when the view leaves or
-     * returns to the default pose.
+     * Camera pose, every frame after controls.update(). React only hears about
+     * it when the view leaves or returns to the default pose, which is the
+     * whole state the Reset button needs.
      */
     orbit: (azimuth: number, polar: number, distance: number, yaw: number) => {
-      const tilt = polar - Math.PI / 2
       const away =
         Math.abs(azimuth) > 0.02 ||
-        Math.abs(tilt) > 0.02 ||
-        // Zooming in is for reading the screen, and the card would sit over it;
-        // only zooming out counts as leaving the view.
+        Math.abs(polar - Math.PI / 2) > 0.02 ||
+        // Zooming in is for reading the screen; only zooming out counts as
+        // leaving the view.
         distance - HOME_DISTANCE > 0.5 ||
         Math.abs(wrap(yaw)) > 0.02
       if (away !== store.get().away) store.set({ away })
-      // The rings are a gimbal fixed in the world; the world turns by the
-      // inverse of the camera, so a drag to the right turns the rings right.
-      if (live.rings) live.rings.style.transform = `rotateX(${tilt}rad) rotateY(${-azimuth}rad)`
-      if (live.nucleus) live.nucleus.style.transform = `rotateY(${yaw}rad)`
-      if (live.electron) {
-        // The electron marks the phone's front on the tilted equator ring, then
-        // takes the same world-to-view turn as the rings so it stays on them.
-        const x0 = Math.sin(yaw) * RING
-        const y0 = Math.cos(yaw) * Math.cos(RING_TILT) * RING
-        const z0 = Math.cos(yaw) * Math.sin(RING_TILT) * RING
-        const x1 = x0 * Math.cos(-azimuth) + z0 * Math.sin(-azimuth)
-        const z1 = -x0 * Math.sin(-azimuth) + z0 * Math.cos(-azimuth)
-        const y2 = y0 * Math.cos(tilt) - z1 * Math.sin(tilt)
-        const z2 = y0 * Math.sin(tilt) + z1 * Math.cos(tilt)
-        live.electron.style.transform = `translate3d(${x1}px, ${y2}px, ${z2}px)`
-      }
-      if (live.dist) {
-        const r = Math.min(44, Math.max(22, (HOME_DISTANCE * 40) / distance))
-        live.dist.style.transform = `scale(${r / 40})`
-      }
-      if (live.cap) {
-        const az = (azimuth * 180) / Math.PI
-        const el = -(tilt * 180) / Math.PI
-        live.cap.textContent = `${signed(az)} · ${signed(el)}`
-      }
     }
   }
 }
@@ -247,63 +205,6 @@ function Hud({
           </svg>
         </label>
       </div>
-      <Minimap live={live} on={s.away} onReset={events.reset} />
-    </div>
-  )
-}
-
-/**
- * The orbit minimap: an atom whose rings are the world's gimbal seen from the
- * camera, a nucleus that is the phone (turns with yaw), an electron marking
- * the phone's front, and a dashed circle that grows as the camera comes closer.
- * Shown only while the view is off its default pose; clicking it resets.
- */
-function Minimap({ live, on, onReset }: { live: Live; on: boolean; onReset: () => void }) {
-  return (
-    <div
-      {...stylex.props(styles.liquid, styles.card, on && styles.cardOn)}
-      data-hud="orbit"
-      data-on={on ? '' : undefined}
-      title="Reset view"
-      onClick={onReset}
-    >
-      <div {...stylex.props(styles.atom)}>
-        <div
-          {...stylex.props(styles.dist)}
-          ref={(el) => {
-            live.dist = el
-          }}
-        />
-        <div
-          {...stylex.props(styles.rings)}
-          ref={(el) => {
-            live.rings = el
-          }}
-        >
-          {[0, 60, 120].map((deg) => (
-            <div key={deg} {...stylex.props(styles.ring, styles.ringAt(deg))} />
-          ))}
-          <div
-            {...stylex.props(styles.nucleus)}
-            ref={(el) => {
-              live.nucleus = el
-            }}
-          />
-        </div>
-        <div
-          {...stylex.props(styles.electron)}
-          ref={(el) => {
-            live.electron = el
-          }}
-        />
-      </div>
-      <span
-        {...stylex.props(styles.cap)}
-        data-cap=""
-        ref={(el) => {
-          live.cap = el
-        }}
-      />
     </div>
   )
 }
@@ -336,7 +237,8 @@ const styles = stylex.create({
     left: 0,
     right: 0,
     color: dim,
-    fontSize: 13,
+    fontSize: { default: 13, '@media (max-width: 600px)': 10 },
+    whiteSpace: 'normal',
     transitionProperty: 'opacity',
     transitionDuration: '0.5s'
   },
@@ -357,18 +259,16 @@ const styles = stylex.create({
 
   hud: {
     position: 'absolute',
-    // Centred under the phone, which hangs half the orbit card's column left of
-    // the window's middle (RIGHT_BAND in main.ts).
-    left: 'calc(50% - 70px)',
-    bottom: 28,
+    left: '50%',
+    bottom: 20,
     transform: 'translateX(-50%)',
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
+    gap: { default: 4, '@media (max-width: 600px)': 2 },
     paddingTop: 6,
     paddingRight: 8,
     paddingBottom: 6,
-    paddingLeft: 16,
+    paddingLeft: { default: 16, '@media (max-width: 600px)': 8 },
     borderRadius: 26,
     color: colors.white,
     fontSize: 13,
@@ -378,8 +278,18 @@ const styles = stylex.create({
   },
   /** Direct children of the pill take their own clicks instead of dragging the window. */
   child: { pointerEvents: 'auto', cursor: 'default', position: 'relative' },
-  sep: { width: 1, height: 20, marginInline: 8, backgroundColor: 'rgba(255, 255, 255, 0.16)' },
-  label: { display: 'flex', alignItems: 'center', gap: 10, paddingInline: 4 },
+  sep: {
+    width: 1,
+    height: 20,
+    marginInline: { default: 8, '@media (max-width: 600px)': 4 },
+    backgroundColor: 'rgba(255, 255, 255, 0.16)'
+  },
+  label: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: { default: 10, '@media (max-width: 600px)': 6 },
+    paddingInline: 4
+  },
   svg: {
     display: 'block',
     width: 18,
@@ -396,7 +306,7 @@ const styles = stylex.create({
   range: {
     appearance: 'none',
     WebkitAppearance: 'none',
-    width: 140,
+    width: { default: 140, '@media (max-width: 600px)': 'clamp(24px, calc(100vw - 342px), 140px)' },
     height: 4,
     borderRadius: 2,
     outlineStyle: 'none',
@@ -420,7 +330,7 @@ const styles = stylex.create({
   }),
 
   button: {
-    width: 38,
+    width: { default: 38, '@media (max-width: 600px)': 34 },
     height: 38,
     padding: 0,
     borderRadius: '50%',
@@ -489,97 +399,5 @@ const styles = stylex.create({
       transitionTimingFunction: ease
     }
   },
-  checkboxOn: { backgroundColor: colors.green, '::after': { transform: 'translateX(12px)' } },
-
-  // The orbit minimap, bottom edge on the pill's baseline. It stands in its own
-  // column: main.ts keeps 164 px clear on the right (RIGHT_BAND) so it never
-  // lands on the phone, and the pill is offset by half that so it stays centred
-  // under the phone rather than under the window.
-  card: {
-    position: 'absolute',
-    right: 28,
-    bottom: 28,
-    width: 112,
-    height: 112,
-    borderRadius: 22,
-    color: colors.white,
-    cursor: 'pointer',
-    opacity: 0,
-    transform: 'scale(0.92)',
-    pointerEvents: 'none',
-    transitionProperty: 'opacity, transform',
-    transitionDuration: { default: '0.3s', [reduce]: '0s' },
-    transitionTimingFunction: ease
-  },
-  cardOn: { opacity: 1, transform: 'scale(1)', pointerEvents: 'auto' },
-  atom: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 92,
-    perspective: '300px',
-    transformStyle: 'preserve-3d'
-  },
-  /** Children centre on the atom and offset themselves; the gimbal keeps its 3D space. */
-  rings: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 0,
-    height: 0,
-    transformStyle: 'preserve-3d'
-  },
-  ring: {
-    position: 'absolute',
-    top: -RING,
-    left: -RING,
-    width: RING * 2,
-    height: RING * 2,
-    borderRadius: '50%',
-    borderWidth: 1.5,
-    borderStyle: 'solid',
-    borderColor: 'rgba(255, 255, 255, 0.7)'
-  },
-  ringAt: (deg: number) => ({ transform: `rotateZ(${deg}deg) rotateX(75deg)` }),
-  nucleus: {
-    position: 'absolute',
-    top: -6,
-    left: -4,
-    width: 8,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)'
-  },
-  electron: {
-    position: 'absolute',
-    top: 'calc(50% - 2.5px)',
-    left: 'calc(50% - 2.5px)',
-    width: 5,
-    height: 5,
-    borderRadius: '50%',
-    backgroundColor: colors.cyan,
-    boxShadow: `0 0 6px ${colors.cyan}, 0 0 2px ${colors.white}`
-  },
-  dist: {
-    position: 'absolute',
-    top: 'calc(50% - 40px)',
-    left: 'calc(50% - 40px)',
-    width: 80,
-    height: 80,
-    borderRadius: '50%',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.28)'
-  },
-  cap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 9,
-    fontSize: 11,
-    lineHeight: 1,
-    fontVariantNumeric: 'tabular-nums',
-    color: 'rgba(255, 255, 255, 0.72)'
-  }
+  checkboxOn: { backgroundColor: colors.green, '::after': { transform: 'translateX(12px)' } }
 })

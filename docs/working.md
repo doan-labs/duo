@@ -144,7 +144,7 @@ Cover/split use one-column cards. The host renders persisted widget snapshots an
 on changes without fetching. Keep `scrollbar-width`/`scrollbar-color` at auto where WebKit
 pseudo-elements apply; non-auto values override the detailed thumb skin in Chromium.
 Other engines use the thin/tinted fallback. [Scrollbar verification](debug.md#known-false-alarms)
-must disable Puppeteer's default scrollbar hiding.
+must launch the browser without `--hide-scrollbars`.
 
 ## Maps maintenance
 
@@ -163,6 +163,13 @@ pin from the space it was meant to fill. Below 600 px the same panels become one
 sheet, sized by `SHEET`.
 
 ## Website
+
+The `/build` workspace generates compiler assets during website dev/build. Use the normal
+web scripts, not Vite alone on a fresh checkout. The first compilation downloads Babel,
+StyleX, esbuild WASM and the prebuilt runtime. Source files export a component; the builder
+owns connect/ready. Browser compilation is not the CLI publication check. Full constraints
+are in [builder](platform/builder.md). Freeze source before tests: HMR can reset the chat's
+preview sequence while leaving the shell mounted; reload the workspace after editing it.
 
 `packages/web` is the developer site: TanStack Start on Vite, StyleX through
 `packages/web/vite-stylex.ts`, every route prerendered. See

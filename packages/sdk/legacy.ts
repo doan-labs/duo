@@ -18,7 +18,7 @@ export type Os = {
   /**
    * This instance is the copy the other display holds while the phone folds
    * (docs/decisions.md 24); the one in use is running too. A copy draws
-   * everything and starts no sound of its own — shared playback (music.tsx's
+   * everything and starts no sound of its own - shared playback (music.tsx's
    * `deck`) is module state and already plays once.
    */
   mirror?: boolean

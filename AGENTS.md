@@ -43,6 +43,7 @@ then read the pages relevant to the task before changing anything non-trivial:
 | Verification, website integration or release preparation | [Debugging](docs/debug.md) before verification, [local review](docs/platform/review.md) for reproducible platform checks for measured limits; [website handoff](docs/platform/website-integration.md), [website plan](docs/platform/web.md) and [publishing](docs/platform/publishing.md) when relevant |
 | Community app submission, review checks or catalog publication | [Publication](docs/platform/publishing.md), [community-apps guide](community-apps/README.md); the publisher moves data only, never runs app code in a credentialed job |
 | Scope or design changes | [Project decisions](docs/decisions.md), [roadmap](docs/platform/roadmap.md), [current scope](docs/platform/README.md) |
+| Browser AI builder, providers, compilation or live revisions | [Browser builder](docs/platform/builder.md), [security](docs/platform/security.md), [local review](docs/platform/review.md) |
 
 Current platform references describe enabled behavior; the roadmap separates deferred work.
 The contract governs enabled safety guarantees. Resolve apparent code/contract conflicts
@@ -62,16 +63,17 @@ file tree.
 
 ## Verification
 
-Use headless Chrome through the installed `puppeteer-core` as the default for
-web UI, behavior checks, and screenshots. Follow [docs/debug.md](docs/debug.md):
-run the local web server, exercise the real page in an isolated browser profile,
-and inspect both state and captured pixels. A visible app window is not required;
-do not ask the user to open the app for routine browser verification.
+Use the `agent-browser` CLI (`.agents/skills/agent-browser`) as the default for
+web UI, behavior checks, and screenshots; load its workflow first with
+`agent-browser skills get core`. Do not reach for `puppeteer-core`, Playwright or
+any other browser driver unless the user asks for one. Follow
+[docs/debug.md](docs/debug.md) for what to assert: run the local web server,
+exercise the real page, and inspect both state and captured pixels.
 
 Use the visible Tauri app when testing native integration, window behavior,
-WKWebView-specific rendering, or a GPU/timing issue headless Chrome cannot resolve,
-or when the user explicitly requests it. Report which runtime was verified;
-headless Chromium results do not establish native WebKit parity.
+WKWebView-specific rendering, or a GPU/timing issue a Chromium browser cannot
+resolve, or when the user explicitly requests it. Report which runtime was
+verified; Chromium results do not establish native WebKit parity.
 
 ## Conventions
 

@@ -11,7 +11,7 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 | Module | Responsibility |
 | --- | --- |
 | `main.ts` | Model loading/mesh classification, scene, fold/render loop, display visibility, HUD wiring and torch LED |
-| `hud.tsx` | Hinge/orbit controls and minimap; per-frame transforms use refs, only visibility changes cross React |
+| `hud.tsx` | Hinge slider, fold/flip/home/reset buttons and auto-rotate; the degree readout is written through a ref, only state changes cross React |
 | `buttons.ts` → `device-buttons.ts` → `device.ts` | Hardware hit boxes/springs/keys → press interpretation → device actions and display registry; device.ts has no React/StyleX |
 | `os.tsx` | Create each display root and mount SpringBoard |
 | `springboard/springboard.tsx` | Layer stack and state that outlives individual layers |
@@ -33,6 +33,11 @@ exports: Control Center uses Music's single shared deck. Calendar's widget is ba
 Weather publishes a persisted declarative snapshot.
 
 ## Build and package boundaries
+
+The website's [builder](platform/builder.md) owns browser provider calls, source projects
+and a compiler worker. `runtime/builder-preview.ts` owns the web-only channel and preview
+activation; `sdk/builder-preview.ts` shares its wire format. Generated documents reuse the
+SDK bridge, sandbox, storage and document verifier. They never execute in the chat page.
 
 `build.ts` builds `packages/shell/index.html` into `dist/` and copies `public/` assets.
 `stylex-plugin.ts` injects styles during development and emits `dist/stylex.css` in builds.

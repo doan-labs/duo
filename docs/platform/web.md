@@ -1,5 +1,9 @@
 # Website and deployment plan
 
+The current authoring route is `/build`, with chat and the real simulator together.
+`/get-started` and `/simulator` redirect there. The [browser builder](builder.md)
+supersedes the separate-page authoring flow described in the historical build record below.
+
 Status: the site is built in `packages/web` (see the build record at the end); the
 deployment requirements below are a plan, not deployment evidence. Public packages remain unpublished. Use [local development](dev.md) today and
 [the integration guide](website-integration.md) for existing API/catalog interfaces.

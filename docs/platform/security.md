@@ -1,5 +1,9 @@
 # Security
 
+The [browser builder](builder.md) keeps provider keys in the trusted chat page only.
+Its web-only channel validates parent source, origin, token and sequence, and the shell
+independently verifies bundles. Generated previews grant no network or device permissions.
+
 Downloadable apps cannot directly access the shell, native services or another app's data.
 Their own persistent data goes through the SDK. These requirements apply equally to
 official, community and development documents; lane grants no execution privilege.

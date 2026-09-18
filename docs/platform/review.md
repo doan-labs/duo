@@ -125,6 +125,41 @@ screenshots are those captures. The publisher check runs on a scratch tree insid
 
 ## Verification scope and limits
 
+### Browser builder (2026-09-18)
+
+The `/build` workspace was verified against the production static build in Chromium 153
+using agent-browser 0.27.0. `bun run typecheck`, the website production build, lint on
+changed builder/runtime files, and all six provider/schema tests (18 assertions) passed.
+The PostToolUse formatting hook was inactive; no manual formatter was run.
+
+`bun scripts/check-builder.mjs http://localhost:3019/build` passed real browser compilation
+and sandbox execution with streamed fixture replies: a timer keeps counting across a
+revision, folding retains the inner view and starts the cover, Undo restores code/data,
+one repair is the limit, and a startup failure that writes app data rolls those writes
+back. Stop aborts without resubmitting. Altered document bytes are refused. Mobile tabs
+retain the simulator; a mobile reload restores conversation but not the key.
+Captures go under `.cache/debug/builder/<session>/`; inspect pixels after the state checks.
+
+Live browser-to-OpenRouter checks used `openai/gpt-5.4-mini` for a timer and a follow-up
+adding one minute, with the running deadline retained. `google/gemini-3.1-flash-lite-preview`
+built notes and added Delete while folded in two successful provider requests, with the
+saved note retained and Delete working on the cover. Both display frames reported ready,
+used only `allow-scripts`, and had opaque origins. The real key was absent from project
+IndexedDB and localStorage, then cleared by navigation. The Clear key control was checked
+separately with a non-secret fixture. Light/dark 390 px previews and
+1440 px desktop captures were inspected; mobile fold controls fit inside the frame.
+
+This is local Chromium evidence, not Cloudflare deployment, Safari, native parity, every
+compatible provider or a guarantee that any model-generated app is correct. Provider CORS,
+hosted asset headers and long-running generated-code behavior need separate checks.
+The full historical platform adversarial suite was not rerun for this change.
+
+Additional live check: `meta/muse-spark-1.3-contributor` built a water counter and
+updated it in two successful requests without compiler repair. The follow-up preserved
+the count, fixed literal Unicode escapes and an oversized first layout, and added a
+Remove control disabled at zero. The cover retained the count after folding. Generated
+designs still benefit from visual review even when compilation succeeds.
+
 The completed local audit verified all four MVP outcomes in Chromium, including stable
 view IDs across 180/120/0 degrees and unchanged hashes for all 378 simulator build files.
 The external workflow exercised create/develop/install, process restart, update staging,

@@ -8,6 +8,7 @@ import { launchFrame } from './bridge.ts'
 import { development } from './development.ts'
 import { observeDisplay, viewInfo } from './display.ts'
 import { restore } from './lifecycle.ts'
+import { previewState } from './preview-events.ts'
 import { closeSession, session } from './sessions.ts'
 
 export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: boolean; side?: 'left' | 'right' }) {
@@ -45,6 +46,7 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
             },
             state: (state, message) => {
               if (disposed) return
+              previewState(id, app.bundle.release.build.hash, state, message)
               setError(state === 'revoked')
               setStatus(state === 'ready' ? '' : (message ?? 'Connecting…'))
             }
@@ -53,6 +55,7 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
         )
       })
       .catch((e) => {
+        previewState(id, '', 'revoked', String(e.message))
         if (!disposed) {
           setError(true)
           setStatus(String(e.message))

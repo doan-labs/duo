@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppsRouteImport } from './routes/apps'
+import { Route as BuildRouteImport } from './routes/build'
 import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as GetStartedRouteImport } from './routes/get-started'
@@ -33,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppsRoute = AppsRouteImport.update({
   id: '/apps',
   path: '/apps',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BuildRoute = BuildRouteImport.update({
+  id: '/build',
+  path: '/build',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangelogRoute = ChangelogRouteImport.update({
@@ -104,6 +110,7 @@ const KitNameRoute = KitNameRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
+  '/build': typeof BuildRoute
   '/changelog': typeof ChangelogRoute
   '/docs': typeof DocsRouteWithChildren
   '/get-started': typeof GetStartedRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
+  '/build': typeof BuildRoute
   '/changelog': typeof ChangelogRoute
   '/get-started': typeof GetStartedRoute
   '/guidelines': typeof GuidelinesRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
+  '/build': typeof BuildRoute
   '/changelog': typeof ChangelogRoute
   '/docs': typeof DocsRouteWithChildren
   '/get-started': typeof GetStartedRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/apps'
+    | '/build'
     | '/changelog'
     | '/docs'
     | '/get-started'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/apps'
+    | '/build'
     | '/changelog'
     | '/get-started'
     | '/guidelines'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/apps'
+    | '/build'
     | '/changelog'
     | '/docs'
     | '/get-started'
@@ -206,6 +218,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppsRoute: typeof AppsRoute
+  BuildRoute: typeof BuildRoute
   ChangelogRoute: typeof ChangelogRoute
   DocsRoute: typeof DocsRouteWithChildren
   GetStartedRoute: typeof GetStartedRoute
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: '/apps'
       fullPath: '/apps'
       preLoaderRoute: typeof AppsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/build': {
+      id: '/build'
+      path: '/build'
+      fullPath: '/build'
+      preLoaderRoute: typeof BuildRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/changelog': {
@@ -355,6 +375,7 @@ const KitRouteWithChildren = KitRoute._addFileChildren(KitRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppsRoute: AppsRoute,
+  BuildRoute: BuildRoute,
   ChangelogRoute: ChangelogRoute,
   DocsRoute: DocsRouteWithChildren,
   GetStartedRoute: GetStartedRoute,

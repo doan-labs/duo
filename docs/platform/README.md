@@ -16,6 +16,7 @@ not published packages, a deployed service or evidence of a remote CI run.
 | Responsibility | Reference |
 | --- | --- |
 | App authoring and local packages | [Development](dev.md), [CLI](../../packages/cli/README.md), [SDK](../../packages/sdk/README.md) |
+| Browser AI authoring | [Browser builder](builder.md): direct provider calls, local compilation and live revisions |
 | SDK and host invariants | [Contract](contract.md), [runtime](runtime.md), [manifest](manifest.md), [security](security.md) |
 | UI components and tokens | [UI kit](uikit.md), [package reference](../../packages/uikit/README.md), [generated API](api/uikit.json) |
 | Installation and lifecycle | [Store](store.md), [app updates](updates.md), [review commands](review.md) |
