@@ -110,7 +110,7 @@ const date = (iso: string) =>
 export function Apps() {
   return (
     <Block labelledBy="apps-title">
-      <Cap>07 · The apps</Cap>
+      <Cap>06 · The apps</Cap>
       <Headline id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
       <Lede>
         Official apps ship in the simulator and publish to the Duo catalog; community apps arrive as pull requests.

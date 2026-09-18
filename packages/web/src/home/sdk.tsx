@@ -16,7 +16,7 @@ const API = [
 export function Sdk() {
   return (
     <Block labelledBy="sdk-title">
-      <Cap>06 · SDK</Cap>
+      <Cap>05 · SDK</Cap>
       <Headline id="sdk-title" lines={['Four primitives.', 'That is the whole surface.']} />
       <Lede>
         Enough to build a real app, small enough to read in a minute. The rest is React and the platform you already

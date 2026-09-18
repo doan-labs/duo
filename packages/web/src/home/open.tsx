@@ -16,7 +16,7 @@ export function Open() {
     <Block cinema labelledBy="open-title">
       <Columns align="start">
         <div>
-          <Cap>08 · Open</Cap>
+          <Cap>07 · Open</Cap>
           <Headline id="open-title" lines={['The platform is open.', 'So are the apps.']} />
           <Lede>
             Someone in Berlin can build a calculator, open a pull request, and after review it can appear in the Duo
