@@ -198,7 +198,9 @@ export function Tile({
 export function Split({ aside, children }: { aside: ReactNode; children: ReactNode }) {
   return (
     <div {...stylex.props(styles.split)}>
-      <aside {...stylex.props(styles.aside)}>{aside}</aside>
+      <aside data-lenis-prevent {...stylex.props(styles.aside)}>
+        {aside}
+      </aside>
       <div {...stylex.props(styles.main)}>{children}</div>
     </div>
   )
@@ -432,7 +434,20 @@ const styles = stylex.create({
     top: '88px',
     alignSelf: 'start',
     maxHeight: { default: 'calc(100vh - 120px)', [NARROW]: 'none' },
-    overflowY: 'auto'
+    overflowY: 'auto',
+    scrollbarWidth: 'thin',
+    scrollbarColor: {
+      default: `${color.borderStrong} transparent`,
+      ':hover': `${color.text3} transparent`,
+      ':focus-within': `${color.text3} transparent`
+    },
+    '::-webkit-scrollbar': { width: '6px' },
+    '::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+    '::-webkit-scrollbar-thumb': {
+      backgroundColor: color.borderStrong,
+      borderRadius: '999px'
+    },
+    '::-webkit-scrollbar-thumb:hover': { backgroundColor: color.text3 }
   },
   main: { minWidth: 0 },
   sideGroup: { marginBottom: '32px' },

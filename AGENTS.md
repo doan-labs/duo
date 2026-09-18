@@ -62,16 +62,17 @@ file tree.
 
 ## Verification
 
-Use headless Chrome through the installed `puppeteer-core` as the default for
-web UI, behavior checks, and screenshots. Follow [docs/debug.md](docs/debug.md):
-run the local web server, exercise the real page in an isolated browser profile,
-and inspect both state and captured pixels. A visible app window is not required;
-do not ask the user to open the app for routine browser verification.
+Use the `agent-browser` CLI (`.agents/skills/agent-browser`) as the default for
+web UI, behavior checks, and screenshots; load its workflow first with
+`agent-browser skills get core`. Do not reach for `puppeteer-core`, Playwright or
+any other browser driver unless the user asks for one. Follow
+[docs/debug.md](docs/debug.md) for what to assert: run the local web server,
+exercise the real page, and inspect both state and captured pixels.
 
 Use the visible Tauri app when testing native integration, window behavior,
-WKWebView-specific rendering, or a GPU/timing issue headless Chrome cannot resolve,
-or when the user explicitly requests it. Report which runtime was verified;
-headless Chromium results do not establish native WebKit parity.
+WKWebView-specific rendering, or a GPU/timing issue a Chromium browser cannot
+resolve, or when the user explicitly requests it. Report which runtime was
+verified; Chromium results do not establish native WebKit parity.
 
 ## Conventions
 

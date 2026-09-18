@@ -45,25 +45,58 @@ document.documentElement.classList.toggle('web', !isDesktop)
 // load, then `{ deg, yaw, bg, paused, app, cue }` by postMessage (cues in cues.ts).
 // Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
-type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue }
+type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue; hello?: boolean }
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
 const paint = (bg: string | null) => {
   if (bg) document.body.style.background = bg
 }
+// In a frame the page behind it is the backdrop: the light default belongs to
+// the standalone page, and painting it here is a white card on a dark site for
+// as long as the embedder's `bg` takes to arrive.
+const embedded = parent !== window
+if (embedded) document.body.style.background = 'transparent'
 paint(new URLSearchParams(location.search).get('bg'))
 let pose: ((m: Pose) => void) | null = null
 let queued: Pose | null = null
 // Development runs the site and the shell on two localhost ports; that pair is the one exception.
 const local = (o: string) => location.hostname === 'localhost' && new URL(o).hostname === 'localhost'
+/** False until the first frame the phone is drawn in; the scene fades in there. */
+let shown = false
 addEventListener('message', (e: MessageEvent<Pose>) => {
   if (e.source !== parent || typeof e.data !== 'object' || !e.data) return
   if (e.origin !== location.origin && !local(e.origin)) return
+  // `hello` is the page saying it is listening now. Both announcements below can
+  // land before an embedding page has hydrated, which would leave the frame
+  // hidden for good, so the state is repeated on request.
+  if (e.data.hello) announce(shown ? { ready: true } : { live: true })
   if (typeof e.data.bg === 'string') paint(e.data.bg)
   if (typeof e.data.paused === 'boolean') paused = e.data.paused
   if (pose) pose(e.data)
   else queued = { ...queued, ...e.data }
 })
+// The embedder cannot rely on the frame's load event: a frame that starts from
+// server-rendered HTML can be loaded before the page's React has attached a
+// listener, and cross-origin it cannot read the frame's readyState either. So
+// the frame speaks first, here (ready for a message) and again on its first
+// drawn frame (ready to be looked at). The messages carry nothing, so the
+// referrer is address enough.
+const announce = (m: { live?: true; ready?: true }) => {
+  if (!embedded) return
+  try {
+    parent.postMessage(m, new URL(document.referrer).origin)
+  } catch {
+    parent.postMessage(m, '*')
+  }
+}
+announce({ live: true })
+
+// The 3.6 MB body is the long pole, so it is asked for before anything else on
+// this page runs: the icons, the baked screens and the environment map all
+// happen while it is in flight, and the await for it is at the model section
+// below. index.html preloads the same URL, so the request is already open by
+// the time this module is evaluated.
+const modelLoad = new USDLoader().loadAsync('/model/iPhone_Duo_Render.usdc')
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
@@ -184,7 +217,7 @@ const still: THREE.Box3[] = []
 const folds: THREE.Box3[] = []
 const flex: THREE.Box3[] = []
 
-const model = await new USDLoader().loadAsync('/model/iPhone_Duo_Render.usdc')
+const model = await modelLoad
 model.scale.multiplyScalar(100)
 model.updateMatrixWorld(true)
 model.traverse((object) => {
@@ -311,7 +344,8 @@ body.add(ledLight)
 // CSS3DRenderer and drawn over the WebGL canvas. The baked textures show
 // underneath while the hinge moves, when a flat DOM panel can't bend.
 const css = new CSS3DRenderer()
-css.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none'
+// Hidden until the first frame, with the canvas: see `shown` in the loop below.
+css.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity 0.45s ease'
 document.body.appendChild(css.domElement)
 const PXCM = 0.02 // 1 CSS px = 0.2 mm, so the outer display is ~387 px wide like an iPhone
 const px = (cm: number) => Math.round(cm / PXCM)
@@ -338,18 +372,24 @@ hinge.add(outerLive)
 
 // The bands around the phone, in pixels: it hangs centred in what they leave.
 // Everything outside it is transparent desktop the window blocks for nothing, so
-// a band is its widget (the pill, 50 px tall 28 px up; the orbit card, 112 px
-// wide with the same margin — both packages/shell/hud.tsx) plus PAD of slack, and the bare
-// sides are PAD alone. Change one here and in hud.tsx.
-const PAD = 24
+// the band below is the pill (50 px tall, 20 px up, packages/shell/hud.tsx) plus
+// PAD of slack, and the other three are PAD alone. Change one here and in hud.tsx.
+const PAD = 16
 // `?hud=0` draws no widgets, so an embedding page gets the phone centred in the frame.
 const NO_HUD = new URLSearchParams(location.search).get('hud') === '0'
-const HUD_BAND = NO_HUD ? PAD : 78 + PAD
-const RIGHT_BAND = NO_HUD ? PAD : 140 + PAD
+const HUD_BAND = NO_HUD ? PAD : 70 + PAD
+const RIGHT_BAND = PAD
 const TOP_BAND = PAD
 const LEFT_BAND = PAD
-/** Pixels per centimetre face on: the size Apple's reference renders it. */
+/** Pixels per centimetre face on: the size Apple's reference renders it, and the floor for a roomier frame. */
 const SCALE = 37
+/**
+ * The silhouette a whole fold paints, in cm (docs/debug.md §2). A frame with
+ * room to spare draws the phone larger than the reference, but never larger
+ * than this leaves room for, so folding never resizes it. Turning still can:
+ * edge-on the phone is taller than any fold makes it, and it gives way.
+ */
+const SWEEP = { w: 17, h: 14.9 }
 
 const corner = new THREE.Vector3()
 const eye = new THREE.Vector3()
@@ -358,8 +398,9 @@ const above = new THREE.Vector3()
 const behind = new THREE.Vector3()
 
 /**
- * Fit the phone into the box the bands leave, at the reference size or under
- * it. Turned edge-on its near half is perspective-magnified — 19.8 cm tall
+ * Fit the phone into the box the bands leave: the reference size in the native
+ * window, larger in a frame with room for the whole `SWEEP`, smaller when the
+ * pose needs it. Turned edge-on its near half is perspective-magnified — 19.8 cm tall
  * against 11.9 flat, measured, docs/debug.md §2 — so a frame cut to the front
  * view crops as soon as the view turns, and one cut to the worst view wants a
  * bigger window than the one we set out to shrink. The phone gives way instead:
@@ -407,7 +448,8 @@ function frame() {
         minY = Math.min(minY, sy)
         maxY = Math.max(maxY, sy)
       }
-  const pixelsPerUnit = Math.max(8, Math.min(boxW / (2 * EYE.z * tanX), boxH / (2 * EYE.z * tanY), SCALE))
+  const cap = Math.max(SCALE, Math.min(boxW / SWEEP.w, boxH / SWEEP.h))
+  const pixelsPerUnit = Math.max(8, Math.min(boxW / (2 * EYE.z * tanX), boxH / (2 * EYE.z * tanY), cap))
   camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(h / pixelsPerUnit / 2 / EYE.z))
   // The camera aims at the phone and so draws it in the middle of the window;
   // the bands want it in the middle of what they leave. Slide the image, not the
@@ -717,4 +759,13 @@ renderer.setAnimationLoop((now) => {
     outerLive.element.style.pointerEvents = touch ? 'auto' : 'none'
   }
   css.render(scene, camera)
+  // The first frame that has the phone in it. Until here the page is a backdrop
+  // and nothing else: the canvas and the live panels fade in together, and an
+  // embedding page is told it finally has a picture to show (packages/web/src/simulator.tsx).
+  if (!shown) {
+    shown = true
+    document.body.dataset.ready = ''
+    css.domElement.style.opacity = '1'
+    announce({ ready: true })
+  }
 })

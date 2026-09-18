@@ -144,7 +144,7 @@ Cover/split use one-column cards. The host renders persisted widget snapshots an
 on changes without fetching. Keep `scrollbar-width`/`scrollbar-color` at auto where WebKit
 pseudo-elements apply; non-auto values override the detailed thumb skin in Chromium.
 Other engines use the thin/tinted fallback. [Scrollbar verification](debug.md#known-false-alarms)
-must disable Puppeteer's default scrollbar hiding.
+must launch the browser without `--hide-scrollbars`.
 
 ## Maps maintenance
 
@@ -249,10 +249,9 @@ bun run api            # only the TSDoc reference
 - Inside a frame the shell's HUD hides its "iPhone Duo" heading and display
   line (`window.self !== window.top` in `packages/shell/hud.tsx`); the hint
   and the control bar stay.
-- The check runs against the production build too:
-  `bun scripts/check.mjs http://localhost:3011` with `dist/client` served on
-  that port. It blocks frames for the page checks and loads the hero shell once
-  for the bridge check, so expect about two minutes.
+- Check the production build too, with `dist/client` served on port 3011. Block
+  frames for the page checks and load the hero shell once for the bridge check,
+  so expect about two minutes.
 
 ## Community apps and the catalog branch
 

@@ -102,7 +102,7 @@ packages/
     src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
     src/device.tsx  a CSS-3D Duo driven by a motion value, for scroll and posture scenes
     src/smooth-scroll.tsx  Lenis on the window, off under reduced motion
-    scripts/        api.ts (TSDoc → src/generated/api.ts), simulator.ts (copies the shell), check.mjs
+    scripts/        api.ts (TSDoc → src/generated/api.ts), simulator.ts (copies the shell), catalog.ts
     video/          Remotion project for the hero loop (own bun.lock), renders to public/hero.*
     vite-stylex.ts  StyleX for Vite, same Babel plugin as the root
   apps/             one private workspace per existing app

@@ -380,9 +380,10 @@ block in the root route, matching the shell's convention.
 
 ### Verification
 
-`bun packages/web/scripts/check.mjs [url]` drives headless Chrome through
-twelve routes at 1440, 820 and 390 px, blocks the simulator frame so the check
-is about the site, and asserts: HTTP 200, an `h1`, no page or console errors,
+The website pass (the committed `check.mjs` until puppeteer-core was removed;
+drive it with `agent-browser` now) walks twelve routes at 1440, 820 and 390 px,
+blocks the simulator frame so the check is about the site, and asserts:
+HTTP 200, an `h1`, no page or console errors,
 no horizontal overflow, the desktop list or the mobile menu shown for the
 width, tables and code blocks present on platform docs, the mobile menu opening
 with every link, every internal link answering 200 with an `h1`, and a nav click

@@ -51,6 +51,10 @@ export function Simulator({
   const frame = useRef<HTMLIFrameElement>(null)
   const [near, setNear] = useState(eager)
   const [ready, setReady] = useState(false)
+  // The frame answers its load event seconds before the shell has the model on
+  // screen. Poses may go as soon as it loads (the shell queues them), but the
+  // frame stays hidden behind the placeholder until it says it has a picture.
+  const [painted, setPainted] = useState(false)
   const shown = useRef(app)
   const theme = useTheme()
 
@@ -68,7 +72,9 @@ export function Simulator({
 
   // Every load of the frame gets the full state: the browser can fire `load`
   // once for the blank document before the shell's, and a frame in the server
-  // HTML can finish loading before React attaches anything.
+  // HTML can finish loading before React attaches anything. That last case is
+  // why the shell's own `live` message counts as a load too: cross-origin the
+  // readyState fallback below reads nothing, and the event is already past.
   useEffect(() => {
     const f = frame.current
     if (!near || !f) return
@@ -76,9 +82,24 @@ export function Simulator({
       setReady(true)
       post(f, { bg: bg(box.current), deg, yaw })
     }
+    const heard = (e: MessageEvent<{ live?: boolean; ready?: boolean }>) => {
+      if (e.source !== f.contentWindow || !e.data) return
+      // `ready` re-sends too: it is the second chance for a `live` sent before
+      // this listener existed.
+      if (e.data.live || e.data.ready) loaded()
+      if (e.data.ready) setPainted(true)
+    }
+    addEventListener('message', heard)
+    // The shell can be up and drawn before this page has hydrated, in which case
+    // both its announcements are already past: ask, and it answers with the one
+    // that applies.
+    post(f, { hello: true })
     if (f.contentDocument?.readyState === 'complete') loaded()
     f.addEventListener('load', loaded)
-    return () => f.removeEventListener('load', loaded)
+    return () => {
+      removeEventListener('message', heard)
+      f.removeEventListener('load', loaded)
+    }
   }, [near, deg, yaw])
 
   // Off screen, the shell stops rendering; a scroll back resumes it without a reload.
@@ -134,9 +155,10 @@ export function Simulator({
           title={app ? `Duo running ${app}` : 'Duo simulator'}
           src={src}
           allow="camera; geolocation"
-          {...stylex.props(styles.frame, !ready && styles.hidden)}
+          {...stylex.props(styles.frame, !painted && styles.hidden)}
         />
       ) : null}
+      {!painted && <div {...stylex.props(styles.ghost, deg <= 90 && styles.ghostShut)} aria-hidden="true" />}
       {children}
     </div>
   )
@@ -144,10 +166,13 @@ export function Simulator({
 
 const post = (
   f: HTMLIFrameElement | null,
-  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue }
+  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue; hello?: boolean }
 ) => f?.contentWindow?.postMessage(msg, new URL(BASE, location.href).origin)
 // The box's own colour, not the body's: a frame inside a dark section takes the section's backdrop.
 const bg = (el: HTMLElement | null) => getComputedStyle(el ?? document.body).backgroundColor
+
+const REDUCE = '@media (prefers-reduced-motion: reduce)'
+const breathe = stylex.keyframes({ '0%, 100%': { opacity: 0.35 }, '50%': { opacity: 0.75 } })
 
 const styles = stylex.create({
   box: {
@@ -170,5 +195,26 @@ const styles = stylex.create({
     transitionProperty: 'opacity',
     transitionDuration: '0.6s'
   },
-  hidden: { opacity: 0 }
+  hidden: { opacity: 0 },
+  /** The phone's own outline, breathing, while its 3.6 MB body is on the way. */
+  ghost: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    height: '68%',
+    aspectRatio: '16.6 / 11.8',
+    transform: 'translate(-50%, -50%)',
+    borderRadius: '18px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: color.border,
+    animationName: { default: breathe, [REDUCE]: 'none' },
+    animationDuration: '1.8s',
+    animationTimingFunction: 'ease-in-out',
+    animationIterationCount: 'infinite',
+    opacity: { default: null, [REDUCE]: 0.5 },
+    pointerEvents: 'none'
+  },
+  /** Folded shut, the phone stands on its cover display instead. */
+  ghostShut: { aspectRatio: '8.3 / 11.8', height: '62%' }
 })

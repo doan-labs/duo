@@ -19,8 +19,8 @@ type Entry = { key: string; name: string; icon: string; author: string; status: 
 const STATUS: Record<Status, { label: string; text: string }> = {
   published: { label: 'Published', text: 'In the catalog. Installs through the Store on any Duo.' },
   working: {
-    label: 'Built in',
-    text: 'Runs inside the shell. Needs the camera, microphone or embedded pages the app sandbox does not allow.'
+    label: 'Available',
+    text: 'Ready to use in the simulator.'
   },
   mockup: { label: 'In development', text: 'A static screen with invented data while the real app is built.' }
 }
@@ -127,9 +127,12 @@ export function Browser() {
           ) : layout === 'list' ? (
             <Shelf apps={l.apps} layout="list" />
           ) : (
-            ORDER.filter((s) => l.apps.some((a) => a.status === s)).map((s) => (
-              <Group key={s} status={s} apps={l.apps.filter((a) => a.status === s)} />
-            ))
+            <>
+              <Shelf apps={l.apps.filter((a) => a.status !== 'mockup')} layout="grid" />
+              {l.apps.some((a) => a.status === 'mockup') && (
+                <Group status="mockup" apps={l.apps.filter((a) => a.status === 'mockup')} />
+              )}
+            </>
           )}
         </section>
       ))}
@@ -208,7 +211,7 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
                   {a.author}
                   {a.release && ` · v${a.release.version}`}
                   {a.release && a.release.releases > 1 && ` · ${a.release.releases} releases`}
-                  {!a.release && ` · ${STATUS[a.status].label.toLowerCase()}`}
+                  {a.status === 'mockup' && ` · ${STATUS[a.status].label.toLowerCase()}`}
                 </p>
                 {a.release && (
                   <>

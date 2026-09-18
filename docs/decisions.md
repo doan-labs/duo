@@ -847,3 +847,43 @@ developer catalog is loaded; an app installed from another origin is refused an 
 with both origins named and the supported transition (remove, then get), rather than a
 silent inheritance. The native **Submit your app** link goes through a new `open_url`
 command behind the `Platform` trait, so the web side never learns which OS opens URLs.
+
+## 62. The Reset button is the whole orbit UI, and the phone grows to the frame it is given
+2026-09-18, accepted. Supersedes 19, amends 22. The atom minimap read as a
+second device floating beside the first, and it earned its 112 px column at the
+cost of the phone's: with the card gone the right band is plain `PAD` again, the
+pill is centred under the window rather than offset, and the only thing left of
+the orbit state is the pill's Reset, which still lights up the moment the view
+leaves the front pose. The bands themselves are down from 24 px to 16 (and the
+pill sits 20 px up, not 28), and the fit's ceiling is no longer the flat 37 px/cm
+reference: it is whichever is larger of that reference and what the box leaves
+for `SWEEP`, the silhouette a whole fold paints (17 x 14.9 cm, measured off the
+drawing buffer). A frame with room to spare therefore draws the phone larger,
+682 px wide in the website's 1280 x 715 hero against 613 before, and centred
+rather than hanging left, while the native window keeps its reference size
+within a couple of percent. Folding never resizes the phone at any frame size,
+since the ceiling already holds the sweep. Costs: the camera pose is no longer
+drawn anywhere, so a turned view is read off the phone itself, and the per-pose
+click coordinates in docs/debug.md move with the bands.
+
+## 63. The frame is asked for first, the scene fades in, and the page and the shell shake hands
+2026-09-18, accepted. The 3.6 MB body was requested only after the icons loaded
+and both displays were baked, so the download started about three seconds into
+a page that then sat black until it arrived. It is now asked for in `index.html`
+(`rel=preload`, one request: the loader picks up the same entry) and kicked off
+at the top of `main.ts`, so it flies while the rest of the boot runs. The canvas
+and the CSS3D layer start at zero and fade in on the first frame that has the
+phone in it, and an embedding page holds a breathing outline until then.
+
+Which needs a handshake, because the shell can be drawn before the page that
+embeds it has hydrated: the shell announces `live` when it can take a message
+and `ready` when it has drawn, the page answers by sending the pose, and the
+page also sends `hello` when it starts listening, which the shell answers with
+whichever state applies. The frame's own load event is no longer the trigger:
+cross-origin it cannot be recovered after the fact, which is why the website's
+frames stayed hidden in development. A framed shell also stops painting the
+standalone page's light background, so a dark site gets the phone on its own
+backdrop rather than a white card while `bg` is in flight. Cost: two more
+message shapes on the bridge, and a page that embeds the shell without
+answering `hello` still gets the announcements, so nothing is lost if it ignores
+them.

@@ -8,7 +8,6 @@
     "dev": "bun scripts/api.ts && vite dev",
     "build": "bun scripts/api.ts && bun scripts/simulator.ts && bun scripts/catalog.ts && vite build",
     "preview": "vite preview",
-    "check": "bun scripts/check.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

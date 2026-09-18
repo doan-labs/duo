@@ -6,6 +6,10 @@ deployment verification remain in the [website plan](web.md); no deployment is c
 Taken up 2026-09-18: `packages/web` describes this state on every page; the
 [website record](web.md#build-record) has the details.
 
+The website's `/apps` page lists working shell apps alongside catalog releases in
+Official, with no separate Built in group. Unfinished mockups remain grouped under
+In development. This presentation does not change app execution or catalog availability.
+
 - SDK preview version: 0.0.0, protocol 1. The accepted runtime contract remains
   `contract.md`; capture and extra device permissions remain deferred.
 - UI-kit preview version: 0.1.0. Generated `api/uikit.json` contains package

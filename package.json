@@ -25,7 +25,6 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.185.4",
     "lint-staged": "^17.5.1",
-    "puppeteer-core": "^25.10.0",
     "simple-git-hooks": "^2.14.0",
     "typescript": "^7.0.2"
   },
