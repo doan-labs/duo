@@ -22,6 +22,7 @@ export function Simulator({
   app,
   cue,
   eager = false,
+  spin = false,
   tall = false,
   mount = true,
   bare = false,
@@ -39,6 +40,8 @@ export function Simulator({
   cue?: Cue
   /** Mount at once instead of waiting for the viewport (the hero). */
   eager?: boolean
+  /** Turn the phone on its own from the moment the scene draws; off under prefers-reduced-motion. */
+  spin?: boolean
   tall?: boolean
   /** Hold the frame back until true (the camera scene waits for its permission prompt). */
   mount?: boolean
@@ -146,6 +149,7 @@ export function Simulator({
   // a live `deg` in `src` would reload the whole scene on every change.
   const [src] = useState(() => {
     const q = new URLSearchParams({ deg: String(deg) })
+    if (spin) q.set('spin', '1')
     if (builder) q.set('builder', builder)
     if (yaw !== undefined) q.set('yaw', String(yaw))
     if (app) q.set('app', app)

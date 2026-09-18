@@ -59,7 +59,7 @@ export function Hero() {
               <source src="/hero.mp4" type="video/mp4" />
             </video>
           ) : (
-            <Simulator deg={180} eager tall />
+            <Simulator deg={180} eager tall spin />
           )}
           <p {...stylex.props(styles.hint)}>Drag to turn. Use the slider to fold. Tap an icon to open an app.</p>
         </motion.div>

@@ -51,13 +51,17 @@ const wrap = (rad: number) => Math.atan2(Math.sin(rad), Math.cos(rad))
 const HOME_DISTANCE = 40
 
 export function mountHud(events: HudEvents) {
-  const store = createStore({ target: 180, yaw: 0, hint: true, spin: false, away: false })
+  const q = new URLSearchParams(location.search)
+  // `?spin=1`: start turning as soon as the scene draws (the hero). A stated
+  // preference for less motion wins; the checkbox still turns it on by hand.
+  const spin = q.get('spin') === '1' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+  const store = createStore({ target: 180, yaw: 0, hint: true, spin, away: false })
   const live: Live = { deg: 180, degEl: null }
   const web = document.documentElement.classList.contains('web')
   // An embedding page has its own headline; the frame shows the device alone.
   const title = web && window.self === window.top
   // `?hud=0`: the phone and nothing else, for pages that pose it by postMessage.
-  if (new URLSearchParams(location.search).get('hud') !== '0') {
+  if (q.get('hud') !== '0') {
     const container = document.body.appendChild(document.createElement('div'))
     createRoot(container).render(<Hud store={store} live={live} events={events} web={web} title={title} />)
   }
