@@ -18,6 +18,45 @@ export const bob = stylex.keyframes({
 export const glow = stylex.keyframes({ '50%': { opacity: 0.55 } })
 export const fade = stylex.keyframes({ from: { opacity: 0 } })
 
+// Keyframes stay in this module because StyleX resolves their definitions locally.
+export const animations = stylex.create({
+  spin: {
+    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '1s',
+    animationTimingFunction: 'linear',
+    animationIterationCount: 'infinite'
+  },
+  rise: {
+    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.5s',
+    animationFillMode: 'backwards'
+  },
+  pop: {
+    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.4s',
+    animationTimingFunction: easing.pop
+  },
+  fade: {
+    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.25s'
+  },
+  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },
+  draw: {
+    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '1s'
+  },
+  bob: {
+    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '1s',
+    animationIterationCount: 'infinite'
+  },
+  glow: {
+    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '2s',
+    animationIterationCount: 'infinite'
+  }
+})
+
 export const shared = stylex.create({
   /** Fixed app header: title left, actions right. */
   hdr: {

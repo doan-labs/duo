@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
+import { createContext, type ReactNode, type Ref, useContext, useEffect, useRef, useState } from 'react'
 import { shared } from './styles.ts'
 import { Sym } from './sym.tsx'
 import { app, easing } from './tokens.stylex.ts'
@@ -18,6 +18,14 @@ let seq = 0
  * `children` is the root page.
  */
 export function Nav({ children }: { children: ReactNode }) {
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>())
+  useEffect(
+    () => () => {
+      for (const timer of timers.current) clearTimeout(timer)
+      timers.current.clear()
+    },
+    []
+  )
   const [stack, setStack] = useState<Entry[]>([])
   const [leaving, setLeaving] = useState<Entry[]>([])
   const pop = () =>
@@ -25,7 +33,11 @@ export function Nav({ children }: { children: ReactNode }) {
       const top = s.at(-1)
       if (!top) return s
       setLeaving((l) => [...l, top])
-      setTimeout(() => setLeaving((l) => l.filter((e) => e !== top)), 380)
+      const timer = setTimeout(() => {
+        timers.current.delete(timer)
+        setLeaving((l) => l.filter((e) => e !== top))
+      }, 380)
+      timers.current.add(timer)
       return s.slice(0, -1)
     })
   const push: Push = (make) => setStack((s) => [...s, { id: ++seq, node: make(pop), entered: false }])
@@ -60,11 +72,12 @@ export function Nav({ children }: { children: ReactNode }) {
 }
 
 /** One page in a `Nav`: fixed header with an optional back chevron, scrolling body. */
-export const Page = ({ title, back, children }: { title: ReactNode; back?: () => void; children?: ReactNode }) => (
+export type PageProps = { title: ReactNode; back?: () => void; backRef?: Ref<HTMLButtonElement>; children?: ReactNode }
+export const Page = ({ title, back, backRef, children }: PageProps) => (
   <div {...stylex.props(shared.column)}>
     <div {...stylex.props(shared.hdr)}>
       {back && (
-        <button type="button" {...stylex.props(shared.bk)} onClick={back}>
+        <button ref={backRef} type="button" aria-label="Back" {...stylex.props(shared.bk)} onClick={back}>
           <Sym name="back" size={20} />
         </button>
       )}
@@ -86,7 +99,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     backgroundColor: app.bg,
     transitionProperty: 'transform, opacity',
-    transitionDuration: '.38s',
+    transitionDuration: { default: '.38s', '@media (prefers-reduced-motion: reduce)': '0s' },
     transitionTimingFunction: easing.push
   },
   off: { transform: 'translateX(100%)' },

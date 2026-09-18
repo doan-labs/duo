@@ -1,3 +1,4 @@
+/// <reference path="./assets.d.ts" />
 // Every on-screen number rolls through @sfinterface/numbers. Formatting is
 // plain Intl.NumberFormat; `undefined` renders the em dash the apps already use.
 // Whole numbers by default, as the apps rounded before. The box is inline-flex,

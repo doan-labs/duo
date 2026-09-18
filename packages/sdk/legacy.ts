@@ -8,6 +8,7 @@ export type CameraHooks = {
 }
 
 export type Os = {
+  store?: import('./store.ts').Store
   /** Photos taken in Camera, newest first. One array per display. */
   shots: string[]
   /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */

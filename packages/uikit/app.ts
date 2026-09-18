@@ -4,6 +4,8 @@ import type { Os } from '@doan-labs/ipduo-sdk'
 import type { ComponentType } from 'react'
 
 export type App = {
+  id?: string
+  icon?: string
   name: string
   light?: boolean
   /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */

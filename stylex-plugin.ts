@@ -7,7 +7,7 @@ import type { BunPlugin } from 'bun'
 
 type Rule = [string, { ltr: string; rtl?: string | null }, number]
 
-export function stylexPlugin(dev: boolean) {
+export function stylexPlugin(dev: boolean, aliases?: Record<string, string>) {
   const rules = new Map<string, Rule>()
   const plugin: BunPlugin = {
     name: 'stylex',
@@ -28,6 +28,7 @@ export function stylexPlugin(dev: boolean) {
                 dev,
                 runtimeInjection: dev,
                 treeshakeCompensation: true,
+                aliases,
                 unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dir }
               }
             ]

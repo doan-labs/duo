@@ -3,7 +3,7 @@ import { SYM } from './icons/index.ts'
 
 /** An SF Symbol, tinted by the element's colour through a mask. */
 export const Sym = ({ name, size = 17 }: { name: keyof typeof SYM; size?: number }) => (
-  <i {...stylex.props(styles.sym, styles.symSize(size, `url(${SYM[name]})`))} />
+  <i aria-hidden="true" {...stylex.props(styles.sym, styles.symSize(size, `url(${SYM[name]})`))} />
 )
 
 const styles = stylex.create({
