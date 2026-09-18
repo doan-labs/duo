@@ -11,8 +11,11 @@ import { type Project, parseResponse, type Source } from './types'
 
 const SUGGESTIONS = ['Make me a timer app', 'Build a simple notes app', 'Make a daily habit counter']
 
-/** `upcoming` shows the workspace with the phone live and the chat side switched off. */
-export function Workspace({ upcoming = false }: { upcoming?: boolean }) {
+/**
+ * `upcoming` shows the workspace with the phone live and the chat side switched off.
+ * `app` is the home screen name the phone opens on, from the /apps deep links.
+ */
+export function Workspace({ upcoming = false, app }: { upcoming?: boolean; app?: string }) {
   const [project, setProject] = useState<Project>()
   const [projects, setProjects] = useState<Project[]>([])
   const [connection, setConnection] = useState<Connection>({
@@ -317,7 +320,7 @@ export function Workspace({ upcoming = false }: { upcoming?: boolean }) {
     <section {...stylex.props(styles.workspace)} data-builder data-lenis-prevent>
       <div {...stylex.props(styles.toolbar)}>
         <div {...stylex.props(styles.toolbarSide)}>
-          <span {...stylex.props(styles.appName)}>{upcoming ? 'Duo' : (source?.name ?? 'Your app')}</span>
+          <span {...stylex.props(styles.appName)}>{upcoming ? (app ?? 'Duo') : (source?.name ?? 'Your app')}</span>
           <span {...stylex.props(styles.hint, styles.desktopOnly)}>
             {project && project.revisions.length > 1
               ? `Revision ${project.current + 1} of ${project.revisions.length}`
@@ -685,7 +688,9 @@ export function Workspace({ upcoming = false }: { upcoming?: boolean }) {
           {...stylex.props(styles.preview, mode === 'build' && tab !== 'preview' && styles.mobileHidden)}
         >
           <div inert={sourceOpen} {...stylex.props(styles.phone)}>
-            {token && <Simulator eager fill builder={upcoming ? undefined : token} onBuilderReady={frameReady} />}
+            {token && (
+              <Simulator eager fill app={app} builder={upcoming ? undefined : token} onBuilderReady={frameReady} />
+            )}
           </div>
           {sourceOpen && (
             <div {...stylex.props(styles.source)}>

@@ -28,6 +28,8 @@ type Entry = {
   created?: string
   updated?: string
   release?: CatalogApp
+  /** The home screen name the simulator opens on `/simulator?app=`; absent for apps the shell does not carry. */
+  open?: string
 }
 
 const STATUS: Record<Status, { label: string; text: string }> = {
@@ -66,7 +68,8 @@ const OFFICIAL: Entry[] = [
       permissions: release?.permissions ?? USES[s.name] ?? [],
       created: release?.created ?? s.created,
       updated: release?.updated ?? s.updated,
-      release
+      release,
+      open: s.name
     }
   }),
   ...CATALOG.filter((c) => c.lane === 'official' && !SHELL.some((s) => s.name === c.name)).map(fromRelease)
@@ -222,7 +225,10 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
                   <img src={a.icon} alt="" width={1024} height={1024} {...stylex.props(styles.iconSm)} />
                   <div>
                     <Name entry={a} row />
-                    <div {...stylex.props(styles.meta)}>{a.author}</div>
+                    <div {...stylex.props(styles.meta)}>
+                      {a.author}
+                      <Source entry={a} />
+                    </div>
                   </div>
                 </div>
               </td>
@@ -256,6 +262,7 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
                   {a.version && ` · v${a.version}`}
                   {a.release && a.release.releases > 1 && ` · ${a.release.releases} releases`}
                   {a.status === 'mockup' && ` · ${STATUS[a.status].label.toLowerCase()}`}
+                  <Source entry={a} />
                 </p>
                 <Permissions perms={a.permissions} />
                 {a.created && a.updated && (
@@ -273,17 +280,30 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
   )
 }
 
+/** The name opens the app on the phone; only a catalog app the shell does not carry points at its repo instead. */
 function Name({ entry, row = false }: { entry: Entry; row?: boolean }) {
   const style = row ? styles.rowName : styles.link
-  return entry.release ? (
-    <a href={entry.release.repo} {...stylex.props(style)}>
-      {entry.name}
-    </a>
-  ) : (
-    // Nothing to link to on GitHub: baked apps only exist inside the simulator.
-    <Link to="/simulator" {...stylex.props(style)}>
+  return entry.open ? (
+    <Link to="/simulator" search={{ app: entry.open }} {...stylex.props(style)}>
       {entry.name}
     </Link>
+  ) : (
+    <a href={entry.release?.repo} {...stylex.props(style)}>
+      {entry.name}
+    </a>
+  )
+}
+
+/** The repo, for an app whose name goes to the simulator. */
+function Source({ entry }: { entry: Entry }) {
+  if (!entry.open || !entry.release) return null
+  return (
+    <>
+      {' · '}
+      <a href={entry.release.repo} {...stylex.props(styles.metaLink)}>
+        Source
+      </a>
+    </>
   )
 }
 
@@ -470,6 +490,7 @@ const styles = stylex.create({
   },
   link: { color: color.text, textDecorationLine: 'none' },
   meta: { marginTop: '3px', marginBottom: 0, fontSize: '14px', lineHeight: 1.5, color: color.text2 },
+  metaLink: { color: 'inherit', textDecorationLine: 'underline', textUnderlineOffset: '3px' },
   dates: {
     marginTop: '12px',
     marginBottom: 0,
