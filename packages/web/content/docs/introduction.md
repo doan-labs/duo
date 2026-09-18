@@ -32,4 +32,4 @@ Every display runs its own copy of your app, so while the phone folds the other 
 - [Your first app](your-first-app.md): what the generated project does, line by line.
 - [Manifest](manifest.md), [Lifecycle](lifecycle.md), [Storage](storage.md), [Permissions](permissions.md): the contract.
 - [CLI](cli.md) and [Catalogs](catalogs.md): building, serving and installing.
-- The [SDK reference](/sdk) and [UI kit reference](/kit) are generated from the source.
+- The [SDK reference](/docs/sdk) and [UI kit reference](/kit) are generated from the source.

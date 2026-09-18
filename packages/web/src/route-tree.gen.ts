@@ -21,6 +21,7 @@ import { Route as SdkRouteImport } from './routes/sdk'
 import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
+import { Route as DocsSdkRouteImport } from './routes/docs.sdk'
 import { Route as KitIndexRouteImport } from './routes/kit.index'
 import { Route as KitNameRouteImport } from './routes/kit.$name'
 
@@ -84,6 +85,11 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => DocsRoute,
 } as any)
+const DocsSdkRoute = DocsSdkRouteImport.update({
+  id: '/sdk',
+  path: '/sdk',
+  getParentRoute: () => DocsRoute,
+} as any)
 const KitIndexRoute = KitIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
   '/docs/$': typeof DocsSplatRoute
+  '/docs/sdk': typeof DocsSdkRoute
   '/kit/$name': typeof KitNameRoute
   '/docs/': typeof DocsIndexRoute
   '/kit/': typeof KitIndexRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
   '/docs/$': typeof DocsSplatRoute
+  '/docs/sdk': typeof DocsSdkRoute
   '/kit/$name': typeof KitNameRoute
   '/docs': typeof DocsIndexRoute
   '/kit': typeof KitIndexRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
   '/docs/$': typeof DocsSplatRoute
+  '/docs/sdk': typeof DocsSdkRoute
   '/kit/$name': typeof KitNameRoute
   '/docs/': typeof DocsIndexRoute
   '/kit/': typeof KitIndexRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/sdk'
     | '/simulator'
     | '/docs/$'
+    | '/docs/sdk'
     | '/kit/$name'
     | '/docs/'
     | '/kit/'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/sdk'
     | '/simulator'
     | '/docs/$'
+    | '/docs/sdk'
     | '/kit/$name'
     | '/docs'
     | '/kit'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/sdk'
     | '/simulator'
     | '/docs/$'
+    | '/docs/sdk'
     | '/kit/$name'
     | '/docs/'
     | '/kit/'
@@ -290,6 +302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsSplatRouteImport
       parentRoute: typeof DocsRoute
     }
+    '/docs/sdk': {
+      id: '/docs/sdk'
+      path: '/sdk'
+      fullPath: '/docs/sdk'
+      preLoaderRoute: typeof DocsSdkRouteImport
+      parentRoute: typeof DocsRoute
+    }
     '/kit/': {
       id: '/kit/'
       path: '/'
@@ -309,11 +328,13 @@ declare module '@tanstack/react-router' {
 
 interface DocsRouteChildren {
   DocsSplatRoute: typeof DocsSplatRoute
+  DocsSdkRoute: typeof DocsSdkRoute
   DocsIndexRoute: typeof DocsIndexRoute
 }
 
 const DocsRouteChildren: DocsRouteChildren = {
   DocsSplatRoute: DocsSplatRoute,
+  DocsSdkRoute: DocsSdkRoute,
   DocsIndexRoute: DocsIndexRoute,
 }
 

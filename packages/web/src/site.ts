@@ -11,10 +11,9 @@ export const CATALOG = 'https://duo.doan-labs.com/catalog/index.json'
 /** The global bar. `Try Duo` is the call to action and lives in the bar's right group. */
 export const NAV = [
   { to: '/apps', label: 'Apps' },
-  { to: '/sdk', label: 'SDK' },
   { to: '/kit', label: 'UI kit' },
   { to: '/docs', label: 'Docs' },
-  { to: '/get-started', label: 'Build an app' }
+  { to: '/get-started', label: 'Build an app', highlight: true }
 ] as const
 
 /** Every other page, reachable from the footer so nothing is orphaned. */

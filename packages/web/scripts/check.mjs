@@ -30,7 +30,7 @@ const PAGES = [
   '/kit',
   '/kit/Nav',
   '/kit/Button',
-  '/sdk',
+  '/docs/sdk',
   '/publish',
   '/guidelines',
   '/changelog',

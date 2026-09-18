@@ -68,7 +68,7 @@ bun packages/cli/index.mjs serve dist --port 5173    # from the repository root`
         <Next to="/docs/$" params={{ _splat: 'displays' }} title="Displays and the fold">
           Two displays, one app, one owner.
         </Next>
-        <Next to="/sdk" title="SDK reference">
+        <Next to="/docs/sdk" title="SDK reference">
           Every export, generated from the source.
         </Next>
         <Next href={blob('examples/fold-compass/main.tsx')} title="Fold Compass">

@@ -137,8 +137,10 @@ progress files. Decision 57 records the change.
 
 - `/docs` renders `packages/web/content/docs/*.md`: Start (Introduction,
   Getting started, Your first app), Build (Manifest, Lifecycle, Displays and
-  the fold, Storage, Permissions), Ship (CLI, Catalogs, Publishing), and a
-  Reference group linking `/sdk`, `/kit` and `/changelog`. Each page has the
+  the fold, Storage, Permissions, then the SDK reference at `/docs/sdk`), Ship
+  (CLI, Catalogs, Publishing), and a Reference group linking `/kit` and
+  `/changelog`. `/sdk` forwards to `/docs/sdk`; the global bar lists Apps, UI
+  kit, Docs and a highlighted Build an app. Each page has the
   outline box when long, previous and next, and an edit link. The index shows
   each page's first paragraph. Content is drawn from the SDK source
   (`client.ts`, `protocol.ts`, `manifest.ts`, `permissions.ts`), the three

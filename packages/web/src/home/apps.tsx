@@ -1,66 +1,102 @@
-// The published apps, from the curated catalog (src/generated/catalog.ts, written from
-// public/catalog/index.json at build time): release icon, newest version, permissions
-// with their glyphs, and the first and latest release dates. The home page shows the
-// grid; /apps adds the lane filter and the grid/list switch.
+// The apps, from two build-time sources (src/generated/catalog.ts): the curated catalog
+// (published releases with icon, version, permissions and dates) and the shell's own
+// home screen (every official app, working in the simulator or still a mockup). The
+// home page shows a grid; /apps adds the lane filter, status groups and a list layout.
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { CATALOG } from '../generated/catalog'
+import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
 import { color, font } from '../tokens.stylex'
 import { Block, Cap, Headline, Lede, Reveal } from './parts'
 
+const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
 
-type App = (typeof CATALOG)[number]
-type Lane = App['lane']
+type Lane = CatalogApp['lane']
+type Status = 'published' | 'working' | 'mockup'
 type Layout = 'grid' | 'list'
-const LANES: { key: Lane; label: string; text: string }[] = [
-  { key: 'official', label: 'Official', text: 'Built and signed off by Doan Labs. Ship with the simulator.' },
+type Entry = { key: string; name: string; icon: string; author: string; status: Status; release?: CatalogApp }
+
+const STATUS: Record<Status, { label: string; text: string }> = {
+  published: { label: 'Published', text: 'In the catalog. Installs through the Store on any Duo.' },
+  working: { label: 'In the simulator', text: 'Built into the shell and working; not yet cut as a catalog release.' },
+  mockup: { label: 'In development', text: 'A static screen with invented data while the real app is built.' }
+}
+const ORDER: Status[] = ['published', 'working', 'mockup']
+
+const OFFICIAL: Entry[] = [
+  ...SHELL.map((s): Entry => {
+    const release = CATALOG.find((c) => c.lane === 'official' && c.name === s.name)
+    return {
+      key: release?.id ?? s.name,
+      name: s.name,
+      icon: release?.icon ?? s.icon,
+      author: release?.author ?? 'Doan Labs',
+      status: release ? 'published' : s.mock ? 'mockup' : 'working',
+      release
+    }
+  }),
+  ...CATALOG.filter((c) => c.lane === 'official' && !SHELL.some((s) => s.name === c.name)).map(fromRelease)
+].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name))
+const COMMUNITY: Entry[] = CATALOG.filter((c) => c.lane === 'community').map(fromRelease)
+function fromRelease(c: CatalogApp): Entry {
+  return { key: c.id, name: c.name, icon: c.icon, author: c.author, status: 'published', release: c }
+}
+
+const LANES: { key: Lane; label: string; text: string; apps: Entry[] }[] = [
+  {
+    key: 'official',
+    label: 'Official',
+    text: 'Built by Doan Labs. Every app on the simulator’s home screen, from published releases to the mockups still being built.',
+    apps: OFFICIAL
+  },
   {
     key: 'community',
     label: 'Community',
-    text: 'Submitted through pull requests, reviewed, and published to the catalog.'
+    text: 'Submitted through pull requests, reviewed, and published to the catalog.',
+    apps: COMMUNITY
   }
 ]
 const date = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
-export function Apps({ all = false }: { all?: boolean }) {
+export function Apps() {
   return (
     <Block labelledBy="apps-title">
-      <Cap>07 · In the catalog</Cap>
+      <Cap>07 · The apps</Cap>
       <Headline id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
       <Lede>
-        Every app here is published in the Duo catalog and installs through the Store. Each one is a pull request in the
-        repository, MIT licensed, and built for both displays.
+        Official apps ship in the simulator and publish to the Duo catalog; community apps arrive as pull requests.
+        Every one is MIT licensed and installs through the Store.
       </Lede>
-      <Shelf apps={all ? CATALOG : CATALOG.slice(0, 4)} layout="grid" />
+      <Shelf apps={OFFICIAL.filter((a) => a.status !== 'mockup').slice(0, 6)} layout="grid" />
     </Block>
   )
 }
 
-/** The /apps browser: a lane filter, a layout switch, and one section per lane. */
+/** The /apps browser: a lane filter, a layout switch, and one section per lane grouped by status. */
 export function Browser() {
   const [lane, setLane] = useState<Lane | 'all'>('all')
   const [layout, setLayout] = useState<Layout>('grid')
   const shown = LANES.filter((l) => lane === 'all' || l.key === lane)
+  const total = LANES.reduce((n, l) => n + l.apps.length, 0)
   return (
     <>
       <div {...stylex.props(styles.bar)}>
         <fieldset aria-label="Lane" {...stylex.props(styles.segment)}>
-          {[{ key: 'all' as const, label: 'All' }, ...LANES].map((l) => (
-            <button
-              key={l.key}
-              type="button"
-              aria-pressed={lane === l.key}
-              onClick={() => setLane(l.key)}
-              {...stylex.props(styles.seg, lane === l.key && styles.segOn)}
-            >
-              {l.label}
-              <span {...stylex.props(styles.count)}>
-                {l.key === 'all' ? CATALOG.length : CATALOG.filter((a) => a.lane === l.key).length}
-              </span>
-            </button>
-          ))}
+          {[{ key: 'all' as const, label: 'All', n: total }, ...LANES.map((l) => ({ ...l, n: l.apps.length }))].map(
+            (l) => (
+              <button
+                key={l.key}
+                type="button"
+                aria-pressed={lane === l.key}
+                onClick={() => setLane(l.key)}
+                {...stylex.props(styles.seg, lane === l.key && styles.segOn)}
+              >
+                {l.label}
+                <span {...stylex.props(styles.count)}>{l.n}</span>
+              </button>
+            )
+          )}
         </fieldset>
         <fieldset aria-label="Layout" {...stylex.props(styles.segment)}>
           {(['grid', 'list'] as const).map((l) => (
@@ -77,33 +113,45 @@ export function Browser() {
           ))}
         </fieldset>
       </div>
-      {shown.map((l) => {
-        const apps = CATALOG.filter((a) => a.lane === l.key)
-        return (
-          <section key={l.key} aria-labelledby={`lane-${l.key}`} {...stylex.props(styles.lane)}>
-            <h2 id={`lane-${l.key}`} {...stylex.props(styles.laneTitle)}>
-              {l.label}
-            </h2>
-            <p {...stylex.props(styles.laneText)}>{l.text}</p>
-            {apps.length === 0 ? (
-              <p {...stylex.props(styles.empty)}>No {l.label.toLowerCase()} apps are published yet.</p>
-            ) : (
-              <Shelf apps={apps} layout={layout} />
-            )}
-          </section>
-        )
-      })}
+      {shown.map((l) => (
+        <section key={l.key} aria-labelledby={`lane-${l.key}`} {...stylex.props(styles.lane)}>
+          <h2 id={`lane-${l.key}`} {...stylex.props(styles.laneTitle)}>
+            {l.label}
+          </h2>
+          <p {...stylex.props(styles.laneText)}>{l.text}</p>
+          {l.apps.length === 0 ? (
+            <p {...stylex.props(styles.empty)}>No {l.label.toLowerCase()} apps are published yet.</p>
+          ) : layout === 'list' ? (
+            <Shelf apps={l.apps} layout="list" />
+          ) : (
+            ORDER.filter((s) => l.apps.some((a) => a.status === s)).map((s) => {
+              const apps = l.apps.filter((a) => a.status === s)
+              return (
+                <div key={s} {...stylex.props(styles.group)}>
+                  <h3 {...stylex.props(styles.groupTitle)}>
+                    <StatusChip status={s} />
+                    <span {...stylex.props(styles.groupText)}>{STATUS[s].text}</span>
+                    <span {...stylex.props(styles.count)}>{apps.length}</span>
+                  </h3>
+                  <Shelf apps={apps} layout="grid" />
+                </div>
+              )
+            })
+          )}
+        </section>
+      ))}
     </>
   )
 }
 
-export function Shelf({ apps, layout }: { apps: readonly App[]; layout: Layout }) {
+export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout }) {
   if (layout === 'list')
     return (
       <table {...stylex.props(styles.table)}>
         <thead>
           <tr>
             <th {...stylex.props(styles.th)}>App</th>
+            <th {...stylex.props(styles.th)}>Status</th>
             <th {...stylex.props(styles.th)}>Version</th>
             <th {...stylex.props(styles.th)}>Permissions</th>
             <th {...stylex.props(styles.th)}>Created</th>
@@ -112,24 +160,23 @@ export function Shelf({ apps, layout }: { apps: readonly App[]; layout: Layout }
         </thead>
         <tbody>
           {apps.map((a) => (
-            <tr key={a.id}>
+            <tr key={a.key}>
               <td {...stylex.props(styles.td)}>
                 <div {...stylex.props(styles.rowApp)}>
                   <img src={a.icon} alt="" width={1024} height={1024} {...stylex.props(styles.iconSm)} />
                   <div>
-                    <a href={a.repo} {...stylex.props(styles.rowName)}>
-                      {a.name}
-                    </a>
+                    <Name entry={a} row />
                     <div {...stylex.props(styles.meta)}>{a.author}</div>
                   </div>
                 </div>
               </td>
-              <td {...stylex.props(styles.td, styles.mono)}>{a.version}</td>
               <td {...stylex.props(styles.td)}>
-                <Permissions app={a} />
+                <StatusChip status={a.status} />
               </td>
-              <td {...stylex.props(styles.td, styles.mono)}>{date(a.created)}</td>
-              <td {...stylex.props(styles.td, styles.mono)}>{date(a.updated)}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.release?.version ?? '—'}</td>
+              <td {...stylex.props(styles.td)}>{a.release ? <Permissions app={a.release} /> : <Dash />}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.created) : '—'}</td>
+              <td {...stylex.props(styles.td, styles.mono)}>{a.release ? date(a.release.updated) : '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -138,25 +185,29 @@ export function Shelf({ apps, layout }: { apps: readonly App[]; layout: Layout }
   return (
     <ul {...stylex.props(styles.grid)}>
       {apps.map((a, i) => (
-        <li key={a.id} {...stylex.props(styles.item)}>
-          <Reveal delay={(i % 2) * 0.08}>
+        <li key={a.key} {...stylex.props(styles.item)}>
+          <Reveal delay={(i % 3) * 0.06}>
             <article {...stylex.props(styles.card)}>
               <img src={a.icon} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
               <div {...stylex.props(styles.body)}>
-                <h3 {...stylex.props(styles.name)}>
-                  <a href={a.repo} {...stylex.props(styles.link)}>
-                    {a.name}
-                  </a>
-                </h3>
+                <h4 {...stylex.props(styles.name)}>
+                  <Name entry={a} />
+                </h4>
                 <p {...stylex.props(styles.meta)}>
-                  {a.author} · v{a.version}
-                  {a.releases > 1 && ` · ${a.releases} releases`}
+                  {a.author}
+                  {a.release && ` · v${a.release.version}`}
+                  {a.release && a.release.releases > 1 && ` · ${a.release.releases} releases`}
+                  {!a.release && ` · ${STATUS[a.status].label.toLowerCase()}`}
                 </p>
-                <Permissions app={a} />
-                <p {...stylex.props(styles.dates)}>
-                  <span>Created {date(a.created)}</span>
-                  <span>Updated {date(a.updated)}</span>
-                </p>
+                {a.release && (
+                  <>
+                    <Permissions app={a.release} />
+                    <p {...stylex.props(styles.dates)}>
+                      <span>Created {date(a.release.created)}</span>
+                      <span>Updated {date(a.release.updated)}</span>
+                    </p>
+                  </>
+                )}
               </div>
             </article>
           </Reveal>
@@ -166,7 +217,29 @@ export function Shelf({ apps, layout }: { apps: readonly App[]; layout: Layout }
   )
 }
 
-function Permissions({ app }: { app: App }) {
+function Name({ entry, row = false }: { entry: Entry; row?: boolean }) {
+  const style = row ? styles.rowName : styles.link
+  return entry.release ? (
+    <a href={entry.release.repo} {...stylex.props(style)}>
+      {entry.name}
+    </a>
+  ) : (
+    <span {...stylex.props(style)}>{entry.name}</span>
+  )
+}
+
+const Dash = () => <span {...stylex.props(styles.mono)}>—</span>
+
+function StatusChip({ status }: { status: Status }) {
+  return (
+    <span {...stylex.props(styles.chip, styles[status])}>
+      <Glyph name={status} />
+      {STATUS[status].label}
+    </span>
+  )
+}
+
+function Permissions({ app }: { app: CatalogApp }) {
   return (
     <ul {...stylex.props(styles.chips)} aria-label="Permissions">
       {app.permissions.length === 0 ? (
@@ -186,7 +259,7 @@ function Permissions({ app }: { app: App }) {
   )
 }
 
-/** 14 px line glyphs: the permission set from packages/sdk/permissions.ts plus the layout switch. */
+/** 14 px line glyphs: the permission set from packages/sdk/permissions.ts, the statuses and the layout switch. */
 function Glyph({ name }: { name: string }) {
   const d = GLYPHS[name] ?? GLYPHS.none!
   return (
@@ -205,6 +278,9 @@ const GLYPHS: Record<string, string> = {
   photos:
     'M2.5 4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1zM3 11l3-3 2 2 2-2 3 3M10.5 6.5a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4z',
   none: 'M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM3.8 3.8l8.4 8.4',
+  published: 'M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM5.2 8.2l1.9 1.9 3.7-3.9',
+  working: 'M3 4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM6 13.5h4M8 11.5v2',
+  mockup: 'M3.5 3.5h9v9h-9zM3.5 6.5h9M6.5 6.5v6',
   grid: 'M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5V7H9zM2.5 9H7v4.5H2.5zM9 9h4.5v4.5H9z',
   list: 'M5 3.5h8.5M5 8h8.5M5 12.5h8.5M2.5 3.5h.01M2.5 8h.01M2.5 12.5h.01'
 }
@@ -247,7 +323,7 @@ const styles = stylex.create({
   segIcon: { paddingLeft: '10px', paddingRight: '10px' },
   segOn: { backgroundColor: color.surface, color: color.text, boxShadow: '0 1px 2px rgba(20,20,19,0.08)' },
   count: { fontFamily: font.mono, fontSize: '12px', color: color.text3 },
-  lane: { marginTop: '48px' },
+  lane: { marginTop: '56px' },
   laneTitle: {
     margin: 0,
     fontFamily: font.display,
@@ -256,7 +332,19 @@ const styles = stylex.create({
     letterSpacing: '-0.02em',
     color: color.text
   },
-  laneText: { marginTop: '6px', marginBottom: 0, fontSize: '16px', color: color.text2 },
+  laneText: { marginTop: '6px', marginBottom: 0, maxWidth: '64ch', fontSize: '16px', color: color.text2 },
+  group: { marginTop: '32px' },
+  groupTitle: {
+    margin: 0,
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '10px',
+    fontFamily: font.sans,
+    fontSize: '14px',
+    fontWeight: 400
+  },
+  groupText: { color: color.text2 },
   empty: {
     marginTop: '20px',
     marginBottom: 0,
@@ -271,44 +359,49 @@ const styles = stylex.create({
   grid: {
     listStyleType: 'none',
     margin: 0,
-    marginTop: '24px',
+    marginTop: '16px',
     padding: 0,
     display: 'grid',
-    gridTemplateColumns: { default: 'repeat(2, minmax(0, 1fr))', [SMALL]: 'minmax(0, 1fr)' },
-    gap: '20px'
+    gridTemplateColumns: {
+      default: 'repeat(3, minmax(0, 1fr))',
+      [MID]: 'repeat(2, minmax(0, 1fr))',
+      [SMALL]: 'minmax(0, 1fr)'
+    },
+    gap: '16px'
   },
   item: { display: 'block' },
   card: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '20px',
-    padding: '22px',
-    borderRadius: '22px',
+    gap: '16px',
+    padding: '18px',
+    borderRadius: '20px',
     backgroundColor: color.surface,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: color.border
+    borderColor: color.border,
+    minHeight: '100%'
   },
-  icon: { width: '72px', height: '72px', flexShrink: 0, borderRadius: '16px' },
-  iconSm: { width: '40px', height: '40px', flexShrink: 0, borderRadius: '9px' },
+  icon: { width: '56px', height: '56px', flexShrink: 0, borderRadius: '13px' },
+  iconSm: { width: '36px', height: '36px', flexShrink: 0, borderRadius: '8px' },
   body: { minWidth: 0, flexGrow: 1 },
   name: {
     margin: 0,
     fontFamily: font.display,
-    fontSize: '22px',
+    fontSize: '19px',
     fontWeight: 600,
     letterSpacing: '-0.02em',
     lineHeight: 1.2,
     color: color.text
   },
   link: { color: color.text, textDecorationLine: 'none' },
-  meta: { marginTop: '4px', marginBottom: 0, fontSize: '15px', lineHeight: 1.5, color: color.text2 },
+  meta: { marginTop: '3px', marginBottom: 0, fontSize: '14px', lineHeight: 1.5, color: color.text2 },
   dates: {
-    marginTop: '14px',
+    marginTop: '12px',
     marginBottom: 0,
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '14px',
+    gap: '12px',
     fontFamily: font.mono,
     fontSize: '12px',
     color: color.text3
@@ -316,7 +409,7 @@ const styles = stylex.create({
   chips: {
     listStyleType: 'none',
     margin: 0,
-    marginTop: '12px',
+    marginTop: '10px',
     padding: 0,
     display: 'flex',
     flexWrap: 'wrap',
@@ -335,9 +428,13 @@ const styles = stylex.create({
     paddingRight: '11px',
     borderRadius: '999px',
     backgroundColor: color.well,
-    color: color.text
+    color: color.text,
+    whiteSpace: 'nowrap'
   },
   chipNone: { color: color.text3 },
+  published: { color: color.green },
+  working: { color: color.text },
+  mockup: { color: color.orange },
   glyph: { flexShrink: 0 },
   table: { width: '100%', marginTop: '20px', borderCollapse: 'collapse', fontSize: '15px' },
   th: {
@@ -357,8 +454,8 @@ const styles = stylex.create({
     borderBottomColor: color.border
   },
   td: {
-    paddingTop: '14px',
-    paddingBottom: '14px',
+    paddingTop: '12px',
+    paddingBottom: '12px',
     paddingLeft: '12px',
     paddingRight: '12px',
     verticalAlign: 'middle',

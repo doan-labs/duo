@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { publish } from '../../../scripts/publish-catalog.ts'
 import { type Catalog, type Release, releaseId } from '../../sdk/manifest.ts'
 import { PERMISSIONS } from '../../sdk/permissions.ts'
+import { ICONS } from '../../uikit/icons/index.ts'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url))
 const here = fileURLToPath(new URL('../', import.meta.url))
@@ -54,6 +55,15 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
     icon: `/catalog/apps/${id}/${releaseId(newest)}/icon-1024.png`
   }
 })
+// Every official app the simulator ships, from the shell's home-screen data: the ones
+// with a catalog release above are published; the rest are working in the simulator
+// or, when the shell marks them `mock`, still in development behind a static screen.
+const shellSource = readFileSync(`${root}packages/shell/apps.ts`, 'utf8')
+const seen = new Set<string>()
+const shell = [...shellSource.matchAll(/\{ name: '([^']+)'(?:, mock: (true))?/g)]
+  .map((m) => ({ name: m[1] ?? '', icon: ICONS[m[1] ?? ''] ?? '', mock: m[2] === 'true' }))
+  // Folders (Utilities) have no app icon and are not apps.
+  .filter(({ name, icon }) => name && icon && !seen.has(name) && seen.add(name))
 const generated = `${here}src/generated/catalog.ts`
 writeFileSync(
   generated,
@@ -73,7 +83,9 @@ writeFileSync(
     '  icon: string',
     '}',
     `export const CATALOG: CatalogApp[] = ${JSON.stringify(shelf, null, 2)}`,
+    '/** Official apps built into the simulator; `mock` marks a static screen still in development. */',
+    `export const SHELL: { name: string; icon: string; mock: boolean }[] = ${JSON.stringify(shell, null, 2)}`,
     ''
   ].join('\n')
 )
-console.log(`catalog: ${shelf.length} apps → src/generated/catalog.ts`)
+console.log(`catalog: ${shelf.length} published and ${shell.length} shell apps → src/generated/catalog.ts`)

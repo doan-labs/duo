@@ -24,7 +24,7 @@ export function Nav() {
             const on = !!matchRoute({ to: n.to, fuzzy: true })
             return (
               <li key={n.to} {...stylex.props(styles.item)}>
-                <Link to={n.to} {...stylex.props(styles.link, on && styles.on)}>
+                <Link to={n.to} {...stylex.props(styles.link, 'highlight' in n && styles.highlight, on && styles.on)}>
                   {n.label}
                   {on && <motion.span layoutId="nav-on" {...stylex.props(styles.mark)} />}
                 </Link>
@@ -178,6 +178,8 @@ const styles = stylex.create({
     transitionTimingFunction: ease.out
   },
   on: { color: color.text },
+  /** The one link that is an invitation rather than a section: the accent, and it keeps it when active. */
+  highlight: { color: { default: color.accent, ':hover': color.accent }, fontWeight: 600 },
   /** The moving indicator: one element shared across links via `layoutId`. */
   mark: {
     position: 'absolute',

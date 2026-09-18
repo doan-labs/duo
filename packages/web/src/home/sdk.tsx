@@ -21,7 +21,7 @@ export function Sdk() {
       <Lede>
         Enough to build a real app, small enough to read in a minute. The rest is React and the platform you already
         know.{' '}
-        <Link to="/sdk" {...stylex.props(styles.link)}>
+        <Link to="/docs/sdk" {...stylex.props(styles.link)}>
           Read the SDK page
         </Link>{' '}
         for the full client.

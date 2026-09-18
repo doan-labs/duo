@@ -16,8 +16,8 @@ function Page() {
       <Cap>Apps</Cap>
       <Headline as="h1" id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
       <Lede>
-        Every app on this page is published in the Duo catalog. Each one is a pull request in the repository, MIT
-        licensed, and installs from a catalog through the Duo Store.{' '}
+        Official apps ship in the simulator and publish to the Duo catalog; community apps arrive as pull requests,
+        reviewed and published the same way. Everything is MIT licensed and installs through the Store.{' '}
         <Link to="/publish" {...stylex.props(styles.link)}>
           How to add yours.
         </Link>
