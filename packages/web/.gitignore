@@ -2,4 +2,6 @@
 public/device/
 public/model/
 public/icons/
+public/cdn/
+public/preinstalled/
 .output/

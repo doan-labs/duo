@@ -3,7 +3,6 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Section } from '../layout'
 import { PageTop, SectionTop } from '../page-parts'
 import { Simulator } from '../simulator'
-import { Notice } from '../status'
 import { color, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
@@ -20,14 +19,10 @@ function Page() {
     <>
       <Section narrow>
         <PageTop
-          eyebrow="Guidelines · Works today"
+          eyebrow="Guidelines"
           title="Human Interface Guidelines"
           lead="Short and opinionated. Three rules cover most of what makes an app feel right on a phone that folds; the rest is iOS."
         />
-        <Notice status="works">
-          These rules describe how the shell and its baked apps already behave. They will become the review checklist
-          for store apps; what a component must do to merge into the kit is in the UI kit plan.
-        </Notice>
 
         <ol {...stylex.props(styles.rules)}>
           <Rule n="1" title="Design for the cover first">
@@ -78,13 +73,13 @@ function Page() {
           </li>
         </ul>
         <p {...stylex.props(styles.p)}>
-          More on components:{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/uikit' }} {...stylex.props(styles.link)}>
-            UI kit plan
+          Every component:{' '}
+          <Link to="/kit" {...stylex.props(styles.link)}>
+            UI kit
           </Link>
-          . More on the fold's mechanics:{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/runtime' }} {...stylex.props(styles.link)}>
-            Runtime
+          . The fold's mechanics:{' '}
+          <Link to="/docs/$" params={{ _splat: 'displays' }} {...stylex.props(styles.link)}>
+            Displays and the fold
           </Link>
           .
         </p>

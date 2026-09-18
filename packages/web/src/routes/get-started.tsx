@@ -1,10 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Section } from '../layout'
-import { Code, PageTop, Pre, SectionTop } from '../page-parts'
+import { Code, PageTop, Pre } from '../page-parts'
 import { Simulator } from '../simulator'
 import { blob, REPO } from '../site'
-import { Notice } from '../status'
 import { color, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
@@ -18,98 +17,65 @@ export const Route = createFileRoute('/get-started')({
 
 function Page() {
   return (
-    <>
-      <Section narrow>
-        <PageTop
-          eyebrow="Get started · Works today"
-          title="Five minutes to a folding phone on your desk"
-          lead="The simulator running on your machine with an app of yours on its home screen. Today that app is a baked one inside the repository; the SDK path is below, labelled for what it is."
-        />
-        <Notice status="works">
-          Everything in this first part is how the repository works right now. The commands are the ones in its README
-          and are run by its own checks.
-        </Notice>
-        <ol {...stylex.props(styles.timeline)}>
-          <Step n={1} title="Run the shell">
-            <Pre>{`git clone ${REPO}.git && cd iphoneduo
+    <Section narrow>
+      <PageTop
+        eyebrow="Get started"
+        title="Ten minutes to your app on a folding phone"
+        lead="The simulator on your machine, a new app on its home screen, then installed from a catalog like any other. You need Bun and Python 3."
+      />
+      <ol {...stylex.props(styles.timeline)}>
+        <Step n={1} title="Run the simulator">
+          <Pre>{`git clone ${REPO}.git && cd iphoneduo
 bun install
-pip install usd-core && python3 scripts/prepare-model.py   # fetches Apple's model into public/model, once
+pip install usd-core && python3 scripts/prepare-model.py   # Apple's model, once
 bun run dev                                                # http://localhost:3000`}</Pre>
-            <p {...stylex.props(styles.p)}>
-              Bun is the runtime, bundler and dev server. The model is not redistributable, so every clone fetches it
-              once.
-            </p>
-          </Step>
-          <Step n={2} title="Put the device in a known pose">
-            <p {...stylex.props(styles.p)}>
-              Open <Code>http://localhost:3000/?app=Notes&deg=0</Code> for Notes on the cover, or{' '}
-              <Code>?app=Notes&deg=180</Code> for Notes unfolded. The hinge slider on the right folds it live and hands
-              the app from one display to the other.
-            </p>
-            <Simulator deg={0} app="Notes" />
-          </Step>
-          <Step n={3} title="Add an app the way the shell's own apps are added">
-            <p {...stylex.props(styles.p)}>
-              Each baked app is a workspace under <Code>packages/apps/</Code> that exports a React component taking{' '}
-              <Code>{'{ os }'}</Code>, registered in the shell's app list. The walkthrough is in the repository's
-              working notes:{' '}
-              <Link to="/docs/$" params={{ _splat: 'working' }} {...stylex.props(styles.link)}>
-                working.md
-              </Link>
-              , and the registry is{' '}
-              <a href={blob('packages/shell/apps.ts')} {...stylex.props(styles.link)}>
-                packages/shell/apps.ts
-              </a>
-              . Style with StyleX and the kit's tokens; the shell's conventions are in{' '}
-              <a href={blob('AGENTS.md')} {...stylex.props(styles.link)}>
-                AGENTS.md
-              </a>
-              .
-            </p>
-          </Step>
-        </ol>
-      </Section>
-
-      <Section alt narrow>
-        <SectionTop eyebrow="Not built yet" title="The SDK path" />
-        <Notice status="unfinished">
-          None of this exists yet. The CLI package is an empty scaffold, the shell does not read <Code>?dev=</Code>, and
-          the SDK exports only transitional types. This is the accepted plan from the stage 2 contract, shown so you
-          know what is coming, not something to type today.
-        </Notice>
-        <ol {...stylex.props(styles.timeline)}>
-          <Step n={1} title="Create">
-            <p {...stylex.props(styles.p)}>
-              <Code>npx @doan-labs/ipduo create my-app</Code> writes a manifest, an icon placeholder and an entry with a
-              list inside a navigation stack.
-            </p>
-          </Step>
-          <Step n={2} title="Build and serve">
-            <p {...stylex.props(styles.p)}>
-              <Code>npx @doan-labs/ipduo dev</Code> builds a single self-contained <Code>app.html</Code> with the same
-              builder CI uses and serves it locally.
-            </p>
-          </Step>
-          <Step n={3} title="Open it in the simulator">
-            <p {...stylex.props(styles.p)}>
-              Opening the hosted simulator with <Code>?dev=http://localhost:5173</Code> puts your app on the inner home
-              screen with a DEV badge, in the same sandbox an installed app gets.
-            </p>
-          </Step>
-        </ol>
-        <p {...stylex.props(styles.p)}>
-          The contract behind it, with the manifest fields, the bridge handshake and the acceptance checks:{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/progress/contract' }} {...stylex.props(styles.link)}>
-            Stage 2 runtime contract
-          </Link>{' '}
-          and the shorter{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/dev' }} {...stylex.props(styles.link)}>
-            Developing an app
-          </Link>
-          .
-        </p>
-      </Section>
-    </>
+          <p {...stylex.props(styles.p)}>
+            Open <Code>?deg=0</Code> for the cover or <Code>?deg=180</Code> for the phone flat open. The slider on the
+            right folds it live and hands the running app from one display to the other.
+          </p>
+          <Simulator deg={0} app="Notes" />
+        </Step>
+        <Step n={2} title="Create an app">
+          <Pre>{`bun scripts/package-platform.ts          # local SDK, kit and CLI archives, once
+bun packages/cli/index.mjs create my-app --packages .cache/platform-packages/artifacts.json
+cd my-app && bun install`}</Pre>
+          <p {...stylex.props(styles.p)}>
+            A manifest, an entry with a navigation stack, an icon and a changelog. The folder can live anywhere. The
+            name is kebab-case and at most twelve characters, so it fits on the cover.
+          </p>
+        </Step>
+        <Step n={3} title="Run it on the phone">
+          <Pre>{`bun run check   # import boundaries, strict TypeScript, the 4 MiB cap
+bun run dev     # builds, watches, prints the link`}</Pre>
+          <p {...stylex.props(styles.p)}>
+            Open the printed <Code>?dev=</Code> link. Your app is on the inner home screen with a DEV badge, in the same
+            sandbox an installed app gets. Edit <Code>main.tsx</Code>, save, reload the simulator.
+          </p>
+        </Step>
+        <Step n={4} title="Install it">
+          <Pre>{`bun run build                                        # dist/: index.json plus the release
+bun packages/cli/index.mjs serve dist --port 5173    # from the repository root`}</Pre>
+          <p {...stylex.props(styles.p)}>
+            In App Store, paste <Code>http://localhost:5173/index.json</Code> into the Developer catalog field, then Get
+            and Open. Verified, hashed, stored in the shell's own database, launched from there.
+          </p>
+        </Step>
+      </ol>
+      <div {...stylex.props(styles.next)}>
+        <Next to="/docs/$" params={{ _splat: 'your-first-app' }} title="Your first app">
+          What the generated project does, line by line.
+        </Next>
+        <Next to="/docs/$" params={{ _splat: 'displays' }} title="Displays and the fold">
+          Two displays, one app, one owner.
+        </Next>
+        <Next to="/sdk" title="SDK reference">
+          Every export, generated from the source.
+        </Next>
+        <Next href={blob('examples/fold-compass/main.tsx')} title="Fold Compass">
+          A complete independent app in a hundred lines.
+        </Next>
+      </div>
+    </Section>
   )
 }
 
@@ -120,9 +86,40 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       <span {...stylex.props(styles.n)} aria-hidden="true">
         {String(n).padStart(2, '0')}
       </span>
-      <h3 {...stylex.props(styles.stepTitle)}>{title}</h3>
+      <h2 {...stylex.props(styles.stepTitle)}>{title}</h2>
       {children}
     </li>
+  )
+}
+
+function Next({
+  to,
+  params,
+  href,
+  title,
+  children
+}: {
+  to?: string
+  params?: Record<string, string>
+  href?: string
+  title: string
+  children: React.ReactNode
+}) {
+  const body = (
+    <>
+      <span {...stylex.props(styles.nextTitle)}>{title}</span>
+      <span {...stylex.props(styles.nextText)}>{children}</span>
+    </>
+  )
+  const s = stylex.props(styles.nextCard)
+  return to ? (
+    <Link to={to} params={params} {...s}>
+      {body}
+    </Link>
+  ) : (
+    <a href={href} {...s}>
+      {body}
+    </a>
   )
 }
 
@@ -130,7 +127,7 @@ const styles = stylex.create({
   timeline: {
     listStyleType: 'none',
     margin: 0,
-    marginTop: '40px',
+    marginTop: '8px',
     marginBottom: '8px',
     padding: 0,
     paddingLeft: '15px'
@@ -138,7 +135,7 @@ const styles = stylex.create({
   step: {
     position: 'relative',
     paddingLeft: { default: '40px', [SMALL]: '28px' },
-    paddingBottom: '36px',
+    paddingBottom: '40px',
     borderLeftWidth: '1px',
     borderLeftStyle: 'solid',
     borderLeftColor: color.border
@@ -180,8 +177,29 @@ const styles = stylex.create({
     marginTop: 0,
     marginBottom: '16px'
   },
-  link: {
-    color: { default: color.accent, ':hover': color.accentHover },
-    textDecoration: { default: 'none', ':hover': 'underline' }
-  }
+  next: {
+    display: 'grid',
+    gridTemplateColumns: { default: '1fr 1fr', [SMALL]: '1fr' },
+    gap: '12px',
+    marginTop: '24px'
+  },
+  nextCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    paddingTop: '18px',
+    paddingBottom: '18px',
+    paddingLeft: '20px',
+    paddingRight: '20px',
+    backgroundColor: color.surface,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: { default: color.border, ':hover': color.borderStrong },
+    borderRadius: radius.md,
+    textDecoration: 'none',
+    transitionProperty: 'border-color',
+    transitionDuration: '0.2s'
+  },
+  nextTitle: { fontFamily: font.sans, fontSize: '16px', fontWeight: 500, color: color.text },
+  nextText: { fontFamily: font.sans, fontSize: '14px', lineHeight: 1.5, color: color.text2 }
 })

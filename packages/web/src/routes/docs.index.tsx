@@ -2,13 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { docs, groups } from '../docs'
 import { Prose } from '../layout'
-import { Code, PageTop } from '../page-parts'
-import { Badge } from '../status'
+import { PageTop } from '../page-parts'
 import { color, font, radius } from '../tokens.stylex'
-
-// StyleX 0.19 cannot resolve an imported string as a media-query key, so the
-// shared breakpoint is declared here (see tokens.stylex.ts).
-const SMALL = '@media (max-width: 734px)'
 
 export const Route = createFileRoute('/docs/')({
   head: () => ({ meta: [{ title: 'Documentation · Duo' }] }),
@@ -19,15 +14,9 @@ function Index() {
   return (
     <Prose>
       <PageTop
-        eyebrow="Docs · Straight from the repository"
-        title="Documentation"
-        lead={
-          <>
-            Rendered from the Markdown in the repository's <Code>docs/</Code> folder on every build; the site keeps no
-            copy. Each page carries a badge: a planning document describes intent, a progress record describes what was
-            built and how it was verified, and the repository notes describe the code as it is.
-          </>
-        }
+        eyebrow="Documentation"
+        title="Build for a phone that folds"
+        lead="Everything from the first command to a catalog people can install from. Start at the top; the reference for every export is on the SDK and UI kit pages."
       />
       {groups.map((g) => (
         <section key={g}>
@@ -39,8 +28,7 @@ function Index() {
                 <li key={d.slug}>
                   <Link to="/docs/$" params={{ _splat: d.slug }} {...stylex.props(styles.row)}>
                     <span {...stylex.props(styles.title)}>{d.title}</span>
-                    <Badge status={d.status} />
-                    <span {...stylex.props(styles.path)}>{d.path}</span>
+                    <span {...stylex.props(styles.summary)}>{d.summary}</span>
                   </Link>
                 </li>
               ))}
@@ -65,11 +53,10 @@ const styles = stylex.create({
   list: { listStyleType: 'none', margin: 0, padding: 0, display: 'grid', gap: '8px' },
   row: {
     display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '10px',
-    paddingTop: '14px',
-    paddingBottom: '14px',
+    flexDirection: 'column',
+    gap: '4px',
+    paddingTop: '16px',
+    paddingBottom: '16px',
     paddingLeft: '18px',
     paddingRight: '18px',
     backgroundColor: color.surface,
@@ -78,15 +65,17 @@ const styles = stylex.create({
     borderColor: { default: color.border, ':hover': color.borderStrong },
     borderRadius: radius.md,
     textDecoration: 'none',
-    transitionProperty: 'border-color, background-color',
+    transitionProperty: 'border-color',
     transitionDuration: '0.2s'
   },
   title: { fontSize: '17px', fontWeight: 500, color: color.text },
-  path: {
-    fontFamily: font.mono,
-    fontSize: '12px',
-    color: color.text3,
-    marginLeft: { default: 'auto', [SMALL]: '0' },
-    overflowWrap: 'anywhere'
+  summary: {
+    fontSize: '15px',
+    lineHeight: 1.5,
+    color: color.text2,
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden'
   }
 })

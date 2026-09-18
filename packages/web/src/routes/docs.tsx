@@ -7,17 +7,26 @@ export const Route = createFileRoute('/docs')({ component: Layout })
 function Layout() {
   return (
     <Split
-      aside={groups.map((g) => (
-        <SideList key={g} title={g}>
-          {docs
-            .filter((d) => d.group === g)
-            .map((d) => (
-              <SideLink key={d.slug} to="/docs/$" params={{ _splat: d.slug }}>
-                {d.title}
-              </SideLink>
-            ))}
-        </SideList>
-      ))}
+      aside={
+        <>
+          {groups.map((g) => (
+            <SideList key={g} title={g}>
+              {docs
+                .filter((d) => d.group === g)
+                .map((d) => (
+                  <SideLink key={d.slug} to="/docs/$" params={{ _splat: d.slug }}>
+                    {d.title}
+                  </SideLink>
+                ))}
+            </SideList>
+          ))}
+          <SideList title="Reference">
+            <SideLink to="/sdk">SDK</SideLink>
+            <SideLink to="/kit">UI kit</SideLink>
+            <SideLink to="/changelog">Changelog</SideLink>
+          </SideList>
+        </>
+      }
     >
       <Outlet />
     </Split>

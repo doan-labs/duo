@@ -6,6 +6,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Link } from '@tanstack/react-router'
 import { Fragment, type ReactNode } from 'react'
+import { ROOT, slugOf } from './docs'
 import { blob } from './site'
 import { color, font, radius } from './tokens.stylex'
 
@@ -155,9 +156,9 @@ const INLINE =
   /(`+)([\s\S]*?[^`])\1(?!`)|\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)|\*\*(.+?)\*\*|(?<![\w`*])\*([^*\n]+?)\*(?![\w*])|(?<![\w`])_([^_\n]+?)_(?!\w)|<(https?:\/\/[^>\s]+)>/g
 
 export type LinkCtx = {
-  /** Path of the document being rendered, relative to the repository root, e.g. `docs/platform/manifest.md`. */
+  /** Repository path of the document being rendered, e.g. `packages/web/content/docs/manifest.md`. */
   from: string
-  /** Every path under docs/ that has a page, so a link to a missing file goes to GitHub instead of a 404. */
+  /** Every documentation path that has a page, so a link to a missing file goes to GitHub instead of a 404. */
   known: Set<string>
 }
 
@@ -182,15 +183,17 @@ function A({ href, children, ctx }: { href: string; children: ReactNode; ctx: Li
       </a>
     )
   }
-  const { path, hash } = resolve(ctx.from, href)
-  if (path.endsWith('.md') && ctx.known.has(path)) {
+  if (href.startsWith('/')) {
     return (
-      <Link
-        to="/docs/$"
-        params={{ _splat: path.slice('docs/'.length, -'.md'.length) }}
-        hash={hash.slice(1) || undefined}
-        {...a}
-      >
+      <Link to={href} {...a}>
+        {children}
+      </Link>
+    )
+  }
+  const { path, hash } = resolve(ctx.from, href)
+  if (path.startsWith(ROOT) && ctx.known.has(path)) {
+    return (
+      <Link to="/docs/$" params={{ _splat: slugOf(path) }} hash={hash.slice(1) || undefined} {...a}>
         {children}
       </Link>
     )

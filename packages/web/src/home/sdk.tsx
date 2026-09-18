@@ -7,10 +7,10 @@ import { Block, Cap, Headline, Lede, Reveal } from './parts'
 const MID = '@media (max-width: 1068px)'
 
 const API = [
-  { area: 'Display', sig: 'useDisplay()', text: 'Fold angle, active display, dimensions and posture, live.' },
-  { area: 'Storage', sig: 'useStorage()', text: 'Persistent, namespaced storage for each application.' },
-  { area: 'Camera', sig: 'requestCamera()', text: 'The host’s camera hardware, with permission.' },
-  { area: 'Links', sig: 'openURL()', text: 'Web URLs, or the routes Duo itself understands.' }
+  { area: 'Display', sig: 'useDisplay()', text: 'Which display, its size, the hinge angle and focus, live.' },
+  { area: 'Storage', sig: 'useKV()', text: 'Durable, revisioned storage, private to each app.' },
+  { area: 'Views', sig: 'os.commands', text: 'Two views of one app, one owner; the rest send it commands.' },
+  { area: 'Links', sig: 'os.open()', text: 'Hand off to another app on the device, with an argument.' }
 ]
 
 export function Sdk() {
@@ -24,7 +24,7 @@ export function Sdk() {
         <Link to="/sdk" {...stylex.props(styles.link)}>
           Read the SDK page
         </Link>{' '}
-        for what exists today and what is proposed.
+        for the full client.
       </Lede>
       <dl {...stylex.props(styles.rows)}>
         {API.map((a, i) => (

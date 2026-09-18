@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { versions } from '../generated/api'
 import { Prose } from '../layout'
-import { Code, PageTop } from '../page-parts'
+import { Code, PageTop, Pre } from '../page-parts'
 import { blob } from '../site'
-import { Badge, Notice } from '../status'
 import { color, font, radius } from '../tokens.stylex'
 import { kit } from './kit'
 
@@ -12,33 +12,54 @@ export const Route = createFileRoute('/kit/')({
   component: Index
 })
 
+// Components first, then hooks; types close the list.
+const KIND_ORDER = ['component', 'hook', 'function', 'value', 'class', 'type']
+const listed = [...kit].sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind))
+
 function Index() {
   return (
     <Prose>
       <PageTop
-        eyebrow="UI kit · Works today"
+        eyebrow="Reference"
         title="UI kit"
-        badge={<Badge status="works" />}
         lead={
           <>
-            <Code>@doan-labs/ipduo-uikit</Code>, the components and tokens apps compile against. Every page here is
-            generated from the TSDoc and props type on the export, nothing is hand-written.
+            <Code>@doan-labs/ipduo-uikit</Code>: the components and tokens every app on the phone is built from. They
+            already know about the cover and the inner display, so a screen that reads at 387 points grows into the room
+            it gets unfolded.
           </>
         }
       />
-      <Notice status="works">
-        These exports exist and are what the shell's own apps use today. The kit is version 0.0.0: the harvest of the
-        shell's remaining components (List, NavigationStack, Toolbar and the rest) is a later stage, and until it lands
-        the kit has no compatibility promise.
-      </Notice>
-      <Notice status="unfinished">
-        Live demos of each component are not on this page yet. The plan is one demo file that powers both the in-OS
-        Developer app and this site; the Developer app does not exist, so neither does the demo. Until then, the
-        simulator shows the components in use inside the baked apps.
-      </Notice>
+      <Pre>{`import {
+  Button, Row, Screen, Section, Text, Title, useDisplay
+} from '@doan-labs/ipduo-uikit'
+
+function App() {
+  const view = useDisplay()
+  return (
+    <Screen>
+      <Title>Field guide</Title>
+      <Section>
+        <Row label="Display" detail={view.display} />
+        <Row label="Fold" detail={<Text value={view.angle} suffix="°" />} />
+        <Row><Button onClick={save}>Continue</Button></Row>
+      </Section>
+    </Screen>
+  )
+}`}</Pre>
+      <p {...stylex.props(styles.p)}>
+        Version <Code>{versions.uikit?.version}</Code>. Apps bundle the kit they compile against, so a new version never
+        changes whether a host can run an installed app. Components accept native attributes, <Code>as</Code> for the
+        element, <Code>animate</Code> for the CSS-only presets and <Code>xstyle</Code> for compiled StyleX extensions,
+        and refuse raw <Code>style</Code> and <Code>className</Code>. The{' '}
+        <a href={blob('examples/developer/main.tsx')} {...stylex.props(styles.link)}>
+          Developer gallery
+        </a>{' '}
+        is an installable app that renders every export at both display widths.
+      </p>
       <h2 {...stylex.props(styles.h2)}>Exports</h2>
       <ul {...stylex.props(styles.list)}>
-        {kit.map((e) => (
+        {listed.map((e) => (
           <li key={e.name}>
             <Link to="/kit/$name" params={{ name: e.name }} {...stylex.props(styles.row)}>
               <span {...stylex.props(styles.name)}>{e.name}</span>
@@ -54,14 +75,8 @@ function Index() {
         <a href={blob('packages/uikit/tokens.stylex.ts')} {...stylex.props(styles.link)}>
           tokens.stylex.ts
         </a>{' '}
-        as StyleX variables. Apps use them and never a literal; that rule is what lets a fix in the kit reach every app.
-      </p>
-      <p {...stylex.props(styles.p)}>
-        The harvest plan, the rules every component must meet and the versioning policy:{' '}
-        <Link to="/docs/$" params={{ _splat: 'platform/uikit' }} {...stylex.props(styles.link)}>
-          UI kit plan
-        </Link>
-        .
+        as StyleX variables. Use them and never a literal: the two displays have different densities, the shell tunes
+        the palette for both, and that rule is what lets a fix in the kit reach every app.
       </p>
     </Prose>
   )

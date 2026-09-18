@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Section } from '../layout'
 import { Code, PageTop, SectionTop, Table, Td } from '../page-parts'
 import { Simulator } from '../simulator'
-import { Badge } from '../status'
 import { color, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
@@ -22,7 +21,7 @@ function Page() {
       <section {...stylex.props(styles.top)}>
         <div {...stylex.props(styles.head)}>
           <PageTop
-            eyebrow="Simulator · Works today"
+            eyebrow="Simulator"
             title="Simulator"
             lead="The same page the desktop app wraps. Drag to orbit, use the slider on the right to fold, press the side and volume buttons on the frame, open an app from the home screen."
           />
@@ -32,21 +31,21 @@ function Page() {
       <Section alt narrow>
         <SectionTop eyebrow="Query parameters" title="Drive it from the URL" />
         <p {...stylex.props(styles.p)}>
-          <Badge status="works" /> The shell reads these query parameters today. They are how the repository's own
-          checks put the device in a known pose.
+          The shell reads these on load. They are how the repository's own checks put the device in a known pose, and
+          how the CLI hands it your app.
         </p>
         <Table>
           <tbody>
             <Row k="?deg=0" v="Hinge angle in degrees. 0 is closed and shows the cover; 180 is flat open." />
-            <Row k="?app=Notes" v="Opens a baked app by name at load, and skips the lock screen." />
+            <Row k="?app=Notes" v="Opens an app by name at load, and skips the lock screen." />
+            <Row
+              k="?dev=http://localhost:5173"
+              v="Loads the release the CLI's dev command serves, verified once, into a sandboxed frame with a DEV badge."
+            />
             <Row k="?yaw=-1.2" v="Turns the view, in radians, to show the right edge and its buttons." />
             <Row k="?debug" v="Exposes __duo on the window for the headless checks in docs/debug.md." />
           </tbody>
         </Table>
-        <p {...stylex.props(styles.p)}>
-          <Badge status="unfinished" /> <Code>?dev=http://localhost:5173</Code> will put your own app on the home screen
-          once stage 2 lands. The shell does not read it yet.
-        </p>
       </Section>
     </>
   )

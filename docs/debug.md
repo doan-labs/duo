@@ -18,6 +18,12 @@ Assert state, then inspect pixels. Chromium results do not establish native pari
 5. Record the tested runtime and limits. Wait ≥1 s for unlock (420 ms animation); side-click
    handling includes a 300 ms double-click window. Inspect screenshots after compositing settles.
 
+- **`Encountered two children with the same key` on a `/kit/Nav` pop is not
+  the site's.** `packages/uikit/nav.tsx` calls `setLeaving` inside the
+  `setStack` updater; React dev double-invokes updaters, so the leaving entry
+  is queued twice. It is a dev-only warning in the kit, seen wherever `Nav`
+  pops under a development build.
+
 ## 1. Headless Chrome
 
 Start `bun run dev` on a free port. For a quick capture:
@@ -416,3 +422,11 @@ from section 1 inside it.
 False alarm: `FAIL link /device/...` from an older check meant the link
 crawler followed the "Open full size" link into the copied shell, which has no
 `h1`; the crawler now skips `/device`.
+
+False alarm: the embedded Store on a black screen reading "Preinstalled
+catalog unavailable. Reload to retry." is not a runtime fault. The shell fetches
+`/cdn/index.json` and `/preinstalled/index.json` from the origin root, so the
+site build must copy both directories out of `dist/` beside `/model` and
+`/icons` (`packages/web/scripts/simulator.ts` does). "Loading apps…" for a few
+seconds after that is the registry seeding Notes and Weather; a screenshot
+taken before it ends shows the same black screen.

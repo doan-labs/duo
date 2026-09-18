@@ -4,6 +4,15 @@ import type { ApiEntry } from '../api-types'
 export const api: ApiEntry[] = [
   {
     "pkg": "@doan-labs/ipduo-sdk",
+    "name": "PlatformError",
+    "kind": "class",
+    "file": "packages/sdk/guards.ts",
+    "line": 5,
+    "doc": "",
+    "signature": "class PlatformError extends Error"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
     "name": "CameraHooks",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
@@ -38,8 +47,14 @@ export const api: ApiEntry[] = [
     "file": "packages/sdk/legacy.ts",
     "line": 10,
     "doc": "",
-    "signature": "type Os = {\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own — shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
+    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own — shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
     "members": [
+      {
+        "name": "store",
+        "type": "import('./store.ts').Store",
+        "optional": true,
+        "doc": ""
+      },
       {
         "name": "shots",
         "type": "string[]",
@@ -79,14 +94,346 @@ export const api: ApiEntry[] = [
     ]
   },
   {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "Manifest",
+    "kind": "type",
+    "file": "packages/sdk/manifest.ts",
+    "line": 4,
+    "doc": "",
+    "signature": "type Manifest = {\n  id: string\n  name: string\n  version: string\n  lane: 'official' | 'community'\n  entry: string\n  icon: string\n  light?: boolean\n  edge?: boolean\n  widgets?: ('small' | 'medium')[]\n  network?: string[]\n  permissions?: PermissionName[]\n  author: string\n  repo: string\n  license: 'MIT'\n}",
+    "members": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "lane",
+        "type": "'official' | 'community'",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "entry",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "icon",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "light",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "edge",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "widgets",
+        "type": "('small' | 'medium')[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "network",
+        "type": "string[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "permissions",
+        "type": "PermissionName[]",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "author",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "repo",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "license",
+        "type": "'MIT'",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "Release",
+    "kind": "type",
+    "file": "packages/sdk/manifest.ts",
+    "line": 21,
+    "doc": "",
+    "signature": "type Release = {\n  manifest: Manifest\n  build: { sdk: string; kit?: string; at: string; commit: string; hash: string }\n  files: { path: string; bytes: number; sha256: string }[]\n}",
+    "members": [
+      {
+        "name": "manifest",
+        "type": "Manifest",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "build",
+        "type": "{ sdk: string; kit?: string; at: string; commit: string; hash: string }",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "files",
+        "type": "{ path: string; bytes: number; sha256: string }[]",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "ReleaseId",
+    "kind": "type",
+    "file": "packages/sdk/manifest.ts",
+    "line": 20,
+    "doc": "",
+    "signature": "type ReleaseId = `${string}+${string}`"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "PermissionName",
+    "kind": "type",
+    "file": "packages/sdk/permissions.ts",
+    "line": 13,
+    "doc": "",
+    "signature": "type PermissionName = keyof typeof PERMISSIONS"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "Photo",
+    "kind": "type",
+    "file": "packages/sdk/permissions.ts",
+    "line": 15,
+    "doc": "",
+    "signature": "type Photo = { id: string; takenAt: number; width: number; height: number }",
+    "members": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "takenAt",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "width",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "height",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "ErrCode",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 35,
+    "doc": "",
+    "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "KV",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 80,
+    "doc": "",
+    "signature": "type KV = {\n  get(k: string): Promise<string | null>\n  set(k: string, v: string): Promise<{ rev: number }>\n  del(k: string): Promise<{ rev: number }>\n  keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>\n  snapshot(cursor?: string): Promise<Snapshot>\n  watch(since: number, cb: (e: Change) => void): () => void\n}",
+    "members": []
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "Limits",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 19,
+    "doc": "",
+    "signature": "type Limits = typeof LIMITS"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "ViewInfo",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 4,
+    "doc": "",
+    "signature": "type ViewInfo = {\n  display: 'inner' | 'cover'\n  placement: 'full' | 'left' | 'right'\n  width: number\n  height: number\n  visible: boolean\n  active: boolean\n  focused: boolean\n  angle: number\n}",
+    "members": [
+      {
+        "name": "display",
+        "type": "'inner' | 'cover'",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "placement",
+        "type": "'full' | 'left' | 'right'",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "width",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "height",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "visible",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "active",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "focused",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "angle",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "WidgetSnapshot",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 14,
+    "doc": "",
+    "signature": "type WidgetSnapshot = {\n  arg?: string\n  lines: { text: string; role: 'label' | 'value' | 'caption' }[]\n  tint?: 'glass' | 'dark'\n}",
+    "members": [
+      {
+        "name": "arg",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "lines",
+        "type": "{ text: string; role: 'label' | 'value' | 'caption' }[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "tint",
+        "type": "'glass' | 'dark'",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-sdk",
+    "name": "os",
+    "kind": "value",
+    "file": "packages/sdk/index.ts",
+    "line": 8,
+    "doc": "",
+    "signature": "os = createClient()"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "AnimationName",
+    "kind": "type",
+    "file": "packages/uikit/animations.ts",
+    "line": 5,
+    "doc": "",
+    "signature": "type AnimationName = keyof typeof animations"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "animations",
+    "kind": "value",
+    "file": "packages/uikit/styles.ts",
+    "line": 22,
+    "doc": "",
+    "signature": "animations = stylex.create({\n  spin: {\n    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationTimingFunction: 'linear',\n    animationIterationCount: 'infinite'\n  },\n  rise: {\n    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.5s',\n    animationFillMode: 'backwards'\n  },\n  pop: {\n    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.4s',\n    animationTimingFunction: easing.pop\n  },\n  fade: {\n    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.25s'\n  },\n  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },\n  draw: {\n    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s'\n  },\n  bob: {\n    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationIterationCount: 'infinite'\n  },\n  glow: {\n    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '2s',\n    animationIterationCount: 'infinite'\n  }\n})"
+  },
+  {
     "pkg": "@doan-labs/ipduo-uikit",
     "name": "App",
     "kind": "type",
     "file": "packages/uikit/app.ts",
     "line": 6,
     "doc": "",
-    "signature": "type App = {\n  name: string\n  light?: boolean\n  /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */\n  edge?: boolean\n  view: ComponentType<{ os: Os }>\n  /** Names of the apps inside, when this tile is a folder rather than an app. */\n  folder?: string[]\n}",
+    "signature": "type App = {\n  id?: string\n  icon?: string\n  name: string\n  light?: boolean\n  /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */\n  edge?: boolean\n  view: ComponentType<{ os: Os }>\n  /** Names of the apps inside, when this tile is a folder rather than an app. */\n  folder?: string[]\n}",
     "members": [
+      {
+        "name": "id",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "icon",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
       {
         "name": "name",
         "type": "string",
@@ -121,6 +468,108 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Button",
+    "kind": "component",
+    "file": "packages/uikit/button.tsx",
+    "line": 9,
+    "doc": "Native button with the existing tinted capsule or filled/plain variants. Icon-only buttons need aria-label.",
+    "signature": "function Button({ variant = 'tinted', xstyle, animate, as: _as, type = 'button', ...props }: ButtonProps)",
+    "members": [
+      {
+        "name": "variant",
+        "type": "'filled' | 'tinted' | 'plain'",
+        "optional": true,
+        "doc": "",
+        "default": "'tinted'"
+      }
+    ],
+    "extends": [
+      "PrimitiveProps<'button'>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "ButtonProps",
+    "kind": "type",
+    "file": "packages/uikit/button.tsx",
+    "line": 8,
+    "doc": "Native button with the existing tinted capsule or filled/plain variants. Icon-only buttons need aria-label.",
+    "signature": "type ButtonProps = PrimitiveProps<'button'> & { variant?: 'filled' | 'tinted' | 'plain' }"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "useDisplay",
+    "kind": "hook",
+    "file": "packages/uikit/display.ts",
+    "line": 5,
+    "doc": "Current SDK display snapshot. Subscribes only; the app explicitly connects the SDK.",
+    "signature": "function useDisplay(): ViewInfo"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Hero",
+    "kind": "component",
+    "file": "packages/uikit/hero.tsx",
+    "line": 6,
+    "doc": "Large introductory title; shares the established large-title typography.",
+    "signature": "function Hero<T extends ElementType = 'div'>(props: HeroProps<T>)",
+    "extends": [
+      "LargeTitleProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "HeroProps",
+    "kind": "type",
+    "file": "packages/uikit/hero.tsx",
+    "line": 5,
+    "doc": "Large introductory title; shares the established large-title typography.",
+    "signature": "type HeroProps<T extends ElementType = 'div'> = LargeTitleProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "LargeTitle",
+    "kind": "component",
+    "file": "packages/uikit/large-title.tsx",
+    "line": 7,
+    "doc": "The existing 34-point large app title. It wraps naturally at cover width.",
+    "signature": "function LargeTitle<T extends ElementType = 'div'>({ as, xstyle, animate, ...props }: LargeTitleProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "LargeTitleProps",
+    "kind": "type",
+    "file": "packages/uikit/large-title.tsx",
+    "line": 6,
+    "doc": "The existing 34-point large app title. It wraps naturally at cover width.",
+    "signature": "type LargeTitleProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "List",
+    "kind": "component",
+    "file": "packages/uikit/list.tsx",
+    "line": 7,
+    "doc": "Semantic list. Use Row as=\"li\" for direct children, or place Sections inside list items.",
+    "signature": "function List<T extends ElementType = 'ul'>({ as, xstyle, animate, ...props }: ListProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "ListProps",
+    "kind": "type",
+    "file": "packages/uikit/list.tsx",
+    "line": 6,
+    "doc": "Semantic list. Use Row as=\"li\" for direct children, or place Sections inside list items.",
+    "signature": "type ListProps<T extends ElementType = 'ul'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
     "name": "Nav",
     "kind": "component",
     "file": "packages/uikit/nav.tsx",
@@ -141,9 +590,9 @@ export const api: ApiEntry[] = [
     "name": "Page",
     "kind": "function",
     "file": "packages/uikit/nav.tsx",
-    "line": 63,
-    "doc": "One page in a `Nav`: fixed header with an optional back chevron, scrolling body.",
-    "signature": "const Page = ({ title, back, children }: { title: ReactNode; back?: () => void; children?: ReactNode }) => ( …"
+    "line": 76,
+    "doc": "",
+    "signature": "const Page = ({ title, back, backRef, children }: PageProps) => ( …"
   },
   {
     "pkg": "@doan-labs/ipduo-uikit",
@@ -156,12 +605,211 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/ipduo-uikit",
+    "name": "useNavigation",
+    "kind": "hook",
+    "file": "packages/uikit/nav.tsx",
+    "line": 10,
+    "doc": "Inside a `<Nav>`: `push((back) => <Page title=\"…\" back={back}>…</Page>)`.",
+    "signature": "const useNav = () => …"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "NavigationLink",
+    "kind": "component",
+    "file": "packages/uikit/navigation-link.tsx",
+    "line": 7,
+    "doc": "Keyboard-accessible push navigation. The destination renders inside a page with a back button.",
+    "signature": "function NavigationLink({ title, destination, ...props }: NavigationLinkProps)",
+    "members": [
+      {
+        "name": "title",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "destination",
+        "type": "ReactNode",
+        "optional": false,
+        "doc": ""
+      }
+    ],
+    "extends": [
+      "Omit<ButtonProps, 'onClick' | 'ref'>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "NavigationLinkProps",
+    "kind": "type",
+    "file": "packages/uikit/navigation-link.tsx",
+    "line": 6,
+    "doc": "Keyboard-accessible push navigation. The destination renders inside a page with a back button.",
+    "signature": "type NavigationLinkProps = Omit<ButtonProps, 'onClick' | 'ref'> & { title: string; destination: ReactNode }"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "NavigationStack",
+    "kind": "component",
+    "file": "packages/uikit/navigation-stack.tsx",
+    "line": 6,
+    "doc": "Push navigation retaining the established Nav transition and useNavigation contract.",
+    "signature": "function NavigationStack(props: NavigationStackProps)",
+    "members": [
+      {
+        "name": "children",
+        "type": "ReactNode",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "NavigationStackProps",
+    "kind": "type",
+    "file": "packages/uikit/navigation-stack.tsx",
+    "line": 5,
+    "doc": "Push navigation retaining the established Nav transition and useNavigation contract.",
+    "signature": "type NavigationStackProps = { children: ReactNode }",
+    "members": [
+      {
+        "name": "children",
+        "type": "ReactNode",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
     "name": "Num",
     "kind": "component",
     "file": "packages/uikit/num.tsx",
-    "line": 10,
+    "line": 11,
     "doc": "",
-    "signature": "function Num({\n  value,\n  format = whole,\n  suffix,\n  ...rest\n}: Omit<NumbersProps, 'value'> & { value: number | undefined })"
+    "signature": "function Num({\n  value,\n  format = whole,\n  suffix,\n  ...rest\n}: Omit<NumbersProps, 'value'> & { value: number | undefined })",
+    "members": [
+      {
+        "name": "value",
+        "type": "number | undefined",
+        "optional": false,
+        "doc": ""
+      }
+    ],
+    "extends": [
+      "Omit<NumbersProps, 'value'>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Placeholder",
+    "kind": "component",
+    "file": "packages/uikit/placeholder.tsx",
+    "line": 7,
+    "doc": "Centred empty, unavailable or loading content harvested from five existing apps.",
+    "signature": "function Placeholder<T extends ElementType = 'div'>({ as, xstyle, animate, ...props }: PlaceholderProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "PlaceholderProps",
+    "kind": "type",
+    "file": "packages/uikit/placeholder.tsx",
+    "line": 6,
+    "doc": "Centred empty, unavailable or loading content harvested from five existing apps.",
+    "signature": "type PlaceholderProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Row",
+    "kind": "component",
+    "file": "packages/uikit/row.tsx",
+    "line": 13,
+    "doc": "Grouped row with optional leading icon and trailing detail. Use as=\"button\" for an action.",
+    "signature": "function Row<T extends ElementType = 'div'>({\n  as,\n  label,\n  detail,\n  icon,\n  chevron,\n  children,\n  xstyle,\n  animate,\n  ...props\n}: RowProps<T>)",
+    "members": [
+      {
+        "name": "label",
+        "type": "ReactNode",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "detail",
+        "type": "ReactNode",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "icon",
+        "type": "ReactNode",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "chevron",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      }
+    ],
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "RowProps",
+    "kind": "type",
+    "file": "packages/uikit/row.tsx",
+    "line": 7,
+    "doc": "Grouped row with optional leading icon and trailing detail. Use as=\"button\" for an action.",
+    "signature": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Screen",
+    "kind": "component",
+    "file": "packages/uikit/screen.tsx",
+    "line": 8,
+    "doc": "Scrolling app content. Exposes display metadata without opening a bridge or starting effects.",
+    "signature": "function Screen<T extends ElementType = 'div'>({ as, xstyle, animate, ...props }: ScreenProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "ScreenProps",
+    "kind": "type",
+    "file": "packages/uikit/screen.tsx",
+    "line": 7,
+    "doc": "Scrolling app content. Exposes display metadata without opening a bridge or starting effects.",
+    "signature": "type ScreenProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Section",
+    "kind": "component",
+    "file": "packages/uikit/section.tsx",
+    "line": 7,
+    "doc": "Inset rounded group of rows, retaining the original grouped-list geometry.",
+    "signature": "function Section<T extends ElementType = 'div'>({ as, xstyle, animate, ...props }: SectionProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "SectionProps",
+    "kind": "type",
+    "file": "packages/uikit/section.tsx",
+    "line": 6,
+    "doc": "Inset rounded group of rows, retaining the original grouped-list geometry.",
+    "signature": "type SectionProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
   },
   {
     "pkg": "@doan-labs/ipduo-uikit",
@@ -171,6 +819,238 @@ export const api: ApiEntry[] = [
     "line": 5,
     "doc": "An SF Symbol, tinted by the element's colour through a mask.",
     "signature": "const Sym = ({ name, size = 17 }: { name: keyof typeof SYM; size?: number }) => ( …"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Symbol",
+    "kind": "component",
+    "file": "packages/uikit/symbol.tsx",
+    "line": 6,
+    "doc": "Decorative symbol inheriting text colour. Name the enclosing button when it is the only content.",
+    "signature": "function KitSymbol(props: SymbolProps)",
+    "extends": [
+      "ComponentProps<typeof Sym>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "SymbolProps",
+    "kind": "type",
+    "file": "packages/uikit/symbol.tsx",
+    "line": 5,
+    "doc": "Decorative symbol inheriting text colour. Name the enclosing button when it is the only content.",
+    "signature": "type SymbolProps = ComponentProps<typeof Sym>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Text",
+    "kind": "component",
+    "file": "packages/uikit/text.tsx",
+    "line": 18,
+    "doc": "Inline text or formatted animated number. Caption reproduces the harvested secondary label.",
+    "signature": "function Text<T extends ElementType = 'span'>({\n  as,\n  size = 'body',\n  weight,\n  color,\n  value,\n  format,\n  suffix,\n  children,\n  xstyle,\n  animate,\n  ...props\n}: TextProps<T>)",
+    "members": [
+      {
+        "name": "size",
+        "type": "'body' | 'caption' | 'footnote' | 'title'",
+        "optional": true,
+        "doc": "",
+        "default": "'body'"
+      },
+      {
+        "name": "weight",
+        "type": "'regular' | 'medium' | 'bold'",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "color",
+        "type": "'primary' | 'secondary' | 'accent'",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "value",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "format",
+        "type": "Intl.NumberFormatOptions",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "suffix",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ],
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "TextProps",
+    "kind": "type",
+    "file": "packages/uikit/text.tsx",
+    "line": 10,
+    "doc": "Inline text or formatted animated number. Caption reproduces the harvested secondary label.",
+    "signature": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: 'body' | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Title",
+    "kind": "component",
+    "file": "packages/uikit/title.tsx",
+    "line": 7,
+    "doc": "Fixed app header, or its compact trailing accessories. Use as=\"h1\" for a semantic heading.",
+    "signature": "function Title<T extends ElementType = 'div'>({\n  as,\n  variant = 'header',\n  xstyle,\n  animate,\n  ...props\n}: TitleProps<T>)",
+    "members": [
+      {
+        "name": "variant",
+        "type": "'header' | 'accessory'",
+        "optional": true,
+        "doc": "",
+        "default": "'header'"
+      }
+    ],
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "TitleProps",
+    "kind": "type",
+    "file": "packages/uikit/title.tsx",
+    "line": 6,
+    "doc": "Fixed app header, or its compact trailing accessories. Use as=\"h1\" for a semantic heading.",
+    "signature": "type TitleProps<T extends ElementType = 'div'> = PrimitiveProps<T> & { variant?: 'header' | 'accessory' }"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Toggle",
+    "kind": "component",
+    "file": "packages/uikit/toggle.tsx",
+    "line": 7,
+    "doc": "Native checkbox styled as the existing iOS switch. Supply a visible label or aria-label.",
+    "signature": "function Toggle({ xstyle, animate, ...props }: ToggleProps)",
+    "extends": [
+      "Omit<PrimitiveProps<'input'>, 'type' | 'as'>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "ToggleProps",
+    "kind": "type",
+    "file": "packages/uikit/toggle.tsx",
+    "line": 6,
+    "doc": "Native checkbox styled as the existing iOS switch. Supply a visible label or aria-label.",
+    "signature": "type ToggleProps = Omit<PrimitiveProps<'input'>, 'type' | 'as'>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "VStack",
+    "kind": "component",
+    "file": "packages/uikit/v-stack.tsx",
+    "line": 7,
+    "doc": "A shrinking vertical stack that fills its flex parent, including the cover display.",
+    "signature": "function VStack<T extends ElementType = 'div'>({ as, xstyle, animate, ...props }: VStackProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "VStackProps",
+    "kind": "type",
+    "file": "packages/uikit/v-stack.tsx",
+    "line": 6,
+    "doc": "A shrinking vertical stack that fills its flex parent, including the cover display.",
+    "signature": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "Widget",
+    "kind": "component",
+    "file": "packages/uikit/widget.tsx",
+    "line": 16,
+    "doc": "Host-rendered declarative snapshot. Refresh remains the app owner's responsibility.",
+    "signature": "function Widget({ snapshot, updatedAt, onOpen }: WidgetProps)",
+    "members": [
+      {
+        "name": "snapshot",
+        "type": "WidgetSnapshot",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "updatedAt",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "onOpen",
+        "type": "(element: HTMLElement, arg?: string) => void",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "WidgetProps",
+    "kind": "type",
+    "file": "packages/uikit/widget.tsx",
+    "line": 11,
+    "doc": "Host-rendered declarative snapshot. Refresh remains the app owner's responsibility.",
+    "signature": "type WidgetProps = {\n  snapshot: WidgetSnapshot\n  updatedAt: number\n  onOpen: (element: HTMLElement, arg?: string) => void\n}",
+    "members": [
+      {
+        "name": "snapshot",
+        "type": "WidgetSnapshot",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "updatedAt",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "onOpen",
+        "type": "(element: HTMLElement, arg?: string) => void",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "WidgetLabel",
+    "kind": "component",
+    "file": "packages/uikit/widget-label.tsx",
+    "line": 7,
+    "doc": "Passive text label using existing widget typography; never fetches or schedules refreshes.",
+    "signature": "function WidgetLabel<T extends ElementType = 'b'>({ as, xstyle, animate, ...props }: WidgetLabelProps<T>)",
+    "extends": [
+      "PrimitiveProps<T>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/ipduo-uikit",
+    "name": "WidgetLabelProps",
+    "kind": "type",
+    "file": "packages/uikit/widget-label.tsx",
+    "line": 6,
+    "doc": "Passive text label using existing widget typography; never fetches or schedules refreshes.",
+    "signature": "type WidgetLabelProps<T extends ElementType = 'b'> = PrimitiveProps<T>"
   }
 ]
 
@@ -183,8 +1063,8 @@ export const versions: Record<string, { name: string; version: string; changelog
   },
   "uikit": {
     "name": "@doan-labs/ipduo-uikit",
-    "version": "0.0.0",
-    "changelog": null
+    "version": "0.1.0",
+    "changelog": "# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
   },
   "shell": {
     "name": "@doan-labs/ipduo-shell",

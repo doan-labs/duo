@@ -5,7 +5,6 @@ import { versions } from '../generated/api'
 import { Section } from '../layout'
 import { parse, render } from '../markdown'
 import { PageTop, Reveal } from '../page-parts'
-import { Notice } from '../status'
 import { color, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
@@ -24,15 +23,10 @@ function Page() {
   return (
     <Section narrow>
       <PageTop
-        eyebrow="Changelog · Nothing released yet"
+        eyebrow="Changelog"
         title="Changelog"
-        lead="The SDK's, the kit's and the shell's, on one page, read from each package's CHANGELOG.md at build time."
+        lead="Every package on one page, read from its CHANGELOG.md at build time. Apps bundle the SDK and kit they compile against, so a new version here never breaks an installed app."
       />
-      <Notice status="unfinished">
-        No package has published a release yet, so there is no changelog to show. Every version below is the workspace
-        placeholder 0.0.0. The first real entries arrive when the SDK's host contract and the kit's first components
-        ship.
-      </Notice>
       <Reveal>
         <ul {...stylex.props(styles.cards)}>
           {ORDER.map((k) => {

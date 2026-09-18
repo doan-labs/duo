@@ -689,3 +689,39 @@ The footer credits the studio: the Doan mark (the four-shape drawing from
 doan-labs.com's handoff file, inlined so it takes `currentColor`) and "Made by
 Doan Labs" linking to doan-labs.com.
 
+
+## 53. The site's badges follow the progress records, not the plan files' age
+
+2026-09-18. After the rebase onto stages 2–5, `packages/web/src/docs.ts` stopped
+treating every `docs/platform/*.md` as a planning document. The files that
+carry their own "Implemented / Not implemented" header now render as "Works
+today" with a note that the roadmap sections inside them remain intent; the
+progress records are "Works today"; the revision-2 contract is "Works today"
+because the shell implements it, with its superseded A–M checklist named in the
+note; `web.md` stays "Proposed" until something is deployed. Pages that quote
+commands quote the CLI's real ones and say the packages are local archives, not
+npm. Cost: the badge is per file, so a reader of `store.md` sees one badge over
+a document that is half shipped and half roadmap; the file's own header does
+the finer split, and the note under the badge points at it. Alternative
+rejected: per-section badges parsed from headings, which would put a rule in
+the site about how the plan files are written.
+
+## 54. The site's docs are written for developers, not rendered from the repository's notes
+
+2026-09-18, the same day, superseding decision 53 and the "docs live next to
+code" rule in `docs/platform/web.md`. `/docs` no longer renders
+`docs/**/*.md`; it renders `packages/web/content/docs/*.md`, eleven pages
+written for someone building an app: Introduction, Getting started, Your first
+app, Manifest, Lifecycle, Displays and the fold, Storage, Permissions, CLI,
+Catalogs, Publishing. The status badges (`src/status.tsx`) and the notices
+under every heading are gone with it, and the eyebrows read "Get started",
+"Reference", not "Get started · Works today". The reason: the repository's
+notes are planning records, progress logs and a decision journal, half of each
+file describing roadmap, and a badge per file could not make them read as
+documentation; the owner said so after seeing them. The plan files stay where
+they are and the site links to GitHub for them. Cost: two places now describe
+the platform, and a contract change has to reach `content/docs` by hand; the
+SDK and kit references remain generated, and the pages quote only commands
+that `packages/cli/README.md` documents. Alternative rejected: keeping the
+repository docs as a fourth sidebar group, which would have put the same
+"Planning document" badges back one click away.

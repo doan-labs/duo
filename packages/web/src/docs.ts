@@ -1,87 +1,57 @@
-// Every Markdown file under docs/ becomes a page at /docs/<path without .md>.
-// The files are bundled as strings at build time; the site never copies them.
-import type { Status } from './status'
-
-const files = import.meta.glob('../../../docs/**/*.md', { query: '?raw', import: 'default', eager: true }) as Record<
+// The developer documentation: every Markdown file under content/docs/ is a
+// page at /docs/<name>. Bundled as strings at build time.
+const files = import.meta.glob('../content/docs/*.md', { query: '?raw', import: 'default', eager: true }) as Record<
   string,
   string
 >
 
+/** Repository path the files live under; links in the Markdown resolve against it. */
+export const ROOT = 'packages/web/content/docs/'
+export const slugOf = (path: string) => path.slice(ROOT.length, -'.md'.length)
+
 export type Doc = {
-  /** Repository path, `docs/platform/manifest.md`. */
+  /** Repository path, `packages/web/content/docs/manifest.md`. */
   path: string
-  /** Route param, `platform/manifest`. */
+  /** Route param, `manifest`. */
   slug: string
   title: string
-  group: 'Platform plan' | 'Progress' | 'Repository'
-  status: Status
-  /** What the badge means for this file, one sentence. */
-  note: string
+  /** The first paragraph, plain text, for the index. */
+  summary: string
+  group: (typeof groups)[number]
   body: string
 }
 
-const ORDER = [
-  'platform/README',
-  'platform/monorepo',
-  'platform/manifest',
-  'platform/runtime',
-  'platform/uikit',
-  'platform/store',
-  'platform/updates',
-  'platform/dev',
-  'platform/publishing',
-  'platform/security',
-  'platform/web',
-  'platform/decisions',
-  'platform/progress/README',
-  'platform/progress/migration',
-  'platform/progress/contract-review-1',
-  'platform/progress/contract',
-  'architecture',
-  'working',
-  'decisions',
-  'debug'
-]
+export const groups = ['Start', 'Build', 'Ship'] as const
 
-function status(slug: string): Pick<Doc, 'status' | 'note'> {
-  if (slug === 'platform/progress/migration')
-    return { status: 'works', note: 'Implemented and accepted: the monorepo the site is built from.' }
-  if (slug === 'platform/progress/contract')
-    return {
-      status: 'proposed',
-      note: 'The stage 2 runtime contract, revision 2. Accepted as the design; the SDK, bridge and store it describes are being implemented and none of it ships yet.'
-    }
-  if (slug === 'platform/progress/contract-review-1')
-    return {
-      status: 'proposed',
-      note: 'The review of revision 1, kept verbatim. Historical; superseded by revision 2.'
-    }
-  if (slug.startsWith('platform/'))
-    return {
-      status: 'plan',
-      note: 'Intent, not shipped code. Commands, packages and APIs named here do not exist until a progress record says they do.'
-    }
-  return { status: 'works', note: 'Describes the current code in the repository.' }
+const ORDER: Record<Doc['group'], string[]> = {
+  Start: ['introduction', 'getting-started', 'your-first-app'],
+  Build: ['manifest', 'lifecycle', 'displays', 'storage', 'permissions'],
+  Ship: ['cli', 'catalogs', 'publishing']
+}
+
+const rank = (slug: string) => {
+  const flat = Object.values(ORDER).flat()
+  const i = flat.indexOf(slug)
+  return i === -1 ? flat.length : i
 }
 
 export const docs: Doc[] = Object.entries(files)
   .map(([key, body]) => {
-    const path = key.replace(/^(\.\.\/)+/, '')
-    const slug = path.slice('docs/'.length, -'.md'.length)
+    const path = ROOT + key.slice(key.lastIndexOf('/') + 1)
+    const slug = slugOf(path)
     const title = /^#\s+(.+)$/m.exec(body)?.[1]?.trim() ?? slug
-    const group: Doc['group'] = slug.startsWith('platform/progress/')
-      ? 'Progress'
-      : slug.startsWith('platform/')
-        ? 'Platform plan'
-        : 'Repository'
-    return { path, slug, title, group, body, ...status(slug) }
+    const summary =
+      body
+        .split(/\n\s*\n/)
+        .map((b) => b.trim())
+        .find((b) => b && !b.startsWith('#'))
+        ?.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/[`*]/g, '')
+        .replace(/\s+/g, ' ') ?? ''
+    const group = (groups.find((g) => ORDER[g].includes(slug)) ?? 'Build') as Doc['group']
+    return { path, slug, title, summary, group, body }
   })
-  .sort((a, b) => {
-    const ia = ORDER.indexOf(a.slug)
-    const ib = ORDER.indexOf(b.slug)
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.slug.localeCompare(b.slug)
-  })
+  .sort((a, b) => rank(a.slug) - rank(b.slug))
 
 export const known = new Set(docs.map((d) => d.path))
 export const doc = (slug: string) => docs.find((d) => d.slug === slug)
-export const groups = ['Platform plan', 'Progress', 'Repository'] as const

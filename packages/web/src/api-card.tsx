@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ApiEntry } from './api-types'
 import { known } from './docs'
+import { Line } from './highlight'
 import { inline, parse, render } from './markdown'
 import { blob } from './site'
 import { color, font, radius } from './tokens.stylex'
@@ -9,6 +10,7 @@ const KIND: Record<ApiEntry['kind'], string> = {
   component: 'Component',
   hook: 'Hook',
   function: 'Function',
+  class: 'Class',
   type: 'Type',
   value: 'Value'
 }
@@ -29,8 +31,25 @@ export function ApiCard({ entry, heading = 'h2' }: { entry: ApiEntry; heading?: 
         <p {...stylex.props(styles.undocumented)}>No TSDoc on this export yet.</p>
       )}
       <pre {...stylex.props(styles.pre)}>
-        <code>{entry.signature}</code>
+        <code>
+          <Line code={entry.signature} />
+        </code>
       </pre>
+      <ApiTable entry={entry} />
+      <p {...stylex.props(styles.source)}>
+        <a href={`${blob(entry.file)}#L${entry.line}`} {...stylex.props(styles.link)}>
+          {entry.file}:{entry.line}
+        </a>
+      </p>
+    </section>
+  )
+}
+
+/** Props or members table plus the "Also accepts" line; the kit pages use it under their own heading. */
+export function ApiTable({ entry }: { entry: ApiEntry }) {
+  const ctx = { from: entry.file, known }
+  return (
+    <>
       {entry.members && entry.members.length > 0 && (
         <div {...stylex.props(styles.tableWrap)}>
           <table {...stylex.props(styles.table)}>
@@ -38,6 +57,7 @@ export function ApiCard({ entry, heading = 'h2' }: { entry: ApiEntry; heading?: 
               <tr>
                 <th {...stylex.props(styles.th)}>{entry.kind === 'component' ? 'Prop' : 'Member'}</th>
                 <th {...stylex.props(styles.th)}>Type</th>
+                {entry.kind === 'component' && <th {...stylex.props(styles.th)}>Default</th>}
                 <th {...stylex.props(styles.th)}>Description</th>
               </tr>
             </thead>
@@ -51,8 +71,13 @@ export function ApiCard({ entry, heading = 'h2' }: { entry: ApiEntry; heading?: 
                     </code>
                   </td>
                   <td {...stylex.props(styles.td)}>
-                    <code {...stylex.props(styles.code)}>{m.type}</code>
+                    <code {...stylex.props(styles.code, styles.type)}>{m.type}</code>
                   </td>
+                  {entry.kind === 'component' && (
+                    <td {...stylex.props(styles.td)}>
+                      {m.default ? <code {...stylex.props(styles.code, styles.type)}>{m.default}</code> : '–'}
+                    </td>
+                  )}
                   <td {...stylex.props(styles.td)}>{m.doc ? inline(m.doc.replace(/\n+/g, ' '), ctx) : ''}</td>
                 </tr>
               ))}
@@ -60,12 +85,37 @@ export function ApiCard({ entry, heading = 'h2' }: { entry: ApiEntry; heading?: 
           </table>
         </div>
       )}
-      <p {...stylex.props(styles.source)}>
-        <a href={`${blob(entry.file)}#L${entry.line}`} {...stylex.props(styles.link)}>
-          {entry.file}:{entry.line}
-        </a>
-      </p>
-    </section>
+      {entry.extends && entry.extends.length > 0 && (
+        <p {...stylex.props(styles.extends)}>{extendsLine(entry.extends)}</p>
+      )}
+    </>
+  )
+}
+
+/** `PrimitiveProps<'button'>` is the kit's shared contract; spell it out rather than naming the type. */
+function extendsLine(types: string[]) {
+  const parts = types.map((t, i) => {
+    const primitive = /^PrimitiveProps<(.+)>$/.exec(t)
+    const tag = primitive?.[1]?.match(/^'(\w+)'$/)?.[1]
+    return primitive ? (
+      <span key={t}>
+        every attribute of {tag ? <code {...stylex.props(styles.code)}>{`<${tag}>`}</code> : 'the rendered element'},
+        plus <code {...stylex.props(styles.code)}>as</code>, <code {...stylex.props(styles.code)}>xstyle</code> and{' '}
+        <code {...stylex.props(styles.code)}>animate</code>
+        {i < types.length - 1 ? ', ' : ''}
+      </span>
+    ) : (
+      <span key={t}>
+        <code {...stylex.props(styles.code)}>{t}</code>
+        {i < types.length - 1 ? ', ' : ''}
+      </span>
+    )
+  })
+  return (
+    <>
+      Also accepts {parts}. Raw <code {...stylex.props(styles.code)}>style</code> and{' '}
+      <code {...stylex.props(styles.code)}>className</code> are refused.
+    </>
   )
 }
 
@@ -124,6 +174,8 @@ const styles = stylex.create({
     marginBottom: '20px'
   },
   code: { fontFamily: font.mono, fontSize: '13px', color: color.text },
+  type: { color: color.accent },
+  extends: { fontSize: '15px', lineHeight: 1.6, color: color.text2, margin: 0, marginBottom: '20px' },
   tableWrap: {
     overflowX: 'auto',
     marginBottom: '20px',

@@ -238,13 +238,8 @@ export function Prose({ children }: { children: ReactNode }) {
   return <article {...stylex.props(styles.prose)}>{children}</article>
 }
 
-export function Title({ children, badge }: { children: ReactNode; badge?: ReactNode }) {
-  return (
-    <h1 {...stylex.props(styles.title)}>
-      {children}
-      {badge && <span {...stylex.props(styles.titleBadge)}>{badge}</span>}
-    </h1>
-  )
+export function Title({ children }: { children: ReactNode }) {
+  return <h1 {...stylex.props(styles.title)}>{children}</h1>
 }
 
 const MID = '@media (max-width: 1068px)'
@@ -475,6 +470,5 @@ const styles = stylex.create({
     fontWeight: 600,
     letterSpacing: '-0.03em',
     color: color.text
-  },
-  titleBadge: { display: 'inline-block', marginLeft: '12px', verticalAlign: 'middle' }
+  }
 })

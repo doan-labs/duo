@@ -48,8 +48,9 @@ The Tauri crate lives under `packages/shell/desktop`, while `.cargo` and its
 shared output directory remain at the root. The CLI supports local create/check
 and `packages/web` is the launch site and developer docs, with its own Vite
 build that copies the shell's `dist/` under `/device/` to embed it
-([progress/web.md](platform/progress/web.md)). Stage 2 adds the runtime and
-catalog installation to the earlier monorepo migration.
+([progress/web.md](platform/progress/web.md)). Stages 2–5 add the runtime,
+catalog installation, the CLI workflow and the kit harvest to the earlier
+monorepo migration; the site's badges follow those checkpoints.
 
 ## Geometry and framing
 

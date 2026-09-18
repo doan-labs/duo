@@ -74,8 +74,9 @@ compatibility have already been verified.
 
 ## Rules
 
-- Docs live next to code. The site selects current platform references and generated
-  kit API data explicitly; it does not copy them or automatically publish archives,
-  roadmap pages or maintainer reports as user instructions.
+- Docs live next to code. Superseded by decision 54 (2026-09-18): the site's
+  `/docs` is written for developers in `packages/web/content/docs/`; only the
+  SDK and kit references are generated from the source. This folder stays the
+  planning record and is not rendered.
 - No blog, no accounts, no forum. GitHub Discussions link in the footer.
 - Ships after the kit exists. Building it earlier means writing it twice.
