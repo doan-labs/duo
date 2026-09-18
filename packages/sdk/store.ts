@@ -13,6 +13,12 @@ export type StoreRow = {
   development?: boolean
   progress?: number
   error?: string
+  /** Release icon URL: a catalog file, or an object URL for a release only installed locally. */
+  icon?: string
+  repo?: string
+  /** Download size of the offered release. */
+  bytes?: number
+  note?: string
 }
 /** `source` names the catalog the rows came from: the Duo catalog, or a developer catalog URL. */
 export type StoreState = { rows: StoreRow[]; error?: string; loading: boolean; source: string; developer: boolean }

@@ -19,6 +19,17 @@ const listeners = new Set<() => void>()
 const progress = new Map<string, number>()
 const errors = new Map<string, string>()
 const pending = new Set<string>()
+// Icons for releases that are installed but not in the selected catalog, one object URL per release.
+const localIcons = new Map<string, { release: string; url: string }>()
+function localIcon(id: string, release: string, blob: Blob | undefined) {
+  const old = localIcons.get(id)
+  if (old?.release === release) return old.url
+  if (old) URL.revokeObjectURL(old.url)
+  if (!blob) return undefined
+  const url = URL.createObjectURL(blob)
+  localIcons.set(id, { release, url })
+  return url
+}
 const emit = () => {
   for (const cb of listeners) cb()
 }
@@ -68,7 +79,9 @@ async function sync() {
       failed: app.failedVersion,
       recovery: !!app.recovery,
       compatible: supports(bundle.release.build.sdk),
-      error: errors.get(app.id)
+      error: errors.get(app.id),
+      icon: localIcon(app.id, app.current, bundle.icons[0]),
+      repo: manifest.repo
     })
   }
   for (const [id, { bundle }] of development) {
@@ -84,7 +97,9 @@ async function sync() {
       recovery: false,
       compatible: true,
       development: true,
-      error: errors.get(id)
+      error: errors.get(id),
+      icon: localIcon(id, releaseId(bundle.release), bundle.icons[0]),
+      repo: manifest.repo
     })
   }
   state = {
@@ -106,7 +121,11 @@ async function sync() {
           recovery: !!current?.recovery,
           compatible: !!release,
           progress: progress.get(id),
-          error: errors.get(id)
+          error: errors.get(id),
+          icon: release ? `${source}/apps/${id}/${release.release}/icon-1024.png` : undefined,
+          repo: app.repo,
+          bytes: release?.bytes,
+          note: release?.note
         }
       })
       .concat(local)

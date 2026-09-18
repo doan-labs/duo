@@ -5,6 +5,22 @@ UPDATE/remove, staging while sessions run, restore/retry and DEV namespace remov
 The default catalog is the curated one published from `community-apps/` ([publication](publishing.md));
 curated shelves remain [roadmap](roadmap.md); there is no catalog polling, Update All or native Software Update.
 
+## The screen
+
+`packages/apps/appstore/index.tsx`, a baked `light` app inside a kit `Nav`. The root page
+has the large title with a source chip (green dot for the Duo catalog, orange with the host
+for a developer catalog) and Refresh, a search field, the Apps/Updates segmented control
+behind `stageUpdates`, a featured card (one compatible official release per day, rotating),
+then **From Doan Labs**, **Community** and **Local previews** groups of rows: 62 px icon,
+name, `author · version`, lane and permission tags with glyphs, and the GET / OPEN / UPDATE /
+Retry update capsule or a download ring. Notices (errors as `role="alert"`, "Updates when …
+closes", **Restore previous version**) sit under the row. Tapping an icon or name pushes a
+detail page: version, size, lane, licence and access facts, a Privacy list of the granted
+permissions, View source (the manifest repo, through the native bridge) and **Remove App**.
+Rows carry `data-store-app`; the checks drive those buttons by their text. The runtime gives
+each row `icon` (a catalog file, or an object URL for a locally installed release), `repo`,
+`bytes` and the optional release `note`.
+
 ## Default and developer catalogs
 
 At boot and on Refresh the Store loads the first available of `/catalog/index.json` (the

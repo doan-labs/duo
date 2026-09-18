@@ -1,186 +1,554 @@
+// App Store. The real catalog: featured release on top, official and community
+// rows with GET / OPEN, a detail page per app and the developer tools at the
+// bottom. Every row and button here is what the store checks drive.
 import type { Os } from '@doan-labs/duo-sdk'
 import { PREVIEW_FEATURES } from '@doan-labs/duo-sdk/preview-features.ts'
-import type { Store } from '@doan-labs/duo-sdk/store.ts'
-import { LargeTitle, Screen } from '@doan-labs/duo-uikit'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import type { Store, StoreRow } from '@doan-labs/duo-sdk/store.ts'
+import { LargeTitle, Placeholder, Screen, Section, VStack } from '@doan-labs/duo-uikit'
+import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import { art } from '@doan-labs/duo-uikit/shared.ts'
+import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useState, useSyncExternalStore } from 'react'
+import { type ReactNode, useState, useSyncExternalStore } from 'react'
+import { styles } from './styles.ts'
 
 /** Where app authors go to publish; opened outside the device, so the shell hands us the opener. */
 const SUBMIT_URL = 'https://duo.doan-labs.com/publish'
+type Open = Os['open']
+type External = (url: string) => void
 
-export function AppStore({ os, openExternal }: { os: Os; openExternal: (url: string) => void }) {
-  return os.store ? <Shelf store={os.store} open={os.open} openExternal={openExternal} /> : <p>Store unavailable</p>
+/** Permission labels come from the runtime; the glyph is ours. */
+const PERM_GLYPH: Record<string, Parameters<typeof Sym>[0]['name']> = {
+  Location: 'location',
+  Photos: 'grid',
+  'Read clipboard': 'note',
+  'Write clipboard': 'compose'
 }
-function Shelf({ store, open, openExternal }: { store: Store; open: Os['open']; openExternal: (url: string) => void }) {
+const size = (bytes?: number) =>
+  bytes === undefined
+    ? '—'
+    : bytes < 1e6
+      ? `${Math.max(1, Math.round(bytes / 1e3))} KB`
+      : `${(bytes / 1e6).toFixed(1)} MB`
+const version = (row: StoreRow) => (row.installed ?? row.version)?.split('+')[0] ?? 'Unavailable'
+const hasUpdate = (row: StoreRow) =>
+  PREVIEW_FEATURES.stageUpdates && !!row.installed && !row.development && !!row.version && row.version !== row.installed
+const needsRetry = (row: StoreRow) =>
+  !!row.failed && (!row.version || row.version === row.failed || row.version === row.installed)
+
+export function AppStore({ os, openExternal }: { os: Os; openExternal: External }) {
+  return os.store ? (
+    <Nav>
+      <Shelf store={os.store} open={os.open} openExternal={openExternal} />
+    </Nav>
+  ) : (
+    <Placeholder>Store unavailable</Placeholder>
+  )
+}
+
+function Shelf({ store, open, openExternal }: { store: Store; open: Open; openExternal: External }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
+  const { push } = useNav()
   const [tab, setTab] = useState('Apps')
   const [query, setQuery] = useState('')
-  const [catalogUrl, setCatalogUrl] = useState('')
-  const [catalogError, setCatalogError] = useState('')
+  const q = query.trim().toLowerCase()
   const rows = state.rows.filter(
     (row) =>
-      row.name.toLowerCase().includes(query.toLowerCase()) &&
+      (row.name.toLowerCase().includes(q) || row.author.toLowerCase().includes(q)) &&
       (tab !== 'Updates' || (row.installed && (row.version !== row.installed || row.failed || row.candidate)))
   )
+  const official = rows.filter((r) => r.lane === 'official')
+  const community = rows.filter((r) => r.lane === 'community')
+  const development = rows.filter((r) => r.lane === 'development')
+  // One featured app a day, rotating through the compatible official releases.
+  const day = Math.floor(Date.now() / 864e5)
+  const pool = state.rows.filter((r) => r.lane === 'official' && r.compatible)
+  const featured = !q && tab === 'Apps' && pool.length ? pool[day % pool.length] : undefined
+  const show = (row: StoreRow) =>
+    push((back) => <Detail id={row.id} store={store} open={open} openExternal={openExternal} back={back} />)
+  const tabs = PREVIEW_FEATURES.stageUpdates ? ['Apps', 'Updates'] : ['Apps']
   return (
-    <Screen>
-      <LargeTitle as="h1">App Store</LargeTitle>
-      <nav aria-label="Store sections" {...stylex.props(styles.actions)}>
-        {(PREVIEW_FEATURES.stageUpdates ? ['Apps', 'Updates'] : ['Apps']).map((name) => (
-          <button key={name} type="button" aria-pressed={name === tab} onClick={() => setTab(name)}>
-            {name}
-          </button>
-        ))}
-      </nav>
-      <input
-        aria-label="Search apps"
-        placeholder="Search apps"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      <button
-        type="button"
-        onClick={() => {
-          void store.refresh()
-        }}
-      >
-        Refresh catalog
-      </button>
-      <p>
-        Catalog: {state.source}
-        {state.developer && (
+    <VStack>
+      <div {...stylex.props(styles.top)}>
+        <LargeTitle as="h1">App Store</LargeTitle>
+        <div {...stylex.props(styles.topRight)}>
+          <span {...stylex.props(styles.chip, state.developer && styles.chipDev)} title={state.source}>
+            {!state.developer && <i {...stylex.props(styles.chipDot)} />}
+            {state.developer ? new URL(state.source).host : state.source}
+          </span>
           <button
             type="button"
+            aria-label="Refresh catalog"
+            {...stylex.props(styles.iconBtn, shared.press)}
             onClick={() => {
-              void store.resetCatalog()
+              void store.refresh()
             }}
           >
-            Back to Duo catalog
+            <Sym name="reload" size={15} />
           </button>
-        )}
-      </p>
-      {state.loading && <p role="status">Loading catalog…</p>}
-      {state.error && <p role="status">Catalog offline. Showing the last available releases.</p>}
-      {rows.map((row) => (
-        <section key={row.id} data-store-app={row.id} {...stylex.props(styles.row)}>
-          <h2>
-            {row.name} {row.lane === 'community' && <small>Community</small>}
-          </h2>
-          <p>
-            {row.author} · {row.version?.split('+')[0] ?? 'Unavailable'}
-          </p>
-          <p>Can use: {row.permissions.join(', ') || 'none'}</p>
-          {row.development && <p>Local preview. Remove App clears this preview’s private data.</p>}
-          {row.error && <p role="alert">{row.error}</p>}
-          {!row.compatible ? (
-            <>
-              <p>Requires a newer platform version</p>
-              <button type="button" onClick={() => location.reload()}>
-                Reload platform
+        </div>
+      </div>
+      <Screen>
+        <label {...stylex.props(styles.search)}>
+          <Sym name="search" size={15} />
+          <input
+            aria-label="Search apps"
+            placeholder="Games, Apps, Stories and More"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            {...stylex.props(styles.searchInput)}
+          />
+        </label>
+        {tabs.length > 1 && (
+          <nav aria-label="Store sections" {...stylex.props(styles.seg)}>
+            {tabs.map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={name === tab}
+                onClick={() => setTab(name)}
+                {...stylex.props(styles.segBtn, name === tab && styles.segOn)}
+              >
+                {name}
               </button>
-            </>
-          ) : row.progress !== undefined ? (
-            <progress aria-label={`Downloading ${row.name}`} value={row.progress} max={1} />
-          ) : (
-            <div {...stylex.props(styles.actions)}>
-              {!row.installed ? (
+            ))}
+          </nav>
+        )}
+        {state.error && (
+          <div role="status" {...stylex.props(styles.banner)}>
+            <Sym name="antenna" size={14} />
+            Catalog offline. Showing the last available releases.
+          </div>
+        )}
+        {state.loading && !state.rows.length ? (
+          <div role="status" {...stylex.props(styles.center)}>
+            <i {...stylex.props(styles.spinner, animations.spin)} />
+            Loading catalog…
+          </div>
+        ) : (
+          <>
+            {featured && <Featured row={featured} store={store} open={open} onShow={() => show(featured)} />}
+            <Group title="From Doan Labs" rows={official} store={store} open={open} onShow={show} />
+            <Group title="Community" rows={community} store={store} open={open} onShow={show} />
+            <Group title="Local previews" rows={development} store={store} open={open} onShow={show} />
+            {!rows.length && (
+              <Placeholder xstyle={[styles.center]}>No {tab === 'Updates' ? 'updates' : 'apps'} found.</Placeholder>
+            )}
+          </>
+        )}
+        <Developer store={store} openExternal={openExternal} source={state.source} developer={state.developer} />
+      </Screen>
+    </VStack>
+  )
+}
+
+function Featured({ row, store, open, onShow }: { row: StoreRow; store: Store; open: Open; onShow: () => void }) {
+  return (
+    <div {...stylex.props(styles.hero, styles.heroArt(art(row.name, 50)), shared.select)}>
+      <button type="button" onClick={onShow} {...stylex.props(styles.heroTop, styles.grow, styles.heroBtn)}>
+        <div {...stylex.props(styles.kicker)}>{row.installed ? 'On your Duo' : 'Featured today'}</div>
+        <div>
+          <div {...stylex.props(styles.heroName)}>{row.name}</div>
+          <div {...stylex.props(styles.heroBlurb)}>
+            {row.permissions.length ? `Uses ${row.permissions.join(' and ').toLowerCase()}` : 'Runs fully sandboxed'} ·
+            open source
+          </div>
+        </div>
+      </button>
+      <div {...stylex.props(styles.heroBar)}>
+        <Icon row={row} xstyle={styles.heroIcon} />
+        <div {...stylex.props(styles.heroInfo)}>
+          <div {...stylex.props(styles.heroTitle)}>{row.name}</div>
+          <div {...stylex.props(styles.heroSub)}>
+            {row.author} · {size(row.bytes)}
+          </div>
+        </div>
+        <Action row={row} store={store} open={open} light />
+      </div>
+    </div>
+  )
+}
+
+function Group({
+  title,
+  rows,
+  store,
+  open,
+  onShow
+}: {
+  title: string
+  rows: StoreRow[]
+  store: Store
+  open: Open
+  onShow: (row: StoreRow) => void
+}) {
+  if (!rows.length) return null
+  return (
+    <>
+      <div {...stylex.props(styles.h)}>
+        {title}
+        <span {...stylex.props(styles.hCount)}>
+          {rows.length} {rows.length === 1 ? 'app' : 'apps'}
+        </span>
+      </div>
+      <Section>
+        {rows.map((row) => (
+          <Item key={row.id} row={row} store={store} open={open} onShow={() => onShow(row)} />
+        ))}
+      </Section>
+    </>
+  )
+}
+
+function Item({ row, store, open, onShow }: { row: StoreRow; store: Store; open: Open; onShow: () => void }) {
+  const notes = Notices(row, store)
+  return (
+    <div data-store-app={row.id}>
+      <div {...stylex.props(styles.item)}>
+        <button type="button" onClick={onShow} aria-label={`${row.name} details`} {...stylex.props(styles.bare)}>
+          <Icon row={row} />
+        </button>
+        <button type="button" onClick={onShow} {...stylex.props(styles.info, styles.bare)}>
+          <span {...stylex.props(styles.name)}>{row.name}</span>
+          <span {...stylex.props(styles.sub)}>
+            {row.author} · {version(row)}
+          </span>
+          <span {...stylex.props(styles.perms)}>
+            {row.development ? (
+              <span {...stylex.props(styles.tag, styles.tagDev)}>DEV</span>
+            ) : (
+              row.lane === 'community' && <span {...stylex.props(styles.tag)}>Community</span>
+            )}
+            {row.permissions.map((p) => (
+              <span key={p} title={p} {...stylex.props(styles.tag)}>
+                <Sym name={PERM_GLYPH[p] ?? 'lock'} size={10} />
+                {p}
+              </span>
+            ))}
+            {!row.permissions.length && !row.development && (
+              <span {...stylex.props(styles.tag)}>
+                <Sym name="lock" size={10} />
+                Sandboxed
+              </span>
+            )}
+          </span>
+        </button>
+        <Action row={row} store={store} open={open} />
+      </div>
+      {notes && <div {...stylex.props(styles.itemTail)}>{notes}</div>}
+    </div>
+  )
+}
+
+/** Error, staged update and recovery notices; the checks look for these buttons next to the row. */
+function Notices(row: StoreRow, store: Store): ReactNode {
+  const parts: ReactNode[] = []
+  if (row.error)
+    parts.push(
+      <span key="e" role="alert" {...stylex.props(styles.alert)}>
+        {row.error}
+      </span>
+    )
+  if (row.candidate && !row.development)
+    parts.push(
+      <span key="c" {...stylex.props(styles.note)}>
+        Updates when {row.name} closes
+      </span>
+    )
+  if (row.recovery)
+    parts.push(
+      <button
+        key="r"
+        type="button"
+        {...stylex.props(styles.plain)}
+        onClick={() => {
+          void store.restore(row.id)
+        }}
+      >
+        Restore previous version
+      </button>
+    )
+  return parts.length ? parts : null
+}
+
+/** GET, OPEN, UPDATE, Retry update, a download ring or a reload prompt, whatever the row is in. */
+function Action({ row, store, open, light }: { row: StoreRow; store: Store; open: Open; light?: boolean }) {
+  const pill = (label: string, onClick: () => void, filled = false) => (
+    <button
+      type="button"
+      onClick={onClick}
+      {...stylex.props(styles.pill, filled && styles.pillFilled, light && !filled && styles.pillLight)}
+    >
+      {label}
+    </button>
+  )
+  if (!row.compatible)
+    return (
+      <div {...stylex.props(styles.action)}>
+        {pill('Reload platform', () => location.reload())}
+        <span {...stylex.props(styles.pct)}>Needs a newer Duo</span>
+      </div>
+    )
+  if (row.progress !== undefined)
+    return (
+      <div {...stylex.props(styles.action)}>
+        <div
+          role="progressbar"
+          aria-label={`Downloading ${row.name}`}
+          aria-valuenow={Math.round(row.progress * 100)}
+          {...stylex.props(styles.ring(row.progress))}
+        >
+          <i {...stylex.props(styles.ringHole)} />
+          <i {...stylex.props(styles.ringStop)} />
+        </div>
+        <span {...stylex.props(styles.pct)}>{Math.round(row.progress * 100)}%</span>
+      </div>
+    )
+  if (!row.installed)
+    return (
+      <div {...stylex.props(styles.action)}>
+        {pill('GET', () => {
+          void store.install(row.id)
+        })}
+        <span {...stylex.props(styles.pct)}>{size(row.bytes)}</span>
+      </div>
+    )
+  if (PREVIEW_FEATURES.stageUpdates && !row.development && needsRetry(row))
+    return (
+      <div {...stylex.props(styles.action)}>
+        {pill('Retry update', () => {
+          void store.retry(row.id)
+        })}
+      </div>
+    )
+  if (hasUpdate(row) && !row.candidate)
+    return (
+      <div {...stylex.props(styles.action)}>
+        {pill(
+          'UPDATE',
+          () => {
+            void store.install(row.id)
+          },
+          true
+        )}
+        <span {...stylex.props(styles.pct)}>{row.version?.split('+')[0]}</span>
+      </div>
+    )
+  return <div {...stylex.props(styles.action)}>{pill('OPEN', () => open(row.id))}</div>
+}
+
+function Icon({ row, xstyle }: { row: StoreRow; xstyle?: stylex.StyleXStyles }) {
+  return row.icon ? (
+    <img src={row.icon} alt="" {...stylex.props(styles.icon, xstyle)} />
+  ) : (
+    <span aria-hidden="true" {...stylex.props(styles.icon, styles.iconArt(art(row.name)), xstyle)}>
+      {row.name[0]}
+    </span>
+  )
+}
+
+function Detail({
+  id,
+  store,
+  open,
+  openExternal,
+  back
+}: {
+  id: string
+  store: Store
+  open: Open
+  openExternal: External
+  back: () => void
+}) {
+  const state = useSyncExternalStore(store.subscribe, store.snapshot)
+  const row = state.rows.find((r) => r.id === id)
+  if (!row)
+    return (
+      <Page title="App" back={back}>
+        <Placeholder>This app is no longer listed.</Placeholder>
+      </Page>
+    )
+  const facts: [string, ReactNode, string?][] = [
+    [
+      'Version',
+      version(row),
+      row.installed && row.version !== row.installed ? `${row.version?.split('+')[0]} available` : 'Current'
+    ],
+    ['Size', size(row.bytes), 'Download'],
+    ['Lane', row.lane === 'official' ? 'Official' : row.lane === 'community' ? 'Community' : 'Preview', row.author],
+    ['Licence', 'MIT', 'Open source'],
+    [
+      'Access',
+      row.permissions.length ? String(row.permissions.length) : <Sym key="lock" name="lock" size={16} />,
+      row.permissions.length ? 'permissions' : 'Sandboxed'
+    ]
+  ]
+  const notes = Notices(row, store)
+  return (
+    <Page title={row.name} back={back}>
+      <div data-store-app={row.id}>
+        <div {...stylex.props(styles.dHead)}>
+          <Icon row={row} xstyle={styles.dIcon} />
+          <div {...stylex.props(styles.dInfo)}>
+            <div {...stylex.props(styles.dName)}>{row.name}</div>
+            <div {...stylex.props(styles.dAuthor)}>{row.author}</div>
+            <div {...stylex.props(styles.dActions)}>
+              <Action row={row} store={store} open={open} />
+              {row.repo && (
                 <button
                   type="button"
-                  onClick={() => {
-                    void store.install(row.id)
-                  }}
+                  aria-label="View source"
+                  {...stylex.props(styles.iconBtn, shared.press)}
+                  onClick={() => openExternal(row.repo!)}
                 >
-                  GET
+                  <Sym name="share" size={15} />
                 </button>
-              ) : (
-                <>
-                  <button type="button" onClick={() => open(row.id)}>
-                    OPEN
-                  </button>
-                  {PREVIEW_FEATURES.stageUpdates &&
-                    !row.development &&
-                    (row.candidate ? (
-                      <span>Updates when {row.name} closes</span>
-                    ) : row.failed && (!row.version || row.version === row.failed || row.version === row.installed) ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void store.retry(row.id)
-                        }}
-                      >
-                        Retry update
-                      </button>
-                    ) : (
-                      row.version !== row.installed && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void store.install(row.id)
-                          }}
-                        >
-                          UPDATE
-                        </button>
-                      )
-                    ))}
-                  {row.recovery && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void store.restore(row.id)
-                      }}
-                    >
-                      Restore previous version
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void store.remove(row.id)
-                    }}
-                  >
-                    Remove App
-                  </button>
-                </>
               )}
             </div>
+          </div>
+        </div>
+        {notes && <div {...stylex.props(styles.para, styles.stack)}>{notes}</div>}
+        <div {...stylex.props(styles.facts)}>
+          {facts.map(([k, v, s]) => (
+            <div key={k} {...stylex.props(styles.fact)}>
+              <span {...stylex.props(styles.factK)}>{k}</span>
+              <span {...stylex.props(styles.factV)}>{v}</span>
+              {s && <span {...stylex.props(styles.factS)}>{s}</span>}
+            </div>
+          ))}
+        </div>
+        {row.note && (
+          <>
+            <div {...stylex.props(styles.h)}>What’s new</div>
+            <p {...stylex.props(styles.para)}>{row.note}</p>
+          </>
+        )}
+        <div {...stylex.props(styles.h)}>Privacy</div>
+        <Section>
+          {row.permissions.length ? (
+            row.permissions.map((p) => (
+              <div key={p} {...stylex.props(shared.row)}>
+                <span {...stylex.props(styles.permGlyph)}>
+                  <Sym name={PERM_GLYPH[p] ?? 'lock'} size={16} />
+                </span>
+                <span {...stylex.props(styles.permText)}>{p}</span>
+              </div>
+            ))
+          ) : (
+            <div {...stylex.props(shared.row)}>
+              <span {...stylex.props(styles.permGlyph)}>
+                <Sym name="lock" size={16} />
+              </span>
+              <span {...stylex.props(styles.permText)}>No device access</span>
+            </div>
           )}
-          {row.recovery && <p>Restore keeps newer edits aside; those edits may be missing in the previous version.</p>}
-        </section>
-      ))}
-      {!state.loading && !rows.length && <p>No {tab === 'Updates' ? 'updates' : 'apps'} found.</p>}
-      <section aria-labelledby="for-developers" {...stylex.props(styles.row)}>
-        <h2 id="for-developers">For developers</h2>
-        <button type="button" data-store-submit onClick={() => openExternal(SUBMIT_URL)}>
-          Submit your app
+        </Section>
+        <p {...stylex.props(styles.footnote)}>
+          {row.development
+            ? 'Local preview. Remove App clears this preview’s private data.'
+            : 'Runs in its own sandbox: no camera, microphone or embedded pages. Storage stays on this device.'}
+          {row.recovery && ' Restore keeps newer edits aside; those edits may be missing in the previous version.'}
+        </p>
+        {row.installed && (
+          <Section>
+            <button
+              type="button"
+              {...stylex.props(shared.row, styles.remove)}
+              onClick={() => {
+                void store.remove(row.id)
+                back()
+              }}
+            >
+              <Sym name="trash" size={16} />
+              Remove App
+            </button>
+          </Section>
+        )}
+      </div>
+    </Page>
+  )
+}
+
+function Developer({
+  store,
+  openExternal,
+  source,
+  developer
+}: {
+  store: Store
+  openExternal: External
+  source: string
+  developer: boolean
+}) {
+  const [url, setUrl] = useState('')
+  const [error, setError] = useState('')
+  return (
+    <>
+      <div {...stylex.props(styles.h)}>For developers</div>
+      <Section aria-labelledby="for-developers">
+        <button
+          type="button"
+          data-store-submit
+          {...stylex.props(shared.row, styles.link)}
+          onClick={() => openExternal(SUBMIT_URL)}
+        >
+          <span {...stylex.props(styles.permGlyph, styles.glyphGreen)}>
+            <Sym name="plus" size={16} />
+          </span>
+          <span id="for-developers" {...stylex.props(styles.permText)}>
+            Submit your app
+          </span>
+          <span {...stylex.props(shared.rowR)}>›</span>
         </button>
         <form
+          {...stylex.props(shared.row, styles.form)}
           onSubmit={(event) => {
             event.preventDefault()
-            setCatalogError('')
-            void store.loadCatalog(catalogUrl).catch((error) => setCatalogError(String(error.message)))
+            setError('')
+            void store.loadCatalog(url).catch((e) => setError(String(e.message)))
           }}
         >
-          <label>
-            Developer catalog
+          <span {...stylex.props(styles.permText)}>Developer catalog</span>
+          <label {...stylex.props(styles.field)}>
+            <Sym name="tabs" size={14} />
             <input
               aria-label="Developer catalog URL"
               type="url"
               placeholder="http://localhost:5173/index.json"
-              value={catalogUrl}
-              onChange={(event) => setCatalogUrl(event.target.value)}
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
               required
+              {...stylex.props(styles.searchInput)}
             />
           </label>
-          <button type="submit">Load catalog</button>
+          <div {...stylex.props(styles.dActions, styles.noTop)}>
+            <button type="submit" {...stylex.props(styles.pill, styles.pillFilled)}>
+              Load catalog
+            </button>
+            {developer && (
+              <button
+                type="button"
+                {...stylex.props(styles.pill)}
+                onClick={() => {
+                  void store.resetCatalog()
+                }}
+              >
+                Back to Duo catalog
+              </button>
+            )}
+          </div>
+          {error && (
+            <span role="alert" {...stylex.props(styles.alert)}>
+              {error}
+            </span>
+          )}
         </form>
-        <p>Install a separately built app. Catalog hashes check downloads; they do not verify the publisher.</p>
-        {catalogError && <p role="alert">{catalogError}</p>}
-      </section>
-    </Screen>
+      </Section>
+      <p {...stylex.props(styles.footnote)}>
+        Catalog: {source}. Install a separately built app. Catalog hashes check downloads; they do not verify the
+        publisher.
+      </p>
+    </>
   )
 }
-const styles = stylex.create({
-  row: { borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: colors.grey, paddingBlock: 16 },
-  actions: { display: 'flex', flexWrap: 'wrap', gap: 12, paddingBlock: 8 }
-})
