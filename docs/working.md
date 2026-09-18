@@ -20,6 +20,11 @@ Prepare the model once: `pip install usd-core && python3 scripts/prepare-model.p
 Native production: from `packages/shell`, run `bun x tauri build --debug --no-bundle`.
 Workspace consumers own runtime dependencies; root owns tools, public assets and caches.
 
+The production build and CI disable Bun's FTL optimizer (`BUN_JSC_useFTLJIT=false`).
+Bun 1.4.0 can miscompile StyleX's parser after repeated compilations, rejecting valid
+media queries; see [Bun #41609](https://github.com/oven-sh/bun/issues/41609).
+Keep reduced-motion rules and media-query ordering enabled.
+
 StyleX compiles through `stylex-plugin.ts`: dev injects rules, production extracts CSS.
 The plugin includes installed `@doan-labs` sources importing StyleX. Use the kit's exported
 `tokens.stylex.ts`; an isolated document cannot inherit shell styles or assets.

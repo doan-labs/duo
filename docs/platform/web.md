@@ -10,6 +10,38 @@ real device instead of screenshots.
 
 ## Deployment
 
+### Cloudflare build watch paths
+
+The `duo` Worker's Settings → Builds → Build watch paths were configured on
+2026-09-18. These are dashboard settings, not Wrangler configuration. The site
+build imports the shell, baked apps, SDK and kit, and generates package reference
+pages, so those inputs must trigger builds too.
+
+Include paths:
+
+```text
+packages/web/*, packages/shell/*, packages/apps/*, packages/uikit/*, packages/sdk/*
+packages/cli/package.json, packages/cli/CHANGELOG.md, public/*
+scripts/build-app.ts, scripts/build-preinstalled.ts, scripts/prepare-model.py
+stylex-plugin.ts, build.ts, bun.lock, bunfig.toml, package.json, tsconfig.json, wrangler.jsonc
+```
+
+Exclude paths:
+
+```text
+packages/shell/desktop/*, packages/web/video/*, public/readme/*
+*/README.md, */AGENTS.md, *.test.ts, packages/web/scripts/check.mjs
+```
+
+Website docs under `packages/web/content/docs/` still trigger builds; maintainer
+docs, README media, native-only code and Blender sources do not. Update the
+dashboard lists when adding a build input outside the watched paths. Cloudflare
+checks excludes first and builds when any remaining changed path matches an
+include; empty pushes, pushes with 20+ commits or 3000+ changed files bypass
+filtering ([provider rules](https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/)).
+
+### Deployment requirements
+
 Accepted 2026-09-18: the canonical public origin is
 `https://duo.doan-labs.com`. Host the website, browser simulator, first-party
 catalog and immutable app bundles as static files on this origin initially.

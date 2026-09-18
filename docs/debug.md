@@ -196,6 +196,12 @@ The Tauri config generator/adapter workaround and bounded native coverage are in
 
 ## Known false alarms
 
+`Invalid media query syntax` after repeated StyleX compilations can be Bun's FTL
+optimizer bug, not invalid CSS ([Bun #41609](https://github.com/oven-sh/bun/issues/41609)).
+The full Linux build reproduces it; `BUN_JSC_useFTLJIT=false` fixes that reproduction.
+`bun run build` and CI set this flag. For direct platform verification, use
+`BUN_JSC_useFTLJIT=false bun scripts/check-platform.ts`.
+
 | Symptom | Check / correction |
 | --- | --- |
 | Timeout during load | Source may have rebundled; rerun against stable output. For ready failures, check SwiftShader contention and offscreen frames |
