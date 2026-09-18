@@ -1,7 +1,7 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
+import { Workspace } from '../builder/workspace'
 
 export const Route = createFileRoute('/simulator')({
-  beforeLoad: () => {
-    throw redirect({ to: '/build' })
-  }
+  head: () => ({ meta: [{ title: 'Simulator - Duo' }] }),
+  component: () => <Workspace upcoming />
 })

@@ -1,5 +1,59 @@
 export type Connection = { endpoint: string; model: string; key: string }
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+export type Provider = { id: string; name: string; endpoint: string; model: string; keys: string }
+/** OpenAI-compatible endpoints known to allow browser requests. Anything else is a custom endpoint. */
+export const PROVIDERS: Provider[] = [
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    endpoint: 'https://openrouter.ai/api/v1',
+    model: 'openrouter/auto',
+    keys: 'https://openrouter.ai/keys'
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    endpoint: 'https://api.openai.com/v1',
+    model: 'gpt-5',
+    keys: 'https://platform.openai.com/api-keys'
+  },
+  {
+    id: 'google',
+    name: 'Google Gemini',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    model: 'gemini-2.5-pro',
+    keys: 'https://aistudio.google.com/apikey'
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    endpoint: 'https://api.groq.com/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    keys: 'https://console.groq.com/keys'
+  }
+]
+/** Model IDs the endpoint lists; OpenRouter answers without a key, the others need one. */
+export async function models(connection: Connection, signal: AbortSignal): Promise<string[]> {
+  const url = endpointURL(connection.endpoint).replace(/chat\/completions$/, 'models')
+  const key = connection.key.trim()
+  const response = await fetch(url, {
+    headers: key ? { Authorization: `Bearer ${key}` } : {},
+    credentials: 'omit',
+    redirect: 'error',
+    referrerPolicy: 'no-referrer',
+    signal
+  })
+  if (!response.ok) throw new Error(`Model list unavailable (${response.status})`)
+  const data = await response.json()
+  const list: unknown[] = Array.isArray(data?.data) ? data.data : []
+  return list
+    .map((m) =>
+      m && typeof m === 'object' && typeof (m as { id?: unknown }).id === 'string' ? (m as { id: string }).id : ''
+    )
+    .filter(Boolean)
+    .map((id) => id.replace(/^models\//, ''))
+    .sort()
+}
 export function endpointURL(base: string) {
   const url = new URL(base.trim())
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash)

@@ -39,7 +39,7 @@ export function Nav() {
         </ul>
         <div {...stylex.props(styles.right)}>
           <ThemeToggle />
-          <Link to="/build" {...stylex.props(styles.cta)}>
+          <Link to="/simulator" {...stylex.props(styles.cta)}>
             Try Duo
           </Link>
           <details {...stylex.props(styles.menu)}>

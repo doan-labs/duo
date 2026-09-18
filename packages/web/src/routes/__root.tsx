@@ -44,10 +44,13 @@ export const Route = createRootRoute({
 })
 
 function Root() {
-  const builder = useRouterState({ select: (state) => state.location.pathname.replace(/\/+$/, '') === '/build' })
+  // The workspace is its own full-height layout: no page scroll, no footer.
+  const workspace = useRouterState({
+    select: (state) => state.location.pathname.replace(/\/+$/, '') === '/simulator'
+  })
   return (
     <Document>
-      {builder ? (
+      {workspace ? (
         <>
           <Nav />
           <main>

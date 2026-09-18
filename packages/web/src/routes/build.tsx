@@ -1,7 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { Workspace } from '../builder/workspace'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+// The browser AI builder (src/builder) is parked as upcoming work; the live simulator is the public page.
 export const Route = createFileRoute('/build')({
-  head: () => ({ meta: [{ title: 'Build an app - Duo' }] }),
-  component: Workspace
+  beforeLoad: () => {
+    throw redirect({ to: '/simulator' })
+  }
 })

@@ -969,3 +969,17 @@ Behavior verification moves to `agent-browser` against a running simulator, cons
 decision 63 for the website. Those passes are deliberately not committed gates: an
 agent-driven walk is not a CI check, and the review and debugging guides now say so instead
 of pointing at scripts that no longer exist.
+
+## 67. The simulator is the public page again; the browser builder is parked
+
+Decision 65 made `/build` the single product entry. Its first live use showed the
+interaction and provider setup were not ready to ship, and the page depended on the
+simulator being healthy to become usable at all. The navigation item is now `Simulator`
+and points at `/simulator`, the standalone page where a visitor folds and taps the phone
+online with nothing to configure. `/build` and `/get-started` redirect there.
+
+The builder source, its provider presets, model list and end-to-end check remain in the
+repository as upcoming work rather than being deleted, so the next attempt starts from the
+refined workspace instead of from zero. This supersedes the routing part of decision 65;
+its credential and preview-lifecycle guarantees still govern the parked code.
+

@@ -1,16 +1,20 @@
 # Browser app builder
 
-The website's `/build` combines chat and the real simulator. `/get-started` and
-`/simulator` redirect there; `/device/` remains the embedded shell. Local CLI authoring
-remains under `/docs/getting-started`.
+Status: upcoming. The builder workspace (`packages/web/src/builder`) stays in the tree
+but is not linked; `/build` and `/get-started` redirect to `/simulator`, the public page
+where visitors drive the phone directly. `/device/` remains the embedded shell. Local CLI
+authoring remains under `/docs/getting-started`. The rest of this page describes the
+parked workspace as built.
 
 ## Credentials and requests
 
 The trusted chat page calls the selected HTTPS provider's Chat Completions endpoint
 directly, with bearer authorization, omitted cookies and refused redirects. There is
 no AI server route. Providers must support browser CORS. Base URLs exclude credentials,
-queries and fragments. Changing the endpoint clears the key. Manual model entry does
-not require a models-list API.
+queries and fragments. Changing the endpoint clears the key. The Connection panel offers
+OpenRouter, OpenAI, Google Gemini and Groq presets plus a custom base URL; while it is open
+it fetches the endpoint's `/models` list (with the key when one is entered) to fill a
+datalist for the model field. Manual model entry still works when that list is unavailable.
 
 Keys exist only in React memory and provider authorization headers. They never enter
 prompts, workers, simulator messages, saved projects or downloads. Provider errors use
