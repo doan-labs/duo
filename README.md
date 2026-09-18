@@ -21,10 +21,10 @@ The same React and TypeScript shell runs on the web and in a native Tauri window
 An SDK, a shared UI kit, and a CLI provide a way to build and install independent apps
 without rebuilding the simulator.
 
+
 ## See it in motion
 
-https://github.com/user-attachments/assets/00fb37fb-1858-40ce-92fc-5a2f00c5a91f
-
+https://github.com/user-attachments/assets/2460d57e-335e-4c2f-bda9-b00b6561417d
 
 ## Run locally
 
