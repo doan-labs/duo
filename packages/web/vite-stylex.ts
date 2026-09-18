@@ -7,7 +7,7 @@
 // head and break hydration. HMR instead refreshes the virtual stylesheet.
 import { transformAsync } from '@babel/core'
 import stylex from '@stylexjs/babel-plugin'
-import type { Plugin } from 'vite'
+import type { Plugin, ViteDevServer } from 'vite'
 
 type Rule = [string, { ltr: string; rtl?: string | null }, number]
 const VIRTUAL = 'virtual:stylex.css'
@@ -17,19 +17,41 @@ const MARK = '.stylex-rules-placeholder{--stylex:pending}'
 export function stylexVite(): Plugin {
   const rules = new Map<string, Rule>()
   let dev = false
+  let server: ViteDevServer | undefined
+  let queued: ReturnType<typeof setTimeout> | undefined
   const css = () => stylex.processStylexRules([...rules.values()], true)
+  // A lazy route is compiled the first time something imports it, which is long
+  // after the page asked for the stylesheet: on a client-side navigation its
+  // rules would sit in the map with no way to reach the browser, and the page
+  // would render with whatever classes other modules happen to share. Serve the
+  // sheet again whenever a module brings rules that were not in it, coalesced so
+  // a burst of modules costs one update.
+  // The browser's copy only: the server environment has no stylesheet to update,
+  // and reloading it there asks the page to reload rather than swapping the CSS.
+  const refresh = () => {
+    if (!server || queued) return
+    queued = setTimeout(() => {
+      queued = undefined
+      const client = server?.environments.client
+      const mod = client?.moduleGraph.getModuleById(RESOLVED)
+      if (client && mod) void client.reloadModule(mod)
+    }, 50)
+  }
   return {
     name: 'stylex',
     enforce: 'pre',
     configResolved(c) {
       dev = c.command === 'serve'
     },
+    configureServer(s) {
+      server = s
+    },
     resolveId(id) {
       return id === VIRTUAL ? RESOLVED : undefined
     },
     load(id) {
-      // In dev the SSR pass has transformed every module of the page before the
-      // browser asks for the stylesheet; in the build, generateBundle fills it in.
+      // In dev this is every rule collected so far, and `refresh` sends it again
+      // as later modules add theirs; in the build, generateBundle fills it in.
       return id === RESOLVED ? (dev ? css() : MARK) : undefined
     },
     async transform(source, id) {
@@ -53,7 +75,12 @@ export function stylexVite(): Plugin {
           ]
         ]
       })
-      for (const r of (out?.metadata as { stylex?: Rule[] })?.stylex ?? []) rules.set(r[0], r)
+      let added = false
+      for (const r of (out?.metadata as { stylex?: Rule[] })?.stylex ?? []) {
+        if (!rules.has(r[0])) added = true
+        rules.set(r[0], r)
+      }
+      if (dev && added) refresh()
       return out?.code ? { code: out.code, map: null } : undefined
     },
     handleHotUpdate({ server, modules }) {
