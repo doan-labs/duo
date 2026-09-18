@@ -21,6 +21,12 @@
     font: inherit;
     color: inherit;
   }
+  /* The kit's frame on the UI kit pages: the same button reset the shell's index.html applies. */
+  [data-kit-frame] button {
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
   ::selection {
     background: rgba(143, 143, 255, 0.28);
   }

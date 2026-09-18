@@ -5,6 +5,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { motion, useReducedMotion } from 'motion/react'
 import type { ReactNode } from 'react'
+import { Line } from './highlight'
 import { color, font, radius } from './tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
@@ -34,24 +35,11 @@ export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: n
 }
 
 /** A page's top: mono uppercase eyebrow, display headline, lead paragraph. */
-export function PageTop({
-  eyebrow,
-  title,
-  lead,
-  badge
-}: {
-  eyebrow: string
-  title: string
-  lead?: ReactNode
-  badge?: ReactNode
-}) {
+export function PageTop({ eyebrow, title, lead }: { eyebrow: string; title: string; lead?: ReactNode }) {
   return (
     <Reveal>
       <p {...stylex.props(styles.eyebrow)}>{eyebrow}</p>
-      <h1 {...stylex.props(styles.h1)}>
-        {title}
-        {badge && <span {...stylex.props(styles.badge)}>{badge}</span>}
-      </h1>
+      <h1 {...stylex.props(styles.h1)}>{title}</h1>
       {lead && <p {...stylex.props(styles.lead)}>{lead}</p>}
     </Reveal>
   )
@@ -72,12 +60,33 @@ export function Code({ children }: { children: ReactNode }) {
   return <code {...stylex.props(styles.code)}>{children}</code>
 }
 
-/** A code block: surface, hairline, scrolls rather than overflowing. */
-export function Pre({ children }: { children: string }) {
+/**
+ * A code block: surface, hairline, scrolls rather than overflowing. With a
+ * `title` it takes the homepage's shape: file tab, line numbers and syntax
+ * colour; without one it stays plain, for shell transcripts.
+ */
+export function Pre({ children, title }: { children: string; title?: string }) {
+  if (!title)
+    return (
+      <pre {...stylex.props(styles.pre)}>
+        <code>{children}</code>
+      </pre>
+    )
+  const lines = children.split('\n')
   return (
-    <pre {...stylex.props(styles.pre)}>
-      <code>{children}</code>
-    </pre>
+    <div {...stylex.props(styles.codeBox)}>
+      <div {...stylex.props(styles.codeTitle)}>{title}</div>
+      <pre {...stylex.props(styles.codePre)}>
+        {lines.map((line, i) => (
+          <div key={`L${String(i + 1)}`} {...stylex.props(styles.codeLine)}>
+            <span {...stylex.props(styles.gutter, lines.length > 9 && styles.gutterWide)}>{i + 1}</span>
+            <code {...stylex.props(styles.codeText)}>
+              <Line code={line} />
+            </code>
+          </div>
+        ))}
+      </pre>
+    </div>
   )
 }
 
@@ -128,7 +137,6 @@ const styles = stylex.create({
     letterSpacing: '-0.025em',
     color: color.text
   },
-  badge: { display: 'inline-block', marginLeft: '12px', verticalAlign: 'middle' },
   lead: {
     marginTop: '18px',
     marginBottom: '32px',
@@ -168,6 +176,49 @@ const styles = stylex.create({
     overflowX: 'auto',
     whiteSpace: 'pre'
   },
+  codeBox: {
+    marginBottom: '16px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: color.border,
+    borderRadius: '14px',
+    backgroundColor: color.surface,
+    overflow: 'hidden'
+  },
+  codeTitle: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '18px',
+    paddingRight: '18px',
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: color.border,
+    fontFamily: font.mono,
+    fontSize: '11.5px',
+    letterSpacing: '0.04em',
+    color: color.text3
+  },
+  codePre: {
+    margin: 0,
+    paddingTop: '14px',
+    paddingBottom: '14px',
+    fontFamily: font.mono,
+    fontSize: '13.5px',
+    lineHeight: 1.7,
+    color: color.text,
+    overflowX: 'auto'
+  },
+  codeLine: {
+    display: 'flex',
+    gap: '16px',
+    paddingLeft: '16px',
+    paddingRight: '18px',
+    width: 'max-content',
+    minWidth: '100%'
+  },
+  gutter: { flexShrink: 0, width: '1.5ch', textAlign: 'right', color: color.text3, userSelect: 'none' },
+  gutterWide: { width: '2ch' },
+  codeText: { whiteSpace: 'pre', fontFamily: 'inherit' },
   tableWrap: {
     marginBottom: '24px',
     backgroundColor: color.surface,

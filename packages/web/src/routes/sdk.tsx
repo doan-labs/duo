@@ -1,10 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ApiCard } from '../api-card'
-import { api } from '../generated/api'
+import { api, versions } from '../generated/api'
 import { Prose } from '../layout'
 import { Code, PageTop, Pre } from '../page-parts'
-import { Badge, Notice } from '../status'
 import { color, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
@@ -16,30 +15,15 @@ export const Route = createFileRoute('/sdk')({
   component: Page
 })
 
-const sdk = api.filter((e) => e.pkg === '@doan-labs/ipduo-sdk')
+// The host-only types the shell's own apps receive are not part of the app-facing SDK.
+const sdk = api.filter((e) => e.pkg === '@doan-labs/ipduo-sdk' && !e.file.endsWith('/legacy.ts'))
 
-const CONTRACT = [
-  [
-    'Manifest and compatibility',
-    'What identifies an app, what a release is, how a host decides it can run one.',
-    '1-manifest-and-compatibility'
-  ],
-  [
-    'Sandbox and bridge',
-    'The iframe, the nonce handshake, request and event shapes, errors, limits and teardown.',
-    '2-sandbox-and-bridge'
-  ],
-  [
-    'App session and displays',
-    'What survives a fold, how two views of one app share state, who owns timers and network.',
-    '3-app-session-and-displays'
-  ],
-  [
-    'Storage and release lifecycle',
-    'Per-app data, offline bundles, install integrity, updates, recovery and uninstall.',
-    '4-storage-and-release-lifecycle'
-  ],
-  ['Permissions', 'Browser features and host services declared in the manifest; review is the grant.', '6-permissions']
+const GUIDES = [
+  ['Lifecycle', 'Connect, render, ready. Requests, errors and limits.', 'lifecycle'],
+  ['Displays and the fold', 'The view, two running copies, one owner, commands and widgets.', 'displays'],
+  ['Storage', 'Two revisioned key-value spaces and the React hook over them.', 'storage'],
+  ['Permissions', 'The permission table, network origins and what the sandbox denies.', 'permissions'],
+  ['Manifest', 'Every field, and what a built release adds.', 'manifest']
 ] as const
 
 function Page() {
@@ -47,72 +31,54 @@ function Page() {
     <div {...stylex.props(styles.wrap)}>
       <Prose>
         <PageTop
-          eyebrow="SDK · Two things, one name"
+          eyebrow="Reference"
           title="SDK"
           lead={
             <>
-              <Code>@doan-labs/ipduo-sdk</Code> owns the host API, the bridge protocol and the manifest contract for
-              every downloadable app. Two things share the name today, and the badges keep them apart.
+              <Code>@doan-labs/ipduo-sdk</Code> is how an app talks to the phone: displays and the fold, storage,
+              commands between its views, widgets and links. One client, <Code>os</Code>, and a React hook.
             </>
           }
         />
+        <Pre title="app.ts">{`import { os } from '@doan-labs/ipduo-sdk'
+await os.connect()                       // handshake with the shell, before rendering
+os.ready()                               // first frame painted
 
-        <h2 {...stylex.props(styles.h2)}>
-          What the package exports now <Badge status="legacy" />
-        </h2>
-        <Notice status="legacy">
-          Version 0.0.0 exports the host types baked apps receive as a React prop. They are not the sandbox bridge and
-          no downloadable app will ever see them. Generated from the source's TSDoc.
-        </Notice>
-        {sdk.map((e) => (
-          <ApiCard key={e.name} entry={e} />
-        ))}
+os.view                                  // display, placement, width, height, angle…
+os.onView((view) => ...)                 // the fold, live
 
-        <h2 {...stylex.props(styles.h2)}>
-          The runtime contract <Badge status="proposed" />
-        </h2>
-        <Notice status="proposed">
-          Revision 2 of the stage 2 contract is the accepted design and is being implemented now. Names, shapes and
-          limits below can still move while the acceptance checks run; the document is the source, this page only points
-          into it.
-        </Notice>
+await os.storage.set('lastTab', 'today') // durable when this resolves
+const snap = await os.storage.snapshot() // { rev, entries }, then
+os.storage.watch(snap.rev, (c) => ...)   // every change after it, in order
+
+os.owner                                 // { epoch } in the view that runs effects
+os.commands.send('refresh', '')          // resolves when the owner acknowledged
+os.widget.set('small', { lines })        // owner only
+os.open('labs.doan.ipduo.maps', 'q=1')
+
+import { useKV } from '@doan-labs/ipduo-sdk/react'
+const note = useKV(os.storage, 'note')   // { value, status, set, del }`}</Pre>
+
+        <h2 {...stylex.props(styles.h2)}>Guides</h2>
         <ul {...stylex.props(styles.list)}>
-          {CONTRACT.map(([title, text, hash]) => (
-            <li key={hash}>
-              <Link
-                to="/docs/$"
-                params={{ _splat: 'platform/progress/contract' }}
-                hash={hash}
-                {...stylex.props(styles.row)}
-              >
+          {GUIDES.map(([title, text, slug]) => (
+            <li key={slug}>
+              <Link to="/docs/$" params={{ _splat: slug }} {...stylex.props(styles.row)}>
                 <span {...stylex.props(styles.rowTitle)}>{title}</span>
                 <span {...stylex.props(styles.text)}>{text}</span>
               </Link>
             </li>
           ))}
         </ul>
-        <h3 {...stylex.props(styles.h3)}>The shape of an app, as proposed</h3>
-        <Pre>{`import { os } from '@doan-labs/ipduo-sdk'          // proposed, not published
-await os.connect()                                   // hello(nonce) → welcome → ack, before rendering
-os.ready()                                           // first frame painted; the kit's <Screen> calls it
-const { rev } = await os.storage.set('lastTab', 'today')   // durable when the ack arrives
-os.view                                              // { display, placement, width, height, visible, active, focused, angle }
-os.owner                                             // { epoch } while this view is the designated owner, else null`}</Pre>
+
+        <h2 {...stylex.props(styles.h2)}>Reference</h2>
         <p {...stylex.props(styles.p)}>
-          Shorter reads on the same subject:{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/manifest' }} {...stylex.props(styles.link)}>
-            Manifest
-          </Link>
-          ,{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/runtime' }} {...stylex.props(styles.link)}>
-            Runtime
-          </Link>
-          ,{' '}
-          <Link to="/docs/$" params={{ _splat: 'platform/security' }} {...stylex.props(styles.link)}>
-            Security
-          </Link>
-          .
+          Every export of the package, generated from the source and its TSDoc. Version{' '}
+          <Code>{versions.sdk?.version}</Code>, protocol 1.
         </p>
+        {sdk.map((e) => (
+          <ApiCard key={e.name} entry={e} />
+        ))}
       </Prose>
     </div>
   )
@@ -128,30 +94,16 @@ const styles = stylex.create({
     paddingLeft: '22px',
     paddingRight: '22px'
   },
-  p: { fontSize: '17px', lineHeight: 1.6, marginTop: 0, marginBottom: '16px' },
+  p: { fontSize: '17px', lineHeight: 1.6, marginTop: 0, marginBottom: '24px' },
   h2: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '12px',
     fontFamily: font.display,
     fontSize: { default: '28px', [SMALL]: '24px' },
     lineHeight: 1.15,
     fontWeight: 600,
     letterSpacing: '-0.02em',
     marginTop: '48px',
-    marginBottom: '8px',
+    marginBottom: '16px',
     color: color.text
-  },
-  h3: {
-    fontFamily: font.mono,
-    fontSize: '11px',
-    fontWeight: 500,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-    color: color.text3,
-    marginTop: '32px',
-    marginBottom: '10px'
   },
   list: { listStyleType: 'none', margin: 0, padding: 0, marginBottom: '16px', display: 'grid', gap: '8px' },
   row: {
@@ -172,9 +124,5 @@ const styles = stylex.create({
     transitionDuration: '0.2s'
   },
   rowTitle: { fontSize: '17px', fontWeight: 500, color: color.text },
-  text: { fontSize: '15px', lineHeight: 1.5, color: color.text2 },
-  link: {
-    color: { default: color.accent, ':hover': color.accentHover },
-    textDecoration: { default: 'none', ':hover': 'underline' }
-  }
+  text: { fontSize: '15px', lineHeight: 1.5, color: color.text2 }
 })

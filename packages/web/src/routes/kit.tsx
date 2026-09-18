@@ -19,6 +19,8 @@ function Layout() {
             [
               ['Components', 'component'],
               ['Hooks', 'hook'],
+              ['Functions', 'function'],
+              ['Values', 'value'],
               ['Types', 'type']
             ] as const
           ).map(

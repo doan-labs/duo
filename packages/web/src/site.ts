@@ -8,6 +8,7 @@ export const blob = (path: string) => `${REPO}/blob/main/${path}`
 export const NAV = [
   { to: '/apps', label: 'Apps' },
   { to: '/sdk', label: 'SDK' },
+  { to: '/kit', label: 'UI kit' },
   { to: '/docs', label: 'Docs' },
   { to: '/get-started', label: 'Build an app' }
 ] as const
@@ -15,7 +16,6 @@ export const NAV = [
 /** Every other page, reachable from the footer so nothing is orphaned. */
 export const MORE = [
   { to: '/simulator', label: 'Simulator' },
-  { to: '/kit', label: 'UI kit' },
   { to: '/publish', label: 'Publish' },
   { to: '/guidelines', label: 'Guidelines' },
   { to: '/changelog', label: 'Changelog' }
