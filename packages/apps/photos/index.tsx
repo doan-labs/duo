@@ -229,7 +229,11 @@ export const Photos = () => {
             </section>
           ))}
           <div {...stylex.props(styles.count)}>
-            {loading ? 'Loading' : pics.length ? `${pics.length} ${pics.length === 1 ? 'Photo' : 'Photos'}` : 'No Photos'}
+            {loading
+              ? 'Loading'
+              : pics.length
+                ? `${pics.length} ${pics.length === 1 ? 'Photo' : 'Photos'}`
+                : 'No Photos'}
           </div>
         </div>
       </div>
