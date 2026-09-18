@@ -1,10 +1,11 @@
 import { Screen, Text, Title } from '@doan-labs/duo-uikit'
+
 // Messages: a chat list, and threads that answer back. The reply is what sells
 // it: a pause, three bouncing dots, then a bubble.
 
+import { art, beep } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
-import { art, beep } from '@doan-labs/duo-uikit/shared.ts'
 import { delay, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

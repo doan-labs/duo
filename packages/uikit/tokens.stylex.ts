@@ -46,10 +46,18 @@ export const colors = stylex.defineVars({
   trackLight: '#e9e9eb',
   /** Elevated dark surface. */
   darkElevated: '#1c1c1e',
+  /** A step above `darkElevated`: a toolbar or sheet header in a dark app. */
+  darkElevated2: '#2c2c2e',
+  /** Hairline between rows in a dark app. */
+  separatorDark: 'rgba(255,255,255,.11)',
   /** iOS `systemFill` at 16%; buttons and pills over any background. */
   fill: 'rgba(120,120,128,.16)',
   fillThin: 'rgba(120,120,128,.12)',
   fillThick: 'rgba(120,120,128,.22)',
+  /** `systemFill` over a dark surface, where 16% does not read. */
+  fillDark: 'rgba(120,120,128,.32)',
+  /** Track for switches at rest in a dark app. */
+  trackDark: 'rgba(120,120,128,.4)',
   white: '#fff',
   black: '#000'
 })
@@ -59,12 +67,47 @@ export const fonts = stylex.defineVars({
 })
 
 /**
- * Per-app surface. The shell themes these per app (`light` apps get the
- * grouped light background), so nav pages and sheets pick up the right one.
+ * Per-app surface. The shell themes these per app, so nav pages, sheets, rows,
+ * separators and switches all pick up the right one. Apply `light` or `dark`
+ * from `styles.ts` rather than hand-rolling a `createTheme`.
+ *
+ * The defaults are the light values the kit used to hardcode, so a component
+ * that has never been themed looks exactly as it did before these existed.
  */
 export const app = stylex.defineVars({
   bg: '#000',
-  fg: '#fff'
+  fg: '#fff',
+  /** A row, card or grouped-list surface sitting over `bg`. */
+  surface: '#fff',
+  /** A surface that has to read as raised above `surface`: a toolbar, a sheet header. */
+  elevated: '#f7f7f9',
+  /** Secondary label over `surface`, for trailing detail and captions. */
+  label2: '#8e8e93',
+  /** Hairline between rows. */
+  separator: '#e5e5ea',
+  /** `systemFill`: pills and plain controls over any surface. */
+  fill: 'rgba(120,120,128,.16)',
+  /** A switch at rest. */
+  track: '#e9e9eb'
+})
+
+/**
+ * The type ramp, in the px the shell actually renders at: its body text is 15,
+ * not Apple's 17. `Text`'s `size` prop names these; reach for the consts
+ * directly only inside an app's own block.
+ */
+export const typeScale = stylex.defineConsts({
+  largeTitle: '34px',
+  title1: '28px',
+  title2: '22px',
+  title3: '20px',
+  headline: '17px',
+  body: '15px',
+  callout: '14px',
+  subheadline: '13px',
+  footnote: '12px',
+  caption1: '11px',
+  caption2: '10px'
 })
 
 /**
@@ -107,10 +150,7 @@ export const appAppearance = stylex.defineConsts({
   photosBorderRadius: '5px',
   photosBorderRadius2: '7px',
   photosBorderRadius3: '3px',
-  weatherRim: 'inset 0 1px 0 rgba(255,255,255,.42),inset 0 0 0 0.5px rgba(255,255,255,.2)',
-  weatherShadowSmall: '0 2px 10px rgba(6,20,40,.16)',
   weatherShadowLarge: '0 10px 30px rgba(6,20,40,.14)',
-  weatherShadowInput: '0 2px 10px rgba(6,20,40,.14)',
   weatherShadowCard: '0 10px 30px rgba(6,20,40,.16)',
   walletAppleCard: 'linear-gradient(150deg,#f5f5f7,#c9c9ce)',
   walletTransit: 'linear-gradient(150deg,#0a84ff,#5e5ce6)',
@@ -150,7 +190,6 @@ export const appAppearance = stylex.defineConsts({
   homeGlow5: 'rgba(150,220,255,.6)',
   homeGlow6: 'rgba(255,140,200,.6)',
   homeColor: '#59c8ff',
-  homeColor2: '#ff9f0a',
   homeColor3: 'rgba(255,255,255,.12)',
   homeBackgroundColor: 'rgba(255,255,255,.09)',
   homeColor4: '#111',
@@ -168,7 +207,6 @@ export const appAppearance = stylex.defineConsts({
   calendarFontSize3: '31px',
   calendarFontSize4: '10px',
   calendarFontWeight: 400,
-  memosColor: '#ff453a',
   memosBorderRadius: '5px',
   memosBackgroundColor: 'rgba(255,255,255,.07)',
   calculatorBackgroundColor: '#333',
@@ -176,7 +214,6 @@ export const appAppearance = stylex.defineConsts({
   calculatorBackgroundColor2: '#a5a5a5',
   calculatorBorderRadius: '40px',
   calculatorFontSize2: '56px',
-  appstoreBoxShadow: '0 8px 22px rgba(0,0,0,.13)',
   appstoreFontSize: '24px',
   appstoreColor: '#3c3c43',
   appstoreBorderColor: 'rgba(10,124,255,.22)',
@@ -188,13 +225,9 @@ export const appAppearance = stylex.defineConsts({
   cameraBackgroundColor3: 'rgba(0,0,0,.45)',
   cameraBorderRadius: '8px',
   healthColor: '#ff9500',
-  healthColor2: '#ff375f',
-  healthColor3: '#5e5ce6',
-  healthColor4: '#00c7be',
   healthAnimationTimingFunction: 'cubic-bezier(.3,.9,.3,1)',
   contactsBackgroundColor: 'rgba(10,124,255,.12)',
   itunesBorderRadius: '9px',
-  stocksColor: '#31d158',
   stocksFontSize: '28px',
   booksBorderTopLeftRadius: '4px',
   booksBoxShadow: '0 10px 22px rgba(0,0,0,.3),inset 7px 0 12px -6px rgba(0,0,0,.45)',
@@ -203,7 +236,6 @@ export const appAppearance = stylex.defineConsts({
   booksColor2: '#241f18',
   booksTransitionTimingFunction: 'cubic-bezier(.3,.85,.3,1)',
   booksColor3: '#8a7f6d',
-  youtubeBackgroundColor: '#000',
   youtubeColor: '#aaa',
   tvTextShadow: '0 2px 8px rgba(0,0,0,.5)',
   tvBackgroundColor: 'rgba(0,0,0,.55)',
@@ -212,17 +244,11 @@ export const appAppearance = stylex.defineConsts({
   podcastsBorderRadius: '7px',
   podcastsFontSize: '20px',
   notesColor: '#c8c9cd',
-  notesColor2: '#0a84ff',
   notesColor3: '#e8453c',
-  notesColor4: '#f2f2f7',
   notesColor5: '#c99a5b',
   notesColor6: '#2c2c2e',
   notesColor7: '#ffffff',
-  notesColor8: '#34c759',
-  notesColor9: '#ffd60a',
-  notesColor10: '#1c1c1e',
   notesFontFamily: 'inherit',
-  notesFontFamily2: '"Bradley Hand","Marker Felt","Segoe Script",cursive',
   notesFontSize: '52px',
   notesBoxShadow: '0 12px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1)',
   notesBoxShadow2: 'inset 0 0 0 1px rgba(255,255,255,.22)',
@@ -238,7 +264,6 @@ export const appAppearance = stylex.defineConsts({
   shortcutsFontSize: '34px',
   tipsBoxShadow: '0 6px 18px rgba(0,0,0,.1)',
   tipsTransitionTimingFunction: 'cubic-bezier(.3,.9,.3,1), ease',
-  walletColor: '#fff',
   walletBoxShadow: '0 -1px 0 rgba(255,255,255,.25) inset,0 14px 30px rgba(0,0,0,.4)',
   walletFontFamily: 'ui-monospace,SFMono-Regular,monospace',
   walletFontSize: '32px',
@@ -252,8 +277,6 @@ export const appAppearance = stylex.defineConsts({
   phoneBackgroundColor3: 'rgba(255,255,255,.16)',
   facetimeTextShadow: '0 1px 8px rgba(0,0,0,.6)',
   facetimeBoxShadow: '0 8px 22px rgba(0,0,0,.6)',
-  freeformColor: '#ff3b30',
-  freeformColor2: '#0a7cff',
   freeformColor3: '#af52de',
   freeformBackgroundColor: 'rgba(250,250,252,.9)',
   freeformBoxShadow: '0 8px 22px rgba(0,0,0,.2)',
@@ -273,35 +296,18 @@ export const appAppearance = stylex.defineConsts({
   previewBackgroundColor: 'rgba(60,60,67,.08)',
   fitnessColor: '#a6f425',
   fitnessColor2: '#fa114f',
-  fitnessColor3: '#22e0f5',
   weatherBorderRadius: '999px',
-  weatherBackgroundImage: 'linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,0) 65%)',
   weatherTextShadow: '0 1px 2px rgba(0,20,40,.18)',
-  weatherBackgroundImage2: 'linear-gradient(165deg,#1462a8 0%,#3f92cb 55%,#8fc2dc 100%)',
-  weatherBackgroundImage3: 'linear-gradient(155deg,#0e1730,#264263 65%,#5f7590)',
-  weatherBackgroundImage4: 'linear-gradient(155deg,#34526c,#6a8799 65%,#9cb0be)',
-  weatherBackgroundImage5:
-    'radial-gradient(ellipse at 80% 0%,rgba(255,255,255,.32),transparent 45%),radial-gradient(ellipse at 5% 35%,rgba(255,255,255,.12),transparent 55%)',
   weatherBackgroundImage6:
     'radial-gradient(ellipse 40% 13% at 16% 17%,rgba(227,236,246,.7),transparent),radial-gradient(ellipse 55% 18% at 90% 35%,rgba(227,236,246,.55),transparent)',
   weatherAnimationTimingFunction: 'ease-in-out',
-  weatherBackgroundColor: 'rgba(255,255,255,.24)',
   weatherBackgroundColor2: 'rgba(255,255,255,.32)',
   weatherOutlineColor: 'rgba(255,255,255,.8)',
   weatherFontSize: '96px',
   weatherFontWeight: 200,
   weatherTextShadow2: '0 4px 24px rgba(0,20,50,.22)',
-  weatherBorderBottomColor: 'rgba(255,255,255,.22)',
-  weatherTextShadow3: '0 2px 8px rgba(0,0,0,.18)',
-  weatherBorderTopColor: 'rgba(255,255,255,.18)',
-  weatherBoxShadow: 'inset 0 0.5px 1px rgba(0,0,0,.12)',
-  weatherBackgroundImage7: 'linear-gradient(90deg,#8ddbc0,#ece88b,#ffba67)',
-  weatherBoxShadow2: '0 0 6px rgba(255,220,140,.35)',
   weatherFontSize2: '11.5px',
-  weatherBoxShadow3:
-    'inset 0 1px 0 rgba(255,255,255,.42),inset 0 0 0 1px rgba(255,255,255,.6),0 2px 14px rgba(6,20,40,.18)',
   weatherColor: 'rgba(255,255,255,.62)',
-  weatherBackgroundImage8: 'linear-gradient(125deg,rgba(24,54,96,.7),rgba(108,150,182,.5))',
   weatherBoxShadow4:
     'inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 0.5px rgba(255,255,255,.3),0 12px 32px rgba(6,20,40,.2)',
   weatherBoxShadow5:

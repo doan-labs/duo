@@ -1,8 +1,8 @@
-import { NavigationLink, NavigationStack, Row, Section, Text, Title } from '@doan-labs/duo-uikit'
+import { Nav, NavigationLink, Row, Section, Text, Title } from '@doan-labs/duo-uikit'
 
 export default function Demo() {
   return (
-    <NavigationStack>
+    <Nav>
       <Title as="h1">Trips</Title>
       <Section>
         <Row>
@@ -11,6 +11,6 @@ export default function Demo() {
           </NavigationLink>
         </Row>
       </Section>
-    </NavigationStack>
+    </Nav>
   )
 }

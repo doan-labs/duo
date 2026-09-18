@@ -1,7 +1,6 @@
 // Activity rings and the weekly bar chart, shared by Fitness, Health and Watch.
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
-import { walk } from './shared.ts'
 import { colors } from './tokens.stylex.ts'
 
 /** label, colour, done, goal, unit */
@@ -62,12 +61,14 @@ export function Rings({ size = 160, stroke = 15 }: { size?: number; stroke?: num
 }
 
 /**
- * A bar chart with one bar per day, growing out of the axis on mount. `walk` is
- * a stock-chart random walk and barely moves over seven steps, so stretch its
- * range across the plot or every day comes out the same height.
+ * A bar chart with one bar per day, growing out of the axis on mount. The
+ * caller supplies the values: a random walk barely moves over seven steps, so
+ * the plot stretches whatever range it is given or every day comes out the
+ * same height.
  */
-export function Bars({ seed, colour, n = 7 }: { seed: string; colour: string; n?: number }) {
-  const raw = walk(seed, n)
+export function Bars({ values, colour }: { values: number[]; colour: string }) {
+  const n = values.length
+  const raw = n > 0 ? values : [0]
   const lo = Math.min(...raw)
   const span = Math.max(1, Math.max(...raw) - lo)
   const vals = raw.map((v) => 26 + ((v - lo) / span) * 74)

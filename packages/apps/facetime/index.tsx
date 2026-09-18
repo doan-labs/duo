@@ -1,10 +1,11 @@
 import { Placeholder, Row, Screen, Section, Text, Title } from '@doan-labs/duo-uikit'
+
 // FaceTime. Tapping a contact rings a generated far end; after a beat they
 // "answer" and your own webcam sits in the corner, as on a real call.
 
+import { art, beep } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
-import { art, beep } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

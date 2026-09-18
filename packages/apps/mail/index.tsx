@@ -1,8 +1,9 @@
 import { Screen, Text, Title, VStack } from '@doan-labs/duo-uikit'
+
 // Mail. A fixed inbox; each message opens on a pushed page.
 
+import { art, beep } from '@doan-labs/duo-fixtures'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
-import { art, beep } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

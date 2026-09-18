@@ -1,6 +1,6 @@
 {
   "package": "@doan-labs/duo-uikit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "components": [
     {
       "name": "Button",
@@ -9,10 +9,10 @@
       "source": "packages/uikit/button.tsx"
     },
     {
-      "name": "Hero",
-      "description": "Large introductory title; shares the established large-title typography.",
-      "props": "type HeroProps<T extends ElementType = 'div'> = LargeTitleProps<T>",
-      "source": "packages/uikit/hero.tsx"
+      "name": "HStack",
+      "description": "A horizontal row of children, centred on the cross axis. The kit had no\nhorizontal primitive, so every app wrote its own flex block: reach for this\nbefore a `stylex.create`.",
+      "props": "type HStackProps<T extends ElementType = 'div'> = PrimitiveProps<T> & StackProps",
+      "source": "packages/uikit/h-stack.tsx"
     },
     {
       "name": "LargeTitle",
@@ -33,12 +33,6 @@
       "source": "packages/uikit/navigation-link.tsx"
     },
     {
-      "name": "NavigationStack",
-      "description": "Push navigation retaining the established Nav transition and useNavigation contract.",
-      "props": "type NavigationStackProps = { children: ReactNode }",
-      "source": "packages/uikit/navigation-stack.tsx"
-    },
-    {
       "name": "Placeholder",
       "description": "Centred empty, unavailable or loading content harvested from five existing apps.",
       "props": "type PlaceholderProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
@@ -46,8 +40,8 @@
     },
     {
       "name": "Row",
-      "description": "Grouped row with optional leading icon and trailing detail. Use as=\"button\" for an action.",
-      "props": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}",
+      "description": "Grouped row with an optional leading icon, a secondary line under the label\nand trailing detail. Use `as=\"button\"` for an action, `as=\"li\"` inside a\n`List`.",
+      "props": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  /** Second line under `label`, in the secondary colour. Most iOS rows have one. */\n  subtitle?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}",
       "source": "packages/uikit/row.tsx"
     },
     {
@@ -63,15 +57,15 @@
       "source": "packages/uikit/section.tsx"
     },
     {
-      "name": "Symbol",
-      "description": "Decorative symbol inheriting text colour. Name the enclosing button when it is the only content.",
-      "props": "type SymbolProps = ComponentProps<typeof Sym>",
-      "source": "packages/uikit/symbol.tsx"
+      "name": "Sym",
+      "description": "An SF Symbol, tinted by the element's colour through a mask. Decorative by\ndefault: name the enclosing button when the symbol is its only content.",
+      "props": "type SymProps = { name: keyof typeof SYM; size?: number }",
+      "source": "packages/uikit/sym.tsx"
     },
     {
       "name": "Text",
-      "description": "Inline text or formatted animated number. Caption reproduces the harvested secondary label.",
-      "props": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: 'body' | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}",
+      "description": "A step of the type ramp. `body` emits nothing, so it inherits.",
+      "props": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: Ramp | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}",
       "source": "packages/uikit/text.tsx"
     },
     {
@@ -89,7 +83,7 @@
     {
       "name": "VStack",
       "description": "A shrinking vertical stack that fills its flex parent, including the cover display.",
-      "props": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T>",
+      "props": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T> & StackProps",
       "source": "packages/uikit/v-stack.tsx"
     },
     {

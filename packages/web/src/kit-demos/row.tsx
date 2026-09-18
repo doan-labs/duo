@@ -1,4 +1,4 @@
-import { Symbol as DuoSymbol, Row, Section, Toggle } from '@doan-labs/duo-uikit'
+import { Row, Section, Sym, Toggle } from '@doan-labs/duo-uikit'
 import { useState } from 'react'
 
 export default function Demo() {
@@ -7,7 +7,7 @@ export default function Demo() {
     <Section>
       <Row label="Label only" />
       <Row label="With detail" detail="Value" />
-      <Row icon={<DuoSymbol name="gear" />} label="Icon and chevron" chevron />
+      <Row icon={<Sym name="gear" />} label="Icon and chevron" chevron />
       <Row label="With a control">
         <Toggle aria-label="Example switch" defaultChecked />
       </Row>

@@ -1,6 +1,6 @@
+import { art, beep } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { Button, Row, Screen, Section, Text, Title, Toggle } from '@doan-labs/duo-uikit'
-import { art, beep } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

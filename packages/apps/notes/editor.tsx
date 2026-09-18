@@ -10,19 +10,19 @@ import { useNoteText } from './store.ts'
 /** Barrel colour per pencil; the nib is always pale. */
 const PENS = [
   appAppearance.notesColor,
-  appAppearance.notesColor2,
+  colors.blueDark,
   appAppearance.notesColor3,
-  appAppearance.notesColor4,
+  colors.groupedLight,
   appAppearance.notesColor5,
   appAppearance.notesColor6
 ]
 const INKS = [
   appAppearance.notesColor7,
-  appAppearance.notesColor2,
-  appAppearance.notesColor8,
-  appAppearance.notesColor9,
-  appAppearance.memosColor,
-  appAppearance.notesColor10
+  colors.blueDark,
+  colors.green,
+  colors.yellow,
+  colors.redBright,
+  colors.darkElevated
 ]
 
 export function NotePane({

@@ -1,8 +1,9 @@
 import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
+
 // TV. Shelves of posters generated from their titles; opening one plays a real trailer embed.
 
+import { art, hue } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
-import { art, hue } from '@doan-labs/duo-uikit/shared.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { Fragment, useState } from 'react'

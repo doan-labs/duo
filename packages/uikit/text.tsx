@@ -3,12 +3,23 @@ import type { ElementType } from 'react'
 import { animations } from './animations.ts'
 import { Num } from './num.tsx'
 import type { PrimitiveProps } from './primitive.ts'
-import { shared } from './styles.ts'
+import { shared, typography } from './styles.ts'
 import { colors } from './tokens.stylex.ts'
 
-/** Inline text or formatted animated number. Caption reproduces the harvested secondary label. */
+/** A step of the type ramp. `body` emits nothing, so it inherits. */
+type Ramp = keyof typeof typography
+
+/**
+ * Inline text or a formatted animated number.
+ *
+ * `size` names a step of the type ramp, which carries size, leading and weight
+ * together. `caption`, `footnote` and `title` are the kit's original names and
+ * still render exactly as they did; unlike the ramp steps they also set a
+ * colour. Prefer `size="subheadline" color="secondary"` over `size="caption"`
+ * in new UI.
+ */
 export type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {
-  size?: 'body' | 'caption' | 'footnote' | 'title'
+  size?: Ramp | 'caption' | 'footnote' | 'title'
   weight?: 'regular' | 'medium' | 'bold'
   color?: 'primary' | 'secondary' | 'accent'
   value?: number
@@ -33,9 +44,16 @@ export function Text<T extends ElementType = 'span'>({
     <Tag
       {...props}
       {...stylex.props(
-        size === 'caption' && shared.sub,
-        size === 'footnote' && styles.footnote,
-        size === 'title' && styles.title,
+        // The three original names win over the ramp step they shadow, so no
+        // existing call site moves. `body` emits nothing and inherits, which is
+        // what lets a Text inside a header still read at the header's size.
+        size === 'caption'
+          ? shared.sub
+          : size === 'footnote'
+            ? styles.footnote
+            : size === 'title'
+              ? styles.title
+              : size !== 'body' && typography[size],
         weight && styles[weight],
         color && styles[color],
         animate && animations[animate],

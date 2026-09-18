@@ -3,16 +3,15 @@ import { parseSync } from '@babel/core'
 
 const components = [
   'button',
-  'hero',
+  'h-stack',
   'large-title',
   'list',
   'navigation-link',
-  'navigation-stack',
   'placeholder',
   'row',
   'screen',
   'section',
-  'symbol',
+  'sym',
   'text',
   'title',
   'toggle',

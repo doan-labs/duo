@@ -1,12 +1,13 @@
 // App Store. The real catalog: featured release on top, official and community
 // rows with GET / OPEN, a detail page per app and the developer tools at the
 // bottom. Every row and button here is what the store checks drive.
+
+import { art } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { PREVIEW_FEATURES } from '@doan-labs/duo-sdk/preview-features.ts'
 import type { Store, StoreRow } from '@doan-labs/duo-sdk/store.ts'
 import { LargeTitle, Placeholder, Screen, Section, VStack } from '@doan-labs/duo-uikit'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
-import { art } from '@doan-labs/duo-uikit/shared.ts'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

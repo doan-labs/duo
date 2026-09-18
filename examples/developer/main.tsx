@@ -2,16 +2,16 @@ import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import {
   Button,
-  Symbol as DuoSymbol,
-  Hero,
+  HStack,
   LargeTitle,
   List,
+  Nav,
   NavigationLink,
-  NavigationStack,
   Placeholder,
   Row,
   Screen,
   Section,
+  Sym,
   Text,
   Title,
   Toggle,
@@ -35,7 +35,7 @@ function Gallery() {
   }, [])
   return (
     <VStack as="main" xstyle={[styles.root, light]}>
-      <NavigationStack>
+      <Nav>
         <Title>
           Developer{' '}
           <Title as="span" variant="accessory">
@@ -48,7 +48,6 @@ function Gallery() {
           </Text>
           <LargeTitle>Components</LargeTitle>
           <Section>
-            <Hero>Harvested UI</Hero>
             <Row label="Body" detail={<Text>Regular text</Text>} />
             <Row label="Caption" detail={<Text size="caption">Secondary label</Text>} />
             <Row label="Footnote" detail={<Text size="footnote">Footnote</Text>} />
@@ -68,7 +67,7 @@ function Gallery() {
           </Section>
           <Section>
             <List aria-label="Rows">
-              <Row as="li" icon={<DuoSymbol name="gear" />} label="Icon and detail" detail="Value" chevron />
+              <Row as="li" icon={<Sym name="gear" />} label="Icon and detail" detail="Value" chevron />
               <Row as="li" label="Switch">
                 <Toggle
                   aria-label="Gallery switch"
@@ -83,7 +82,7 @@ function Gallery() {
             </List>
           </Section>
           <Section>
-            <Row xstyle={styles.wrap}>
+            <HStack gap={8} wrap xstyle={styles.tray}>
               <Button variant="filled" onClick={() => setMessage('Filled pressed')}>
                 Filled
               </Button>
@@ -93,9 +92,9 @@ function Gallery() {
               </Button>
               <Button disabled>Disabled</Button>
               <Button aria-label="Symbol action" onClick={() => setMessage('Symbol pressed')}>
-                <DuoSymbol name="gear" />
+                <Sym name="gear" />
               </Button>
-            </Row>
+            </HStack>
             <Row>
               <NavigationLink
                 title="Detail"
@@ -113,13 +112,19 @@ function Gallery() {
             </Row>
           </Section>
           <Section>
-            <Row xstyle={styles.wrap}>
+            <HStack gap={8} wrap xstyle={styles.tray}>
               {(['spin', 'rise', 'pop', 'fade', 'rip', 'draw', 'bob', 'glow'] as const).map((animation) => (
                 <Text key={animation} animate={animation} xstyle={styles.sample}>
                   {animation}
                 </Text>
               ))}
-            </Row>
+            </HStack>
+          </Section>
+          <Section>
+            <Row label="Type ramp" subtitle="Every step, with its own leading" chevron />
+            {(['largeTitle', 'title2', 'headline', 'body', 'subheadline', 'caption2'] as const).map((step) => (
+              <Row key={step} label={<Text size={step}>{step}</Text>} detail={step} />
+            ))}
           </Section>
           <Section>
             <Placeholder>No content yet</Placeholder>
@@ -139,7 +144,7 @@ function Gallery() {
             />
           </Section>
         </Screen>
-      </NavigationStack>
+      </Nav>
     </VStack>
   )
 }
@@ -153,7 +158,7 @@ const styles = stylex.create({
     fontFamily: fonts.system
   },
   inset: { paddingLeft: 16, paddingRight: 16 },
-  wrap: { flexWrap: 'wrap' },
+  tray: { flexWrap: 'wrap', paddingTop: 11, paddingRight: 16, paddingBottom: 11, paddingLeft: 16 },
   sample: { display: 'inline-block', paddingTop: 10, paddingRight: 10, paddingBottom: 10, paddingLeft: 10 },
   widget: {
     backgroundColor: colors.weatherNight,

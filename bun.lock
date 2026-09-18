@@ -415,6 +415,10 @@
         "duo": "./index.mjs",
       },
     },
+    "packages/fixtures": {
+      "name": "@doan-labs/duo-fixtures",
+      "version": "0.0.0",
+    },
     "packages/sdk": {
       "name": "@doan-labs/duo-sdk",
       "version": "0.0.0",
@@ -634,6 +638,8 @@
     "@doan-labs/duo-app-youtube": ["@doan-labs/duo-app-youtube@workspace:packages/apps/youtube"],
 
     "@doan-labs/duo-cli": ["@doan-labs/duo-cli@workspace:packages/cli"],
+
+    "@doan-labs/duo-fixtures": ["@doan-labs/duo-fixtures@workspace:packages/fixtures"],
 
     "@doan-labs/duo-sdk": ["@doan-labs/duo-sdk@workspace:packages/sdk"],
 

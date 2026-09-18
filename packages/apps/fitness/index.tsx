@@ -1,8 +1,9 @@
+import { walk } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
 import { Bars, card, RINGS, Rings } from '@doan-labs/duo-uikit/rings.tsx'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 
@@ -33,14 +34,14 @@ export const Fitness = (_: { os: Os }) => (
         <div {...stylex.props(card.val)}>
           3,411<s {...stylex.props(card.unit)}>KCAL</s>
         </div>
-        <Bars seed="fitness-move" colour={appAppearance.fitnessColor2} />
+        <Bars values={walk('fitness-move', 7)} colour={appAppearance.fitnessColor2} />
       </div>
       <div {...stylex.props(card.hcard, card.hcardDark, delay.ms(150))}>
-        <div {...stylex.props(card.cap, card.capTint(appAppearance.fitnessColor3))}>Stand · this week</div>
+        <div {...stylex.props(card.cap, card.capTint(colors.cyan))}>Stand · this week</div>
         <div {...stylex.props(card.val)}>
           68<s {...stylex.props(card.unit)}>HRS</s>
         </div>
-        <Bars seed="fitness-stand" colour={appAppearance.fitnessColor3} />
+        <Bars values={walk('fitness-stand', 7)} colour={colors.cyan} />
       </div>
     </div>
     <Title xstyle={[styles.hdrSm]}>Workouts</Title>

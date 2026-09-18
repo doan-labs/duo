@@ -1,9 +1,10 @@
 import { Row, Screen, Section, Text, Title } from '@doan-labs/duo-uikit'
+
 // Music: a now-playing card over the queue, driven by one <audio> and a clock.
 
+import { art, mmss } from '@doan-labs/duo-fixtures'
+import { TRACKS, type Track } from '@doan-labs/duo-fixtures/tracks.ts'
 import type { Os } from '@doan-labs/duo-sdk'
-import { TRACKS, type Track } from '@doan-labs/duo-uikit/sample-tracks.ts'
-import { art, mmss } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'

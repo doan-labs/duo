@@ -1,18 +1,18 @@
+import { beep } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { Screen } from '@doan-labs/duo-uikit'
-import { beep } from '@doan-labs/duo-uikit/shared.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent, useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
 
 export const INKS = [
-  appAppearance.notesColor10,
-  appAppearance.freeformColor,
-  appAppearance.homeColor2,
-  appAppearance.notesColor8,
-  appAppearance.freeformColor2,
+  colors.darkElevated,
+  colors.red,
+  colors.orange,
+  colors.green,
+  colors.blueBright,
   appAppearance.freeformColor3
 ]
 
