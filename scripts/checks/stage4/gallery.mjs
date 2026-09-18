@@ -81,8 +81,18 @@ try {
   await cover.evaluate(() =>
     [...document.querySelectorAll('button')].find((button) => button.textContent === 'Open detail').click()
   )
-  await cover.waitForSelector('[aria-label="Back"]')
-  await cover.click('[aria-label="Back"]')
+  // Nav starts its slide after two animation frames; DOM presence is not click readiness.
+  await cover.waitForFunction(() => {
+    let node = document.querySelector('[aria-label="Back"]')
+    if (!node) return false
+    while (node) {
+      if (getComputedStyle(node).transform !== 'none') return false
+      node = node.parentElement
+    }
+    return true
+  })
+  await cover.locator('[aria-label="Back"]').click()
+  console.log('Gallery: waiting for Back to close the detail')
   await cover.waitForFunction(() => !document.querySelector('[aria-label="Back"]'))
   assert.equal(await cover.$eval('[aria-label="Gallery switch"]', (input) => input.checked), true)
   console.log('Gallery: reduced motion and layout')
@@ -122,8 +132,12 @@ try {
   await Bun.write(`${cache}/evidence.json`, JSON.stringify(evidence, null, 2))
   console.log('Gallery PASS', JSON.stringify(evidence))
 } catch (error) {
+  await page.screenshot({ path: `${cache}/failure.png` })
   console.error('Gallery browser errors:', errors)
-  console.error('Gallery frame state:', await page.evaluate(() => document.body.innerHTML))
+  console.error(
+    'Gallery frame state:',
+    await page.evaluate(() => [...document.querySelectorAll('iframe')].map((frame) => ({ ...frame.dataset })))
+  )
   throw error
 } finally {
   await browser.close()
