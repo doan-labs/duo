@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -19,19 +19,19 @@ export const styles = stylex.create({
     flexDirection: 'column',
     borderRightWidth: 1,
     borderRightStyle: 'solid',
-    borderRightColor: 'rgba(255,255,255,.08)'
+    borderRightColor: appAppearance.musicBorderBottomColor
   },
   listHdr: { display: 'flex', alignItems: 'center', paddingInline: 12, paddingTop: 4, paddingBottom: 6, flexShrink: 0 },
-  listTitle: { fontSize: 15, fontWeight: 700 },
-  listCount: { fontSize: 11 },
+  listTitle: { fontSize: appAppearance.musicFontSize, fontWeight: appAppearance.musicFontWeight },
+  listCount: { fontSize: appAppearance.musicFontSize3 },
   push: { marginLeft: 'auto' },
   round: {
     width: 27,
     height: 27,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(255,255,255,.1)',
+    backgroundColor: appAppearance.podcastsBorderTopColor,
     color: colors.white,
     flexShrink: 0
   }

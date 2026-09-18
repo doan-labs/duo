@@ -1,7 +1,8 @@
-import { widgetSnapshot } from '@doan-labs/ipduo-app-weather/data.ts'
 import { WALL_KEY } from '@doan-labs/ipduo-uikit/icons/index.ts'
 import * as THREE from 'three'
+import { widgetAge } from '../uikit/widget.tsx'
 import { DOCK, LEFT, RIGHT } from './apps.ts'
+import { widgetSnapshot } from './runtime/widgets.tsx'
 
 // Scene units are metres; PX converts a millimetre to canvas pixels.
 const PX = 12
@@ -408,13 +409,13 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
   ctx.textAlign = 'left'
   ctx.fillStyle = '#fff'
   ctx.font = `600 ${u(11)}px ${FONT}`
-  ctx.fillText(weather.name, wx(0) + u(12), wtop + u(12), wsize - u(24))
+  ctx.fillText(weather.lines[0]?.text ?? '', wx(0) + u(12), wtop + u(12), wsize - u(24))
   ctx.font = `300 ${u(34)}px ${FONT}`
-  ctx.fillText(weather.temperature, wx(0) + u(12), wtop + u(26))
+  ctx.fillText(weather.lines[1]?.text ?? '', wx(0) + u(12), wtop + u(26))
   ctx.font = `600 ${u(11)}px ${FONT}`
-  ctx.fillText(weather.condition, wx(0) + u(12), wtop + wsize - u(34))
+  ctx.fillText(weather.lines[2]?.text ?? '', wx(0) + u(12), wtop + wsize - u(34))
   ctx.fillStyle = 'rgba(255,255,255,0.72)'
-  ctx.fillText(weather.range, wx(0) + u(12), wtop + wsize - u(19))
+  ctx.fillText(widgetAge(weather.updatedAt) || weather.lines[3]?.text || '', wx(0) + u(12), wtop + wsize - u(19))
   label(ctx, 'Weather', wx(0) + wsize / 2, wtop + wsize + u(4))
 
   // Calendar widget, matching the live one in os.ts.

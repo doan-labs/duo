@@ -1,6 +1,7 @@
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import { type Os, os } from '@doan-labs/ipduo-sdk'
+import { useKV } from '@doan-labs/ipduo-sdk/react.ts'
+import { Text, Title, VStack } from '@doan-labs/ipduo-uikit'
+import { Page } from '@doan-labs/ipduo-uikit/nav.tsx'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
@@ -13,6 +14,13 @@ import { styles } from './styles.ts'
 export const Notes = (_: { os: Os }) => {
   const root = useRef<HTMLDivElement>(null)
   const [wide, setWide] = useState(false)
+  const selected = useKV(os.session, 'selected')
+  const pushed = useKV(os.session, 'pushed')
+  const note = NOTES.find((n) => n.id === selected.value) ?? NOTES[0]!
+  const pick = (n: typeof note) => {
+    selected.set(n.id)
+    pushed.set('true')
+  }
   // The box decides, not the display: a split half of the inner panel is as
   // narrow as the cover, and gets the same one-column Notes.
   useEffect(() => {
@@ -21,16 +29,21 @@ export const Notes = (_: { os: Os }) => {
     return () => ro.disconnect()
   }, [])
   return (
-    <div ref={root} {...stylex.props(shared.column)}>
-      {wide ? <Columns /> : <Stack />}
-    </div>
+    <VStack ref={root}>
+      {wide ? (
+        <Columns sel={note} onPick={pick} />
+      ) : pushed.value === 'true' ? (
+        <NoteSheet note={note} back={() => pushed.set('false')} />
+      ) : (
+        <Stack onPick={pick} />
+      )}
+    </VStack>
   )
 }
 
 // ---------- unfolded: folders | list | note ----------
 
-const Columns = () => {
-  const [sel, setSel] = useState(NOTES[0]!)
+const Columns = ({ sel, onPick }: { sel: (typeof NOTES)[number]; onPick: (note: (typeof NOTES)[number]) => void }) => {
   const [ink, setInk] = useState(0)
   return (
     <div {...stylex.props(styles.cols)}>
@@ -39,14 +52,16 @@ const Columns = () => {
         <div {...stylex.props(styles.listHdr)}>
           <div>
             <div {...stylex.props(styles.listTitle)}>Notes</div>
-            <div {...stylex.props(shared.sub, styles.listCount)}>{NOTES.length} Notes</div>
+            <Text as="div" size="caption" xstyle={[styles.listCount]}>
+              {NOTES.length} Notes
+            </Text>
           </div>
           <span {...stylex.props(styles.round, styles.push)}>
             <Sym name="more" size={17} />
           </span>
         </div>
         <div {...stylex.props(styles.scroll)}>
-          <NoteList sel={sel.id} onPick={setSel} />
+          <NoteList sel={sel.id} onPick={onPick} />
         </div>
       </div>
       <NotePane key={sel.id} note={sel} ink={ink} onInk={setInk} />
@@ -54,25 +69,18 @@ const Columns = () => {
   )
 }
 
-const Stack = () => (
-  <Nav>
-    <Page
-      title={
-        <>
-          Notes
-          <span {...stylex.props(shared.hdrSm, styles.gold)}>
-            <Sym name="more" size={19} />
-            <Sym name="compose" size={19} />
-          </span>
-        </>
-      }
-    >
-      <Picker />
-    </Page>
-  </Nav>
+const Stack = ({ onPick }: { onPick: (note: (typeof NOTES)[number]) => void }) => (
+  <Page
+    title={
+      <>
+        Notes
+        <Title as="span" variant="accessory" xstyle={[styles.gold]}>
+          <Sym name="more" size={19} />
+          <Sym name="compose" size={19} />
+        </Title>
+      </>
+    }
+  >
+    <NoteList onPick={onPick} />
+  </Page>
 )
-
-const Picker = () => {
-  const { push } = useNav()
-  return <NoteList onPick={(n) => push((back) => <NoteSheet note={n} back={back} />)} />
-}

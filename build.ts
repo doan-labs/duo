@@ -1,6 +1,10 @@
 // Production build. The CLI has no plugin flag, so this is `bun build ./packages/shell/index.html
 // --production` in code, plus the StyleX stylesheet the plugin collected.
+
+import { buildPreinstalled } from './scripts/build-preinstalled.ts'
 import { stylexPlugin } from './stylex-plugin.ts'
+
+await buildPreinstalled()
 
 const { plugin, css } = stylexPlugin(false)
 const result = await Bun.build({

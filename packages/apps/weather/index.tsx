@@ -1,4 +1,5 @@
 import type { Os } from '@doan-labs/ipduo-sdk'
+import { WidgetLabel } from '@doan-labs/ipduo-uikit'
 import { Num } from '@doan-labs/ipduo-uikit/num.tsx'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
@@ -582,14 +583,14 @@ export function WeatherWidget({ onOpen }: { onOpen: (from: HTMLElement) => void 
       {...stylex.props(shared.glass, shared.widget, styles.widget)}
       onClick={() => onOpen(el.current!)}
     >
-      <b {...stylex.props(shared.widgetLabel)}>{place.name}</b>
+      <WidgetLabel>{place.name}</WidgetLabel>
       <div {...stylex.props(styles.widgetTemp)}>
         <Temp value={data?.current.temperature_2m} unit={preferences.unit} />
       </div>
-      <b {...stylex.props(shared.widgetLabel, styles.widgetFoot)}>
+      <WidgetLabel xstyle={[styles.widgetFoot]}>
         {data ? condition(data.current.weather_code!, data.current.is_day)[1] : error ? 'Unavailable' : 'Loading…'}
-      </b>
-      <b {...stylex.props(shared.widgetLabel)}>
+      </WidgetLabel>
+      <WidgetLabel>
         {data && (
           <>
             H:
@@ -597,7 +598,7 @@ export function WeatherWidget({ onOpen }: { onOpen: (from: HTMLElement) => void 
             <Temp value={data.daily.temperature_2m_min?.[0]} unit={preferences.unit} />
           </>
         )}
-      </b>
+      </WidgetLabel>
     </button>
   )
 }

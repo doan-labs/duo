@@ -6,10 +6,13 @@ import { colors, fonts } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { createRoot } from 'react-dom/client'
 import { device } from './device.ts'
+import { development } from './runtime/development.ts'
+import { shots } from './runtime/photos.ts'
+import { bootRegistry } from './runtime/registry.ts'
 import { SpringBoard } from './springboard/springboard.tsx'
 
 /** Builds one display's OS. `w`/`hgt` in CSS px; `wall` is a wallpaper URL. */
-export function os(w: number, hgt: number, wall: string, boot?: string | null): HTMLElement {
+export function os(w: number, hgt: number, wall: string, container: HTMLElement, boot?: string | null): HTMLElement {
   const wide = w > 600
   // The root is handed to CSS3DObject before React has rendered anything, so
   // its own look is applied here by hand; everything inside is React.
@@ -20,13 +23,25 @@ export function os(w: number, hgt: number, wall: string, boot?: string | null): 
   const p = stylex.props(styles.os, styles.size(w, hgt), wide ? styles.osWide : styles.osNarrow)
   root.className = p.className ?? ''
   for (const [k, v] of Object.entries(p.style ?? {})) root.style.setProperty(k, String(v))
+  // CSS3DRenderer only attaches visible objects; hidden sandbox views still need a live document.
+  root.style.display = 'none'
+  container.append(root)
   // Tap to wake. A block, not an expression: an `on*` handler returning false
   // cancels the event, and a cancelled pointerdown never focuses the field
   // under it, so nothing could be typed anywhere.
   root.onpointerdown = () => {
     if (device.asleep) device.wake()
   }
-  createRoot(root).render(<SpringBoard w={w} hgt={hgt} wall={wall} boot={boot} shots={[]} />)
+  root.textContent = 'Loading apps…'
+  void bootRegistry()
+    .then(() => {
+      root.textContent = ''
+      const dev = [...development].find(([, value]) => value.bundle.release.manifest.id === boot)
+      createRoot(root).render(<SpringBoard w={w} hgt={hgt} wall={wall} boot={dev?.[0] ?? boot} shots={shots} />)
+    })
+    .catch((error) => {
+      root.textContent = `Apps unavailable: ${error.message}. Reload to retry.`
+    })
   return root
 }
 

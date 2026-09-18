@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { clock, type Forecast, temperature } from './data.ts'
 
@@ -57,5 +57,5 @@ const styles = stylex.create({
   chart: { display: 'block', width: '100%', maxHeight: 210, marginBottom: 16, overflow: 'visible' },
   grid: { stroke: colors.white, opacity: 0.12, strokeWidth: 1 },
   line: { fill: 'none', stroke: colors.weatherSun, strokeWidth: 3, strokeLinecap: 'round', strokeLinejoin: 'round' },
-  label: { fill: colors.white, opacity: 0.7, fontSize: 10 }
+  label: { fill: colors.white, opacity: 0.7, fontSize: appAppearance.calendarFontSize4 }
 })

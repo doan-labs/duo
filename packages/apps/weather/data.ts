@@ -1,3 +1,4 @@
+import { os } from '@doan-labs/ipduo-sdk'
 import { useEffect, useSyncExternalStore } from 'react'
 
 export type Place = { id: string; name: string; region: string; latitude: number; longitude: number }
@@ -9,11 +10,11 @@ export const home: Place = {
   longitude: -122.42
 }
 type Preferences = { places: Place[]; selected: string; unit: 'C' | 'F' }
-const key = 'duo.weather.v1'
+const key = 'preferences'
 const defaults: Preferences = { places: [home], selected: home.id, unit: 'C' }
-function read(): Preferences {
+function read(raw: string | null): Preferences {
   try {
-    const p = JSON.parse(localStorage.getItem(key) || 'null')
+    const p = JSON.parse(raw || 'null')
     if (
       p &&
       ['C', 'F'].includes(p.unit) &&
@@ -34,7 +35,7 @@ function read(): Preferences {
   }
   return defaults
 }
-let preferences = read()
+let preferences = defaults
 const listeners = new Set<() => void>()
 const emit = () => {
   for (const listener of listeners) listener()
@@ -47,19 +48,13 @@ export const subscribe = (listener: () => void) => {
 }
 export function update(patch: Partial<Preferences>) {
   preferences = { ...preferences, ...patch }
-  try {
-    localStorage.setItem(key, JSON.stringify(preferences))
-  } catch {
-    /* Keep session state if storage is unavailable. */
-  }
+  void os.storage.set(key, JSON.stringify(preferences)).catch(() => {
+    const place = preferences.places.find((p) => p.id === preferences.selected)!
+    cache.set(place.id, { ...cache.get(place.id), loading: false, error: 'Preferences were not saved. Try again.' })
+    emit()
+  })
   emit()
 }
-window.addEventListener('storage', (event) => {
-  if (event.key === key || event.key === null) {
-    preferences = read()
-    emit()
-  }
-})
 export const usePreferences = () => useSyncExternalStore(subscribe, () => preferences)
 export function select(place: Place) {
   const places = place.id.startsWith('local:')
@@ -82,6 +77,11 @@ const cache = new Map<string, Entry>()
 const empty: Entry = { loading: true }
 const pending = new Set<string>()
 export async function refresh(place: Place, force = false) {
+  if (!os.owner) {
+    if (force) await os.commands.send('refresh', place.id)
+    return
+  }
+  const epoch = os.owner.epoch
   const prior = cache.get(place.id)
   if (pending.has(place.id) || (!force && prior?.fetched && Date.now() - prior.fetched < 600_000)) return
   pending.add(place.id)
@@ -102,7 +102,8 @@ export async function refresh(place: Place, force = false) {
         'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max'
     })
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
-      signal: AbortSignal.timeout(15000)
+      credentials: 'omit',
+      signal: AbortSignal.any([ownerAbort.signal, AbortSignal.timeout(15000)])
     })
     if (!response.ok) throw new Error('Forecast service unavailable')
     const data: Forecast = await response.json()
@@ -113,6 +114,7 @@ export async function refresh(place: Place, force = false) {
       !data.timezone
     )
       throw new Error('Incomplete forecast')
+    if (os.owner?.epoch !== epoch) return
     cache.set(place.id, { data, loading: false, fetched: Date.now() })
   } catch {
     cache.set(place.id, {
@@ -123,23 +125,36 @@ export async function refresh(place: Place, force = false) {
   } finally {
     pending.delete(place.id)
     emit()
+    if (os.owner?.epoch === epoch) {
+      try {
+        await os.storage.set(`forecast:${place.id}`, JSON.stringify(cache.get(place.id)))
+        await publishWidget()
+      } catch {
+        cache.set(place.id, { ...cache.get(place.id), loading: false, error: 'Weather could not be saved. Try again.' })
+        emit()
+      }
+    }
   }
 }
 export function useForecast(place: Place) {
   const entry = useSyncExternalStore(subscribe, () => cache.get(place.id) || empty)
   useEffect(() => {
     void refresh(place)
-    const timer = setInterval(() => {
-      void refresh(place)
-    }, 600_000)
-    return () => clearInterval(timer)
   }, [place])
   return entry
 }
 export async function search(query: string, signal: AbortSignal): Promise<Place[]> {
+  if (!os.owner) {
+    const request = crypto.randomUUID()
+    await os.commands.send('search', JSON.stringify({ query, request }))
+    const value = await os.session.get(`search:${request}`)
+    await os.session.del(`search:${request}`)
+    signal.throwIfAborted()
+    return JSON.parse(value ?? '[]')
+  }
   const response = await fetch(
     `https://geocoding-api.open-meteo.com/v1/search?${new URLSearchParams({ name: query, count: '8', language: 'en', format: 'json' })}`,
-    { signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]) }
+    { credentials: 'omit', signal: AbortSignal.any([signal, ownerAbort.signal, AbortSignal.timeout(15000)]) }
   )
   if (!response.ok) throw new Error('Search unavailable')
   const data = await response.json()
@@ -190,4 +205,88 @@ export function widgetSnapshot() {
       ? `H:${temperature(data.daily.temperature_2m_max?.[0], preferences.unit)} L:${temperature(data.daily.temperature_2m_min?.[0], preferences.unit)}`
       : ''
   }
+}
+
+let ownerAbort = new AbortController()
+async function publishWidget() {
+  if (!os.owner) return
+  const value = widgetSnapshot()
+  const place = preferences.places.find((p) => p.id === preferences.selected) ?? home
+  await os.widget.set('small', {
+    arg: place.id,
+    tint: 'glass',
+    lines: [
+      { role: 'label', text: value.name.slice(0, 64) },
+      { role: 'value', text: value.temperature },
+      { role: 'caption', text: cache.get(place.id)?.error ? 'Offline · cached forecast' : value.condition },
+      { role: 'caption', text: value.range }
+    ]
+  })
+}
+export async function initializeWeather() {
+  let revision = 0
+  let unwatch: (() => void) | undefined
+  const apply = (k: string, v: string | null) => {
+    if (k === key) preferences = read(v)
+    if (k.startsWith('forecast:')) {
+      try {
+        if (v) cache.set(k.slice(9), JSON.parse(v))
+        else cache.delete(k.slice(9))
+      } catch {
+        /* Ignore invalid old cache entries. */
+      }
+    }
+  }
+  const load = async () => {
+    unwatch?.()
+    let cursor: string | undefined
+    do {
+      const snap = await os.storage.snapshot(cursor)
+      revision = snap.rev
+      cursor = snap.cursor
+      for (const [k, v] of snap.entries) apply(k, v)
+    } while (cursor)
+    unwatch = os.storage.watch(revision, (change) => {
+      if (change.rev < 0 || change.rev > revision + 1) {
+        void load()
+        return
+      }
+      if (change.rev <= revision) return
+      revision = change.rev
+      apply(change.k, change.v)
+      emit()
+    })
+    emit()
+  }
+  await load()
+  const reconcile = () => {
+    if (os.owner) {
+      const place = preferences.places.find((p) => p.id === preferences.selected) ?? home
+      void refresh(place)
+    }
+  }
+  os.onOwner(() => {
+    ownerAbort.abort()
+    ownerAbort = new AbortController()
+    reconcile()
+  })
+  os.onView((view) => {
+    if (view.visible) reconcile()
+  })
+  os.commands.onCommand(async ({ type, payload }) => {
+    if (type === 'refresh') {
+      const place = preferences.places.find((p) => p.id === payload)
+      if (place) await refresh(place, true)
+    }
+    if (type === 'search') {
+      const { query, request } = JSON.parse(payload)
+      await os.session.set(`search:${request}`, JSON.stringify(await search(query, ownerAbort.signal)))
+    }
+  })
+  os.session.onArg((arg) => {
+    if (preferences.places.some((p) => p.id === arg)) update({ selected: arg })
+  })
+  if (os.session.arg && preferences.places.some((p) => p.id === os.session.arg)) update({ selected: os.session.arg })
+  setInterval(reconcile, 30000)
+  reconcile()
 }

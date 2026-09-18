@@ -35,7 +35,7 @@ export const Icon = ({
   ) : (
     <img
       ref={ref as Ref<HTMLImageElement>}
-      src={ICONS[a.name] ?? ''}
+      src={a.icon ?? ICONS[a.name] ?? ''}
       alt=""
       {...stylex.props(styles.icon, size, pressed && styles.iconPressed)}
     />

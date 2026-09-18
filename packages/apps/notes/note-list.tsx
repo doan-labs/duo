@@ -1,6 +1,6 @@
 import { art } from '@doan-labs/ipduo-uikit/shared.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { GROUPS, type Note } from './data.ts'
 import { useNoteText } from './store.ts'
@@ -47,7 +47,13 @@ function NoteRow({ note: n, sel, onPick }: { note: Note; sel?: string; onPick: (
 const styles = stylex.create({
   clip: { color: colors.white, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
   groups: { paddingInline: 10 },
-  groupHdr: { fontSize: 16, fontWeight: 700, paddingTop: 8, paddingBottom: 8, paddingInline: 2 },
+  groupHdr: {
+    fontSize: appAppearance.calendarFontSize,
+    fontWeight: appAppearance.musicFontWeight,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingInline: 2
+  },
   li: {
     width: '100%',
     textAlign: 'left',
@@ -56,34 +62,34 @@ const styles = stylex.create({
     gap: 7,
     paddingBlock: 8,
     paddingInline: 8,
-    borderRadius: 10,
+    borderRadius: appAppearance.calendarFontSize4,
     cursor: 'pointer',
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: 'rgba(255,255,255,.11)'
+    borderBottomColor: appAppearance.notesBorderBottomColor
   },
-  liOn: { backgroundColor: '#e2b93b', color: colors.black, borderBottomColor: 'transparent' },
+  liOn: { backgroundColor: appAppearance.notesBackgroundColor, color: colors.black, borderBottomColor: 'transparent' },
   liTx: { minWidth: 0, flexGrow: 1 },
   liTitle: {
     display: 'block',
-    fontSize: 13,
-    fontWeight: 600,
+    fontSize: appAppearance.musicFontSize6,
+    fontWeight: appAppearance.musicFontWeight2,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
-  liSub: { display: 'flex', gap: 7, fontSize: 11, opacity: 0.72, marginTop: 1 },
+  liSub: { display: 'flex', gap: 7, fontSize: appAppearance.musicFontSize3, opacity: 0.72, marginTop: 1 },
   when: { flexShrink: 0 },
   mark: { display: 'flex', flexShrink: 0, opacity: 0.75 },
   thumb: {
     width: 30,
     height: 30,
-    borderRadius: 5,
+    borderRadius: appAppearance.memosBorderRadius,
     flexShrink: 0,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 13,
-    fontWeight: 700,
+    fontSize: appAppearance.musicFontSize6,
+    fontWeight: appAppearance.musicFontWeight,
     fontStyle: 'normal',
     color: colors.white
   },

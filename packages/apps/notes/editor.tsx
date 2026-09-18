@@ -1,14 +1,29 @@
+import { Title, VStack } from '@doan-labs/ipduo-uikit'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { Note } from './data.ts'
 import { useNoteText } from './store.ts'
 
 /** Barrel colour per pencil; the nib is always pale. */
-const PENS = ['#c8c9cd', '#0a84ff', '#e8453c', '#f2f2f7', '#c99a5b', '#2c2c2e']
-const INKS = ['#ffffff', '#0a84ff', '#34c759', '#ffd60a', '#ff453a', '#1c1c1e']
+const PENS = [
+  appAppearance.notesColor,
+  appAppearance.notesColor2,
+  appAppearance.notesColor3,
+  appAppearance.notesColor4,
+  appAppearance.notesColor5,
+  appAppearance.notesColor6
+]
+const INKS = [
+  appAppearance.notesColor7,
+  appAppearance.notesColor2,
+  appAppearance.notesColor8,
+  appAppearance.notesColor9,
+  appAppearance.memosColor,
+  appAppearance.notesColor10
+]
 
 export function NotePane({ note, ink, onInk }: { note: Note; ink: number; onInk: (i: number) => void }) {
   const [, , undo] = useNoteText(note)
@@ -84,45 +99,57 @@ export function NotePane({ note, ink, onInk }: { note: Note; ink: number; onInk:
 
 export function NoteSheet({ note, back }: { note: Note; back: () => void }) {
   return (
-    <div {...stylex.props(shared.column)}>
-      <div {...stylex.props(shared.hdr, styles.hdrMd)}>
+    <VStack>
+      <Title xstyle={[styles.hdrMd]}>
         <button type="button" {...stylex.props(shared.bk, styles.gold)} onClick={back}>
           <Sym name="back" size={20} />
           Notes
         </button>
-        <span {...stylex.props(shared.hdrSm, styles.gold)}>
+        <Title as="span" variant="accessory" xstyle={[styles.gold]}>
           <Sym name="share" size={19} />
           <Sym name="compose" size={19} />
           <Sym name="more" size={19} />
-        </span>
-      </div>
+        </Title>
+      </Title>
       <NoteEditor note={note} />
-    </div>
+    </VStack>
   )
 }
 
 function NoteEditor({ note, ink }: { note: Note; ink?: number }) {
-  const [body, put] = useNoteText(note)
+  const [body, put, , state] = useNoteText(note)
   return (
-    <textarea
-      aria-label="Note text"
-      {...stylex.props(styles.ta, note.ink && styles.hand, ink !== undefined && styles.tint(INKS[ink]!))}
-      value={body}
-      onChange={(e) => put(e.target.value)}
-    />
+    <>
+      <div role="status" aria-live="polite" {...stylex.props(styles.save)}>
+        {state?.status === 'error'
+          ? `Not saved (${state.error})`
+          : state?.status === 'saving'
+            ? 'Saving…'
+            : state?.status === 'hydrating'
+              ? 'Loading…'
+              : 'Saved'}
+      </div>
+      <textarea
+        aria-label="Note text"
+        {...stylex.props(styles.ta, note.ink && styles.hand, ink !== undefined && styles.tint(INKS[ink]!))}
+        value={body}
+        onChange={(e) => put(e.target.value)}
+      />
+    </>
   )
 }
 
 const styles = stylex.create({
+  save: { fontSize: appAppearance.musicFontSize3, color: colors.white, opacity: 0.6, paddingInline: 20, minHeight: 16 },
   gold: { color: colors.yellow, opacity: 1 },
   push: { marginLeft: 'auto' },
   round: {
     width: 27,
     height: 27,
-    borderRadius: '50%',
+    borderRadius: appAppearance.settingsBorderRadius,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(255,255,255,.1)',
+    backgroundColor: appAppearance.podcastsBorderTopColor,
     color: colors.white,
     flexShrink: 0
   },
@@ -135,12 +162,12 @@ const styles = stylex.create({
     gap: 12,
     paddingInline: 11,
     height: 27,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,.1)'
+    borderRadius: appAppearance.musicBorderRadius,
+    backgroundColor: appAppearance.podcastsBorderTopColor
   },
-  aa: { fontSize: 13, fontWeight: 500 },
+  aa: { fontSize: appAppearance.musicFontSize6, fontWeight: appAppearance.musicFontWeight3 },
   double: { display: 'flex' },
-  hdrMd: { fontSize: 17 },
+  hdrMd: { fontSize: appAppearance.messagesFontSize },
   ta: {
     flexGrow: 1,
     borderWidth: 0,
@@ -151,15 +178,15 @@ const styles = stylex.create({
     outline: 0,
     backgroundColor: 'transparent',
     color: colors.white,
-    fontSize: 16,
+    fontSize: appAppearance.calendarFontSize,
     lineHeight: 1.5,
-    fontFamily: 'inherit'
+    fontFamily: appAppearance.notesFontFamily
   },
   // Apple Pencil, faked by the one handwriting face every Mac ships with.
   hand: {
-    fontFamily: '"Bradley Hand","Marker Felt","Segoe Script",cursive',
-    fontSize: 52,
-    fontWeight: 600,
+    fontFamily: appAppearance.notesFontFamily2,
+    fontSize: appAppearance.notesFontSize,
+    fontWeight: appAppearance.musicFontWeight2,
     lineHeight: 1.3,
     letterSpacing: 1
   },
@@ -177,39 +204,39 @@ const styles = stylex.create({
     gap: 9,
     height: 58,
     paddingInline: 12,
-    borderRadius: 17,
-    backgroundColor: '#2c2c2e',
-    boxShadow: '0 12px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1)',
+    borderRadius: appAppearance.messagesFontSize,
+    backgroundColor: appAppearance.notesColor6,
+    boxShadow: appAppearance.notesBoxShadow,
     zIndex: 5
   },
   flat: { display: 'flex', color: colors.white, flexShrink: 0 },
   dim: { opacity: 0.35 },
   mirror: { transform: 'scaleX(-1)' },
-  bar: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,.2)' },
+  bar: { width: 1, height: 26, backgroundColor: appAppearance.musicBackgroundColor },
   pens: { display: 'flex', alignItems: 'flex-start', gap: 5, height: 58, overflow: 'hidden' },
   pen: {
     width: 14,
     height: 40,
     flexShrink: 0,
     clipPath: 'polygon(0 0,100% 0,100% 62%,50% 100%,0 62%)',
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
+    borderTopLeftRadius: appAppearance.musicBorderRadius2,
+    borderTopRightRadius: appAppearance.musicBorderRadius2,
     // The dark barrel would be invisible against the tray without it.
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.22)',
+    boxShadow: appAppearance.notesBoxShadow2,
     marginTop: 13,
     transitionProperty: 'margin-top',
     transitionDuration: '.18s'
   },
   penUp: { marginTop: 4 },
-  barrel: (c: string) => ({ backgroundImage: `linear-gradient(180deg,${c} 0 60%,#e7e7ea 60%)` }),
+  barrel: (c: string) => ({ backgroundImage: `linear-gradient(180deg,${c} 0 60%,${colors.penRim} 60%)` }),
   inks: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3,1fr)',
     gap: 4,
     padding: 4,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,.07)'
+    borderRadius: appAppearance.musicFontSize3,
+    backgroundColor: appAppearance.memosBackgroundColor
   },
-  ink: { width: 14, height: 14, borderRadius: '50%' },
-  inkOn: { boxShadow: '0 0 0 1.5px #2c2c2e,0 0 0 3px #fff' }
+  ink: { width: 14, height: 14, borderRadius: appAppearance.settingsBorderRadius },
+  inkOn: { boxShadow: appAppearance.notesBoxShadow3 }
 })

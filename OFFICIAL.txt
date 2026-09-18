@@ -1,0 +1,2 @@
+labs.doan.ipduo.notes
+labs.doan.ipduo.weather

@@ -12,6 +12,7 @@ import type { App } from '@doan-labs/ipduo-uikit/app.ts'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { byName } from '../apps.ts'
 import { device, type Stage } from '../device.ts'
+import { store } from '../runtime/catalog.ts'
 import { type Box, type Side, settle, spot, zone, zoom } from './gestures.ts'
 import type { Open } from './tile.tsx'
 
@@ -70,6 +71,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     const id = ++seq
     if (quiet) zoomed.current.add(id)
     const ctx: Os = {
+      store,
       shots,
       open: (name, g) => swap(id, name, g),
       home: () => close(id),
@@ -107,14 +109,14 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (device.asleep) device.wake()
     const a = byName(name)
     const on = onStage()
-    if (!a || on.some((e) => e.a.name === name)) return
+    if (!a || on.some((e) => (a.id ? e.a.id === a.id : e.a.name === a.name))) return
     // Into the free half if there is one; otherwise in place of the app under
     // the status stack, the one iOS would call frontmost.
     const victim = on.find((e) => !e.side) ?? (on.length === 2 ? on.find((e) => e.side === 'right') : undefined)
     if (victim) swap(victim.id, name)
     else open(a)
   }
-  const stage = (): Stage => onStage().map((e) => ({ name: e.a.name, side: e.side }))
+  const stage = (): Stage => onStage().map((e) => ({ name: e.a.id ?? e.a.name, side: e.side }))
   /**
    * This display as the other one's mirror (device.ts `follow`): made to match
    * `want` with no zoom in or out, since nothing is being launched or closed
@@ -122,7 +124,11 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
    */
   const mirror = (want: Stage) => {
     const on = onStage()
-    if (on.length === want.length && on.every((e, i) => e.a.name === want[i]?.name && e.side === want[i]?.side)) return
+    if (
+      on.length === want.length &&
+      on.every((e, i) => (e.a.id ?? e.a.name) === want[i]?.name && e.side === want[i]?.side)
+    )
+      return
     for (const e of on) close(e.id, [])
     for (const s of want) {
       const a = byName(s.name)

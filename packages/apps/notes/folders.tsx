@@ -1,5 +1,5 @@
 import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { NOTES } from './data.ts'
 
@@ -71,7 +71,7 @@ const styles = stylex.create({
     backgroundColor: colors.darkElevated,
     borderRightWidth: 1,
     borderRightStyle: 'solid',
-    borderRightColor: 'rgba(255,255,255,.08)'
+    borderRightColor: appAppearance.musicBorderBottomColor
   },
   sideHdr: {
     display: 'flex',
@@ -79,7 +79,7 @@ const styles = stylex.create({
     height: 40,
     paddingInline: 16,
     flexShrink: 0,
-    fontSize: 14
+    fontSize: appAppearance.musicBorderRadius
   },
   sideIcons: { display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto' },
   scroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingBottom: 22 },
@@ -90,32 +90,32 @@ const styles = stylex.create({
     marginInline: 8,
     paddingBlock: 7,
     paddingInline: 8,
-    borderRadius: 9,
-    fontSize: 13,
+    borderRadius: appAppearance.itunesBorderRadius,
+    fontSize: appAppearance.musicFontSize6,
     color: colors.yellow,
     cursor: 'pointer'
   },
   // The glyph is the only yellow part of a row; the label stays white.
   clip: { color: colors.white, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
-  folderOn: { backgroundColor: 'rgba(255,255,255,.12)' },
-  count: { marginLeft: 'auto', paddingLeft: 8, color: colors.grey, fontSize: 13 },
+  folderOn: { backgroundColor: appAppearance.homeColor3 },
+  count: { marginLeft: 'auto', paddingLeft: 8, color: colors.grey, fontSize: appAppearance.musicFontSize6 },
   section: {
     display: 'flex',
     alignItems: 'center',
     paddingTop: 16,
     paddingBottom: 4,
     paddingInline: 16,
-    fontSize: 15,
-    fontWeight: 600
+    fontSize: appAppearance.musicFontSize,
+    fontWeight: appAppearance.musicFontWeight2
   },
   chev: { display: 'flex', marginLeft: 'auto', transform: 'rotate(180deg)' },
   tags: { display: 'flex', flexWrap: 'wrap', gap: 6, paddingInline: 16, paddingTop: 6 },
   tag: {
     paddingBlock: 5,
     paddingInline: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,.1)',
-    fontSize: 12,
+    borderRadius: appAppearance.cameraBorderRadius,
+    backgroundColor: appAppearance.podcastsBorderTopColor,
+    fontSize: appAppearance.calendarFontSize2,
     color: colors.grey
   }
 })

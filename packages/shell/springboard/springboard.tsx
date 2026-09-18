@@ -16,6 +16,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
 import { addDisplay, type Display, device, lockState, unlockAll } from '../device.ts'
+import { Sandbox } from '../runtime/sandbox.tsx'
 import { ControlCenter } from './control-center.tsx'
 import { settle, swipe } from './gestures.ts'
 import { type Drop, HomeBars } from './home-bar.tsx'
@@ -274,7 +275,7 @@ export function SpringBoard({ w, hgt, wall, boot, shots }: SpringBoardProps) {
                 e.a.light && light
               )}
             >
-              <View os={e.ctx} />
+              {e.a.id ? <Sandbox id={e.a.id} os={e.ctx} wide={wide} side={e.side} /> : <View os={e.ctx} />}
             </div>
           )
         })}

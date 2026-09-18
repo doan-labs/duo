@@ -1,0 +1,15 @@
+{
+  "id": "labs.doan.ipduo.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "lane": "official",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "edge": true,
+  "widgets": ["small"],
+  "permissions": ["geolocation"],
+  "network": ["https://api.open-meteo.com", "https://geocoding-api.open-meteo.com"],
+  "author": "Doan Labs",
+  "repo": "https://github.com/doan-labs/iphoneduo",
+  "license": "MIT"
+}

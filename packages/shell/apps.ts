@@ -24,7 +24,6 @@ import { Memos } from '@doan-labs/ipduo-app-memos/index.tsx'
 import { Messages } from '@doan-labs/ipduo-app-messages/index.tsx'
 import { Music } from '@doan-labs/ipduo-app-music/index.tsx'
 import { News } from '@doan-labs/ipduo-app-news/index.tsx'
-import { Notes } from '@doan-labs/ipduo-app-notes/index.tsx'
 import { Phone } from '@doan-labs/ipduo-app-phone/index.tsx'
 import { Photos } from '@doan-labs/ipduo-app-photos/index.tsx'
 import { Podcasts } from '@doan-labs/ipduo-app-podcasts/index.tsx'
@@ -40,7 +39,6 @@ import { Tv } from '@doan-labs/ipduo-app-tv/index.tsx'
 import { IN_FOLDER, Utilities } from '@doan-labs/ipduo-app-utilities/index.tsx'
 import { Wallet } from '@doan-labs/ipduo-app-wallet/index.tsx'
 import { Watch } from '@doan-labs/ipduo-app-watch/index.tsx'
-import { Weather } from '@doan-labs/ipduo-app-weather/index.tsx'
 import { YouTube } from '@doan-labs/ipduo-app-youtube/index.tsx'
 import type { App } from '@doan-labs/ipduo-uikit/app.ts'
 
@@ -51,7 +49,6 @@ export const LEFT: App[] = [
   { name: 'Photos', light: true, view: Photos },
   { name: 'Camera', view: Camera },
   { name: 'Mail', light: true, view: Mail },
-  { name: 'Notes', view: Notes },
   { name: 'Clock', view: Clock },
   { name: 'Maps', light: true, view: Maps },
   { name: 'TV', view: Tv },
@@ -64,7 +61,6 @@ export const LEFT: App[] = [
 
 /** Right half — only on the inner display, rows 1 to 6. */
 export const RIGHT: App[] = [
-  { name: 'Weather', view: Weather, edge: true },
   { name: 'Stocks', view: Stocks },
   { name: 'Find My', light: true, view: FindMy },
   { name: 'Home', view: Home },
@@ -102,4 +98,4 @@ export const APPS: App[] = [
 ]
 
 /** Look an app up by name, case-insensitively; undefined if nothing matches. */
-export const byName = (n: string) => APPS.find((a) => a.name.toLowerCase() === n.toLowerCase())
+export const byName = (n: string) => APPS.find((a) => a.name.toLowerCase() === n.toLowerCase() || a.id === n)

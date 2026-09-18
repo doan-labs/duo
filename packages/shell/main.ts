@@ -1,4 +1,3 @@
-import { subscribe as subscribeWeather, widgetSnapshot } from '@doan-labs/ipduo-app-weather/data.ts'
 import { loadIcons, WALLPAPER } from '@doan-labs/ipduo-uikit/icons/index.ts'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -11,6 +10,9 @@ import { press } from './device-buttons.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
 import { os } from './os.tsx'
+import { updateDisplays } from './runtime/display.ts'
+import { subscribeRegistry } from './runtime/registry.ts'
+import { subscribeWidgets, widgetSnapshot } from './runtime/widgets.tsx'
 import { screen } from './screen.ts'
 import foldGlsl from './shaders/fold.ts'
 import screenGlsl from './shaders/screen.ts'
@@ -100,10 +102,16 @@ const bake = (lock: boolean) => {
 }
 let home = bake(false)
 let weatherSnapshot = JSON.stringify(widgetSnapshot())
-subscribeWeather(() => {
+subscribeWidgets(() => {
   const next = JSON.stringify(widgetSnapshot())
   if (next === weatherSnapshot) return
   weatherSnapshot = next
+  const previous = home
+  home = bake(false)
+  previous.inner.dispose()
+  previous.outer.dispose()
+})
+subscribeRegistry(() => {
   const previous = home
   home = bake(false)
   previous.inner.dispose()
@@ -263,7 +271,9 @@ const px = (cm: number) => Math.round(cm / PXCM)
 // A deep link into an app lands past the lock screen.
 lockState.locked = !new URLSearchParams(location.search).get('app')
 function live(w: number, h: number) {
-  const o = new CSS3DObject(os(w, h, WALLPAPER, new URLSearchParams(location.search).get('app')))
+  // Pre-attach hidden roots to the renderer's camera layer: moving a live iframe reloads its document.
+  const container = css.domElement.firstElementChild!.firstElementChild as HTMLElement
+  const o = new CSS3DObject(os(w, h, WALLPAPER, container, new URLSearchParams(location.search).get('app')))
   o.scale.setScalar(PXCM)
   return o
 }
@@ -575,6 +585,15 @@ renderer.setAnimationLoop((now) => {
   const clip = foldClip()
   innerLive.visible = facing(innerLive) && (angle > FLAT || app)
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
+  updateDisplays(
+    { visible: innerLive.visible && !device.asleep, active: angle > 40, angle, clip },
+    {
+      visible: outerLive.visible && Number(outerLive.element.style.opacity) > 0 && !device.asleep,
+      active: angle <= 40,
+      angle,
+      clip: 0
+    }
+  )
   // Past half way the clip has eaten the whole band, as it has in the shader.
   innerFold(clip < 0.5 && angle < FLAT ? smooth(Math.min(1, bend.value / (Math.PI / 2))) : 0)
   // No depth test either: a turned panel would still take the clicks meant for

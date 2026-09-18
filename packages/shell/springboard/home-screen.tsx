@@ -13,12 +13,13 @@
 // 768/1072 — the width of this panel's glass over the width of theirs.
 
 import { CalendarWidget } from '@doan-labs/ipduo-app-calendar/index.tsx'
-import { WeatherWidget } from '@doan-labs/ipduo-app-weather/index.tsx'
 import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
 import { layout } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
+import { type Ref, type RefObject, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { byName, DOCK, LEFT, RIGHT } from '../apps.ts'
+import { registryRevision, subscribeRegistry } from '../runtime/registry.ts'
+import { WeatherSnapshot } from '../runtime/widgets.tsx'
 import type { Side } from './gestures.ts'
 import { Magnifier } from './spotlight.tsx'
 import { type Open, Tile, WidgetTile } from './tile.tsx'
@@ -62,6 +63,7 @@ export function HomeScreen({
   searchRef: Ref<HTMLDivElement>
 }) {
   const [page, setPage] = useState(0)
+  useSyncExternalStore(subscribeRegistry, registryRevision)
   const homeWide = wide && !side
 
   // Swipe between pages; a short drag still counts as a tap on an icon.
@@ -79,7 +81,12 @@ export function HomeScreen({
   const left = (
     <div key="left" {...stylex.props(styles.half)}>
       <WidgetTile i={0} name="Weather">
-        <WeatherWidget onOpen={(el) => onOpen(byName('Weather')!, el)} />
+        <WeatherSnapshot
+          onOpen={(el) => {
+            const app = byName('Weather')
+            if (app) onOpen(app, el)
+          }}
+        />
       </WidgetTile>
       <WidgetTile i={1} name="Calendar">
         <CalendarWidget onOpen={(el) => onOpen(byName('Calendar')!, el)} />
