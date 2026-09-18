@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Link, useMatchRoute } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
-import { NAV, REPO } from './site'
+import { GITHUB_MARK, NAV, REPO } from './site'
 import { setTheme, type Theme, useTheme } from './theme'
 import { color, ease, font, radius } from './tokens.stylex'
 
@@ -25,6 +25,7 @@ export function Nav() {
             return (
               <li key={n.to} {...stylex.props(styles.item)}>
                 <Link to={n.to} {...stylex.props(styles.link, 'highlight' in n && styles.highlight, on && styles.on)}>
+                  <Icon d={n.icon} />
                   {n.label}
                   {on && <motion.span layoutId="nav-on" {...stylex.props(styles.mark)} />}
                 </Link>
@@ -33,6 +34,7 @@ export function Nav() {
           })}
           <li {...stylex.props(styles.item)}>
             <a href={REPO} {...stylex.props(styles.link)}>
+              <Icon d={GITHUB_MARK} fill />
               GitHub
             </a>
           </li>
@@ -52,12 +54,14 @@ export function Nav() {
               {NAV.map((n) => (
                 <li key={n.to} {...stylex.props(styles.sheetItem)}>
                   <Link to={n.to} {...stylex.props(styles.sheetLink)}>
+                    <Icon d={n.icon} />
                     {n.label}
                   </Link>
                 </li>
               ))}
               <li {...stylex.props(styles.sheetItem)}>
                 <a href={REPO} {...stylex.props(styles.sheetLink)}>
+                  <Icon d={GITHUB_MARK} fill />
                   GitHub
                 </a>
               </li>
@@ -66,6 +70,22 @@ export function Nav() {
         </div>
       </nav>
     </header>
+  )
+}
+
+/** A 16 × 16 glyph before a link's label, tinted by the link. Stroked by default; `fill` for a logo. */
+function Icon({ d, fill = false }: { d: string; fill?: boolean }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" {...stylex.props(styles.linkIcon)}>
+      <path
+        d={d}
+        fill={fill ? 'currentColor' : 'none'}
+        stroke={fill ? 'none' : 'currentColor'}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 
@@ -160,7 +180,9 @@ const styles = stylex.create({
   item: { display: 'block' },
   link: {
     position: 'relative',
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '7px',
     paddingTop: '8px',
     paddingBottom: '8px',
     paddingLeft: '12px',
@@ -178,6 +200,7 @@ const styles = stylex.create({
     transitionTimingFunction: ease.out
   },
   on: { color: color.text },
+  linkIcon: { display: 'block', flexShrink: 0, opacity: 0.85 },
   /** The one link that is an invitation rather than a section: the accent, and it keeps it when active. */
   highlight: { color: { default: color.accent, ':hover': color.accent }, fontWeight: 600 },
   /** The moving indicator: one element shared across links via `layoutId`. */
@@ -263,7 +286,9 @@ const styles = stylex.create({
     borderBottomColor: color.border
   },
   sheetLink: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
     paddingTop: '14px',
     paddingBottom: '14px',
     color: color.text,

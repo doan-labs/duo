@@ -3,9 +3,8 @@
 // hardware and App Store steps. Six captions take turns; the visitor keeps the
 // scroll and only the device's pose and app are linked to it.
 import * as stylex from '@stylexjs/stylex'
-import { Link } from '@tanstack/react-router'
 import { type MotionValue, motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform } from 'motion/react'
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useMedia } from '../media'
 import { type Cue, Simulator } from '../simulator'
 import { color, font } from '../tokens.stylex'
@@ -54,10 +53,18 @@ const STEPS: Step[] = [
 const CROSS = 4
 /** The last step goes full width: words on top, the phone large beneath them. */
 const FULL = 5
+/** The step whose cue follows the scroll instead of playing on its own clock. */
+const SPLIT = 3
 const N = STEPS.length
 const band = (i: number) => [i / N, (i + 1) / N] as const
 
-type Cam = 'ask' | 'granted' | 'denied'
+type Cam = 'idle' | 'asking' | 'granted' | 'denied'
+const CAM_SAYS: Record<Cam, string> = {
+  idle: 'Allow camera',
+  asking: 'Asking your browser…',
+  granted: 'Camera allowed',
+  denied: 'Camera blocked'
+}
 
 export function Works() {
   const still = useReducedMotion()
@@ -72,24 +79,38 @@ export function Works() {
   const [deg, setDeg] = useState(180)
   const [yaw, setYaw] = useState(-10 * RAD)
   const [step, setStep] = useState(0)
-  const [cam, setCam] = useState<Cam>('ask')
+  // How far through the split step the scroll is, in hundredths: the drag in the frame follows it.
+  const [at, setAt] = useState(0)
+  const [cam, setCam] = useState<Cam>('idle')
   useMotionValueEvent(open, 'change', (v) => setDeg(Math.round(v * 180)))
   useMotionValueEvent(spin, 'change', (v) => setYaw(Math.round(v) * RAD))
-  useMotionValueEvent(scrollYProgress, 'change', (p) => setStep(Math.min(N - 1, Math.floor(p * N))))
+  useMotionValueEvent(scrollYProgress, 'change', (p) => {
+    setStep(Math.min(N - 1, Math.floor(p * N)))
+    setAt(Math.round(Math.min(1, Math.max(0, p * N - SPLIT)) * 100) / 100)
+  })
 
   // The page asks for the camera itself, drops the stream, and only then opens
   // the app, which finds the permission already given. A refusal still opens it.
-  const allow = () =>
+  const allow = () => {
+    setCam('asking')
     Promise.resolve(navigator.mediaDevices?.getUserMedia({ video: true }))
       .then((s) => {
         s?.getTracks().forEach((t) => t.stop())
         setCam(s ? 'granted' : 'denied')
       })
       .catch(() => setCam('denied'))
+  }
 
   const current = STEPS[step] ?? STEPS[0]!
-  // Camera waits for the visitor's word; the other steps switch on their own.
-  const app = current.app === 'Camera' && cam === 'ask' ? '' : (current.app ?? '')
+  // The camera step asks as soon as it is on screen; the button is for a browser
+  // that wants the ask to come from a tap, and for a second try after a refusal.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `allow` only sets state; the step and answer are the inputs.
+  useEffect(() => {
+    if (current.app === 'Camera' && cam === 'idle') allow()
+  }, [current.app, cam])
+  // Camera opens once the browser has answered; the other steps switch on their own.
+  const app = current.app === 'Camera' && cam !== 'granted' && cam !== 'denied' ? '' : (current.app ?? '')
+  const cue = step === SPLIT ? { ...current.cue, at } : current.cue
   const crossed = step >= CROSS && step < FULL && !stacked
   const full = step >= FULL && !stacked
 
@@ -122,7 +143,7 @@ export function Works() {
             transition={{ layout: { duration: 0.9, ease: CURVE } }}
             {...stylex.props(styles.device, crossed && styles.deviceRight, full && styles.deviceFull)}
           >
-            <Simulator deg={deg} yaw={yaw} app={app} cue={current.cue} bare fill={full} />
+            <Simulator deg={deg} yaw={yaw} app={app} cue={cue} bare fill={full} />
           </motion.div>
           <motion.div
             layout="position"
@@ -133,7 +154,6 @@ export function Works() {
             {STEPS.map((s, i) => (
               <Caption key={s.text[0]} progress={scrollYProgress} at={band(i)} step={s} centre={i >= FULL && !stacked}>
                 {s.app === 'Camera' && <CameraAsk state={cam} onAllow={allow} />}
-                {s.app === 'App Store' && <StoreNote />}
               </Caption>
             ))}
           </motion.div>
@@ -200,42 +220,44 @@ function Caption({
   )
 }
 
-/** The permission card: what will be asked, where the picture goes, and the button that asks. */
+/** The permission card: what is being asked, where the picture goes, and one button that names the state. */
 function CameraAsk({ state, onAllow }: { state: Cam; onAllow: () => void }) {
+  const done = state === 'granted' || state === 'denied'
   return (
     <div {...stylex.props(styles.card)}>
-      {state === 'ask' ? (
-        <>
-          <p {...stylex.props(styles.cardText)}>
-            Your browser will ask for the camera. The picture goes to the phone on this page and nowhere else. Nothing
-            is recorded or uploaded.
-          </p>
-          <button type="button" onClick={onAllow} {...stylex.props(styles.button)}>
-            Allow camera
-          </button>
-        </>
-      ) : (
-        <p {...stylex.props(styles.cardText)}>
-          {state === 'granted'
-            ? 'Point it at the screen and the phone films itself, forever.'
-            : 'No camera this time. The app still opens; it just has nothing to show.'}
-        </p>
-      )}
+      <p {...stylex.props(styles.cardText)}>
+        {state === 'granted'
+          ? 'Point it at the screen and the phone films itself, forever.'
+          : state === 'denied'
+            ? 'No camera this time. The app still opens; it just has nothing to show. Allow it in the address bar and try again.'
+            : 'Your browser is asking for the camera. The picture goes to the phone on this page and nowhere else. Nothing is recorded or uploaded.'}
+      </p>
+      <button
+        type="button"
+        onClick={onAllow}
+        disabled={state === 'asking' || state === 'granted'}
+        aria-busy={state === 'asking'}
+        {...stylex.props(styles.button, done && styles.buttonDone)}
+      >
+        {state === 'asking' && <span {...stylex.props(styles.spinner)} aria-hidden="true" />}
+        {state === 'granted' && (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path
+              d="M2.5 7.5l3 3 6-6.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+        {state === 'denied' ? 'Try again' : CAM_SAYS[state]}
+      </button>
     </div>
   )
 }
 
-function StoreNote() {
-  return (
-    <p {...stylex.props(styles.annotation)}>
-      The store in the frame is the real one. Tap Get on Notes or Weather, then open it. Paste the URL of{' '}
-      <Link to="/docs/$" params={{ _splat: 'catalogs' }} {...stylex.props(styles.link)}>
-        a catalog you host
-      </Link>{' '}
-      and yours installs the same way.
-    </p>
-  )
-}
+const turn = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
 
 const styles = stylex.create({
   track: { position: 'relative', height: `${N * 90}vh`, marginTop: '56px' },
@@ -329,20 +351,26 @@ const styles = stylex.create({
     fontWeight: 500,
     color: color.bg,
     backgroundColor: color.text,
-    cursor: 'pointer',
-    opacity: { default: 1, ':hover': 0.85 }
+    cursor: { default: 'pointer', ':disabled': 'default' },
+    opacity: { default: 1, ':hover': 0.85, ':disabled': 1 },
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px'
   },
-  annotation: {
-    marginTop: '20px',
-    marginBottom: 0,
-    marginInline: 'auto',
-    maxWidth: '60ch',
-    fontFamily: font.mono,
-    fontSize: '12.5px',
-    lineHeight: 1.6,
-    color: color.text3
+  buttonDone: { backgroundColor: color.well, color: color.text },
+  spinner: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    borderWidth: '2px',
+    borderStyle: 'solid',
+    borderColor: 'currentColor',
+    borderTopColor: 'transparent',
+    animationName: turn,
+    animationDuration: '0.8s',
+    animationTimingFunction: 'linear',
+    animationIterationCount: 'infinite'
   },
-  link: { color: color.text2, textDecorationLine: 'underline', textUnderlineOffset: '3px' },
   stillScene: {
     display: 'grid',
     gridTemplateColumns: { default: 'minmax(0, 1fr) minmax(0, 1fr)', [MID]: 'minmax(0, 1fr)' },

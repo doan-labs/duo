@@ -687,7 +687,8 @@ renderer.setAnimationLoop((now) => {
   last = now
   angle = mix(angle, targetAngle, k)
   yaw = mix(yaw, targetYaw, k)
-  if (hud.spinning()) targetYaw += 0.004
+  // Not while the boot screen is up: the phone turns once the OS is on the glass.
+  if (hud.spinning() && booted()) targetYaw += 0.004
   hud.angle(angle)
   if (homing) {
     camera.position.lerp(EYE, k)
