@@ -1,27 +1,91 @@
-# iPhone Duo
+# <img src="public/icon.svg" width="40" height="40" alt="" /> iPhone Duo
 
-Apple's iPhone Duo, folding in the browser and in a native window. Three.js scene with a
-fixed-view projected screen.
+[Official website](https://duo.doan-labs.com/) · [Apps](https://duo.doan-labs.com/apps) · [Docs](https://duo.doan-labs.com/docs)
 
-## Run
+Built for the Astra challenge.
+
+<a href="https://www.producthunt.com/products/duo-9?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-duo-536" target="_blank" rel="noopener noreferrer"><img alt="Duo - An iPhone Duo simulator you can build apps for | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1254308&amp;theme=light&amp;t=1789724483407"></a>
+
+A folding iPhone simulator for the browser and desktop. Explore the device, move between
+its displays, and build apps that respond to the fold.
+
+![iPhone Duo unfolded, showing its lock screen beneath the introduction to the simulator.](public/readme/hero.png)
+
+## A device you can explore
+
+Duo brings a Three.js device model together with an interactive home screen, apps,
+gestures, and hardware controls. Fold it closed to use the cover display, open it for
+more room, or place two apps side by side.
+
+The same React and TypeScript shell runs on the web and in a native Tauri window.
+An SDK, a shared UI kit, and a CLI provide a way to build and install independent apps
+without rebuilding the simulator.
+
+## See it in motion
+
+<video src="public/readme/iphone-duo-post.mp4" controls preload="none" width="960">
+  <a href="public/readme/iphone-duo-post.mp4">Watch the iPhone Duo demo</a>
+</video>
+
+[Watch the demo · 49 seconds, MP4](public/readme/iphone-duo-post.mp4)
+
+## Run locally
+
+You'll need Bun and Python. For the desktop app, you'll also need Rust and the
+Tauri prerequisites for your operating system.
+
+Install dependencies and prepare Apple's model once:
 
 ```sh
 bun install
-pip install usd-core && python3 scripts/prepare-model.py   # once: fetches Apple's model into public/model
-bun run dev                  # web, http://localhost:3000
-bun run desktop              # native window (Tauri), needs rustup
-bun run desktop:build        # .app / .exe / .AppImage
+pip install usd-core
+python3 scripts/prepare-model.py
 ```
 
-## Docs
+Start the web app:
 
-[Developer platform review](docs/platform/review.md): create an external app,
-install it without rebuilding the simulator, and reproduce stages 2–5 evidence.
+```sh
+bun run dev
+```
 
-[Documentation index](docs/README.md): architecture, working guide, debugging, decisions,
-current platform references, roadmap and verification guidance.
+Open [localhost:3000](http://localhost:3000). To run the desktop window instead, use
+`bun run desktop`.
 
-## Layout
+The model is downloaded into `public/model` and stays out of Git because it is not
+redistributable. Native development currently focuses on macOS; Windows and Linux
+parity has not been verified.
+
+| Command | Purpose |
+| --- | --- |
+| `bun run dev` | Start the simulator in the browser |
+| `bun run desktop` | Start the native Tauri window |
+| `bun run typecheck` | Check the simulator and website types |
+| `bun run build` | Build the web app into `dist/` |
+| `bun run desktop:build` | Build the desktop app |
+
+## Build an app
+
+Start with the [app development guide](docs/platform/dev.md), or explore the
+[Fold Compass example](examples/fold-compass/README.md). The
+[UI kit](packages/uikit/README.md) supplies shared components, while the
+[SDK](packages/sdk/README.md) exposes the display and lifecycle APIs.
+
+The developer packages are local previews. The [platform review guide](docs/platform/review.md)
+walks through building, installing, and verifying an external app, with the current
+testing scope and limitations.
+
+## Find your way around
+
+| Guide | What it covers |
+| --- | --- |
+| [Documentation index](docs/README.md) | All project and platform guides |
+| [Architecture](docs/architecture.md) | The scene, displays, shell, and native boundaries |
+| [Working guide](docs/working.md) | Commands, controls, and contributor conventions |
+| [Debugging](docs/debug.md) | Browser and native verification |
+| [Developer platform](docs/platform/README.md) | App authoring, isolation, storage, and lifecycle |
+
+<details>
+<summary>Repository layout</summary>
 
 ```
 packages/
@@ -46,6 +110,7 @@ packages/
     vite-stylex.ts  StyleX for Vite, same Babel plugin as the root
   apps/             one private workspace per existing app
 public/             static assets; icons/ and gitignored model/
+  readme/           README hero image and compressed demo video
 examples/
   fold-compass/     independent public-SDK demo, never seeded into the shell
   developer/        installable public UI-kit component gallery
@@ -72,3 +137,5 @@ scripts/            model preparation, asset extraction, screenshots
 design/             Blender sources, outside the build
 .cache/             local verification evidence and Rust build output
 ```
+
+</details>
