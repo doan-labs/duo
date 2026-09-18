@@ -10,7 +10,7 @@
 // scrubs (the unlock lift, the app zoom, the home-bar drag) is imperative on refs,
 // because a scrubbed animation has no declarative equivalent.
 
-import { app, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'

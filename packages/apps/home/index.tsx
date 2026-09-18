@@ -1,8 +1,8 @@
-import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
-import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 // Home, the HomeKit app: accessory tiles that light up, and a thermostat dial you drag.
 
-import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
+import { beep } from '@doan-labs/duo-uikit/shared.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent, useRef, useState } from 'react'
 import { styles } from './styles.ts'

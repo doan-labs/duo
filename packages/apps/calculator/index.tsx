@@ -1,8 +1,8 @@
-import { Screen } from '@doan-labs/ipduo-uikit'
+import { Screen } from '@doan-labs/duo-uikit'
 // The iOS calculator: one pending operator, immediate evaluation on the next.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { Num } from '@doan-labs/ipduo-uikit/num.tsx'
+import type { Os } from '@doan-labs/duo-sdk'
+import { Num } from '@doan-labs/duo-uikit/num.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { styles } from './styles.ts'

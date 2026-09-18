@@ -1,11 +1,11 @@
-import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
 // Podcasts: shows on a shelf, episodes below, and a mini player that appears
 // once something has been started.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { TRACKS, type Track } from '@doan-labs/ipduo-uikit/sample-tracks.ts'
-import { art } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import type { Os } from '@doan-labs/duo-sdk'
+import { TRACKS, type Track } from '@doan-labs/duo-uikit/sample-tracks.ts'
+import { art } from '@doan-labs/duo-uikit/shared.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'

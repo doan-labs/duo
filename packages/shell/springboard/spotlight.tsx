@@ -3,9 +3,9 @@
 // state, and because the glyph belongs to the thing it opens — the home screen's
 // search button imports it from here rather than keeping a second copy.
 
-import type { App } from '@doan-labs/ipduo-uikit/app.ts'
-import { delay } from '@doan-labs/ipduo-uikit/styles.ts'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import type { App } from '@doan-labs/duo-uikit/app.ts'
+import { delay } from '@doan-labs/duo-uikit/styles.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { APPS } from '../apps.ts'

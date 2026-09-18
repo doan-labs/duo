@@ -1,8 +1,8 @@
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { WidgetLabel } from '@doan-labs/ipduo-uikit'
-import { Num } from '@doan-labs/ipduo-uikit/num.tsx'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import type { Os } from '@doan-labs/duo-sdk'
+import { WidgetLabel } from '@doan-labs/duo-uikit'
+import { Num } from '@doan-labs/duo-uikit/num.tsx'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {

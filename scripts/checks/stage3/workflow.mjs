@@ -48,7 +48,7 @@ async function start(args, cwd, port) {
 await run(['bun', 'install', '--ignore-scripts'])
 await run([
   'bun',
-  join(parent, 'node_modules/@doan-labs/ipduo/index.mjs'),
+  join(parent, 'node_modules/@doan-labs/duo-cli/index.mjs'),
   'create',
   'field-guide',
   '--packages',
@@ -56,7 +56,7 @@ await run([
 ])
 const project = join(parent, 'field-guide')
 await run(['bun', 'install', '--ignore-scripts'], project)
-const cli = join(project, 'node_modules/@doan-labs/ipduo/index.mjs')
+const cli = join(project, 'node_modules/@doan-labs/duo-cli/index.mjs')
 const appSource = await Bun.file('examples/fold-compass/main.tsx').text()
 await Bun.write(join(project, 'main.tsx'), appSource)
 const id = 'dev.example.field-guide'
@@ -267,7 +267,7 @@ try {
   console.log('Update PASS')
   await storePage.goto(`${url}?debug&app=App%20Store&deg=180`, { timeout: 120000 })
   const failing =
-    "import { os } from '@doan-labs/ipduo-sdk'; await os.connect(); await os.storage.set('trial-only','failed version edits'); dispatchEvent(new ErrorEvent('error',{message:'Intentional workflow launch failure'}));"
+    "import { os } from '@doan-labs/duo-sdk'; await os.connect(); await os.storage.set('trial-only','failed version edits'); dispatchEvent(new ErrorEvent('error',{message:'Intentional workflow launch failure'}));"
   await build('3.0.0', failing)
   await loadCatalog(storePage)
   await button(storePage, 'UPDATE')

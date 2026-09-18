@@ -1,5 +1,5 @@
-import { os } from '@doan-labs/ipduo-sdk'
-import { appAppearance, colors, fonts } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { os } from '@doan-labs/duo-sdk'
+import { appAppearance, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'

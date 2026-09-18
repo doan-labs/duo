@@ -1,8 +1,8 @@
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { PREVIEW_FEATURES } from '@doan-labs/ipduo-sdk/preview-features.ts'
-import type { Store } from '@doan-labs/ipduo-sdk/store.ts'
-import { LargeTitle, Screen } from '@doan-labs/ipduo-uikit'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import type { Os } from '@doan-labs/duo-sdk'
+import { PREVIEW_FEATURES } from '@doan-labs/duo-sdk/preview-features.ts'
+import type { Store } from '@doan-labs/duo-sdk/store.ts'
+import { LargeTitle, Screen } from '@doan-labs/duo-uikit'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState, useSyncExternalStore } from 'react'
 

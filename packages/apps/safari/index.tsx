@@ -1,10 +1,10 @@
-import { Screen } from '@doan-labs/ipduo-uikit'
+import { Screen } from '@doan-labs/duo-uikit'
 // A real browser in an iframe. Sites that refuse to be framed show blank; the
 // bookmarks are ones that don't.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import type { Os } from '@doan-labs/duo-sdk'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useRef, useState } from 'react'
 import { styles } from './styles.ts'

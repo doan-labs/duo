@@ -3,8 +3,8 @@
 // of its own — it sits over the home screen and shares nothing with it; only the
 // pointer maths that dismisses it stays in the shell.
 
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, type Ref, useRef } from 'react'
 import { clock, dateOf, useNow } from './clock.ts'

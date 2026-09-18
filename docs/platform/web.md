@@ -56,7 +56,7 @@ compatibility have already been verified.
 
 1. **Home.** The device, folding on scroll. Download links for the dmg, msi,
    AppImage, and Open in Browser.
-2. **Get started (after publication).** `npx @doan-labs/ipduo create`, `npx @doan-labs/ipduo dev`, and the `?dev=`
+2. **Get started (after publication).** `npx @doan-labs/duo-cli create`, `npx @doan-labs/duo-cli dev`, and the `?dev=`
    link. Target: an app on the home screen in five minutes. The embedded
    simulator targets the reader's localhost app document, subject to browser
    network permissions and CORS. Development uses the production sandbox and SDK.

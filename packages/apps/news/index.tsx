@@ -1,12 +1,12 @@
-import { Placeholder, Screen, Text, Title, VStack } from '@doan-labs/ipduo-uikit'
+import { Placeholder, Screen, Text, Title, VStack } from '@doan-labs/duo-uikit'
 // News. Hacker News' front page dressed as Apple News: the stories are live,
 // the artwork is generated from their titles so nothing else needs a round-trip.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
-import { art } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import type { Os } from '@doan-labs/duo-sdk'
+import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import { art } from '@doan-labs/duo-uikit/shared.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { styles } from './styles.ts'

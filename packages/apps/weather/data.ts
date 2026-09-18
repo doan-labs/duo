@@ -1,4 +1,4 @@
-import { os } from '@doan-labs/ipduo-sdk'
+import { os } from '@doan-labs/duo-sdk'
 import { useEffect, useSyncExternalStore } from 'react'
 
 export type Place = { id: string; name: string; region: string; latitude: number; longitude: number }

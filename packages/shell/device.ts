@@ -3,7 +3,7 @@
 // shell on purpose, so packages/shell/device-buttons.ts and packages/shell/main.ts can reach the hardware
 // side of iOS without importing the UI.
 
-import type { CameraHooks } from '@doan-labs/ipduo-sdk'
+import type { CameraHooks } from '@doan-labs/duo-sdk'
 
 // The home bar is a 5 px pill on a panel you may be looking at edge-on, and
 // there is no swipe-up gesture here, so the page keeps a Home button.

@@ -1,4 +1,4 @@
-import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 /** Gutter between two columns, which is also the distance one page turn travels. */

@@ -1,5 +1,5 @@
 {
-  "name": "@doan-labs/ipduo-app-shortcuts",
+  "name": "@doan-labs/duo-app-shortcuts",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@doan-labs/ipduo-sdk": "workspace:*",
-    "@doan-labs/ipduo-uikit": "workspace:*",
+    "@doan-labs/duo-sdk": "workspace:*",
+    "@doan-labs/duo-uikit": "workspace:*",
     "@stylexjs/stylex": "0.19.0",
     "react": "^19"
   }

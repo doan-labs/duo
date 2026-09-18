@@ -1,9 +1,9 @@
-import { Screen, Title } from '@doan-labs/ipduo-uikit'
+import { Screen, Title } from '@doan-labs/duo-uikit'
 // A feed of thumbnails; tapping one opens the privacy-enhanced embed above it.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { ICONS } from '@doan-labs/ipduo-uikit/icons/index.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import type { Os } from '@doan-labs/duo-sdk'
+import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { styles } from './styles.ts'

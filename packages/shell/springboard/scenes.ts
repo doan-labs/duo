@@ -7,8 +7,8 @@
 // drag all reach into this list, and none of them should have to reach through
 // the shell to do it.
 
-import type { CameraHooks, Os } from '@doan-labs/ipduo-sdk'
-import type { App } from '@doan-labs/ipduo-uikit/app.ts'
+import type { CameraHooks, Os } from '@doan-labs/duo-sdk'
+import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { byName } from '../apps.ts'
 import { device, type Stage } from '../device.ts'

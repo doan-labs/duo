@@ -1,6 +1,6 @@
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { ComponentProps } from 'react'
 import { styles } from './styles.ts'
@@ -72,4 +72,4 @@ export const Settings = () => (
   </Screen>
 )
 
-import { Row, Screen, Section, Text, Title, Toggle } from '@doan-labs/ipduo-uikit'
+import { Row, Screen, Section, Text, Title, Toggle } from '@doan-labs/duo-uikit'

@@ -7,9 +7,9 @@
 // panel: airplane mode, the two radios, the focus moon and the rotation lock all
 // come from `toggles.ts`, so flipping one on the cover shows on the inner display.
 
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { clock, useNow } from './clock.ts'

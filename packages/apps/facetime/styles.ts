@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared.ts's. StyleX resolves a keyframe name at compile time, so one

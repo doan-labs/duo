@@ -1,4 +1,4 @@
-import { WALL_KEY } from '@doan-labs/ipduo-uikit/icons/index.ts'
+import { WALL_KEY } from '@doan-labs/duo-uikit/icons/index.ts'
 import * as THREE from 'three'
 import { widgetAge } from '../uikit/widget.tsx'
 import { DOCK, LEFT, RIGHT } from './apps.ts'

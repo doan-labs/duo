@@ -10,10 +10,10 @@
 // plays through, so a track started here is still playing when the app opens. The
 // shell owns the open/close animations, because a finger scrubs them.
 
-import { useNowPlaying } from '@doan-labs/ipduo-app-music/index.tsx'
-import { art, mmss } from '@doan-labs/ipduo-uikit/shared.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { useNowPlaying } from '@doan-labs/duo-app-music/index.tsx'
+import { art, mmss } from '@doan-labs/duo-uikit/shared.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, type PointerEvent as ReactPointerEvent, type Ref, useState } from 'react'
 import { flip, NETWORK, type Toggles, useToggles } from './toggles.ts'

@@ -1,6 +1,7 @@
 # CLI
 
 Local Bun tooling; this package is private and is not published to npm.
+The package is `@doan-labs/duo-cli`; installed projects use the `duo` executable.
 
 ```sh
 bun scripts/package-platform.ts

@@ -6,7 +6,7 @@ SDK runtime requirements remain separate. Existing Nav/Page/Sym/Num and style
 subpaths continue to work. See [CHANGELOG](CHANGELOG.md).
 
 ```tsx
-import { Button, Row, Screen, Section, Text, Title, useDisplay } from '@doan-labs/ipduo-uikit'
+import { Button, Row, Screen, Section, Text, Title, useDisplay } from '@doan-labs/duo-uikit'
 
 function App() {
   const view = useDisplay()

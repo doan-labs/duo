@@ -1,8 +1,8 @@
-import { Screen, Title } from '@doan-labs/ipduo-uikit'
+import { Screen, Title } from '@doan-labs/duo-uikit'
 // Camera shots first, then placeholders; tap a tile for a full-bleed viewer.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import type { Os } from '@doan-labs/duo-sdk'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { styles } from './styles.ts'

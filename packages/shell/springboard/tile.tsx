@@ -3,10 +3,10 @@
 // use Icon — and the two 2x2 widgets sit in the same kind of labelled cell, so
 // the tile, wtile and land looks have exactly one home here.
 
-import type { App } from '@doan-labs/ipduo-uikit/app.ts'
-import { ICONS } from '@doan-labs/ipduo-uikit/icons/index.ts'
-import { delay } from '@doan-labs/ipduo-uikit/styles.ts'
-import { layout } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import type { App } from '@doan-labs/duo-uikit/app.ts'
+import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
+import { delay } from '@doan-labs/duo-uikit/styles.ts'
+import { layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import type { StyleXStyles } from '@stylexjs/stylex'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, type Ref, useRef, useState } from 'react'

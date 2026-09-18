@@ -12,9 +12,9 @@
 // Metrics below are Apple's own, measured off the HIG renders and scaled by
 // 768/1072 — the width of this panel's glass over the width of theirs.
 
-import { CalendarWidget } from '@doan-labs/ipduo-app-calendar/index.tsx'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { layout } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { CalendarWidget } from '@doan-labs/duo-app-calendar/index.tsx'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type Ref, type RefObject, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { byName, DOCK, LEFT, RIGHT } from '../apps.ts'

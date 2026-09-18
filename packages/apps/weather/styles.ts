@@ -1,4 +1,4 @@
-import { appAppearance, colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const drift = stylex.keyframes({ from: { transform: 'translateX(-4%)' }, to: { transform: 'translateX(4%)' } })

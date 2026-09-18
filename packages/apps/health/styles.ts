@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const draw = stylex.keyframes({ to: { strokeDashoffset: 0 } })

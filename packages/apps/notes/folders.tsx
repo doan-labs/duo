@@ -1,5 +1,5 @@
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { appAppearance, colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { NOTES } from './data.ts'
 

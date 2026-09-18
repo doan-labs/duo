@@ -1,6 +1,6 @@
 # UI kit
 
-Private `@doan-labs/ipduo-uikit` 0.1.0 provides presentation components for baked apps
+Private `@doan-labs/duo-uikit` 0.1.0 provides presentation components for baked apps
 and isolated documents. The SDK separately owns host API, bridge, manifest and runtime
 compatibility. The kit's version never gates host compatibility.
 

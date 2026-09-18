@@ -1,4 +1,4 @@
-import type { WidgetSnapshot } from '@doan-labs/ipduo-sdk/protocol.ts'
+import type { WidgetSnapshot } from '@doan-labs/duo-sdk/protocol.ts'
 import * as stylex from '@stylexjs/stylex'
 import { shared } from './styles.ts'
 import { colors } from './tokens.stylex.ts'

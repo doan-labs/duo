@@ -1,5 +1,5 @@
-import { Row, Screen, Section, Text, Title, WidgetLabel } from '@doan-labs/ipduo-uikit'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import { Row, Screen, Section, Text, Title, WidgetLabel } from '@doan-labs/duo-uikit'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useRef } from 'react'
 import { styles } from './styles.ts'

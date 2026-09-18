@@ -1,7 +1,7 @@
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { Screen } from '@doan-labs/ipduo-uikit'
-import { ICONS } from '@doan-labs/ipduo-uikit/icons/index.ts'
-import { delay, shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import type { Os } from '@doan-labs/duo-sdk'
+import { Screen } from '@doan-labs/duo-uikit'
+import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
+import { delay, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 

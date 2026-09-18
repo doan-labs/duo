@@ -2,7 +2,7 @@
 // else lives here. The shell is springboard/, the device is device.ts, and the
 // framework the apps link against is uikit/.
 
-import { colors, fonts } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { createRoot } from 'react-dom/client'
 import { device } from './device.ts'

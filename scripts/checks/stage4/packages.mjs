@@ -25,7 +25,7 @@ async function run(args, cwd = directory) {
 await run(['bun', 'install', '--ignore-scripts'])
 await run([
   'bun',
-  join(directory, 'node_modules/@doan-labs/ipduo/index.mjs'),
+  join(directory, 'node_modules/@doan-labs/duo-cli/index.mjs'),
   'create',
   'developer',
   '--packages',

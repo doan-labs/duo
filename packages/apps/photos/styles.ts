@@ -1,4 +1,4 @@
-import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({

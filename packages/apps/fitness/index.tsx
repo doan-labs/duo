@@ -1,8 +1,8 @@
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { LargeTitle, Screen, Text, Title } from '@doan-labs/ipduo-uikit'
-import { Bars, card, RINGS, Rings } from '@doan-labs/ipduo-uikit/rings.tsx'
-import { delay } from '@doan-labs/ipduo-uikit/styles.ts'
-import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import type { Os } from '@doan-labs/duo-sdk'
+import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
+import { Bars, card, RINGS, Rings } from '@doan-labs/duo-uikit/rings.tsx'
+import { delay } from '@doan-labs/duo-uikit/styles.ts'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 

@@ -48,9 +48,9 @@ export async function buildApp(
       }
     }
   }
-  const sdkRoot = dirname(resolveDependency('@doan-labs/ipduo-sdk/package.json'))
-  const kitRoot = dirname(resolveDependency('@doan-labs/ipduo-uikit/package.json'))
-  const sx = stylexPlugin(false, { '@doan-labs/ipduo-uikit/*': join(kitRoot, '*') })
+  const sdkRoot = dirname(resolveDependency('@doan-labs/duo-sdk/package.json'))
+  const kitRoot = dirname(resolveDependency('@doan-labs/duo-uikit/package.json'))
+  const sx = stylexPlugin(false, { '@doan-labs/duo-uikit/*': join(kitRoot, '*') })
   const adapter = join(kitRoot, 'sandbox-stylex.ts')
   const assetRoot = (await Bun.file(join(kitRoot, 'assets/asset-manifest.json')).exists())
     ? join(kitRoot, 'assets')
@@ -65,7 +65,7 @@ export async function buildApp(
       {
         name: 'isolated-stylex',
         setup(build) {
-          build.onResolve({ filter: /^@doan-labs\/ipduo-(sdk|uikit)(\/.*)?$/ }, (args) => {
+          build.onResolve({ filter: /^@doan-labs\/duo-(sdk|uikit)(\/.*)?$/ }, (args) => {
             return { path: resolveDependency(args.path) }
           })
           build.onResolve({ filter: /^(react|react-dom)(\/.*)?$/ }, (args) => ({

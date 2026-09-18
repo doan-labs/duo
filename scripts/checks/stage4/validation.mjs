@@ -9,8 +9,8 @@ try {
   const source = join(folder, 'main.tsx')
   for (const code of [
     "import '../shell/main.ts'",
-    "export * from '@doan-labs/ipduo-shell/native.ts'",
-    "import { Notes } from '@doan-labs/ipduo-app-notes'",
+    "export * from '@doan-labs/duo-shell/native.ts'",
+    "import { Notes } from '@doan-labs/duo-app-notes'",
     "import('/private/shell.ts')",
     "import('https://example.com/code.js')",
     "const file = 'arbitrary'; import(file)",

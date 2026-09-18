@@ -1,7 +1,7 @@
-import { Row, Screen, Section, Title } from '@doan-labs/ipduo-uikit'
+import { Row, Screen, Section, Title } from '@doan-labs/duo-uikit'
 // Reminders. A checklist kept in localStorage, so it survives a reload.
 
-import { beep } from '@doan-labs/ipduo-uikit/shared.ts'
+import { beep } from '@doan-labs/duo-uikit/shared.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type KeyboardEvent, useState } from 'react'
 import { styles } from './styles.ts'

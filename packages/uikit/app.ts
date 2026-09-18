@@ -1,6 +1,6 @@
 // React adapter for the shell's baked app registry.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
+import type { Os } from '@doan-labs/duo-sdk'
 import type { ComponentType } from 'react'
 
 export type App = {

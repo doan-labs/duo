@@ -1,10 +1,10 @@
-import { Text, Title } from '@doan-labs/ipduo-uikit'
+import { Text, Title } from '@doan-labs/duo-uikit'
 // Books: a shelf of covers, and a reader that pages through the text.
 
-import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
-import { art } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import { art } from '@doan-labs/duo-uikit/shared.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GAP, styles } from './styles.ts'

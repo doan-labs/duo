@@ -624,3 +624,12 @@ as the empty progress directory. Supersedes decision 50's archive-retention poli
 Current guides retain the accepted contract, launch scope and verification limitations;
 committed history remains available through Git. Do not recreate archive/progress folders.
 Cost: old proposals and checkpoint narratives are no longer browsable as current files.
+
+## 52. Use the Duo package namespace before publication
+
+2026-09-18. Supersedes earlier package naming: the workspace root is `@doan-labs/duo`,
+the SDK and kit are `@doan-labs/duo-sdk` and `@doan-labs/duo-uikit`, and the CLI is
+`@doan-labs/duo-cli` with the `duo` executable. Internal packages use the `duo-` prefix.
+Update imports, tooling, templates and archives together. App ids, database/lock names,
+bridge protocol and native bundle identity remain stable to preserve installed data.
+Cost: existing local consumers must rebuild/reinstall their archives.

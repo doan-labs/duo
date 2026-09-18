@@ -1,5 +1,5 @@
 {
-  "name": "@doan-labs/ipduo-sdk",
+  "name": "@doan-labs/duo-sdk",
   "version": "0.0.0",
   "private": true,
   "type": "module",

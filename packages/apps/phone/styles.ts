@@ -1,4 +1,4 @@
-import { appAppearance, colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Local copies of shared's `pop` and `rip`: StyleX only resolves imported

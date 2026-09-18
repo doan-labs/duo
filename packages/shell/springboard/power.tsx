@@ -2,7 +2,7 @@
 // Its own file because neither belongs to anything on screen — they are the
 // device itself taking the whole display, and the shell only decides when.
 
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useRef, useState } from 'react'
 

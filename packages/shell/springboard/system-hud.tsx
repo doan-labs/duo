@@ -5,9 +5,9 @@
 // documented in docs/debug.md, and screenshot() strips elements by that same
 // attribute, so nothing here can be renamed on its own.
 
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useEffect, useId, useRef, useState } from 'react'
 import { device } from '../device.ts'

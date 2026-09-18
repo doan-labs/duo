@@ -1,4 +1,4 @@
-import { loadIcons, WALLPAPER } from '@doan-labs/ipduo-uikit/icons/index.ts'
+import { loadIcons, WALLPAPER } from '@doan-labs/duo-uikit/icons/index.ts'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'

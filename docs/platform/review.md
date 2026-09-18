@@ -33,7 +33,7 @@ bun install --ignore-scripts
 cp "$platform_repo/examples/fold-compass/main.tsx" main.tsx
 bun run check
 bun run build
-bun node_modules/@doan-labs/ipduo/index.mjs serve dist --port 5173
+bun node_modules/@doan-labs/duo-cli/index.mjs serve dist --port 5173
 ```
 
 In App Store, load `http://localhost:5173/index.json`, then GET and OPEN

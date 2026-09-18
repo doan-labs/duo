@@ -1,7 +1,7 @@
-import { Screen } from '@doan-labs/ipduo-uikit'
+import { Screen } from '@doan-labs/duo-uikit'
 // OpenStreetMap's embed, centred on San Francisco.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
+import type { Os } from '@doan-labs/duo-sdk'
 import { styles } from './styles.ts'
 
 const osm = (lat: number, lon: number, z = 0.06) =>

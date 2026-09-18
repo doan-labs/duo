@@ -117,16 +117,16 @@ if (command === 'create') {
         ...(Object.keys(artifacts).length
           ? { overrides: Object.fromEntries(Object.entries(artifacts).map(([name, path]) => [name, `file:${path}`])) }
           : {}),
-        scripts: { check: 'ipduo check .', build: 'ipduo build .', dev: 'ipduo dev .' },
+        scripts: { check: 'duo check .', build: 'duo build .', dev: 'duo dev .' },
         devDependencies: {
-          '@doan-labs/ipduo': artifacts['@doan-labs/ipduo'] ? `file:${artifacts['@doan-labs/ipduo']}` : sdkVersion
+          '@doan-labs/duo-cli': artifacts['@doan-labs/duo-cli'] ? `file:${artifacts['@doan-labs/duo-cli']}` : sdkVersion
         },
         dependencies: {
-          '@doan-labs/ipduo-sdk': artifacts['@doan-labs/ipduo-sdk']
-            ? `file:${artifacts['@doan-labs/ipduo-sdk']}`
+          '@doan-labs/duo-sdk': artifacts['@doan-labs/duo-sdk']
+            ? `file:${artifacts['@doan-labs/duo-sdk']}`
             : sdkVersion,
-          '@doan-labs/ipduo-uikit': artifacts['@doan-labs/ipduo-uikit']
-            ? `file:${artifacts['@doan-labs/ipduo-uikit']}`
+          '@doan-labs/duo-uikit': artifacts['@doan-labs/duo-uikit']
+            ? `file:${artifacts['@doan-labs/duo-uikit']}`
             : kitVersion,
           '@stylexjs/stylex': '0.19.0',
           react: '^19',
@@ -141,11 +141,9 @@ if (command === 'create') {
   await Bun.write(join(folder, 'CHANGELOG.md'), '# 1.0.0\n\nInitial release.\n')
   await Bun.write(
     join(folder, 'main.tsx'),
-    `import { os } from '@doan-labs/ipduo-sdk'\nimport { Nav, Page } from '@doan-labs/ipduo-uikit/nav.tsx'\nimport { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'\nimport * as stylex from '@stylexjs/stylex'\nimport { useEffect } from 'react'\nimport { createRoot } from 'react-dom/client'\nfunction App() {\n  useEffect(() => { requestAnimationFrame(() => os.ready()) }, [])\n  return <main {...stylex.props(styles.root)}><Nav><Page title=${JSON.stringify(name)}><ul><li>Your first Duo app</li></ul></Page></Nav></main>\n}\nconst styles = stylex.create({ root: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', color: colors.white, backgroundColor: colors.black } })\nawait os.connect()\ncreateRoot(document.body).render(<App />)\n`
+    `import { os } from '@doan-labs/duo-sdk'\nimport { Nav, Page } from '@doan-labs/duo-uikit/nav.tsx'\nimport { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'\nimport * as stylex from '@stylexjs/stylex'\nimport { useEffect } from 'react'\nimport { createRoot } from 'react-dom/client'\nfunction App() {\n  useEffect(() => { requestAnimationFrame(() => os.ready()) }, [])\n  return <main {...stylex.props(styles.root)}><Nav><Page title=${JSON.stringify(name)}><ul><li>Your first Duo app</li></ul></Page></Nav></main>\n}\nconst styles = stylex.create({ root: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', color: colors.white, backgroundColor: colors.black } })\nawait os.connect()\ncreateRoot(document.body).render(<App />)\n`
   )
-  console.log(
-    `Created ${folder}. In that folder run bun install, bun run check, then bun run build. Local unpublished packages require create --packages <artifacts.json>.`
-  )
+  console.log(`Created ${folder}. In that folder run bun install, bun run check, then bun run build.`)
 } else if (command === 'check') await check()
 else if (command === 'build') {
   const built = await buildApp(folder, { output: resolve(option('out', join(folder, 'dist'))) })
@@ -200,5 +198,5 @@ else if (command === 'build') {
   process.once('SIGTERM', stop)
 } else
   throw new Error(
-    'Usage: ipduo create <name> [--packages artifacts.json] | check [folder] | build [folder] [--out catalog] | dev [folder] | preview [folder] | serve [catalog]'
+    'Usage: duo create <name> [--packages artifacts.json] | check [folder] | build [folder] [--out catalog] | dev [folder] | preview [folder] | serve [catalog]'
   )

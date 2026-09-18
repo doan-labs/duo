@@ -1,5 +1,5 @@
-import { os } from '@doan-labs/ipduo-sdk'
-import { useKV } from '@doan-labs/ipduo-sdk/react.ts'
+import { os } from '@doan-labs/duo-sdk'
+import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import {
   Button,
   Symbol as DuoSymbol,
@@ -19,8 +19,8 @@ import {
   VStack,
   Widget,
   WidgetLabel
-} from '@doan-labs/ipduo-uikit'
-import { app, colors, fonts } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+} from '@doan-labs/duo-uikit'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'

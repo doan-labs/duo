@@ -1,12 +1,12 @@
-import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/ipduo-uikit'
-import { appAppearance } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/duo-uikit'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 // Stocks: a watchlist with sparklines, and a detail page whose chart draws itself in.
 
-import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
-import { Num } from '@doan-labs/ipduo-uikit/num.tsx'
-import { poly, walk } from '@doan-labs/ipduo-uikit/shared.ts'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
-import { Sym } from '@doan-labs/ipduo-uikit/sym.tsx'
+import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import { Num } from '@doan-labs/duo-uikit/num.tsx'
+import { poly, walk } from '@doan-labs/duo-uikit/shared.ts'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 

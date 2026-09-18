@@ -1,6 +1,6 @@
-import { Placeholder, Row, Text } from '@doan-labs/ipduo-uikit'
-import { Nav, Page, useNav } from '@doan-labs/ipduo-uikit/nav.tsx'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import { Placeholder, Row, Text } from '@doan-labs/duo-uikit'
+import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 

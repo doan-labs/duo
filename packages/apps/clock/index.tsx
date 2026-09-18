@@ -1,8 +1,8 @@
-import { Row, Screen, Section, Title } from '@doan-labs/ipduo-uikit'
+import { Row, Screen, Section, Title } from '@doan-labs/duo-uikit'
 // World clock: local time large, six cities below, ticking once a second.
 
-import type { Os } from '@doan-labs/ipduo-sdk'
-import { shared } from '@doan-labs/ipduo-uikit/styles.ts'
+import type { Os } from '@doan-labs/duo-sdk'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { styles } from './styles.ts'

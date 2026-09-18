@@ -1,4 +1,4 @@
-import { os, type ViewInfo } from '@doan-labs/ipduo-sdk'
+import { os, type ViewInfo } from '@doan-labs/duo-sdk'
 import { useSyncExternalStore } from 'react'
 
 /** Current SDK display snapshot. Subscribes only; the app explicitly connects the SDK. */

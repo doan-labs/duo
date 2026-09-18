@@ -2,7 +2,7 @@
 // owns the numbers (hinge angle, yaw, camera pose); this file only draws them
 // and reports the controls back through `HudEvents`.
 
-import { colors } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -1,5 +1,5 @@
-import { os } from '@doan-labs/ipduo-sdk'
-import { useKV } from '@doan-labs/ipduo-sdk/react.ts'
+import { os } from '@doan-labs/duo-sdk'
+import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import type { Note } from './data.ts'
 
 /** Both displays and every row read the same persisted text; no editor keeps a stale copy. */

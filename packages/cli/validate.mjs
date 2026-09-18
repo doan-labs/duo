@@ -52,7 +52,7 @@ export async function validateSources(folder) {
     })
     for (const specifier of imports) {
       if (
-        /^(?:@tauri-apps(?:\/|$)|@doan-labs\/ipduo-(?:shell|app-)|node:|bun:|https?:|file:)/.test(specifier) ||
+        /^(?:@tauri-apps(?:\/|$)|@doan-labs\/duo-(?:shell|app-)|node:|bun:|https?:|file:)/.test(specifier) ||
         isAbsolute(specifier)
       )
         throw new Error(`Host or external source import is not allowed: ${specifier} in ${file}`)
@@ -96,7 +96,7 @@ export async function typecheckApp(folder, files) {
   const temporary = await mkdtemp(join(tmpdir(), 'duo-typecheck-'))
   const paths = {}
   // Repository examples are not workspaces. Installed external projects resolve their package exports normally.
-  for (const name of ['@doan-labs/ipduo-sdk', '@doan-labs/ipduo-uikit', '@stylexjs/stylex']) {
+  for (const name of ['@doan-labs/duo-sdk', '@doan-labs/duo-uikit', '@stylexjs/stylex']) {
     try {
       Bun.resolveSync(`${name}/package.json`, folder)
     } catch {

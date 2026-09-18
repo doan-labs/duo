@@ -1,10 +1,10 @@
 {
-  "name": "@doan-labs/ipduo",
+  "name": "@doan-labs/duo-cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "bin": {
-    "ipduo": "./index.mjs"
+    "duo": "./index.mjs"
   },
   "exports": {
     ".": "./index.ts",

@@ -1,4 +1,4 @@
-import { appAppearance, colors, easing } from '@doan-labs/ipduo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared's; StyleX only resolves keyframes defined in the file that uses them.

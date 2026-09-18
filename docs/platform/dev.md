@@ -47,7 +47,7 @@ CORS and local-network permissions. The fully local path remains supported.
 ## SDK use
 
 ```ts
-import { os } from '@doan-labs/ipduo-sdk'
+import { os } from '@doan-labs/duo-sdk'
 
 await os.connect()
 // Render the app and finish any owner migration, then signal its first painted frame:
@@ -62,7 +62,7 @@ const stop = os.onView((next) => console.log(next.display, next.angle))
 
 The app owns connect/ready and effect cleanup. The kit's `Screen` and `useDisplay` only
 subscribe; they do not connect or signal readiness. Use `useKV` from
-`@doan-labs/ipduo-sdk/react` for hydration, optimistic edits, ordered writes and visible
+`@doan-labs/duo-sdk/react` for hydration, optimistic edits, ordered writes and visible
 saving/error states. A timeout does not prove a write failed. See [the SDK reference](../../packages/sdk/README.md)
 and [contract](contract.md) for snapshot/watch, retries, ownership and commands.
 
