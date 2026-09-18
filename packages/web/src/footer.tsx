@@ -51,7 +51,7 @@ export function Footer() {
         <p {...stylex.props(styles.fine)}>
           <a href={DOAN} {...stylex.props(styles.studio)}>
             <DoanMark />
-            Made by Doan Labs
+            An experiment by Doan Labs
           </a>
           Built in the open. Not affiliated with Apple.
         </p>
