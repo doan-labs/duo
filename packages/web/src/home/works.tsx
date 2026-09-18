@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import { type MotionValue, motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { type ReactNode, useRef, useState } from 'react'
 import { useMedia } from '../media'
-import { Simulator } from '../simulator'
+import { type Cue, Simulator } from '../simulator'
 import { color, font } from '../tokens.stylex'
 import { Block, Cap, Headline, Lede } from './parts'
 
@@ -16,12 +16,27 @@ const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
 const CURVE = [0.32, 0.72, 0, 1] as const
 
-type Step = { cap?: string; text: string[]; note: string; app?: string }
+type Step = { cap?: string; text: string[]; note: string; app?: string; cue?: Cue }
 const STEPS: Step[] = [
-  { text: ['Fold it.'], note: 'The inner display hands over to the cover as the hinge closes.' },
-  { text: ['Close it mid-song.'], note: 'Playback continues on the cover. Nothing remounts.' },
-  { text: ['Take a screenshot.'], note: 'Side button and volume up, like the phone in your pocket.' },
-  { text: ['Drag an app into split screen.'], note: 'Two apps, one per half, open flat.' },
+  { text: ['Fold it.'], note: 'The inner display hands over to the cover as the hinge closes.', app: 'Maps' },
+  {
+    text: ['Close it mid-song.'],
+    note: 'Playback continues on the cover. Nothing remounts.',
+    app: 'Music',
+    cue: { play: true }
+  },
+  {
+    text: ['Take a screenshot.'],
+    note: 'Side button and volume up, like the phone in your pocket.',
+    app: 'Music',
+    cue: { screenshot: true }
+  },
+  {
+    text: ['Drag an app into split screen.'],
+    note: 'Swipe up from the home bar and hold: the app becomes a card. Drop it on a half and open the next one beside it.',
+    app: 'Notes',
+    cue: { split: 'Safari' }
+  },
   {
     cap: '02 · Real hardware',
     text: ['The simulated phone', 'can use your real camera.'],
@@ -107,7 +122,7 @@ export function Works() {
             transition={{ layout: { duration: 0.9, ease: CURVE } }}
             {...stylex.props(styles.device, crossed && styles.deviceRight, full && styles.deviceFull)}
           >
-            <Simulator deg={deg} yaw={yaw} app={app} bare fill={full} />
+            <Simulator deg={deg} yaw={yaw} app={app} cue={current.cue} bare fill={full} />
           </motion.div>
           <motion.div
             layout="position"

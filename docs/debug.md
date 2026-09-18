@@ -56,7 +56,7 @@ StyleX classes are unstable; use shell data attributes:
 
 | Area | Selectors/state |
 | --- | --- |
-| Display/app | data-os; data-app; data-side=left/right; data-lock/data-hidden; data-pages |
+| Display/app | data-os=wide/narrow; data-app; data-side=left/right; data-lock/data-hidden; data-pages; data-homebar; data-drop=left/right/none while an app is on a finger |
 | HUD/hardware | data-hud=vol/thumb/poff/flash/torch/cc/dim/orbit; data-on; data-torch; data-boot |
 | Control Center | data-cc; data-cc-slider=bright/volume; data-cc-pull; data-cc-page=0/1/2 |
 | Split | data-drop=left/right/none |

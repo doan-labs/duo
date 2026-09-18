@@ -5,6 +5,9 @@ import { color } from './tokens.stylex'
 
 const BASE = import.meta.env.VITE_SIMULATOR_URL ?? (import.meta.env.DEV ? 'http://localhost:3000/' : '/device/')
 
+/** Something for the phone to do once its app is up; the shell's side is packages/shell/cues.ts. */
+export type Cue = { split?: string; screenshot?: boolean; play?: boolean }
+
 /**
  * The real shell in a frame, sitting on the page rather than in a card. It
  * mounts when it comes within a screen of the viewport, takes its backdrop
@@ -17,6 +20,7 @@ export function Simulator({
   deg = 180,
   yaw,
   app,
+  cue,
   eager = false,
   tall = false,
   mount = true,
@@ -29,6 +33,8 @@ export function Simulator({
   yaw?: number
   /** The app to show, by its home screen name; the empty string is Home. Changes after load go by postMessage. */
   app?: string
+  /** The split-screen drag toward `split`, a screenshot, or a song, replayed whenever the cue changes. */
+  cue?: Cue
   /** Mount at once instead of waiting for the viewport (the hero). */
   eager?: boolean
   tall?: boolean
@@ -101,6 +107,11 @@ export function Simulator({
     shown.current = app
     post(frame.current, { app: app ?? '' })
   }, [ready, app])
+  const cueKey = JSON.stringify(cue ?? null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `cueKey` stands for `cue`; an equal object is not a new cue.
+  useEffect(() => {
+    if (ready && cue) post(frame.current, { cue })
+  }, [ready, cueKey])
 
   // The URL is fixed at first render: later poses go by postMessage. Putting
   // a live `deg` in `src` would reload the whole scene on every change.
@@ -133,8 +144,8 @@ export function Simulator({
 
 const post = (
   f: HTMLIFrameElement | null,
-  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string }
-) => f?.contentWindow?.postMessage(msg, location.origin)
+  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue }
+) => f?.contentWindow?.postMessage(msg, new URL(BASE, location.href).origin)
 // The box's own colour, not the body's: a frame inside a dark section takes the section's backdrop.
 const bg = (el: HTMLElement | null) => getComputedStyle(el ?? document.body).backgroundColor
 

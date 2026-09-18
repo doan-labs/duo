@@ -753,3 +753,27 @@ SDK and kit references remain generated, and the pages quote only commands
 that `packages/cli/README.md` documents. Alternative rejected: keeping the
 repository docs as a fourth sidebar group, which would have put the same
 "Planning document" badges back one click away.
+
+## 58. The bridge cues what the phone does, and the lead display follows the target angle
+
+2026-09-18. The "it behaves like a device" scroll had captions about a song, a
+screenshot and split screen over a phone showing its home screen. The bridge in
+`packages/shell/main.ts` now takes `cue` beside `app`: `{ split: 'Safari' }`
+replays the real home-bar drag through the shell's own `grab()` with synthetic
+pointer events (up, hold until it is a card, over to the left half, drop) and
+opens the named app on the free half; `{ screenshot: true }` presses the chord;
+`{ play: true }` starts the deck muted, because a page scroll is not a gesture
+to play sound on. The scripts live in `packages/shell/cues.ts`, the page never
+touches the shell's DOM, and `app` now clears the stage first so a step always
+shows one app whole. An app or cue that lands before the displays have booted
+waits for them instead of throwing.
+
+Two facts forced a change to decision 24's crossing. A launch that arrives with
+a new pose used to land on the display in use at that instant; when the hinge
+then passed 40°, the other display became the lead with an empty stage and
+mirrored the app away. `follow()` is now called with the target angle rather
+than the eased one, and the bridge calls it before launching, so a launch lands
+on the display the hinge is heading to and the lead never swings back over it.
+Nothing visible changes at the crossing, as before: both displays already show
+the session. Cost: the frame buttons act on the target side for the fraction of
+a second the hinge is still easing.

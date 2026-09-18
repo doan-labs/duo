@@ -49,6 +49,8 @@ export type Display = {
 export type Stage = { name: string; side?: 'left' | 'right' }[]
 const displays: Display[] = []
 const inUse = () => displays.find((d) => d.wide === active.wide) ?? displays[0]!
+/** The displays have booted (os.tsx renders them once the registry is in); before that there is nothing to launch on. */
+export const booted = () => displays.length > 0
 /** An app is up somewhere, so the baked home screen is not what the device is doing. */
 export const busy = () => displays.some((d) => d.covered())
 

@@ -76,10 +76,11 @@ const styles = stylex.create({
     paddingRight: { default: '40px', [SMALL]: '24px' },
     backgroundColor: color.bg,
     color: color.text,
-    fontFamily: font.sans
+    fontFamily: font.sans,
+    overflow: 'hidden'
   },
   inner: { maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto' },
-  copy: { maxWidth: '1100px' },
+  copy: { position: 'relative', zIndex: 1, maxWidth: '1100px' },
   title: {
     marginTop: 0,
     marginBottom: 0,
@@ -98,7 +99,8 @@ const styles = stylex.create({
     color: color.text2
   },
   actions: { display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '36px' },
-  stage: { marginTop: { default: '48px', [SMALL]: '32px' } },
+  // The shell's camera leaves headroom above the phone; pull the frame up under the buttons and let the section clip it.
+  stage: { marginTop: { default: '-40px', [SMALL]: '32px' } },
   video: { display: 'block', width: '100%', height: 'auto', aspectRatio: '16 / 9', borderRadius: '20px' },
   hint: {
     marginTop: '16px',

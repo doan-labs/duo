@@ -5,7 +5,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { USDLoader } from 'three/addons/loaders/USDLoader.js'
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js'
 import { buttons } from './buttons.ts'
-import { busy, device, follow, goHome, lockState, unlockAll } from './device.ts'
+import { type Cue, cancel, cue } from './cues.ts'
+import { booted, busy, device, follow, goHome, lockState, unlockAll } from './device.ts'
 import { press } from './device-buttons.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
@@ -40,11 +41,11 @@ const screenShader = defines + screenGlsl
 // The desktop window is transparent and frameless: the wallpaper is the backdrop.
 document.documentElement.classList.toggle('web', !isDesktop)
 
-// An embedding page drives the backdrop and the pose: `?bg=` at load, then
-// `{ deg, yaw, bg, paused, app }` by postMessage. Same-origin only, so the site that ships
-// the shell is the only sender. Registered before the model loads so a
+// An embedding page drives the backdrop, the pose and what the phone is doing: `?bg=` at
+// load, then `{ deg, yaw, bg, paused, app, cue }` by postMessage (cues in cues.ts).
+// Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
-type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string }
+type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue }
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
 const paint = (bg: string | null) => {
@@ -53,8 +54,11 @@ const paint = (bg: string | null) => {
 paint(new URLSearchParams(location.search).get('bg'))
 let pose: ((m: Pose) => void) | null = null
 let queued: Pose | null = null
+// Development runs the site and the shell on two localhost ports; that pair is the one exception.
+const local = (o: string) => location.hostname === 'localhost' && new URL(o).hostname === 'localhost'
 addEventListener('message', (e: MessageEvent<Pose>) => {
-  if (e.source !== parent || e.origin !== location.origin || typeof e.data !== 'object' || !e.data) return
+  if (e.source !== parent || typeof e.data !== 'object' || !e.data) return
+  if (e.origin !== location.origin && !local(e.origin)) return
   if (typeof e.data.bg === 'string') paint(e.data.bg)
   if (typeof e.data.paused === 'boolean') paused = e.data.paused
   if (pose) pose(e.data)
@@ -468,6 +472,17 @@ function setAngle(v: number) {
 addEventListener('keydown', (e) => e.key === 'Escape' && goHome())
 setAngle(targetAngle)
 
+/**
+ * Where the lead passes between the displays: above it the inner display is
+ * the one in use and the cover mirrors it, below it the other way round
+ * (docs/decisions.md 24). By 40° the fold has taken 94% of the inner display's
+ * width and the cover has turned round to be the glass in front of you. Nothing
+ * visible happens at the crossing — both displays already show the session.
+ */
+const HANDOVER = 40
+/** The display the hinge is heading to leads: a launch that comes with a new pose lands where it will be seen. */
+const lead = () => follow(targetAngle > HANDOVER)
+
 // The pose half of the embed bridge, now that the numbers exist; a message
 // that arrived during the model load is applied here.
 pose = (m) => {
@@ -476,14 +491,34 @@ pose = (m) => {
     targetYaw = m.yaw
     hud.yaw(targetYaw)
   }
-  // An app by its home screen name; the empty string is Home.
+  stage(m)
+}
+// The frame answers its load event before the displays have booted (os.tsx), so
+// an app or cue that arrives early waits for them; the pose above need not.
+let late: Pose | null = null
+function stage(m: Pose) {
+  if (!booted()) {
+    if (!late) {
+      setTimeout(() => {
+        const l = late!
+        late = null
+        stage(l)
+      }, 100)
+    }
+    late = { ...late, ...m }
+    return
+  }
+  // An app by its home screen name, alone on the display; the empty string is Home.
   if (typeof m.app === 'string') {
-    if (!m.app) goHome()
-    else {
+    cancel()
+    goHome()
+    if (m.app) {
       unlockAll()
+      lead()
       device.open(m.app)
     }
   }
+  if (m.cue) cue(m.cue)
 }
 if (queued) pose(queued)
 
@@ -496,14 +531,6 @@ const dir = new THREE.Vector3()
 const pos = new THREE.Vector3()
 /** Flat: off it the inner display is a bent surface, and only the clip below keeps its panel honest. */
 const FLAT = 179
-/**
- * Where the lead passes between the displays: above it the inner display is
- * the one in use and the cover mirrors it, below it the other way round
- * (docs/decisions.md 24). By 40° the fold has taken 94% of the inner display's
- * width and the cover has turned round to be the glass in front of you. Nothing
- * visible happens at the crossing — both displays already show the session.
- */
-const HANDOVER = 40
 const camLocal = new THREE.Vector3()
 /**
  * How much of the inner display the fold has taken, as a fraction of its width
@@ -632,8 +659,10 @@ renderer.setAnimationLoop((now) => {
   ledLight.intensity = torch ? 4 : 0
   glow.visible = torch
   // The display in use leads and the other mirrors it, so both hold the session
-  // through the whole fold and nothing launches when the lead passes.
-  follow(angle > HANDOVER)
+  // through the whole fold and nothing launches when the lead passes. By the
+  // target rather than the eased angle: the lead never swings back over a
+  // launch that has just landed on the display the hinge is heading to.
+  lead()
   const app = busy()
   // Asleep, both displays are dark; open, the outer one sleeps on its own. Both
   // go dark under an app: the bake can only draw the shell, and a home screen

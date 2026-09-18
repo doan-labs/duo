@@ -199,12 +199,16 @@ bun run api            # only the TSDoc reference
   through a StyleX function style (`at: (left) => ({ left })`) or a `motion.*`
   element that carries only `style`.
 - The embedded shell is driven over the bridge in `packages/shell/main.ts`:
-  `?bg=` at load, then `{ deg, yaw, bg, paused, app }` by postMessage from the
-  same origin: `paused` parks the render loop while the frame is off screen,
-  `app` launches an app by home screen name (empty string is Home).
-  `src/simulator.tsx` posts the body colour and its `deg`, `yaw` and `app`
-  props, and never puts a live pose in the frame URL: a `src` change reloads
-  the whole scene. After changing
+  `?bg=` at load, then `{ deg, yaw, bg, paused, app, cue }` by postMessage from
+  the same origin: `paused` parks the render loop while the frame is off screen,
+  `app` clears the stage and launches an app by home screen name (empty string
+  is Home), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
+  `split` drags it onto the left half by synthetic pointer events and opens the
+  named app beside it, `screenshot`, `play` starts the deck muted). The shell
+  also accepts a localhost parent on another port, so `vite dev` on 3001 can
+  drive the root dev server on 3000; anything else must be the same origin. `src/simulator.tsx` posts the body colour and
+  its `deg`, `yaw`, `app` and `cue` props, and never puts a live pose in the
+  frame URL: a `src` change reloads the whole scene. After changing
   the bridge, rebuild the copy with `bun scripts/simulator.ts`. That script also
   copies `/model`, `/icons`, `/cdn` and `/preinstalled` to the site root: the
   shell loads all four by absolute path, and the runtime seeds Notes and

@@ -27,6 +27,7 @@ export function HomeBar({
 }) {
   return (
     <div
+      data-homebar=""
       {...stylex.props(
         styles.homebar,
         side === 'left' && styles.homebarLeft,

@@ -77,6 +77,10 @@ function deck(list: Track[]) {
     skip,
     toggle,
     seek,
+    /** Silent from here on; the embed bridge starts a song on a page scroll, which is no gesture to play out loud. */
+    mute() {
+      a.muted = true
+    },
     /** Reports every change to `onChange`; returns the unsubscribe. */
     watch(onChange: () => void) {
       subs.add(onChange)
