@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="56" fill="#F6F1E8"/>
+  <g fill="#6B6BFF" stroke="#6B6BFF" stroke-width="16" stroke-linejoin="round">
+    <!-- front panel, facing the viewer -->
+    <rect x="64" y="64" width="64" height="128" rx="10"/>
+    <!-- second panel, half-open and turned away: foreshortened -->
+    <path d="M148 64 L184 84 L184 172 L148 192z"/>
+  </g>
+</svg>

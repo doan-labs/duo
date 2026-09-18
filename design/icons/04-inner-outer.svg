@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="56" fill="#111111"/>
+  <!-- open state: the wide surface -->
+  <rect x="40" y="72" width="176" height="112" rx="24" fill="#F6F1E8"/>
+  <!-- hinge -->
+  <rect x="124" y="72" width="8" height="112" fill="#111111"/>
+  <!-- closed state: the compact surface, read in negative space -->
+  <rect x="146" y="100" width="56" height="56" rx="14" fill="#111111"/>
+</svg>

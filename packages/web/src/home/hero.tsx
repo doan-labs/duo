@@ -23,9 +23,6 @@ export function Hero() {
     <section {...stylex.props(styles.hero)} aria-labelledby="hero-title">
       <div {...stylex.props(styles.inner)}>
         <div {...stylex.props(styles.copy)}>
-          <motion.p {...stylex.props(styles.name)} {...rise(0)}>
-            Duo
-          </motion.p>
           <motion.h1 id="hero-title" {...stylex.props(styles.title)} {...rise(1)}>
             Apple’s folding iPhone, simulated.
             <br />
@@ -83,17 +80,8 @@ const styles = stylex.create({
   },
   inner: { maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto' },
   copy: { maxWidth: '1100px' },
-  name: {
-    margin: 0,
-    fontFamily: font.mono,
-    fontSize: '13px',
-    fontWeight: 500,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    color: color.text3
-  },
   title: {
-    marginTop: '20px',
+    marginTop: 0,
     marginBottom: 0,
     fontFamily: font.display,
     fontSize: { default: '76px', [MID]: '54px', [SMALL]: '38px' },

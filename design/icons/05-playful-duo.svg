@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="56" fill="#3A1F3D"/>
+  <!-- left tile leans in -->
+  <rect x="-36" y="-60" width="72" height="120" rx="20" fill="#FF7A1A" transform="translate(82 130) rotate(8)"/>
+  <!-- right tile leans in, a little shorter -->
+  <rect x="-36" y="-54" width="72" height="108" rx="20" fill="#E8776B" transform="translate(174 136) rotate(-8)"/>
+</svg>

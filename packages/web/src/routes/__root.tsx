@@ -12,14 +12,12 @@ import 'lenis/dist/lenis.css'
 import '../reset.css'
 import 'virtual:stylex.css'
 
-// The nav's two-screen glyph, inline so the icon needs no file. The indigo
-// accent reads on both a light and a dark browser chrome.
-const ICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 14"><rect x="0.75" y="0.75" width="8.5" height="12.5" rx="1.75" fill="none" stroke="#8f8fff" stroke-width="1.75"/><rect x="10.75" y="0.75" width="8.5" height="12.5" rx="1.75" fill="none" stroke="#8f8fff" stroke-width="1.75"/></svg>')}`
-
 export const Route = createRootRoute({
   head: () => ({
     links: [
-      { rel: 'icon', href: ICON },
+      { rel: 'icon', href: '/icon.svg', type: 'image/svg+xml' },
+      { rel: 'icon', href: '/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { rel: 'apple-touch-icon', href: '/icon-180.png' },
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
       { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
       {
@@ -35,7 +33,10 @@ export const Route = createRootRoute({
         name: 'description',
         content:
           'A working simulator of Apple’s iPhone Duo: hold it, fold it, install apps, and build your own with the SDK.'
-      }
+      },
+      { property: 'og:image', content: 'https://duo.doan-labs.com/icon-512.png' },
+      { name: 'twitter:card', content: 'summary' },
+      { name: 'twitter:image', content: 'https://duo.doan-labs.com/icon-512.png' }
     ]
   }),
   component: Root,

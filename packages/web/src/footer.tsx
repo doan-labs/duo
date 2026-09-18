@@ -29,6 +29,7 @@ export function Footer() {
     <footer {...stylex.props(styles.foot)}>
       <div {...stylex.props(styles.row)}>
         <Link to="/" {...stylex.props(styles.mark)}>
+          <img src="/icon.svg" alt="" width="22" height="22" {...stylex.props(styles.glyph)} />
           Duo
         </Link>
         <nav aria-label="Footer" {...stylex.props(styles.links)}>
@@ -92,6 +93,9 @@ const styles = stylex.create({
   },
   base: { marginTop: '28px' },
   mark: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
     fontFamily: font.display,
     fontSize: '18px',
     fontWeight: 600,
@@ -118,5 +122,6 @@ const styles = stylex.create({
     transitionProperty: 'color',
     transitionDuration: '0.15s'
   },
+  glyph: { display: 'block', borderRadius: '5px' },
   markSvg: { display: 'block', flexShrink: 0 }
 })

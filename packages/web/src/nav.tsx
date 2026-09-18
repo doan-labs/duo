@@ -16,6 +16,7 @@ export function Nav() {
     <header {...stylex.props(styles.bar)}>
       <nav {...stylex.props(styles.inner)} aria-label="Global">
         <Link to="/" {...stylex.props(styles.logo)} aria-label="Duo home">
+          <img src="/icon.svg" alt="" width="22" height="22" {...stylex.props(styles.glyph)} />
           Duo
         </Link>
         <ul {...stylex.props(styles.list)}>
@@ -137,6 +138,9 @@ const styles = stylex.create({
     gap: '24px'
   },
   logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
     color: color.text,
     textDecoration: 'none',
     fontFamily: font.display,
@@ -144,6 +148,7 @@ const styles = stylex.create({
     fontWeight: 600,
     letterSpacing: '-0.03em'
   },
+  glyph: { display: 'block', borderRadius: '5px' },
   list: {
     display: { default: 'flex', [MID]: 'none' },
     alignItems: 'center',

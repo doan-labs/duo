@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="56" fill="#F4EFE4"/>
+  <defs>
+    <clipPath id="ribbon">
+      <path d="M72 56h104a20 20 0 0 1 20 20v112a20 20 0 0 1-20 20h-16a20 20 0 0 1-20-20V112H72a20 20 0 0 1-20-20V76a20 20 0 0 1 20-20z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#ribbon)">
+    <!-- top face -->
+    <rect x="0" y="0" width="256" height="256" fill="#8FB3FF"/>
+    <!-- front face, split from the top face by one diagonal fold -->
+    <path fill="#1F4FD8" d="M140 112 L196 56 L196 256 L140 256z"/>
+  </g>
+</svg>

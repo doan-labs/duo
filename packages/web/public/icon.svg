@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="56" fill="#2A2A2E"/>
+  <!-- revealed plane, folded back along the D's spine -->
+  <path fill="#B9A9E6" d="M76 44 L48 72 L48 216 L76 188z"/>
+  <!-- D: front plane -->
+  <path fill="#F4EFE4" fill-rule="evenodd" d="M80 44h56c40 0 72 32 72 72s-32 72-72 72H80z M112 76v80h24c22 0 40-18 40-40s-18-40-40-40z"/>
+</svg>
