@@ -33,7 +33,16 @@ export const color = stylex.defineVars({
   red: { default: '#b3261e', [DARK]: '#ff8a80' },
   redBg: { default: 'rgba(179,38,30,0.10)', [DARK]: 'rgba(255,138,128,0.12)' },
   gray: { default: '#5f5e58', [DARK]: '#a3a29a' },
-  grayBg: { default: 'rgba(20,20,19,0.06)', [DARK]: 'rgba(242,241,236,0.08)' }
+  grayBg: { default: 'rgba(20,20,19,0.06)', [DARK]: 'rgba(242,241,236,0.08)' },
+  /** Syntax colour for the code samples (`src/highlight.tsx`): keywords, strings, numbers, JSX tags, calls, properties, punctuation, comments. */
+  synKw: { default: '#7a3e9d', [DARK]: '#c792ea' },
+  synStr: { default: '#1f6f3f', [DARK]: '#8fd6a3' },
+  synNum: { default: '#a04a00', [DARK]: '#f0b27a' },
+  synTag: { default: '#1a5fb4', [DARK]: '#7fb8ff' },
+  synFn: { default: '#5b3fbf', [DARK]: '#a8a8ff' },
+  synProp: { default: '#3b5b7a', [DARK]: '#9fc5e8' },
+  synPunct: { default: '#8a897f', [DARK]: '#7c7b73' },
+  synCmt: { default: '#8a897f', [DARK]: '#7c7b73' }
 })
 
 /** Explicit overrides when the visitor picks a theme; each flattens the media query away. */
@@ -59,7 +68,15 @@ export const light = stylex.createTheme(color, {
   red: '#b3261e',
   redBg: 'rgba(179,38,30,0.10)',
   gray: '#5f5e58',
-  grayBg: 'rgba(20,20,19,0.06)'
+  grayBg: 'rgba(20,20,19,0.06)',
+  synKw: '#7a3e9d',
+  synStr: '#1f6f3f',
+  synNum: '#a04a00',
+  synTag: '#1a5fb4',
+  synFn: '#5b3fbf',
+  synProp: '#3b5b7a',
+  synPunct: '#8a897f',
+  synCmt: '#8a897f'
 })
 
 export const dark = stylex.createTheme(color, {
@@ -84,7 +101,15 @@ export const dark = stylex.createTheme(color, {
   red: '#ff8a80',
   redBg: 'rgba(255,138,128,0.12)',
   gray: '#a3a29a',
-  grayBg: 'rgba(242,241,236,0.08)'
+  grayBg: 'rgba(242,241,236,0.08)',
+  synKw: '#c792ea',
+  synStr: '#8fd6a3',
+  synNum: '#f0b27a',
+  synTag: '#7fb8ff',
+  synFn: '#a8a8ff',
+  synProp: '#9fc5e8',
+  synPunct: '#7c7b73',
+  synCmt: '#7c7b73'
 })
 
 export const font = stylex.defineVars({

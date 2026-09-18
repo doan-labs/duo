@@ -1,40 +1,36 @@
 // The core idea: the fold is input. Four postures the visitor can pick; the
-// device animates to each and a readout beside the code shows what
-// `useDisplay()` would hand the app in that state.
+// real shell eases to each, the line of code that posture would run lights
+// up, and a readout shows what `useDisplay()` hands the app in that state.
 import * as stylex from '@stylexjs/stylex'
-import { animate, useMotionValue, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
-import { Device } from '../device'
-import { useNarrow } from '../media'
+import { Line } from '../highlight'
+import { Simulator } from '../simulator'
 import { color, font, radius } from '../tokens.stylex'
-import { Block, Cap, Code, Columns, Headline, Lede } from './parts'
+import { Block, Cap, Columns, Headline, Lede } from './parts'
 
-const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
 
-const OPEN = { deg: 180, name: 'Fully open', mode: 'open', screen: 'inner', size: '790 × 850' }
-const STATES = [
+type Posture = { deg: number; name: string; display: 'inner' | 'cover'; size: string; runs: number }
+const OPEN: Posture = { deg: 180, name: 'Fully open', display: 'inner', size: '790 × 850', runs: 4 }
+const STATES: Posture[] = [
   OPEN,
-  { deg: 120, name: 'Partially folded', mode: 'folding', screen: 'inner', size: '790 × 850' },
-  { deg: 90, name: 'Desk', mode: 'half-open', screen: 'inner', size: '790 × 850' },
-  { deg: 0, name: 'Closed', mode: 'closed', screen: 'cover', size: '387 × 850' }
+  { deg: 120, name: 'Partially folded', display: 'inner', size: '790 × 850', runs: 3 },
+  { deg: 90, name: 'Desk', display: 'inner', size: '790 × 850', runs: 3 },
+  { deg: 0, name: 'Closed', display: 'cover', size: '387 × 850', runs: 2 }
 ]
 
-const CODE = `const { mode, foldAngle, width, height } = useDisplay()
-
-if (mode === 'half-open') {
-  return <DeskMode />
-}`
+// What `useDisplay()` really returns: display, placement, size and the hinge
+// angle. `runs` above points at the line each posture reaches.
+const CODE = [
+  'const { display, angle, width, height } = useDisplay()',
+  '',
+  "if (display === 'cover') return <PocketCard />",
+  'if (angle < 150) return <Workspace angle={angle} />',
+  'return <Board width={width} height={height} />'
+]
 
 export function Fold() {
-  const still = useReducedMotion()
-  const narrow = useNarrow()
   const [s, setS] = useState(OPEN)
-  const open = useMotionValue(1)
-  const pick = (st: typeof OPEN) => {
-    setS(st)
-    animate(open, st.deg / 180, still ? { duration: 0 } : { duration: 1.1, ease: [0.65, 0, 0.35, 1] })
-  }
 
   return (
     <Block cinema labelledBy="fold-title">
@@ -54,7 +50,7 @@ export function Fold() {
                   key={st.deg}
                   type="button"
                   aria-pressed={st === s}
-                  onClick={() => pick(st)}
+                  onClick={() => setS(st)}
                   {...stylex.props(styles.state, st === s && styles.stateOn)}
                 >
                   <span {...stylex.props(styles.deg)}>{st.deg}°</span>
@@ -62,20 +58,34 @@ export function Fold() {
                 </button>
               ))}
             </fieldset>
-            <Code title="app.tsx">{CODE}</Code>
+
+            <div {...stylex.props(styles.code)}>
+              <div {...stylex.props(styles.codeTitle)}>app.tsx</div>
+              <pre {...stylex.props(styles.pre)}>
+                {CODE.map((line, i) => (
+                  <div key={line || `blank-${i}`} {...stylex.props(styles.line, i === s.runs && styles.lineOn)}>
+                    <span {...stylex.props(styles.gutter)}>{i + 1}</span>
+                    <code {...stylex.props(styles.text)}>
+                      <Line code={line} />
+                    </code>
+                  </div>
+                ))}
+              </pre>
+            </div>
+
             <dl {...stylex.props(styles.readout)} aria-live="polite">
-              <Field k="mode" v={`"${s.mode}"`} />
-              <Field k="foldAngle" v={String(s.deg)} />
-              <Field k="screen" v={`"${s.screen}"`} />
+              <Field k="display" v={`"${s.display}"`} />
+              <Field k="angle" v={String(s.deg)} />
+              <Field k="placement" v={'"full"'} />
               <Field k="width × height" v={s.size} />
             </dl>
             <p {...stylex.props(styles.list)}>
-              Apps react to display mode, fold angle, active screen, hinge position and transition state. Nothing else;
-              the fold is the API.
+              Apps hear about the display in use, their placement on it, its size and the hinge angle, every time one
+              changes. Nothing else; the fold is the API.
             </p>
           </div>
           <div {...stylex.props(styles.device)}>
-            <Device open={open} width={narrow ? 300 : 600} />
+            <Simulator deg={s.deg} bare />
           </div>
         </Columns>
       </div>
@@ -126,6 +136,57 @@ const styles = stylex.create({
   },
   stateOn: { backgroundColor: color.text, borderColor: color.text, color: color.bg },
   deg: { fontFamily: font.mono, fontSize: '12px' },
+  code: {
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: color.border,
+    borderRadius: '14px',
+    backgroundColor: color.surface,
+    overflow: 'hidden'
+  },
+  codeTitle: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '18px',
+    paddingRight: '18px',
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: color.border,
+    fontFamily: font.mono,
+    fontSize: '11.5px',
+    letterSpacing: '0.04em',
+    color: color.text3
+  },
+  pre: {
+    margin: 0,
+    paddingTop: '14px',
+    paddingBottom: '14px',
+    fontFamily: font.mono,
+    fontSize: '13.5px',
+    lineHeight: 1.7,
+    color: color.text,
+    overflowX: 'auto'
+  },
+  line: {
+    display: 'flex',
+    gap: '16px',
+    paddingLeft: '14px',
+    paddingRight: '18px',
+    borderLeftWidth: '2px',
+    borderLeftStyle: 'solid',
+    borderLeftColor: 'transparent',
+    transitionProperty: 'background-color, border-color',
+    transitionDuration: '0.35s'
+  },
+  lineOn: { backgroundColor: color.accentSoft, borderLeftColor: color.accent },
+  gutter: {
+    flexShrink: 0,
+    width: '1.5ch',
+    textAlign: 'right',
+    color: color.text3,
+    userSelect: 'none'
+  },
+  text: { whiteSpace: 'pre', fontFamily: 'inherit' },
   readout: {
     margin: 0,
     marginTop: '16px',
@@ -147,7 +208,15 @@ const styles = stylex.create({
     paddingRight: '18px'
   },
   key: { fontFamily: font.mono, fontSize: '11px', letterSpacing: '0.06em', color: color.text3 },
-  val: { margin: 0, marginTop: '6px', fontFamily: font.mono, fontSize: '15px', color: color.text },
+  val: {
+    margin: 0,
+    marginTop: '6px',
+    fontFamily: font.mono,
+    fontSize: '15px',
+    color: color.text,
+    transitionProperty: 'color',
+    transitionDuration: '0.35s'
+  },
   list: {
     marginTop: '28px',
     marginBottom: 0,
@@ -156,11 +225,5 @@ const styles = stylex.create({
     lineHeight: 1.55,
     color: color.text2
   },
-  device: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: { default: '680px', [MID]: '0' },
-    paddingTop: { default: '24px', [MID]: '0' }
-  }
+  device: { position: 'sticky', top: '96px', display: 'flex', justifyContent: 'center', alignItems: 'center' }
 })
