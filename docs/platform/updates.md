@@ -1,18 +1,39 @@
 # Updates
 
+The [stage 2 MVP amendment](stage-2-mvp.md) defers native shell updating and
+advanced app-update recovery from the launch gate. Existing basic lifecycle
+code is retained only with its documented verification scope.
+
+**Implemented:** the app update flow and recovery below (download as install,
+`candidate`, lease-gated activation, checkpoint, `trial`, `failedVersion`,
+Restore/Retry) in `packages/shell/runtime/lifecycle.ts`. **Not implemented:**
+CI publication, the Tauri updater, `update.*` in `native.ts`, the Software
+Update screen, badges and boot/daily checks. Those sections are the original plan.
+
 Two paths because two different things change at two different speeds.
 
 ## Apps, over the CDN
 
-App updates need no shell restart. The Store downloads the complete new
-sandboxed bundle and activates it on the next app launch, after old instances
-and bridge connections close. It never imports app code into the shell.
-Multi-view activation semantics still need the session contract in runtime.md.
+App updates need no shell restart. The Store downloads and verifies the new
+release exactly as an install does, records it as `candidate`, and activates
+it when no tab holds a session lease for the app (progress/contract.md §4.5).
+Activation checkpoints the app's data and widget snapshots in the same
+transaction that flips `current`, marks the release `trial` until its first
+`ready`, and delivers the migration context to the owner view once before
+secondary views mount. It never tears down a running view and never imports
+app code into the shell.
 
-Old artifacts make rollback possible, but are not a recovery mechanism by
-themselves. Version selection, failed-launch recovery, and data migration or
-downgrade rules remain open. Repointing the catalog to an older version does
-not work with a client that only accepts increasing versions.
+Recovery (progress/contract.md §4.6): the device keeps one known-good pair,
+the previous release's bytes and the data checkpoint taken at activation, and
+replaces that pair only when the next candidate proves itself with `ready`. A
+release that fails to start twice, counted per launch attempt, offers
+"Restore previous version": code and checkpoint come back together, the data
+the failed release wrote is kept aside in a bounded recovery copy, and the
+failed release becomes `failedVersion`, offered as "Retry update" and never
+reactivated automatically. Data migration is the app's job, driven by the
+migration context and a schema marker; the host records completion on
+`ready`. Repointing the catalog to an older version is not a mechanism; the
+on-device recovery pair is.
 
 Publishing an update is a PR that bumps `version` in the manifest and adds a
 line to the app's `CHANGELOG.md`. CI builds the bundle, uploads under the new
@@ -44,7 +65,7 @@ cache behavior need an explicit policy before promising it is up to date.
 The SDK's host contract. Runtime requirements determine app compatibility;
 a shell update may supply the required API or protocol support. The app's
 bundled UI kit has its own version and does not gate host compatibility.
-The store's "Requires iPhone Duo x.y" row links to Software Update when a shell
+The store's "Requires a newer platform version" row links to Software Update when a shell
 update that would satisfy it is waiting.
 
 ## Skipped

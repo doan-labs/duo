@@ -487,3 +487,122 @@ separate workstreams. Packages are private at 0.0.0. Root-relative icon URLs
 preserve current browser/native delivery; isolated releases will need their
 own asset distribution design before publication. Storage keys, app names,
 seed positions and renderer behavior are unchanged.
+
+## 38. Isolated documents carry assets and lift dynamic styles into classes
+
+2026-09-17. The app builder emits one `app.html`, with a first-head-child CSP
+hashing its script and static stylesheet. Public icon/font URLs are replaced
+with data URIs. A builder-only StyleX adapter turns dynamic variable maps into
+classes using CSSOM in an initially empty, hash-authorized stylesheet. Each
+property value is parsed separately through `setProperty`; it cannot inject a
+second rule. The baked shell keeps its existing StyleX runtime.
+
+Cost: every app bundles its own runtime and assets, the dynamic stylesheet
+retains each distinct value map for the document lifetime, and arbitrary
+third-party inline-style conventions are not promised compatible. The CSP
+bounds connections, not all JavaScript-driven presentation changes or
+self-navigation. Real Notes document probes exercise the strategy in Chromium
+and WKWebView; integrated migration and lifecycle evidence remain in the
+platform checkpoint.
+
+## 39. Notes navigation belongs to its sandbox session
+
+2026-09-18. Supersedes decision 32 for isolated Notes. Selected note and pushed
+page are string keys in `os.session`, so replacement views restore navigation
+after split collapse. Text uses `useKV(os.storage, note.id)`; an absent value
+means shipped text, while an empty string remains an edit. The editor displays
+hydration, saving and failure states instead of treating an optimistic edit as
+durable. Cost: navigation changes are shared between displays and persistence
+is asynchronous.
+
+## 40. Persistent launch authority is in IndexedDB
+
+2026-09-18. The `ipduo` database owns installed records, release bytes, app data,
+checkpoints and migration markers. Transactions acknowledge only on complete;
+data writes check the installed generation inside the write transaction.
+Lifecycle changes use per-app Web Locks and cross-tab leases. BroadcastChannel
+only invalidates; it never supplies trusted data. Native engine prerequisites
+were measured before implementing the host. Cost: unavailable storage is an
+explicit error, and a crashed tab's lease can delay activation up to 30 seconds.
+
+## 41. Sandbox effect ownership is sticky
+
+2026-09-18. The first view owns effects until revoked; the oldest survivor then
+receives a new epoch. Hinge angle and visibility never transfer ownership.
+Owner-only host methods check the epoch and acknowledged commands survive
+handover. Cost: hidden-frame timer throttling and user-activation loss remain
+browser constraints; cooperative network effects cannot promise exactly-once
+execution. Audio apps remain gated on the measured media contract.
+
+## 42. Opaque-origin media capture is deferred
+
+2026-09-18. Approved during implementation after Chromium refused
+`getUserMedia` with SecurityError even with camera policy, fake devices and
+browser permission granted. Camera and microphone are omitted from the
+permission table and explicitly denied on every sandbox. Geolocation,
+clipboard and photos remain in scope. Capture requires a separately reviewed
+host-mediated media contract; the sandbox does not gain `allow-same-origin`.
+
+## 43. Stage 2 launches at the four-outcome MVP gate
+
+2026-09-18. The user's [scope amendment](platform/stage-2-mvp.md) supersedes
+the broader stage 2 completion matrix, including decision 42's requirement
+to finish additional permissions for launch. Capture stays denied. Keep core
+infrastructure and existing lifecycle safeguards; optional live development
+and new update staging are disabled at their entry points, with no development
+watcher/fetch or background catalog polling. Existing durable transitions
+still reconcile. Cost: private local tooling and unsigned developer catalogs
+prove installation; they do not constitute a published distribution service.
+
+## 44. Display roots attach before sandbox documents load
+
+2026-09-18. Both OS roots are initially hidden inside CSS3DRenderer's final
+camera container before async app boot. Appending to the body and letting
+Three.js reparent on first display caused iframe document reloads while
+folding. Cost: `main.ts` depends on the installed renderer's container nesting;
+the fold integration check asserts stable view IDs across 180/120/0 degrees.
+Display changes update the existing SDK views instead of relaunching apps.
+
+## 45. Explicit developer preview and updates resume after safety checks
+
+2026-09-18. The stage-3 scope supersedes decision 43's temporary disabling of
+live development and explicit update staging/retry. Preview documents use
+immutable release URLs and separate origin/app storage namespaces; reload is
+explicit. Updates reuse retained checkpoints, generation fencing and leases.
+Catalog selection never starts polling. Cost: local CLI previews require a
+running developer server and simulator reload to select a rebuilt release.
+
+## 46. Unsigned installed apps bind to their catalog origin
+
+2026-09-18. Initial installation records its source origin. A different catalog
+origin cannot update that id and inherit its data. Records without provenance
+accept only the shell origin. Cost: moving an unsigned catalog to a new origin
+requires explicit removal/reinstallation; signing and publisher identities are
+future distribution work, not an implicit trust decision.
+
+## 47. Review packages carry their build toolchain and assets
+
+2026-09-18. Local SDK/kit/CLI archives resolve dependencies from the external
+consumer and include the existing compiler and local kit assets. The workspace
+is a fallback for repository apps only. Cost: unpublished versions require
+local archive overrides for transitive package resolution; public npm release
+and provenance remain separate decisions.
+
+## 48. Harvest the UI kit without changing app composition
+
+2026-09-18. Public kit 0.1.0 wraps existing native elements and StyleX patterns;
+typed `as`/`xstyle` preserve each app's appearance. Existing low-level exports
+and trusted shell components stay supported. Exact legacy appearance constants
+live in tokens, with a local/CI AST check rather than a new lint dependency.
+Cost: names and bespoke app compositions are less uniform than a redesign.
+
+## 49. Development src pins verified document bytes
+
+2026-09-18. Supersedes decision 45's direct remote iframe navigation and the
+literal server-src wording in platform contract §2.1/§2.7. The downloader still
+uses immutable developer release URLs; iframe `src` is now an owned Blob URL
+of the verified HTML. A second server fetch could otherwise substitute its CSP
+and code after validation. Same-release loads reuse the URL; replacement/removal
+revoke it under the existing app lock. Storage namespace, SDK protocol, opaque
+sandbox and generation rules are unchanged. Cost: one in-memory document copy
+per loaded developer app and a required `blob:` allowance in shell frame CSP.

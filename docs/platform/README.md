@@ -1,5 +1,18 @@
 # Platform
 
+**Status:** stages 2–5 (non-website scope) are implemented and locally verified;
+see [progress](progress/README.md). Use the [review guide](review.md) for exact
+commands, artifacts and measured limits.
+
+**Current stage 2 launch gate:** [scope amendment](stage-2-mvp.md), accepted
+2026-09-18. Prove an independent third-party app, isolation, meaningful visible
+fold/display behavior and installation without rebuilding simulator source.
+The broader workstreams below are a roadmap, not additional launch gates.
+
+**Public deployment:** `https://duo.doan-labs.com`, using static hosting/CDN
+without a custom application server. Provider and final routes remain open.
+This leaves the runtime architecture unchanged; see [web.md](web.md#deployment).
+
 The plan for turning the fake OS into a developer platform: a store that installs
 real apps, an SDK and UI kit to build them, a site that teaches it. Discussed
 2026-09-17; everything here is intent until the matching code lands, then the
@@ -7,7 +20,8 @@ file becomes the reference for that code.
 
 Rules that hold across every file:
 
-- Every app in the store is MIT and lives in this repo. No commerce, no accounts.
+- The curated catalog proposal uses MIT apps in this repo. The revised launch
+  gate also permits independently hosted developer catalogs. No commerce or accounts.
 - Every downloadable app, official or community, runs as an immutable sandboxed
   bundle. It never runs in the shell's JavaScript context or directly reaches Tauri IPC.
 - The SDK owns the host API, bridge protocol, and manifest contract. The UI kit
@@ -22,9 +36,11 @@ Implementation checkpoints, verification evidence and remaining limits live in
 
 | File | What it settles |
 | --- | --- |
+| [stage-2-mvp.md](stage-2-mvp.md) | Current four-outcome launch gate; explicitly supersedes conflicting broader scope |
 | [monorepo.md](monorepo.md) | Package layout, workspaces, what moves where |
 | [manifest.md](manifest.md) | The app manifest: id, version, lane, entry, widgets, permissions |
 | [runtime.md](runtime.md) | Baked shell components, sandboxed app bundles, the SDK bridge, and display instances |
+| [progress/contract.md](progress/contract.md) | Stage 2 contract, revision 2: manifest and compatibility, bridge, sessions and views, storage and release lifecycle, Notes as the first sandboxed app, experiments and acceptance checks |
 | [uikit.md](uikit.md) | The UI kit: harvest plan, component tiers, rules, versioning |
 | [store.md](store.md) | CDN layout, index, install, updates, Requires-version gating |
 | [updates.md](updates.md) | App updates over the CDN and shell updates over Tauri's updater |
@@ -36,9 +52,10 @@ Implementation checkpoints, verification evidence and remaining limits live in
 
 ## Workstreams and one-day constraint
 
-The target is the full platform in one day of agent work, including the UI kit
-harvest, official app migration, and website. This is a planning document,
-not authorization to start implementation.
+Historical plan, 2026-09-17. The original target was the full platform in one
+day of work, including the website. Stages 2–5 completed the non-website
+workstreams; the website (workstream 10) is handed off separately in
+[website-integration.md](website-integration.md).
 
 The numbers retain the original workstream identifiers, not an executable order.
 Sandboxed installation depends on the SDK and iframe runtime. Final sequencing
@@ -59,8 +76,11 @@ remains open; all workstreams stay within the one-day target.
 
 The create → develop → install → fold → persist → update → uninstall flow
 provides early integration evidence, verified in browser and native runtimes.
-Completion also includes the kit harvest, official app migration, website, and
-the other workstreams above. Signing, npm publishing, and deployment access
+[progress/contract.md](progress/contract.md) defines that flow for Notes, with the runtime
+contracts it exercises and the checks that prove each step; it is the stage 2
+historical broader acceptance plan; the amended launch gate is stage-2-mvp.md.
+The kit harvest and official app migration are complete (stage 4); the website
+remains the separate owner's work. Signing, npm publishing, and deployment access
 are unresolved external dependencies.
 
 ## Vocabulary

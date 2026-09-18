@@ -1,5 +1,16 @@
 # Architecture
 
+Stage 4 adds the public kit primitives, generated API data and a standalone
+Developer gallery. The kit owns shared presentation and subscription-only view
+hooks; apps retain their effects and trusted native integration. Exact legacy
+appearance values are collected in kit tokens, enforced by `check-app-tokens.ts`.
+
+Stage 3 adds public CLI packaging in `scripts/package-platform.ts` and immutable
+development serving in `packages/cli/development.mjs`. The existing runtime
+owns development namespaces, source-origin-bound installs and explicit update
+transitions; neither the CLI nor Store duplicates lifecycle authority. See
+`platform/progress/stage-3.md` for checked behavior and local artifact workflow.
+
 A folding iPhone Duo: one Three.js scene, a fake iOS drawn in real DOM, and a
 transparent Tauri window so the device floats on the desktop. Web and desktop
 run the same bundle; `packages/shell/native.ts` is the only file that knows which one it is.
@@ -33,20 +44,30 @@ Package imports run one way: apps consume `@doan-labs/ipduo-sdk` and
 tokens, the icon catalog, shared helpers, rings and sample tracks. Its React
 `App` adapter consumes `Os` from the SDK; SDK `legacy.ts` owns the existing
 `Os` and `CameraHooks` types without React. These are transitional baked-app
-types, not an implemented sandbox protocol.
+types. The separate sandbox contract and client live in SDK `manifest.ts`,
+`compat.ts`, `permissions.ts`, `protocol.ts`, `guards.ts` and `client.ts`;
+`mirror.ts` and `react.ts` own optimistic async KV hydration. Their integrated
+host lives under `packages/shell/runtime/`.
+
+`scripts/build-app.ts` bundles isolated documents, embeds public icon/font
+assets, hashes script/styles into the first-head-child CSP, and emits immutable
+release files plus a catalog. `uikit/sandbox-stylex.ts` is a builder-only alias:
+it lifts dynamic StyleX variables into CSSOM classes in a hash-authorized
+stylesheet. The baked shell still uses the ordinary StyleX runtime.
 
 The shell imports app entries through workspace exports and keeps the baked
 registry and default positions in `apps.ts`. Control Center still reads Music's
-shared deck; home widgets and baking still consume Calendar and Weather.
+shared deck; Calendar remains baked, while Weather publishes a persisted
+declarative widget snapshot through the SDK.
 The hardware path (`buttons.ts` → `device-buttons.ts` → `device.ts`) retains
-its behavior. Every current app remains baked at this migration gate.
+its behavior. Notes and Weather are isolated releases; other existing apps remain baked.
 
 Root tooling builds the shell page at `packages/shell/index.html` into `dist/`.
 `public/` is copied verbatim, including icons referenced by the UI kit catalog.
 The Tauri crate lives under `packages/shell/desktop`, while `.cargo` and its
-shared output directory remain at the root. CLI and web workspaces are empty
-scaffolds. No manifests, runtime bridge, store installation, updater, or new UI
-kit components are implemented by the restructure.
+shared output directory remain at the root. The CLI supports local create/check
+and the web workspace remains a scaffold. Stage 2 adds the runtime and catalog
+installation to the earlier monorepo migration.
 
 ## Weather data and widget
 
@@ -54,9 +75,11 @@ kit components are implemented by the restructure.
 and units, subscriptions and the widget snapshot. `weather/styles.ts` owns
 presentation; `temperature-chart.tsx` draws actual hourly temperatures.
 `apps/weather/index.tsx` owns location management and daily-detail navigation.
-Both displays and the widget share the selected city and forecast cache;
+Both displays share SDK storage for preferences and forecasts. Only the session
+owner fetches; other views send commands. The owner publishes the widget snapshot;
 search, scroll and detail navigation remain local to each app instance.
-`screen.ts` reads the widget snapshot; `main.ts` rebakes home textures only
+`runtime/widgets.tsx` reads the persisted snapshot without fetching weather.
+`screen.ts` reads that snapshot; `main.ts` rebakes home textures only
 when that snapshot changes and disposes the previous textures.
 
 ## Units and camera
@@ -187,7 +210,32 @@ Where the numbers come from:
   `packages/shell/device-buttons.ts` (meaning) → `device` → the display in use. The Camera
   app publishes `CameraHooks` on `os.camera` for shutter, record and zoom.
 
-## Desktop shell
+## Isolated app runtime
+
+`packages/shell/runtime/database.ts` owns IndexedDB schema and transaction
+completion. `storage.ts` implements revisioned persistent and session KV;
+`releases.ts` streams and verifies release artifacts; `lifecycle.ts` owns
+locks, leases, install, activation, rollback, legacy migration and removal.
+`sessions.ts` owns each document's app session, sticky owner and command queue.
+`bridge.ts` creates opaque-origin iframes and authenticates nonce/port launches.
+`display.ts` derives view fields from render-loop visibility writes;
+`sandbox.tsx` renders connection/failure state. `registry.ts` populates shell
+tiles from authoritative records and seeds bundled releases once. `photos.ts`
+adapts the existing camera roll for the manifest-gated host service.
+
+Notes and Weather are bundled separately by `scripts/build-app.ts`; the shell
+imports neither app module. `scripts/build-preinstalled.ts` packages their
+immutable releases under both the local catalog and bundled offline source.
+The Store can select a separately hosted developer catalog and install its
+verified documents without rebuilding the shell. Release hashes establish
+integrity relative to that catalog, not publisher identity. The host recomputes
+script/style hashes and checks the exact document CSP against the manifest.
+
+Both display roots attach to CSS3DRenderer's final camera container before
+apps mount, initially hidden. A later reparent would reload an iframe; this
+placement preserves the same documents and sessions across folding.
+
+## Native window
 
 Tauri 2 window: `transparent`, `decorations: false`, `shadow: false`,
 `macOSPrivateApi` for the transparent WKWebView. The HUD pill is the

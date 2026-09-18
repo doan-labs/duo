@@ -4,6 +4,50 @@
 any other platform's docs: the simulator is a web page, so the site embeds the
 real device instead of screenshots.
 
+## Deployment
+
+Accepted 2026-09-18: the canonical public origin is
+`https://duo.doan-labs.com`. Host the website, browser simulator, first-party
+catalog and immutable app bundles as static files on this origin initially.
+Build locally or in CI; installation, app execution and persistence stay in
+the client. No custom application server is required for the MVP. This does
+not change the SDK, iframe isolation or lifecycle contracts.
+
+The hosting provider and final paths for the simulator, docs, catalog and
+bundles remain open. Keep deployment URLs configurable rather than encoding
+an assumed route layout into the SDK. A separate CDN hostname is optional;
+external developer catalogs remain supported.
+
+Deployment requirements:
+
+- Configure DNS and HTTPS for the canonical domain, and serve correct content
+  types. Do not return the website's HTML fallback for missing catalog or
+  artifact paths.
+- Cache immutable versioned bundles long-term. Revalidate site entry documents
+  and keep catalog freshness short (the store proposal uses 60 seconds).
+  Publish complete artifacts before the catalog references them. An already
+  open simulator does not automatically adopt newly deployed shell code.
+- Configure the desktop shell's first-party catalog URL and verify required
+  cross-origin reads from the actual native origin. Verify hosted-shell reads
+  of external developer catalogs separately. CDN CORS and the app-document
+  sandbox/CSP serve different purposes; preserve the latter.
+- Verify hosted `?dev=` loading against localhost in supported browsers,
+  including CORS and browser local-network permissions. Retain a fully local
+  shell plus app development path when hosted access is unavailable.
+- Verify the website embed, app installation and persisted launch on the
+  deployed origin. A successful local build is not deployment evidence.
+
+Web installations and data are scoped to the origin. Localhost, previous
+domains and the native shell have separate storage; no automatic migration
+or cross-device sync is promised. Website and simulator pages on this origin
+share its storage boundary regardless of URL path. Downloadable app documents
+remain opaque-origin sandboxed frames and use the SDK for persistence.
+Choose the public origin before collecting user data; a later domain change
+would need an explicit migration/export plan.
+
+These are deployment requirements, not a claim that DNS, hosting or browser
+compatibility have already been verified.
+
 ## Pages
 
 1. **Home.** The device, folding on scroll. Download links for the dmg, msi,

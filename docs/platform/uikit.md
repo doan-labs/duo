@@ -1,5 +1,16 @@
 # UI kit
 
+**Current implementation:** the stage-4 harvest ships as private kit 0.1.0.
+See [progress](progress/stage-4.md), the package README and generated
+`api/uikit.json`. The design below remains historical intent. The 2026-09-18
+scope decision replaces one-PR-per-app sequencing with local incremental
+migration and verification; no public release or PR is created by this work.
+Native/trusted app integration remains where the accepted architecture requires
+it. Token checks use a local/CI source gate alongside Biome, rather than adding a
+new lint plugin. Appearance tokens preserve existing values; this is not a visual
+redesign. Broader second-tier components still ship only when a real app needs
+them, and expanded widgets remain deferred.
+
 `@doan-labs/ipduo-uikit`. SwiftUI-shaped components, React underneath, StyleX
 for styling. It owns the UI contract and tokens. The SDK separately owns the
 host API, bridge, manifest, and runtime compatibility.

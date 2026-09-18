@@ -70,9 +70,9 @@ counted as a complete pass; production has the complete three-view capture.
    now passes with zero errors; 199 non-blocking lint warnings remain.
    Typecheck and production build pass after formatting. See
    `monorepo-format-fix.log` and `monorepo-format.log`.
-2. **Window drag confirmed by the user.** The earlier synthetic drag was
-   inconclusive; the user subsequently confirmed native dragging works. Native
-   sleep/wake, folding, assets and app rendering were observed by the agent.
+2. **Window drag confirmed manually.** The earlier synthetic drag was
+   inconclusive; native dragging was then confirmed by hand. Native
+   sleep/wake, folding, assets and app rendering were observed in the window.
 3. **Coverage is scoped.** No observed functional regression in the exercised
    flows. Every app typechecks/builds, but every control in all 39 apps was not
    exercised. Native IPC invocation, camera permissions, Windows/Linux,

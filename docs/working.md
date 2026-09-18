@@ -293,15 +293,17 @@ The full procedure, scripts and known false alarms are in `docs/debug.md`. In sh
 ## Notes maintenance
 
 The app entry chooses columns above 600 px and the existing UIKit `Nav` below
-that width. Keep the public `Notes({ os })` entry and shell registration intact.
+that width. `main.tsx` connects the sandbox SDK and renders the app.
 `apps/notes/data.ts` owns the ten shipped notes; `store.ts` is the only Notes
-module that reads or writes localStorage. Keys stay `duo.notes.<id>`, including
-empty strings. Writing the shipped body removes its override. The undo buttons
+module that adapts SDK storage. The host migrates legacy `duo.notes.<id>` keys
+once, verifies the transaction, and conditionally removes unchanged originals.
+Empty strings remain edits. Writing the shipped body removes its override. The undo buttons
 restore that body; they are not an edit-history stack.
 
 Both display editors and rows subscribe to persisted text. Navigation and palette
-state remain per instance: the cover starts at its list, resizing across 600 px
-remounts the layout, and selecting a different note resets the pen but retains
+state now uses shared session keys for selected note and pushed page; palette
+state stays per instance. Resizing across 600 px remounts the layout, and
+selecting a different note resets the pen but retains
 the wide layout's ink colour. Folders, tags, compose, sharing, search and most
 toolbar icons remain decorative. No note creation, deletion or folder filtering
 is implemented by this rebuild.
@@ -315,17 +317,19 @@ units. Forecast timestamps are Unix seconds, formatted in the city's timezone.
 Use the location ID plus coordinates for geolocation entries so moving to a
 new position cannot reuse the previous position's cached forecast.
 
-`duo.weather.v1` stores places, selected place and temperature units. Clear that
-key to reset. Forecasts are cached only in memory for ten minutes. A failed
-request must never fall back to fabricated measurements. A reload while
-offline deliberately shows an unavailable state. Browser location access needs
+Weather's SDK storage stores places, selected place, units and forecasts.
+The session owner refreshes stale forecasts after ten minutes, reconciling
+every 30 seconds and on visibility changes. Nonowners request refresh through
+commands. Owner changes abort in-flight work. A failed request must never fall
+back to fabricated measurements. Browser location access needs
 a secure context (localhost qualifies) and permission; native location access
 depends on the webview environment. Search remains available if it is denied.
 
 The cards grid responds to its own container width, so cover and split displays
 use one column. Keep actionable buttons out of the bottom-centre home-bar
 region; the saved-city Remove control sits at the right edge for that reason.
-The baked home widget also reads weather data and is rebaked on snapshot changes.
+The baked home widget reads the host's persisted declarative snapshot and is
+rebaked on changes; it does not fetch weather itself.
 
 Weather's scroll areas use `styles.scrollbar`: a rounded translucent native
 thumb with a subtle track and hover/pressed feedback. Keep `scrollbar-width`
@@ -333,10 +337,94 @@ and `scrollbar-color` at `auto` in engines supporting `::-webkit-scrollbar`;
 non-auto standard values override that detailed skin in Chromium. Engines
 without those pseudo-elements use the thin, tinted standard-property fallback.
 
-## Monorepo migration gate
+## Monorepo migration gate (historical)
 
 Root commands remain the entry points. Bun workspaces own runtime dependencies; root owns build and verification tools. Each package has its own typecheck configuration. `bun run --filter '@doan-labs/*' typecheck` checks all packages. `cargo shell-check` checks the relocated native crate from the root. Tauri commands run from `packages/shell`, with frontend hooks explicitly running at the repository root. `dist/`, `public/`, model preparation and the shared Cargo cache stay at the root.
 
 App imports use SDK and UI kit package exports, never another app or shell internals. The shell seed registry is `packages/shell/apps.ts`. The SDK exports only existing transitional baked-app host types; the UI kit owns the React `App` adapter. All packages remain private at version 0.0.0. CLI and website are empty scaffolds; manifests, sandboxing, component harvest, publication and update features are not implemented at this gate.
 
+The preceding paragraph records the earlier migration gate. Stage 2 supersedes
+its SDK/CLI/runtime status; see the current checkpoint below.
+
 The icon catalog now lives in `packages/uikit/icons/index.ts` and serves assets from `public/icons/`; the extraction script writes there. Publishing an isolated UI kit consumer will need its own asset distribution contract. No publishable package claim is made by this migration.
+
+## Isolated document tooling
+
+`bun scripts/build-app.ts <app-folder>` validates the folder's authored
+`manifest.json`, bundles its entry, and writes `app.html`, the icon and
+`release.json` under `dist/cdn/apps/<id>/<version>+<hash>/`. The catalog retains
+release identities. Existing release folders are immutable: repeating an
+identical build refuses to overwrite them. `IPDUO_BUILD_OUTPUT` selects a
+separate output root for experiments. Assets referenced under `/icons/` and
+`/fonts/` are embedded; they cannot rely on the parent shell's origin.
+
+The builder's `--experiment` switch and `IPDUO_BUILD_ENTRY` are test-only.
+They let E0 render Notes with a memory store independently of the integrated
+host database. Do not use that fixture for an installed Notes release.
+The status of app migration, the shell `?dev=` loader, measured limits and
+owner experiments is in [the stage 2 checkpoint](platform/progress/stage-2.md).
+
+Opaque-origin camera capture is not enabled by Permissions Policy alone.
+The feature probe currently reports `SecurityError: Invalid security origin`
+even for a declared camera. Do not add `allow-same-origin` as a workaround.
+
+## Stage 2 MVP operation and limits
+
+This section records the stage-2 gate. Stage 3 subsequently enables verified
+local development and explicit staging/retry after their safety checks passed;
+see the current workflow below. Other scope deferrals remain in force.
+
+The [amended gate](platform/stage-2-mvp.md) is independent app execution,
+isolation, visible fold/display behavior and installation without simulator
+rebuild. Build the simulator once with `bun run build`, then run
+`bun scripts/checks/stage2/mvp.mjs` for the separate-catalog demonstration.
+For an authored app, build with `bun scripts/build-app.ts <folder>`, serve
+the output with CORS, and enter its `/index.json` URL in App Store. The SDK and
+kit remain private 0.0.0 packages resolved by the local toolchain.
+
+`PREVIEW_FEATURES` disables live development and new update staging. CLI `dev`
+returns before building, watching or serving; shell `?dev=` rejects before
+fetching or creating a development namespace/frame. Catalog refresh runs at
+boot or on explicit request, with no hourly polling or automatic downloads.
+Update/retry controls are hidden and their Store operations reject. Existing
+committed candidates, trial recovery, leases, cleanup and removal remain
+reconciled; disabling shared lifecycle work could strand durable state.
+
+External catalogs may install apps with network origins but no device
+permissions. Camera/microphone are rejected globally. Existing permission
+adapters and Weather's declared geolocation remain without expanding their
+acceptance claims. No downloadable camera or photos app is exposed in this
+gate. Weather's retained widget age timer runs once per minute; it does not
+wake an app or fetch a forecast. Broader widgets, device permissions and native
+app updates remain roadmap work.
+
+App documents have a 1 MiB soft / 4 MiB hard cap; complete releases have an
+8 MiB hard cap. The downloader verifies streamed size, file hashes, release
+identity and the exact hashed document policy. Catalogs are not signed:
+selecting one does not authenticate its author. Old pre-platform browser tabs
+can still edit legacy localStorage after migration; close them before relying
+on the migrated Notes state. Full native permission, background timer/audio,
+offline/update recovery and publishing matrices are not claimed at this gate.
+
+## Current developer workflow
+
+`bun scripts/package-platform.ts` writes private local tar archives. CLI create
+accepts `--packages <artifacts.json>` so new projects use those archives rather
+than unpublished registry versions. The generated project supports `bun run
+check`, `bun run build` and `bun run dev` after `bun install`. Its source and
+node_modules can live wholly outside this repository. CLI build's `--out`
+selects a catalog directory; `serve <catalog> --port 5173` serves it with CORS.
+
+`dev` watches source and prints a `?dev=` link; `preview` serves one build.
+Documents download from immutable release URLs and execute via a Blob `src` of
+the verified bytes, preventing a second server response from replacing the CSP.
+Reload selects the new build and fences
+the previous preview generation; it never aliases installed data. Stopping the
+CLI closes its server/watcher and removes owned temporary output. Store's DEV
+row removes preview data. Device permissions remain denied for these previews.
+
+Store refresh is explicit and retains the selected catalog. Updates use the
+existing candidate/checkpoint/lease machinery and must come from the app's
+original catalog origin. This prevents another unsigned catalog from taking
+over an installed id's data. Existing provenance-less records accept the shell
+origin. The SDK protocol and launch-generation rules are unchanged.

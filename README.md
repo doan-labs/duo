@@ -15,6 +15,9 @@ bun run desktop:build        # .app / .exe / .AppImage
 
 ## Docs
 
+[Developer platform review](docs/platform/review.md): create an external app,
+install it without rebuilding the simulator, and reproduce stages 2–5 evidence.
+
 `docs/architecture.md` how it fits together, `docs/decisions.md` why, `docs/working.md` how to add things and what is known broken, `docs/debug.md` how to drive and verify it from a terminal.
 
 ## Layout
@@ -23,14 +26,18 @@ bun run desktop:build        # .app / .exe / .AppImage
 packages/
   shell/            scene, HUD, hardware buttons, shaders, native.ts, index.html
     springboard/    display layers, scenes, gestures and device controls
-    apps.ts         unchanged baked-app seed registry and home grid
+    apps.ts         remaining baked apps and home grid
+    runtime/        isolated app bridge, storage, lifecycle, catalog and registry
     desktop/        Tauri crate, commands/ and platform/
-  uikit/            existing UI, tokens, icon catalog and shared helpers
-  sdk/              transitional host types; future runtime contract scaffold
-  cli/              future CLI scaffold (@doan-labs/ipduo)
+  uikit/            harvested typed components, tokens, icons and shared helpers
+  sdk/              host types, sandbox contract/client and async React adapter
+  cli/              create/check/build/dev/preview/serve, import and type validation
   web/              future official website scaffold
   apps/             one private workspace per existing app
 public/             static assets; icons/ and gitignored model/
+examples/
+  fold-compass/     independent public-SDK demo, never seeded into the shell
+  developer/        installable public UI-kit component gallery
 serve.ts            root development server
 build.ts            root production build, writes dist/ and stylex.css
 stylex-plugin.ts    shared Bun StyleX compilation
@@ -39,6 +46,16 @@ tsconfig.json       shared strict TypeScript configuration
 .cargo/             shared Rust cache configuration and shell-check alias
 docs/               architecture, decisions, workflow, debug and platform plan
 scripts/            model preparation, asset extraction, screenshots
+  build-app.ts      isolated document builder and local release catalog
+  build-preinstalled.ts  bundled Notes and Weather releases
+  package-platform.ts  private SDK/kit/CLI archives for external consumers
+  check-platform.ts    local/CI platform gate
+  check-app-tokens.ts   app appearance token gate alongside Biome
+  generate-kit-docs.ts  exported props and TSDoc to API data
+  checks/stage2/    document, storage, permission, lifecycle and MVP checks
+  checks/stage3/    external developer workflow and preview teardown checks
+  checks/stage4/    official app captures, component gallery and validation checks
+.github/workflows/ read-only platform validation; no publication or deployment
 design/             Blender sources, outside the build
 .cache/             local verification evidence and Rust build output
 ```

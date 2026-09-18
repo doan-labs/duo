@@ -1,5 +1,26 @@
 # Debugging without a human
 
+Platform checks are reproducible from `scripts/check-platform.ts` (local/CI),
+`scripts/checks/stage3/workflow.mjs` (external packages and actual Store), and
+`scripts/checks/stage4/apps.mjs <tag> [App names...]` (built simulator pixels at
+inner/cover widths). `APP_DIST` freezes a baseline independently of source edits;
+`APP_PORT` avoids conflicts. Gallery tests use real opaque sandbox documents but
+no 3D model. `CHROME_BIN` selects the installed browser in CI. Headless pixel
+review caught a missing gallery navigation theme even when DOM checks passed:
+set the public `app` token theme on the root, not only its background colour.
+
+Run full SwiftShader simulator tests serially. Concurrent software-GPU renderers
+can starve sandbox first-paint callbacks beyond the existing ready deadline;
+record the failure and rerun alone before diagnosing a lifecycle regression.
+Do not lengthen safety deadlines to make an overloaded test pass.
+
+Native raw debug binaries can share WKWebView storage despite different Tauri
+identifiers. The platform native harness now sets an explicit random window
+`dataStoreIdentifier`, requiring macOS 14+ for isolated persistent test storage.
+Rebuild once and restart that same binary to test persistence in that store.
+Production storage settings are unchanged. Earlier stage-2 native checks did
+not use this partition and are not evidence of test-profile isolation.
+
 How to drive, observe and verify this app from a terminal: headless Chrome for
 logic and layout, the real Tauri window for anything a GPU or WKWebView changes.
 Every snippet here has been run. Mac only, like the rest of working.md.
@@ -434,3 +455,77 @@ Orca resolved it by process name. Inspect native screenshots as well as AX:
 hidden mirrored scenes can appear in the accessibility tree. Synthetic HUD
 dragging did not move the window in this session and is not a verified drag test.
 The user subsequently confirmed native dragging works, closing that review item.
+
+## 9. Stage 2 document and engine experiments
+
+`bun scripts/checks/stage2/e0-document.mjs` builds a real Notes document with
+an explicit memory-store fixture, serves installed-style `srcdoc` and dev-style
+`src` frames, and asserts their probes in an isolated Chromium instance. It
+also exercises actual Open-Meteo requests, denied origins, IndexedDB and Web
+Locks. `--serve` leaves the harness running for the visible native recipe in
+[stage-2.md](platform/progress/stage-2.md). Native builds use the separate
+`com.mnismt.iphoneduo.stage2` identifier and embedded harness assets; regular
+app data is not a test fixture.
+
+The harness records `window.results`, with a `loader` discriminator, and
+writes received native probe JSON into `.cache/debug/stage2/native-*.json`.
+These are experiment probes, not new shell `data-*` hooks. The memory-store
+fixture deliberately cannot establish persistence or bridge acceptance.
+
+`bun scripts/checks/stage2/m-permissions.mjs` runs the feature portion of M
+using Chromium's fake media device and mocked geolocation. A failed declared
+camera result is a real API refusal, not missing headless hardware. Photos and
+the host permission gate require the integrated runtime and are separate.
+
+The first native harness capture appeared black because default black text
+was drawn over a transparent window, with the Notes frames below a long
+results block. The harness now uses an opaque background and collapsed
+results. Inspect screenshots after the view settles; an immediate screenshot
+after a synthetic scroll can contain only partial composited layers. A
+successful accessibility probe alone does not establish the captured pixels.
+
+## 10. Stage 2 integrated MVP checks
+
+Prepare local archives with `bun scripts/package-platform.ts .cache/platform-packages/final`
+when absent, then run `bun run build` and `bun scripts/checks/stage2/mvp.mjs`. The script copies
+Fold Compass outside the repository, builds with public SDK/kit imports, serves
+the frozen simulator on 3111 and a separate app catalog on 3112, and drives
+real Store GET/OPEN. It checks isolation, app-private persistence, 180/120/0
+degree SDK layouts, stable frame IDs and relaunch. It hashes every simulator
+dist file before the separate build and after install/fold/reload. Evidence and
+pixels live under `.cache/debug/stage2/mvp/`. Inspect the three fold captures;
+partial clipping at 120 degrees is the real folded device, not a layout failure.
+`--serve` leaves both servers running for native UI verification.
+
+`bun scripts/checks/stage2/runtime.mjs` exercises the real host with probe apps:
+policy tampering, migration, quota abort, owner and nonowner commands, handover,
+trial activation/restoration, two-tab removal and old-generation rejection
+after reinstall. These fixture-only update calls verify retained safeguards.
+Stage 3's Store workflow separately verifies the subsequently enabled entry points.
+
+`bun scripts/checks/stage2/notes.mjs` and `weather.mjs` use the real shell on
+port 3110 (`PORT=3110 bun run dev`). Notes verifies SDK edits/reload; Weather
+checks one owner fetch across two views, command refresh and denied network.
+Sandbox frames expose `data-view`, `data-session`, `data-generation`,
+`data-state` and `data-owner` for test observation. Puppeteer frame evaluation
+is privileged test inspection, not an API available to an installed app.
+
+Both display roots must already be in CSS3DRenderer's camera container when
+iframes load. A detached hidden cover never connected; moving it from body
+into the renderer on its first visible frame reloaded it. Checking only
+`ready` at 180 degrees misses this failure; assert unchanged view IDs after
+folding through the cover transition.
+
+Stage-5 development probes need a viewport that keeps every iframe onscreen.
+Cross-origin frames below the viewport may suspend requestAnimationFrame, so
+an app that calls ready after its first paint can time out in an undersized
+test harness. This is separate from parallel SwiftShader contention; neither
+justifies weakening the host deadline. Select frames by `data-view`, not by
+Puppeteer's frame-list order. Maps' blank external embed was present in both
+the frozen pre-migration baseline and final headless captures.
+
+MVP checks consume `.cache/platform-packages/final/artifacts.json` (override with
+`PLATFORM_ARTIFACTS`) in the external test project. A naked temporary source
+folder can make Bun resolve React from its global cache without transitive
+dependencies. Installing the prepared archives first verifies the actual
+developer setup and avoids relying on that cache fallback.

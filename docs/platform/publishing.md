@@ -1,5 +1,15 @@
 # Publishing
 
+The [2026-09-18 scope amendment](stage-2-mvp.md) allows a separately authored,
+separately built developer catalog for the launch proof. The in-repo PR/CI
+workflow below remains a curated-catalog roadmap and does not block this gate.
+
+**Implemented:** the per-app `check` rules (lane, CHANGELOG, caps, icon, import
+boundary, strict types, tokens) and `.github/workflows/platform.yml`, which runs
+`scripts/check-platform.ts` only. **Not implemented:** published `npx` packages,
+merge-triggered catalog builds and uploads, id uniqueness and version-bump
+checks, PR comments, icon variants, per-submission Puppeteer isolation runs.
+
 Every app is a folder under `packages/apps/`, MIT, in this repo. Publishing is
 a pull request.
 
@@ -10,7 +20,7 @@ a pull request.
 | Who | The maintainer, or promoted from community | Anyone |
 | Downloadable runtime | Sandboxed bundle | Sandboxed bundle |
 | Direct `native.ts` access | No; baked shell components are a separate boundary | No |
-| Cover display | Requested through manifest | Initial restriction pending runtime review |
+| Cover display | Required of every app, verified by contract check F | Same |
 | Review | Maintainer | Maintainer, with author participation |
 | Store | No ribbon | Community ribbon, author shown |
 
@@ -36,6 +46,9 @@ CODEOWNERS listing multiple people does not require approval from each of them.
 Everything a machine can decide, so the human review stays short:
 
 - Manifest matches the schema. `id` is reverse-DNS and unique. `license` is MIT.
+  `permissions` names rows of the SDK permission table; the PR comment lists
+  them in words ("Can use: Location, Photos") so the reviewer's approval is
+  the grant (progress/contract.md §6).
 - `version` increased if any file in the folder changed.
 - `CHANGELOG.md` has a line for that version.
 - Build succeeds with declared SDK and kit dependencies. Host compatibility

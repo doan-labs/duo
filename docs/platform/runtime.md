@@ -21,52 +21,65 @@ isolated apps remains open.
 
 - Seeded at boot from the baked list (the old `index.ts`), with default grid
   positions for a fresh install.
-- Extended from `localStorage['os.installed']`: an array of `{ id, version,
-  manifest }`. Each entry becomes an `App` whose view launches the installed
-  bundle in a sandboxed iframe. Persistent artifact storage is a separate
-  design decision; an entry in localStorage is not the installed app's bytes.
+- Extended from the `installed` object store in the shell's IndexedDB, the
+  only authority (progress/contract.md §4.1: `generation`, `state`, `current`,
+  `candidate`, `recovery`, `failedVersion`, `attempts`). A `localStorage` cache
+  lets the grid lay out before the database answers but grants no launch.
+  Each record becomes an `App` whose view launches the stored release in a
+  sandboxed iframe.
 - `byName` becomes `byId`. `os.open` takes an id. A name lookup stays for Siri
   and Spotlight, which search by display name.
 
-Uninstall removes the entry, deletes `os.storage` under that id, and drops the
-cached bundle. Baked apps cannot be uninstalled; they can be hidden.
+Uninstall follows progress/contract.md §4.9, under a per-app lock: mark
+`removing`, revoke every view in every tab, wait for leases to clear, delete
+release bytes, app data, checkpoints, recovery and legacy copies and widget
+snapshots, then the record; a non-data marker prevents reimport. Baked apps cannot be
+uninstalled; they can be hidden.
 
 ## Loading an app bundle
 
 ```
-repository source → CI build → immutable document, scripts, styles, assets
-installed release → sandboxed iframe → SDK handshake with the shell
+repository source → CI build → release.json + one app.html (inline script, styles, data-URI assets) + icons
+installed release → IndexedDB → <iframe sandbox="allow-scripts" allow="…'none'" name=nonce srcdoc> → hello(nonce) / welcome + MessagePort / ack
+?dev= app         → verified CLI document → Blob URL <iframe … src> → same handshake, dev: namespace
 ```
 
 Apps may bundle React and the UI kit inside their own documents. They do not
 share the shell's React tree, stylesheets, or import map. No downloadable app
 module, including a widget, is imported into the shell's JavaScript context.
-How cached documents and assets are served offline in each runtime remains
-part of the artifact-loader design.
+The single-file document and `srcdoc` loader are the stage 2 recommendation
+(progress/contract.md §2.1); they make offline storage one record and integrity one hash.
 
 ## Loading an iframe app
 
-One component, `Iframe`, in the shell. `sandbox="allow-scripts allow-forms"`
-and no `allow-same-origin`. The app cannot read the parent document or shell
-storage, but can hold a parent-window reference for messaging. The SDK owns the
-host API and versioned protocol. This is the initial message sketch, not a
-complete protocol specification:
+One component, `Sandbox` (`packages/shell/runtime/sandbox.tsx`). `sandbox="allow-scripts"`,
+no `allow-same-origin`, and an `allow` attribute that explicitly denies every
+policy-controlled feature the manifest does not declare (security.md). The app cannot read the parent document or shell
+storage, but holds a parent-window reference for the `hello` message. Every
+view starts from a host launch record with a single-use nonce handed to the
+document as `window.name`. The SDK owns the host API and versioned protocol;
+progress/contract.md §2 is the specification. In outline:
 
 ```
-shell → app:  { t: 'os', mirror, display: 'cover'|'inner'|'half', arg }
-              { t: 'fold', angle }          while the hinge moves
-              { t: 'button', which, kind }  frame buttons, when the app is frontmost
-              { t: 'storage', key, value }  reply to a get
-app → shell:  { t: 'open', id, arg }
-              { t: 'home' }
-              { t: 'storage', op: 'get'|'set'|'del', key, value }
+app → shell   hello { protocol, sdk, nonce }          window.postMessage, retried each second until welcome
+shell → app   welcome { view, session, owner, limits } reply, transfers a MessagePort
+              refused { e: E_INCOMPATIBLE | E_PROTOCOL | E_BLOCKED }
+app → shell   { ev: 'ack' } over the port              connected; a later hello revokes the view
+over the port
+app → shell   { id, m: 'storage.*' | 'session.*' | 'cmd.send' | 'cmd.ack' | 'widget.set' | 'open' | 'home', p, epoch? }
+              { ev: 'ready' } | { ev: 'error', p } | { ev: 'key', p: { key: 'Escape' } }
+shell → app   { id, ok, v } | { id, ok: false, e, msg }
+              { ev: 'view' | 'kv' | 'arg' | 'owner' | 'cmd' | 'bye', p }
 ```
 
-`@doan-labs/ipduo-sdk` exposes these operations to every downloadable app. The
-bridge must bind requests to the actual frame, validate payloads, and derive
-app identity in the host. Request correlation, timeouts, errors, storage limits,
-and connection teardown still need specification. An opaque origin alone
-does not identify an app. See security.md.
+The host identifies the view from its launch record: `event.source` must be
+the frame it created and the nonce must match; the port is the capability
+bound to that record, never an identity proof, and nothing is inferred from an
+app-supplied id. Requests are answered in order, mutations are acknowledged
+after the database transaction completes, and a retry after timeout reuses
+the request id so the host can deduplicate. Lifecycle states, revocation
+order, limits and rate are in progress/contract.md §2.4 and §2.5. See
+security.md for the boundary the acceptance check asserts.
 
 ## Two instances
 
@@ -75,33 +88,46 @@ display holds a mirror copy of the open app. Every app therefore runs twice,
 sometimes three times. This is the single fact community developers will trip
 on, so:
 
-- `os.mirror` is true on the copy. A copy draws everything and starts nothing:
-  no sound, no network write, no timer with side effects.
-- Existing baked apps can share module state in the shell document; Music's
-  `deck` currently does. Downloadable apps cannot rely on that mechanism.
-- Each iframe instance has a separate document and module state. Shared app
-  data and changing active-display ownership need an SDK contract. The existing
-  `mirror` flag alone does not solve synchronization or duplicate effects.
+- Existing baked apps share module state in the shell document; Music's `deck`
+  does. Downloadable apps cannot: each iframe is its own document.
+- The stage 2 contract (progress/contract.md §3) names the copies: one
+  **session** per open app per shell document, one **view** per document on
+  glass, all views sharing `os.session` (ephemeral) and `os.storage`
+  (persistent) through the host, with revisions. One view is the designated
+  **owner** of effects, chosen first, sticky until revoked, and identified by
+  an epoch the host checks on owner-only calls. Ownership is cooperative: the
+  platform promises at most one designated owner, not exactly-once effects,
+  precise hidden timers or uninterrupted audio. Intent that must happen once
+  travels as an acknowledged command. `os.owner` replaces the legacy `os.mirror`.
+- The fold tears no view down. The one exception is the split collapse at 40°,
+  where the inner display reopens the first app full as a new view of the same
+  session.
 
-The review recommends one logical session with multiple display views. Its
-state, effect ownership, and lifecycle API remain open decisions, not an
-implemented or accepted guarantee of exactly-once behavior.
+Checks G and G2 in progress/contract.md §5 record how hidden owner views
+behave for timers and for audio activation in both runtimes; the results
+become documented limits, and a refused audio activation opens a media
+contract before any audio app moves to the sandbox.
 
 ## Mid-fold
 
 The current renderer bakes the home screen, but keeps open app panels live,
 clipped, blurred, and darkened through the fold. It does not bake an app-icon
 snapshot (docs/decisions.md 24). The earlier community cover restriction was
-based on that stale snapshot description. Whether to lift it is still open;
-first verify sandboxed iframe rendering, input, and state handover in Chromium
-and the Tauri WKWebView.
+based on that stale snapshot description. The stage 2 review accepted lifting
+it and dropping the manifest `cover` field; responsive cover support is a
+requirement of every app, verified by progress/contract.md check F in Chromium
+and WKWebView, and no per-lane restriction returns if a runtime fails it.
 
 ## Fold-aware layout
 
 The SDK owns display information supplied by the host; the kit consumes it for
-layout. The original sketch was `{ display: 'cover' | 'inner' | 'half', width,
-folding }`. The review recommends separating physical display from placement,
-and exposing active/visible state. The exact shape remains open.
+layout. The shape is `ViewInfo` in progress/contract.md §3.2: `display`
+(`inner` | `cover`), `placement` (`full` | `left` | `right`), `width`,
+`height`, `visible` (derived from the render loop's own visibility, opacity
+and clip writes plus sleep, not from the angle), `active`, `focused`, `angle`.
+Layout still follows the box (a split half is as narrow as the cover);
+`display` is for behaviour that is truly per glass. `view` events are
+coalesced to one per frame and sent only on change.
 
 ## Inter-app links
 
