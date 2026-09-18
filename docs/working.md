@@ -20,7 +20,8 @@ Prepare the model once: `pip install usd-core && python3 scripts/prepare-model.p
 Native production: from `packages/shell`, run `bun x tauri build --debug --no-bundle`.
 Workspace consumers own runtime dependencies; root owns tools, public assets and caches.
 
-The production build and CI disable Bun's FTL optimizer (`BUN_JSC_useFTLJIT=false`).
+The dev server, the production build and CI disable Bun's FTL optimizer
+(`BUN_JSC_useFTLJIT=false`).
 Bun 1.4.0 can miscompile StyleX's parser after repeated compilations, rejecting valid
 media queries; see [Bun #41609](https://github.com/oven-sh/bun/issues/41609).
 Keep reduced-motion rules and media-query ordering enabled.

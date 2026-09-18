@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun ./serve.ts",
+    "dev": "BUN_JSC_useFTLJIT=false bun ./serve.ts",
     "build": "BUN_JSC_useFTLJIT=false bun ./build.ts && cp -r public/. dist/",
     "typecheck": "tsc --noEmit && tsc --noEmit -p packages/web",
     "format": "biome check --write .",
