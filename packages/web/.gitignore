@@ -4,4 +4,6 @@ public/model/
 public/icons/
 public/cdn/
 public/preinstalled/
+# Assembled by scripts/catalog.ts from the catalog branch and dist/cdn
+public/catalog/
 .output/

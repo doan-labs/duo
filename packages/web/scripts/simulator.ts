@@ -15,7 +15,8 @@ if (!existsSync(`${root}public/model/iPhone_Duo_Render.usdc`)) {
 const build = spawnSync('bun', ['run', 'build'], { cwd: root, stdio: 'inherit' })
 if (build.status !== 0) process.exit(build.status ?? 1)
 const ROOTED = ['model', 'icons', 'cdn', 'preinstalled']
-for (const d of ['device', ...ROOTED]) rmSync(`${here}public/${d}`, { recursive: true, force: true })
+// /catalog is assembled separately by catalog.ts from the catalog branch and dist/cdn.
+for (const d of ['device', 'catalog', ...ROOTED]) rmSync(`${here}public/${d}`, { recursive: true, force: true })
 cpSync(`${root}dist`, `${here}public/device`, { recursive: true })
 for (const d of ROOTED) cpSync(`${root}dist/${d}`, `${here}public/${d}`, { recursive: true })
 console.log(`simulator: copied dist/ → public/device/ and /${ROOTED.join(', /')}`)

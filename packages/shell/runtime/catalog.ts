@@ -9,9 +9,12 @@ import { install, restore, retry, uninstall } from './lifecycle.ts'
 import { boundedFetch } from './releases.ts'
 
 let catalog: Catalog = { apps: {} }
+// The hosted site serves the curated catalog at /catalog; a local shell only has the bundled /cdn output.
+const DEFAULT_SOURCES = ['/catalog', '/cdn', '/preinstalled']
+const DUO_CATALOG = 'Duo catalog'
 let source = '/cdn'
 let selectedCatalog: string | undefined
-let state: StoreState = { rows: [], loading: true }
+let state: StoreState = { rows: [], loading: true, source: DUO_CATALOG, developer: false }
 const listeners = new Set<() => void>()
 const progress = new Map<string, number>()
 const errors = new Map<string, string>()
@@ -144,8 +147,15 @@ export const store: Store = {
     catalog = data
     selectedCatalog = url.href
     source = new URL('.', url).href.replace(/\/$/, '')
-    state = { ...state, loading: false, error: undefined }
+    state = { ...state, loading: false, error: undefined, source: url.href, developer: true }
     await sync()
+  },
+  async resetCatalog() {
+    selectedCatalog = undefined
+    catalog = { apps: {} }
+    state = { ...state, loading: true, error: undefined, source: DUO_CATALOG, developer: false }
+    emit()
+    await store.refresh()
   },
   subscribe(cb) {
     listeners.add(cb)
@@ -165,14 +175,17 @@ export const store: Store = {
       return
     }
     try {
-      let bytes: Uint8Array
-      try {
-        bytes = await boundedFetch('/cdn/index.json', 1024 * 1024)
-        source = '/cdn'
-      } catch {
-        bytes = await boundedFetch('/preinstalled/index.json', 1024 * 1024)
-        source = '/preinstalled'
+      let bytes: Uint8Array | undefined
+      for (const candidate of DEFAULT_SOURCES) {
+        try {
+          bytes = await boundedFetch(`${candidate}/index.json`, 1024 * 1024)
+          source = candidate
+          break
+        } catch {
+          /* Try the next bundled location. */
+        }
       }
+      if (!bytes) throw new Error('No default catalog is available')
       const value: unknown = JSON.parse(new TextDecoder().decode(bytes))
       if (!valid(value)) throw new Error('Invalid catalog')
       catalog = value
@@ -181,7 +194,7 @@ export const store: Store = {
     } catch (error) {
       try {
         const cached = JSON.parse(localStorage.getItem('os.catalog.cache') ?? 'null')
-        if (valid(cached?.catalog) && ['/cdn', '/preinstalled'].includes(cached.source)) {
+        if (valid(cached?.catalog) && DEFAULT_SOURCES.includes(cached.source)) {
           catalog = cached.catalog
           source = cached.source
         }

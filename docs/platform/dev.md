@@ -77,3 +77,11 @@ Serve a built catalog, select its `index.json` in Store, then GET/OPEN. External
 accept no device permissions. Refresh and updates are explicit; an update must come from
 the installed app's source origin. Running sessions retain their release until activation
 is safe. See [Store](store.md), [updates](updates.md) and the [review guide](review.md).
+
+## Submit to the curated catalog
+
+To ship through the default Store, add the app under `community-apps/<app-slug>/` following
+[the directory guide](../../community-apps/README.md), run
+`bun scripts/check-submissions.ts community-apps/<app-slug> --runtime`, and open a pull
+request with the app-submission template. [Publication](publishing.md) describes review,
+the CI trust boundary and how a merge becomes a live release.

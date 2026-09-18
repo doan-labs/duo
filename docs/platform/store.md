@@ -2,8 +2,21 @@
 
 Current Store supports explicit catalog selection/Refresh, compatible GET/OPEN,
 UPDATE/remove, staging while sessions run, restore/retry and DEV namespace removal.
-The local builder generates catalogs. Curated shelves and automated publication remain
-[roadmap](roadmap.md); there is no catalog polling, Update All or native Software Update.
+The default catalog is the curated one published from `community-apps/` ([publication](publishing.md));
+curated shelves remain [roadmap](roadmap.md); there is no catalog polling, Update All or native Software Update.
+
+## Default and developer catalogs
+
+At boot and on Refresh the Store loads the first available of `/catalog/index.json` (the
+hosted curated catalog), `/cdn/index.json` (a local build) and `/preinstalled/index.json`,
+caching the last good default. The current source is shown in the Store; a developer catalog
+loaded by URL replaces the rows and shows **Back to Duo catalog**, which discards the selection
+and reloads the default. A compact **For developers** section groups the developer catalog
+field with **Submit your app**, which opens the website guide through the native bridge.
+
+An app installed from one origin never inherits an update from another: the install refuses
+with the two origins named and the supported transition (Remove App, then GET from the new
+catalog). Installed source identity is preserved across catalog switching.
 
 ## Catalog and immutable releases
 

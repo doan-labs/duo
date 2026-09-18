@@ -815,3 +815,35 @@ every control that would have needed a backend — guides, saved places, share, 
 issue, the account avatar — was removed rather than left as decoration. Places sit at their
 real coordinates to about a block, walking times are invented, and recents are sampled from
 the list at load, so the session opens on a different three each time.
+
+## 61. Community apps are source in the repository, published by a publisher that only moves data
+
+2026-09-18. The curated Store needed a path from a contributor's fork to an installable
+release. Apps now live under `community-apps/<slug>/` as independent projects (not
+workspaces, no root lockfile edits); `community-apps/registry.json` is the ownership
+record, because an `author` string in a manifest proves nothing. Pull requests run
+`scripts/check-submissions.ts` in a job with read-only permissions and no secrets: the
+builder, the CLI checks and a headless install/launch that captures both displays are
+evidence for a reviewer, and a pass means eligible, not accepted. Empty permissions are
+required for the first curated release so publication never widens runtime privilege.
+
+Publication is two jobs. The read-only one builds the merged commit; the writing one runs
+`scripts/publish-catalog.ts`, which copies validated release files as data, refuses a
+version already published with different bytes, reuses an identical release without
+touching its metadata (the builder stamps `build.at`, so a rebuild must not win), and
+assembles `index.json` from every release in the tree so one app's publication cannot
+drop another's listing. The tree is the `catalog` git branch: the site is static assets
+on the same origin, a rejected push is the conflict detection between close merges, and
+the history is the audit log. The website build unpacks that branch and merges the
+bundled Notes and Weather releases with the same publisher into `/catalog/`, which the
+Store tries before `/cdn` and `/preinstalled`. Cost: a release is live only after the
+site's next deploy, and the publish job cannot verify the hosted URL, only the branch.
+Alternatives rejected: an object bucket (credentials and a second origin, while installs
+bind updates to their origin), and committing built releases to `main` (contributor PRs
+would carry binaries and every merge would need a follow-up commit).
+
+The Store shows which catalog it is reading and offers **Back to Duo catalog** after a
+developer catalog is loaded; an app installed from another origin is refused an update
+with both origins named and the supported transition (remove, then get), rather than a
+silent inheritance. The native **Submit your app** link goes through a new `open_url`
+command behind the `Platform` trait, so the web side never learns which OS opens URLs.

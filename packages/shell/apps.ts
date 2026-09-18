@@ -41,6 +41,8 @@ import { Wallet } from '@doan-labs/duo-app-wallet/index.tsx'
 import { Watch } from '@doan-labs/duo-app-watch/index.tsx'
 import { YouTube } from '@doan-labs/duo-app-youtube/index.tsx'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
+import { createElement } from 'react'
+import { openExternal } from './native.ts'
 
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
@@ -92,7 +94,8 @@ export const APPS: App[] = [
   { name: 'Voice Memos', view: Memos },
   { name: 'Shortcuts', mock: true, light: true, view: Shortcuts },
   { name: 'Podcasts', mock: true, light: true, view: Podcasts },
-  { name: 'App Store', light: true, view: AppStore },
+  // Baked apps never import the shell, so the Store gets its link opener as a prop.
+  { name: 'App Store', light: true, view: (props) => createElement(AppStore, { ...props, openExternal }) },
   { name: 'Books', mock: true, light: true, view: Books },
   { name: 'YouTube', light: true, view: YouTube }
 ]

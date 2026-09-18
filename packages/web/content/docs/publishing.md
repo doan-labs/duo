@@ -1,6 +1,6 @@
 # Publishing
 
-Publishing a Duo app means hosting a catalog. There is no account to create and no submission form.
+There are two ways to distribute a Duo app: submit it to the curated catalog through a pull request, or host a catalog yourself. Either way there is no account to create.
 
 ## Host your own catalog
 
@@ -22,7 +22,11 @@ Lane is a review status, not a capability. An official app has exactly the same 
 
 ## The official catalog
 
-The first-party catalog that will ship with Duo is built from apps in the repository: a pull request with your app folder, the same `check` in CI, review by the maintainer, and a merge that publishes the immutable release. The lanes, checks and release format above are that workflow's; the automated publish step and the hosted catalog are not live yet. Until they are, a catalog you host is the way to distribute, and it needs no change later.
+The curated catalog is built from source in the repository. An app is a folder under `community-apps/<app-slug>/` holding its manifest, source, icon, screenshots, readme, changelog and MIT licence, plus an entry in `community-apps/registry.json` naming the GitHub accounts allowed to maintain it.
+
+You add that folder in a pull request opened with the `app-submission` template. CI runs `bun scripts/check-submissions.ts` over it; a passing check means the submission is eligible for review, not that it is accepted. Merging is acceptance. After the merge, the publish workflow builds the immutable release and writes it to the catalog hosted at `https://duo.doan-labs.com/catalog/index.json` — the app is live only once that run succeeds.
+
+The full guide, including the first launch's acceptance rules, is at [/publish](/publish).
 
 ## Telemetry
 

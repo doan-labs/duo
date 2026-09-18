@@ -1,0 +1,106 @@
+# Publishes merged community apps to the catalog branch, which the website build serves
+# at /catalog. Two jobs on purpose: `build` compiles contributor code with no write
+# access; `publish` only copies validated files and never runs app code or installs.
+# Merge is acceptance; only a green `publish` job means the release is live.
+name: Publish catalog
+on:
+  push:
+    branches: [main]
+    paths: ['community-apps/**']
+  workflow_dispatch:
+    inputs:
+      folder:
+        description: 'community-apps/<slug> to (re)publish; empty = every folder changed by the push'
+        required: false
+        default: ''
+      delist:
+        description: 'Release to stop offering, as <id>@<version>+<hash>'
+        required: false
+        default: ''
+concurrency:
+  group: publish-catalog
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Validate and build the changed submissions
+        run: |
+          if [ -n "${{ inputs.folder }}" ]; then
+            bun scripts/check-submissions.ts "${{ inputs.folder }}" --runtime --base "${{ github.event.before || 'HEAD~1' }}"
+          elif [ -n "${{ inputs.delist }}" ]; then
+            echo "Delist only"
+          else
+            bun scripts/check-submissions.ts --runtime --base "${{ github.event.before }}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-input
+          path: .cache/submissions
+          if-no-files-found: ignore
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: catalog
+          path: catalog-tree
+        continue-on-error: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: publish-input
+          path: .cache/submissions
+      - name: Start the catalog branch on first use
+        run: |
+          if [ ! -d catalog-tree/.git ]; then
+            git init catalog-tree
+            git -C catalog-tree checkout --orphan catalog
+          fi
+      - name: Merge validated releases into the catalog tree
+        run: |
+          set -e
+          for built in .cache/submissions/*/catalog; do
+            [ -d "$built" ] || continue
+            bun scripts/publish-catalog.ts "$built" catalog-tree | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          if [ -n "${{ inputs.delist }}" ]; then
+            mkdir -p .cache/empty
+            bun scripts/publish-catalog.ts .cache/empty catalog-tree --delist "${{ inputs.delist }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Push the catalog branch
+        # A rejected push means another publication landed first: the tree is untouched
+        # remotely, so re-running this workflow republishes on top of it.
+        run: |
+          cd catalog-tree
+          git config user.name "duo-publisher"
+          git config user.email "publisher@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "Nothing new to publish" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          git commit -m "Publish ${{ github.sha }}"
+          git push origin HEAD:catalog
+      - name: Verify the published tree
+        run: |
+          git -C catalog-tree fetch origin catalog
+          git -C catalog-tree diff --quiet origin/catalog -- . || { echo "Remote catalog differs from the verified tree"; exit 1; }
+          echo "Published: catalog branch at $(git -C catalog-tree rev-parse --short origin/catalog). The site serves it at /catalog on its next deploy." >> "$GITHUB_STEP_SUMMARY"

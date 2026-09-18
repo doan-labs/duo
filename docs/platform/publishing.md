@@ -1,42 +1,79 @@
-# Publication plan and current validation
+# Publication: submission, review and the curated catalog
 
-Status: local validation exists; public package/catalog publication is not implemented.
-Use [development](dev.md) and [the local review guide](review.md) to distribute a separately
-built developer catalog today. Apps do not need to contribute source to this repository
-for that workflow. Public release requires separate authorization and release decisions.
+Status: the source-in-repository flow is implemented, 2026-09-18. Community apps live in
+[`community-apps/`](../../community-apps/README.md), are validated by
+`scripts/check-submissions.ts` on pull requests, and after merge are published by
+`.github/workflows/publish.yml` to the `catalog` branch, which the website build serves at
+`https://duo.doan-labs.com/catalog/`. Public npm packages remain unpublished; developers
+use the local archive workflow in [development](dev.md). A separately hosted developer
+catalog stays supported and needs no source contribution.
 
-## Implemented checks
+## Submission contract
 
-CLI check validates manifest metadata, lane membership, CHANGELOG, icon, strict types,
-import boundaries, tokens and bundle size. `official` is checked against `OFFICIAL.txt`.
-The document hard cap is 4 MiB; runtime release download caps are 8 MiB. Isolation is
-provided by the sandbox and bridge, not static source checks.
+`community-apps/<app-slug>/` holds manifest, source, `package.json` (plus `bun.lock` when it
+depends on more than the platform set), a 1024 px `icon.png`, `screenshots/inner.png` and
+`screenshots/cover.png`, `README.md`, `CHANGELOG.md` and the MIT `LICENSE`. The reverse-DNS
+manifest id is the identity; the folder is a label. `community-apps/registry.json` maps ids
+to folders and authorized GitHub maintainers and reserves `labs.doan.ipduo.` and
+`dev.example.`. First-release rules: both displays, public SDK/kit only, complete metadata,
+existing limits, `lane: community` with empty `permissions`. Approval grants no official
+status and no permissions; permission-bearing submissions are a separate, verified expansion.
 
-`.github/workflows/platform.yml` runs `scripts/check-platform.ts`: types, SDK tests,
-API freshness, token/negative validation checks, app/shell builds and the isolated gallery.
-The gate passed locally; a remote CI pass is not claimed by the implementation reports.
+The registry, `OFFICIAL.txt`, `scripts/` and `.github/` are owned by maintainers through
+`.github/CODEOWNERS`. `author` and `repo` strings prove nothing; identity changes,
+transfers and release approval need the listed maintainers.
 
-## Proposed curated catalog
+## Automated checks
 
-A reviewed source-in-repository workflow remains proposed for the curated catalog:
-MIT apps, maintainer-controlled official/community lanes, reviewed dependencies,
-inner/cover screenshots and explicit permission review. Lane is maintenance status,
-never permission to execute in the shell. Protect trust lists and release configuration.
+`bun scripts/check-submissions.ts [folder] [--runtime] [--base origin/main]` checks every
+changed folder (or the named ones) and writes `.cache/submissions/<slug>/` with
+`report.json`, the built release under `catalog/` and, with `--runtime`, `runtime/` captures.
 
-Before enabling merge-to-publication, implement and verify id uniqueness/version-bump
-checks, per-submission isolation tests, immutable artifact upload followed by catalog
-publication, release metadata and failure handling. Every app supports the cover;
-there is no `cover` flag. Icon variants and PR comments remain unimplemented.
+| Group | Verified |
+| --- | --- |
+| Identity and version | Valid manifest, kebab-case folder, registry entry and folder match, reserved namespaces, id unchanged against the base branch, version above the base branch and absent from the published index (`DUO_CATALOG_URL`, default the hosted catalog; unavailable history fails in CI) |
+| Completeness | Required files, PNG screenshots, MIT text, changelog entry for the version |
+| Source and dependencies | CLI `check` (imports, strict types, tokens, cap); dependencies beyond sdk/kit/stylex/react need `bun.lock` and are flagged for review |
+| Release validity | Real builder output: size, hashes, SDK/kit versions, commit, empty permissions |
+| Runtime (`--runtime`) | Store install from the built catalog in headless Chromium, launch, inner and cover captures, page errors, app-frame requests outside declared `network` origins |
 
-Public SDK/kit/CLI distribution needs versions, provenance and credentials. Use the existing
-local toolchain; no published `npx` workflow is promised. Catalog hashes are not signatures.
-Publisher authentication and signing remain separate design/release decisions.
+Screenshot presence is automated; whether the interface is usable is review. A pass means
+eligible for review, not accepted. Reviewers weigh behavior, dependency necessity, network
+access, content rights and the captures. `scripts/checks/submission/negatives.mjs` proves
+representative invalid submissions fail for the stated reason.
 
-## Removal and privacy decisions
+## Trust boundary and workflows
 
-Delisting a catalog entry, disabling an installed app and deleting its data are different
-actions. Existing user uninstall is implemented; maintainer revocation and distribution
-recovery policy remain open. Do not treat a removed listing as revoked execution authority.
+`submissions.yml` runs on pull requests touching `community-apps/**` with `contents: read`
+and no secrets; evidence is uploaded as the `submission-evidence` artifact and the step
+summary. `publish.yml` runs on pushes to `main` touching the same paths, serialized by a
+concurrency group: a `build` job (read-only) validates and builds the changed folders; a
+`publish` job with `contents: write` only runs `scripts/publish-catalog.ts` over the built
+files and pushes the `catalog` branch. No contributor install or build script runs in the
+publishing job. Three states: checks passed → merged → published; only a green `publish` run
+means the release is live, on the site's next deploy.
 
-Any public telemetry statement must be checked against actual instrumentation and approved
-before publication. This document makes no new claim about deployed analytics. See [roadmap](roadmap.md) for outstanding release work.
+## Publisher behavior
+
+`bun scripts/publish-catalog.ts <built> <tree> [--delist id@version+hash]` copies new
+releases into `tree/apps/<id>/<version>+<hash>/` (release.json last, staged then renamed),
+verifies uploaded hashes, refuses a version already published with different bytes, reuses an
+identical existing release without touching its metadata or timestamp, records delisted
+identities in `delisted.json`, then assembles `index.json` from every release in the tree,
+newest version first. One publication never drops another app or its history; a failure
+before the rename leaves the tree unchanged and a retry finishes. `git push` rejection is
+the conflict detection between close merges; rerun the workflow to publish on top.
+`scripts/checks/publish/publisher.mjs` exercises these cases.
+
+Delisting stops offering a release to new installs; it does not downgrade, revoke or delete
+installed apps or their data. A faulty release is superseded by a corrective version.
+Retry a failed publication with `workflow_dispatch` and the folder name.
+
+## Hosting
+
+The website build runs `packages/web/scripts/catalog.ts`: it unpacks `origin/catalog` into
+`public/catalog/` when reachable and merges the bundled Notes and Weather releases from
+`dist/cdn` with the same publisher, so the hosted Store lists official and community apps
+from one origin. The Store loads `/catalog/index.json`, then `/cdn`, then `/preinstalled`.
+Catalog hashes are integrity checks, not signatures; publisher identity and signing remain
+release decisions, as does any public telemetry statement.

@@ -14,9 +14,12 @@ export type StoreRow = {
   progress?: number
   error?: string
 }
-export type StoreState = { rows: StoreRow[]; error?: string; loading: boolean }
+/** `source` names the catalog the rows came from: the Duo catalog, or a developer catalog URL. */
+export type StoreState = { rows: StoreRow[]; error?: string; loading: boolean; source: string; developer: boolean }
 export type Store = {
   loadCatalog(url: string): Promise<void>
+  /** Leave a developer catalog and reload the default Duo catalog. */
+  resetCatalog(): Promise<void>
   subscribe(cb: () => void): () => void
   snapshot(): StoreState
   refresh(): Promise<void>

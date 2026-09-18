@@ -10,6 +10,8 @@ mod other;
 
 pub trait Platform {
     fn name(&self) -> &'static str;
+    /// Open an already validated http(s) URL in the user's default browser.
+    fn open_url(&self, url: &str) -> Result<(), String>;
 }
 
 pub fn current() -> impl Platform {

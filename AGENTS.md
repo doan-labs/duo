@@ -41,6 +41,7 @@ then read the pages relevant to the task before changing anything non-trivial:
 | SDK, sandbox, app sessions, storage or lifecycle | [Platform overview](docs/platform/README.md), [accepted contract and amendments](docs/platform/contract.md), [runtime](docs/platform/runtime.md), [security](docs/platform/security.md); [manifest](docs/platform/manifest.md) or [updates](docs/platform/updates.md) as relevant |
 | App authoring, CLI, UI kit or Store | [Development](docs/platform/dev.md), the relevant package README, [UI kit](docs/platform/uikit.md) or [Store](docs/platform/store.md); distinguish trusted baked apps from sandboxed apps |
 | Verification, website integration or release preparation | [Debugging](docs/debug.md) before verification, [local review](docs/platform/review.md) for reproducible platform checks for measured limits; [website handoff](docs/platform/website-integration.md), [website plan](docs/platform/web.md) and [publishing](docs/platform/publishing.md) when relevant |
+| Community app submission, review checks or catalog publication | [Publication](docs/platform/publishing.md), [community-apps guide](community-apps/README.md); the publisher moves data only, never runs app code in a credentialed job |
 | Scope or design changes | [Project decisions](docs/decisions.md), [roadmap](docs/platform/roadmap.md), [current scope](docs/platform/README.md) |
 
 Current platform references describe enabled behavior; the roadmap separates deferred work.

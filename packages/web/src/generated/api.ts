@@ -388,10 +388,22 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-sdk",
+    "name": "transition",
+    "kind": "function",
+    "file": "packages/sdk/transition.ts",
+    "line": 7,
+    "doc": "Runs `fn` inside a same-document view transition, so whatever it changes on\nscreen cross-fades instead of snapping. Falls back to a plain call where the\nAPI is missing or the user asked for reduced motion. Concurrent calls are\nfine: the browser skips the one in flight.",
+    "signature": "function transition(fn: () => void)",
+    "extends": [
+      "() => void"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
     "name": "os",
     "kind": "value",
     "file": "packages/sdk/index.ts",
-    "line": 8,
+    "line": 9,
     "doc": "",
     "signature": "os = createClient()"
   },
@@ -409,9 +421,9 @@ export const api: ApiEntry[] = [
     "name": "animations",
     "kind": "value",
     "file": "packages/uikit/styles.ts",
-    "line": 22,
+    "line": 27,
     "doc": "",
-    "signature": "animations = stylex.create({\n  spin: {\n    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationTimingFunction: 'linear',\n    animationIterationCount: 'infinite'\n  },\n  rise: {\n    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.5s',\n    animationFillMode: 'backwards'\n  },\n  pop: {\n    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.4s',\n    animationTimingFunction: easing.pop\n  },\n  fade: {\n    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.25s'\n  },\n  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },\n  draw: {\n    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s'\n  },\n  bob: {\n    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationIterationCount: 'infinite'\n  },\n  glow: {\n    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '2s',\n    animationIterationCount: 'infinite'\n  }\n})"
+    "signature": "animations = stylex.create({\n  spin: {\n    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationTimingFunction: 'linear',\n    animationIterationCount: 'infinite'\n  },\n  rise: {\n    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.5s',\n    animationFillMode: 'backwards'\n  },\n  pop: {\n    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.4s',\n    animationTimingFunction: easing.pop\n  },\n  fade: {\n    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.25s'\n  },\n  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },\n  draw: {\n    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s'\n  },\n  bob: {\n    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationIterationCount: 'infinite'\n  },\n  glow: {\n    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '2s',\n    animationIterationCount: 'infinite'\n  },\n  /** A row that just appeared in a list: settles down from above. */\n  row: {\n    animationName: { default: drop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.3s',\n    animationTimingFunction: easing.pop\n  },\n  /** A floating tray or toolbar entering from below; pair with `floatOut` under `usePresence`. */\n  float: {\n    animationName: { default: lift, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.34s',\n    animationTimingFunction: easing.pop\n  },\n  floatOut: {\n    animationName: { default: sink, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.34s',\n    animationFillMode: 'forwards'\n  },\n  /** A page pushed over another, sliding in from the right; `Push` in nav.tsx applies these. */\n  sheet: {\n    animationName: { default: slideIn, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.38s',\n    animationTimingFunction: easing.push\n  },\n  sheetOut: {\n    animationName: { default: slideOut, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.38s',\n    animationTimingFunction: easing.push,\n    animationFillMode: 'forwards'\n  }\n})"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -420,7 +432,7 @@ export const api: ApiEntry[] = [
     "file": "packages/uikit/app.ts",
     "line": 6,
     "doc": "",
-    "signature": "type App = {\n  id?: string\n  icon?: string\n  name: string\n  light?: boolean\n  /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */\n  edge?: boolean\n  view: ComponentType<{ os: Os }>\n  /** Names of the apps inside, when this tile is a folder rather than an app. */\n  folder?: string[]\n}",
+    "signature": "type App = {\n  id?: string\n  icon?: string\n  name: string\n  light?: boolean\n  /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */\n  edge?: boolean\n  view: ComponentType<{ os: Os }>\n  /** Invented data behind a static screen: the tile shows a dot and the app a 'Mockup' pill. */\n  mock?: boolean\n  /** Names of the apps inside, when this tile is a folder rather than an app. */\n  folder?: string[]\n}",
     "members": [
       {
         "name": "id",
@@ -457,6 +469,12 @@ export const api: ApiEntry[] = [
         "type": "ComponentType<{ os: Os }>",
         "optional": false,
         "doc": ""
+      },
+      {
+        "name": "mock",
+        "type": "boolean",
+        "optional": true,
+        "doc": "Invented data behind a static screen: the tile shows a dot and the app a 'Mockup' pill."
       },
       {
         "name": "folder",
@@ -573,7 +591,7 @@ export const api: ApiEntry[] = [
     "name": "Nav",
     "kind": "component",
     "file": "packages/uikit/nav.tsx",
-    "line": 20,
+    "line": 21,
     "doc": "iOS push navigation: the new page slides in from the right and the one behind\ndrifts left and dims, so the stack reads as depth rather than a cross-fade.\n`children` is the root page.",
     "signature": "function Nav({ children }: { children: ReactNode })",
     "members": [
@@ -590,16 +608,25 @@ export const api: ApiEntry[] = [
     "name": "Page",
     "kind": "function",
     "file": "packages/uikit/nav.tsx",
-    "line": 76,
+    "line": 96,
     "doc": "",
     "signature": "const Page = ({ title, back, backRef, children }: PageProps) => ( …"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "Push",
+    "kind": "type",
+    "file": "packages/uikit/nav.tsx",
+    "line": 8,
+    "doc": "",
+    "signature": "type Push = (make: (back: () => void) => ReactNode) => void"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
     "name": "useNav",
     "kind": "hook",
     "file": "packages/uikit/nav.tsx",
-    "line": 10,
+    "line": 11,
     "doc": "Inside a `<Nav>`: `push((back) => <Page title=\"…\" back={back}>…</Page>)`.",
     "signature": "const useNav = () => …"
   },
@@ -608,7 +635,7 @@ export const api: ApiEntry[] = [
     "name": "useNavigation",
     "kind": "hook",
     "file": "packages/uikit/nav.tsx",
-    "line": 10,
+    "line": 11,
     "doc": "Inside a `<Nav>`: `push((back) => <Page title=\"…\" back={back}>…</Page>)`.",
     "signature": "const useNav = () => …"
   },
@@ -721,6 +748,18 @@ export const api: ApiEntry[] = [
     "line": 6,
     "doc": "Centred empty, unavailable or loading content harvested from five existing apps.",
     "signature": "type PlaceholderProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "usePresence",
+    "kind": "hook",
+    "file": "packages/uikit/presence.ts",
+    "line": 7,
+    "doc": "Keeps a thing mounted for `ms` after `open` drops so its exit animation can\nplay. `closing` is true during that tail; style the exit off it.",
+    "signature": "function usePresence(open: boolean, ms = 340)",
+    "extends": [
+      "boolean"
+    ]
   },
   {
     "pkg": "@doan-labs/duo-uikit",

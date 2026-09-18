@@ -106,6 +106,9 @@ packages/
     video/          Remotion project for the hero loop (own bun.lock), renders to public/hero.*
     vite-stylex.ts  StyleX for Vite, same Babel plugin as the root
   apps/             one private workspace per existing app
+community-apps/     submitted apps for the curated catalog, one independent project per folder
+  registry.json     maintainer-controlled id → folder and maintainers; reserved namespaces
+  fold-compass/     the example submission: manifest, source, icon, screenshots, docs, license
 public/             static assets; icons/ and gitignored model/
   readme/           README hero image and compressed demo video
 examples/
@@ -125,12 +128,21 @@ scripts/            model preparation, asset extraction, screenshots
   build-preinstalled.ts  bundled Notes and Weather releases
   package-platform.ts  private SDK/kit/CLI archives for external consumers
   check-platform.ts    local/CI platform gate
+  check-submissions.ts community-apps gate: identity, completeness, dependencies, build, runtime evidence
+  publish-catalog.ts   merges validated releases into the catalog tree and rewrites its index
   check-app-tokens.ts   app appearance token gate alongside Biome
   generate-kit-docs.ts  exported props and TSDoc to API data
   checks/stage2/    document, storage, permission, lifecycle and MVP checks
   checks/stage3/    external developer workflow and preview teardown checks
   checks/stage4/    official app captures, component gallery and validation checks
-.github/workflows/ read-only platform validation; no publication or deployment
+  checks/submission/ headless install/launch captures and the invalid-submission cases
+  checks/publish/   publisher behaviors on a scratch catalog tree
+  checks/store/     default/developer catalog switching and origin binding
+.github/
+  workflows/        platform.yml validation; submissions.yml PR checks; publish.yml catalog publication
+  CODEOWNERS        maintainer review for trust lists, scripts and workflows
+  PULL_REQUEST_TEMPLATE/ app-submission.md
+CONTRIBUTING.md     how to submit an app
 design/             Blender sources, outside the build
 .cache/             local verification evidence and Rust build output
 ```

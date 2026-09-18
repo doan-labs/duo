@@ -106,6 +106,23 @@ ordinary debug native binary `.cache/cargo/debug/iphoneduo`. Build the latter
 with `bun x tauri build --debug --no-bundle` from `packages/shell`.
 Versions: SDK/CLI 0.0.0, kit 0.1.0, protocol 1. These are private previews.
 
+## 6. Reproduce the submission and publication checks
+
+```sh
+bun run build                                                        # the shell the runtime probe serves
+bun scripts/check-submissions.ts community-apps/fold-compass --runtime   # PASS, evidence in .cache/submissions/
+bun scripts/checks/submission/negatives.mjs                          # nine invalid submissions fail for the stated reason
+bun scripts/checks/publish/publisher.mjs                             # sequential publish, update, retry, failure, delist
+cd packages/web && bun run build                                     # assembles public/catalog/ from dist/cdn (+ the catalog branch)
+```
+
+The runtime probe installs the built release through the real Store from a loopback catalog
+in headless Chromium, launches it, captures `inner.png` and `cover.png` and records console
+errors and app-frame requests outside the declared origins. The example's committed
+screenshots are those captures. The publisher check runs on a scratch tree inside `.cache/`.
+`scripts/checks/store/catalog-switching.mjs` covers the default catalog, a developer catalog,
+**Back to Duo catalog** and the origin-binding refusal in Chromium.
+
 ## Verification scope and limits
 
 The completed local audit verified all four MVP outcomes in Chromium, including stable
@@ -140,6 +157,12 @@ the gallery/app capture matrix. These files are ignored and may not exist on ano
 machine. The commands above reproduce checks; paths alone are not evidence of a new run.
 Run heavy SwiftShader checks serially and keep probe frames onscreen; renderer starvation
 or suspended first-paint callbacks must not be fixed by weakening lifecycle deadlines.
+
+The submission and publication workflows were verified locally through their scripts; a
+remote run of `submissions.yml` and `publish.yml`, and the site serving `/catalog` from the
+`catalog` branch, need the first real pull request and deploy. The native **Submit your app**
+link compiles (`cargo shell-check`) but opening a browser from the Tauri window was not
+exercised in this pass.
 
 Remote CI, npm publication, signed native distribution and public hosting require their
 normal release decisions; none is established by local verification. See

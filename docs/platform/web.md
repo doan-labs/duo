@@ -232,7 +232,7 @@ nothing is published, no host is chosen, no CI deploys it.
 | 4 | The core idea | "The fold is not a breakpoint. It is input." Four postures, `useDisplay()` code, a live readout | `home/fold.tsx`; `animate(open, deg / 180)` on the CSS device |
 | 5 | Build | "Build software for hardware that doesn't exist yet." Terminal, editor beside the device; a colour line changes and the phone folds on a loop; "Change code. Fold the phone. See what breaks." | `home/build.tsx` |
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
-| 7 | First apps | "Built for a phone that doesn't exist yet." FoldCam, Notes, Calculator, Music (Game and Browser on `/apps`) as tinted plates | `home/apps.tsx`, reused by `routes/apps.tsx` |
+| 7 | In the catalog | The apps published in `/catalog/index.json`, read at build time into `src/generated/catalog.ts`: release icon, newest version, lane | `home/apps.tsx`, reused by `routes/apps.tsx` |
 | 8 | Open | "The platform is open. So are the apps." Four facts, the Berlin sentence, fork → PR → review → Duo Store | `home/open.tsx` |
 | 9 | Go | "Build something strange for a phone that doesn't exist." Try Duo, Read the docs, View on GitHub | `home/cta.tsx` |
 

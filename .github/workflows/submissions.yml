@@ -1,0 +1,33 @@
+# Validates community-apps/ pull requests. Contributor source and dependencies are
+# untrusted build inputs: this job has read-only permissions and no secrets, and its
+# evidence is uploaded as artifacts for reviewers. A green run means eligible for
+# review, not accepted.
+name: App submissions
+on:
+  pull_request:
+    paths: ['community-apps/**']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - run: git fetch origin ${{ github.base_ref }}
+      - run: bun run build
+      - run: bun scripts/check-submissions.ts --runtime --base origin/${{ github.base_ref }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: submission-evidence
+          path: .cache/submissions
+          if-no-files-found: ignore

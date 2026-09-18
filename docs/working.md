@@ -254,6 +254,18 @@ bun run api            # only the TSDoc reference
   that port. It blocks frames for the page checks and loads the hero shell once
   for the bridge check, so expect about two minutes.
 
+## Community apps and the catalog branch
+
+`community-apps/<slug>/` folders are not workspaces: they resolve `@doan-labs/*` and React
+through the root fallback in `scripts/build-app.ts`, so keep them inside the repository and
+never add them to the root `workspaces`. Scratch apps for checks also live under `.cache/`
+for the same reason (a temp directory outside the repo cannot resolve React's transitive
+`scheduler`). `scripts/check-submissions.ts` compares against `origin/main` by default; pass
+`--base` on another branch. Never edit `registry.json` for someone else's id without the
+listed maintainers. The `catalog` branch holds only the published tree; do not merge it into
+`main` or rewrite its history, since release folders under `apps/` are immutable URLs.
+`packages/web/scripts/catalog.ts` fetches it during the site build and tolerates its absence.
+
 ## Isolated document tooling
 
 `bun scripts/build-app.ts <app-folder>` emits immutable releases/catalogs under dist/cdn;

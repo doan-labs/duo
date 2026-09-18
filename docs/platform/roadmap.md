@@ -7,7 +7,9 @@ constitute authorization to implement, publish or deploy them. Current behavior 
 
 | Area | Status | Remaining decision or work |
 | --- | --- | --- |
-| Public packages and curated publication | Needs release decisions / proposed | Versions, provenance, credentials, source-submission governance, uniqueness/version-bump checks, immutable upload-before-index pipeline and per-submission verification; [publication plan](publishing.md) |
+| Curated publication | Implemented locally, 2026-09-18 / needs first remote run | Source submission under `community-apps/`, registry ownership, uniqueness/version checks, immutable publish-before-index pipeline and per-submission runtime evidence exist; the first real PR, publish run and `/catalog` deploy remain to be observed; [publication](publishing.md) |
+| Public packages | Needs release decisions | Versions, provenance, credentials and npm publication; the local archive workflow stays the documented path |
+| Permission-bearing community apps | Deferred | Curated submissions accept only empty permissions; an expansion needs its own verification and review policy |
 | Website and static hosting | Separate workstream / needs deployment verification | Website integration, provider, final routes, DNS/TLS, MIME/cache headers, native cross-origin catalog reads, hosted localhost preview access and web-shell freshness; [website plan](web.md), [handoff](website-integration.md) |
 | Native distribution and updater | Deferred | Signing/notarization, platform installers, updater keys/plugin/configuration and real Software Update UI; no automatic updater currently runs |
 | Permissions and media | Deferred / needs verification | Host-mediated camera/microphone contract; native/browser location, clipboard/photos matrix; hidden-owner timers and user-activation/audio tests before sandbox audio migration; external catalogs and previews currently accept no device permissions |

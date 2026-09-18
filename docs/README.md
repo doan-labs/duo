@@ -21,6 +21,7 @@ the root README remains the only repository file tree.
 | App metadata and isolation | [Manifest](platform/manifest.md), [security](platform/security.md) |
 | Authoring and presentation | [Development](platform/dev.md), [CLI package](../packages/cli/README.md), [UI kit](platform/uikit.md), [kit package](../packages/uikit/README.md) |
 | Installation and data lifecycle | [Store](platform/store.md), [updates](platform/updates.md), [local review](platform/review.md) |
+| Submitting and publishing apps | [Publication](platform/publishing.md), [community-apps guide](../community-apps/README.md), [CONTRIBUTING](../CONTRIBUTING.md) |
 | Website integration and generated data | [Integration guide](platform/website-integration.md), [generated kit API](platform/api/uikit.json) |
 
 ## Plans and evidence
@@ -28,7 +29,7 @@ the root README remains the only repository file tree.
 | Need | Read |
 | --- | --- |
 | Remaining work and verification gaps | [Roadmap](platform/roadmap.md) |
-| Future public distribution | [Publication plan](platform/publishing.md), [website plan and build record](platform/web.md) |
+| Public packages and hosting | [Publication](platform/publishing.md) for the curated catalog, [website plan and build record](platform/web.md) |
 | Verification scope and limits | [Local review](platform/review.md) |
 
 ## Maintenance

@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Shelf } from '../home/apps'
+import { Browser } from '../home/apps'
 import { Block, Cap, Headline, Lede } from '../home/parts'
+import { Button } from '../layout'
 import { color } from '../tokens.stylex'
 
 export const Route = createFileRoute('/apps')({
@@ -15,17 +16,21 @@ function Page() {
       <Cap>Apps</Cap>
       <Headline as="h1" id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
       <Lede>
-        The first apps designed around the fold. Each one is a pull request in the repository, MIT licensed, and
-        installs from a catalog through the Duo Store.{' '}
+        Every app on this page is published in the Duo catalog. Each one is a pull request in the repository, MIT
+        licensed, and installs from a catalog through the Duo Store.{' '}
         <Link to="/publish" {...stylex.props(styles.link)}>
           How to add yours.
         </Link>
       </Lede>
-      <Shelf all />
+      <div {...stylex.props(styles.action)}>
+        <Button to="/publish">Submit your app</Button>
+      </div>
+      <Browser />
     </Block>
   )
 }
 
 const styles = stylex.create({
-  link: { color: color.text, textDecorationLine: 'underline', textUnderlineOffset: '3px' }
+  link: { color: color.text, textDecorationLine: 'underline', textUnderlineOffset: '3px' },
+  action: { marginTop: '28px' }
 })

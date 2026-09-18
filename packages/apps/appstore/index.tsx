@@ -6,10 +6,13 @@ import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState, useSyncExternalStore } from 'react'
 
-export function AppStore({ os }: { os: Os }) {
-  return os.store ? <Shelf store={os.store} open={os.open} /> : <p>Store unavailable</p>
+/** Where app authors go to publish; opened outside the device, so the shell hands us the opener. */
+const SUBMIT_URL = 'https://duo.doan-labs.com/publish'
+
+export function AppStore({ os, openExternal }: { os: Os; openExternal: (url: string) => void }) {
+  return os.store ? <Shelf store={os.store} open={os.open} openExternal={openExternal} /> : <p>Store unavailable</p>
 }
-function Shelf({ store, open }: { store: Store; open: Os['open'] }) {
+function Shelf({ store, open, openExternal }: { store: Store; open: Os['open']; openExternal: (url: string) => void }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const [tab, setTab] = useState('Apps')
   const [query, setQuery] = useState('')
@@ -30,28 +33,6 @@ function Shelf({ store, open }: { store: Store; open: Os['open'] }) {
           </button>
         ))}
       </nav>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          setCatalogError('')
-          void store.loadCatalog(catalogUrl).catch((error) => setCatalogError(String(error.message)))
-        }}
-      >
-        <label>
-          Developer catalog
-          <input
-            aria-label="Developer catalog URL"
-            type="url"
-            placeholder="http://localhost:5173/index.json"
-            value={catalogUrl}
-            onChange={(event) => setCatalogUrl(event.target.value)}
-            required
-          />
-        </label>
-        <button type="submit">Load catalog</button>
-      </form>
-      <p>Install a separately built app. Catalog hashes check downloads; they do not verify the publisher.</p>
-      {catalogError && <p role="alert">{catalogError}</p>}
       <input
         aria-label="Search apps"
         placeholder="Search apps"
@@ -66,6 +47,19 @@ function Shelf({ store, open }: { store: Store; open: Os['open'] }) {
       >
         Refresh catalog
       </button>
+      <p>
+        Catalog: {state.source}
+        {state.developer && (
+          <button
+            type="button"
+            onClick={() => {
+              void store.resetCatalog()
+            }}
+          >
+            Back to Duo catalog
+          </button>
+        )}
+      </p>
       {state.loading && <p role="status">Loading catalog…</p>}
       {state.error && <p role="status">Catalog offline. Showing the last available releases.</p>}
       {rows.map((row) => (
@@ -155,6 +149,34 @@ function Shelf({ store, open }: { store: Store; open: Os['open'] }) {
         </section>
       ))}
       {!state.loading && !rows.length && <p>No {tab === 'Updates' ? 'updates' : 'apps'} found.</p>}
+      <section aria-labelledby="for-developers" {...stylex.props(styles.row)}>
+        <h2 id="for-developers">For developers</h2>
+        <button type="button" data-store-submit onClick={() => openExternal(SUBMIT_URL)}>
+          Submit your app
+        </button>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            setCatalogError('')
+            void store.loadCatalog(catalogUrl).catch((error) => setCatalogError(String(error.message)))
+          }}
+        >
+          <label>
+            Developer catalog
+            <input
+              aria-label="Developer catalog URL"
+              type="url"
+              placeholder="http://localhost:5173/index.json"
+              value={catalogUrl}
+              onChange={(event) => setCatalogUrl(event.target.value)}
+              required
+            />
+          </label>
+          <button type="submit">Load catalog</button>
+        </form>
+        <p>Install a separately built app. Catalog hashes check downloads; they do not verify the publisher.</p>
+        {catalogError && <p role="alert">{catalogError}</p>}
+      </section>
     </Screen>
   )
 }
