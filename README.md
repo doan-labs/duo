@@ -23,11 +23,8 @@ without rebuilding the simulator.
 
 ## See it in motion
 
-<video src="public/readme/iphone-duo-post.mp4" controls preload="none" width="960">
-  <a href="public/readme/iphone-duo-post.mp4">Watch the iPhone Duo demo</a>
-</video>
+https://github.com/user-attachments/assets/00fb37fb-1858-40ce-92fc-5a2f00c5a91f
 
-[Watch the demo · 49 seconds, MP4](public/readme/iphone-duo-post.mp4)
 
 ## Run locally
 
