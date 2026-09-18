@@ -17,6 +17,13 @@ writes, and exposes hydrating/ready/saving/error states. A timeout does not
 prove a write failed: the client retries a mutation once using the same
 request ID, then the app must read back before starting a new operation.
 
+`transition(fn)` runs `fn` inside a same-document view transition, so the
+screen cross-fades to whatever it changes; it is a plain call where the API
+is missing or motion is reduced. `useKV` already applies it to changes that
+arrive from the other display or another view, so a stored selection swaps
+smoothly with no app code. Wrap an app's own big swaps (a city pick, a page
+change) the same way; leave per-keystroke writes alone.
+
 Migration convention: keep a `schema` key in app storage, migrate forward,
 tolerate unknown keys, and finish migration before calling ready. The host
 delivers migration context only to the designated owner.

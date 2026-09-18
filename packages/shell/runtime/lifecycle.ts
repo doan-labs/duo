@@ -122,7 +122,8 @@ export async function install(
     if (old && (old.source ?? location.origin) !== source)
       throw new PlatformError('E_DENIED', 'Updates must come from the app’s installed catalog origin')
     const seeded = await transaction(['marks'], 'readonly', (tx) => read<{ seeded?: boolean }>(tx, 'marks', id))
-    if (options.seeded && seeded?.seeded) return
+    // A rebuilt bundle is a new release id, so a changed preinstalled app re-seeds as a candidate.
+    if (options.seeded && seeded?.seeded && (!listed || old?.current === listed.release)) return
     const bundle = await download(base, id, listed, options.progress)
     const next = releaseId(bundle.release)
     await transaction(['installed', 'releases', 'marks'], 'readwrite', async (tx) => {

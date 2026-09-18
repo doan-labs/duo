@@ -16,7 +16,11 @@ export class KVMirror {
   private started = false
   private unwatch?: () => void
   private serial = 0
-  constructor(private space: KV) {}
+  /** `transition` wraps a change that arrived from outside this frame, so the screen can cross-fade to it. */
+  constructor(
+    private space: KV,
+    private transition: (fn: () => void) => void = (fn) => fn()
+  ) {}
   read = (key: string) => this.states.get(key) ?? (this.hydrated ? this.readyEmpty : empty)
   private readyEmpty: KeyState = { value: null, status: 'ready' }
   subscribe = (cb: () => void) => {
@@ -74,8 +78,10 @@ export class KVMirror {
       this.deferred.set(e.k, e)
       return
     }
-    this.states.set(e.k, { value: e.v, status: 'ready' })
-    this.emit()
+    this.transition(() => {
+      this.states.set(e.k, { value: e.v, status: 'ready' })
+      this.emit()
+    })
   }
   write(key: string, value: string | null) {
     const serial = ++this.serial

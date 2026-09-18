@@ -11,6 +11,7 @@ export const styles = stylex.create({
     color: colors.white
   },
   gold: { color: colors.yellow, opacity: 1 },
+  flat: { display: 'flex', padding: 0 },
   scroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingBottom: 22 },
   list: {
     width: 208,
@@ -25,6 +26,28 @@ export const styles = stylex.create({
   listTitle: { fontSize: appAppearance.musicFontSize, fontWeight: appAppearance.musicFontWeight },
   listCount: { fontSize: appAppearance.musicFontSize3 },
   push: { marginLeft: 'auto' },
+  search: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    marginInline: 10,
+    marginBottom: 6,
+    paddingInline: 8,
+    height: 28,
+    borderRadius: appAppearance.itunesBorderRadius,
+    backgroundColor: appAppearance.podcastsBorderTopColor,
+    color: colors.grey,
+    flexShrink: 0
+  },
+  searchIn: {
+    flexGrow: 1,
+    minWidth: 0,
+    borderWidth: 0,
+    outline: 0,
+    backgroundColor: 'transparent',
+    color: colors.white,
+    fontSize: appAppearance.musicFontSize6
+  },
   round: {
     width: 27,
     height: 27,

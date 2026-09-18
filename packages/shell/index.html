@@ -11,7 +11,9 @@
          it sits under every StyleX layer. */
       @layer reset;
       @layer reset {
-        * { margin: 0; box-sizing: border-box; }
+        /* iOS shows no persistent scrollbar; an app that wants one styles its own over this. */
+        * { margin: 0; box-sizing: border-box; scrollbar-width: none; }
+        ::-webkit-scrollbar { display: none; }
         button, input, textarea { font: inherit; color: inherit; }
         button { border: 0; background: none; cursor: pointer; }
         img { -webkit-user-drag: none; }

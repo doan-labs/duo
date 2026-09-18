@@ -17,6 +17,11 @@ export const bob = stylex.keyframes({
 })
 export const glow = stylex.keyframes({ '50%': { opacity: 0.55 } })
 export const fade = stylex.keyframes({ from: { opacity: 0 } })
+export const drop = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(-8px) scale(.98)' } })
+export const lift = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(24px) scale(.96)' } })
+export const sink = stylex.keyframes({ to: { opacity: 0, transform: 'translateY(24px) scale(.96)' } })
+export const slideIn = stylex.keyframes({ from: { transform: 'translateX(100%)' } })
+export const slideOut = stylex.keyframes({ to: { transform: 'translateX(100%)' } })
 
 // Keyframes stay in this module because StyleX resolves their definitions locally.
 export const animations = stylex.create({
@@ -54,10 +59,56 @@ export const animations = stylex.create({
     animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },
     animationDuration: '2s',
     animationIterationCount: 'infinite'
+  },
+  /** A row that just appeared in a list: settles down from above. */
+  row: {
+    animationName: { default: drop, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.3s',
+    animationTimingFunction: easing.pop
+  },
+  /** A floating tray or toolbar entering from below; pair with `floatOut` under `usePresence`. */
+  float: {
+    animationName: { default: lift, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.34s',
+    animationTimingFunction: easing.pop
+  },
+  floatOut: {
+    animationName: { default: sink, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.34s',
+    animationFillMode: 'forwards'
+  },
+  /** A page pushed over another, sliding in from the right; `Push` in nav.tsx applies these. */
+  sheet: {
+    animationName: { default: slideIn, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.38s',
+    animationTimingFunction: easing.push
+  },
+  sheetOut: {
+    animationName: { default: slideOut, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.38s',
+    animationTimingFunction: easing.push,
+    animationFillMode: 'forwards'
   }
 })
 
 export const shared = stylex.create({
+  /** Anything tappable: shrinks under the finger and eases back. */
+  press: {
+    transitionProperty: 'transform, color, background-color',
+    transitionDuration: '.15s, .2s, .2s',
+    transform: { default: 'scale(1)', ':active': 'scale(.9)' }
+  },
+  /** A selectable row: colours ease instead of snapping, with a gentler press. */
+  select: {
+    transitionProperty: 'transform, color, background-color, border-color',
+    transitionDuration: '.15s, .22s, .22s, .22s',
+    transform: { default: 'scale(1)', ':active': 'scale(.98)' }
+  },
+  /** Content that swaps in place (a detail pane changing note): fades in. */
+  swap: {
+    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.25s'
+  },
   /** Fixed app header: title left, actions right. */
   hdr: {
     flexShrink: 0,

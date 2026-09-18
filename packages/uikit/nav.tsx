@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { createContext, type ReactNode, type Ref, useContext, useEffect, useRef, useState } from 'react'
-import { shared } from './styles.ts'
+import { usePresence } from './presence.ts'
+import { animations, shared } from './styles.ts'
 import { Sym } from './sym.tsx'
 import { app, easing } from './tokens.stylex.ts'
 
@@ -71,6 +72,25 @@ export function Nav({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * The push transition with the state kept by the caller: `children` is the page
+ * underneath, `sheet` slides over it while `open`, and slides back out when it
+ * is not. For apps whose selection already lives in storage and cannot be a
+ * `Nav` stack. Keep `sheet` renderable while closing; it stays mounted for the
+ * exit.
+ */
+export function Push({ open, sheet, children }: { open: boolean; sheet: ReactNode; children: ReactNode }) {
+  const { mounted, closing } = usePresence(open, 380)
+  return (
+    <div {...stylex.props(styles.nav)}>
+      <div {...stylex.props(styles.pg, open && styles.under)}>{children}</div>
+      {mounted && (
+        <div {...stylex.props(styles.pg, styles.shadow, animations.sheet, closing && animations.sheetOut)}>{sheet}</div>
+      )}
+    </div>
+  )
+}
+
 /** One page in a `Nav`: fixed header with an optional back chevron, scrolling body. */
 export type PageProps = { title: ReactNode; back?: () => void; backRef?: Ref<HTMLButtonElement>; children?: ReactNode }
 export const Page = ({ title, back, backRef, children }: PageProps) => (
@@ -103,5 +123,6 @@ const styles = stylex.create({
     transitionTimingFunction: easing.push
   },
   off: { transform: 'translateX(100%)' },
+  shadow: { boxShadow: '-8px 0 24px rgba(0,0,0,.35)' },
   under: { transform: 'translateX(-26%)', opacity: 0.5 }
 })

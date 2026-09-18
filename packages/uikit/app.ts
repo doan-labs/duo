@@ -11,6 +11,8 @@ export type App = {
   /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */
   edge?: boolean
   view: ComponentType<{ os: Os }>
+  /** Invented data behind a static screen: the tile shows a dot and the app a 'Mockup' pill. */
+  mock?: boolean
   /** Names of the apps inside, when this tile is a folder rather than an app. */
   folder?: string[]
 }

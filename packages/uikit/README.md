@@ -39,7 +39,13 @@ uses `app.bg` from the public token module. For a light app, apply a
 `stylex.createTheme(app, { bg: colors.groupedLight, fg: colors.black })` theme
 to its root as shown in the [Developer gallery](../../examples/developer/main.tsx).
 
-`animations` contains spin/rise/pop/fade/rip/draw/bob/glow. Reduced-motion users
+`animations` contains spin/rise/pop/fade/rip/draw/bob/glow plus the motion every
+app should have by default: `row` for a list row that just appeared, `float` /
+`floatOut` for a tray entering from below, `sheet` / `sheetOut` for a page
+sliding over another. `shared.press` (tappable), `shared.select` (selectable
+row) and `shared.swap` (content replaced in place) are the matching transitions.
+`usePresence(open)` keeps a thing mounted through its exit animation; `Push`
+is the nav transition with the open state kept by the caller. Reduced-motion users
 receive no preset animation. `Widget` only renders the existing declarative
 snapshot; `WidgetLabel` is passive typography. Neither refreshes data. Legacy
 audio helpers remain explicit helpers for trusted integrations, not automatic

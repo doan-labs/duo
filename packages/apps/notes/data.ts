@@ -1,53 +1,40 @@
 export type Note = {
   id: string
+  /** Creation time, ISO. The body lives in storage under `note:<id>`. */
   when: string
-  group: string
-  body: string
-  /** Written with the pencil: the pane renders it as ink, the list says so. */
-  ink?: boolean
-  /** Artwork tile at the end of the row, for a note carrying an attachment. */
-  thumb?: boolean
-  /** Leading glyph: a shared note, or a locked one. */
-  mark?: 'person' | 'lock'
+  /** Folder id; unset means the built-in "Notes" folder. */
+  folder?: string
 }
 
-export const NOTES: Note[] = [
-  { id: 'live', when: '3:15 PM', group: 'Today', body: 'Live long\nand prosper.', ink: true },
-  { id: 'places', when: '2:26 PM', group: 'Today', body: 'Places to Visit or Revisit\nLondon\nKyoto\nReykjavík' },
-  { id: 'zabar', when: '1:54 PM', group: 'Today', body: "Zabar's Store on Broadway\n1 attachment", thumb: true },
-  {
-    id: 'egg',
-    when: '1:54 PM',
-    group: 'Today',
-    body: 'This egg cream was just right\nin Brooklyn — Tim recommended it',
-    thumb: true
-  },
-  { id: 'issues', when: '1:53 PM', group: 'Today', body: 'Issues to get:\n- ASM 2: 5 or higher', mark: 'person' },
-  {
-    id: 'todo',
-    when: '1:52 PM',
-    group: 'Today',
-    body: 'Things to do in and around\nKensington Palace',
-    mark: 'person'
-  },
-  {
-    id: 'top',
-    when: '1:52 PM',
-    group: 'Today',
-    body: 'Here are the top things to do\nEiffel Tower: No visit to Paris is complete without it.'
-  },
-  {
-    id: 'glass',
-    when: '1:35 PM',
-    group: 'Today',
-    body: 'Hate Liquid Glass? You are not alone.\n1 web link',
-    thumb: true
-  },
-  { id: 'downtime', when: '8/24/25', group: 'August', body: 'Downtime\nWho video' },
-  { id: 'keys', when: '8/12/25', group: 'August', body: 'ChatGPT API keys\nRotate before launch', mark: 'lock' }
-]
+export type Folder = { id: string; name: string }
 
-export const GROUPS = [...new Set(NOTES.map((note) => note.group))].map((name) => ({
-  name,
-  notes: NOTES.filter((note) => note.group === name)
-}))
+/** The line under the toolbar in the real editor: "September 18, 2026 at 3:38 PM". */
+export const longStamp = (note: Note) => {
+  const d = new Date(note.when)
+  return `${d.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric' })} at ${d.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+
+/** Today's notes show a time, older ones a date, like the real list. */
+export const stamp = (note: Note) => {
+  const d = new Date(note.when)
+  return sameDay(d, new Date())
+    ? d.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleDateString('en', { month: 'numeric', day: 'numeric', year: '2-digit' })
+}
+
+/** Section header a note files under: Today, Yesterday, then the month. */
+export const groupOf = (note: Note) => {
+  const d = new Date(note.when)
+  const now = new Date()
+  if (sameDay(d, now)) return 'Today'
+  if (sameDay(d, new Date(now.getTime() - 864e5))) return 'Yesterday'
+  return d.toLocaleDateString('en', {
+    month: 'long',
+    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric'
+  })
+}
+
+export const group = (notes: Note[]) =>
+  [...new Set(notes.map(groupOf))].map((name) => ({ name, notes: notes.filter((n) => groupOf(n) === name) }))

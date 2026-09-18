@@ -1,5 +1,6 @@
-import { os } from '@doan-labs/duo-sdk'
+import { os, transition } from '@doan-labs/duo-sdk'
 import { useEffect, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 
 export type Place = { id: string; name: string; region: string; latitude: number; longitude: number }
 export const home: Place = {
@@ -40,6 +41,8 @@ const listeners = new Set<() => void>()
 const emit = () => {
   for (const listener of listeners) listener()
 }
+/** A city or unit change is a whole new screen; it cross-fades rather than snaps. */
+const swap = () => transition(() => flushSync(emit))
 export const subscribe = (listener: () => void) => {
   listeners.add(listener)
   return () => {
@@ -53,7 +56,7 @@ export function update(patch: Partial<Preferences>) {
     cache.set(place.id, { ...cache.get(place.id), loading: false, error: 'Preferences were not saved. Try again.' })
     emit()
   })
-  emit()
+  swap()
 }
 export const usePreferences = () => useSyncExternalStore(subscribe, () => preferences)
 export function select(place: Place) {
@@ -253,8 +256,11 @@ export async function initializeWeather() {
       }
       if (change.rev <= revision) return
       revision = change.rev
+      // Our own write echoes back here; only a change we have not shown yet is worth a cross-fade.
+      const before = JSON.stringify(preferences)
       apply(change.k, change.v)
-      emit()
+      if (change.k === key && JSON.stringify(preferences) !== before) swap()
+      else emit()
     })
     emit()
   }

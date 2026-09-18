@@ -1,10 +1,10 @@
-import { Title, VStack } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Title, usePresence, VStack } from '@doan-labs/duo-uikit'
+import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import type { Note } from './data.ts'
+import { longStamp, type Note } from './data.ts'
 import { useNoteText } from './store.ts'
 
 /** Barrel colour per pencil; the nib is always pale. */
@@ -25,20 +25,32 @@ const INKS = [
   appAppearance.notesColor10
 ]
 
-export function NotePane({ note, ink, onInk }: { note: Note; ink: number; onInk: (i: number) => void }) {
-  const [, , undo] = useNoteText(note)
+export function NotePane({
+  note,
+  ink,
+  onInk,
+  compose,
+  trash
+}: {
+  note?: Note
+  ink: number
+  onInk: (i: number) => void
+  compose: () => void
+  trash: () => void
+}) {
   const [pen, setPen] = useState(1)
+  // The palette is a mode the pencil button enters, not furniture.
+  const [marking, setMarking] = useState(false)
+  const palette = usePresence(marking)
+  if (!note) return <div {...stylex.props(styles.pane, styles.none, shared.swap)}>No Note Selected</div>
   return (
-    <div {...stylex.props(styles.pane)}>
+    <div {...stylex.props(styles.pane, shared.swap)}>
       <div {...stylex.props(styles.tools)}>
-        <span {...stylex.props(styles.round)}>
+        <span {...stylex.props(styles.round, shared.press)}>
           <Sym name="expand" size={14} />
         </span>
-        <span {...stylex.props(styles.round)}>
+        <button type="button" {...stylex.props(styles.round, shared.press)} onClick={compose} aria-label="New note">
           <Sym name="compose" size={15} />
-        </span>
-        <button type="button" {...stylex.props(styles.round)} onClick={undo}>
-          <Sym name="undo" size={15} />
         </button>
         <span {...stylex.props(styles.group)}>
           <span {...stylex.props(styles.aa)}>Aa</span>
@@ -46,58 +58,85 @@ export function NotePane({ note, ink, onInk }: { note: Note; ink: number; onInk:
           <Sym name="table" size={15} />
         </span>
         <span {...stylex.props(styles.group)}>
-          <Sym name="markup" size={16} />
+          <button
+            type="button"
+            {...stylex.props(styles.flat, shared.press, marking && styles.gold)}
+            onClick={() => setMarking(!marking)}
+            aria-pressed={marking}
+            aria-label="Markup"
+          >
+            <Sym name="markup" size={16} />
+          </button>
           <Sym name="share" size={15} />
+          <button type="button" {...stylex.props(styles.flat, shared.press)} onClick={trash} aria-label="Delete note">
+            <Sym name="trash" size={15} />
+          </button>
           <i {...stylex.props(styles.double)}>
             <Sym name="forward" size={11} />
             <Sym name="forward" size={11} />
           </i>
         </span>
-        <span {...stylex.props(styles.round, styles.push)}>
+        <span {...stylex.props(styles.round, styles.push, shared.press)}>
           <Sym name="search" size={14} />
         </span>
       </div>
-      <NoteEditor note={note} ink={ink} />
-      <div {...stylex.props(styles.palette)}>
-        <button type="button" {...stylex.props(styles.flat)} onClick={undo}>
-          <Sym name="undo" size={17} />
-        </button>
-        <i {...stylex.props(styles.flat, styles.dim, styles.mirror)}>
-          <Sym name="undo" size={17} />
-        </i>
-        <i {...stylex.props(styles.bar)} />
-        <div {...stylex.props(styles.pens)}>
-          {PENS.map((c, i) => (
-            <button
-              key={c}
-              type="button"
-              {...stylex.props(styles.pen, styles.barrel(c), i === pen && styles.penUp)}
-              onClick={() => setPen(i)}
-            />
-          ))}
+      <NoteEditor note={note} ink={marking ? ink : undefined} />
+      {palette.mounted && (
+        <div
+          role="toolbar"
+          aria-label="Markup tools"
+          {...stylex.props(styles.palette, animations.float, palette.closing && animations.floatOut)}
+        >
+          <i {...stylex.props(styles.flat, styles.dim)}>
+            <Sym name="undo" size={17} />
+          </i>
+          <i {...stylex.props(styles.flat, styles.dim, styles.mirror)}>
+            <Sym name="undo" size={17} />
+          </i>
+          <i {...stylex.props(styles.bar)} />
+          <div {...stylex.props(styles.pens)}>
+            {PENS.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                {...stylex.props(styles.pen, styles.barrel(c), i === pen && styles.penUp)}
+                onClick={() => setPen(i)}
+              />
+            ))}
+          </div>
+          <div {...stylex.props(styles.inks)}>
+            {INKS.map((c, i) => (
+              <button
+                key={c}
+                type="button"
+                {...stylex.props(styles.ink, shared.press, styles.fill(c), i === ink && styles.inkOn)}
+                onClick={() => onInk(i)}
+              />
+            ))}
+          </div>
+          <i {...stylex.props(styles.flat)}>
+            <Sym name="plus" size={15} />
+          </i>
+          <i {...stylex.props(styles.flat)}>
+            <Sym name="more" size={17} />
+          </i>
         </div>
-        <div {...stylex.props(styles.inks)}>
-          {INKS.map((c, i) => (
-            <button
-              key={c}
-              type="button"
-              {...stylex.props(styles.ink, styles.fill(c), i === ink && styles.inkOn)}
-              onClick={() => onInk(i)}
-            />
-          ))}
-        </div>
-        <i {...stylex.props(styles.flat)}>
-          <Sym name="plus" size={15} />
-        </i>
-        <i {...stylex.props(styles.flat)}>
-          <Sym name="more" size={17} />
-        </i>
-      </div>
+      )}
     </div>
   )
 }
 
-export function NoteSheet({ note, back }: { note: Note; back: () => void }) {
+export function NoteSheet({
+  note,
+  back,
+  compose,
+  trash
+}: {
+  note: Note
+  back: () => void
+  compose: () => void
+  trash: () => void
+}) {
   return (
     <VStack>
       <Title xstyle={[styles.hdrMd]}>
@@ -106,8 +145,12 @@ export function NoteSheet({ note, back }: { note: Note; back: () => void }) {
           Notes
         </button>
         <Title as="span" variant="accessory" xstyle={[styles.gold]}>
-          <Sym name="share" size={19} />
-          <Sym name="compose" size={19} />
+          <button type="button" {...stylex.props(styles.flat, styles.gold)} onClick={trash} aria-label="Delete note">
+            <Sym name="trash" size={19} />
+          </button>
+          <button type="button" {...stylex.props(styles.flat, styles.gold)} onClick={compose} aria-label="New note">
+            <Sym name="compose" size={19} />
+          </button>
           <Sym name="more" size={19} />
         </Title>
       </Title>
@@ -121,17 +164,11 @@ function NoteEditor({ note, ink }: { note: Note; ink?: number }) {
   return (
     <>
       <div role="status" aria-live="polite" {...stylex.props(styles.save)}>
-        {state?.status === 'error'
-          ? `Not saved (${state.error})`
-          : state?.status === 'saving'
-            ? 'Saving…'
-            : state?.status === 'hydrating'
-              ? 'Loading…'
-              : 'Saved'}
+        {state?.status === 'error' ? `Not saved (${state.error})` : longStamp(note)}
       </div>
       <textarea
         aria-label="Note text"
-        {...stylex.props(styles.ta, note.ink && styles.hand, ink !== undefined && styles.tint(INKS[ink]!))}
+        {...stylex.props(styles.ta, ink !== undefined && styles.tint(INKS[ink]!))}
         value={body}
         onChange={(e) => put(e.target.value)}
       />
@@ -140,7 +177,13 @@ function NoteEditor({ note, ink }: { note: Note; ink?: number }) {
 }
 
 const styles = stylex.create({
-  save: { fontSize: appAppearance.musicFontSize3, color: colors.white, opacity: 0.6, paddingInline: 20, minHeight: 16 },
+  save: {
+    fontSize: appAppearance.musicFontSize3,
+    color: colors.grey,
+    textAlign: 'center',
+    paddingTop: 10,
+    minHeight: 16
+  },
   gold: { color: colors.yellow, opacity: 1 },
   push: { marginLeft: 'auto' },
   round: {
@@ -155,6 +198,7 @@ const styles = stylex.create({
   },
   fill: (c: string) => ({ backgroundColor: c }),
   pane: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
+  none: { alignItems: 'center', justifyContent: 'center', color: colors.grey },
   tools: { display: 'flex', alignItems: 'center', gap: 6, paddingInline: 7, height: 40, flexShrink: 0 },
   group: {
     display: 'flex',
@@ -180,15 +224,9 @@ const styles = stylex.create({
     color: colors.white,
     fontSize: appAppearance.calendarFontSize,
     lineHeight: 1.5,
-    fontFamily: appAppearance.notesFontFamily
-  },
-  // Apple Pencil, faked by the one handwriting face every Mac ships with.
-  hand: {
-    fontFamily: appAppearance.notesFontFamily2,
-    fontSize: appAppearance.notesFontSize,
-    fontWeight: appAppearance.musicFontWeight2,
-    lineHeight: 1.3,
-    letterSpacing: 1
+    fontFamily: appAppearance.notesFontFamily,
+    transitionProperty: 'color',
+    transitionDuration: '.3s'
   },
   tint: (c: string) => ({ color: c }),
   // Clear of the home bar: that pill is 22 px tall, centred, and owns its
@@ -198,7 +236,7 @@ const styles = stylex.create({
     position: 'absolute',
     bottom: 26,
     left: '50%',
-    transform: 'translateX(-50%)',
+    translate: '-50%',
     display: 'flex',
     alignItems: 'center',
     gap: 9,
@@ -225,7 +263,8 @@ const styles = stylex.create({
     boxShadow: appAppearance.notesBoxShadow2,
     marginTop: 13,
     transitionProperty: 'margin-top',
-    transitionDuration: '.18s'
+    transitionDuration: '.28s',
+    transitionTimingFunction: easing.spring
   },
   penUp: { marginTop: 4 },
   barrel: (c: string) => ({ backgroundImage: `linear-gradient(180deg,${c} 0 60%,${colors.penRim} 60%)` }),
@@ -237,6 +276,10 @@ const styles = stylex.create({
     borderRadius: appAppearance.musicFontSize3,
     backgroundColor: appAppearance.memosBackgroundColor
   },
-  ink: { width: 14, height: 14, borderRadius: appAppearance.settingsBorderRadius },
-  inkOn: { boxShadow: appAppearance.notesBoxShadow3 }
+  ink: {
+    width: 14,
+    height: 14,
+    borderRadius: appAppearance.settingsBorderRadius
+  },
+  inkOn: { boxShadow: appAppearance.notesBoxShadow3, transform: 'scale(1.15)' }
 })

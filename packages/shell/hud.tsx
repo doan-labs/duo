@@ -4,7 +4,7 @@
 
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 
 export type HudEvents = {
@@ -308,42 +308,14 @@ function Minimap({ live, on, onReset }: { live: Live; on: boolean; onReset: () =
   )
 }
 
-/** The four squares gather toward the centre while the button is hovered. */
-const SQUARES: [x: number, y: number, dx: number, dy: number][] = [
-  [3, 3, 1, 1],
-  [11, 3, -1, 1],
-  [3, 11, 1, -1],
-  [11, 11, -1, -1]
-]
-
-function HomeButton({ onClick }: { onClick: () => void }) {
-  // StyleX has no parent-hover selector, so the button reports its hover to the rects.
-  const [hover, setHover] = useState(false)
-  return (
-    <button
-      type="button"
-      {...stylex.props(styles.child, styles.button)}
-      title="Home (Esc)"
-      onClick={onClick}
-      onPointerEnter={() => setHover(true)}
-      onPointerLeave={() => setHover(false)}
-    >
-      <svg {...stylex.props(styles.svg)} viewBox="0 0 20 20" aria-hidden="true">
-        {SQUARES.map(([x, y, dx, dy]) => (
-          <rect
-            key={`${x},${y}`}
-            {...stylex.props(styles.sq, hover && styles.gather(dx, dy))}
-            x={x}
-            y={y}
-            width="6"
-            height="6"
-            rx="1.8"
-          />
-        ))}
-      </svg>
-    </button>
-  )
-}
+const HomeButton = ({ onClick }: { onClick: () => void }) => (
+  <button type="button" {...stylex.props(styles.child, styles.button)} title="Home (Esc)" onClick={onClick}>
+    <svg {...stylex.props(styles.svg)} viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3 9.5 L10 3.5 L17 9.5 V16.5 H3 Z" />
+      <path d="M8 16.5 V11.5 H12 V16.5" />
+    </svg>
+  </button>
+)
 
 const dim = '#6b7064'
 const spring = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
@@ -483,12 +455,6 @@ const styles = stylex.create({
     transitionTimingFunction: spring,
     transform: `rotate(${rad}rad)`
   }),
-  sq: {
-    transitionProperty: 'transform',
-    transitionDuration: { default: '0.3s', [reduce]: '0s' },
-    transitionTimingFunction: spring
-  },
-  gather: (dx: number, dy: number) => ({ transform: `translate(${dx}px, ${dy}px)` }),
   orbit: { transformOrigin: '50% 50%' },
   orbiting: {
     animationName: { default: spin, [reduce]: 'none' },

@@ -276,6 +276,7 @@ export function SpringBoard({ w, hgt, wall, boot, shots }: SpringBoardProps) {
               )}
             >
               {e.a.id ? <Sandbox id={e.a.id} os={e.ctx} wide={wide} side={e.side} /> : <View os={e.ctx} />}
+              {e.a.mock && <span {...stylex.props(styles.mockPill)}>Mockup · in development</span>}
             </div>
           )
         })}
@@ -348,6 +349,23 @@ const styles = stylex.create({
   },
   // Room for the status stack. `edge` apps skip it and run under the clock like Apple's footage.
   appPad: { paddingTop: 40 },
+  mockPill: {
+    position: 'absolute',
+    top: 44,
+    right: 12,
+    zIndex: 2,
+    pointerEvents: 'none',
+    fontSize: 10,
+    fontWeight: 600,
+    lineHeight: 1,
+    paddingTop: 4,
+    paddingBottom: 4,
+    paddingLeft: 8,
+    paddingRight: 8,
+    borderRadius: 999,
+    color: 'white',
+    backgroundColor: colors.orange
+  },
   // Split at the hinge, as Apple's footage shows: no seam, the two just meet.
   appLeft: { right: '50%' },
   appRight: { left: '50%' },

@@ -44,43 +44,43 @@ import type { App } from '@doan-labs/duo-uikit/app.ts'
 
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
-  { name: 'FaceTime', view: FaceTime },
+  { name: 'FaceTime', mock: true, view: FaceTime },
   { name: 'Calendar', light: true, view: Calendar },
   { name: 'Photos', light: true, view: Photos },
   { name: 'Camera', view: Camera },
-  { name: 'Mail', light: true, view: Mail },
+  { name: 'Mail', mock: true, light: true, view: Mail },
   { name: 'Clock', view: Clock },
   { name: 'Maps', light: true, view: Maps },
-  { name: 'TV', view: Tv },
+  { name: 'TV', mock: true, view: Tv },
   { name: 'News', light: true, view: News },
-  { name: 'Health', light: true, view: Health },
-  { name: 'Wallet', view: Wallet },
-  { name: 'Siri', view: Siri },
-  { name: 'Settings', light: true, view: Settings }
+  { name: 'Health', mock: true, light: true, view: Health },
+  { name: 'Wallet', mock: true, view: Wallet },
+  { name: 'Siri', mock: true, view: Siri },
+  { name: 'Settings', mock: true, light: true, view: Settings }
 ]
 
 /** Right half — only on the inner display, rows 1 to 6. */
 export const RIGHT: App[] = [
-  { name: 'Stocks', view: Stocks },
-  { name: 'Find My', light: true, view: FindMy },
-  { name: 'Home', view: Home },
-  { name: 'Fitness', view: Fitness },
-  { name: 'Watch', view: Watch },
+  { name: 'Stocks', mock: true, view: Stocks },
+  { name: 'Find My', mock: true, light: true, view: FindMy },
+  { name: 'Home', mock: true, view: Home },
+  { name: 'Fitness', mock: true, view: Fitness },
+  { name: 'Watch', mock: true, view: Watch },
   { name: 'Reminders', light: true, view: Reminders },
-  { name: 'Files', light: true, view: Files },
-  { name: 'Preview', light: true, view: Preview },
+  { name: 'Files', mock: true, light: true, view: Files },
+  { name: 'Preview', mock: true, light: true, view: Preview },
   { name: 'Utilities', view: Utilities, folder: IN_FOLDER },
-  { name: 'Contacts', light: true, view: Contacts },
-  { name: 'iTunes Store', light: true, view: Itunes },
+  { name: 'Contacts', mock: true, light: true, view: Contacts },
+  { name: 'iTunes Store', mock: true, light: true, view: Itunes },
   { name: 'Freeform', light: true, view: Freeform },
-  { name: 'Tips', light: true, view: Tips }
+  { name: 'Tips', mock: true, light: true, view: Tips }
 ]
 
 export const DOCK: App[] = [
-  { name: 'Phone', view: Phone },
+  { name: 'Phone', mock: true, view: Phone },
   { name: 'Safari', light: true, view: Safari },
-  { name: 'Messages', light: true, view: Messages },
-  { name: 'Music', view: Music }
+  { name: 'Messages', mock: true, light: true, view: Messages },
+  { name: 'Music', mock: true, view: Music }
 ]
 
 /** Everything openable by name, including what only lives inside Utilities. */
@@ -90,10 +90,10 @@ export const APPS: App[] = [
   ...DOCK,
   { name: 'Calculator', view: Calculator },
   { name: 'Voice Memos', view: Memos },
-  { name: 'Shortcuts', light: true, view: Shortcuts },
-  { name: 'Podcasts', light: true, view: Podcasts },
+  { name: 'Shortcuts', mock: true, light: true, view: Shortcuts },
+  { name: 'Podcasts', mock: true, light: true, view: Podcasts },
   { name: 'App Store', light: true, view: AppStore },
-  { name: 'Books', light: true, view: Books },
+  { name: 'Books', mock: true, light: true, view: Books },
   { name: 'YouTube', light: true, view: YouTube }
 ]
 

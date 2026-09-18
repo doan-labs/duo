@@ -6,7 +6,7 @@
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
-import { layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import type { StyleXStyles } from '@stylexjs/stylex'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, type Ref, useRef, useState } from 'react'
@@ -59,7 +59,10 @@ export function Tile({ a, i, dock, onOpen }: { a: App; i?: number; dock?: boolea
       onPointerLeave={up}
       onPointerCancel={up}
     >
-      <Icon ref={icon} a={a} size={dock ? styles.iconDock : undefined} pressed={pressed} />
+      <div {...stylex.props(styles.iconWrap)}>
+        <Icon ref={icon} a={a} size={dock ? styles.iconDock : undefined} pressed={pressed} />
+        {a.mock && <span {...stylex.props(styles.mockDot)} title="Mockup" />}
+      </div>
       {a.name}
     </div>
   )
@@ -98,6 +101,20 @@ const styles = stylex.create({
     display: 'block',
     transitionProperty: 'transform',
     transitionDuration: '.12s'
+  },
+  iconWrap: { position: 'relative' },
+  // Marks the tiles whose app is invented data, so a visitor knows before tapping.
+  mockDot: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.orange,
+    borderWidth: 1.5,
+    borderStyle: 'solid',
+    borderColor: 'white'
   },
   iconDock: { width: 41, height: 41 },
   iconPressed: { transform: 'scale(.88)' },

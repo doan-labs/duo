@@ -30,7 +30,9 @@ on-device recovery pair is.
 ## Authoring an update
 
 Bump the authored manifest version, document it in CHANGELOG, check/build, then serve
-the catalog from the same origin. Store Refresh offers the candidate. Public CI uploads,
+the catalog from the same origin. Store Refresh offers the candidate. Preinstalled apps
+re-seed on boot whenever the bundled release id differs from the installed one, so a
+rebuild at the same version still lands as a candidate. Public CI uploads,
 release governance and npm publication are separate [publishing plans](publishing.md).
 Release bytes are immutable, including shared-dependency rebuilds.
 

@@ -1,55 +1,80 @@
+import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { NOTES } from './data.ts'
+import { useState } from 'react'
+import { useFolder, useFolders, useNotes } from './store.ts'
 
-const FOLDERS: [name: string, count: number, icon: 'folder' | 'gear' | 'trash'][] = [
-  ['All iCloud', 71, 'folder'],
-  ['Notes', NOTES.length, 'folder'],
-  ['Ideas', 5, 'gear'],
-  ['Personal', 7, 'folder'],
-  ['Professional', 1, 'folder'],
-  ['Recently Deleted', 13, 'trash']
-]
-
-export const Folders = () => (
-  <div {...stylex.props(styles.side)}>
-    <div {...stylex.props(styles.sideHdr)}>
-      <span {...stylex.props(styles.gold)}>Edit</span>
-      <span {...stylex.props(styles.gold, styles.sideIcons)}>
-        <Sym name="newFolder" size={18} />
-        <Sym name="sidebar" size={18} />
-      </span>
-    </div>
-    <div {...stylex.props(styles.scroll)}>
-      <div {...stylex.props(styles.folder)}>
-        <Sym name="note" size={16} />
-        Quick Notes
-        <span {...stylex.props(styles.count)}>2</span>
+export const Folders = () => {
+  const { notes } = useNotes()
+  const { folders, add } = useFolders()
+  const [current, setCurrent] = useFolder()
+  const [naming, setNaming] = useState(false)
+  // No prompt() inside a sandboxed frame, so the name is typed in place like the real sheet's field.
+  const create = (name: string) => {
+    setNaming(false)
+    if (name.trim()) setCurrent(add(name.trim()).id)
+  }
+  return (
+    <div {...stylex.props(styles.side)}>
+      <div {...stylex.props(styles.sideHdr)}>
+        <span {...stylex.props(styles.gold)}>Edit</span>
+        <span {...stylex.props(styles.gold, styles.sideIcons)}>
+          <button
+            type="button"
+            {...stylex.props(styles.gold, styles.flat, shared.press)}
+            onClick={() => setNaming(true)}
+            aria-label="New folder"
+          >
+            <Sym name="newFolder" size={18} />
+          </button>
+          <Sym name="sidebar" size={18} />
+        </span>
       </div>
-      <div {...stylex.props(styles.folder)}>
-        <Sym name="people" size={16} />
-        Shared
-        <span {...stylex.props(styles.count)}>4</span>
-      </div>
-      <Section name="iCloud" />
-      {FOLDERS.map(([name, n, icon]) => (
-        <div key={name} {...stylex.props(styles.folder, name === 'Notes' && styles.folderOn)}>
-          <Sym name={icon} size={16} />
-          <span {...stylex.props(styles.clip)}>{name}</span>
-          <span {...stylex.props(styles.count)}>{n}</span>
-        </div>
-      ))}
-      <Section name="Tags" />
-      <div {...stylex.props(styles.tags)}>
-        {['All Tags', '#Book', '#Ideas'].map((t) => (
-          <span key={t} {...stylex.props(styles.tag)}>
-            {t}
-          </span>
+      <div {...stylex.props(styles.scroll)}>
+        <Section name="iCloud" />
+        <Row name="Notes" count={notes.filter((n) => !n.folder).length} on={!current} pick={() => setCurrent()} />
+        {folders.map((f) => (
+          <Row
+            key={f.id}
+            name={f.name}
+            count={notes.filter((n) => n.folder === f.id).length}
+            on={current === f.id}
+            pick={() => setCurrent(f.id)}
+          />
         ))}
+        {naming && (
+          <div {...stylex.props(styles.folder, animations.row)}>
+            <Sym name="folder" size={16} />
+            <input
+              // biome-ignore lint/a11y/noAutofocus: the row exists only to be typed into
+              autoFocus
+              aria-label="Folder name"
+              placeholder="New Folder"
+              {...stylex.props(styles.input)}
+              onBlur={(e) => create(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') create(e.currentTarget.value)
+                if (e.key === 'Escape') setNaming(false)
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
-  </div>
+  )
+}
+
+const Row = ({ name, count, on, pick }: { name: string; count: number; on: boolean; pick: () => void }) => (
+  <button
+    type="button"
+    {...stylex.props(styles.folder, shared.select, animations.row, on && styles.folderOn)}
+    onClick={pick}
+  >
+    <Sym name="folder" size={16} />
+    <span {...stylex.props(styles.clip)}>{name}</span>
+    <span {...stylex.props(styles.count)}>{count}</span>
+  </button>
 )
 
 const Section = ({ name }: { name: string }) => (
@@ -63,6 +88,7 @@ const Section = ({ name }: { name: string }) => (
 
 const styles = stylex.create({
   gold: { color: colors.yellow, opacity: 1 },
+  flat: { display: 'flex', padding: 0 },
   side: {
     width: 198,
     flexShrink: 0,
@@ -84,6 +110,7 @@ const styles = stylex.create({
   sideIcons: { display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto' },
   scroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingBottom: 22 },
   folder: {
+    width: 'calc(100% - 16px)',
     display: 'flex',
     alignItems: 'center',
     gap: 9,
@@ -93,10 +120,20 @@ const styles = stylex.create({
     borderRadius: appAppearance.itunesBorderRadius,
     fontSize: appAppearance.musicFontSize6,
     color: colors.yellow,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    textAlign: 'left'
   },
   // The glyph is the only yellow part of a row; the label stays white.
   clip: { color: colors.white, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
+  input: {
+    flexGrow: 1,
+    minWidth: 0,
+    borderWidth: 0,
+    outline: 0,
+    backgroundColor: 'transparent',
+    color: colors.white,
+    fontSize: appAppearance.musicFontSize6
+  },
   folderOn: { backgroundColor: appAppearance.homeColor3 },
   count: { marginLeft: 'auto', paddingLeft: 8, color: colors.grey, fontSize: appAppearance.musicFontSize6 },
   section: {
@@ -108,14 +145,5 @@ const styles = stylex.create({
     fontSize: appAppearance.musicFontSize,
     fontWeight: appAppearance.musicFontWeight2
   },
-  chev: { display: 'flex', marginLeft: 'auto', transform: 'rotate(180deg)' },
-  tags: { display: 'flex', flexWrap: 'wrap', gap: 6, paddingInline: 16, paddingTop: 6 },
-  tag: {
-    paddingBlock: 5,
-    paddingInline: 10,
-    borderRadius: appAppearance.cameraBorderRadius,
-    backgroundColor: appAppearance.podcastsBorderTopColor,
-    fontSize: appAppearance.calendarFontSize2,
-    color: colors.grey
-  }
+  chev: { display: 'flex', marginLeft: 'auto', transform: 'rotate(180deg)' }
 })
