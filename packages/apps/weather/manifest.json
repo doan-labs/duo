@@ -8,7 +8,11 @@
   "edge": true,
   "widgets": ["small"],
   "permissions": ["geolocation"],
-  "network": ["https://api.open-meteo.com", "https://geocoding-api.open-meteo.com"],
+  "network": [
+    "https://api.open-meteo.com",
+    "https://geocoding-api.open-meteo.com",
+    "https://air-quality-api.open-meteo.com"
+  ],
   "author": "Doan Labs",
   "repo": "https://github.com/doan-labs/duo",
   "license": "MIT"

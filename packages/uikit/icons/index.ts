@@ -83,6 +83,33 @@ const person = '/icons/sym/person-crop-circle.webp'
 const plus = '/icons/sym/plus.webp'
 const exposure = '/icons/sym/plusminus-circle.webp'
 const sidebar = '/icons/sym/sidebar-left.webp'
+const moonStars = '/icons/sym/moon-stars-fill.webp'
+const cloudSun = '/icons/sym/cloud-sun-fill.webp'
+const cloudMoon = '/icons/sym/cloud-moon-fill.webp'
+const cloud = '/icons/sym/cloud-fill.webp'
+const fog = '/icons/sym/cloud-fog-fill.webp'
+const drizzle = '/icons/sym/cloud-drizzle-fill.webp'
+const rain = '/icons/sym/cloud-rain-fill.webp'
+const heavyRain = '/icons/sym/cloud-heavyrain-fill.webp'
+const snow = '/icons/sym/cloud-snow-fill.webp'
+const storm = '/icons/sym/cloud-bolt-rain-fill.webp'
+const sunRain = '/icons/sym/cloud-sun-rain-fill.webp'
+const moonRain = '/icons/sym/cloud-moon-rain-fill.webp'
+const sunrise = '/icons/sym/sunrise-fill.webp'
+const sunset = '/icons/sym/sunset-fill.webp'
+const wind = '/icons/sym/wind.webp'
+const thermometer = '/icons/sym/thermometer-medium.webp'
+const humidity = '/icons/sym/humidity-fill.webp'
+const eye = '/icons/sym/eye-fill.webp'
+const gauge = '/icons/sym/gauge-with-dots-needle-33percent.webp'
+const sunOutline = '/icons/sym/sun-max.webp'
+const drop = '/icons/sym/drop-fill.webp'
+const map = '/icons/sym/map-fill.webp'
+const list = '/icons/sym/list-bullet.webp'
+const aqi = '/icons/sym/aqi-medium.webp'
+const umbrella = '/icons/sym/umbrella-fill.webp'
+const calendarSym = '/icons/sym/calendar.webp'
+const clockSym = '/icons/sym/clock.webp'
 const volume = '/icons/sym/speaker-wave-3-fill.webp'
 const share = '/icons/sym/square-and-arrow-up.webp'
 const compose = '/icons/sym/square-and-pencil.webp'
@@ -272,7 +299,34 @@ export const SYM = {
   undo,
   checklist,
   table,
-  markup
+  markup,
+  moonStars,
+  cloudSun,
+  cloudMoon,
+  cloud,
+  fog,
+  drizzle,
+  rain,
+  heavyRain,
+  snow,
+  storm,
+  sunRain,
+  moonRain,
+  sunrise,
+  sunset,
+  wind,
+  thermometer,
+  humidity,
+  eye,
+  gauge,
+  sunOutline,
+  drop,
+  map,
+  list,
+  aqi,
+  umbrella,
+  calendarSym,
+  clockSym
 }
 
 /** The wallpaper rides along under this key: screen.ts needs it decoded too. */

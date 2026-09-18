@@ -1,4 +1,5 @@
 import { os, transition } from '@doan-labs/duo-sdk'
+import type { SYM } from '@doan-labs/duo-uikit/icons/index.ts'
 import { useEffect, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 
@@ -74,6 +75,8 @@ export type Forecast = {
   hourly: Record<string, number[]>
   daily: Record<string, number[]>
   timezone: string
+  /** US AQI, when the air-quality service answered. */
+  aqi?: number
 }
 type Entry = { data?: Forecast; loading: boolean; error?: string; fetched?: number }
 const cache = new Map<string, Entry>()
@@ -104,12 +107,22 @@ export async function refresh(place: Place, force = false) {
       daily:
         'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max'
     })
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
-      credentials: 'omit',
-      signal: AbortSignal.any([ownerAbort.signal, AbortSignal.timeout(15000)])
+    const signal = AbortSignal.any([ownerAbort.signal, AbortSignal.timeout(15000)])
+    const air = new URLSearchParams({
+      latitude: String(place.latitude),
+      longitude: String(place.longitude),
+      current: 'us_aqi'
     })
+    const [response, quality] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { credentials: 'omit', signal }),
+      // Air quality is a bonus tile: a failure here must not take the forecast down.
+      fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${air}`, { credentials: 'omit', signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+    ])
     if (!response.ok) throw new Error('Forecast service unavailable')
     const data: Forecast = await response.json()
+    if (Number.isFinite(quality?.current?.us_aqi)) data.aqi = quality.current.us_aqi
     if (
       !Number.isFinite(data.current?.temperature_2m) ||
       !data.daily?.time?.length ||
@@ -180,17 +193,34 @@ export const clock = (
   timezone: string,
   options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
 ) => (Number.isFinite(time) ? new Date(time * 1000).toLocaleString('en-US', { ...options, timeZone: timezone }) : '—')
-export function condition(code: number, isDay = 1): [string, string] {
-  if (code === 0) return [isDay ? '☀️' : '🌙', isDay ? 'Sunny' : 'Clear']
-  if (code === 1 || code === 2) return [isDay ? '⛅️' : '☁️', 'Partly Cloudy']
-  if (code === 3) return ['☁️', 'Cloudy']
-  if (code === 45 || code === 48) return ['🌫️', 'Fog']
-  if (code >= 51 && code <= 57) return ['🌦️', 'Drizzle']
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return ['🌨️', 'Snow']
-  if (code >= 95) return ['⛈️', 'Thunderstorms']
-  if (code >= 61 && code <= 82) return ['🌧️', 'Rain']
-  return ['—', 'Unavailable']
+export type SymName = keyof typeof SYM
+/** SF Symbol and label for a WMO weather code. */
+export function condition(code: number, isDay = 1): [SymName, string] {
+  if (code === 0) return [isDay ? 'sun' : 'moonStars', isDay ? 'Sunny' : 'Clear']
+  if (code === 1 || code === 2) return [isDay ? 'cloudSun' : 'cloudMoon', 'Partly Cloudy']
+  if (code === 3) return ['cloud', 'Cloudy']
+  if (code === 45 || code === 48) return ['fog', 'Fog']
+  if (code >= 51 && code <= 57) return ['drizzle', 'Drizzle']
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return ['snow', 'Snow']
+  if (code >= 95) return ['storm', 'Thunderstorms']
+  if (code >= 80 && code <= 82) return [isDay ? 'sunRain' : 'moonRain', 'Showers']
+  if (code >= 65 || code === 82) return ['heavyRain', 'Heavy Rain']
+  if (code >= 61 && code <= 82) return ['rain', 'Rain']
+  return ['cloud', 'Unavailable']
 }
+export type Scene = 'clear' | 'night' | 'cloudy' | 'cloudyNight' | 'rain' | 'storm' | 'snow' | 'fog'
+/** Which sky to paint. Precipitation wins over time of day, as in the real app. */
+export function scene(code: number | undefined, isDay = 1): Scene {
+  if (code == null) return isDay ? 'clear' : 'night'
+  if (code >= 95) return 'storm'
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow'
+  if (code >= 51) return 'rain'
+  if (code === 45 || code === 48) return 'fog'
+  if (code >= 2) return isDay ? 'cloudy' : 'cloudyNight'
+  return isDay ? 'clear' : 'night'
+}
+/** "10AM" the way the hourly strip writes it. */
+export const hour = (time: number, timezone: string) => clock(time, timezone, { hour: 'numeric' }).replace(' ', '')
 
 export function widgetSnapshot() {
   const place = preferences.places.find((p) => p.id === preferences.selected) || preferences.places[0]!

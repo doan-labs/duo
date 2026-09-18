@@ -2,18 +2,30 @@ import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.style
 import * as stylex from '@stylexjs/stylex'
 
 const drift = stylex.keyframes({ from: { transform: 'translateX(-4%)' }, to: { transform: 'translateX(4%)' } })
+const fall = stylex.keyframes({
+  from: { backgroundPosition: '0 0, 0 0' },
+  to: { backgroundPosition: '0 240px, 0 300px' }
+})
+const snowfall = stylex.keyframes({
+  from: { backgroundPosition: '0 0, 0 0, 0 0' },
+  to: { backgroundPosition: '40px 420px, -60px 560px, 30px 700px' }
+})
+const flash = stylex.keyframes({
+  '0%, 92%, 96%, 100%': { opacity: 0 },
+  '93%, 97%': { opacity: 0.55 }
+})
 const lift = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(28px) scale(.985)' } })
 const spin = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
 
-// One glass recipe for every surface: a thin white fill over a blurred, saturated
-// backdrop, a 1 px top highlight, a half-pixel rim, and a soft drop. Cards use
-// it as-is; controls layer hover/active fills and a press scale on top.
-const blur = 'blur(24px) saturate(170%)'
-const rim = appAppearance.weatherRim
+// Every card is the same tinted glass: a translucent blue over a blurred sky, a
+// half-pixel hairline and a 1px top highlight. Headers are quiet and separated
+// from the body by a hairline, as in the real app.
+const blur = 'blur(24px) saturate(160%)'
+const wide = '@container (min-width: 600px)'
+const motion = '@media (prefers-reduced-motion: reduce)'
 
 export const styles = stylex.create({
   scrollbar: {
-    // Non-auto standard properties override the detailed WebKit scrollbar skin in Chromium.
     scrollbarWidth: { default: 'auto', '@supports not selector(::-webkit-scrollbar)': 'thin' },
     scrollbarColor: {
       default: 'auto',
@@ -36,13 +48,11 @@ export const styles = stylex.create({
         ':hover': colors.weatherScrollHover,
         ':active': colors.weatherScrollActive
       },
-      backgroundImage: appAppearance.weatherBackgroundImage,
       backgroundClip: 'padding-box',
       borderRadius: appAppearance.weatherBorderRadius,
       borderWidth: 2,
       borderStyle: 'solid',
       borderColor: 'transparent',
-      boxShadow: `inset 0 0 0 1px ${colors.weatherScrollRim}`,
       minHeight: 32,
       minWidth: 32
     },
@@ -61,75 +71,149 @@ export const styles = stylex.create({
     backgroundColor: colors.weatherNight,
     textShadow: appAppearance.weatherTextShadow
   },
-  day: { backgroundImage: appAppearance.weatherBackgroundImage2 },
-  night: { backgroundImage: appAppearance.weatherBackgroundImage3 },
-  cloudy: { backgroundImage: appAppearance.weatherBackgroundImage4 },
-  atmosphere: {
-    pointerEvents: 'none',
-    position: 'absolute',
-    inset: 0,
-    backgroundImage: appAppearance.weatherBackgroundImage5
-  },
+
+  // Sky scenes. The root paints the gradient; layers add glare, stars, clouds or precipitation.
+  clear: { backgroundImage: appAppearance.weatherSceneClear },
+  night: { backgroundImage: appAppearance.weatherSceneNight },
+  cloudy: { backgroundImage: appAppearance.weatherSceneCloudy },
+  cloudyNight: { backgroundImage: appAppearance.weatherSceneCloudyNight },
+  rain: { backgroundImage: appAppearance.weatherSceneRain },
+  storm: { backgroundImage: appAppearance.weatherSceneStorm },
+  snow: { backgroundImage: appAppearance.weatherSceneSnow },
+  fog: { backgroundImage: appAppearance.weatherSceneFog },
+  layer: { pointerEvents: 'none', position: 'absolute', inset: 0 },
+  glare: { backgroundImage: appAppearance.weatherGlare },
+  moon: { backgroundImage: appAppearance.weatherMoonGlow },
   stars: {
     backgroundImage:
-      'radial-gradient(1px 1px at 15% 12%,white,transparent),radial-gradient(1px 1px at 70% 20%,white,transparent),radial-gradient(2px 2px at 85% 7%,white,transparent),radial-gradient(1px 1px at 40% 30%,white,transparent)'
+      'radial-gradient(1px 1px at 15% 12%,white,transparent),radial-gradient(1px 1px at 70% 20%,white,transparent),radial-gradient(1.5px 1.5px at 88% 30%,white,transparent),radial-gradient(1px 1px at 40% 30%,white,transparent),radial-gradient(1px 1px at 55% 8%,white,transparent),radial-gradient(1px 1px at 30% 42%,white,transparent)'
   },
   clouds: {
-    pointerEvents: 'none',
-    position: 'absolute',
     inset: '-10%',
-    opacity: 0.25,
+    opacity: 0.35,
     backgroundImage: appAppearance.weatherBackgroundImage6,
-    animationName: { default: drift, '@media (prefers-reduced-motion: reduce)': 'none' },
-    animationDuration: '24s',
+    animationName: { default: drift, [motion]: 'none' },
+    animationDuration: '28s',
+    animationDirection: 'alternate',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: appAppearance.weatherAnimationTimingFunction
+  },
+  cloudsBack: { animationDuration: '44s', animationDirection: 'alternate-reverse', opacity: 0.22, top: '18%' },
+  streaks: {
+    inset: '-20%',
+    opacity: 0.5,
+    transform: 'rotate(12deg)',
+    backgroundImage: appAppearance.weatherRainStreaks,
+    backgroundSize: '3px 60px, 2px 75px',
+    backgroundPosition: '0 0, 17px 20px',
+    animationName: { default: fall, [motion]: 'none' },
+    animationDuration: '.9s',
+    animationTimingFunction: appAppearance.weatherLinear,
+    animationIterationCount: 'infinite'
+  },
+  heavy: { opacity: 0.7, animationDuration: '.6s' },
+  lightning: {
+    backgroundColor: colors.white,
+    animationName: { default: flash, [motion]: 'none' },
+    animationDuration: '9s',
+    animationIterationCount: 'infinite'
+  },
+  flakes: {
+    inset: '-20%',
+    opacity: 0.85,
+    backgroundImage: appAppearance.weatherSnowFlakes,
+    backgroundSize: '70px 70px, 110px 110px, 160px 160px',
+    animationName: { default: snowfall, [motion]: 'none' },
+    animationDuration: '18s',
+    animationTimingFunction: appAppearance.weatherLinear,
+    animationIterationCount: 'infinite'
+  },
+  bands: {
+    inset: '-10%',
+    backgroundImage: appAppearance.weatherFogBands,
+    animationName: { default: drift, [motion]: 'none' },
+    animationDuration: '36s',
     animationDirection: 'alternate',
     animationIterationCount: 'infinite',
     animationTimingFunction: appAppearance.weatherAnimationTimingFunction
   },
 
-  toolbar: {
+  // Bars. Weather is an `edge` app: the status stack sits over the top padding.
+  top: {
     position: 'relative',
-    display: 'flex',
-    justifyContent: 'space-between',
+    zIndex: 1,
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
-    // Weather is an `edge` app: the status stack sits over this padding.
     paddingTop: 46,
-    paddingBottom: 6,
+    paddingBottom: 2,
     paddingInline: 14,
-    gap: 8,
+    flexShrink: 0
+  },
+  topLeft: { display: 'flex', justifyContent: 'flex-start' },
+  topRight: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
+  wideOnly: { display: { default: 'none', [wide]: 'flex' } },
+  bottom: {
+    position: 'relative',
+    zIndex: 1,
+    display: { default: 'grid', [wide]: 'none' },
+    gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
+    paddingInline: 16,
+    paddingBlock: 10,
     flexShrink: 0,
-    minHeight: 48
+    backgroundColor: appAppearance.weatherBottomBar,
+    backdropFilter: blur,
+    WebkitBackdropFilter: blur,
+    boxShadow: `inset 0 0.5px 0 ${appAppearance.weatherHairline}`
   },
-  toolbarTitle: {
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: -0.2
+  dots: { display: 'flex', alignItems: 'center', gap: 4 },
+  dot: {
+    display: 'grid',
+    placeItems: 'center',
+    width: 20,
+    height: 20,
+    padding: 0,
+    color: appAppearance.weatherDot,
+    cursor: 'pointer',
+    borderRadius: appAppearance.weatherBorderRadius,
+    outlineWidth: { default: 0, ':focus-visible': 2 },
+    outlineStyle: 'solid',
+    outlineColor: appAppearance.weatherOutlineColor,
+    '::before': {
+      content: '""',
+      width: 6,
+      height: 6,
+      borderRadius: appAppearance.weatherBorderRadius,
+      backgroundColor: 'currentColor'
+    }
   },
-  actions: { display: 'flex', gap: 8, alignItems: 'center' },
-  /** Glass capsule control. Text with an optional leading symbol; `icon` makes it a circle. */
-  button: {
+  dotCurrent: { color: colors.white },
+  dotLocal: { '::before': { display: 'none' } },
+  /** Icon-only glass circle, the only control the real app puts on the sky. */
+  control: {
     position: 'relative',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
     height: 36,
-    paddingInline: 14,
+    minWidth: 36,
+    paddingInline: 0,
     borderRadius: appAppearance.weatherBorderRadius,
     color: colors.white,
-    fontSize: appAppearance.musicBorderRadius,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: -0.2,
+    fontSize: appAppearance.musicFontSize,
+    fontWeight: appAppearance.calendarFontWeight,
     textShadow: 'none',
     whiteSpace: 'nowrap',
     backgroundColor: {
-      default: appAppearance.cameraBackgroundColor2,
-      ':hover': appAppearance.weatherBackgroundColor,
+      default: appAppearance.weatherControl,
+      ':hover': appAppearance.weatherControlHover,
       ':active': appAppearance.weatherBackgroundColor2
     },
     backdropFilter: blur,
     WebkitBackdropFilter: blur,
-    boxShadow: `${rim},${appAppearance.weatherShadowSmall}`,
+    boxShadow: appAppearance.weatherCardRim,
     outlineWidth: { default: 0, ':focus-visible': 2 },
     outlineStyle: 'solid',
     outlineColor: appAppearance.weatherOutlineColor,
@@ -140,7 +224,9 @@ export const styles = stylex.create({
     transitionDuration: '.15s, .2s',
     transform: { default: null, ':active': 'scale(.94)' }
   },
-  icon: { width: 36, paddingInline: 0 },
+  /** Text pill: Back, Retry, Use Current Location. */
+  pill: { paddingInline: 14 },
+  plain: { backgroundColor: 'transparent', boxShadow: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none' },
   spin: {
     display: 'grid',
     placeItems: 'center',
@@ -157,173 +243,265 @@ export const styles = stylex.create({
     overflowY: 'auto',
     overflowX: 'hidden',
     paddingInline: 16,
-    paddingBottom: 40
+    paddingBottom: 24,
+    scrollbarGutter: 'stable'
   },
-  hero: { textAlign: 'center', paddingTop: 6, paddingBottom: 26 },
+  hero: {
+    textAlign: 'center',
+    paddingTop: { default: 22, [wide]: 12 },
+    paddingBottom: { default: 44, [wide]: 30 },
+    fontWeight: appAppearance.calendarFontWeight
+  },
   eyebrow: {
-    fontSize: appAppearance.musicFontSize3,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: 1.6,
-    opacity: 0.72
+    fontSize: appAppearance.musicFontSize6,
+    letterSpacing: 1,
+    opacity: 0.85
   },
   city: {
     fontSize: appAppearance.shortcutsFontSize,
-    fontWeight: appAppearance.musicFontWeight3,
-    marginTop: 4,
+    fontWeight: appAppearance.calendarFontWeight,
+    lineHeight: 1.15,
+    marginTop: 0,
     marginBottom: 0,
-    letterSpacing: -0.6
+    letterSpacing: -0.3
   },
   temperature: {
     fontSize: appAppearance.weatherFontSize,
-    lineHeight: 1.02,
-    letterSpacing: -5,
+    lineHeight: 1.05,
+    letterSpacing: -2,
     fontWeight: appAppearance.weatherFontWeight,
-    paddingLeft: 18,
+    paddingLeft: 22,
     textShadow: appAppearance.weatherTextShadow2
   },
-  condition: { fontSize: appAppearance.podcastsFontSize, fontWeight: appAppearance.musicFontWeight3, opacity: 0.92 },
-  highLow: { fontSize: appAppearance.musicFontSize5, fontWeight: appAppearance.musicFontWeight3, marginTop: 4 },
-  localTime: { fontSize: appAppearance.calendarFontSize2, opacity: 0.7, marginTop: 10 },
+  condition: { fontSize: appAppearance.podcastsFontSize, lineHeight: 1.3, opacity: 0.95 },
+  highLow: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: 10,
+    fontSize: appAppearance.podcastsFontSize,
+    marginTop: 2
+  },
+  localTime: { fontSize: appAppearance.musicFontSize6, opacity: 0.75, marginTop: 8 },
 
   card: {
     position: 'relative',
-    borderRadius: appAppearance.mailFontSize,
-    paddingInline: 16,
-    paddingBlock: 14,
-    marginBottom: 12,
+    borderRadius: appAppearance.calendarFontSize2,
+    paddingInline: 14,
+    paddingBlock: 12,
+    marginBottom: 10,
     minWidth: 0,
-    backgroundColor: appAppearance.notesBorderBottomColor,
+    color: colors.white,
+    backgroundColor: appAppearance.weatherCard,
     backdropFilter: blur,
     WebkitBackdropFilter: blur,
-    boxShadow: `${rim},${appAppearance.weatherShadowLarge}`
+    boxShadow: appAppearance.weatherCardRim
   },
   summary: {
-    fontSize: appAppearance.musicBorderRadius,
-    lineHeight: 1.5,
+    fontSize: appAppearance.musicFontSize,
+    lineHeight: 1.4,
     paddingBottom: 12,
-    marginBottom: 6,
+    marginBottom: 4,
     borderBottomWidth: 0.5,
     borderBottomStyle: 'solid',
-    borderBottomColor: appAppearance.weatherBorderBottomColor
+    borderBottomColor: appAppearance.weatherHairline
   },
   label: {
     display: 'flex',
     alignItems: 'center',
     gap: 5,
-    fontSize: appAppearance.musicFontSize3,
+    fontSize: appAppearance.calendarFontSize2,
     fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: 0.8,
-    opacity: 0.7,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    opacity: 0.6,
     marginTop: 0,
-    marginBottom: 10
+    marginBottom: 0,
+    paddingBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomStyle: 'solid',
+    borderBottomColor: appAppearance.weatherHairline
   },
-  hourly: { display: 'flex', overflowX: 'auto', gap: 6, marginInline: -8, paddingInline: 8, paddingBottom: 6 },
+  labelPlain: { borderBottomWidth: 0, paddingBottom: 4 },
+  hourly: {
+    display: 'flex',
+    overflowX: 'auto',
+    gap: 2,
+    marginInline: -8,
+    paddingInline: 4,
+    paddingTop: 4,
+    paddingBottom: 4,
+    scrollbarWidth: 'none',
+    '::-webkit-scrollbar': { display: 'none' }
+  },
   hour: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flexShrink: 0,
-    minWidth: 52,
+    minWidth: 54,
     paddingBlock: 8,
     paddingInline: 4,
-    borderRadius: appAppearance.calendarFontSize,
+    borderRadius: appAppearance.calendarFontSize2,
     color: colors.white,
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight3,
+    fontSize: appAppearance.musicFontSize,
+    fontWeight: appAppearance.musicFontWeight2,
     cursor: 'pointer',
-    backgroundColor: { default: 'transparent', ':hover': appAppearance.cameraBackgroundColor2 },
-    boxShadow: { default: 'none', ':hover': rim },
+    backgroundColor: { default: 'transparent', ':hover': appAppearance.weatherControl },
     transitionProperty: 'transform, background-color',
     transitionDuration: '.15s, .2s',
     transform: { default: null, ':active': 'scale(.94)' }
   },
-  weatherIcon: {
-    fontSize: appAppearance.appstoreFontSize,
-    color: colors.weatherSun,
-    lineHeight: 1.1,
-    textShadow: appAppearance.weatherTextShadow3
-  },
+  hourIcon: { display: 'grid', placeItems: 'center', height: 40, color: colors.white },
+  sunColor: { color: colors.weatherSun },
+  rainColor: { color: colors.weatherRain },
   chance: {
     fontSize: appAppearance.musicFontSize3,
     color: colors.weatherRain,
-    fontWeight: appAppearance.musicFontWeight2
+    fontWeight: appAppearance.musicFontWeight2,
+    lineHeight: 1,
+    marginTop: -4
   },
+  hourEvent: { fontSize: appAppearance.musicFontSize6, fontWeight: appAppearance.musicFontWeight2 },
+
+  // Wide: four columns, the ten-day card takes the left half for three rows and
+  // the tiles flow around it, then continue full width below, as on iPad.
   grid: {
     display: 'grid',
-    gridTemplateColumns: { default: '1fr', '@container (min-width: 600px)': '1.1fr 1fr' },
-    gap: 12,
-    alignItems: 'start'
+    gridTemplateColumns: { default: '1fr', [wide]: 'repeat(4, 1fr)' },
+    gap: 10,
+    alignItems: 'stretch'
   },
-  forecast: { marginBottom: 0, paddingBottom: 6 },
+  forecast: {
+    marginBottom: 0,
+    paddingBottom: 4,
+    gridColumn: { default: 'auto', [wide]: 'span 2' },
+    gridRow: { default: 'auto', [wide]: 'span 3' }
+  },
   daily: {
     display: 'grid',
-    gridTemplateColumns: '50px 32px 34px 1fr 34px 12px',
+    gridTemplateColumns: '48px 36px 38px 1fr 38px',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     width: 'calc(100% + 16px)',
     marginInline: -8,
     paddingInline: 8,
     minHeight: 46,
     borderRadius: appAppearance.calendarFontSize2,
     color: colors.white,
-    fontSize: appAppearance.musicFontSize,
+    fontSize: appAppearance.podcastsFontSize,
     fontWeight: appAppearance.musicFontWeight3,
     textAlign: 'left',
     borderTopWidth: { default: 0.5, ':first-of-type': 0 },
     borderTopStyle: 'solid',
-    borderTopColor: appAppearance.weatherBorderTopColor,
-    backgroundColor: { default: 'transparent', ':hover': appAppearance.homeColor3 },
+    borderTopColor: appAppearance.weatherHairline,
+    backgroundColor: { default: 'transparent', ':hover': appAppearance.weatherControl },
     cursor: 'pointer',
     transitionProperty: 'background-color',
     transitionDuration: '.2s'
   },
-  dailyIcon: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    fontSize: appAppearance.podcastsFontSize,
-    color: colors.weatherSun
-  },
-  muted: { opacity: 0.65 },
+  dailyIcon: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, color: colors.white },
+  muted: { opacity: 0.6 },
   track: {
-    height: 5,
-    backgroundColor: appAppearance.phoneBackgroundColor3,
-    borderRadius: appAppearance.memosBorderRadius,
     position: 'relative',
-    overflow: 'hidden',
-    boxShadow: appAppearance.weatherBoxShadow
+    height: 5,
+    borderRadius: appAppearance.weatherBorderRadius,
+    backgroundColor: appAppearance.weatherBarTrack,
+    overflow: 'visible'
   },
+  /** The bar is a window onto one gradient spanning the whole ten-day range. */
   range: (left: number, width: number) => ({
     position: 'absolute',
+    top: 0,
     height: '100%',
     left: `${left}%`,
     width: `${width}%`,
-    borderRadius: appAppearance.memosBorderRadius,
-    backgroundImage: appAppearance.weatherBackgroundImage7,
-    boxShadow: appAppearance.weatherBoxShadow2
+    borderRadius: appAppearance.weatherBorderRadius,
+    backgroundImage: appAppearance.weatherBar,
+    backgroundSize: `${10000 / width}% 100%`,
+    backgroundPosition: `${width >= 100 ? 0 : (left / (100 - width)) * 100}% 0`
   }),
-  metrics: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
-  metric: { marginBottom: 0, minHeight: 128, display: 'flex', flexDirection: 'column' },
-  metricValue: {
-    fontSize: appAppearance.phoneFontSize2,
-    fontWeight: appAppearance.musicFontWeight3,
-    letterSpacing: -0.7
+  marker: (left: number) => ({
+    position: 'absolute',
+    top: -1,
+    left: `calc(${left}% - 3.5px)`,
+    width: 7,
+    height: 7,
+    borderRadius: appAppearance.weatherBorderRadius,
+    backgroundColor: colors.white,
+    boxShadow: appAppearance.weatherMarker
+  }),
+
+  tiles: { display: { default: 'grid', [wide]: 'contents' }, gridTemplateColumns: '1fr 1fr', gap: 10 },
+  tile: {
+    marginBottom: 0,
+    aspectRatio: { default: 'auto', [wide]: '1 / 1' },
+    minHeight: 150,
+    display: 'flex',
+    flexDirection: 'column'
   },
-  metricDescription: {
-    fontSize: appAppearance.weatherFontSize2,
-    lineHeight: 1.45,
+  tileWide: { gridColumn: { default: '1 / -1', [wide]: 'span 2' }, aspectRatio: 'auto' },
+  tileValue: {
+    fontSize: appAppearance.stocksFontSize,
+    fontWeight: appAppearance.calendarFontWeight,
+    lineHeight: 1.15,
+    letterSpacing: -0.5,
+    marginTop: 8
+  },
+  tileSub: { fontSize: appAppearance.podcastsFontSize, lineHeight: 1.2 },
+  tileBody: { flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 0 },
+  tileNote: {
+    fontSize: appAppearance.musicFontSize6,
+    lineHeight: 1.35,
     marginBottom: 0,
     marginTop: 'auto',
-    paddingTop: 10,
-    opacity: 0.78
+    paddingTop: 8
   },
+  spectrum: (image: string, position: number) => ({
+    position: 'relative',
+    height: 5,
+    marginTop: 10,
+    borderRadius: appAppearance.weatherBorderRadius,
+    backgroundImage: image,
+    '::after': {
+      content: '""',
+      position: 'absolute',
+      top: -1,
+      left: `calc(${position}% - 3.5px)`,
+      width: 7,
+      height: 7,
+      borderRadius: appAppearance.weatherBorderRadius,
+      backgroundColor: colors.white,
+      boxShadow: appAppearance.weatherMarker
+    }
+  }),
+  gauge: { display: 'block', width: '100%', height: 'auto', maxHeight: 96, marginTop: 6, overflow: 'visible' },
+  stroke: { fill: 'none', stroke: colors.white, strokeLinecap: 'round' },
+  faint: { opacity: 0.3 },
+  fill: { fill: colors.white },
+  svgText: {
+    fill: colors.white,
+    fontSize: appAppearance.calendarFontSize4,
+    fontWeight: appAppearance.musicFontWeight2,
+    opacity: 0.8
+  },
+  compassValue: { fontSize: appAppearance.podcastsFontSize, fontWeight: appAppearance.musicFontWeight3, opacity: 1 },
+  bars: { display: 'flex', alignItems: 'flex-end', gap: 2, height: 56, marginTop: 8 },
+  bar: (height: number) => ({
+    flexGrow: 1,
+    minHeight: 2,
+    height: `${height}%`,
+    borderRadius: appAppearance.weatherBorderRadius,
+    backgroundColor: colors.weatherRain,
+    opacity: height > 3 ? 1 : 0.4
+  }),
+
   footnote: {
     fontSize: appAppearance.weatherFontSize2,
-    opacity: 0.72,
+    opacity: 0.7,
     lineHeight: 1.7,
     textAlign: 'center',
-    marginBlock: 20
+    marginBlock: 18
   },
   link: { color: colors.white, textDecoration: 'underline', textUnderlineOffset: 2 },
   notice: {
@@ -334,154 +512,178 @@ export const styles = stylex.create({
     gap: 10,
     fontSize: appAppearance.musicFontSize6,
     lineHeight: 1.5,
-    paddingBlock: 10,
-    paddingLeft: 16,
-    paddingRight: 10,
-    borderRadius: appAppearance.musicFontSize5,
-    marginBottom: 12,
-    backgroundColor: appAppearance.podcastsBorderTopColor,
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
-    boxShadow: `${rim},${appAppearance.weatherShadowLarge}`
+    paddingBlock: 8,
+    paddingLeft: 14,
+    paddingRight: 8
   },
 
+  // Locations list.
+  listHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 12
+  },
   listTitle: {
     fontSize: appAppearance.shortcutsFontSize,
     fontWeight: appAppearance.musicFontWeight,
-    letterSpacing: -0.8,
-    marginTop: 6,
-    marginBottom: 14
+    letterSpacing: -0.6,
+    margin: 0
   },
-  searchBox: { position: 'relative', marginBottom: 10 },
+  menuWrap: { position: 'relative' },
+  menu: {
+    position: 'absolute',
+    right: 0,
+    top: 42,
+    zIndex: 3,
+    minWidth: 190,
+    padding: 6,
+    borderRadius: appAppearance.calendarFontSize,
+    backgroundColor: appAppearance.weatherMenu,
+    backdropFilter: blur,
+    WebkitBackdropFilter: blur,
+    boxShadow: `${appAppearance.weatherCardRim},${appAppearance.weatherShadowLarge}`
+  },
+  menuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+    paddingBlock: 9,
+    paddingInline: 10,
+    borderRadius: appAppearance.calendarFontSize4,
+    color: colors.white,
+    fontSize: appAppearance.musicFontSize,
+    textAlign: 'left',
+    cursor: 'pointer',
+    backgroundColor: { default: 'transparent', ':hover': appAppearance.weatherControl }
+  },
+  searchBox: { position: 'relative', marginBottom: 12 },
   searchIcon: {
     zIndex: 1,
     position: 'absolute',
-    left: 15,
+    left: 12,
     top: '50%',
     transform: 'translateY(-50%)',
     display: 'grid',
-    opacity: 0.75,
+    opacity: 0.7,
     pointerEvents: 'none'
   },
   search: {
     width: '100%',
-    height: 46,
-    paddingLeft: 42,
-    paddingRight: 16,
+    height: 38,
+    paddingLeft: 36,
+    paddingRight: 14,
     borderWidth: 0,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: appAppearance.calendarFontSize4,
     appearance: 'none',
     color: colors.white,
-    fontSize: appAppearance.calendarFontSize,
-    backgroundColor: { default: appAppearance.homeColor3, ':focus': appAppearance.weatherBorderTopColor },
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
-    boxShadow: {
-      default: `${rim},${appAppearance.weatherShadowInput}`,
-      ':focus': appAppearance.weatherBoxShadow3
-    },
+    fontSize: appAppearance.messagesFontSize,
+    backgroundColor: { default: appAppearance.weatherBarTrack, ':focus': appAppearance.weatherControl },
     outlineStyle: 'none',
-    transitionProperty: 'background-color, box-shadow',
+    transitionProperty: 'background-color',
     transitionDuration: '.2s',
     '::placeholder': { color: appAppearance.weatherColor },
     '::-webkit-search-cancel-button': { display: 'none' }
   },
-  locate: { marginBottom: 14 },
   message: { fontSize: appAppearance.musicFontSize6, minHeight: 20, marginTop: 0, marginBottom: 10, opacity: 0.85 },
   result: {
     display: 'flex',
     flexDirection: 'column',
     position: 'relative',
-    gap: 3,
+    gap: 2,
     width: '100%',
     textAlign: 'left',
     color: colors.white,
-    paddingBlock: 13,
-    paddingLeft: 16,
-    paddingRight: 56,
+    paddingBlock: 12,
+    paddingLeft: 14,
+    paddingRight: 52,
     marginBottom: 8,
-    borderRadius: appAppearance.musicFontSize5,
+    borderRadius: appAppearance.calendarFontSize,
     fontSize: appAppearance.musicFontSize6,
-    backgroundColor: { default: appAppearance.podcastsBorderTopColor, ':hover': appAppearance.weatherBorderTopColor },
+    backgroundColor: { default: appAppearance.weatherCard, ':hover': appAppearance.weatherControlHover },
     backdropFilter: blur,
     WebkitBackdropFilter: blur,
-    boxShadow: rim,
+    boxShadow: appAppearance.weatherCardRim,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',
     transitionDuration: '.15s, .2s',
     transform: { default: null, ':active': 'scale(.985)' }
   },
-  resultName: { fontSize: appAppearance.calendarFontSize, fontWeight: appAppearance.musicFontWeight2 },
+  resultName: { fontSize: appAppearance.messagesFontSize, fontWeight: appAppearance.musicFontWeight2 },
   add: {
     position: 'absolute',
     right: 12,
     top: '50%',
     transform: 'translateY(-50%)',
-    width: 30,
-    height: 30,
-    borderRadius: appAppearance.settingsBorderRadius,
+    width: 28,
+    height: 28,
+    borderRadius: appAppearance.weatherBorderRadius,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: appAppearance.weatherBorderTopColor,
-    boxShadow: rim
+    backgroundColor: appAppearance.weatherControl
   },
+  /** A saved city: its own sky, name and time left, temperature right, condition and range below. */
   location: {
     position: 'relative',
-    borderRadius: appAppearance.appstoreFontSize,
-    marginBottom: 12,
+    borderRadius: appAppearance.calendarFontSize,
+    marginBottom: 10,
     overflow: 'hidden',
-    backgroundImage: appAppearance.weatherBackgroundImage8,
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
+    backgroundColor: colors.weatherNight,
     boxShadow: {
-      default: `${rim},${appAppearance.weatherShadowCard}`,
+      default: `${appAppearance.weatherCardRim},${appAppearance.weatherShadowCard}`,
       ':hover': appAppearance.weatherBoxShadow4
     },
     transitionProperty: 'transform, box-shadow',
     transitionDuration: '.2s',
     transform: { default: null, ':active': 'scale(.985)' }
   },
-  locationSelected: {
-    boxShadow: appAppearance.weatherBoxShadow5
-  },
+  locationSelected: { boxShadow: appAppearance.weatherBoxShadow5 },
   locationMain: {
     position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
+    display: 'grid',
+    gridTemplateColumns: '1fr auto',
+    gridTemplateRows: 'auto 1fr auto',
+    alignItems: 'start',
+    gap: 2,
     width: '100%',
+    minHeight: 112,
     color: colors.white,
     textAlign: 'left',
-    paddingTop: 16,
-    paddingBottom: 18,
-    paddingLeft: 18,
-    paddingRight: 110,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingLeft: 16,
+    paddingRight: 16,
     cursor: 'pointer',
     fontSize: appAppearance.musicFontSize6
   },
   locationName: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
     fontSize: appAppearance.appstoreFontSize,
     fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: -0.4
+    letterSpacing: -0.3,
+    lineHeight: 1.15
   },
-  locationCondition: {
-    marginTop: 10,
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight3,
-    opacity: 0.9
-  },
+  locationTime: { fontSize: appAppearance.musicFontSize6, opacity: 0.9 },
+  locationCondition: { alignSelf: 'end', fontSize: appAppearance.musicFontSize6, opacity: 0.95 },
   locationTemp: {
-    position: 'absolute',
-    top: 12,
-    right: 18,
+    gridRow: '1 / 3',
+    gridColumn: 2,
     fontSize: appAppearance.weatherFontSize3,
     fontWeight: appAppearance.weatherFontWeight,
-    letterSpacing: -2
+    lineHeight: 1,
+    letterSpacing: -1.5
   },
-  remove: { position: 'absolute', right: 14, bottom: 14, height: 30, width: 30, paddingInline: 0 },
+  locationRange: { gridColumn: 2, alignSelf: 'end', justifySelf: 'end', fontSize: appAppearance.musicFontSize6 },
+  remove: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    height: 26,
+    minWidth: 26,
+    opacity: { default: 0.7, ':hover': 1 }
+  },
 
   sheet: {
     position: 'absolute',
@@ -492,15 +694,23 @@ export const styles = stylex.create({
     backgroundColor: appAppearance.weatherBackgroundColor3,
     backdropFilter: 'blur(30px) saturate(160%)',
     WebkitBackdropFilter: 'blur(30px) saturate(160%)',
-    animationName: { default: lift, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationName: { default: lift, [motion]: 'none' },
     animationDuration: '.36s',
     animationTimingFunction: easing.pop
   },
+  sheetTitle: {
+    fontSize: appAppearance.musicFontSize,
+    fontWeight: appAppearance.musicFontWeight2,
+    textAlign: 'center'
+  },
   detailTitle: {
-    textAlign: 'center',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
     fontSize: appAppearance.stocksFontSize,
-    fontWeight: appAppearance.musicFontWeight3,
-    letterSpacing: -0.5,
+    fontWeight: appAppearance.calendarFontWeight,
+    letterSpacing: -0.3,
     marginTop: 18
   },
   detailSummary: { textAlign: 'center', fontSize: appAppearance.calendarFontSize, lineHeight: 1.7, opacity: 0.85 },
@@ -514,7 +724,7 @@ export const styles = stylex.create({
     fontSize: appAppearance.musicFontSize6,
     borderTopWidth: 0.5,
     borderTopStyle: 'solid',
-    borderTopColor: appAppearance.weatherBorderTopColor
+    borderTopColor: appAppearance.weatherHairline
   },
 
   widget: {
