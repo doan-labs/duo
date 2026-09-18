@@ -120,6 +120,31 @@ const table = '/icons/sym/tablecells.webp'
 const trash = '/icons/sym/trash-fill.webp'
 const wifi = '/icons/sym/wifi.webp'
 const close = '/icons/sym/xmark.webp'
+const library = '/icons/sym/photo-on-rectangle-angled.webp'
+const collections = '/icons/sym/square-grid-2x2.webp'
+const heart = '/icons/sym/heart.webp'
+const heartFill = '/icons/sym/heart-fill.webp'
+const saved = '/icons/sym/square-and-arrow-down.webp'
+const mapOutline = '/icons/sym/map.webp'
+const video = '/icons/sym/video.webp'
+const screenshot = '/icons/sym/camera-viewfinder.webp'
+const peopleStack = '/icons/sym/person-2-crop-square-stack.webp'
+const trashOutline = '/icons/sym/trash.webp'
+const albums = '/icons/sym/rectangle-stack.webp'
+const photo = '/icons/sym/photo.webp'
+const sharedAlbums = '/icons/sym/rectangle-stack-badge-person-crop.webp'
+const activity = '/icons/sym/bubble-left-and-bubble-right.webp'
+const sharedWithYou = '/icons/sym/shared-with-you.webp'
+const handwriting = '/icons/sym/hand-draw.webp'
+const illustration = '/icons/sym/paintbrush-pointed.webp'
+const document = '/icons/sym/doc-text.webp'
+const imports = '/icons/sym/square-and-arrow-down-on-square.webp'
+const minus = '/icons/sym/minus.webp'
+const filter = '/icons/sym/line-3-horizontal-decrease.webp'
+const ellipsis = '/icons/sym/ellipsis.webp'
+const info = '/icons/sym/info-circle.webp'
+const check = '/icons/sym/checkmark-circle-fill.webp'
+const down = '/icons/sym/chevron-down.webp'
 
 /** Apple's icon outline is a superellipse, not a rounded rect. */
 function squircle(size: number, n = 5) {
@@ -252,6 +277,31 @@ export const ICONS: Record<string, string> = {
 
 /** SF Symbols, as white glyphs to be recoloured through a CSS mask. */
 export const SYM = {
+  library,
+  collections,
+  heart,
+  heartFill,
+  saved,
+  mapOutline,
+  video,
+  screenshot,
+  peopleStack,
+  trashOutline,
+  albums,
+  photo,
+  sharedAlbums,
+  activity,
+  sharedWithYou,
+  handwriting,
+  illustration,
+  document,
+  imports,
+  minus,
+  filter,
+  ellipsis,
+  info,
+  check,
+  down,
   cellular,
   wifi,
   battery,

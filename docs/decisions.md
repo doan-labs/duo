@@ -777,3 +777,24 @@ on the display the hinge is heading to and the lead never swings back over it.
 Nothing visible changes at the crossing, as before: both displays already show
 the session. Cost: the frame buttons act on the target side for the fraction of
 a second the hinge is still easing.
+
+## 59. Photos is the macOS Photos window, and baked apps keep shared state at module level
+
+Photos was a title over a square grid. It is now the macOS Photos window: a
+sidebar of Library and the pinned Favorites, Recently Saved and Recently
+Deleted, every row backed by a real filter; a toolbar with the − / + zoom pill, the Years / Months / All
+Photos switch, the aspect, filter, more, info, share, favourite and delete
+items and a search magnifier; a grid of aspect-fit thumbnails with a "45
+Photos" footer; and a dark viewer opened by clicking a selected photo. The
+macOS albums, sharing and utilities rows have nothing behind them here and are
+left out; filter and more are disabled. The toolbar is too wide for the 590 px beside the sidebar, so search
+opens a row under the toolbar rather than sitting in it, the way macOS
+collapses a narrow window's toolbar. Folded, the same window loses the inline
+sidebar and the sidebar button slides it over the grid.
+
+Photos is baked into the shell bundle, so it cannot use the SDK's `useKV`
+React hook: `packages/sdk/react.ts` imports React, which resolves from
+`packages/sdk`, and only sandboxed apps carry their own React. Selection,
+favourites and the bin therefore live in a module-level store read through
+`useSyncExternalStore`, which is also what decision 24's mirror needs: the copy
+the other display holds during a fold reads the same library.

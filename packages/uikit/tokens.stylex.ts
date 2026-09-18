@@ -92,6 +92,21 @@ export const easing = stylex.defineConsts({
 
 /** Exact values harvested from official apps. Names identify their first use; no visual redesign. */
 export const appAppearance = stylex.defineConsts({
+  photosSidebarBackgroundColor: '#ececec',
+  photosSidebarBorderColor: 'rgba(0,0,0,.1)',
+  photosSelectionBackgroundColor: 'rgba(0,0,0,.08)',
+  photosControlBackgroundColor: 'rgba(0,0,0,.055)',
+  photosSegmentBoxShadow: '0 1px 3px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.06)',
+  photosBadgeTextShadow: '0 1px 3px rgba(0,0,0,.5)',
+  photosViewerBackgroundColor: 'rgba(0,0,0,.94)',
+  photosFontSize: '13px',
+  photosFontSize2: '11px',
+  photosFontSize3: '15px',
+  photosFontWeight: 600,
+  photosFontWeight2: 500,
+  photosBorderRadius: '5px',
+  photosBorderRadius2: '7px',
+  photosBorderRadius3: '3px',
   weatherRim: 'inset 0 1px 0 rgba(255,255,255,.42),inset 0 0 0 0.5px rgba(255,255,255,.2)',
   weatherShadowSmall: '0 2px 10px rgba(6,20,40,.16)',
   weatherShadowLarge: '0 10px 30px rgba(6,20,40,.14)',

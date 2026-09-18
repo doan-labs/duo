@@ -46,7 +46,7 @@ import type { App } from '@doan-labs/duo-uikit/app.ts'
 export const LEFT: App[] = [
   { name: 'FaceTime', mock: true, view: FaceTime },
   { name: 'Calendar', light: true, view: Calendar },
-  { name: 'Photos', light: true, view: Photos },
+  { name: 'Photos', light: true, edge: true, view: Photos },
   { name: 'Camera', view: Camera },
   { name: 'Mail', mock: true, light: true, view: Mail },
   { name: 'Clock', view: Clock },
