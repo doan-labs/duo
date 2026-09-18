@@ -798,3 +798,20 @@ React hook: `packages/sdk/react.ts` imports React, which resolves from
 favourites and the bin therefore live in a module-level store read through
 `useSyncExternalStore`, which is also what decision 24's mirror needs: the copy
 the other display holds during a fold reads the same library.
+## 60. Maps draws its own tiles instead of embedding OpenStreetMap
+
+2026-09-18. Maps was an `<iframe>` of openstreetmap.org: it brought a foreign map's chrome
+into the frame and never rendered in a headless capture. It now draws raster tiles itself.
+`packages/apps/maps/data.ts` holds the Web Mercator maths, the tile URLs and the places;
+`map.tsx` lays out the tile grid with pointer-capture panning over it. The furniture is
+Apple Maps': a full-height sidebar of search, one Siri suggestion and recents, the selected
+place's card beside it, pins carrying their own labels rather than callouts, and a glass
+control stack down the right edge. Explore uses OpenStreetMap Japan's MapTiler Basic raster
+and Satellite uses Esri World Imagery, both keyless, because CARTO watermarks anonymous
+requests and Stadia rejects them.
+
+Nothing routes or geocodes. A place owns its walking time, search filters the list, and
+every control that would have needed a backend — guides, saved places, share, report an
+issue, the account avatar — was removed rather than left as decoration. Places sit at their
+real coordinates to about a block, walking times are invented, and recents are sampled from
+the list at load, so the session opens on a different three each time.

@@ -118,7 +118,8 @@ permissions, cross-tab removal and stale-generation rejection after reinstall.
 The kit gallery covered external package consumption, keyboard/navigation, mirror state
 and reduced motion. All 39 official app surfaces were captured at both fold endpoints
 (78 inspected captures); this was a rendering smoke matrix, not exhaustive interaction.
-Maps' external embed was blank in both baseline and final headless captures. Camera used
+Maps' external embed was blank in both baseline and final headless captures; it has since
+been rebuilt on tiles it draws itself and does render there (decision 60). Camera used
 its unavailable state in headless Chromium.
 
 Native checks covered real Store installation, field-note persistence across process

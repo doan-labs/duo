@@ -145,6 +145,22 @@ pseudo-elements apply; non-auto values override the detailed thumb skin in Chrom
 Other engines use the thin/tinted fallback. [Scrollbar verification](debug.md#known-false-alarms)
 must disable Puppeteer's default scrollbar hiding.
 
+## Maps maintenance
+
+`data.ts` owns the places, the tile URLs and the Web Mercator maths; `map.tsx` draws the
+tile grid, the pins and the map chrome, `sidebar.tsx` the search column, `place.tsx` the
+selected place. Explore uses OpenStreetMap Japan's MapTiler Basic raster and Satellite uses
+Esri World Imagery, both keyless: CARTO watermarks anonymous requests and Stadia rejects
+them. Places sit at their real coordinates; walking times are invented, and recents are
+sampled from the list at load rather than persisted. Nothing routes or geocodes, so search
+filters the place list and no control opens a backend.
+
+Panels run the full height of the display and pad their own content past the 40 px status
+stack, which the map draws under. `ASIDE` and `CARD` in `styles.ts` are also what the map
+centres against through `padX` in `index.tsx`; changing one without the other offsets every
+pin from the space it was meant to fill. Below 600 px the same panels become one bottom
+sheet, sized by `SHEET`.
+
 ## Website
 
 `packages/web` is the developer site: TanStack Start on Vite, StyleX through

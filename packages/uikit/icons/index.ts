@@ -110,6 +110,20 @@ const aqi = '/icons/sym/aqi-medium.webp'
 const umbrella = '/icons/sym/umbrella-fill.webp'
 const calendarSym = '/icons/sym/calendar.webp'
 const clockSym = '/icons/sym/clock.webp'
+const pin = '/icons/sym/mappin.webp'
+const walk = '/icons/sym/figure-walk.webp'
+const bus = '/icons/sym/bus-fill.webp'
+const tram = '/icons/sym/tram-fill.webp'
+const fork = '/icons/sym/fork-knife.webp'
+const cup = '/icons/sym/cup-and-saucer-fill.webp'
+const cart = '/icons/sym/cart-fill.webp'
+const cross = '/icons/sym/cross-fill.webp'
+const leaf = '/icons/sym/leaf-fill.webp'
+const museum = '/icons/sym/building-columns-fill.webp'
+const film = '/icons/sym/film-fill.webp'
+const star = '/icons/sym/star.webp'
+const tick = '/icons/sym/checkmark.webp'
+const globe = '/icons/sym/globe-americas-fill.webp'
 const volume = '/icons/sym/speaker-wave-3-fill.webp'
 const share = '/icons/sym/square-and-arrow-up.webp'
 const compose = '/icons/sym/square-and-pencil.webp'
@@ -376,7 +390,21 @@ export const SYM = {
   aqi,
   umbrella,
   calendarSym,
-  clockSym
+  clockSym,
+  pin,
+  walk,
+  bus,
+  tram,
+  fork,
+  cup,
+  cart,
+  cross,
+  leaf,
+  museum,
+  film,
+  star,
+  tick,
+  globe
 }
 
 /** The wallpaper rides along under this key: screen.ts needs it decoded too. */

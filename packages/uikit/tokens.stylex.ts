@@ -345,5 +345,25 @@ export const appAppearance = stylex.defineConsts({
   findmyBoxShadow: '0 2px 8px rgba(0,0,0,.4)',
   findmyBackgroundColor: 'rgba(10,124,255,.35)',
   findmyBackgroundColor2: '#eaf3ff',
-  remindersTransitionTimingFunction: 'cubic-bezier(.2,1.5,.4,1)'
+  remindersTransitionTimingFunction: 'cubic-bezier(.2,1.5,.4,1)',
+  /** Apple Maps: the land tone a tile paints over, the sidebar material and the floating card. */
+  mapsLand: '#f2efe9',
+  mapsPanel: 'rgba(246,246,248,.82)',
+  mapsCard: 'rgba(255,255,255,.96)',
+  mapsControl: 'rgba(255,255,255,.86)',
+  mapsField: 'rgba(118,118,128,.12)',
+  mapsHairline: 'rgba(60,60,67,.13)',
+  mapsHover: 'rgba(120,120,128,.1)',
+  mapsSelected: 'rgba(10,124,255,.14)',
+  mapsShadow: '0 8px 30px rgba(0,0,0,.18)',
+  mapsControlShadow: '0 1px 4px rgba(0,0,0,.2)',
+  mapsPinShadow: '0 1px 3px rgba(0,0,0,.3)',
+  mapsMarkerShadow: '0 3px 10px rgba(0,0,0,.35)',
+  /** Map labels sit on the tiles behind a halo instead of a plate: white over the light map, black over imagery. */
+  mapsLabelShadow: '0 0 3px #fff,0 0 6px #fff,0 0 10px #fff',
+  mapsLabelShadowDark: '0 0 3px rgba(0,0,0,.9),0 1px 6px rgba(0,0,0,.7)',
+  mapsDotShadow: '0 0 0 2.5px #fff,0 1px 6px rgba(0,0,0,.35)',
+  /** Apple's brown for landmark and museum pins. */
+  mapsBrown: '#a2845e',
+  mapsBorderRadius: '12px'
 })

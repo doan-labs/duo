@@ -50,7 +50,7 @@ export const LEFT: App[] = [
   { name: 'Camera', view: Camera },
   { name: 'Mail', mock: true, light: true, view: Mail },
   { name: 'Clock', view: Clock },
-  { name: 'Maps', light: true, view: Maps },
+  { name: 'Maps', light: true, edge: true, view: Maps },
   { name: 'TV', mock: true, view: Tv },
   { name: 'News', light: true, view: News },
   { name: 'Health', mock: true, light: true, view: Health },

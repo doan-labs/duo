@@ -4,7 +4,8 @@ dist/
 .DS_Store
 
 # Apple's iPhone Duo model, fetched per clone: python3 scripts/prepare-model.py
-public/model/
+# No trailing slash: a worktree usually links this at the main checkout's copy.
+public/model
 
 # Blender scratch output
 design/blender/tex/
