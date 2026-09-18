@@ -42,8 +42,8 @@ and the exact document policy, then commits release bytes and the installed reco
 one IndexedDB transaction. Interrupted downloads create no partial installation.
 Document size is 1 MiB soft / 4 MiB hard; complete releases have an 8 MiB hard cap.
 
-OPEN launches the stored document through the sandbox. Notes and Weather are seeded
-from separate bundled releases once. A removed preinstalled app is not silently seeded
+OPEN launches the stored document through the sandbox. The preinstalled official apps
+are seeded from separate bundled releases once. A removed preinstalled app is not silently seeded
 again. Native bundled assets can support offline installation; a network URL on the web
 is not an offline cache guarantee.
 

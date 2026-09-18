@@ -5,7 +5,7 @@ import { delay, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 
-export const IN_FOLDER = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'App Store', 'Books', 'YouTube']
+export const IN_FOLDER = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books', 'YouTube']
 
 /** The folder's own screen: the icons it holds, at home-screen size. */
 export const Utilities = ({ os }: { os: Os }) => (

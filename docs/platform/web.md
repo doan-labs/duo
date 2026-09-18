@@ -194,7 +194,7 @@ the site invents a command: every one quoted is in `packages/cli/README.md` or
 `useNav` no longer appears twice) and a value declared in the index itself
 (`os`). 58 exports generate, up from 54.
 
-The embed needed one more copy: the runtime seeds Notes and Weather from
+The embed needed one more copy: the runtime seeds the preinstalled apps from
 `/preinstalled/index.json` and reads `/cdn/index.json` first, both absolute,
 so `scripts/simulator.ts` now copies `dist/cdn` and `dist/preinstalled` to the
 site root beside `/model` and `/icons`. Without them the Store frame showed
@@ -234,7 +234,7 @@ nothing is published, no host is chosen, no CI deploys it.
 | 4 | The core idea | "The fold is not a breakpoint. It is input." Four postures, `useDisplay()` code, a live readout | `home/fold.tsx`; `animate(open, deg / 180)` on the CSS device |
 | 5 | Build | "Build software for hardware that doesn't exist yet." Terminal, editor beside the device; a colour line changes and the phone folds on a loop; "Change code. Fold the phone. See what breaks." | `home/build.tsx` |
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
-| 7 | In the catalog | The apps published in `/catalog/index.json`, read at build time into `src/generated/catalog.ts`: release icon, newest version, lane | `home/apps.tsx`, reused by `routes/apps.tsx` |
+| 7 | The apps | The catalog (`/catalog/index.json`) and the shell's home-screen list, read at build time into `src/generated/catalog.ts`. `/apps` groups the official lane by status behind `<details>`: Published (open), Built in and In development (folded) | `home/apps.tsx`, reused by `routes/apps.tsx` |
 | 8 | Open | "The platform is open. So are the apps." Four facts, the Berlin sentence, fork → PR → review → Duo Store | `home/open.tsx` |
 | 9 | Go | "Build something strange for a phone that doesn't exist." Try Duo, Read the docs, View on GitHub | `home/cta.tsx` |
 

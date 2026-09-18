@@ -11,8 +11,10 @@ accepted design; [current platform verification](review.md) states what has been
 | Installed app | Verified immutable document from bundled assets or a selected catalog | SDK through an opaque sandbox; no shell DOM/storage or direct Tauri IPC |
 | Development app | Verified CLI document in a separate development namespace | Same sandbox and SDK; device permissions refused |
 
-Notes and Weather are separately built, preinstalled sandbox apps. Other existing apps
-remain trusted baked components. Lane does not grant privileges. Apps may bundle React
+Calculator, Calendar, Clock, Freeform, News, Notes, Photos, Reminders and Weather are separately built,
+preinstalled sandbox apps (`scripts/build-preinstalled.ts` builds every `packages/apps/*/manifest.json`).
+Camera, Voice Memos, Maps, Safari, YouTube and App Store remain trusted baked components:
+the document policy allows no camera, microphone or frames. Lane does not grant privileges. Apps may bundle React
 and the kit but never share the shell's JavaScript, stylesheet or import map.
 
 ## Responsibilities

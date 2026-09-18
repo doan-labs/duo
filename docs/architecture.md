@@ -22,7 +22,7 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 | `screen.ts`, `shaders/` | Baked shell textures, fold geometry and fixed-eye projection |
 | `runtime/` | Isolated app authority; [module map and invariants](platform/runtime.md) |
 | `native.ts`, `desktop/` | Typed IPC/defaults; Rust wiring, feature commands and OS-specific platform implementations |
-| `packages/apps/` | App-local presentation/effects; Notes and Weather are sandbox releases, other existing apps remain baked |
+| `packages/apps/` | App-local presentation/effects; every folder with a `manifest.json` is a preinstalled sandbox release, the rest stay baked (they need the camera, microphone or embedded pages) |
 | `packages/sdk/`, `packages/uikit/` | Host protocol/manifest/state API; presentation, tokens, icons and subscription-only display hooks |
 | `packages/web/` | Launch site and developer docs: TanStack Start prerendered to `dist/client`, docs from `content/docs/*.md`, references generated from the SDK and kit exports, the shell embedded in a frame and posed over the `main.ts` bridge ([website](platform/web.md)) |
 | Root build tooling | StyleX transform, isolated app/preinstalled builds and shell output |

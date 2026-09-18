@@ -12,6 +12,11 @@ import { startWidgets } from './widgets.tsx'
 let revision = 0
 const listeners = new Set<() => void>()
 const icons = new Map<string, { release: string; url: string }>()
+// Where apps.ts places each release on the home screen, read before any is spliced out.
+// A release listed only in APPS (inside a folder) has no home-screen slot; a new install lands last on the right.
+const SLOTS = new Map<string, [App[], number] | null>()
+for (const a of APPS) if (a.id) SLOTS.set(a.id, null)
+for (const list of [LEFT, RIGHT]) list.forEach((a, i) => a.id && SLOTS.set(a.id, [list, i]))
 export const registryRevision = () => revision
 export const subscribeRegistry = (fn: () => void) => {
   listeners.add(fn)
@@ -59,9 +64,8 @@ export function refreshRegistry() {
         if (existing) Object.assign(existing, tile)
         else {
           APPS.push(tile)
-          if (app.id === 'labs.doan.ipduo.notes') LEFT.splice(5, 0, tile)
-          else if (app.id === 'labs.doan.ipduo.weather') RIGHT.unshift(tile)
-          else RIGHT.push(tile)
+          const slot: [App[], number] | null | undefined = SLOTS.has(app.id) ? SLOTS.get(app.id) : [RIGHT, RIGHT.length]
+          if (slot) slot[0].splice(Math.min(slot[1], slot[0].length), 0, tile)
         }
       }
       revision++

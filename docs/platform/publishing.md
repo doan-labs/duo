@@ -72,7 +72,7 @@ Retry a failed publication with `workflow_dispatch` and the folder name.
 ## Hosting
 
 The website build runs `packages/web/scripts/catalog.ts`: it unpacks `origin/catalog` into
-`public/catalog/` when reachable and merges the bundled Notes and Weather releases from
+`public/catalog/` when reachable and merges the nine bundled official releases from
 `dist/cdn` with the same publisher, so the hosted Store lists official and community apps
 from one origin. The Store loads `/catalog/index.json`, then `/cdn`, then `/preinstalled`.
 Catalog hashes are integrity checks, not signatures; publisher identity and signing remain

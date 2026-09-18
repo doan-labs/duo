@@ -43,7 +43,7 @@ try {
         timeout: 120000
       })
       await page.waitForSelector('[data-app]', { timeout: 60000 })
-      if (app === 'Notes' || app === 'Weather')
+      if (await page.$('[data-app] iframe'))
         await page.waitForSelector('iframe[data-state="ready"]', { timeout: 60000 })
       await new Promise((r) => setTimeout(r, 2400))
       const state = await page.evaluate((angle) => {

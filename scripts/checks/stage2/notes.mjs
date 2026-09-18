@@ -18,22 +18,41 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('iframe[data-state="ready"]').length === 2, {
     timeout: 60000
   })
-  const frames = page.frames().filter((f) => f.parentFrame())
-  const inner = frames[0]
-  await inner.waitForSelector('textarea')
+  // A fresh profile has no notes: compose one, then wait for the display that renders its editor.
+  const editor = async () => {
+    const frames = page.frames().filter((f) => f.parentFrame())
+    for (const f of frames) if (await f.$('textarea')) return f
+    return frames[0]
+  }
+  const list = await editor()
+  await list.waitForSelector('[aria-label="New note"]')
+  await list.evaluate(() => document.querySelector('[aria-label="New note"]').click())
+  await list.waitForSelector('textarea')
+  const inner = await editor()
   await inner.evaluate(() => {
     const area = document.querySelector('textarea')
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(area, 'Sandboxed Notes persists')
     area.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  await inner.waitForFunction(() => document.querySelector('[role="status"]')?.textContent === 'Saved')
+  // The list titles a note from its stored text, so the row proves the write reached storage.
+  // innerText skips the textarea, so this line can only come from the list row.
+  await inner.waitForFunction(() => document.body.innerText.includes('Sandboxed Notes persists'))
   await page.screenshot({ path: '.cache/debug/stage2/notes-180.png' })
   await page.reload({ timeout: 120000 })
   await page.waitForFunction(() => document.querySelectorAll('iframe[data-state="ready"]').length === 2, {
     timeout: 60000
   })
-  const next = page.frames().filter((f) => f.parentFrame())[0]
-  await next.waitForSelector('textarea')
+  // The selection lives in session storage and does not survive a reload: pick the row again.
+  const list2 = page.frames().filter((f) => f.parentFrame())[0]
+  await list2.waitForFunction(() => document.body.innerText.includes('Sandboxed Notes persists'))
+  await list2.evaluate(() => {
+    const row = [...document.querySelectorAll('*')].find(
+      (e) => e.childElementCount === 0 && e.textContent === 'Sandboxed Notes persists'
+    )
+    row.closest('button, li, [role="button"], a')?.click() ?? row.click()
+  })
+  await list2.waitForSelector('textarea')
+  const next = await editor()
   await next.waitForFunction(() => document.querySelector('textarea')?.value === 'Sandboxed Notes persists')
   assert.equal(await next.evaluate(() => document.querySelector('textarea').value), 'Sandboxed Notes persists')
   await next.focus('textarea')

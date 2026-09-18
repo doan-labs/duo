@@ -1,7 +1,6 @@
 // The macOS Photos window: a sidebar of albums, a toolbar with the zoom pill,
 // the Years / Months / All Photos switch and the item actions, and a grid of
 // aspect-fit thumbnails. Folded, the sidebar becomes a panel over the grid.
-import type { Os } from '@doan-labs/duo-sdk'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
@@ -9,12 +8,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   filter,
   itemName,
-  library,
   month,
   type Pic,
   range,
   toggle,
   update,
+  useLibrary,
   useStore,
   VIEWS,
   type View,
@@ -26,7 +25,7 @@ import { styles } from './styles.ts'
 /** Thumbnail minimum widths the − / + pill steps through. */
 const ZOOM = [56, 76, 96, 130, 190]
 
-export const Photos = ({ os }: { os: Os }) => {
+export const Photos = () => {
   const root = useRef<HTMLDivElement>(null)
   const [wide, setWide] = useState(false)
   // Unfolded the sidebar is open until hidden; folded it starts closed and slides over the grid.
@@ -42,7 +41,8 @@ export const Photos = ({ os }: { os: Os }) => {
     ro.observe(root.current!)
     return () => ro.disconnect()
   }, [])
-  const pics = filter(place, library(os.shots), fav, del, q ?? '')
+  const { pics: all, loading } = useLibrary()
+  const pics = filter(place, all, fav, del, q ?? '')
   const selected = pics.find((p) => p.id === sel)
   const viewing = pics.find((p) => p.id === open)
   const pick = (place: string) => {
@@ -229,7 +229,7 @@ export const Photos = ({ os }: { os: Os }) => {
             </section>
           ))}
           <div {...stylex.props(styles.count)}>
-            {pics.length ? `${pics.length} ${pics.length === 1 ? 'Photo' : 'Photos'}` : 'No Photos'}
+            {loading ? 'Loading' : pics.length ? `${pics.length} ${pics.length === 1 ? 'Photo' : 'Photos'}` : 'No Photos'}
           </div>
         </div>
       </div>

@@ -1,0 +1,12 @@
+{
+  "id": "labs.doan.ipduo.calendar",
+  "name": "Calendar",
+  "version": "1.0.0",
+  "lane": "official",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "light": true,
+  "author": "Doan Labs",
+  "repo": "https://github.com/doan-labs/duo",
+  "license": "MIT"
+}

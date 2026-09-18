@@ -1,6 +1,8 @@
 import { Row, Screen, Section, Title } from '@doan-labs/duo-uikit'
-// Reminders. A checklist kept in localStorage, so it survives a reload.
+// Reminders. A checklist kept in the app's storage, so it survives a reload and both displays agree on it.
 
+import { os } from '@doan-labs/duo-sdk'
+import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { beep } from '@doan-labs/duo-uikit/shared.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type KeyboardEvent, useState } from 'react'
@@ -8,7 +10,6 @@ import { styles } from './styles.ts'
 
 type Task = { t: string; done: boolean }
 
-const KEY = 'duo.reminders'
 const DEFAULTS: Task[] = [
   { t: 'Re-render the macro shot at 400 samples', done: false },
   { t: 'Measure the spine radius against the mock', done: false },
@@ -16,16 +17,12 @@ const DEFAULTS: Task[] = [
   { t: 'Ask about the CSS3D panel tone mapping', done: false },
   { t: 'Polish the titanium', done: false }
 ]
-const load = (): Task[] => JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? DEFAULTS
-const save = (items: Task[]) => localStorage.setItem(KEY, JSON.stringify(items))
 
 export const Reminders = () => {
-  const [items, setItems] = useState(load)
+  const kv = useKV(os.storage, 'tasks')
+  const items: Task[] = kv.value ? JSON.parse(kv.value) : DEFAULTS
   const [draft, setDraft] = useState('')
-  const update = (next: Task[]) => {
-    setItems(next)
-    save(next)
-  }
+  const update = (next: Task[]) => kv.set(JSON.stringify(next))
   const flip = (i: number) => {
     const next = items.map((task, j) => (j === i ? { ...task, done: !task.done } : task))
     update(next)

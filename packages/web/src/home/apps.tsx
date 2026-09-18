@@ -18,7 +18,10 @@ type Entry = { key: string; name: string; icon: string; author: string; status: 
 
 const STATUS: Record<Status, { label: string; text: string }> = {
   published: { label: 'Published', text: 'In the catalog. Installs through the Store on any Duo.' },
-  working: { label: 'In the simulator', text: 'Built into the shell and working; not yet cut as a catalog release.' },
+  working: {
+    label: 'Built in',
+    text: 'Runs inside the shell. Needs the camera, microphone or embedded pages the app sandbox does not allow.'
+  },
   mockup: { label: 'In development', text: 'A static screen with invented data while the real app is built.' }
 }
 const ORDER: Status[] = ['published', 'working', 'mockup']
@@ -124,23 +127,31 @@ export function Browser() {
           ) : layout === 'list' ? (
             <Shelf apps={l.apps} layout="list" />
           ) : (
-            ORDER.filter((s) => l.apps.some((a) => a.status === s)).map((s) => {
-              const apps = l.apps.filter((a) => a.status === s)
-              return (
-                <div key={s} {...stylex.props(styles.group)}>
-                  <h3 {...stylex.props(styles.groupTitle)}>
-                    <StatusChip status={s} />
-                    <span {...stylex.props(styles.groupText)}>{STATUS[s].text}</span>
-                    <span {...stylex.props(styles.count)}>{apps.length}</span>
-                  </h3>
-                  <Shelf apps={apps} layout="grid" />
-                </div>
-              )
-            })
+            ORDER.filter((s) => l.apps.some((a) => a.status === s)).map((s) => (
+              <Group key={s} status={s} apps={l.apps.filter((a) => a.status === s)} />
+            ))
           )}
         </section>
       ))}
     </>
+  )
+}
+
+/** One status group, folded away unless it is the published one. */
+function Group({ status, apps }: { status: Status; apps: Entry[] }) {
+  const [open, setOpen] = useState(status === 'published')
+  return (
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} {...stylex.props(styles.group)}>
+      <summary {...stylex.props(styles.groupTitle)}>
+        <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>
+          <Glyph name="chevron" />
+        </span>
+        <StatusChip status={status} />
+        <span {...stylex.props(styles.groupText)}>{STATUS[status].text}</span>
+        <span {...stylex.props(styles.count)}>{apps.length}</span>
+      </summary>
+      <Shelf apps={apps} layout="grid" />
+    </details>
   )
 }
 
@@ -282,7 +293,8 @@ const GLYPHS: Record<string, string> = {
   working: 'M3 4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM6 13.5h4M8 11.5v2',
   mockup: 'M3.5 3.5h9v9h-9zM3.5 6.5h9M6.5 6.5v6',
   grid: 'M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5V7H9zM2.5 9H7v4.5H2.5zM9 9h4.5v4.5H9z',
-  list: 'M5 3.5h8.5M5 8h8.5M5 12.5h8.5M2.5 3.5h.01M2.5 8h.01M2.5 12.5h.01'
+  list: 'M5 3.5h8.5M5 8h8.5M5 12.5h8.5M2.5 3.5h.01M2.5 8h.01M2.5 12.5h.01',
+  chevron: 'M6 4l4 4-4 4'
 }
 
 const styles = stylex.create({
@@ -342,8 +354,18 @@ const styles = stylex.create({
     gap: '10px',
     fontFamily: font.sans,
     fontSize: '14px',
-    fontWeight: 400
+    fontWeight: 400,
+    cursor: 'pointer',
+    listStyleType: 'none',
+    '::-webkit-details-marker': { display: 'none' }
   },
+  chevron: {
+    display: 'inline-flex',
+    color: color.text3,
+    transitionProperty: 'transform',
+    transitionDuration: '0.15s'
+  },
+  chevronOpen: { transform: 'rotate(90deg)' },
   groupText: { color: color.text2 },
   empty: {
     marginTop: '20px',

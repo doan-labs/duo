@@ -14,6 +14,71 @@ export type CatalogApp = {
 }
 export const CATALOG: CatalogApp[] = [
   {
+    "id": "labs.doan.ipduo.calculator",
+    "name": "Calculator",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:22.945Z",
+    "updated": "2026-09-18T09:54:22.945Z",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.0.0+39d19c2c/icon-1024.png"
+  },
+  {
+    "id": "labs.doan.ipduo.calendar",
+    "name": "Calendar",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:23.235Z",
+    "updated": "2026-09-18T09:54:23.235Z",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.0.0+e8a7bdd4/icon-1024.png"
+  },
+  {
+    "id": "labs.doan.ipduo.clock",
+    "name": "Clock",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:23.518Z",
+    "updated": "2026-09-18T09:54:23.518Z",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.0.0+5b1f4fc2/icon-1024.png"
+  },
+  {
+    "id": "labs.doan.ipduo.freeform",
+    "name": "Freeform",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:23.836Z",
+    "updated": "2026-09-18T09:54:23.836Z",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+6cf7a6d4/icon-1024.png"
+  },
+  {
+    "id": "labs.doan.ipduo.news",
+    "name": "News",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:24.144Z",
+    "updated": "2026-09-18T09:54:24.144Z",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.news/1.0.0+ab88d004/icon-1024.png"
+  },
+  {
     "id": "labs.doan.ipduo.notes",
     "name": "Notes",
     "author": "Doan Labs",
@@ -21,10 +86,41 @@ export const CATALOG: CatalogApp[] = [
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.0.0",
     "releases": 1,
-    "created": "2026-09-18T09:24:47.576Z",
-    "updated": "2026-09-18T09:24:47.576Z",
+    "created": "2026-09-18T09:54:24.488Z",
+    "updated": "2026-09-18T09:54:24.488Z",
     "permissions": [],
     "icon": "/catalog/apps/labs.doan.ipduo.notes/1.0.0+140756fa/icon-1024.png"
+  },
+  {
+    "id": "labs.doan.ipduo.photos",
+    "name": "Photos",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:24.859Z",
+    "updated": "2026-09-18T09:54:24.859Z",
+    "permissions": [
+      {
+        "name": "photos",
+        "label": "Photos"
+      }
+    ],
+    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+4bf8072c/icon-1024.png"
+  },
+  {
+    "id": "labs.doan.ipduo.reminders",
+    "name": "Reminders",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-18T09:54:25.164Z",
+    "updated": "2026-09-18T09:54:25.164Z",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.0.0+9a1160df/icon-1024.png"
   },
   {
     "id": "labs.doan.ipduo.weather",
@@ -34,8 +130,8 @@ export const CATALOG: CatalogApp[] = [
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.0.0",
     "releases": 1,
-    "created": "2026-09-18T09:24:47.761Z",
-    "updated": "2026-09-18T09:24:47.761Z",
+    "created": "2026-09-18T09:54:25.611Z",
+    "updated": "2026-09-18T09:54:25.611Z",
     "permissions": [
       {
         "name": "geolocation",
@@ -78,6 +174,11 @@ export const SHELL: { name: string; icon: string; mock: boolean }[] = [
     "mock": false
   },
   {
+    "name": "Notes",
+    "icon": "/icons/notes.webp",
+    "mock": false
+  },
+  {
     "name": "Maps",
     "icon": "/icons/maps.webp",
     "mock": false
@@ -111,6 +212,11 @@ export const SHELL: { name: string; icon: string; mock: boolean }[] = [
     "name": "Settings",
     "icon": "/icons/settings.webp",
     "mock": true
+  },
+  {
+    "name": "Weather",
+    "icon": "/icons/weather.webp",
+    "mock": false
   },
   {
     "name": "Stocks",

@@ -1,32 +1,50 @@
+import { os, type Photo } from '@doan-labs/duo-sdk'
 import type { SYM } from '@doan-labs/duo-uikit/icons/index.ts'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 export type Pic = { id: string; src: string; takenAt: number; ratio: number }
 
-const FIRST = new Date(2026, 1, 28, 9).getTime()
-const LAST = new Date(2026, 8, 8, 18).getTime()
-const SHAPES = [
-  [400, 300],
-  [300, 400],
-  [400, 400],
-  [520, 300],
-  [300, 520],
-  [400, 260]
-]
-
-/** Camera shots first (portrait, like the viewfinder), then placeholders spread across the library's dates. */
-export const library = (shots: string[]): Pic[] => [
-  ...shots.map((src, i) => ({ id: `shot:${src}`, src, takenAt: Date.now() - i * 60_000, ratio: 3 / 4 })),
-  ...Array.from({ length: 44 }, (_, i) => {
-    const [w, h] = SHAPES[(i * 7) % SHAPES.length]!
-    return {
-      id: `duo${i}`,
-      src: `https://picsum.photos/seed/duo${i}/${w}/${h}`,
-      takenAt: LAST - i * ((LAST - FIRST) / 43),
-      ratio: w! / h!
-    }
+/** Read a stored photo as a data URL: the sandbox document policy allows no other image source. */
+const dataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
   })
-]
+
+let cached: Pic[] | undefined
+/** The device's photo library through the SDK photos service, newest first; nothing invented. */
+export function useLibrary() {
+  const [pics, setPics] = useState<Pic[] | undefined>(cached)
+  useEffect(() => {
+    if (cached) return
+    let live = true
+    os.photos
+      .list()
+      .then((list: Photo[]) =>
+        Promise.all(
+          list.map(async (photo) => ({
+            id: photo.id,
+            src: await dataUrl(await os.photos.get(photo.id)),
+            takenAt: photo.takenAt,
+            ratio: photo.width / photo.height
+          }))
+        )
+      )
+      .then((all) => {
+        cached = all.sort((a, b) => b.takenAt - a.takenAt)
+        if (live) setPics(cached)
+      })
+      .catch(() => {
+        if (live) setPics([])
+      })
+    return () => {
+      live = false
+    }
+  }, [])
+  return { pics: pics ?? [], loading: pics === undefined }
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const LONG = [

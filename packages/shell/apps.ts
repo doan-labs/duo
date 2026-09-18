@@ -5,16 +5,12 @@
 
 import { AppStore } from '@doan-labs/duo-app-appstore/index.tsx'
 import { Books } from '@doan-labs/duo-app-books/index.tsx'
-import { Calculator } from '@doan-labs/duo-app-calculator/index.tsx'
-import { Calendar } from '@doan-labs/duo-app-calendar/index.tsx'
 import { Camera } from '@doan-labs/duo-app-camera/index.tsx'
-import { Clock } from '@doan-labs/duo-app-clock/index.tsx'
 import { Contacts } from '@doan-labs/duo-app-contacts/index.tsx'
 import { FaceTime } from '@doan-labs/duo-app-facetime/index.tsx'
 import { Files } from '@doan-labs/duo-app-files/index.tsx'
 import { FindMy } from '@doan-labs/duo-app-findmy/index.tsx'
 import { Fitness } from '@doan-labs/duo-app-fitness/index.tsx'
-import { Freeform } from '@doan-labs/duo-app-freeform/index.tsx'
 import { Health } from '@doan-labs/duo-app-health/index.tsx'
 import { Home } from '@doan-labs/duo-app-home/index.tsx'
 import { Itunes } from '@doan-labs/duo-app-itunes/index.tsx'
@@ -23,12 +19,9 @@ import { Maps } from '@doan-labs/duo-app-maps/index.tsx'
 import { Memos } from '@doan-labs/duo-app-memos/index.tsx'
 import { Messages } from '@doan-labs/duo-app-messages/index.tsx'
 import { Music } from '@doan-labs/duo-app-music/index.tsx'
-import { News } from '@doan-labs/duo-app-news/index.tsx'
 import { Phone } from '@doan-labs/duo-app-phone/index.tsx'
-import { Photos } from '@doan-labs/duo-app-photos/index.tsx'
 import { Podcasts } from '@doan-labs/duo-app-podcasts/index.tsx'
 import { Preview } from '@doan-labs/duo-app-preview/index.tsx'
-import { Reminders } from '@doan-labs/duo-app-reminders/index.tsx'
 import { Safari } from '@doan-labs/duo-app-safari/index.tsx'
 import { Settings } from '@doan-labs/duo-app-settings/index.tsx'
 import { Shortcuts } from '@doan-labs/duo-app-shortcuts/index.tsx'
@@ -44,17 +37,22 @@ import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { createElement } from 'react'
 import { openExternal } from './native.ts'
 
+// An entry with an `id` is an isolated release from the preinstalled catalog: it holds the
+// slot, and runtime/registry.ts fills in its icon once the release is installed.
+const RELEASE = { view: () => null }
+
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
   { name: 'FaceTime', mock: true, view: FaceTime },
-  { name: 'Calendar', light: true, view: Calendar },
-  { name: 'Photos', light: true, edge: true, view: Photos },
+  { name: 'Calendar', id: 'labs.doan.ipduo.calendar', light: true, ...RELEASE },
+  { name: 'Photos', id: 'labs.doan.ipduo.photos', light: true, ...RELEASE },
   { name: 'Camera', view: Camera },
   { name: 'Mail', mock: true, light: true, view: Mail },
-  { name: 'Clock', view: Clock },
+  { name: 'Clock', id: 'labs.doan.ipduo.clock', ...RELEASE },
+  { name: 'Notes', id: 'labs.doan.ipduo.notes', light: true, ...RELEASE },
   { name: 'Maps', light: true, edge: true, view: Maps },
   { name: 'TV', mock: true, view: Tv },
-  { name: 'News', light: true, view: News },
+  { name: 'News', id: 'labs.doan.ipduo.news', light: true, ...RELEASE },
   { name: 'Health', mock: true, light: true, view: Health },
   { name: 'Wallet', mock: true, view: Wallet },
   { name: 'Siri', mock: true, view: Siri },
@@ -63,19 +61,22 @@ export const LEFT: App[] = [
 
 /** Right half — only on the inner display, rows 1 to 6. */
 export const RIGHT: App[] = [
+  { name: 'Weather', id: 'labs.doan.ipduo.weather', edge: true, ...RELEASE },
   { name: 'Stocks', mock: true, view: Stocks },
   { name: 'Find My', mock: true, light: true, view: FindMy },
   { name: 'Home', mock: true, view: Home },
   { name: 'Fitness', mock: true, view: Fitness },
   { name: 'Watch', mock: true, view: Watch },
-  { name: 'Reminders', light: true, view: Reminders },
+  { name: 'Reminders', id: 'labs.doan.ipduo.reminders', light: true, ...RELEASE },
   { name: 'Files', mock: true, light: true, view: Files },
   { name: 'Preview', mock: true, light: true, view: Preview },
   { name: 'Utilities', view: Utilities, folder: IN_FOLDER },
   { name: 'Contacts', mock: true, light: true, view: Contacts },
   { name: 'iTunes Store', mock: true, light: true, view: Itunes },
-  { name: 'Freeform', light: true, view: Freeform },
-  { name: 'Tips', mock: true, light: true, view: Tips }
+  { name: 'Freeform', id: 'labs.doan.ipduo.freeform', light: true, ...RELEASE },
+  { name: 'Tips', mock: true, light: true, view: Tips },
+  // Baked apps never import the shell, so the Store gets its link opener as a prop.
+  { name: 'App Store', light: true, view: (props) => createElement(AppStore, { ...props, openExternal }) }
 ]
 
 export const DOCK: App[] = [
@@ -90,12 +91,10 @@ export const APPS: App[] = [
   ...LEFT,
   ...RIGHT,
   ...DOCK,
-  { name: 'Calculator', view: Calculator },
+  { name: 'Calculator', id: 'labs.doan.ipduo.calculator', ...RELEASE },
   { name: 'Voice Memos', view: Memos },
   { name: 'Shortcuts', mock: true, light: true, view: Shortcuts },
   { name: 'Podcasts', mock: true, light: true, view: Podcasts },
-  // Baked apps never import the shell, so the Store gets its link opener as a prop.
-  { name: 'App Store', light: true, view: (props) => createElement(AppStore, { ...props, openExternal }) },
   { name: 'Books', mock: true, light: true, view: Books },
   { name: 'YouTube', light: true, view: YouTube }
 ]
