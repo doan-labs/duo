@@ -1,6 +1,136 @@
 # Website: launch page, second build
 
-2026-09-18. The site was rewritten end to end from the launch brief: a phone
+## The core idea and the store step use the real shell too
+
+- "The fold is not a breakpoint" (`src/home/fold.tsx`) drives a `Simulator bare`
+  frame from its four posture chips. The code sample now shows what
+  `useDisplay()` really returns (display, angle, width, height) and the line
+  each posture reaches is lit; `src/highlight.tsx` colours it with a
+  hand-rolled tokenizer and `color.syn*` tokens that follow the section's theme.
+  The readout shows display, angle, placement and size. No CSS mockup remains
+  on the home page except in the build section.
+- The App Store step of the scrolling scene goes full width: caption centred on
+  top, the phone large beneath (`Simulator fill` takes the grid row's height).
+- Shell: with `?hud=0` the fit reserves no HUD bands and centres the image on
+  the phone's projected bounds, not the hinge, so a closed or half-open phone
+  sits in the middle of the frame. The flexible display's bounding box is now
+  cut at the hinge (only its moving side turns); before, a closed phone's
+  bounds swung the fixed half's width through the air, which also made the fit
+  shrink the phone more than needed in the desktop window.
+- `Simulator` paints the frame's backdrop from its own box, not the page body,
+  so a frame in a dark section is dark.
+- Verification: `bun scripts/check.mjs` PASS (14 routes × 3 widths × 2 schemes,
+  84 screenshots, 63 links); screenshots of 180°, 120°, 90° and 0° in the fold
+  section and of the full-width store step inspected.
+
+## One real shell carries the home story
+
+- The "Fold it" scene, the camera section and the App Store section are one
+  sticky scene in `src/home/works.tsx`: a single `Simulator bare` frame that
+  folds, turns and reopens over four captions, then crosses to the right column
+  for "Real hardware" and "The twist". The camera step shows a card that says
+  what will be asked and opens the Camera app only after "Allow camera"; the
+  store step opens the App Store. `camera.tsx` and `store.tsx` are gone.
+- The CSS device mockup no longer appears in that scene. The bridge gained
+  `?hud=0` (no controls), `paused` (render loop off while the frame is off
+  screen) and `app` (launch by name), and the frame URL is fixed at first
+  render: a live pose in `src` reloaded the scene on every scroll step, which
+  was the flashing and lag reported on the first cut.
+- The site describes Duo as a simulator of Apple's iPhone Duo, nowhere as a
+  phone that does not exist.
+- Verification: `bun scripts/check.mjs` PASS (13 routes × 3 widths × 2 schemes,
+  78 screenshots, 63 links); a headless scroll-through with a fake camera
+  confirmed zero frame reloads, the crossover, Allow → Camera app with a live
+  feed, App Store on the last step, and Home again on scrolling back.
+
+## Developer docs replace the rendered repository notes
+
+2026-09-18, after the rebase below. The owner reviewed the rebased pages and
+rejected two things: the "Get started · Works today" eyebrows with a status
+notice under every heading, and `/docs` listing the repository's planning and
+progress files. Decision 54 records the change.
+
+- `/docs` renders `packages/web/content/docs/*.md`: Start (Introduction,
+  Getting started, Your first app), Build (Manifest, Lifecycle, Displays and
+  the fold, Storage, Permissions), Ship (CLI, Catalogs, Publishing), and a
+  Reference group linking `/sdk`, `/kit` and `/changelog`. Each page has the
+  outline box when long, previous and next, and an edit link. The index shows
+  each page's first paragraph. Content is drawn from the SDK source
+  (`client.ts`, `protocol.ts`, `manifest.ts`, `permissions.ts`), the three
+  package READMEs, `dev.md`, `store.md`, `security.md` and `publishing.md`,
+  stated as what the code does today; the curated official catalog is named
+  as not live in Publishing.
+- `src/status.tsx` is deleted. No page carries a badge or a notice. Eyebrows
+  are the page's name or "Reference"; `PageTop` and `Title` lost their badge
+  slot.
+- `/get-started` is one four-step timeline (simulator, create, `?dev=`,
+  install) and four cards into the docs. `/sdk` is the usage sample, five
+  guide links and the generated reference without the baked-app host types.
+  `/kit` leads with the README's example and lists components before types.
+  `/publish` renders the Publishing page. Guidelines, Simulator, Changelog and
+  the home store note lost their notices and now link the new pages.
+- `src/markdown.tsx` resolves relative links against `content/docs/` and turns
+  a `/`-prefixed link into a router link. `scripts/check.mjs` requires tables
+  and code blocks on `/docs/manifest` and `/docs/lifecycle`.
+- One hydration mismatch found by the check on the new pages: the previous and
+  next links used `docs.indexOf(doc)` on loader data, which is a copy after
+  hydration. Matching by slug fixed it (`doc-body.tsx`).
+
+| Run | Result |
+| --- | --- |
+| `bun scripts/check.mjs http://localhost:3011` | PASS: 13 routes × 3 widths × 2 schemes, 78 screenshots, 63 links |
+| `bun run typecheck` (root, then `packages/web`) | passes |
+| Desktop screenshots of `/docs`, `/docs/introduction`, `/docs/displays`, `/get-started`, `/sdk`, `/kit`, `/publish` | inspected; the intro's package table became a list after its first column wrapped, and the SDK sample was shortened to fit the measure |
+
+## Rebased onto stages 2–5
+
+2026-09-18, later the same day. `feature/platform-web` was rebased onto `main`
+after stages 2–5 landed there, and every page that had described the platform
+as "being built" was rewritten against the code that now exists. Nothing on
+the site invents a command: every one quoted is in `packages/cli/README.md` or
+`docs/platform/review.md`.
+
+| Where | Before | Now |
+| --- | --- | --- |
+| `/docs` badges (`src/docs.ts`) | every `platform/*` file "Planning document"; the contract "Proposed" | the platform files whose header says what is implemented carry "Works today" with a note that their roadmap sections stay intent; progress records "Works today"; the contract "Works today"; revision 1's review "Transitional"; `platform/web.md` "Proposed" (deployment still open). New files ordered in: `stage-2-mvp`, `review`, `website-integration`, `progress/stage-2…5`, `progress/web`. Group renamed Platform plan → Platform |
+| `/get-started` | SDK path "Not built yet", `npx` commands | four steps that work locally: package archives, `create --packages`, `check`/`dev`, `?dev=` on the local simulator, `build`/`serve` and the Store's Developer catalog field. Links the CLI reference and Fold Compass |
+| `/sdk` | legacy types first; contract "Proposed"; `os` "proposed, not published" | the sandbox client (`os`, `useKV`) first with the usage from `dev.md`, generated cards for the non-legacy exports, the contract "Works today", the baked-app host types last as "Transitional"; camera and microphone stated as rejected |
+| `/kit` | "0.0.0, harvest is a later stage", "Developer app does not exist" | 0.1.0 private preview, 39 official surfaces on it, the Developer gallery linked as the live demo |
+| `/simulator` | `?dev=` "Not built yet" | `?dev=` in the parameter table |
+| `/changelog` | "Not built yet, all 0.0.0" | "Nothing published yet" as Proposed: kit 0.1.0 has the first changelog entry, the rest 0.0.0 from local archives |
+| `/publish` | PR template "later stage" | template still absent; the per-app checks and the CI workflow exist; the curated catalog does not |
+| `/apps`, `home/store.tsx`, `home/sdk.tsx`, `home/build.tsx` | "once the stage 2 runtime lands"; four brief primitives including `requestCamera()`; `npx create-duo-app` | "installs from a catalog through the Duo Store"; the store note says the frame's store is real, lists the bundled Notes and Weather, and takes a developer catalog URL; `useDisplay()` `useKV()` `os.commands` `os.open()`; the CLI's real create/dev lines and the `?dev=` URL; the editor snippet reads `display === 'cover'` |
+
+`scripts/api.ts` learned three shapes it silently skipped: a class
+(`PlatformError`), a re-export or local alias inside the target file
+(`animations`, `Symbol`, `useNavigation`, now named by their exported name so
+`useNav` no longer appears twice) and a value declared in the index itself
+(`os`). 58 exports generate, up from 54.
+
+The embed needed one more copy: the runtime seeds Notes and Weather from
+`/preinstalled/index.json` and reads `/cdn/index.json` first, both absolute,
+so `scripts/simulator.ts` now copies `dist/cdn` and `dist/preinstalled` to the
+site root beside `/model` and `/icons`. Without them the Store frame showed
+"Preinstalled catalog unavailable. Reload to retry." on a black screen.
+
+Verification, headless Chromium against `dist/client` on port 3011:
+
+| Run | Result |
+| --- | --- |
+| `bun scripts/check.mjs http://localhost:3011` | PASS: 13 routes × 3 widths × 2 schemes, 78 screenshots, 79 links (up from 35: the new doc pages), theme kept across reload, reduced motion, posture buttons, bridge, no-JS HTML |
+| `.cache/debug/web/store-wait.mjs` (the embedded shell on `?app=App%20Store`) | "Loading apps…" for under 8 s, then the App Store with Notes 1.0.0 and Weather 1.0.0 (OPEN, Remove App) and the Developer catalog field; the only 4xx is `/favicon.ico` |
+| Screenshots of `/docs`, `/get-started`, `/sdk`, `/kit` and home sections 3, 5, 6 | inspected: badges, commands and copy as described above |
+| `bun run typecheck` (root, then `packages/web`) | passes |
+| `bunx biome check` on the changed files | no lint errors; two files await the formatter's line wrapping (the PostToolUse hook is inactive in this session; the pre-commit hook formats staged files) |
+| `bun scripts/api.ts` | 58 exports |
+
+The "Awaiting stage 2" list at the bottom of the file is done in full.
+
+---
+
+## The second build
+
+The site was rewritten end to end from the launch brief: a phone
 Apple hasn't shipped, that you can build apps for. One story on `/`, told in
 ten sections, with the product as the centrepiece; the documentation pages
 stay and take the same nav, footer and type. Still at the website review gate:
@@ -13,7 +143,7 @@ nothing is published, no host is chosen, no CI deploys it.
 | 0 | Hero | "A phone Apple hasn't shipped, that you can build apps for." Try Duo, Build an app, the real shell full width | `home/hero.tsx`; `Simulator eager tall`; under 734 px the Remotion loop `public/hero.*` |
 | 1 | Not a mockup | "It looks like a concept. It behaves like a device." A device that folds, turns and opens as the page scrolls; four captions take turns | `home/works.tsx`; `useScroll` on a 320 vh track, `Device` from `device.tsx`; reduced motion gets a still device and the captions as a list |
 | 2 | Real hardware | "Your imaginary phone can use your real camera." The shell running Camera; "The apps are fake. The capabilities aren't." | `home/camera.tsx`, near-black palette via the `dark` theme class; the page asks for the webcam when the scene is on screen, then mounts `Simulator app="Camera" mount`, `allow="camera"` |
-| 3 | The twist | "And then we gave it an App Store." The shell on the App Store, six steps from Get to launch | `home/store.tsx`; a mono note says the sandboxed runtime is stage 2 and the store in the frame is the baked Get → wait → Open |
+| 3 | The twist | "And then we gave it an App Store." The shell on the App Store, six steps from Get to launch | `home/store.tsx`; a mono note says the runtime and store are real (stages 2–5) and the frame's store lists the bundled Notes and Weather until a developer catalog URL is pasted |
 | 4 | The core idea | "The fold is not a breakpoint. It is input." Four postures, `useDisplay()` code, a live readout | `home/fold.tsx`; `animate(open, deg / 180)` on the CSS device |
 | 5 | Build | "Build software for hardware that doesn't exist yet." Terminal, editor beside the device; a colour line changes and the phone folds on a loop; "Change code. Fold the phone. See what breaks." | `home/build.tsx` |
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
@@ -186,10 +316,10 @@ Screenshots: `.cache/debug/web/home-{desktop,tablet,phone}.png` and one per
 route and width, plus `simulator-embed-prod.png` with the real device inside
 the page.
 
-## Awaiting stage 2
+## Awaiting stage 2 (done, see the top of this file)
 
-Runtime-dependent pieces are on the site as labelled placeholders, not as
-working features:
+Runtime-dependent pieces were on the site as labelled placeholders until the
+rebase onto stages 2–5:
 
 - [ ] `?dev=` in the embedded simulator (Get started, Simulator pages) once the
       shell reads it; the frame already passes query parameters through.
@@ -198,8 +328,9 @@ working features:
       `packages/sdk` exports them; the generator already walks `index.ts`.
 - [ ] CLI commands on Get started once `packages/cli` ships `create`, `dev`
       and `check`; the page shows them as a plan today.
-- [ ] Kit component demos once the Developer app's demo file exists; the kit
-      pages are generated from TSDoc only.
+- [x] Kit component demos: every `/kit/<Component>` page renders the real
+      component from `src/kit-demos/<name>.tsx` with its source, and the props
+      table carries defaults and what the props extend.
 - [ ] Changelog entries once any package publishes a version and a
       `CHANGELOG.md`; the page reads them at build time already.
 - [ ] Manifest and permission tables from `packages/sdk/manifest.ts` and

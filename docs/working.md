@@ -44,9 +44,59 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | Split (inner display) | Swipe home bar up, hold ≥220 ms, drop on a half; occupied halves swap, hinge drop cancels |
 | Reset / minimap | Return yaw and camera to the default view |
 
-The active display changes at 40°. Ordinary folding keeps the existing views; split
-collapse replaces the inner half view. Camera gestures and clicks use screen-space
-coordinates, so zoom affects gesture distances. See [architecture](architecture.md#state-and-folding).
+- `?debug` exposes `window.__duo` (`bend`, `phone`, `renderer`, `scene`,
+  `camera`, `screens`, `device`, and `press(button, down)` for scripted presses).
+- `?deg=0..180&yaw=<radians>` pins the pose. `?app=Notes` boots into an app,
+  past the lock screen. `?yaw=-1.5708` faces the right edge and its buttons.
+  `?hud=0` drops the slider, buttons, hint and orbit widget and centres the fit
+  on the phone rather than the hinge: the phone alone, for a page that poses it
+  by postMessage (the site's home scenes, `Simulator bare`).
+- Gestures: swipe down from the top 26 px of a display for Control Center, from
+  the lock screen too. Swipe its home bar up, tap the scrim, `Esc` or Home close
+  it. Its volume slider is `device.level`; brightness is a black veil the shell
+  keeps after the panel is gone.
+- Control Center's three pages are the rail on its right edge: dot, note,
+  radiowaves. Folded, the rail sits under the pages instead: the cover is 387 px
+  and the grid plus a rail beside it would run into the status stack. Everything on them does something — the radios and the focus, lock
+  and mirroring tiles show in the status stack on both displays, the transport
+  plays real audio through the Music app's deck, the power glyph opens the
+  slide-to-power-off sheet, `+` wobbles the grid so a tile can be dropped (its
+  dashed slot brings it back).
+- Split screen (inner display): swipe an app's home bar up and hold still for a
+  quarter second; the app becomes a card and two frosted halves appear. Drop it
+  on one to take that half; the home screen squeezes into the other as a whole
+  narrow home (two pages, dock, search), like the cover display's. Open a second
+  app from there. Drop it on the half another app holds and they trade places; drop
+  it over the hinge and it goes back. Each half has its own home bar. Flick a
+  bar without pausing to close that app, as before.
+- Folding keeps the app running. It stays on the inner display, live and clipped
+  where the fold has taken the glass (`foldClip()` in main.ts), blurred and
+  darkened toward the fold the way the bake is (`ramp()`), all the way to
+  closed. The cover mirrors it from the first degree of fold, so wherever the
+  fold turns the cover to you it is already showing the app, with the same ramp
+  over its own width; the display in use switches at `HANDOVER` = 40° and
+  nothing shows for it. Open flat the cover is off, fading in over the first
+  30° of fold, so the back of an open phone is a sleeping display and not a
+  blurred copy of the app (decision 27). The ramp is `z-index: 11`; keep OS layers at 10 or
+  below (the power slider is there) or they will sit over the fold. Folding and
+  opening again does not touch the inner display's app — same DOM, same scroll,
+  no reload — and orbiting mid-fold keeps it too: the clip follows the camera.
+  Two halves fold to the first of them.
+- Keys: `Esc` goes home on both displays. The buttons on the frame are `L`
+  (side), `C` (Camera Control), `↑` `↓` (volume); hold `L` and tap `↑` for a
+  screenshot, keep both down for the power-off slider. A mouse can only press
+  one button at a time, so chords are keyboard, or key plus click.
+- Reset view (the pill's ↺, or a click on the minimap) unwinds yaw and eases the
+  camera back to z = 40. Both are dimmed / hidden while the view is already
+  default: |azimuth| ≤ 0.02, |polar − π/2| ≤ 0.02, distance ≤ 40.5 and yaw
+  within 0.02 of a full turn. Anything else counts as "away", so `?yaw=1` loads
+  with the minimap shown and a Flip shows it until the next Reset. Zooming in
+  alone does not: the card would sit over the screen you zoomed in to read.
+- The minimap's `hud.orbit()` runs every frame and writes transforms through
+  refs; only the away flag crosses React, and only when it changes. Its three
+  rings are the world's gimbal seen from the camera, the nucleus is the phone
+  (turns with yaw), the electron marks the phone's front on the equator ring, the
+  dashed circle grows as the camera comes closer.
 
 ## Buttons on the frame
 
@@ -157,17 +207,37 @@ bun run check          # headless Chrome over every route at three widths; scree
 bun run api            # only the TSDoc reference
 ```
 
-- Docs pages come from `docs/**/*.md` at build time. Add a file there and it
-  has a page at `/docs/<path>`; set its badge in `src/docs.ts` if the default
-  (`plan` under `docs/platform/`, `works` elsewhere) is wrong.
+- Docs pages come from `packages/web/content/docs/*.md` at build time, one
+  page per file at `/docs/<name>`. Add the slug to `ORDER` in `src/docs.ts` to
+  place it in a sidebar group; an unlisted file lands at the end of Build. The
+  first paragraph is the index summary. Links between pages are relative
+  (`storage.md`), site pages absolute (`/sdk`), repository files full GitHub
+  URLs. The repository's own `docs/` is not rendered (decision 54).
 - The kit and SDK references list whatever `packages/uikit/index.ts` and
-  `packages/sdk/index.ts` re-export. Write the TSDoc on the export and on each
-  member of its props type; an undocumented export shows "No TSDoc on this
-  export yet".
+  `packages/sdk/index.ts` re-export. A component's TSDoc may sit on its props
+  type (the kit's habit) or on the function; the props table expands
+  `PrimitiveProps<…> & { … }` intersections, reads defaults off the destructured
+  parameter, and names what the props extend. Document each member of the props
+  type for the Description column; an undocumented export shows "No TSDoc on
+  this export yet".
+- Each `/kit/<Export>` page is breadcrumb, title, the TSDoc's first paragraph
+  and a Source link to the GitHub blob, then Preview and Usage tabs, then an
+  "API reference" table (`ApiTable` in `src/api-card.tsx`, or the signature
+  when there are no members), then three related exports of the same kind.
+  Preview renders the real component in a 387 px frame with the light app
+  theme; Usage is the same file's highlighted text (`src/highlight.tsx`),
+  collapsed past 300 px. The demo is one file per component in
+  `packages/web/src/kit-demos/`, `navigation-link.tsx` for `NavigationLink`,
+  default-exporting a `Demo` that imports only from `@doan-labs/ipduo-uikit`;
+  `src/kit-preview.tsx` picks it up by name, so a demo cannot drift from its
+  code. No file, no tabs: the page shows the signature instead. The frame is 360 px tall and a flex column, so `Nav`, `Screen` and
+  `VStack` fill it; the button reset the shell's `index.html` applies lives in
+  `src/reset.css` under `[data-kit-frame]`.
 - `VITE_SIMULATOR_URL` points the embed elsewhere (a different port, a deployed
   shell). In the build it is `/device/`, the copied root `dist/`.
-- The Markdown renderer covers the syntax `docs/` uses. Before using a new
-  construct in a doc, check it renders; `src/markdown.tsx` is where it learns.
+- The Markdown renderer covers the syntax `content/docs/` uses. Before using a
+  new construct in a doc, check it renders; `src/markdown.tsx` is where it
+  learns. A table's first column wraps on narrow content, so keep it short.
 - Route files are TanStack's names (`docs.$.tsx`, `__root.tsx`); Biome's
   kebab-case rule is off for that folder only. `src/route-tree.gen.ts` is
   generated on `dev` and `build` and committed.
@@ -182,9 +252,16 @@ bun run api            # only the TSDoc reference
   through a StyleX function style (`at: (left) => ({ left })`) or a `motion.*`
   element that carries only `style`.
 - The embedded shell is driven over the bridge in `packages/shell/main.ts`:
-  `?bg=` at load, then `{ deg, yaw, bg }` by postMessage from the same origin.
-  `src/simulator.tsx` posts the body colour and its `deg` prop; after changing
-  the bridge, rebuild the copy with `bun scripts/simulator.ts`.
+  `?bg=` at load, then `{ deg, yaw, bg, paused, app }` by postMessage from the
+  same origin: `paused` parks the render loop while the frame is off screen,
+  `app` launches an app by home screen name (empty string is Home).
+  `src/simulator.tsx` posts the body colour and its `deg`, `yaw` and `app`
+  props, and never puts a live pose in the frame URL: a `src` change reloads
+  the whole scene. After changing
+  the bridge, rebuild the copy with `bun scripts/simulator.ts`. That script also
+  copies `/model`, `/icons`, `/cdn` and `/preinstalled` to the site root: the
+  shell loads all four by absolute path, and the runtime seeds Notes and
+  Weather from the last one.
 - Under 734 px the hero swaps the WebGL shell for `public/hero.{webm,mp4}`,
   rendered from `packages/web/video` (Remotion, its own `bun install`).
 - The page scrolls through Lenis (`src/smooth-scroll.tsx`, `ReactLenis root`
