@@ -7,13 +7,11 @@ unless noted. Native instructions below assume macOS; Windows/Linux parity is un
 ## Commands
 
 ```sh
-bun install
-bun run dev            # http://localhost:3000
-bun run desktop        # Tauri; needs rustup and a free port 3000
-bun run typecheck      # required before calling work done
-bun run build          # dist/ and dist/stylex.css
-bun run --filter '@doan-labs/*' typecheck
-cargo shell-check
+bun run dev            # http://localhost:3000, serves public/ as files
+bun run desktop        # Tauri window; needs rustup and a free port 3000
+bun run typecheck      # required before calling work done; also checks packages/web
+bun run format         # biome; also runs on every edit and pre-commit
+bun run build          # dist/, via build.ts (Bun.build + StyleX plugin, then dist/stylex.css)
 ```
 
 Prepare the model once: `pip install usd-core && python3 scripts/prepare-model.py`.
@@ -133,11 +131,87 @@ stale data after ten minutes, reconcile every 30 seconds/on visibility, and abor
 owner change. Nonowners send refresh commands. Location needs a secure context and browser/OS
 permission; search remains available on denial. Native permission parity is not established.
 
-Cover/split use one-column cards. The host renders persisted widget snapshots and rebakes
-on changes without fetching. Keep `scrollbar-width`/`scrollbar-color` at auto where WebKit
-pseudo-elements apply; non-auto values override the detailed thumb skin in Chromium.
-Other engines use the thin/tinted fallback. [Scrollbar verification](debug.md#known-false-alarms)
-must disable Puppeteer's default scrollbar hiding.
+The cards grid responds to its own container width, so cover and split displays
+use one column. Keep actionable buttons out of the bottom-centre home-bar
+region; the saved-city Remove control sits at the right edge for that reason.
+The baked home widget reads the host's persisted declarative snapshot and is
+rebaked on changes; it does not fetch weather itself.
+
+Weather's scroll areas use `styles.scrollbar`: a rounded translucent native
+thumb with a subtle track and hover/pressed feedback. Keep `scrollbar-width`
+and `scrollbar-color` at `auto` in engines supporting `::-webkit-scrollbar`;
+non-auto standard values override that detailed skin in Chromium. Engines
+without those pseudo-elements use the thin, tinted standard-property fallback.
+
+## Website
+
+`packages/web` is the developer site: TanStack Start on Vite, StyleX through
+`packages/web/vite-stylex.ts`, every route prerendered. See
+[docs/platform/progress/web.md](platform/progress/web.md) for the design.
+
+```sh
+cd packages/web
+bun run dev            # http://localhost:3001; the simulator embed expects the root dev server on 3000
+bun run build          # regenerates src/generated/api.ts, rebuilds the shell into public/device, prerenders dist/client
+bun run check          # headless Chrome over every route at three widths; screenshots in .cache/debug/web
+bun run api            # only the TSDoc reference
+```
+
+- Docs pages come from `docs/**/*.md` at build time. Add a file there and it
+  has a page at `/docs/<path>`; set its badge in `src/docs.ts` if the default
+  (`plan` under `docs/platform/`, `works` elsewhere) is wrong.
+- The kit and SDK references list whatever `packages/uikit/index.ts` and
+  `packages/sdk/index.ts` re-export. Write the TSDoc on the export and on each
+  member of its props type; an undocumented export shows "No TSDoc on this
+  export yet".
+- `VITE_SIMULATOR_URL` points the embed elsewhere (a different port, a deployed
+  shell). In the build it is `/device/`, the copied root `dist/`.
+- The Markdown renderer covers the syntax `docs/` uses. Before using a new
+  construct in a doc, check it renders; `src/markdown.tsx` is where it learns.
+- Route files are TanStack's names (`docs.$.tsx`, `__root.tsx`); Biome's
+  kebab-case rule is off for that folder only. `src/route-tree.gen.ts` is
+  generated on `dev` and `build` and committed.
+- Breakpoints are local constants in each file (`MID` 1068, `NARROW` 833,
+  `SMALL` 734): StyleX 0.19 cannot resolve an imported string as a media-query
+  key and fails with "Invalid pseudo or at-rule".
+- The reset is `src/reset.css`, imported in `__root.tsx` before
+  `virtual:stylex.css`. Keep that order: a layer declared later wins, and React
+  hoists `<link>` above inline `<style>`, which once put the reset last and
+  zeroed every StyleX margin in the production build only.
+- Never put `className` or `style` beside `stylex.props`. Dynamic values go
+  through a StyleX function style (`at: (left) => ({ left })`) or a `motion.*`
+  element that carries only `style`.
+- The embedded shell is driven over the bridge in `packages/shell/main.ts`:
+  `?bg=` at load, then `{ deg, yaw, bg }` by postMessage from the same origin.
+  `src/simulator.tsx` posts the body colour and its `deg` prop; after changing
+  the bridge, rebuild the copy with `bun scripts/simulator.ts`.
+- Under 734 px the hero swaps the WebGL shell for `public/hero.{webm,mp4}`,
+  rendered from `packages/web/video` (Remotion, its own `bun install`).
+- The page scrolls through Lenis (`src/smooth-scroll.tsx`, `ReactLenis root`
+  around everything in `__root.tsx`; off under reduced motion). A region that
+  scrolls on its own needs `data-lenis-prevent`, and anything reading
+  `document.documentElement.className` must expect the `lenis` classes there.
+- The camera scene asks for the webcam itself when it comes on screen, then
+  mounts the frame (`Simulator mount`). Do not open the Camera app in a frame
+  that mounts early: the browser prompts before the reader can see why.
+- Inside a frame the shell's HUD hides its "iPhone Duo" heading and display
+  line (`window.self !== window.top` in `packages/shell/hud.tsx`); the hint
+  and the control bar stay.
+- The check runs against the production build too:
+  `bun scripts/check.mjs http://localhost:3011` with `dist/client` served on
+  that port. It blocks frames for the page checks and loads the hero shell once
+  for the bridge check, so expect about two minutes.
+
+## Monorepo migration gate (historical)
+
+Root commands remain the entry points. Bun workspaces own runtime dependencies; root owns build and verification tools. Each package has its own typecheck configuration. `bun run --filter '@doan-labs/*' typecheck` checks all packages. `cargo shell-check` checks the relocated native crate from the root. Tauri commands run from `packages/shell`, with frontend hooks explicitly running at the repository root. `dist/`, `public/`, model preparation and the shared Cargo cache stay at the root.
+
+App imports use SDK and UI kit package exports, never another app or shell internals. The shell seed registry is `packages/shell/apps.ts`. The SDK exports only existing transitional baked-app host types; the UI kit owns the React `App` adapter. All packages remain private at version 0.0.0. CLI and website are empty scaffolds; manifests, sandboxing, component harvest, publication and update features are not implemented at this gate.
+
+The preceding paragraph records the earlier migration gate. Stage 2 supersedes
+its SDK/CLI/runtime status; see the current checkpoint below.
+
+The icon catalog now lives in `packages/uikit/icons/index.ts` and serves assets from `public/icons/`; the extraction script writes there. Publishing an isolated UI kit consumer will need its own asset distribution contract. No publishable package claim is made by this migration.
 
 ## Isolated document tooling
 

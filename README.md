@@ -33,7 +33,16 @@ packages/
   uikit/            harvested typed components, tokens, icons and shared helpers
   sdk/              host types, sandbox contract/client and async React adapter
   cli/              create/check/build/dev/preview/serve, import and type validation
-  web/              future official website scaffold
+  web/              launch site and developer docs: TanStack Start, prerendered to dist/client
+    src/routes/     one file per page, TanStack file routes
+    src/home/       the launch page, one section per file, plus parts.tsx (blocks, headlines, code)
+    src/            nav, footer, layout, markdown renderer, docs loader, tokens, theme, reset.css
+    src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
+    src/device.tsx  a CSS-3D Duo driven by a motion value, for scroll and posture scenes
+    src/smooth-scroll.tsx  Lenis on the window, off under reduced motion
+    scripts/        api.ts (TSDoc → src/generated/api.ts), simulator.ts (copies the shell), check.mjs
+    video/          Remotion project for the hero loop (own bun.lock), renders to public/hero.*
+    vite-stylex.ts  StyleX for Vite, same Babel plugin as the root
   apps/             one private workspace per existing app
 public/             static assets; icons/ and gitignored model/
 examples/

@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun ./serve.ts",
     "build": "bun ./build.ts && cp -r public/. dist/",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/web",
     "format": "biome check --write .",
     "format:check": "biome check .",
     "lint": "biome lint .",

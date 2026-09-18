@@ -1,5 +1,8 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["desktop", "node_modules"]
+  "compilerOptions": {
+    "types": ["vite/client"]
+  },
+  "include": ["src", "scripts", "vite.config.ts"],
+  "exclude": ["node_modules"]
 }

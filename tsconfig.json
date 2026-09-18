@@ -13,5 +13,5 @@
     "jsx": "react-jsx"
   },
   "include": ["packages"],
-  "exclude": ["packages/shell/desktop", "packages/**/*.test.ts"]
+  "exclude": ["packages/shell/desktop", "packages/**/*.test.ts", "packages/web"]
 }

@@ -40,6 +40,24 @@ const screenShader = defines + screenGlsl
 // The desktop window is transparent and frameless: the wallpaper is the backdrop.
 document.documentElement.classList.toggle('web', !isDesktop)
 
+// An embedding page drives the backdrop and the pose: `?bg=` at load, then
+// `{ deg, yaw, bg }` by postMessage. Same-origin only, so the site that ships
+// the shell is the only sender. Registered before the model loads so a
+// message sent at the frame's load event is not lost; the pose waits below.
+type Pose = { deg?: number; yaw?: number; bg?: string }
+const paint = (bg: string | null) => {
+  if (bg) document.body.style.background = bg
+}
+paint(new URLSearchParams(location.search).get('bg'))
+let pose: ((m: Pose) => void) | null = null
+let queued: Pose | null = null
+addEventListener('message', (e: MessageEvent<Pose>) => {
+  if (e.source !== parent || e.origin !== location.origin || typeof e.data !== 'object' || !e.data) return
+  if (typeof e.data.bg === 'string') paint(e.data.bg)
+  if (pose) pose(e.data)
+  else queued = { ...queued, ...e.data }
+})
+
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
 renderer.setClearColor(0xf6f6f3, 0)
@@ -406,6 +424,17 @@ function setAngle(v: number) {
 // The buttons on the frame have keys too, in packages/shell/buttons.ts.
 addEventListener('keydown', (e) => e.key === 'Escape' && goHome())
 setAngle(targetAngle)
+
+// The pose half of the embed bridge, now that the numbers exist; a message
+// that arrived during the model load is applied here.
+pose = (m) => {
+  if (typeof m.deg === 'number') setAngle(m.deg)
+  if (typeof m.yaw === 'number') {
+    targetYaw = m.yaw
+    hud.yaw(targetYaw)
+  }
+}
+if (queued) pose(queued)
 
 if (q.has('debug')) {
   Object.assign(window, {

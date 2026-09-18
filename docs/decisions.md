@@ -606,30 +606,86 @@ and code after validation. Same-release loads reuse the URL; replacement/removal
 revoke it under the existing app lock. Storage namespace, SDK protocol, opaque
 sandbox and generation rules are unchanged. Cost: one in-memory document copy
 per loaded developer app and a required `blob:` allowance in shell frame CSP.
+## 50. The website is a prerendered TanStack Start site styled with StyleX
 
-## 50. Current guidance, roadmap and evidence have separate homes
+2026-09-17. `packages/web` uses TanStack Start on Vite because the user asked
+for it and because file routes, `head()` per route and a prerender crawl give
+a static `dist/client` with no server to run. Styling stays StyleX, the repo
+rule, through `packages/web/vite-stylex.ts`: the same Babel plugin the root Bun
+plugin runs, collected across the client and server passes into one virtual
+stylesheet, with runtime injection off because a second `<style>` in the
+server-rendered head broke hydration. Documentation is rendered from
+`docs/**/*.md` by a parser written for exactly the syntax those files use,
+and the SDK and kit references come from the Babel parser walking each
+package's `index.ts`, because TypeScript 7 ships no compiler API and no
+Markdown or TSDoc library is installed.
 
-2026-09-18. The documentation index routes tasks to current maintainer/platform guides.
-The accepted contract moves out of progress; completed reports, original proposals and
-superseded scope instructions remain dated archives. Current references incorporate explicit
-amendments; the roadmap owns deferred work. This supersedes instructions to append completed
-workstreams to a live progress folder, not runtime decisions or safety requirements.
-Cost: moved links and website consumers need checking. The root README remains the only
-repository tree; generated API data stays at its existing path and is never hand-edited.
+Cost: two build systems in one repository. Vite's types pull in `@types/node`,
+so `packages/web` is excluded from the root TypeScript project and checked by
+its own `tsc -p` in the same `typecheck` script; the Biome config carves out
+TanStack's `$param` and `__root` file names and the generated route tree. The
+Markdown parser learns new syntax by hand. The site's build runs the root
+build a second time to copy the simulator under `/device/`.
 
-## 51. Remove documentation archives after the restructure
+## 51. The launch page drives the real shell over a postMessage bridge and folds a CSS device everywhere else
 
-2026-09-18. At the user's request, remove both documentation archive directories as well
-as the empty progress directory. Supersedes decision 50's archive-retention policy.
-Current guides retain the accepted contract, launch scope and verification limitations;
-committed history remains available through Git. Do not recreate archive/progress folders.
-Cost: old proposals and checkpoint narratives are no longer browsable as current files.
+2026-09-18. The site was rewritten as a single launch story (hero, it works,
+real camera, App Store, the fold is input, build, SDK, first apps, open, go)
+with the product as the centrepiece. The hero, the camera scene and the store
+scene embed the real shell; `packages/shell/main.ts` now reads `?bg=` at load
+and `{ deg, yaw, bg }` by same-origin postMessage, registered before the model
+loads so a message sent at the frame's load event is queued rather than lost.
+The site posts the page's body colour so the device floats on the page in
+either theme, and posts poses instead of reloading the frame. Every other
+scene (scroll-linked fold, posture picker, live-reload loop) uses
+`packages/web/src/device.tsx`, two hinged panels in CSS 3D driven by a motion
+value, because three WebGL scenes with the 3.5 MB model are the ceiling one
+page can afford and a scroll-linked pose needs per-frame control.
 
-## 52. Use the Duo package namespace before publication
+Two build facts came out of the rewrite. React 19 hoists stylesheet links above
+inline `<style>`, so the reset's `@layer reset` was declared after StyleX's
+priority layers and `* { margin: 0 }` beat every StyleX margin in production;
+the reset now lives in `packages/web/src/reset.css`, imported before the
+virtual StyleX sheet so Vite bundles it first. The prerender crawl's ten
+parallel fetches against its own server timed out often enough to fail one
+build in three; it runs three at a time and skips trailing-slash duplicates.
 
-2026-09-18. Supersedes earlier package naming: the workspace root is `@doan-labs/duo`,
-the SDK and kit are `@doan-labs/duo-sdk` and `@doan-labs/duo-uikit`, and the CLI is
-`@doan-labs/duo-cli` with the `duo` executable. Internal packages use the `duo-` prefix.
-Update imports, tooling, templates and archives together. App ids, database/lock names,
-bridge protocol and native bundle identity remain stable to preserve installed data.
-Cost: existing local consumers must rebuild/reinstall their archives.
+Cost: the shell carries a small website-only listener, and the CSS device is a
+stylised app rather than the real OS, so those scenes show layout, not
+software. A shell rebuild (`bun scripts/simulator.ts`) is needed whenever the
+bridge changes.
+
+## 52. The page scrolls through Lenis, the camera scene asks on arrival, and the frame drops its title
+
+2026-09-18. Three follow-ups from the first review of the launch page.
+
+**Lenis smooth scroll.** The whole document sits in `ReactLenis root`
+(`packages/web/src/smooth-scroll.tsx`), the same wrapper doan-labs.com uses,
+with `anchors` and `stopInertiaOnNavigate` on. Root mode scrolls the real
+window, so `useScroll` in the fold scene reads the same position it always
+did, and the wrapper renders its children directly, so the server and client
+DOM match. Readers with reduced motion never get an instance: native scrolling
+wins. `lenis` is the one dependency added since decision 50, at the user's
+request. Cost: Lenis puts `lenis` classes on `<html>`, which the theme check
+in `check.mjs` now ignores when it compares the class list across a reload.
+
+**The camera prompt fires on the scene, not on the frame.** The frame used to
+mount a screen early with `?app=Camera`, so the browser asked for the webcam
+while the reader was still on the previous section, and a refusal left the app
+saying "allow access and reopen" with no way to reopen. Now `home/camera.tsx`
+watches its own column; when four tenths of it is on screen the page itself
+calls `getUserMedia`, stops the stream, and only then lets the frame mount
+(`Simulator mount={asked}`). Same origin plus `allow="camera"` means the
+Camera app inside finds the permission already answered. Cost: the frame loads
+after the prompt instead of before it, so the device appears a second or two
+after the reader arrives.
+
+**Embedded frames show the device alone.** The HUD's "iPhone Duo" heading and
+the display line are for the shell opened on its own; inside the site every
+scene has its own headline. `packages/shell/hud.tsx` renders them only when
+`window.self === window.top`. The hint line and the control bar stay in both.
+
+The footer credits the studio: the Doan mark (the four-shape drawing from
+doan-labs.com's handoff file, inlined so it takes `currentColor`) and "Made by
+Doan Labs" linking to doan-labs.com.
+

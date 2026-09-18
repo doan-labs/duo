@@ -10,21 +10,24 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 
 | Module | Responsibility |
 | --- | --- |
-| `main.ts` | Model loading/mesh classification, scene, fold/render loop, display visibility, HUD wiring and torch LED |
-| `hud.tsx` | Hinge/orbit controls and minimap; per-frame transforms use refs, only visibility changes cross React |
-| `buttons.ts` → `device-buttons.ts` → `device.ts` | Hardware hit boxes/springs/keys → press interpretation → device actions and display registry; device.ts has no React/StyleX |
-| `os.tsx` | Create each display root and mount SpringBoard |
-| `springboard/springboard.tsx` | Layer stack and state that outlives individual layers |
-| `springboard/scenes.ts` | Per-display apps, split placement and mirrored scenes |
-| `springboard/gestures.ts`, `home-bar.tsx` | WAAPI scrubbing/zoom geometry and hold-to-split gesture |
-| `springboard/control-center.tsx`, `toggles.ts`, `clock.ts` | Control UI, device-wide switches and minute clock |
-| `apps.ts` | Trusted baked registry and default positions |
-| `screen.ts`, `shaders/` | Baked shell textures, fold geometry and fixed-eye projection |
-| `runtime/` | Isolated app authority; [module map and invariants](platform/runtime.md) |
-| `native.ts`, `desktop/` | Typed IPC/defaults; Rust wiring, feature commands and OS-specific platform implementations |
-| `packages/apps/` | App-local presentation/effects; Notes and Weather are sandbox releases, other existing apps remain baked |
-| `packages/sdk/`, `packages/uikit/` | Host protocol/manifest/state API; presentation, tokens, icons and subscription-only display hooks |
-| Root build tooling | StyleX transform, isolated app/preinstalled builds and shell output |
+| `packages/shell/index.html` | page shell: the `@layer reset` CSS and the script tag |
+| `packages/shell/hud.tsx` | floating HUD (hinge slider, Open, Flip, Home, Reset view, Auto-rotate), the "iPhone Duo" heading and hint shown only when the page is not embedded, and the orbit minimap (an atom driven every frame from the camera pose through refs, shown only off the default view), liquid glass, as React + StyleX |
+| `packages/shell/main.ts` | scene, model load and mesh sorting, fold, render loop, HUD wiring, the flash LED (emissive on Apple's emitter and glass, a halo sprite and a point light, read off `toggles.torch` every frame), and the embed bridge (`?bg=` plus same-origin `{ deg, yaw, bg }` messages from the website's frame) |
+| `packages/shell/buttons.ts` | the buttons on the frame as hardware: meshes, hit boxes, cap and body springs, click, keys |
+| `packages/shell/os.tsx` | boot, and nothing else: builds one display's root element, styles it by hand because CSS3DObject gets it before React has run, and renders `<SpringBoard>` into it |
+| `packages/shell/device.ts` | the device the frame buttons see: `lockState`, `device` (sleep and wake, volume, screenshot, power), `active.wide` and the `follow()` that makes the other display mirror the one in use every frame, and the display registry `addDisplay()` keeps. No React and no StyleX, so `packages/shell/buttons.ts` and `main.ts` reach the hardware side of iOS without pulling in the UI |
+| `packages/shell/springboard/` | the shell one display runs. `springboard.tsx` is the layer stack and the state that outlives any one layer; each layer is its own file (`home-screen`, `home-bar`, `lock-screen`, `status-bar`, `spotlight`, `control-center`, `power`, `system-hud`, `tile`). `scenes.ts` owns the open apps, `gestures.ts` the scrubber and the zoom geometry, `clock.ts` the minute, `toggles.ts` the switches. React renders structure; WAAPI scrubbing and zooms stay imperative on refs |
+| `packages/shell/springboard/control-center.tsx` | Control Center, iOS 26: three pages on one rail — the tile grid, the Now Playing card, the connectivity list — a right panel unfolded, full width folded. Volume writes `device.level`, brightness sets the shell's veil, the transport drives the deck in `apps/music/index.tsx`, the power glyph opens the shell's sheet, `+` is edit mode. `springboard.tsx` owns the pull strip and the open/close animations |
+| `packages/shell/springboard/toggles.ts` | the switches Control Center flips (airplane, the three radios, AirDrop, hotspot, rotation lock, mirroring, focus, torch), device-wide rather than per panel, plus `useToggles()` and the plain `toggles` object for code with no render to hook. `status-bar.tsx` is the other reader: what is on shows in the stack on both displays. The torch has two more: `lock-screen.tsx` flips it and `main.ts` lights the LED |
+| `packages/shell/device-buttons.ts` | what a press means: click, hold, double, chord, with iOS timings |
+| `packages/apps/` | a folder per app: `<name>/index.tsx` is the entry component, `<name>/styles.ts` its `stylex.create`, anything else the app alone needs sits beside them. The shell owns the grid in `packages/shell/apps.ts`; the UI kit owns `shared.ts` and `rings.tsx`. A widget ships in the app that owns it, as WidgetKit does (`WeatherWidget`, `CalendarWidget`) |
+| `packages/apps/notes/` | Notes internals: `data.ts` owns the sample notes and groups, `store.ts` owns persisted text and subscriptions, `folders.tsx` the decorative sidebar, `note-list.tsx` the subscribed rows, and `editor.tsx` both editor presentations and the shared textarea. `apps/notes/index.tsx` owns width selection and navigation; view styles stay with their components |
+| `packages/uikit/` | what the apps link against: `app.ts` (the React `App` adapter over SDK host types), `nav.tsx` (`Nav`/`useNav`/`Page`), `sym.tsx` (`Sym`), `styles.ts` (blocks and keyframes more than one file uses, glass included), `tokens.stylex.ts` (colours, fonts, per-app surface, grid geometry, easings) |
+| `stylex-plugin.ts`, `build.ts`, `bunfig.toml` | StyleX compile step for Bun: dev injects rules at runtime, build writes `dist/stylex.css` |
+| `packages/shell/screen.ts` | the same shell baked to canvas textures, for the fold |
+| `packages/shell/shaders/` | GLSL as TS strings: `fold.ts` geometry, `screen.ts` projection |
+| `packages/shell/native.ts` | `isDesktop` and typed `invoke()` wrappers; web gets defaults |
+| `packages/shell/desktop/` | Tauri crate: `main.rs` wires, `commands/` per feature, `platform/` per OS |
 
 Apps consume SDK/kit exports, never another app or shell internals. SDK `legacy.ts` owns
 baked `Os`/`CameraHooks`; the kit owns the React `App` adapter. The shell may consume app
@@ -39,11 +42,14 @@ The Tauri crate is in `packages/shell/desktop`; `.cargo` and its shared cache st
 The CLI supports external create/check/build/serve/dev/preview; the web workspace here is
 a scaffold. See [development](platform/dev.md) for package consumption.
 
-`scripts/build-app.ts` emits immutable releases: one policy-bearing HTML document with
-embedded script/styles/icons/fonts plus release metadata and icon. The builder-only
-`uikit/sandbox-stylex.ts` converts dynamic values into CSSOM classes in a hash-authorized
-stylesheet; baked apps use ordinary StyleX. `scripts/build-preinstalled.ts` packages Notes
-and Weather separately; the shell imports neither app module.
+Root tooling builds the shell page at `packages/shell/index.html` into `dist/`.
+`public/` is copied verbatim, including icons referenced by the UI kit catalog.
+The Tauri crate lives under `packages/shell/desktop`, while `.cargo` and its
+shared output directory remain at the root. The CLI supports local create/check
+and `packages/web` is the launch site and developer docs, with its own Vite
+build that copies the shell's `dist/` under `/device/` to embed it
+([progress/web.md](platform/progress/web.md)). Stage 2 adds the runtime and
+catalog installation to the earlier monorepo migration.
 
 ## Geometry and framing
 

@@ -70,8 +70,10 @@ export function mountHud(events: HudEvents) {
   const store = createStore({ target: 180, yaw: 0, hint: true, spin: false, away: false })
   const live: Live = { deg: 180, degEl: null, rings: null, nucleus: null, electron: null, dist: null, cap: null }
   const web = document.documentElement.classList.contains('web')
+  // An embedding page has its own headline; the frame shows the device alone.
+  const title = web && window.self === window.top
   const container = document.body.appendChild(document.createElement('div'))
-  createRoot(container).render(<Hud store={store} live={live} events={events} web={web} />)
+  createRoot(container).render(<Hud store={store} live={live} events={events} web={web} title={title} />)
   return {
     /** Live hinge angle, called every frame: update the readout without re-rendering (ref + textContent). */
     angle: (deg: number) => {
@@ -128,19 +130,33 @@ export function mountHud(events: HudEvents) {
   }
 }
 
-function Hud({ store, live, events, web }: { store: Store; live: Live; events: HudEvents; web: boolean }) {
+function Hud({
+  store,
+  live,
+  events,
+  web,
+  title
+}: {
+  store: Store
+  live: Live
+  events: HudEvents
+  web: boolean
+  title: boolean
+}) {
   const s = useSyncExternalStore(store.subscribe, store.get)
   const closed = s.target <= 90
   return (
     <div {...stylex.props(styles.ui)}>
-      {web && (
+      {title && (
         <>
           <h1 {...stylex.props(styles.h1)}>iPhone Duo</h1>
           <p {...stylex.props(styles.p)}>7.6″ inner display. 5.4″ outer. Grade&nbsp;5 titanium.</p>
-          <div {...stylex.props(styles.hint, !s.hint && styles.hintHidden)}>
-            Tap the screen to use it · Press the buttons on the frame · Drag outside to orbit · Wheel to zoom
-          </div>
         </>
+      )}
+      {web && (
+        <div {...stylex.props(styles.hint, !s.hint && styles.hintHidden)}>
+          Tap the screen to use it · Press the buttons on the frame · Drag outside to orbit · Wheel to zoom
+        </div>
       )}
       {/* The HUD floats under the device; its padding drags the frameless window. */}
       <div {...stylex.props(styles.liquid, styles.hud)} data-tauri-drag-region="">

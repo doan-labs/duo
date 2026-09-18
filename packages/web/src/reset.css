@@ -1,0 +1,27 @@
+/* Page-level rules for the elements React never renders. Colours live on <body>
+   as StyleX so the theme tokens drive them; everything here is structural.
+   Imported before the StyleX sheet so its layer is declared first and loses. */
+@layer reset;
+@layer reset {
+  * {
+    margin: 0;
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light dark;
+  }
+  body {
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button,
+  input {
+    font: inherit;
+    color: inherit;
+  }
+  ::selection {
+    background: rgba(143, 143, 255, 0.28);
+  }
+}
