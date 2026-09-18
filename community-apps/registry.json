@@ -5,6 +5,10 @@
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
+    },
+    "com.mnismt.duo.snake": {
+      "folder": "snake",
+      "maintainers": ["mnismt"]
     }
   }
 }
