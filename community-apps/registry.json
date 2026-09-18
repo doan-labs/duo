@@ -5,6 +5,10 @@
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
+    },
+    "com.mnismt.duo.2048": {
+      "folder": "2048",
+      "maintainers": ["mnismt"]
     }
   }
 }
