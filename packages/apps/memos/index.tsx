@@ -1,8 +1,7 @@
+import { mmss } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { Button, Placeholder, Row, Screen, Section, Text, Title } from '@doan-labs/duo-uikit'
-import { mmss } from '@doan-labs/duo-uikit/shared.ts'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -79,7 +78,7 @@ export const Memos = (_: { os: Os }) => {
       }
       g.setTransform(2, 0, 0, 2, 0, 0)
       g.clearRect(0, 0, w, ht)
-      g.fillStyle = appAppearance.memosColor
+      g.fillStyle = colors.redBright
       hist.current.forEach((v, i) => {
         const bh = Math.max(2, v * ht * 0.92)
         g.fillRect(i * 3, (ht - bh) / 2, 2, bh)

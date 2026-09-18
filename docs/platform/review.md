@@ -130,7 +130,8 @@ screenshots are those captures. The publisher check runs on a scratch tree insid
 The `/build` workspace was verified against the production static build in Chromium 153
 using agent-browser 0.27.0. `bun run typecheck`, the website production build, lint on
 changed builder/runtime files, and all six provider/schema tests (18 assertions) passed.
-The PostToolUse formatting hook was inactive; no manual formatter was run.
+The PostToolUse formatting hook was inactive; the pre-commit hook subsequently formatted
+and checked the staged changes. No manual formatter was run.
 
 `bun scripts/check-builder.mjs http://localhost:3019/build` passed real browser compilation
 and sandbox execution with streamed fixture replies: a timer keeps counting across a
@@ -159,6 +160,10 @@ updated it in two successful requests without compiler repair. The follow-up pre
 the count, fixed literal Unicode escapes and an oversized first layout, and added a
 Remove control disabled at zero. The cover retained the count after folding. Generated
 designs still benefit from visual review even when compilation succeeds.
+
+After integrating main's UI kit 0.2.0 and `/kit/docs` routes, typecheck, provider tests,
+the production build and the complete builder browser check passed again. This run
+used the refreshed browser runtime descriptor, including the new kit exports and styles.
 
 The completed local audit verified all four MVP outcomes in Chromium, including stable
 view IDs across 180/120/0 degrees and unchanged hashes for all 378 simulator build files.

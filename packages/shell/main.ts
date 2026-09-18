@@ -47,7 +47,7 @@ startBuilderPreview()
 // load, then `{ deg, yaw, bg, paused, app, cue }` by postMessage (cues in cues.ts).
 // Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
-type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue }
+type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue; hello?: boolean }
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
 const paint = (bg: string | null) => {
@@ -63,9 +63,15 @@ let pose: ((m: Pose) => void) | null = null
 let queued: Pose | null = null
 // Development runs the site and the shell on two localhost ports; that pair is the one exception.
 const local = (o: string) => location.hostname === 'localhost' && new URL(o).hostname === 'localhost'
+/** False until the first frame the phone is drawn in; the scene fades in there. */
+let shown = false
 addEventListener('message', (e: MessageEvent<Pose>) => {
   if (e.source !== parent || typeof e.data !== 'object' || !e.data) return
   if (e.origin !== location.origin && !local(e.origin)) return
+  // `hello` is the page saying it is listening now. Both announcements below can
+  // land before an embedding page has hydrated, which would leave the frame
+  // hidden for good, so the state is repeated on request.
+  if (e.data.hello) announce(shown ? { ready: true } : { live: true })
   if (typeof e.data.bg === 'string') paint(e.data.bg)
   if (typeof e.data.paused === 'boolean') paused = e.data.paused
   if (pose) pose(e.data)
@@ -669,8 +675,6 @@ const smooth = (x: number) => x * x * (3 - 2 * x)
 
 /** The cover panel answers a finger only while flat, so `coverTouch` is written on change. */
 let coverTouch = true
-/** False until the first frame the phone is drawn in; the scene fades in there. */
-let shown = false
 let last = performance.now()
 renderer.setAnimationLoop((now) => {
   if (paused) {

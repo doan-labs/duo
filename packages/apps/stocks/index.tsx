@@ -1,10 +1,11 @@
 import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/duo-uikit'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+
 // Stocks: a watchlist with sparklines, and a detail page whose chart draws itself in.
 
+import { poly, walk } from '@doan-labs/duo-fixtures'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
-import { poly, walk } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
@@ -33,7 +34,7 @@ const Spark = ({ t, w, ht, animate = false }: { t: string; w: number; ht: number
         fill="none"
         strokeWidth={1.8}
         strokeLinejoin="round"
-        stroke={pts[pts.length - 1]! >= pts[0]! ? appAppearance.stocksColor : appAppearance.memosColor}
+        stroke={pts[pts.length - 1]! >= pts[0]! ? colors.greenBright : colors.redBright}
         {...stylex.props(animate && styles.draw)}
       />
     </svg>

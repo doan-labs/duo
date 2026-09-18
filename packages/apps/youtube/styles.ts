@@ -1,11 +1,11 @@
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
   body: { display: 'flex', flexDirection: 'column', paddingBottom: 0 },
   logo: { width: 26, height: 26 },
   sm: { opacity: 1 },
-  player: { aspectRatio: '16/9', flexShrink: 0, backgroundColor: appAppearance.youtubeBackgroundColor },
+  player: { aspectRatio: '16/9', flexShrink: 0, backgroundColor: colors.black },
   vid: { display: 'flex', flexDirection: 'column', gap: 8, paddingBlock: 10, paddingInline: 12, cursor: 'pointer' },
   thumb: {
     width: '100%',

@@ -4,7 +4,7 @@
 // import, so an app that animates with its own timing defines its own
 // keyframes and reuses `shared.rise` / `shared.spin` only as whole blocks.
 import * as stylex from '@stylexjs/stylex'
-import { app, colors, easing, layout } from './tokens.stylex.ts'
+import { app, colors, easing, layout, typeScale } from './tokens.stylex.ts'
 
 export const spin = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
 export const pop = stylex.keyframes({ from: { transform: 'scale(.55) translateY(12px)', opacity: 0 } })
@@ -152,10 +152,10 @@ export const shared = stylex.create({
     paddingRight: 16,
     paddingBottom: 11,
     paddingLeft: 16,
-    backgroundColor: colors.white,
+    backgroundColor: app.surface,
     borderBottomWidth: { default: 1, ':last-child': 0 },
     borderBottomStyle: 'solid',
-    borderBottomColor: colors.separator
+    borderBottomColor: app.separator
   },
   /** Coloured glyph square at the start of a row. */
   rowIc: {
@@ -168,7 +168,7 @@ export const shared = stylex.create({
     flexShrink: 0
   },
   /** Trailing detail text in a row. */
-  rowR: { marginLeft: 'auto', color: colors.grey },
+  rowR: { marginLeft: 'auto', color: app.label2 },
   /** Inset group of rows. */
   grp: { marginRight: 16, marginBottom: 20, marginLeft: 16, borderRadius: 12, overflow: 'hidden' },
   /** iOS switch, an `<input type="checkbox">`. */
@@ -177,7 +177,7 @@ export const shared = stylex.create({
     width: 51,
     height: 31,
     borderRadius: 16,
-    backgroundColor: { default: colors.trackLight, ':checked': colors.green },
+    backgroundColor: { default: app.track, ':checked': colors.green },
     position: 'relative',
     marginLeft: 'auto',
     cursor: 'pointer',
@@ -197,19 +197,6 @@ export const shared = stylex.create({
       transform: { default: null, ':checked': 'translateX(20px)' }
     }
   },
-  /** Photo grid. */
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))', gap: 2 },
-  gridImg: { width: '100%', aspectRatio: 1, objectFit: 'cover', display: 'block', cursor: 'pointer' },
-  /** Full-bleed image viewer over an app. */
-  viewer: {
-    position: 'absolute',
-    inset: 0,
-    backgroundColor: colors.black,
-    display: 'grid',
-    placeItems: 'center',
-    zIndex: 3
-  },
-  viewerImg: { maxWidth: '100%', maxHeight: '100%' },
   /** Big numerals (Clock, Weather). */
   big: { fontSize: 84, fontWeight: 200, textAlign: 'center', paddingTop: 20, paddingBottom: 10, letterSpacing: -2 },
   /** Empty-state placeholder, centred. */
@@ -218,7 +205,7 @@ export const shared = stylex.create({
     display: 'grid',
     placeItems: 'center',
     textAlign: 'center',
-    color: colors.grey,
+    color: app.label2,
     fontSize: 14,
     gap: 10,
     alignContent: 'center'
@@ -251,14 +238,14 @@ export const shared = stylex.create({
     borderRadius: 14,
     fontSize: 13,
     fontWeight: 700,
-    backgroundColor: colors.fill,
+    backgroundColor: app.fill,
     color: colors.blue,
     transitionProperty: 'transform, background-color',
     transitionDuration: '.15s, .2s',
     transform: { default: null, ':active': 'scale(.9)' }
   },
   /** Secondary label. */
-  sub: { color: colors.grey, fontSize: 13 },
+  sub: { color: app.label2, fontSize: 13 },
   /** Large title. */
   hero: {
     fontSize: 34,
@@ -317,6 +304,53 @@ export const shared = stylex.create({
   },
   /** Small bold label inside a widget. */
   widgetLabel: { display: 'block', fontSize: 11, fontWeight: 600, opacity: 0.92 }
+})
+
+/**
+ * The type ramp as whole blocks: size, leading and weight together, because
+ * setting one without the others is what produced 233 loose `fontSize`
+ * declarations across the apps. `Text`'s `size` prop names these.
+ */
+export const typography = stylex.create({
+  largeTitle: { fontSize: typeScale.largeTitle, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.8 },
+  title1: { fontSize: typeScale.title1, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.6 },
+  title2: { fontSize: typeScale.title2, fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.4 },
+  title3: { fontSize: typeScale.title3, fontWeight: 600, lineHeight: 1.25 },
+  /** Body weight raised to semibold: the lead line of a row or card. */
+  headline: { fontSize: typeScale.headline, fontWeight: 600, lineHeight: 1.3 },
+  body: { fontSize: typeScale.body, fontWeight: 400, lineHeight: 1.4 },
+  callout: { fontSize: typeScale.callout, fontWeight: 400, lineHeight: 1.4 },
+  subheadline: { fontSize: typeScale.subheadline, fontWeight: 400, lineHeight: 1.4 },
+  footnote: { fontSize: typeScale.footnote, fontWeight: 400, lineHeight: 1.35 },
+  caption1: { fontSize: typeScale.caption1, fontWeight: 400, lineHeight: 1.3 },
+  caption2: { fontSize: typeScale.caption2, fontWeight: 400, lineHeight: 1.3 }
+})
+
+/**
+ * The two app themes. Apply one to an app's root instead of hand-rolling a
+ * `createTheme`: every row, separator, switch and secondary label in the kit
+ * reads from these, so a dark app no longer has to avoid `Row` and `Section`.
+ * `light` restates the kit's own defaults, so applying it changes nothing.
+ */
+export const light = stylex.createTheme(app, {
+  bg: colors.groupedLight,
+  fg: colors.black,
+  surface: colors.white,
+  elevated: colors.barLight,
+  label2: colors.grey,
+  separator: colors.separator,
+  fill: colors.fill,
+  track: colors.trackLight
+})
+export const dark = stylex.createTheme(app, {
+  bg: colors.black,
+  fg: colors.white,
+  surface: colors.darkElevated,
+  elevated: colors.darkElevated2,
+  label2: colors.grey,
+  separator: colors.separatorDark,
+  fill: colors.fillDark,
+  track: colors.trackDark
 })
 
 /** Stagger for lists: `stylex.props(shared.rise, delay(i * 40))`. */

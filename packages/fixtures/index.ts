@@ -1,5 +1,6 @@
-// Helpers more than one app reaches for: generated artwork, deterministic
-// charts and a WebAudio beep.
+// Invented data and feedback for the baked apps: generated artwork, deterministic
+// charts, clock formatting and a WebAudio beep. None of it renders anything, which
+// is why it is not in the UI kit.
 
 /** Deterministic hue from a string, so generated artwork is stable per title. */
 export const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)

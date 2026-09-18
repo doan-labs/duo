@@ -24,7 +24,7 @@ Browser-builder amendment: web-only generated previews use host-derived
 entry owns SDK connect/ready. Explicit preview revisions quiesce old views, checkpoint data
 and advance generations without reloading the shell. Failure/Undo restore matching data;
 pending checkpoints recover interrupted starts. This does not alter installed-app update
-activation or grant permissions. See [builder](builder.md) and decision 63.
+activation or grant permissions. See [builder](builder.md) and decision 65.
 
 Browser preview readiness means the generated host entry completed its first successful
 React commit, including an offscreen mirrored display. This is narrower than a visible

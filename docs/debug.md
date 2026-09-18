@@ -253,19 +253,19 @@ increases while the page stays still; also check page scrolling outside it.
 Its thin, transparent-track scrollbar uses theme tokens and gains contrast on
 hover or keyboard focus. Check both light and dark themes with scrollbars visible.
 
-`bun packages/web/scripts/check.mjs [url]` is the committed check for
-`packages/web`: fourteen routes at 1440, 820 and 390 px, in light and dark, page and console errors,
-horizontal overflow, the nav's desktop list versus mobile `<details>` menu,
-tables and code on the platform docs, every internal link, and a nav click
-that routes without a document reload. It blocks the simulator frame so a
-missing shell server cannot fail the site. Screenshots land in
-`.cache/debug/web/<route>-<width>.png`. Run it against the dev server
-(`bun run dev` in `packages/web`, port 3001) and against the static build
-(`.cache/debug/web/serve-dist.ts` serves `dist/client` on 3011, mapping a
-directory to its `index.html` like a file host).
+There is no general committed website check: the puppeteer one was removed with the
+dependency. What it covered is the list to walk with `agent-browser` instead:
+fourteen routes at 1440, 820 and 390 px, in light and dark, page and console
+errors, horizontal overflow, the nav's desktop list versus mobile `<details>`
+menu, tables and code on the platform docs, every internal link, and a nav
+click that routes without a document reload. Block the simulator frame for
+those passes so a missing shell server cannot fail the site, and run them
+against the dev server (`bun run dev` in `packages/web`, port 3001) and the
+static build (`dist/client` served on 3011, mapping a directory to its
+`index.html` like a file host).
 
-The legacy website scripts describe earlier layout checks and use an older browser
-driver. Current verification uses agent-browser, including the committed builder check
+The removed website scripts described earlier layout checks. Current verification uses
+agent-browser, including the committed builder check
 above. `/simulator` now redirects to `/build`; its phone stays mounted while folding.
 Use fresh frame snapshot refs to enter `iframe[title="Duo simulator"]`, inspect shell
 state, and operate the fold control. Under SwiftShader the shell can take 20 to 60 s

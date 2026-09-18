@@ -16,6 +16,7 @@
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
+    "@doan-labs/duo-fixtures": "workspace:*",
     "@babel/core": "^7",
     "@biomejs/biome": "^2.5.13",
     "@stylexjs/babel-plugin": "0.19.0",
@@ -25,7 +26,6 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.185.4",
     "lint-staged": "^17.5.1",
-    "puppeteer-core": "^25.10.0",
     "simple-git-hooks": "^2.14.0",
     "typescript": "^7.0.2"
   },

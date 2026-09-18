@@ -1,5 +1,5 @@
+import { art, beep } from '@doan-labs/duo-fixtures'
 import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
-import { art, beep } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'

@@ -1,9 +1,10 @@
 import { Row, Screen, Section, Title } from '@doan-labs/duo-uikit'
+
 // Reminders. A checklist kept in the app's storage, so it survives a reload and both displays agree on it.
 
+import { beep } from '@doan-labs/duo-fixtures'
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { beep } from '@doan-labs/duo-uikit/shared.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type KeyboardEvent, useState } from 'react'
 import { styles } from './styles.ts'

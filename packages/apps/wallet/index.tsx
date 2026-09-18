@@ -1,15 +1,15 @@
+import { beep } from '@doan-labs/duo-fixtures'
 import { Button, LargeTitle, Screen } from '@doan-labs/duo-uikit'
-import { beep } from '@doan-labs/duo-uikit/shared.ts'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
 
 const PASSES: [string, string, string][] = [
-  ['Apple Card', appAppearance.walletAppleCard, appAppearance.notesColor10],
-  ['Duo Transit', appAppearance.walletTransit, appAppearance.walletColor],
-  ['Apple Park Badge', appAppearance.walletBadge, appAppearance.walletColor],
-  ['WWDC Pass', appAppearance.walletPass, appAppearance.walletColor]
+  ['Apple Card', appAppearance.walletAppleCard, colors.darkElevated],
+  ['Duo Transit', appAppearance.walletTransit, colors.white],
+  ['Apple Park Badge', appAppearance.walletBadge, colors.white],
+  ['WWDC Pass', appAppearance.walletPass, colors.white]
 ]
 
 // The stack shows the top STEP px of each card behind, so it has to clear the

@@ -24,6 +24,20 @@ const demos = new Map(
 
 export const hasDemo = (name: string) => demos.has(name)
 
+/**
+ * The real kit component, live, in the light app theme at a display width.
+ * 387 is the cover display in points, 790 the inner one.
+ */
+export function KitFrame({ name, width = 387, height = 360 }: { name: string; width?: number; height?: number }) {
+  const demo = demos.get(name)
+  if (!demo) return null
+  return (
+    <div data-kit-frame="" {...stylex.props(styles.frame, theme, styles.size(width, height))}>
+      <demo.Demo />
+    </div>
+  )
+}
+
 type Tab = 'preview' | 'usage'
 
 /** The real kit component in a phone-width frame with the light app theme, and a Usage tab with the source that renders it. */
@@ -50,9 +64,7 @@ export function KitPreview({ name }: { name: string }) {
       </div>
       {tab === 'preview' ? (
         <div {...stylex.props(styles.stage)}>
-          <div data-kit-frame="" {...stylex.props(styles.frame, theme)}>
-            <demo.Demo />
-          </div>
+          <KitFrame name={name} />
         </div>
       ) : (
         <div {...stylex.props(styles.codeCard)}>
@@ -123,11 +135,10 @@ const styles = stylex.create({
     borderRadius: radius.md,
     backgroundColor: color.well
   },
-  // Cover-display width: the kit's layouts are proven at 387 points before anything else.
+  // Cover-display width by default: the kit's layouts are proven at 387 points before anything else.
+  size: (width: number, height: number) => ({ width: `${width}px`, height: `${height}px` }),
   frame: {
-    width: '387px',
     maxWidth: '100%',
-    height: '360px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',

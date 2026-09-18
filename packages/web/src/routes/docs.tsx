@@ -22,7 +22,7 @@ function Layout() {
             </SideList>
           ))}
           <SideList title="Reference">
-            <SideLink to="/kit">UI kit</SideLink>
+            <SideLink to="/kit/docs">UI kit</SideLink>
             <SideLink to="/changelog">Changelog</SideLink>
           </SideList>
         </>

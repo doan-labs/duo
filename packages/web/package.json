@@ -8,7 +8,6 @@
     "dev": "bun scripts/api.ts && BUN_JSC_useFTLJIT=false bun scripts/builder-assets.mjs && vite dev",
     "build": "bun scripts/api.ts && BUN_JSC_useFTLJIT=false bun scripts/builder-assets.mjs && bun scripts/simulator.ts && bun scripts/catalog.ts && vite build",
     "preview": "vite preview",
-    "check": "bun scripts/check.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
 import { Placeholder, Screen } from '@doan-labs/duo-uikit'
+
 // Camera. Also driven by Camera Control and the volume buttons through the
 // hooks it publishes on `os.camera` while open (see os/buttons.ts).
 //
@@ -9,10 +10,10 @@ import { Placeholder, Screen } from '@doan-labs/duo-uikit'
 // under the feed. Most toggles only light up: the UI is the point, not the
 // image pipeline.
 
+import { beep } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { ICONS, type SYM } from '@doan-labs/duo-uikit/icons/index.ts'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
-import { beep } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

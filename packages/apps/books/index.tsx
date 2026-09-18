@@ -1,8 +1,9 @@
 import { Text, Title } from '@doan-labs/duo-uikit'
+
 // Books: a shelf of covers, and a reader that pages through the text.
 
+import { art } from '@doan-labs/duo-fixtures'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
-import { art } from '@doan-labs/duo-uikit/shared.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'

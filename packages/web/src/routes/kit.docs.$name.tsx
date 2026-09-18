@@ -2,14 +2,14 @@ import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { ApiTable } from '../api-card'
 import { known } from '../docs'
+import { kit } from '../kit/data'
 import { hasDemo, KitPreview } from '../kit-preview'
 import { Prose } from '../layout'
 import { inline, parse, render } from '../markdown'
 import { blob } from '../site'
 import { color, font, radius } from '../tokens.stylex'
-import { kit } from './kit'
 
-export const Route = createFileRoute('/kit/$name')({
+export const Route = createFileRoute('/kit/docs/$name')({
   loader: ({ params }) => {
     const e = kit.find((x) => x.name === params.name)
     if (!e) throw notFound()
@@ -39,7 +39,7 @@ function Page() {
   return (
     <Prose>
       <nav aria-label="Breadcrumb" {...stylex.props(styles.crumbs)}>
-        <Link to="/kit" {...stylex.props(styles.crumb)}>
+        <Link to="/kit/docs" {...stylex.props(styles.crumb)}>
           {GROUP[entry.kind]}
         </Link>
         <span aria-hidden="true">›</span>
@@ -87,7 +87,7 @@ function Page() {
           <h2 {...stylex.props(styles.h2)}>Related {GROUP[entry.kind]?.toLowerCase()}</h2>
           <div {...stylex.props(styles.related)}>
             {related.map((e) => (
-              <Link key={e.name} to="/kit/$name" params={{ name: e.name }} {...stylex.props(styles.tile)}>
+              <Link key={e.name} to="/kit/docs/$name" params={{ name: e.name }} {...stylex.props(styles.tile)}>
                 <span {...stylex.props(styles.tileName)}>{e.name}</span>
                 <span {...stylex.props(styles.tileDoc)}>
                   <span {...stylex.props(styles.clamp)}>{e.doc.split(/\n\s*\n/)[0]?.replace(/\n+/g, ' ')}</span>

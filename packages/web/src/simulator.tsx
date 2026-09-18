@@ -98,6 +98,10 @@ export function Simulator({
       if (e.data.ready) setPainted(true)
     }
     addEventListener('message', heard)
+    // The shell can be up and drawn before this page has hydrated, in which case
+    // both its announcements are already past: ask, and it answers with the one
+    // that applies.
+    post(f, { hello: true })
     if (f.contentDocument?.readyState === 'complete') loaded()
     f.addEventListener('load', loaded)
     return () => {
@@ -171,7 +175,7 @@ export function Simulator({
 
 const post = (
   f: HTMLIFrameElement | null,
-  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue }
+  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue; hello?: boolean }
 ) => f?.contentWindow?.postMessage(msg, new URL(BASE, location.href).origin)
 // The box's own colour, not the body's: a frame inside a dark section takes the section's backdrop.
 const bg = (el: HTMLElement | null) => getComputedStyle(el ?? document.body).backgroundColor

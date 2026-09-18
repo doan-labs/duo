@@ -11,7 +11,7 @@
 // shell owns the open/close animations, because a finger scrubs them.
 
 import { useNowPlaying } from '@doan-labs/duo-app-music/index.tsx'
-import { art, mmss } from '@doan-labs/duo-uikit/shared.ts'
+import { art, mmss } from '@doan-labs/duo-fixtures'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'

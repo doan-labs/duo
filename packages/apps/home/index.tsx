@@ -1,8 +1,8 @@
 import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 // Home, the HomeKit app: accessory tiles that light up, and a thermostat dial you drag.
 
-import { beep } from '@doan-labs/duo-uikit/shared.ts'
+import { beep } from '@doan-labs/duo-fixtures'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent, useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -87,7 +87,7 @@ const Thermostat = ({ temp, onChange }: { temp: number; onChange: (t: number) =>
         <defs>
           <linearGradient id="hg" x1={0} y1={0} x2={1} y2={1}>
             <stop offset={0} stopColor={appAppearance.homeColor} />
-            <stop offset={1} stopColor={appAppearance.homeColor2} />
+            <stop offset={1} stopColor={colors.orange} />
           </linearGradient>
         </defs>
         <Ring stroke={appAppearance.homeColor3} dash={C * 0.75} />

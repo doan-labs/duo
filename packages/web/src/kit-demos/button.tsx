@@ -1,4 +1,4 @@
-import { Button, Symbol as DuoSymbol, Row, Section } from '@doan-labs/duo-uikit'
+import { Button, Row, Section, Sym } from '@doan-labs/duo-uikit'
 import { useState } from 'react'
 
 export default function Demo() {
@@ -17,7 +17,7 @@ export default function Demo() {
       <Row>
         <Button disabled>Disabled</Button>
         <Button aria-label="Settings" onClick={() => setPressed('Symbol')}>
-          <DuoSymbol name="gear" />
+          <Sym name="gear" />
         </Button>
       </Row>
       <Row label="Last pressed" detail={pressed} />

@@ -196,7 +196,18 @@ bun run api            # only the TSDoc reference
   parameter, and names what the props extend. Document each member of the props
   type for the Description column; an undocumented export shows "No TSDoc on
   this export yet".
-- Each `/kit/<Export>` page is breadcrumb, title, the TSDoc's first paragraph
+- `/kit` is one hero and nothing else: `src/kit/hero.tsx` is the headline whose
+  count is read from the generated API, the install line, and a full-bleed strip
+  that drifts every demo in `src/kit-demos/` past at the 387 pt cover width. The
+  strip is two identical runs sliding one run's width; hovering or focusing it
+  pauses the drift so the live component can be pressed, and under 734 px or
+  reduced motion the drift is off, the second run is not rendered and the strip
+  scrolls by hand. Counts and lists come from `src/kit/data.ts`, so adding an
+  export or a demo changes the page with no edit. The reference is `/kit/docs`.
+  A dev server serves the site's own `public/icons/`, a stale copy; the build
+  recopies the full set from the root `dist/`, so a symbol that looks blank in
+  dev is not necessarily missing.
+- Each `/kit/docs/<Export>` page is breadcrumb, title, the TSDoc's first paragraph
   and a Source link to the GitHub blob, then Preview and Usage tabs, then an
   "API reference" table (`ApiTable` in `src/api-card.tsx`, or the signature
   when there are no members), then three related exports of the same kind.
@@ -256,10 +267,9 @@ bun run api            # only the TSDoc reference
 - Inside a frame the shell's HUD hides its "iPhone Duo" heading and display
   line (`window.self !== window.top` in `packages/shell/hud.tsx`); the hint
   and the control bar stay.
-- The check runs against the production build too:
-  `bun scripts/check.mjs http://localhost:3011` with `dist/client` served on
-  that port. It blocks frames for the page checks and loads the hero shell once
-  for the bridge check, so expect about two minutes.
+- Check the production build too, with `dist/client` served on port 3011. Block
+  frames for the page checks and load the hero shell once for the bridge check,
+  so expect about two minutes.
 
 ## Community apps and the catalog branch
 

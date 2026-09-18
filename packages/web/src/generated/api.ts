@@ -525,24 +525,25 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
-    "name": "Hero",
+    "name": "HStack",
     "kind": "component",
-    "file": "packages/uikit/hero.tsx",
-    "line": 6,
-    "doc": "Large introductory title; shares the established large-title typography.",
-    "signature": "function Hero<T extends ElementType = 'div'>(props: HeroProps<T>)",
+    "file": "packages/uikit/h-stack.tsx",
+    "line": 11,
+    "doc": "A horizontal row of children, centred on the cross axis. The kit had no\nhorizontal primitive, so every app wrote its own flex block: reach for this\nbefore a `stylex.create`.",
+    "signature": "function HStack<T extends ElementType = 'div'>({\n  as,\n  gap,\n  align,\n  justify,\n  wrap,\n  xstyle,\n  animate,\n  ...props\n}: HStackProps<T>)",
     "extends": [
-      "LargeTitleProps<T>"
+      "PrimitiveProps<T>",
+      "StackProps"
     ]
   },
   {
     "pkg": "@doan-labs/duo-uikit",
-    "name": "HeroProps",
+    "name": "HStackProps",
     "kind": "type",
-    "file": "packages/uikit/hero.tsx",
-    "line": 5,
-    "doc": "Large introductory title; shares the established large-title typography.",
-    "signature": "type HeroProps<T extends ElementType = 'div'> = LargeTitleProps<T>"
+    "file": "packages/uikit/h-stack.tsx",
+    "line": 10,
+    "doc": "A horizontal row of children, centred on the cross axis. The kit had no\nhorizontal primitive, so every app wrote its own flex block: reach for this\nbefore a `stylex.create`.",
+    "signature": "type HStackProps<T extends ElementType = 'div'> = PrimitiveProps<T> & StackProps"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -614,6 +615,41 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
+    "name": "PageProps",
+    "kind": "type",
+    "file": "packages/uikit/nav.tsx",
+    "line": 95,
+    "doc": "One page in a `Nav`: fixed header with an optional back chevron, scrolling body.",
+    "signature": "type PageProps = { title: ReactNode; back?: () => void; backRef?: Ref<HTMLButtonElement>; children?: ReactNode }",
+    "members": [
+      {
+        "name": "title",
+        "type": "ReactNode",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "back",
+        "type": "() => void",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "backRef",
+        "type": "Ref<HTMLButtonElement>",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "children",
+        "type": "ReactNode",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Push",
     "kind": "type",
     "file": "packages/uikit/nav.tsx",
@@ -676,40 +712,6 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
-    "name": "NavigationStack",
-    "kind": "component",
-    "file": "packages/uikit/navigation-stack.tsx",
-    "line": 6,
-    "doc": "Push navigation retaining the established Nav transition and useNavigation contract.",
-    "signature": "function NavigationStack(props: NavigationStackProps)",
-    "members": [
-      {
-        "name": "children",
-        "type": "ReactNode",
-        "optional": false,
-        "doc": ""
-      }
-    ]
-  },
-  {
-    "pkg": "@doan-labs/duo-uikit",
-    "name": "NavigationStackProps",
-    "kind": "type",
-    "file": "packages/uikit/navigation-stack.tsx",
-    "line": 5,
-    "doc": "Push navigation retaining the established Nav transition and useNavigation contract.",
-    "signature": "type NavigationStackProps = { children: ReactNode }",
-    "members": [
-      {
-        "name": "children",
-        "type": "ReactNode",
-        "optional": false,
-        "doc": ""
-      }
-    ]
-  },
-  {
-    "pkg": "@doan-labs/duo-uikit",
     "name": "Num",
     "kind": "component",
     "file": "packages/uikit/num.tsx",
@@ -766,15 +768,21 @@ export const api: ApiEntry[] = [
     "name": "Row",
     "kind": "component",
     "file": "packages/uikit/row.tsx",
-    "line": 13,
-    "doc": "Grouped row with optional leading icon and trailing detail. Use as=\"button\" for an action.",
-    "signature": "function Row<T extends ElementType = 'div'>({\n  as,\n  label,\n  detail,\n  icon,\n  chevron,\n  children,\n  xstyle,\n  animate,\n  ...props\n}: RowProps<T>)",
+    "line": 21,
+    "doc": "Grouped row with an optional leading icon, a secondary line under the label\nand trailing detail. Use `as=\"button\"` for an action, `as=\"li\"` inside a\n`List`.",
+    "signature": "function Row<T extends ElementType = 'div'>({\n  as,\n  label,\n  subtitle,\n  detail,\n  icon,\n  chevron,\n  children,\n  xstyle,\n  animate,\n  ...props\n}: RowProps<T>)",
     "members": [
       {
         "name": "label",
         "type": "ReactNode",
         "optional": true,
         "doc": ""
+      },
+      {
+        "name": "subtitle",
+        "type": "ReactNode",
+        "optional": true,
+        "doc": "Second line under `label`, in the secondary colour. Most iOS rows have one."
       },
       {
         "name": "detail",
@@ -804,9 +812,9 @@ export const api: ApiEntry[] = [
     "name": "RowProps",
     "kind": "type",
     "file": "packages/uikit/row.tsx",
-    "line": 7,
-    "doc": "Grouped row with optional leading icon and trailing detail. Use as=\"button\" for an action.",
-    "signature": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}"
+    "line": 13,
+    "doc": "Grouped row with an optional leading icon, a secondary line under the label\nand trailing detail. Use `as=\"button\"` for an action, `as=\"li\"` inside a\n`List`.",
+    "signature": "type RowProps<T extends ElementType = 'div'> = PrimitiveProps<T> & {\n  label?: ReactNode\n  /** Second line under `label`, in the secondary colour. Most iOS rows have one. */\n  subtitle?: ReactNode\n  detail?: ReactNode\n  icon?: ReactNode\n  chevron?: boolean\n}"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -852,46 +860,101 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
-    "name": "Sym",
-    "kind": "function",
-    "file": "packages/uikit/sym.tsx",
+    "name": "Align",
+    "kind": "type",
+    "file": "packages/uikit/stack.ts",
     "line": 5,
-    "doc": "An SF Symbol, tinted by the element's colour through a mask.",
-    "signature": "const Sym = ({ name, size = 17 }: { name: keyof typeof SYM; size?: number }) => ( …"
+    "doc": "",
+    "signature": "type Align = 'start' | 'center' | 'end' | 'baseline' | 'stretch'"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
-    "name": "Symbol",
-    "kind": "component",
-    "file": "packages/uikit/symbol.tsx",
+    "name": "Justify",
+    "kind": "type",
+    "file": "packages/uikit/stack.ts",
     "line": 6,
-    "doc": "Decorative symbol inheriting text colour. Name the enclosing button when it is the only content.",
-    "signature": "function KitSymbol(props: SymbolProps)",
-    "extends": [
-      "ComponentProps<typeof Sym>"
+    "doc": "",
+    "signature": "type Justify = 'start' | 'center' | 'end' | 'between'"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "StackProps",
+    "kind": "type",
+    "file": "packages/uikit/stack.ts",
+    "line": 9,
+    "doc": "Props both stacks accept on top of the primitive ones.",
+    "signature": "type StackProps = {\n  /** Space between children, in px. */\n  gap?: number\n  /** Cross axis. `HStack` centres by default; `VStack` leaves it to the parent. */\n  align?: Align\n  /** Main axis. */\n  justify?: Justify\n  /** Let children flow onto another line rather than shrink. */\n  wrap?: boolean\n}",
+    "members": [
+      {
+        "name": "gap",
+        "type": "number",
+        "optional": true,
+        "doc": "Space between children, in px."
+      },
+      {
+        "name": "align",
+        "type": "Align",
+        "optional": true,
+        "doc": "Cross axis. `HStack` centres by default; `VStack` leaves it to the parent."
+      },
+      {
+        "name": "justify",
+        "type": "Justify",
+        "optional": true,
+        "doc": "Main axis."
+      },
+      {
+        "name": "wrap",
+        "type": "boolean",
+        "optional": true,
+        "doc": "Let children flow onto another line rather than shrink."
+      }
     ]
   },
   {
     "pkg": "@doan-labs/duo-uikit",
-    "name": "SymbolProps",
+    "name": "Sym",
+    "kind": "function",
+    "file": "packages/uikit/sym.tsx",
+    "line": 10,
+    "doc": "An SF Symbol, tinted by the element's colour through a mask. Decorative by\ndefault: name the enclosing button when the symbol is its only content.",
+    "signature": "const Sym = ({ name, size = 17 }: SymProps) => ( …"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "SymProps",
     "kind": "type",
-    "file": "packages/uikit/symbol.tsx",
-    "line": 5,
-    "doc": "Decorative symbol inheriting text colour. Name the enclosing button when it is the only content.",
-    "signature": "type SymbolProps = ComponentProps<typeof Sym>"
+    "file": "packages/uikit/sym.tsx",
+    "line": 4,
+    "doc": "",
+    "signature": "type SymProps = { name: keyof typeof SYM; size?: number }",
+    "members": [
+      {
+        "name": "name",
+        "type": "keyof typeof SYM",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "size",
+        "type": "number",
+        "optional": true,
+        "doc": ""
+      }
+    ]
   },
   {
     "pkg": "@doan-labs/duo-uikit",
     "name": "Text",
     "kind": "component",
     "file": "packages/uikit/text.tsx",
-    "line": 18,
-    "doc": "Inline text or formatted animated number. Caption reproduces the harvested secondary label.",
+    "line": 29,
+    "doc": "Inline text or a formatted animated number.\n\n`size` names a step of the type ramp, which carries size, leading and weight\ntogether. `caption`, `footnote` and `title` are the kit's original names and\nstill render exactly as they did; unlike the ramp steps they also set a\ncolour. Prefer `size=\"subheadline\" color=\"secondary\"` over `size=\"caption\"`\nin new UI.",
     "signature": "function Text<T extends ElementType = 'span'>({\n  as,\n  size = 'body',\n  weight,\n  color,\n  value,\n  format,\n  suffix,\n  children,\n  xstyle,\n  animate,\n  ...props\n}: TextProps<T>)",
     "members": [
       {
         "name": "size",
-        "type": "'body' | 'caption' | 'footnote' | 'title'",
+        "type": "Ramp | 'caption' | 'footnote' | 'title'",
         "optional": true,
         "doc": "",
         "default": "'body'"
@@ -936,9 +999,9 @@ export const api: ApiEntry[] = [
     "name": "TextProps",
     "kind": "type",
     "file": "packages/uikit/text.tsx",
-    "line": 10,
-    "doc": "Inline text or formatted animated number. Caption reproduces the harvested secondary label.",
-    "signature": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: 'body' | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}"
+    "line": 21,
+    "doc": "Inline text or a formatted animated number.\n\n`size` names a step of the type ramp, which carries size, leading and weight\ntogether. `caption`, `footnote` and `title` are the kit's original names and\nstill render exactly as they did; unlike the ramp steps they also set a\ncolour. Prefer `size=\"subheadline\" color=\"secondary\"` over `size=\"caption\"`\nin new UI.",
+    "signature": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: Ramp | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -996,11 +1059,12 @@ export const api: ApiEntry[] = [
     "name": "VStack",
     "kind": "component",
     "file": "packages/uikit/v-stack.tsx",
-    "line": 7,
+    "line": 8,
     "doc": "A shrinking vertical stack that fills its flex parent, including the cover display.",
-    "signature": "function VStack<T extends ElementType = 'div'>({ as, xstyle, animate, ...props }: VStackProps<T>)",
+    "signature": "function VStack<T extends ElementType = 'div'>({\n  as,\n  gap,\n  align,\n  justify,\n  wrap,\n  xstyle,\n  animate,\n  ...props\n}: VStackProps<T>)",
     "extends": [
-      "PrimitiveProps<T>"
+      "PrimitiveProps<T>",
+      "StackProps"
     ]
   },
   {
@@ -1008,9 +1072,9 @@ export const api: ApiEntry[] = [
     "name": "VStackProps",
     "kind": "type",
     "file": "packages/uikit/v-stack.tsx",
-    "line": 6,
+    "line": 7,
     "doc": "A shrinking vertical stack that fills its flex parent, including the cover display.",
-    "signature": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+    "signature": "type VStackProps<T extends ElementType = 'div'> = PrimitiveProps<T> & StackProps"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -1102,8 +1166,8 @@ export const versions: Record<string, { name: string; version: string; changelog
   },
   "uikit": {
     "name": "@doan-labs/duo-uikit",
-    "version": "0.1.0",
-    "changelog": "# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
+    "version": "0.2.0",
+    "changelog": "# 0.2.0\n\nRemoved three components that were verbatim renames of something already\nexported: `Hero` (`LargeTitle`), `Symbol` (`Sym`) and `NavigationStack` (`Nav`).\n`Sym` now carries the `SymProps` type and the TSDoc that `Symbol` existed to\nhold. `NavigationLink` stays; unlike the other three it manages destination and\nreturn focus, which `Nav` and `Page` do not.\n\nAdded `HStack`, and `gap` / `align` / `justify` / `wrap` on both stacks. The kit\nhad no horizontal primitive, so the apps carried roughly 530 hand-written flex\ndeclarations.\n\nAdded the type ramp. `Text`'s `size` names a step (`largeTitle`,\n`title1`..`title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`,\n`caption1`, `caption2`), each with size, leading and weight together; `typeScale`\nholds the raw px and `typography` the same steps as whole blocks. `caption`,\n`footnote` and `title` still render exactly as before and are now documented as\nthe original names to migrate off.\n\nAdded the per-app surface. `app` gained `surface`, `elevated`, `label2`,\n`separator`, `fill` and `track`, and `shared` reads from them instead of\nhardcoding light values, so a dark app can theme `Row`, `Section`, `Toggle` and\nsecondary labels rather than avoiding them. `light` and `dark` ship as themes;\nthe `app` defaults are the values the kit used to hardcode, so applying `light`\nchanges nothing.\n\n`Row` gained `subtitle`, the second line most iOS rows have, and `chevron` now\nrenders the SF chevron through `Sym` instead of a typed `›`.\n\nMoved invented data and feedback out of the kit into `@doan-labs/duo-fixtures`:\n`hue`, `art`, `walk`, `poly`, `mmss`, `beep` and the sample tracks. `Bars` in\n`rings.tsx` takes the values to plot instead of generating them from a seed, so\nthe kit no longer depends on fixture data to draw a chart.\n\nRemoved four `shared` blocks with no consumer anywhere in the repo (`grid`,\n`gridImg`, `viewer`, `viewerImg`), and 35 `appAppearance` constants: 19 that\nwere never referenced and 16 that were exact duplicates of a palette colour\n(`notesColor10` was `colors.darkElevated`, `healthColor3` was `colors.indigo`,\nand so on). The remaining 224 are still per-app values in a shared module and\nstill want moving into the app that owns them.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
   },
   "shell": {
     "name": "@doan-labs/duo-shell",
