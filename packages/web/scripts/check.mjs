@@ -25,10 +25,11 @@ const PAGES = [
   '/apps',
   '/get-started',
   '/docs',
-  '/docs/platform/manifest',
-  '/docs/platform/progress/contract',
+  '/docs/manifest',
+  '/docs/lifecycle',
   '/kit',
   '/kit/Nav',
+  '/kit/Button',
   '/sdk',
   '/publish',
   '/guidelines',
@@ -101,8 +102,6 @@ const MIN = { h1: 3, p: 4.5, a: 4.5 }
 const STORY = [
   'hero-title',
   'works-title',
-  'camera-title',
-  'store-title',
   'fold-title',
   'build-title',
   'sdk-title',
@@ -129,11 +128,11 @@ for (const path of PAGES) {
       if (state.overflow) fail(`${path} ${w.name} ${s}: horizontal overflow`)
       if (w.width < 1069 ? !state.menuVisible || state.listVisible : state.menuVisible || !state.listVisible)
         fail(`${path} ${w.name} ${s}: nav layout wrong for width`)
-      if (path.startsWith('/docs/platform/') && (state.tables === 0 || state.pres === 0))
+      if (path.startsWith('/docs/') && path !== '/docs/' && (state.tables === 0 || state.pres === 0))
         fail(`${path}: expected tables and code blocks, got ${state.tables}/${state.pres}`)
       if (path === '/' && state.story.join() !== STORY.join())
         fail(`home ${w.name}: sections out of order or missing: ${state.story.join(' ')}`)
-      // Wide screens get the real shell three times; the phone gets the video in the hero.
+      // Wide screens get the real shell three times: hero, the scrolling scene, the fold. The phone's hero is a video.
       if (path === '/' && state.simulators !== (w.width < 735 ? 2 : 3))
         fail(`home ${w.name}: ${state.simulators} simulator frames`)
       // Contrast is a property of the theme, not the width: check it once per scheme.
@@ -260,7 +259,7 @@ else {
     ),
     mode: [...document.querySelectorAll('#fold-title ~ div dd')][0]?.textContent
   }))
-  if (fold.pressed.join() !== 'false,false,false,true' || fold.mode !== '"closed"')
+  if (fold.pressed.join() !== 'false,false,false,true' || fold.mode !== '"cover"')
     fail(`fold: after Closed, pressed=${fold.pressed.join()} mode=${fold.mode}`)
   else console.log('fold posture buttons ok: Closed → mode "closed"')
 }

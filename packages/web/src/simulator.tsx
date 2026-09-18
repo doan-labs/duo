@@ -20,18 +20,24 @@ export function Simulator({
   eager = false,
   tall = false,
   mount = true,
+  bare = false,
+  fill = false,
   children
 }: {
   deg?: number
   /** Turn of the device in radians; negative shows the right edge and its buttons. */
   yaw?: number
-  /** A baked app to open at load, by its home screen name. */
+  /** The app to show, by its home screen name; the empty string is Home. Changes after load go by postMessage. */
   app?: string
   /** Mount at once instead of waiting for the viewport (the hero). */
   eager?: boolean
   tall?: boolean
   /** Hold the frame back until true (the camera scene waits for its permission prompt). */
   mount?: boolean
+  /** The phone only: no slider, buttons, hint or orbit widget inside the frame. */
+  bare?: boolean
+  /** Take the parent's height instead of the device aspect ratio (a grid row that is what is left of the viewport). */
+  fill?: boolean
   /** Shown while the frame has not mounted yet. */
   children?: ReactNode
 }) {
@@ -39,6 +45,7 @@ export function Simulator({
   const frame = useRef<HTMLIFrameElement>(null)
   const [near, setNear] = useState(eager)
   const [ready, setReady] = useState(false)
+  const shown = useRef(app)
   const theme = useTheme()
 
   useEffect(() => {
@@ -61,17 +68,27 @@ export function Simulator({
     if (!near || !f) return
     const loaded = () => {
       setReady(true)
-      post(f, { bg: bg(), deg, yaw })
+      post(f, { bg: bg(box.current), deg, yaw })
     }
     if (f.contentDocument?.readyState === 'complete') loaded()
     f.addEventListener('load', loaded)
     return () => f.removeEventListener('load', loaded)
   }, [near, deg, yaw])
 
+  // Off screen, the shell stops rendering; a scroll back resumes it without a reload.
+  useEffect(() => {
+    if (!ready || !box.current) return
+    const io = new IntersectionObserver(([e]) => post(frame.current, { paused: !e?.isIntersecting }), {
+      rootMargin: '200px 0px'
+    })
+    io.observe(box.current)
+    return () => io.disconnect()
+  }, [ready])
+
   // The backdrop follows the theme; the pose follows its props.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `theme` is the trigger, not an input.
   useEffect(() => {
-    if (ready) post(frame.current, { bg: bg() })
+    if (ready) post(frame.current, { bg: bg(box.current) })
   }, [ready, theme])
   useEffect(() => {
     if (ready) post(frame.current, { deg })
@@ -79,17 +96,32 @@ export function Simulator({
   useEffect(() => {
     if (ready && yaw !== undefined) post(frame.current, { yaw })
   }, [ready, yaw])
+  useEffect(() => {
+    if (!ready || app === shown.current) return
+    shown.current = app
+    post(frame.current, { app: app ?? '' })
+  }, [ready, app])
 
-  const q = new URLSearchParams({ deg: String(deg) })
-  if (yaw !== undefined) q.set('yaw', String(yaw))
-  if (app) q.set('app', app)
+  // The URL is fixed at first render: later poses go by postMessage. Putting
+  // a live `deg` in `src` would reload the whole scene on every change.
+  const [src] = useState(() => {
+    const q = new URLSearchParams({ deg: String(deg) })
+    if (yaw !== undefined) q.set('yaw', String(yaw))
+    if (app) q.set('app', app)
+    if (bare) q.set('hud', '0')
+    return `${BASE}?${q}`
+  })
   return (
-    <div ref={box} {...stylex.props(styles.box, tall && styles.tall)} data-simulator={near ? 'mounted' : 'waiting'}>
+    <div
+      ref={box}
+      {...stylex.props(styles.box, tall && styles.tall, fill && styles.fill)}
+      data-simulator={near ? 'mounted' : 'waiting'}
+    >
       {near ? (
         <iframe
           ref={frame}
           title={app ? `Duo running ${app}` : 'Duo simulator'}
-          src={`${BASE}?${q}`}
+          src={src}
           allow="camera; geolocation"
           {...stylex.props(styles.frame, !ready && styles.hidden)}
         />
@@ -99,9 +131,12 @@ export function Simulator({
   )
 }
 
-const post = (f: HTMLIFrameElement | null, msg: { deg?: number; yaw?: number; bg?: string }) =>
-  f?.contentWindow?.postMessage(msg, location.origin)
-const bg = () => getComputedStyle(document.body).backgroundColor
+const post = (
+  f: HTMLIFrameElement | null,
+  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string }
+) => f?.contentWindow?.postMessage(msg, location.origin)
+// The box's own colour, not the body's: a frame inside a dark section takes the section's backdrop.
+const bg = (el: HTMLElement | null) => getComputedStyle(el ?? document.body).backgroundColor
 
 const styles = stylex.create({
   box: {
@@ -112,6 +147,7 @@ const styles = stylex.create({
     backgroundColor: color.bg
   },
   tall: { maxHeight: 'calc(100vh - 160px)' },
+  fill: { height: '100%', aspectRatio: 'auto', maxHeight: 'none' },
   frame: {
     position: 'absolute',
     inset: 0,

@@ -93,6 +93,8 @@ export const device = {
     if (device.asleep) device.wake()
     else device.sleep()
   },
+  /** An app by name on the display in use; the embed bridge in main.ts uses this. */
+  open: (name: string) => inUse().launch(name),
   siri: () => inUse().launch('Siri'),
   wallet: () => inUse().launch('Wallet'),
   camera: () => inUse().launch('Camera'),

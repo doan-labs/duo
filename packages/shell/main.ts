@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { USDLoader } from 'three/addons/loaders/USDLoader.js'
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js'
 import { buttons } from './buttons.ts'
-import { busy, device, follow, goHome, lockState } from './device.ts'
+import { busy, device, follow, goHome, lockState, unlockAll } from './device.ts'
 import { press } from './device-buttons.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
@@ -41,10 +41,12 @@ const screenShader = defines + screenGlsl
 document.documentElement.classList.toggle('web', !isDesktop)
 
 // An embedding page drives the backdrop and the pose: `?bg=` at load, then
-// `{ deg, yaw, bg }` by postMessage. Same-origin only, so the site that ships
+// `{ deg, yaw, bg, paused, app }` by postMessage. Same-origin only, so the site that ships
 // the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
-type Pose = { deg?: number; yaw?: number; bg?: string }
+type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string }
+/** An embedding page parks the frame while it is off screen: no render, no GPU time. */
+let paused = false
 const paint = (bg: string | null) => {
   if (bg) document.body.style.background = bg
 }
@@ -54,6 +56,7 @@ let queued: Pose | null = null
 addEventListener('message', (e: MessageEvent<Pose>) => {
   if (e.source !== parent || e.origin !== location.origin || typeof e.data !== 'object' || !e.data) return
   if (typeof e.data.bg === 'string') paint(e.data.bg)
+  if (typeof e.data.paused === 'boolean') paused = e.data.paused
   if (pose) pose(e.data)
   else queued = { ...queued, ...e.data }
 })
@@ -175,6 +178,7 @@ const PHANTOM = 'lJPfQMFXvvcmdtA'
  */
 const still: THREE.Box3[] = []
 const folds: THREE.Box3[] = []
+const flex: THREE.Box3[] = []
 
 const model = await new USDLoader().loadAsync('/model/iPhone_Duo_Render.usdc')
 model.scale.multiplyScalar(100)
@@ -242,9 +246,30 @@ model.traverse((object) => {
   body.add(mesh)
   if (object.name !== PHANTOM) {
     geometry.computeBoundingBox()
-    ;(moving || flexible ? folds : still).push(geometry.boundingBox as THREE.Box3)
+    if (flexible) flex.push(geometry.boundingBox as THREE.Box3)
+    else (moving ? folds : still).push(geometry.boundingBox as THREE.Box3)
   }
 })
+// A flexible strip spans both halves and only bends where it crosses the hinge,
+// so its box is cut there: the moving side turns, the rest stays. Whole, it
+// would swing the fixed half's width through the air when closed and drag the
+// fit's bounds a quarter of a phone off the real one.
+{
+  const movingSide = Math.sign(folds.reduce((x, b) => x + b.min.x + b.max.x, 0))
+  for (const box of flex) {
+    const turned = box.clone()
+    const kept = box.clone()
+    if (movingSide < 0) {
+      turned.max.x = Math.min(turned.max.x, 0)
+      kept.min.x = Math.max(kept.min.x, 0)
+    } else {
+      turned.min.x = Math.max(turned.min.x, 0)
+      kept.max.x = Math.min(kept.max.x, 0)
+    }
+    if (!turned.isEmpty()) folds.push(turned)
+    if (!kept.isEmpty()) still.push(kept)
+  }
+}
 const hardware = buttons(body, camera, renderer.domElement, press)
 
 // The flash LED beside the rear cameras: Apple's 3.4 × 1.6 mm recess on the
@@ -313,8 +338,10 @@ hinge.add(outerLive)
 // wide with the same margin — both packages/shell/hud.tsx) plus PAD of slack, and the bare
 // sides are PAD alone. Change one here and in hud.tsx.
 const PAD = 24
-const HUD_BAND = 78 + PAD
-const RIGHT_BAND = 140 + PAD
+// `?hud=0` draws no widgets, so an embedding page gets the phone centred in the frame.
+const NO_HUD = new URLSearchParams(location.search).get('hud') === '0'
+const HUD_BAND = NO_HUD ? PAD : 78 + PAD
+const RIGHT_BAND = NO_HUD ? PAD : 140 + PAD
 const TOP_BAND = PAD
 const LEFT_BAND = PAD
 /** Pixels per centimetre face on: the size Apple's reference renders it. */
@@ -348,6 +375,12 @@ function frame() {
   behind.setFromMatrixColumn(camera.matrixWorld, 2)
   let tanX = 0
   let tanY = 0
+  // Signed extents too: with no HUD the image is centred on the phone itself,
+  // so a closed or half-open phone does not hang off one side of the hinge.
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
   // The turning half is measured in the hinge's own space, which is how the
   // shader turns it: subtract the axis, then let the group's matrix rotate it.
   for (const [boxes, matrix, axis] of [
@@ -361,8 +394,14 @@ function frame() {
           .applyMatrix4(matrix)
           .sub(eye)
         const depth = Math.max(-corner.dot(behind), 1)
-        tanX = Math.max(tanX, Math.abs(corner.dot(right)) / depth)
-        tanY = Math.max(tanY, Math.abs(corner.dot(above)) / depth)
+        const sx = corner.dot(right) / depth
+        const sy = corner.dot(above) / depth
+        tanX = Math.max(tanX, Math.abs(sx))
+        tanY = Math.max(tanY, Math.abs(sy))
+        minX = Math.min(minX, sx)
+        maxX = Math.max(maxX, sx)
+        minY = Math.min(minY, sy)
+        maxY = Math.max(maxY, sy)
       }
   const pixelsPerUnit = Math.max(8, Math.min(boxW / (2 * EYE.z * tanX), boxH / (2 * EYE.z * tanY), SCALE))
   camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(h / pixelsPerUnit / 2 / EYE.z))
@@ -371,8 +410,12 @@ function frame() {
   // phone: off the orbit pivot the phone would swing as the view turns and leave
   // the window from behind. An off-centre frustum is a pure pixel translation,
   // and CSS3DRenderer applies the same one to the live panels from `camera.view`.
-  const dx = LEFT_BAND + boxW / 2 - w / 2
-  const dy = TOP_BAND + boxH / 2 - h / 2
+  let dx = LEFT_BAND + boxW / 2 - w / 2
+  let dy = TOP_BAND + boxH / 2 - h / 2
+  if (NO_HUD) {
+    dx -= ((minX + maxX) / 2) * EYE.z * pixelsPerUnit
+    dy += ((minY + maxY) / 2) * EYE.z * pixelsPerUnit
+  }
   camera.setViewOffset(w, h, -dx, -dy, w, h)
   camera.updateProjectionMatrix()
 }
@@ -432,6 +475,14 @@ pose = (m) => {
   if (typeof m.yaw === 'number') {
     targetYaw = m.yaw
     hud.yaw(targetYaw)
+  }
+  // An app by its home screen name; the empty string is Home.
+  if (typeof m.app === 'string') {
+    if (!m.app) goHome()
+    else {
+      unlockAll()
+      device.open(m.app)
+    }
   }
 }
 if (queued) pose(queued)
@@ -555,6 +606,10 @@ const smooth = (x: number) => x * x * (3 - 2 * x)
 let coverTouch = true
 let last = performance.now()
 renderer.setAnimationLoop((now) => {
+  if (paused) {
+    last = now
+    return
+  }
   // Ease toward the targets at a rate independent of frame rate.
   const dt = Math.min(now - last, 50)
   const k = 1 - 0.92 ** (dt / 16.7)

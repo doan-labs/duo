@@ -72,8 +72,11 @@ export function mountHud(events: HudEvents) {
   const web = document.documentElement.classList.contains('web')
   // An embedding page has its own headline; the frame shows the device alone.
   const title = web && window.self === window.top
-  const container = document.body.appendChild(document.createElement('div'))
-  createRoot(container).render(<Hud store={store} live={live} events={events} web={web} title={title} />)
+  // `?hud=0`: the phone and nothing else, for pages that pose it by postMessage.
+  if (new URLSearchParams(location.search).get('hud') !== '0') {
+    const container = document.body.appendChild(document.createElement('div'))
+    createRoot(container).render(<Hud store={store} live={live} events={events} web={web} title={title} />)
+  }
   return {
     /** Live hinge angle, called every frame: update the readout without re-rendering (ref + textContent). */
     angle: (deg: number) => {
