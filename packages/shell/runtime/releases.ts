@@ -18,7 +18,10 @@ export async function boundedFetch(
   bound: number,
   progress?: (bytes: number) => void
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const response = await fetch(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(30000) })
+  // Static hosts canonicalise paths (`+` → `%2B`, `app.html` → `app`) with redirects, so follow them
+  // but never off the origin we asked; every byte is hash-checked by the caller anyway.
+  const response = await fetch(url, { redirect: 'follow', credentials: 'omit', signal: AbortSignal.timeout(30000) })
+  if (new URL(response.url).origin !== new URL(url, location.href).origin) throw new Error('Download left its origin')
   if (!response.ok || !response.body) throw new Error(`Download failed (${response.status})`)
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -53,8 +56,6 @@ export async function download(
 ): Promise<StoredRelease> {
   const url = new URL(base, location.href)
   if (!url.pathname.endsWith('/')) url.pathname += '/'
-  // Static hosts canonicalise a raw `+` to `%2B` with a redirect, which `redirect: 'error'` refuses.
-  url.pathname = url.pathname.replaceAll('+', '%2B')
   const metadata = await boundedFetch(new URL('release.json', url).href, 64 * 1024)
   if (listed && (await digest(metadata)) !== listed.sha256) throw new Error('Release metadata hash mismatch')
   const parsed: unknown = JSON.parse(new TextDecoder().decode(metadata))

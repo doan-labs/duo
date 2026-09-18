@@ -799,7 +799,7 @@ Under the app lock:
 
 ```
 GET pressed
-  1. fetch release.json (redirect: 'error', ≤ 64 KiB)
+  1. fetch release.json (same-origin redirects followed, ≤ 64 KiB)
      sha256 equals index entry                                   mismatch → discard, GET
   2. validate: id matches, version strict semver, files are bare names, bytes bounded,
      compatible(HOST_SDK, build.sdk)                               fail → reason in the row
