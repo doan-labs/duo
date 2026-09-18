@@ -12,12 +12,12 @@ import { Block, Cap, Code, Columns, Headline, Lede, Reveal, Statement } from './
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
 
-const TERMINAL = `$ npx create-duo-app my-app
-$ cd my-app
-$ npm run dev
+const TERMINAL = `$ bun packages/cli/index.mjs create my-app
+$ cd my-app && bun install
+$ bun run dev
 
-  Duo dev server on http://localhost:5173
-  Open Duo → Settings → Developer → point it here`
+  Serving release on http://localhost:5173
+  Open http://localhost:3000/?dev=http://localhost:5173`
 
 const TINTS = ['#5a5ad6', '#d9653b', '#2e9a6b']
 
@@ -42,7 +42,7 @@ export function Build() {
   return (
     <Block labelledBy="build-title">
       <Cap>05 · Build</Cap>
-      <Headline id="build-title" lines={['Build software for hardware', 'that doesn’t exist yet.']} />
+      <Headline id="build-title" lines={['Build for the folding iPhone', 'before you hold one.']} />
       <Lede>Point Duo at your local dev server. Edit your app. Save. Fold the device.</Lede>
 
       <div {...stylex.props(styles.terminal)}>
@@ -54,9 +54,9 @@ export function Build() {
       <div {...stylex.props(styles.scene)}>
         <Columns>
           <Code title="src/app.tsx · saved">
-            {`export function App() {\n  const { mode } = useDisplay()\n  return (\n    <Screen\n      accent="`}
+            {`export function App() {\n  const { display } = useDisplay()\n  return (\n    <Screen\n      accent="`}
             <span {...stylex.props(styles.hot)}>{TINTS[n]}</span>
-            {`"\n      columns={mode === 'closed' ? 1 : 2}\n    />\n  )\n}`}
+            {`"\n      columns={display === 'cover' ? 1 : 2}\n    />\n  )\n}`}
           </Code>
           <div {...stylex.props(styles.device)}>
             <Device open={open} width={narrow ? 300 : 560} accent={TINTS[n]} />

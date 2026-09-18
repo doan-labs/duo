@@ -27,9 +27,9 @@ export function Hero() {
             Duo
           </motion.p>
           <motion.h1 id="hero-title" {...stylex.props(styles.title)} {...rise(1)}>
-            A phone Apple hasn’t shipped,
+            Apple’s folding iPhone, simulated.
             <br />
-            that you can build apps for.
+            Build apps for it.
           </motion.h1>
           <motion.p {...stylex.props(styles.sub)} {...rise(2)}>
             Hold it. Fold it. Build for it.

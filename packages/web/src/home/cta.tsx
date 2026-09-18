@@ -10,7 +10,7 @@ export function Cta() {
     <Block labelledBy="cta-title">
       <Reveal>
         <div {...stylex.props(styles.centre)}>
-          <Headline id="cta-title" lines={['Build something strange', 'for a phone that doesn’t exist.']} />
+          <Headline id="cta-title" lines={['Build something strange', 'for a phone that folds.']} />
           <div {...stylex.props(styles.actions)}>
             <Button to="/simulator">Try Duo</Button>
             <Button to="/docs" outline>

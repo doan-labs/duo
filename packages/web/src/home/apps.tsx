@@ -46,7 +46,7 @@ export function Apps({ all = false }: { all?: boolean }) {
   return (
     <Block labelledBy="apps-title">
       <Cap>07 · First apps</Cap>
-      <Headline id="apps-title" lines={['Built for a phone', 'that doesn’t exist yet.']} />
+      <Headline id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
       <Lede>
         Each of these treats the fold as the design brief, not a constraint. They are the start of an ecosystem, and the
         first pull requests in the repository.

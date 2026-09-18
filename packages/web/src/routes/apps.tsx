@@ -13,10 +13,10 @@ function Page() {
   return (
     <Block labelledBy="apps-title">
       <Cap>Apps</Cap>
-      <Headline as="h1" id="apps-title" lines={['Built for a phone', 'that doesn’t exist yet.']} />
+      <Headline as="h1" id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
       <Lede>
         The first apps designed around the fold. Each one is a pull request in the repository, MIT licensed, and
-        installs from the Duo Store once the stage 2 runtime lands.{' '}
+        installs from a catalog through the Duo Store.{' '}
         <Link to="/publish" {...stylex.props(styles.link)}>
           How to add yours.
         </Link>
