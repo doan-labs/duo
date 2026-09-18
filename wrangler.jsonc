@@ -1,0 +1,8 @@
+{
+  "name": "duo",
+  "compatibility_date": "2026-09-17",
+  "assets": {
+    "directory": "./packages/web/dist/client",
+    "not_found_handling": "none"
+  }
+}
