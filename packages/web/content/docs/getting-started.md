@@ -7,7 +7,7 @@ You need [Bun](https://bun.sh) and Python 3 with `pip`. The packages are not on 
 ## 1. Run the simulator
 
 ```sh
-git clone https://github.com/doan-labs/iphoneduo.git && cd iphoneduo
+git clone https://github.com/doan-labs/duo.git && cd duo
 bun install
 pip install usd-core && python3 scripts/prepare-model.py   # Apple's model into public/model, once
 bun run dev                                                # http://localhost:3000

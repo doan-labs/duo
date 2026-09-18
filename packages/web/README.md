@@ -12,5 +12,4 @@ bun run build    # api → shell copy → prerender
 bun run check    # headless Chrome over every route at three widths
 ```
 
-Design and status: [docs/platform/progress/web.md](../../docs/platform/progress/web.md).
-Plan: [docs/platform/web.md](../../docs/platform/web.md).
+Design, status and build record: [docs/platform/web.md](../../docs/platform/web.md).

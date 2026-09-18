@@ -10,6 +10,6 @@
   "permissions": ["geolocation"],
   "network": ["https://api.open-meteo.com", "https://geocoding-api.open-meteo.com"],
   "author": "Doan Labs",
-  "repo": "https://github.com/doan-labs/iphoneduo",
+  "repo": "https://github.com/doan-labs/duo",
   "license": "MIT"
 }

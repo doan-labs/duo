@@ -25,7 +25,7 @@ function Page() {
       />
       <ol {...stylex.props(styles.timeline)}>
         <Step n={1} title="Run the simulator">
-          <Pre>{`git clone ${REPO}.git && cd iphoneduo
+          <Pre>{`git clone ${REPO}.git && cd duo
 bun install
 pip install usd-core && python3 scripts/prepare-model.py   # Apple's model, once
 bun run dev                                                # http://localhost:3000`}</Pre>

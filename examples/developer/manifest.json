@@ -6,6 +6,6 @@
   "entry": "main.tsx",
   "icon": "icon.png",
   "author": "Duo",
-  "repo": "https://github.com/doan-labs/iphoneduo",
+  "repo": "https://github.com/doan-labs/duo",
   "license": "MIT"
 }

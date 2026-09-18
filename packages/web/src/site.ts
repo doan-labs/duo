@@ -1,5 +1,5 @@
 // Facts the pages share. Change them here, not in a route.
-export const REPO = 'https://github.com/doan-labs/iphoneduo'
+export const REPO = 'https://github.com/doan-labs/duo'
 export const DISCUSSIONS = `${REPO}/discussions`
 export const LICENSE = `${REPO}/blob/main/LICENSE`
 export const blob = (path: string) => `${REPO}/blob/main/${path}`

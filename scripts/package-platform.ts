@@ -33,7 +33,7 @@ for (const name of packages) {
     metadata.publishConfig = { access: 'public' }
     metadata.repository = {
       type: 'git',
-      url: 'git+https://github.com/doan-labs/iphoneduo.git',
+      url: 'git+https://github.com/doan-labs/duo.git',
       directory: `packages/${name}`
     }
     metadata.description = `Duo developer platform ${name}; Bun-based preview tooling`

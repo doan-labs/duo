@@ -68,5 +68,5 @@ reinstall cannot revive old writers. First-boot seed/migration markers survive r
 See [updates](updates.md) and contract §4 for checkpoint, rollback and cleanup rules.
 
 The SDK exposes app-id `open` and session `home`; Escape is forwarded explicitly because
-iframe keyboard events do not bubble to the shell. A custom `iphoneduo://` scheme remains
+iframe keyboard events do not bubble to the shell. A custom `duo://` scheme remains
 roadmap work. Existing trusted components retain their legacy adapter.

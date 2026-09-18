@@ -79,4 +79,4 @@ Storage is asynchronous, string-valued and private to the app. `status` is `hydr
 
 ## A complete example
 
-[Fold Compass](https://github.com/doan-labs/iphoneduo/blob/main/examples/fold-compass/main.tsx) is an independent app in about a hundred lines: it reads the hinge angle, switches between a pocket card on the cover and a board on the inner display, and keeps one field note in storage. The [Developer gallery](https://github.com/doan-labs/iphoneduo/blob/main/examples/developer/main.tsx) renders every kit component at both widths.
+[Fold Compass](https://github.com/doan-labs/duo/blob/main/examples/fold-compass/main.tsx) is an independent app in about a hundred lines: it reads the hinge angle, switches between a pocket card on the cover and a board on the inner display, and keeps one field note in storage. The [Developer gallery](https://github.com/doan-labs/duo/blob/main/examples/developer/main.tsx) renders every kit component at both widths.
