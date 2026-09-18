@@ -138,7 +138,7 @@ progress files. Decision 57 records the change.
 - `/docs` renders `packages/web/content/docs/*.md`: Start (Introduction,
   Getting started, Your first app), Build (Manifest, Lifecycle, Displays and
   the fold, Storage, Permissions, then the SDK reference at `/docs/sdk`), Ship
-  (CLI, Catalogs, Publishing), and a Reference group linking `/kit` and
+  (CLI, Catalogs, Publishing), and a Reference group linking `/kit/docs` and
   `/changelog`. `/sdk` forwards to `/docs/sdk`; the global bar lists Apps, UI
   kit, Docs and a highlighted Build an app. Each page has the
   outline box when long, previous and next, and an edit link. The index shows
@@ -153,7 +153,9 @@ progress files. Decision 57 records the change.
 - `/get-started` is one four-step timeline (simulator, create, `?dev=`,
   install) and four cards into the docs. `/sdk` is the usage sample, five
   guide links and the generated reference without the baked-app host types.
-  `/kit` leads with the README's example and lists components before types.
+  `/kit` is a single hero: the count read from the generated API, the install
+  line, and a strip that drifts every demo past live; `/kit/docs` leads with the
+  README's example and lists components before types.
   `/publish` renders the Publishing page. Guidelines, Simulator, Changelog and
   the home store note lost their notices and now link the new pages.
 - `src/markdown.tsx` resolves relative links against `content/docs/` and turns
@@ -312,7 +314,7 @@ published, no host is chosen, no CI deploys it.
 | Home | `/` | Apple-style hero, the live simulator, the three fold rules, tiles to every section, download notes | Installers marked not built; browser marked works |
 | Get started | `/get-started` | Clone, model fetch, `bun run dev`, `?app=`/`?deg=` poses, how a baked app is added; the CLI and `?dev=` path as a plan | First half works today; SDK path marked not built |
 | Docs | `/docs`, `/docs/<path>` | Every file under `docs/` rendered from source with a badge and a source link; sidebar grouped Platform plan, Progress, Repository | Planning document, Proposed, or Works today per file |
-| UI kit | `/kit`, `/kit/<export>` | Generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today; live demos marked not built |
+| UI kit | `/kit`, `/kit/docs`, `/kit/docs/<export>` | `/kit` is one hero: the export counts and every demo drifting past live, pausing on hover. Under it the reference is generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today |
 | SDK | `/sdk` | Generated legacy types marked Transitional; the runtime contract summarised and linked by section, marked Proposed | Two badges, never mixed |
 | Publish | `/publish` | `publishing.md` rendered; PR template marked not built | Planning document |
 | Guidelines | `/guidelines` | The three fold rules and the iOS rules that still hold, with Notes on the cover to fold | Works today (describes current shell behaviour) |

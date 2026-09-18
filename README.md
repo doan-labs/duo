@@ -97,7 +97,8 @@ packages/
   web/              launch site and developer docs: TanStack Start, prerendered to dist/client
     src/routes/     one file per page, TanStack file routes
     src/home/       the launch page, one section per file, plus parts.tsx (blocks, headlines, code)
-    src/kit-demos/  one live demo per UI kit component, rendered and shown as source on /kit/<name>
+    src/kit/        the /kit hero: every demo drifting past live, over the counts in data.ts
+    src/kit-demos/  one live demo per UI kit component, rendered on /kit and shown as source on /kit/docs/<name>
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
     src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
     src/device.tsx  a CSS-3D Duo driven by a motion value, for scroll and posture scenes

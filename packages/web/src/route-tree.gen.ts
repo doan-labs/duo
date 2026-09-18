@@ -23,7 +23,9 @@ import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as DocsSdkRouteImport } from './routes/docs.sdk'
 import { Route as KitIndexRouteImport } from './routes/kit.index'
-import { Route as KitNameRouteImport } from './routes/kit.$name'
+import { Route as KitDocsRouteImport } from './routes/kit.docs'
+import { Route as KitDocsIndexRouteImport } from './routes/kit.docs.index'
+import { Route as KitDocsNameRouteImport } from './routes/kit.docs.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -95,10 +97,20 @@ const KitIndexRoute = KitIndexRouteImport.update({
   path: '/',
   getParentRoute: () => KitRoute,
 } as any)
-const KitNameRoute = KitNameRouteImport.update({
+const KitDocsRoute = KitDocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
+  getParentRoute: () => KitRoute,
+} as any)
+const KitDocsIndexRoute = KitDocsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => KitDocsRoute,
+} as any)
+const KitDocsNameRoute = KitDocsNameRouteImport.update({
   id: '/$name',
   path: '/$name',
-  getParentRoute: () => KitRoute,
+  getParentRoute: () => KitDocsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -114,9 +126,11 @@ export interface FileRoutesByFullPath {
   '/simulator': typeof SimulatorRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
-  '/kit/$name': typeof KitNameRoute
+  '/kit/docs': typeof KitDocsRouteWithChildren
   '/docs/': typeof DocsIndexRoute
   '/kit/': typeof KitIndexRoute
+  '/kit/docs/$name': typeof KitDocsNameRoute
+  '/kit/docs/': typeof KitDocsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -129,9 +143,10 @@ export interface FileRoutesByTo {
   '/simulator': typeof SimulatorRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
-  '/kit/$name': typeof KitNameRoute
   '/docs': typeof DocsIndexRoute
   '/kit': typeof KitIndexRoute
+  '/kit/docs/$name': typeof KitDocsNameRoute
+  '/kit/docs': typeof KitDocsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -147,9 +162,11 @@ export interface FileRoutesById {
   '/simulator': typeof SimulatorRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
-  '/kit/$name': typeof KitNameRoute
+  '/kit/docs': typeof KitDocsRouteWithChildren
   '/docs/': typeof DocsIndexRoute
   '/kit/': typeof KitIndexRoute
+  '/kit/docs/$name': typeof KitDocsNameRoute
+  '/kit/docs/': typeof KitDocsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -166,9 +183,11 @@ export interface FileRouteTypes {
     | '/simulator'
     | '/docs/$'
     | '/docs/sdk'
-    | '/kit/$name'
+    | '/kit/docs'
     | '/docs/'
     | '/kit/'
+    | '/kit/docs/$name'
+    | '/kit/docs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -181,9 +200,10 @@ export interface FileRouteTypes {
     | '/simulator'
     | '/docs/$'
     | '/docs/sdk'
-    | '/kit/$name'
     | '/docs'
     | '/kit'
+    | '/kit/docs/$name'
+    | '/kit/docs'
   id:
     | '__root__'
     | '/'
@@ -198,9 +218,11 @@ export interface FileRouteTypes {
     | '/simulator'
     | '/docs/$'
     | '/docs/sdk'
-    | '/kit/$name'
+    | '/kit/docs'
     | '/docs/'
     | '/kit/'
+    | '/kit/docs/$name'
+    | '/kit/docs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -316,12 +338,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KitIndexRouteImport
       parentRoute: typeof KitRoute
     }
-    '/kit/$name': {
-      id: '/kit/$name'
-      path: '/$name'
-      fullPath: '/kit/$name'
-      preLoaderRoute: typeof KitNameRouteImport
+    '/kit/docs': {
+      id: '/kit/docs'
+      path: '/docs'
+      fullPath: '/kit/docs'
+      preLoaderRoute: typeof KitDocsRouteImport
       parentRoute: typeof KitRoute
+    }
+    '/kit/docs/': {
+      id: '/kit/docs/'
+      path: '/'
+      fullPath: '/kit/docs/'
+      preLoaderRoute: typeof KitDocsIndexRouteImport
+      parentRoute: typeof KitDocsRoute
+    }
+    '/kit/docs/$name': {
+      id: '/kit/docs/$name'
+      path: '/$name'
+      fullPath: '/kit/docs/$name'
+      preLoaderRoute: typeof KitDocsNameRouteImport
+      parentRoute: typeof KitDocsRoute
     }
   }
 }
@@ -340,13 +376,26 @@ const DocsRouteChildren: DocsRouteChildren = {
 
 const DocsRouteWithChildren = DocsRoute._addFileChildren(DocsRouteChildren)
 
+interface KitDocsRouteChildren {
+  KitDocsNameRoute: typeof KitDocsNameRoute
+  KitDocsIndexRoute: typeof KitDocsIndexRoute
+}
+
+const KitDocsRouteChildren: KitDocsRouteChildren = {
+  KitDocsNameRoute: KitDocsNameRoute,
+  KitDocsIndexRoute: KitDocsIndexRoute,
+}
+
+const KitDocsRouteWithChildren =
+  KitDocsRoute._addFileChildren(KitDocsRouteChildren)
+
 interface KitRouteChildren {
-  KitNameRoute: typeof KitNameRoute
+  KitDocsRoute: typeof KitDocsRouteWithChildren
   KitIndexRoute: typeof KitIndexRoute
 }
 
 const KitRouteChildren: KitRouteChildren = {
-  KitNameRoute: KitNameRoute,
+  KitDocsRoute: KitDocsRouteWithChildren,
   KitIndexRoute: KitIndexRoute,
 }
 

@@ -887,3 +887,31 @@ backdrop rather than a white card while `bg` is in flight. Cost: two more
 message shapes on the bridge, and a page that embeds the shell without
 answering `hello` still gets the announcements, so nothing is lost if it ignores
 them.
+
+## 64. `/kit` is a showcase, the reference moves under `/kit/docs`
+2026-09-18, accepted. The UI kit's landing page was the reference itself: a lead
+paragraph, one code block and a list of 47 export names. It answered "what is
+the signature of Row" and nothing else, so a visitor who had never seen the kit
+left without seeing a single component. `/kit` is now one hero in the launch
+page's own language and nothing else: a headline whose count is read from the
+generated API, the install line, and a full-bleed strip that drifts every demo
+in `src/kit-demos/` past at the cover display's 387 points. The strip is two
+identical runs sliding one run's width, so the loop never seams; hover or focus
+pauses it, which is how a visitor presses a component before following its name
+to the reference. Under 734 px and under reduced motion the drift is off, the
+second run is not rendered and the strip is a plain scroller.
+
+A browsing page underneath the hero was tried first (a gallery at both display
+widths, a search over every export, the palette and symbol set) and cut: it
+rebuilt `/kit/docs` in a second visual language. Sending "See all components"
+straight to the reference leaves one job per page. The reference is unchanged,
+one level down at `/kit/docs` and `/kit/docs/<Export>`, and the sidebar it
+carries links back.
+
+Nothing on the page is a screenshot or a second copy: the hero reads
+`src/kit/data.ts`, which is the generated API filtered to the kit plus which
+names have a demo file, so a new export or a new demo changes the page without
+an edit. The cost is a heavier route: 18 demos mount on load, twice that on a
+wide screen because of the second run. They are DOM, not canvas, and the
+alternative was a wall of images that goes stale the first time a component
+changes.
