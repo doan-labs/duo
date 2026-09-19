@@ -1061,3 +1061,19 @@ The seam between two halves is a divider, dragged between 30% and 70%. `zone()` 
 ratio, so the zoom, the drop card and the home bars follow it; it returns to the middle
 when a half empties, since the narrow home the other half shows is always half.
 
+## 70. The Store is laid out like the App Store, with the icon as the artwork
+
+The first Store was a settings-style list: a gradient hero, then every app in one long
+grouped list. It worked and looked like a form. The new root page follows the App Store:
+a Today card, then one carousel per lane whose columns of three rows page sideways and
+snap, so nine apps take one screen instead of three, and a lane filter (All, Official,
+Community) beside the Apps/Updates segment, as the website's `/apps` browser has.
+
+The Today card's artwork is the featured release's own icon, blown up and blurred under a
+dark gradient: every app brings its own palette and no artwork has to be drawn or shipped.
+Whether the box is wide decides the layout, measured with a ResizeObserver as Maps and
+Camera do, not the display: a split half of the inner display is as narrow as the cover.
+Every button label, `data-store-app` and `data-store-submit` hook and notice the store
+checks drive is unchanged. The `appstore*` appearance tokens are no longer read; the
+styles use the kit's `app` and `colors` tokens and plain sizes, as the kit's own do.
+

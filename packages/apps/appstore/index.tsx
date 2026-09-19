@@ -1,6 +1,7 @@
-// App Store. The real catalog: featured release on top, official and community
-// rows with GET / OPEN, a detail page per app and the developer tools at the
-// bottom. Every row and button here is what the store checks drive.
+// App Store. The real catalog laid out like the App Store: a Today card for the
+// featured release, then a carousel per lane whose columns of three rows page
+// sideways, a detail page per app and the developer tools at the bottom. Every
+// row and button here is what the store checks drive.
 
 import { art } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
@@ -11,7 +12,7 @@ import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useState, useSyncExternalStore } from 'react'
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { styles } from './styles.ts'
 
 /** Where app authors go to publish; opened outside the device, so the shell hands us the opener. */
@@ -48,10 +49,28 @@ export function AppStore({ os, openExternal }: { os: Os; openExternal: External 
   )
 }
 
+/** Rows per column of a carousel, as the App Store pages its lists. */
+const PER_PAGE = 3
+const chunk = <T,>(xs: T[], n: number) =>
+  Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n))
+/** What a row says under its name: who made it, and what it reaches for. */
+const tagline = (row: StoreRow) =>
+  row.permissions.length ? `Uses ${row.permissions.join(', ').toLowerCase()}` : 'Sandboxed, no device access'
+
 function Shelf({ store, open, openExternal }: { store: Store; open: Open; openExternal: External }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const { push } = useNav()
+  // The box decides, not the display: a split half is as narrow as the cover. Wide
+  // gets two carousel pages side by side and a hero with room for its icon.
+  const head = useRef<HTMLDivElement>(null)
+  const [wide, setWide] = useState(false)
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setWide(e!.contentRect.width > 600))
+    ro.observe(head.current!)
+    return () => ro.disconnect()
+  }, [])
   const [tab, setTab] = useState('Apps')
+  const [lane, setLane] = useState('all')
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   const rows = state.rows.filter(
@@ -65,61 +84,91 @@ function Shelf({ store, open, openExternal }: { store: Store; open: Open; openEx
   // One featured app a day, rotating through the compatible official releases.
   const day = Math.floor(Date.now() / 864e5)
   const pool = state.rows.filter((r) => r.lane === 'official' && r.compatible)
-  const featured = !q && tab === 'Apps' && pool.length ? pool[day % pool.length] : undefined
+  const featured =
+    !q && tab === 'Apps' && (lane === 'all' || lane === 'official') && pool.length ? pool[day % pool.length] : undefined
+  const lanes = [
+    { key: 'all', label: 'All', n: rows.length },
+    { key: 'official', label: 'Official', n: official.length },
+    { key: 'community', label: 'Community', n: community.length },
+    ...(development.length ? [{ key: 'development', label: 'Local previews', n: development.length }] : [])
+  ]
   const show = (row: StoreRow) =>
     push((back) => <Detail id={row.id} store={store} open={open} openExternal={openExternal} back={back} />)
   const tabs = PREVIEW_FEATURES.stageUpdates ? ['Apps', 'Updates'] : ['Apps']
+  const group = (key: string, title: string, blurb: string, list: StoreRow[]) =>
+    (lane === 'all' || lane === key) && (
+      <Group title={title} blurb={blurb} rows={list} wide={wide} store={store} open={open} onShow={show} />
+    )
   return (
     <VStack>
-      <div {...stylex.props(styles.top)}>
-        <LargeTitle as="h1">App Store</LargeTitle>
-        <div {...stylex.props(styles.topRight)}>
-          <span {...stylex.props(styles.chip, state.developer && styles.chipDev)} title={state.source}>
-            {!state.developer && <i {...stylex.props(styles.chipDot)} />}
-            {state.developer ? new URL(state.source).host : state.source}
-          </span>
-          <button
-            type="button"
-            aria-label="Refresh catalog"
-            {...stylex.props(styles.iconBtn, shared.press)}
-            onClick={() => {
-              void store.refresh()
-            }}
-          >
-            <Sym name="reload" size={15} />
-          </button>
-        </div>
-      </div>
-      <Screen>
+      <div ref={head} {...stylex.props(styles.top)}>
+        <LargeTitle as="h1" xstyle={styles.title}>
+          App Store
+        </LargeTitle>
         <label {...stylex.props(styles.search)}>
           <Sym name="search" size={15} />
           <input
             aria-label="Search apps"
-            placeholder="Games, Apps, Stories and More"
+            placeholder="Apps, games and more"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             {...stylex.props(styles.searchInput)}
           />
         </label>
-        {tabs.length > 1 && (
-          <nav aria-label="Store sections" {...stylex.props(styles.seg)}>
-            {tabs.map((name) => (
+        <button
+          type="button"
+          aria-label="Refresh catalog"
+          title={state.source}
+          {...stylex.props(styles.iconBtn, state.developer && styles.iconBtnDev, shared.press)}
+          onClick={() => {
+            void store.refresh()
+          }}
+        >
+          <Sym name="reload" size={15} />
+        </button>
+      </div>
+      <Screen>
+        <div {...stylex.props(styles.filters)}>
+          {tabs.length > 1 && (
+            <nav aria-label="Store sections" {...stylex.props(styles.seg)}>
+              {tabs.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  aria-pressed={name === tab}
+                  onClick={() => setTab(name)}
+                  {...stylex.props(styles.segBtn, name === tab && styles.segOn)}
+                >
+                  {name}
+                </button>
+              ))}
+            </nav>
+          )}
+          <nav aria-label="Lane" {...stylex.props(styles.chips)}>
+            {lanes.map((l) => (
               <button
-                key={name}
+                key={l.key}
                 type="button"
-                aria-pressed={name === tab}
-                onClick={() => setTab(name)}
-                {...stylex.props(styles.segBtn, name === tab && styles.segOn)}
+                aria-pressed={lane === l.key}
+                onClick={() => setLane(l.key)}
+                {...stylex.props(styles.chip, lane === l.key && styles.chipOn, shared.press)}
               >
-                {name}
+                {l.label}
+                <span {...stylex.props(styles.chipN)}>{l.n}</span>
               </button>
             ))}
           </nav>
-        )}
+        </div>
         {state.error && (
           <div role="status" {...stylex.props(styles.banner)}>
             <Sym name="antenna" size={14} />
             Catalog offline. Showing the last available releases.
+          </div>
+        )}
+        {state.developer && (
+          <div role="status" {...stylex.props(styles.banner, styles.bannerDev)}>
+            <Sym name="tabs" size={14} />
+            Developer catalog: {new URL(state.source).host}
           </div>
         )}
         {state.loading && !state.rows.length ? (
@@ -129,10 +178,12 @@ function Shelf({ store, open, openExternal }: { store: Store; open: Open; openEx
           </div>
         ) : (
           <>
-            {featured && <Featured row={featured} store={store} open={open} onShow={() => show(featured)} />}
-            <Group title="From Doan Labs" rows={official} store={store} open={open} onShow={show} />
-            <Group title="Community" rows={community} store={store} open={open} onShow={show} />
-            <Group title="Local previews" rows={development} store={store} open={open} onShow={show} />
+            {featured && (
+              <Featured row={featured} wide={wide} store={store} open={open} onShow={() => show(featured)} />
+            )}
+            {group('official', 'From Doan Labs', 'Official releases, built for both displays.', official)}
+            {group('community', 'Community', 'Submitted as pull requests, reviewed and published.', community)}
+            {group('development', 'Local previews', 'From your developer catalog.', development)}
             {!rows.length && (
               <Placeholder xstyle={[styles.center]}>No {tab === 'Updates' ? 'updates' : 'apps'} found.</Placeholder>
             )}
@@ -144,18 +195,33 @@ function Shelf({ store, open, openExternal }: { store: Store; open: Open; openEx
   )
 }
 
-function Featured({ row, store, open, onShow }: { row: StoreRow; store: Store; open: Open; onShow: () => void }) {
+/** The Today card: the app's own icon, blurred, is the artwork; the icon itself floats over it. */
+function Featured({
+  row,
+  wide,
+  store,
+  open,
+  onShow
+}: {
+  row: StoreRow
+  wide: boolean
+  store: Store
+  open: Open
+  onShow: () => void
+}) {
   return (
-    <div {...stylex.props(styles.hero, styles.heroArt(art(row.name, 50)), shared.select)}>
-      <button type="button" onClick={onShow} {...stylex.props(styles.heroTop, styles.grow, styles.heroBtn)}>
-        <div {...stylex.props(styles.kicker)}>{row.installed ? 'On your Duo' : 'Featured today'}</div>
-        <div>
+    <div {...stylex.props(styles.hero, styles.heroArt(art(row.name, 46)), shared.select)}>
+      {row.icon && <img src={row.icon} alt="" aria-hidden="true" {...stylex.props(styles.heroBlur)} />}
+      <div {...stylex.props(styles.heroShade)} />
+      <button type="button" onClick={onShow} {...stylex.props(styles.bare, styles.heroTop, wide && styles.heroTopWide)}>
+        <div {...stylex.props(styles.heroText)}>
+          <div {...stylex.props(styles.kicker)}>{row.installed ? 'On your Duo' : 'Featured today'}</div>
           <div {...stylex.props(styles.heroName)}>{row.name}</div>
           <div {...stylex.props(styles.heroBlurb)}>
-            {row.permissions.length ? `Uses ${row.permissions.join(' and ').toLowerCase()}` : 'Runs fully sandboxed'} ·
-            open source
+            {tagline(row)}. Open source, MIT licensed{row.note ? `. ${row.note}` : '.'}
           </div>
         </div>
+        {wide && <Icon row={row} xstyle={styles.heroBig} />}
       </button>
       <div {...stylex.props(styles.heroBar)}>
         <Icon row={row} xstyle={styles.heroIcon} />
@@ -171,43 +237,60 @@ function Featured({ row, store, open, onShow }: { row: StoreRow; store: Store; o
   )
 }
 
+/** A lane: heading, then columns of three rows that page sideways, as the App Store lists do. */
 function Group({
   title,
+  blurb,
   rows,
+  wide,
   store,
   open,
   onShow
 }: {
   title: string
+  blurb: string
   rows: StoreRow[]
+  wide: boolean
   store: Store
   open: Open
   onShow: (row: StoreRow) => void
 }) {
   if (!rows.length) return null
   return (
-    <>
+    <section aria-label={title} {...stylex.props(styles.group)}>
       <div {...stylex.props(styles.h)}>
-        {title}
+        <div>
+          <div {...stylex.props(styles.hTitle)}>{title}</div>
+          <div {...stylex.props(styles.hBlurb)}>{blurb}</div>
+        </div>
         <span {...stylex.props(styles.hCount)}>
           {rows.length} {rows.length === 1 ? 'app' : 'apps'}
         </span>
       </div>
-      <Section>
-        {rows.map((row) => (
-          <Item key={row.id} row={row} store={store} open={open} onShow={() => onShow(row)} />
+      <div {...stylex.props(styles.rail)}>
+        {chunk(rows, PER_PAGE).map((page, i) => (
+          <div key={page[0]!.id} {...stylex.props(styles.page, wide && styles.pageWide, i === 0 && styles.pageFirst)}>
+            {page.map((row) => (
+              <Item key={row.id} row={row} store={store} open={open} onShow={() => onShow(row)} />
+            ))}
+          </div>
         ))}
-      </Section>
-    </>
+      </div>
+    </section>
   )
 }
 
 function Item({ row, store, open, onShow }: { row: StoreRow; store: Store; open: Open; onShow: () => void }) {
   const notes = Notices(row, store)
   return (
-    <div data-store-app={row.id}>
-      <div {...stylex.props(styles.item)}>
-        <button type="button" onClick={onShow} aria-label={`${row.name} details`} {...stylex.props(styles.bare)}>
+    <div data-store-app={row.id} {...stylex.props(styles.item)}>
+      <div {...stylex.props(styles.itemRow)}>
+        <button
+          type="button"
+          onClick={onShow}
+          aria-label={`${row.name} details`}
+          {...stylex.props(styles.bare, shared.press)}
+        >
           <Icon row={row} />
         </button>
         <button type="button" onClick={onShow} {...stylex.props(styles.info, styles.bare)}>
@@ -421,11 +504,11 @@ function Detail({
         </div>
         {row.note && (
           <>
-            <div {...stylex.props(styles.h)}>What’s new</div>
+            <div {...stylex.props(styles.h, styles.hTitle)}>What’s new</div>
             <p {...stylex.props(styles.para)}>{row.note}</p>
           </>
         )}
-        <div {...stylex.props(styles.h)}>Privacy</div>
+        <div {...stylex.props(styles.h, styles.hTitle)}>Privacy</div>
         <Section>
           {row.permissions.length ? (
             row.permissions.map((p) => (
@@ -486,8 +569,8 @@ function Developer({
   const [error, setError] = useState('')
   return (
     <>
-      <div {...stylex.props(styles.h)}>For developers</div>
-      <Section aria-labelledby="for-developers">
+      <div {...stylex.props(styles.h, styles.hTitle)}>For developers</div>
+      <Section aria-labelledby="for-developers" xstyle={styles.card}>
         <button
           type="button"
           data-store-submit
