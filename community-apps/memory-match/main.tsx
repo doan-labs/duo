@@ -29,7 +29,7 @@ function Game() {
   const fitWidth = Math.max(
     0,
     Math.floor(
-      Math.min((view.width || 740) - (cover ? 20 : 36), (((view.height || 480) - (cover ? 118 : 144)) * 4) / 3)
+      Math.min((view.width || 740) - (cover ? 20 : 36), (((view.height || 480) - (cover ? 154 : 144)) * 4) / 3)
     )
   )
   const fitHeight = Math.floor((fitWidth * 3) / 4)
@@ -80,7 +80,6 @@ function Game() {
           return (
             <button
               type="button"
-              role="gridcell"
               aria-label={open ? card.symbol : 'Hidden card'}
               key={card.id}
               onClick={() => flip(index)}
@@ -162,4 +161,5 @@ const styles = stylex.create({
   }
 })
 
+await os.connect()
 createRoot(document.body).render(<Game />)
