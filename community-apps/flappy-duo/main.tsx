@@ -35,7 +35,7 @@ function Game() {
   const [spent, setSpent] = useState(PRICE)
   const [toast, setToast] = useState('')
   const [roast, setRoast] = useState('')
-  const [pay, setPay] = useState<'sheet' | 'done' | null>(null)
+  const [pay, setPay] = useState<'sheet' | 'processing' | 'done' | 'leaving' | null>(null)
   const onPay = useRef(() => {})
   const [notice, setNotice] = useState<Notice | null>(null)
   const [startLine] = useState(() => pick(START_LINES))
@@ -89,18 +89,23 @@ function Game() {
     setToast('')
   }
 
+  // Apple Pay's beat: a moment of processing, the check draws in, the sheet drops, then the receipt.
   const confirmPay = () => {
-    setPay('done')
-    cue('pay')
-    setSpent((s) => {
-      void os.storage.set('spent', String(s + PRICE))
-      return s + PRICE
-    })
+    setPay('processing')
+    window.setTimeout(() => {
+      setPay('done')
+      cue('pay')
+      setSpent((s) => {
+        void os.storage.set('spent', String(s + PRICE))
+        return s + PRICE
+      })
+    }, 1100)
+    window.setTimeout(() => setPay('leaving'), 2500)
     window.setTimeout(() => {
       setPay(null)
       setNotice({ title: 'Duo Store', text: `You're charged $${PRICE.toLocaleString()}! Genius.` })
       reset()
-    }, 900)
+    }, 2850)
   }
 
   onPay.current = confirmPay
@@ -283,8 +288,12 @@ function Game() {
       )}
       {pay && (
         <>
-          <div {...stylex.props(styles.dim)} />
-          <section role="dialog" aria-label="Duo Pay" {...stylex.props(styles.sheet, cover && styles.sheetCover)}>
+          <div {...stylex.props(styles.dim, pay === 'leaving' && styles.dimOut)} />
+          <section
+            role="dialog"
+            aria-label="Duo Pay"
+            {...stylex.props(styles.sheet, cover && styles.sheetCover, pay === 'leaving' && styles.sheetOut)}
+          >
             <div {...stylex.props(styles.sheetHead)}>
               <strong {...stylex.props(styles.payMark)}>
                 <span {...stylex.props(styles.apple)}></span> Pay
@@ -298,7 +307,7 @@ function Game() {
             <div {...stylex.props(styles.cardRow)}>
               <span {...stylex.props(styles.card)} />
               <span {...stylex.props(styles.cardText)}>
-                <strong>DUO CARD</strong>
+                <strong>Doan Labs Card</strong>
                 <span>(•••• 2399)</span>
               </span>
               <span {...stylex.props(styles.chev)}>›</span>
@@ -311,25 +320,77 @@ function Game() {
               <span {...stylex.props(styles.rowKey)}>APPLECARE+</span>
               <span {...stylex.props(styles.rowValue)}>DECLINED. BOLD.</span>
             </div>
-            {pay === 'done' ? (
-              <div {...stylex.props(styles.faceId)}>
-                <span {...stylex.props(styles.check)}>✓</span>
-                <span {...stylex.props(styles.faceLabel)}>Done</span>
-              </div>
-            ) : (
-              <div {...stylex.props(styles.faceId)}>
-                <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
-                  <g fill="none" stroke="#0a84ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 22V12a6 6 0 0 1 6-6h10M42 6h10a6 6 0 0 1 6 6v10M58 42v10a6 6 0 0 1-6 6H42M22 58H12a6 6 0 0 1-6-6V42" />
-                    <path d="M22 26v6M42 26v6M32 26v12h-4" />
-                    <path d="M22 42c3 4 7 5 10 5s7-1 10-5" />
-                  </g>
-                </svg>
-                <span {...stylex.props(styles.faceLabel)}>Face ID</span>
-                <span {...stylex.props(styles.sideHint)}>Double-press side button to pay ››</span>
-              </div>
-            )}
+            <div {...stylex.props(styles.faceId)}>
+              {pay === 'sheet' && (
+                <>
+                  <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true" {...stylex.props(styles.glyph)}>
+                    <g fill="none" stroke="#0a84ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 22V12a6 6 0 0 1 6-6h10M42 6h10a6 6 0 0 1 6 6v10M58 42v10a6 6 0 0 1-6 6H42M22 58H12a6 6 0 0 1-6-6V42" />
+                      <path d="M22 26v6M42 26v6M32 26v12h-4" />
+                      <path d="M22 42c3 4 7 5 10 5s7-1 10-5" />
+                    </g>
+                  </svg>
+                  <span {...stylex.props(styles.faceLabel)}>Face ID</span>
+                  <span {...stylex.props(styles.sideHint)}>Double-press side button to pay ››</span>
+                </>
+              )}
+              {pay === 'processing' && (
+                <>
+                  <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true" {...stylex.props(styles.spin)}>
+                    <circle cx="32" cy="32" r="26" fill="none" stroke="#d1d1d6" strokeWidth="4" />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="26"
+                      fill="none"
+                      stroke="#0a84ff"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray="40 124"
+                    />
+                  </svg>
+                  <span {...stylex.props(styles.faceLabel)}>Processing…</span>
+                  <span {...stylex.props(styles.sideHint, styles.still)}>Do not fold the device</span>
+                </>
+              )}
+              {(pay === 'done' || pay === 'leaving') && (
+                <>
+                  <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true" {...stylex.props(styles.pop)}>
+                    <defs>
+                      <linearGradient id="okg" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stopColor="#0a84ff" />
+                        <stop offset="1" stopColor="#30d158" />
+                      </linearGradient>
+                    </defs>
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="26"
+                      fill="none"
+                      stroke="url(#okg)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      pathLength="100"
+                      {...stylex.props(styles.ring)}
+                    />
+                    <path
+                      d="M20 33l8 8 16-17"
+                      fill="none"
+                      stroke="url(#okg)"
+                      strokeWidth="4.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      pathLength="100"
+                      {...stylex.props(styles.tick)}
+                    />
+                  </svg>
+                  <span {...stylex.props(styles.faceLabel)}>Done</span>
+                  <span {...stylex.props(styles.sideHint, styles.still)}>Charged to Doan Labs Card</span>
+                </>
+              )}
+            </div>
           </section>
+          {pay === 'sheet' && <div aria-hidden="true" {...stylex.props(styles.sideGlow)} />}
         </>
       )}
       {notice && (

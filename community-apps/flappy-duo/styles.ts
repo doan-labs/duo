@@ -4,6 +4,26 @@ import * as stylex from '@stylexjs/stylex'
 const pulse = stylex.keyframes({ '0%': { opacity: 0.6 }, '50%': { opacity: 1 }, '100%': { opacity: 0.6 } })
 const rise = stylex.keyframes({ from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } })
 const drop = stylex.keyframes({ from: { transform: 'translateY(-140%)' }, to: { transform: 'translateY(0)' } })
+const breathe = stylex.keyframes({
+  '0%': { transform: 'scale(1)' },
+  '50%': { transform: 'scale(1.1)' },
+  '100%': { transform: 'scale(1)' }
+})
+const turn = stylex.keyframes({ from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } })
+const draw = stylex.keyframes({ from: { strokeDashoffset: 100 }, to: { strokeDashoffset: 0 } })
+const popIn = stylex.keyframes({
+  '0%': { transform: 'scale(.6)', opacity: 0 },
+  '60%': { transform: 'scale(1.08)', opacity: 1 },
+  '100%': { transform: 'scale(1)', opacity: 1 }
+})
+const fall = stylex.keyframes({ from: { transform: 'translateY(0)' }, to: { transform: 'translateY(110%)' } })
+const fadeIn = stylex.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
+const fadeOut = stylex.keyframes({ from: { opacity: 1 }, to: { opacity: 0 } })
+const glow = stylex.keyframes({
+  '0%': { opacity: 0.35, boxShadow: '0 0 6px 2px rgba(10,132,255,.35)' },
+  '50%': { opacity: 1, boxShadow: '0 0 22px 8px rgba(10,132,255,.75)' },
+  '100%': { opacity: 0.35, boxShadow: '0 0 6px 2px rgba(10,132,255,.35)' }
+})
 
 export const styles = stylex.create({
   root: {
@@ -152,7 +172,21 @@ export const styles = stylex.create({
   },
   secondary: { color: '#0b1a3a', backgroundColor: 'rgba(20,60,120,.1)' },
   // ---- the pay sheet ----
-  dim: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,.35)' },
+  dim: {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,.35)',
+    animationName: fadeIn,
+    animationDuration: '.3s',
+    animationFillMode: 'both'
+  },
+  dimOut: { animationName: fadeOut, animationDuration: '.3s' },
+  sheetOut: {
+    animationName: fall,
+    animationDuration: '.34s',
+    animationTimingFunction: 'cubic-bezier(.4,0,.8,.4)',
+    animationFillMode: 'forwards'
+  },
   sheet: {
     position: 'absolute',
     insetInline: 0,
@@ -172,8 +206,8 @@ export const styles = stylex.create({
     fontSize: 13,
     boxShadow: '0 -12px 40px rgba(0,0,0,.25)',
     animationName: rise,
-    animationDuration: '.32s',
-    animationTimingFunction: 'cubic-bezier(.2,.8,.2,1)'
+    animationDuration: '.42s',
+    animationTimingFunction: 'cubic-bezier(.18,.9,.22,1.02)'
   },
   sheetCover: { fontSize: 11, gap: 4, paddingBlock: 8, paddingBottom: 12, paddingInline: 12 },
   sheetHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4 },
@@ -202,8 +236,9 @@ export const styles = stylex.create({
     width: 36,
     height: 24,
     borderRadius: 4,
-    backgroundImage: 'linear-gradient(135deg, #e5484d, #b3261e)',
-    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)'
+    backgroundImage:
+      'linear-gradient(115deg, rgba(255,140,200,.35), rgba(140,200,255,.35) 45%, rgba(255,230,140,.35) 80%), linear-gradient(135deg, #ffffff, #dcdce1 60%, #f2f2f5)',
+    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.12)'
   },
   cardText: { flex: 1, display: 'flex', flexDirection: 'column', fontSize: 12, lineHeight: 1.2, color: '#0b1a3a' },
   chev: { color: '#c7c7cc', fontSize: 22, lineHeight: 1 },
@@ -242,16 +277,55 @@ export const styles = stylex.create({
     animationDuration: '1.2s',
     animationIterationCount: 'infinite'
   },
-  check: {
-    display: 'inline-flex',
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1f8f4e',
-    color: colors.white,
-    fontSize: 24
+  glyph: {
+    animationName: breathe,
+    animationDuration: '1.6s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out'
+  },
+  spin: {
+    animationName: turn,
+    animationDuration: '.9s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'linear'
+  },
+  pop: {
+    animationName: popIn,
+    animationDuration: '.45s',
+    animationTimingFunction: 'cubic-bezier(.2,.9,.3,1.3)',
+    animationFillMode: 'both'
+  },
+  ring: {
+    strokeDasharray: 100,
+    animationName: draw,
+    animationDuration: '.55s',
+    animationTimingFunction: 'ease-out',
+    animationFillMode: 'both'
+  },
+  tick: {
+    strokeDasharray: 100,
+    animationName: draw,
+    animationDuration: '.35s',
+    animationDelay: '.4s',
+    animationTimingFunction: 'ease-out',
+    animationFillMode: 'both'
+  },
+  still: { animationName: 'none' },
+  // Sits where the frame's side button is, so the eye goes to the real button.
+  sideGlow: {
+    position: 'absolute',
+    right: 0,
+    top: '8%',
+    width: 5,
+    height: '27%',
+    borderStartStartRadius: 6,
+    borderEndStartRadius: 6,
+    backgroundImage: 'linear-gradient(180deg, #5ac8fa, #0a84ff, #5ac8fa)',
+    pointerEvents: 'none',
+    animationName: glow,
+    animationDuration: '1.3s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out'
   },
   // ---- the notification after paying ----
   notice: {
