@@ -13,6 +13,20 @@
           "sha256": "4874b34ef3957100ca2e8834bae8bc3e801c24c4ea6847e9de11b2fd8a4deed4"
         }
       ]
+    },
+    "com.mnismt.duo.snake": {
+      "name": "Snake",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
+      "releases": [
+        {
+          "release": "1.0.0+e50d04dd",
+          "sdk": "0.0.0",
+          "bytes": 254199,
+          "sha256": "eca2ddb75864b930bf9f33f8bc49138a9fca5160b12e2739c964117891ee4076"
+        }
+      ]
     }
   }
 }
