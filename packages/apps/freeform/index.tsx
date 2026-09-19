@@ -8,12 +8,12 @@ import { type PointerEvent, useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
 
 export const INKS = [
-  colors.darkElevated,
+  colors.grey6Dark,
   colors.red,
   colors.orange,
   colors.green,
-  colors.blueBright,
-  appAppearance.freeformColor3
+  colors.blue,
+  appAppearance.freeformPurple
 ]
 
 const ctx = (c: HTMLCanvasElement) => c.getContext('2d')!

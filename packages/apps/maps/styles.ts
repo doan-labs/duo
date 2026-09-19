@@ -1,11 +1,24 @@
-import { appAppearance, colors, easing, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  easing,
+  fonts,
+  glass,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Apple's light map furniture: translucent panels over the tiles, controls in a
 // glass stack down the right edge, and pins that carry their own label instead
-// of a callout. Every surface is the same material — the sidebar and the card
+// of a callout. Every surface is the same material - the sidebar and the card
 // only differ in how opaque they are.
-const glass = 'blur(30px) saturate(180%)'
 /** Panel geometry the map also needs, to centre on what the panels leave visible. */
 export const ASIDE = 202
 export const CARD = 246
@@ -15,7 +28,7 @@ const STATUS = 40
 const grow = stylex.keyframes({ from: { opacity: 0, transform: 'translate(-50%,-50%) scale(.6)' } })
 const slide = stylex.keyframes({ from: { opacity: 0, transform: 'translateX(-12px)' } })
 const raise = stylex.keyframes({ from: { transform: 'translateY(100%)' } })
-const motion = '@media (prefers-reduced-motion: reduce)'
+const reduce = '@media (prefers-reduced-motion: reduce)'
 
 export const styles = stylex.create({
   root: {
@@ -27,8 +40,9 @@ export const styles = stylex.create({
     backgroundColor: appAppearance.mapsLand,
     color: colors.black,
     fontFamily: fonts.system,
-    fontSize: appAppearance.musicFontSize6,
-    lineHeight: 1.3,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     userSelect: 'none'
   },
 
@@ -49,20 +63,20 @@ export const styles = stylex.create({
     width: 21,
     height: 21,
     transform: 'translate(-50%,-50%)',
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.circle,
     color: colors.white,
-    boxShadow: appAppearance.mapsPinShadow,
+    boxShadow: shadow.card,
     cursor: 'pointer',
-    animationName: { default: grow, [motion]: 'none' },
+    animationName: { default: grow, [reduce]: 'none' },
     animationDuration: '.2s'
   },
   marker: {
     width: 38,
     height: 38,
-    borderRadius: appAppearance.mapsBorderRadius,
-    boxShadow: appAppearance.mapsMarkerShadow,
+    borderRadius: radius.lg,
+    boxShadow: shadow.float,
     zIndex: 2,
-    animationName: { default: grow, [motion]: 'none' },
+    animationName: { default: grow, [reduce]: 'none' },
     animationDuration: '.3s',
     animationTimingFunction: easing.bounce
   },
@@ -72,15 +86,23 @@ export const styles = stylex.create({
     left: '50%',
     transform: 'translateX(-50%)',
     whiteSpace: 'nowrap',
-    fontSize: appAppearance.calendarFontSize4,
-    fontWeight: appAppearance.musicFontWeight3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.medium,
     color: colors.black,
-    textShadow: appAppearance.mapsLabelShadow,
+    textShadow: appAppearance.mapsLabelHalo,
     pointerEvents: 'none'
   },
-  markerLabel: { top: 42, fontSize: appAppearance.calendarFontSize2, fontWeight: appAppearance.musicFontWeight2 },
+  markerLabel: {
+    top: 42,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold
+  },
   /** Imagery is dark, so labels and the scale flip to white on a dark halo. */
-  onDark: { color: colors.white, textShadow: appAppearance.mapsLabelShadowDark },
+  onDark: { color: colors.white, textShadow: appAppearance.mapsLabelHaloDark },
   ruleDark: { borderColor: colors.white, opacity: 0.9 },
   transit: { backgroundColor: colors.blue },
   rail: { backgroundColor: colors.blue },
@@ -92,16 +114,16 @@ export const styles = stylex.create({
   museum: { backgroundColor: appAppearance.mapsBrown },
   cinema: { backgroundColor: colors.purple },
   landmark: { backgroundColor: colors.teal },
-  address: { backgroundColor: colors.grey2 },
+  address: { backgroundColor: colors.grey },
 
   me: {
     position: 'absolute',
     width: 13,
     height: 13,
     transform: 'translate(-50%,-50%)',
-    borderRadius: appAppearance.weatherBorderRadius,
-    backgroundColor: colors.blueBright,
-    boxShadow: appAppearance.mapsDotShadow,
+    borderRadius: radius.circle,
+    backgroundColor: colors.blue,
+    boxShadow: appAppearance.mapsDotRing,
     pointerEvents: 'none',
     zIndex: 1
   },
@@ -125,20 +147,20 @@ export const styles = stylex.create({
     width: 28,
     height: 28,
     backgroundColor: { default: appAppearance.mapsControl, ':hover': colors.white },
-    backdropFilter: glass,
-    WebkitBackdropFilter: glass,
-    color: appAppearance.appstoreColor,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    color: app.fg,
     cursor: 'pointer',
     transitionProperty: 'background-color, transform',
-    transitionDuration: '.15s',
-    transform: { default: 'scale(1)', ':active': 'scale(.92)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: 'scale(1)', ':active': motion.press }
   },
-  alone: { borderRadius: appAppearance.musicBorderRadius4, boxShadow: appAppearance.mapsControlShadow },
+  alone: { borderRadius: radius.sm, boxShadow: shadow.card },
   stack: {
     display: 'flex',
     flexDirection: 'column',
-    borderRadius: appAppearance.musicBorderRadius4,
-    boxShadow: appAppearance.mapsControlShadow,
+    borderRadius: radius.sm,
+    boxShadow: shadow.card,
     overflow: 'hidden'
   },
   divider: { height: 1, backgroundColor: appAppearance.mapsHairline },
@@ -150,11 +172,11 @@ export const styles = stylex.create({
     minWidth: 130,
     paddingTop: 4,
     paddingBottom: 4,
-    borderRadius: appAppearance.itunesBorderRadius,
+    borderRadius: radius.md,
     backgroundColor: appAppearance.mapsCard,
-    backdropFilter: glass,
-    WebkitBackdropFilter: glass,
-    boxShadow: appAppearance.mapsShadow,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    boxShadow: shadow.float,
     pointerEvents: 'auto',
     zIndex: 3
   },
@@ -165,7 +187,9 @@ export const styles = stylex.create({
     width: '100%',
     paddingInline: 10,
     paddingBlock: 6,
-    fontSize: appAppearance.musicFontSize6,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     color: colors.black,
     textAlign: 'left',
     cursor: 'pointer',
@@ -180,9 +204,11 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    fontSize: appAppearance.calendarFontSize4,
-    color: appAppearance.appstoreColor,
-    textShadow: appAppearance.mapsLabelShadow
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: app.label2,
+    textShadow: appAppearance.mapsLabelHalo
   },
   ticks: { display: 'flex', justifyContent: 'space-between' },
   bar: (width: number) => ({ width }),
@@ -193,7 +219,7 @@ export const styles = stylex.create({
     borderBottomWidth: 1,
     borderTopWidth: 0,
     borderStyle: 'solid',
-    borderColor: appAppearance.appstoreColor,
+    borderColor: app.label2,
     opacity: 0.55
   },
   legal: {
@@ -202,9 +228,11 @@ export const styles = stylex.create({
     bottom: 6,
     paddingInline: 5,
     paddingBlock: 2,
-    borderRadius: appAppearance.musicBorderRadius2,
-    fontSize: appAppearance.calendarFontSize4,
-    color: colors.grey2,
+    borderRadius: radius.xs,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: app.label2,
     backgroundColor: appAppearance.mapsControl
   },
 
@@ -222,8 +250,8 @@ export const styles = stylex.create({
     // Full height like the Mac's sidebar; only the content clears the status stack.
     paddingTop: STATUS,
     backgroundColor: appAppearance.mapsPanel,
-    backdropFilter: glass,
-    WebkitBackdropFilter: glass,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     borderRightWidth: 1,
     borderRightStyle: 'solid',
     borderRightColor: appAppearance.mapsHairline
@@ -237,14 +265,14 @@ export const styles = stylex.create({
     flexShrink: 0,
     paddingTop: STATUS,
     backgroundColor: appAppearance.mapsCard,
-    backdropFilter: glass,
-    WebkitBackdropFilter: glass,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     borderRightWidth: 1,
     borderRightStyle: 'solid',
     borderRightColor: appAppearance.mapsHairline,
-    boxShadow: appAppearance.mapsShadow,
+    boxShadow: shadow.float,
     overflow: 'hidden',
-    animationName: { default: slide, [motion]: 'none' },
+    animationName: { default: slide, [reduce]: 'none' },
     animationDuration: '.28s',
     animationTimingFunction: easing.pop
   },
@@ -258,13 +286,13 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     height: '54%',
-    borderTopLeftRadius: appAppearance.musicBorderRadius,
-    borderTopRightRadius: appAppearance.musicBorderRadius,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     backgroundColor: appAppearance.mapsPanel,
-    backdropFilter: glass,
-    WebkitBackdropFilter: glass,
-    boxShadow: appAppearance.mapsShadow,
-    animationName: { default: raise, [motion]: 'none' },
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    boxShadow: shadow.float,
+    animationName: { default: raise, [reduce]: 'none' },
     animationDuration: '.34s',
     animationTimingFunction: easing.push
   },
@@ -275,7 +303,7 @@ export const styles = stylex.create({
     marginTop: 6,
     marginBottom: 2,
     flexShrink: 0,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.pill,
     backgroundColor: colors.grey3
   },
   scroll: { flexGrow: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' },
@@ -291,7 +319,7 @@ export const styles = stylex.create({
     minWidth: 0,
     height: 26,
     paddingInline: 7,
-    borderRadius: appAppearance.musicBorderRadius4,
+    borderRadius: radius.sm,
     backgroundColor: appAppearance.mapsField,
     color: colors.grey
   },
@@ -302,9 +330,11 @@ export const styles = stylex.create({
     outline: 0,
     backgroundColor: 'transparent',
     color: colors.black,
-    fontSize: appAppearance.musicFontSize6,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     fontFamily: fonts.system,
-    '::placeholder': { color: colors.grey }
+    '::placeholder': { color: app.label3 }
   },
   ghost: {
     display: 'grid',
@@ -312,8 +342,8 @@ export const styles = stylex.create({
     width: 24,
     height: 24,
     flexShrink: 0,
-    borderRadius: appAppearance.musicBorderRadius4,
-    color: colors.grey2,
+    borderRadius: radius.sm,
+    color: app.label2,
     cursor: 'pointer',
     backgroundColor: { default: 'transparent', ':hover': appAppearance.mapsHover }
   },
@@ -321,9 +351,11 @@ export const styles = stylex.create({
     paddingInline: 14,
     paddingTop: 10,
     paddingBottom: 3,
-    fontSize: appAppearance.musicFontSize3,
-    fontWeight: appAppearance.musicFontWeight2,
-    color: colors.grey
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    color: app.label2
   },
   row: {
     display: 'flex',
@@ -333,7 +365,7 @@ export const styles = stylex.create({
     marginInline: 6,
     paddingInline: 8,
     paddingBlock: 6,
-    borderRadius: appAppearance.musicBorderRadius4,
+    borderRadius: radius.sm,
     color: colors.black,
     textAlign: 'left',
     cursor: 'pointer',
@@ -346,23 +378,37 @@ export const styles = stylex.create({
     width: 22,
     height: 22,
     flexShrink: 0,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     color: colors.white
   },
   lines: { minWidth: 0, display: 'flex', flexDirection: 'column' },
   clip: { overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
-  note: { fontSize: appAppearance.musicFontSize3, color: colors.grey },
+  note: {
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: app.label2
+  },
   link: {
     display: 'block',
     marginInline: 14,
     marginTop: 4,
     marginBottom: 8,
-    fontSize: appAppearance.musicFontSize6,
-    color: colors.blue,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: app.link,
     textAlign: 'left',
     cursor: 'pointer'
   },
-  empty: { paddingInline: 14, paddingTop: 16, fontSize: appAppearance.musicFontSize6, color: colors.grey },
+  empty: {
+    paddingInline: 14,
+    paddingTop: 16,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: app.label2
+  },
 
   // ---------- place card ----------
 
@@ -373,19 +419,27 @@ export const styles = stylex.create({
     placeItems: 'center',
     width: 22,
     height: 22,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     backgroundColor: { default: appAppearance.mapsField, ':hover': appAppearance.mapsHover },
-    color: appAppearance.appstoreColor,
+    color: app.label2,
     cursor: 'pointer'
   },
   title: {
     paddingInline: 14,
     paddingTop: 6,
-    fontSize: appAppearance.messagesFontSize,
-    fontWeight: appAppearance.musicFontWeight,
-    lineHeight: 1.15
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    fontWeight: weight.bold
   },
-  kind: { paddingInline: 14, paddingTop: 2, fontSize: appAppearance.calendarFontSize2, color: colors.grey },
+  kind: {
+    paddingInline: 14,
+    paddingTop: 2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    color: app.label2
+  },
   go: {
     display: 'flex',
     alignItems: 'center',
@@ -395,23 +449,27 @@ export const styles = stylex.create({
     marginInline: 14,
     marginTop: 12,
     marginBottom: 14,
-    borderRadius: appAppearance.weatherBorderRadius,
-    backgroundColor: { default: colors.blueBright, ':hover': colors.blue },
+    borderRadius: radius.pill,
+    backgroundColor: { default: colors.blue, ':hover': colors.blueDark },
     color: colors.white,
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',
-    transitionDuration: '.15s',
-    transform: { default: 'scale(1)', ':active': 'scale(.97)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: 'scale(1)', ':active': motion.press }
   },
   hdr: {
     display: 'flex',
     alignItems: 'baseline',
     paddingInline: 14,
     paddingBottom: 6,
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.bold
   },
   detail: {
     display: 'flex',
@@ -422,7 +480,7 @@ export const styles = stylex.create({
     borderTopStyle: 'solid',
     borderTopColor: appAppearance.mapsHairline
   },
-  label: { width: 52, flexShrink: 0, color: colors.grey2 },
+  label: { width: 52, flexShrink: 0, color: app.label2 },
   value: { minWidth: 0, display: 'flex', flexDirection: 'column', wordBreak: 'break-word' },
   action: {
     display: 'flex',
@@ -433,15 +491,17 @@ export const styles = stylex.create({
     marginTop: 10,
     paddingInline: 10,
     paddingBlock: 8,
-    borderRadius: appAppearance.musicBorderRadius4,
+    borderRadius: radius.sm,
     backgroundColor: { default: appAppearance.mapsField, ':hover': appAppearance.mapsHover },
     color: colors.black,
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight3,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.medium,
     textAlign: 'left',
     cursor: 'pointer'
   },
-  actionGlyph: { color: colors.blue, display: 'flex' },
+  actionGlyph: { color: app.link, display: 'flex' },
   gap: { height: 14 },
   tray: {
     display: 'flex',
@@ -453,7 +513,7 @@ export const styles = stylex.create({
     borderTopWidth: 1,
     borderTopStyle: 'solid',
     borderTopColor: appAppearance.mapsHairline,
-    color: appAppearance.appstoreColor
+    color: app.fg
   },
   starred: { color: colors.orange }
 })

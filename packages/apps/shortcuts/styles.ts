@@ -1,4 +1,13 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  leading,
+  motion,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -11,7 +20,7 @@ export const styles = stylex.create({
   },
   sc: {
     position: 'relative',
-    borderRadius: appAppearance.messagesFontSize,
+    borderRadius: radius.xl,
     paddingTop: 13,
     paddingRight: 13,
     paddingBottom: 13,
@@ -25,23 +34,28 @@ export const styles = stylex.create({
     textAlign: 'left',
     overflow: 'hidden',
     transitionProperty: 'transform',
-    transitionDuration: '.18s',
-    transform: { default: null, ':active': 'scale(.95)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
   bg: (img: string) => ({ backgroundImage: img }),
-  glyph: { fontSize: appAppearance.mailFontSize },
-  name: { fontSize: appAppearance.musicBorderRadius, fontWeight: appAppearance.musicFontWeight2 },
+  glyph: { fontSize: typeScale.title2, lineHeight: leading.title2, letterSpacing: tracking.title2 },
+  name: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
+  },
   ok: {
     position: 'absolute',
     inset: 0,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: appAppearance.cameraBackgroundColor3,
-    fontSize: appAppearance.shortcutsFontSize,
+    backgroundColor: appAppearance.shortcutsScrim,
+    fontSize: typeScale.largeTitle,
     opacity: 0,
     transitionProperty: 'opacity',
     transitionDuration: '.25s'
   },
   okOn: { opacity: 1 },
-  hdrSm: { fontSize: appAppearance.musicFontSize5 }
+  hdrSm: { fontSize: typeScale.title3, lineHeight: leading.title3, letterSpacing: tracking.title3 }
 })

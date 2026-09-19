@@ -1,4 +1,15 @@
-import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  easing,
+  leading,
+  motion,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Local copies of the shared keyframes: StyleX only resolves imports from
@@ -19,39 +30,54 @@ export const styles = stylex.create({
     paddingRight: 16,
     paddingBottom: 11,
     paddingLeft: 16,
-    backgroundColor: { default: colors.white, ':active': colors.fillThin },
+    backgroundColor: { default: app.surface, ':active': app.fill3 },
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: appAppearance.messagesBorderBottomColor,
+    borderBottomColor: app.separator,
     cursor: 'pointer',
     alignItems: 'flex-start',
     transitionProperty: 'background-color',
     transitionDuration: '.15s'
   },
   tx: { minWidth: 0, flexGrow: 1, flexBasis: 0 },
-  txB: { display: 'block', fontSize: appAppearance.musicFontSize, fontWeight: appAppearance.musicFontWeight2 },
+  txB: {
+    display: 'block',
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    letterSpacing: tracking.headline,
+    fontWeight: weight.semibold
+  },
   txP: {
-    fontSize: appAppearance.musicFontSize6,
-    color: colors.grey,
-    lineHeight: 1.35,
-    maxHeight: '2.7em',
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: app.label2,
+    // Two lines of the preview and no more.
+    maxHeight: `calc(${leading.footnote} * 2)`,
     overflow: 'hidden'
   },
   avatar: {
     width: 44,
     height: 44,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     flexShrink: 0,
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
-    fontSize: appAppearance.musicFontSize5,
-    fontWeight: appAppearance.musicFontWeight3
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    fontWeight: weight.medium
   },
   bg: (image: string) => ({ backgroundImage: image }),
-  hdr: { fontSize: appAppearance.messagesFontSize, justifyContent: 'center', position: 'relative' },
+  hdr: {
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    letterSpacing: tracking.headline,
+    justifyContent: 'center',
+    position: 'relative'
+  },
   bkAbs: { position: 'absolute', left: 16 },
-  ft: { position: 'absolute', right: 16, color: colors.blueBright },
+  ft: { position: 'absolute', right: 16, color: app.link },
   flush: { paddingBottom: 0 },
   thread: {
     display: 'flex',
@@ -68,20 +94,22 @@ export const styles = stylex.create({
     paddingRight: 13,
     paddingBottom: 8,
     paddingLeft: 13,
-    borderRadius: appAppearance.musicFontSize2,
-    fontSize: appAppearance.musicFontSize,
-    lineHeight: 1.34,
+    borderRadius: radius.xxl,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    fontWeight: weight.regular,
     alignSelf: 'flex-start',
-    backgroundColor: colors.trackLight,
-    color: colors.black,
+    backgroundColor: app.fill2,
+    color: app.fg,
     animationName: pop,
     animationDuration: '.32s',
     animationTimingFunction: easing.spring
   },
   me: {
     alignSelf: 'flex-end',
-    backgroundColor: colors.blueBright,
-    backgroundImage: appAppearance.messagesBackgroundImage,
+    backgroundColor: colors.blue,
+    backgroundImage: appAppearance.messagesBubble,
     color: colors.white
   },
   /** A bubble that changes sender gets a little air before it. */
@@ -94,14 +122,14 @@ export const styles = stylex.create({
     paddingRight: 15,
     paddingBottom: 13,
     paddingLeft: 15,
-    borderRadius: appAppearance.musicFontSize2,
-    backgroundColor: colors.trackLight
+    borderRadius: radius.xxl,
+    backgroundColor: app.fill2
   },
   dot: {
     width: 8,
     height: 8,
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: appAppearance.messagesBackgroundColor,
+    borderRadius: radius.circle,
+    backgroundColor: appAppearance.messagesBubbleGrey,
     animationName: bob,
     animationDuration: '.95s',
     animationIterationCount: 'infinite'
@@ -115,38 +143,41 @@ export const styles = stylex.create({
     paddingRight: 12,
     paddingBottom: 8,
     paddingLeft: 12,
-    backgroundColor: appAppearance.messagesBackgroundColor2,
+    backgroundColor: appAppearance.messagesBar,
     borderTopWidth: 1,
     borderTopStyle: 'solid',
-    borderTopColor: appAppearance.messagesBorderTopColor
+    borderTopColor: appAppearance.messagesBarEdge
   },
   input: {
     flexGrow: 1,
     flexBasis: 0,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: appAppearance.messagesBorderTopColor,
-    borderRadius: appAppearance.messagesFontSize,
+    borderColor: appAppearance.messagesBarEdge,
+    borderRadius: radius.pill,
     paddingTop: 8,
     paddingRight: 14,
     paddingBottom: 8,
     paddingLeft: 14,
-    backgroundColor: colors.white,
+    backgroundColor: app.surface,
+    color: app.fg,
     outline: 0,
-    fontSize: appAppearance.musicFontSize
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body
   },
   send: {
     width: 32,
     height: 32,
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: colors.blueBright,
+    borderRadius: radius.circle,
+    backgroundColor: app.link,
     color: colors.white,
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
     transitionProperty: 'transform, opacity',
-    transitionDuration: '.15s, .2s',
+    transitionDuration: `${motion.pressDuration}, .2s`,
     opacity: { default: null, ':disabled': 0.3 },
-    transform: { default: null, ':active': 'scale(.85)' }
+    transform: { default: null, ':active': motion.press }
   }
 })

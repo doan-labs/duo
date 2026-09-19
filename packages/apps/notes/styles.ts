@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, leading, radius, tracking, typeScale, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -20,11 +20,16 @@ export const styles = stylex.create({
     flexDirection: 'column',
     borderRightWidth: 1,
     borderRightStyle: 'solid',
-    borderRightColor: appAppearance.musicBorderBottomColor
+    borderRightColor: app.separator
   },
   listHdr: { display: 'flex', alignItems: 'center', paddingInline: 12, paddingTop: 4, paddingBottom: 6, flexShrink: 0 },
-  listTitle: { fontSize: appAppearance.musicFontSize, fontWeight: appAppearance.musicFontWeight },
-  listCount: { fontSize: appAppearance.musicFontSize3 },
+  listTitle: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.bold
+  },
+  listCount: { fontSize: typeScale.caption2, lineHeight: leading.caption2, letterSpacing: tracking.caption2 },
   push: { marginLeft: 'auto' },
   search: {
     display: 'flex',
@@ -34,8 +39,8 @@ export const styles = stylex.create({
     marginBottom: 6,
     paddingInline: 8,
     height: 28,
-    borderRadius: appAppearance.itunesBorderRadius,
-    backgroundColor: appAppearance.podcastsBorderTopColor,
+    borderRadius: radius.md,
+    backgroundColor: app.fill3,
     color: colors.grey,
     flexShrink: 0
   },
@@ -46,15 +51,17 @@ export const styles = stylex.create({
     outline: 0,
     backgroundColor: 'transparent',
     color: colors.white,
-    fontSize: appAppearance.musicFontSize6
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
   round: {
     width: 27,
     height: 27,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: appAppearance.podcastsBorderTopColor,
+    backgroundColor: app.fill2,
     color: colors.white,
     flexShrink: 0
   }

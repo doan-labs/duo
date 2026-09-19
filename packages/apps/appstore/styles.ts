@@ -1,4 +1,18 @@
-import { app, appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  easing,
+  fonts,
+  glass,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -25,7 +39,7 @@ export const styles = stylex.create({
     paddingRight: 12,
     paddingBottom: 8,
     paddingLeft: 12,
-    borderRadius: appAppearance.appstoreRadius12,
+    borderRadius: radius.lg,
     backgroundColor: app.fill,
     color: colors.grey
   },
@@ -36,14 +50,16 @@ export const styles = stylex.create({
     outline: 'none',
     backgroundColor: 'transparent',
     color: app.fg,
-    fontSize: appAppearance.appstoreFontSize15,
-    fontFamily: appAppearance.appstoreInheritedFontFamily,
-    '::placeholder': { color: colors.grey }
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontFamily: fonts.system,
+    '::placeholder': { color: app.label3 }
   },
   iconBtn: {
     width: 34,
     height: 34,
-    borderRadius: appAppearance.appstoreRadius17,
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
@@ -71,17 +87,21 @@ export const styles = stylex.create({
     paddingRight: 11,
     paddingBottom: 6,
     paddingLeft: 12,
-    borderRadius: appAppearance.appstoreRadius15,
-    fontSize: appAppearance.appstoreFontSize13,
-    fontWeight: appAppearance.appstoreFontWeight600,
+    borderRadius: radius.pill,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
     color: app.fg,
     backgroundColor: app.fill,
     cursor: 'pointer'
   },
   chipOn: { color: colors.white, backgroundColor: app.fg },
   chipN: {
-    fontSize: appAppearance.appstoreFontSize11,
-    fontWeight: appAppearance.appstoreFontWeight600,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
     opacity: 0.6,
     fontVariantNumeric: 'tabular-nums'
   },
@@ -92,7 +112,7 @@ export const styles = stylex.create({
     paddingRight: 2,
     paddingBottom: 2,
     paddingLeft: 2,
-    borderRadius: appAppearance.appstoreRadius11,
+    borderRadius: radius.lg,
     backgroundColor: app.fill
   },
   segBtn: {
@@ -101,16 +121,18 @@ export const styles = stylex.create({
     paddingRight: 14,
     paddingBottom: 5,
     paddingLeft: 14,
-    borderRadius: appAppearance.appstoreRadius9,
-    fontSize: appAppearance.appstoreFontSize13,
-    fontWeight: appAppearance.appstoreFontWeight600,
+    borderRadius: radius.md,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
     color: app.fg,
     backgroundColor: 'transparent',
     cursor: 'pointer',
     transitionProperty: 'background-color, box-shadow',
     transitionDuration: '.2s'
   },
-  segOn: { backgroundColor: app.surface, boxShadow: appAppearance.appstoreSegmentShadow },
+  segOn: { backgroundColor: app.surface, boxShadow: shadow.card },
   banner: {
     marginRight: 16,
     marginBottom: 14,
@@ -119,16 +141,18 @@ export const styles = stylex.create({
     paddingRight: 12,
     paddingBottom: 9,
     paddingLeft: 12,
-    borderRadius: appAppearance.appstoreRadius12,
-    backgroundColor: appAppearance.appstoreBannerBackground,
-    color: colors.grey2,
-    fontSize: appAppearance.appstoreFontSize12,
-    fontWeight: appAppearance.appstoreFontWeight500,
+    borderRadius: radius.lg,
+    backgroundColor: appAppearance.appstoreBanner,
+    color: app.label2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.medium,
     display: 'flex',
     alignItems: 'center',
     gap: 8
   },
-  bannerDev: { backgroundColor: appAppearance.appstoreBannerDevBackground, color: colors.blue },
+  bannerDev: { backgroundColor: appAppearance.appstoreBannerDev, color: colors.blue },
   /** The Today card. */
   hero: {
     position: 'relative',
@@ -137,11 +161,11 @@ export const styles = stylex.create({
     marginRight: 16,
     marginBottom: 28,
     marginLeft: 16,
-    borderRadius: appAppearance.appstoreRadius22,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
     color: colors.white,
     textAlign: 'left',
-    boxShadow: appAppearance.appstoreHeroShadow,
+    boxShadow: shadow.float,
     cursor: 'pointer',
     // The blurred icon behind is a texture; a transform on this box keeps it clipped to the corners.
     transform: 'translateZ(0)'
@@ -187,27 +211,36 @@ export const styles = stylex.create({
   heroTopWide: { minHeight: 212 },
   heroText: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 },
   kicker: {
-    fontSize: appAppearance.appstoreFontSize11,
-    fontWeight: appAppearance.appstoreFontWeight700,
-    letterSpacing: 1.2,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    fontWeight: weight.bold,
+    // The widest tracking on the scale: this line is uppercase and needs the air.
+    letterSpacing: tracking.largeTitle,
     textTransform: 'uppercase',
     opacity: 0.85
   },
   heroName: {
-    fontSize: appAppearance.appstoreFontSize32,
-    fontWeight: appAppearance.appstoreFontWeight800,
-    lineHeight: 1.05,
-    letterSpacing: -0.6,
-    textShadow: appAppearance.appstoreHeroTextShadow
+    fontSize: typeScale.largeTitle,
+    lineHeight: leading.largeTitle,
+    letterSpacing: tracking.largeTitle,
+    fontWeight: weight.bold,
+    textShadow: shadow.text
   },
-  heroBlurb: { fontSize: appAppearance.appstoreFontSize15, lineHeight: 1.4, opacity: 0.92, maxWidth: 420 },
+  heroBlurb: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    opacity: 0.92,
+    maxWidth: 420
+  },
   heroBig: {
     width: 128,
     height: 128,
-    borderRadius: appAppearance.appstoreRadius30,
-    fontSize: appAppearance.appstoreFontSize48,
+    borderRadius: radius.xxl,
+    fontSize: typeScale.display,
+    lineHeight: 1,
     flexShrink: 0,
-    boxShadow: appAppearance.appstoreHeroBigShadow,
+    boxShadow: shadow.float,
     transform: 'rotate(-4deg)'
   },
   heroBar: {
@@ -219,21 +252,32 @@ export const styles = stylex.create({
     paddingRight: 14,
     paddingBottom: 12,
     paddingLeft: 14,
-    backgroundColor: appAppearance.appstoreHeroBarBackground,
-    backdropFilter: 'blur(24px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(160%)'
+    backgroundColor: appAppearance.appstoreHeroBar,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur
   },
   heroIcon: {
     width: 44,
     height: 44,
-    borderRadius: appAppearance.appstoreRadius10,
-    fontSize: appAppearance.appstoreFontSize18,
+    borderRadius: radius.md,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
     flexShrink: 0,
-    boxShadow: appAppearance.appstoreHeroIconShadow
+    boxShadow: shadow.card
   },
   heroInfo: { flexGrow: 1, minWidth: 0 },
-  heroTitle: { fontSize: appAppearance.appstoreFontSize15, fontWeight: appAppearance.appstoreFontWeight600 },
-  heroSub: { fontSize: appAppearance.appstoreFontSize12, opacity: 0.8 },
+  heroTitle: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold
+  },
+  heroSub: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    opacity: 0.8
+  },
   /** A lane. */
   group: { marginBottom: 26 },
   h: {
@@ -246,15 +290,23 @@ export const styles = stylex.create({
     marginBottom: 10
   },
   hTitle: {
-    fontSize: appAppearance.appstoreFontSize22,
-    fontWeight: appAppearance.appstoreFontWeight700,
-    letterSpacing: -0.4,
-    lineHeight: 1.15
+    fontSize: typeScale.title2,
+    lineHeight: leading.title2,
+    letterSpacing: tracking.title2,
+    fontWeight: weight.bold
   },
-  hBlurb: { fontSize: appAppearance.appstoreFontSize13, color: colors.grey, marginTop: 2 },
+  hBlurb: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: colors.grey,
+    marginTop: 2
+  },
   hCount: {
-    fontSize: appAppearance.appstoreFontSize13,
-    fontWeight: appAppearance.appstoreFontWeight500,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.medium,
     color: colors.grey,
     whiteSpace: 'nowrap',
     paddingBottom: 3
@@ -283,34 +335,41 @@ export const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 6,
-    fontSize: appAppearance.appstoreFontSize12,
-    color: colors.grey2
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    color: app.label2
   },
   icon: {
     width: 60,
     height: 60,
-    borderRadius: appAppearance.appstoreRadius14,
+    borderRadius: radius.xl,
     flexShrink: 0,
     objectFit: 'cover',
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
-    fontSize: appAppearance.appstoreFontSize26,
-    fontWeight: appAppearance.appstoreFontWeight700,
-    boxShadow: appAppearance.appstoreIconShadow
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    fontWeight: weight.bold,
+    boxShadow: shadow.card
   },
   iconArt: (image: string) => ({ backgroundImage: image }),
   info: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
   name: {
-    fontSize: appAppearance.appstoreFontSize15,
-    fontWeight: appAppearance.appstoreFontWeight600,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     color: app.fg,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
   sub: {
-    fontSize: appAppearance.appstoreFontSize12,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     color: colors.grey,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -322,7 +381,9 @@ export const styles = stylex.create({
     gap: 5,
     color: colors.grey,
     marginTop: 2,
-    fontSize: appAppearance.appstoreFontSize11,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     overflow: 'hidden'
   },
   tag: {
@@ -334,14 +395,16 @@ export const styles = stylex.create({
     paddingRight: 6,
     paddingBottom: 1,
     paddingLeft: 6,
-    borderRadius: appAppearance.appstoreRadius6,
+    borderRadius: radius.sm,
     backgroundColor: app.fill,
-    color: colors.grey2,
-    fontSize: appAppearance.appstoreFontSize10,
-    fontWeight: appAppearance.appstoreFontWeight600
+    color: app.label2,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold
   },
   tagDev: { backgroundColor: colors.orange, color: colors.white },
-  tagOfficial: { backgroundColor: appAppearance.appstoreOfficialBackground, color: colors.green },
+  tagOfficial: { backgroundColor: appAppearance.appstoreOfficial, color: colors.green },
   action: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0, minWidth: 72 },
   /** GET / OPEN capsule. */
   pill: {
@@ -350,43 +413,60 @@ export const styles = stylex.create({
     paddingRight: 14,
     paddingBottom: 6,
     paddingLeft: 14,
-    borderRadius: appAppearance.appstoreRadius15,
-    fontSize: appAppearance.appstoreFontSize13,
-    fontWeight: appAppearance.appstoreFontWeight700,
-    letterSpacing: 0.2,
+    borderRadius: radius.pill,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.bold,
     color: colors.blue,
     backgroundColor: app.fill,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color, color',
-    transitionDuration: '.15s, .2s, .2s',
-    transitionTimingFunction: appAppearance.appstoreEase,
-    transform: { default: 'scale(1)', ':active': 'scale(.92)' }
+    transitionDuration: `${motion.pressDuration}, .2s, .2s`,
+    transitionTimingFunction: easing.pop,
+    transform: { default: 'scale(1)', ':active': motion.press }
   },
   pillFilled: { backgroundColor: colors.blue, color: colors.white },
-  pillLight: { backgroundColor: appAppearance.appstorePillLightBackground, color: colors.white },
+  pillLight: { backgroundColor: appAppearance.appstorePillLight, color: colors.white },
   /** Download ring. */
   ring: (turn: number) => ({
     width: 28,
     height: 28,
-    borderRadius: appAppearance.appstoreRadius14,
+    borderRadius: radius.circle,
     backgroundImage: `conic-gradient(${colors.blue} ${turn}turn, ${app.fill} 0)`,
     display: 'grid',
     placeItems: 'center',
     transitionProperty: 'background-image',
     transitionDuration: '.2s'
   }),
-  ringHole: { width: 18, height: 18, borderRadius: appAppearance.appstoreRadius9, backgroundColor: app.surface },
+  ringHole: { width: 18, height: 18, borderRadius: radius.circle, backgroundColor: app.surface },
   ringStop: {
     position: 'absolute',
     width: 8,
     height: 8,
-    borderRadius: appAppearance.appstoreRadius1_5,
+    borderRadius: radius.xs,
     backgroundColor: colors.blue
   },
-  pct: { fontSize: appAppearance.appstoreFontSize10, color: colors.grey, fontVariantNumeric: 'tabular-nums' },
+  pct: {
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: colors.grey,
+    fontVariantNumeric: 'tabular-nums'
+  },
   /** Inline notices. */
-  alert: { color: colors.red, fontSize: appAppearance.appstoreFontSize12, lineHeight: 1.35 },
-  note: { color: colors.grey2, fontSize: appAppearance.appstoreFontSize12, lineHeight: 1.35 },
+  alert: {
+    color: colors.red,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1
+  },
+  note: {
+    color: app.label2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1
+  },
   /** Detail page. */
   dHead: {
     display: 'flex',
@@ -400,18 +480,25 @@ export const styles = stylex.create({
   dIcon: {
     width: 118,
     height: 118,
-    borderRadius: appAppearance.appstoreRadius28,
-    fontSize: appAppearance.appstoreFontSize44,
-    boxShadow: appAppearance.appstoreDetailIconShadow
+    borderRadius: radius.xxl,
+    fontSize: typeScale.display,
+    lineHeight: 1,
+    boxShadow: shadow.float
   },
   dInfo: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 118 },
   dName: {
-    fontSize: appAppearance.appstoreFontSize24,
-    fontWeight: appAppearance.appstoreFontWeight700,
-    letterSpacing: -0.4,
-    lineHeight: 1.15
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.bold
   },
-  dAuthor: { fontSize: appAppearance.appstoreFontSize14, color: colors.grey, marginTop: 2 },
+  dAuthor: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: colors.grey,
+    marginTop: 2
+  },
   dActions: { marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 12, paddingTop: 10 },
   facts: {
     display: 'flex',
@@ -445,42 +532,56 @@ export const styles = stylex.create({
     gap: 4
   },
   factK: {
-    fontSize: appAppearance.appstoreFontSize10,
-    fontWeight: appAppearance.appstoreFontWeight600,
-    letterSpacing: 0.6,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    fontWeight: weight.semibold,
+    // Uppercase key line: the widest tracking on the scale, as with `kicker`.
+    letterSpacing: tracking.largeTitle,
     color: colors.grey,
     textTransform: 'uppercase'
   },
   factV: {
-    fontSize: appAppearance.appstoreFontSize17,
-    fontWeight: appAppearance.appstoreFontWeight600,
-    color: colors.grey2,
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    letterSpacing: tracking.headline,
+    fontWeight: weight.semibold,
+    color: app.label2,
     display: 'flex',
     alignItems: 'center',
     gap: 5
   },
-  factS: { fontSize: appAppearance.appstoreFontSize11, color: colors.grey },
+  factS: {
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: colors.grey
+  },
   para: {
     paddingRight: 16,
     paddingLeft: 16,
     marginBottom: 18,
-    fontSize: appAppearance.appstoreFontSize14,
-    lineHeight: 1.45,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     color: app.fg
   },
   permGlyph: {
     width: 30,
     height: 30,
-    borderRadius: appAppearance.appstoreRadius7,
+    borderRadius: radius.sm,
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
     backgroundColor: colors.blue,
     flexShrink: 0
   },
-  permText: { fontSize: appAppearance.appstoreFontSize15 },
+  permText: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline
+  },
   /** Developer section: a card, since the shelf's own background is the same white as its rows. */
-  card: { boxShadow: appAppearance.appstoreCardShadow },
+  card: { boxShadow: shadow.card },
   form: { display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10, paddingTop: 12, paddingBottom: 12 },
   field: {
     display: 'flex',
@@ -490,7 +591,7 @@ export const styles = stylex.create({
     paddingRight: 10,
     paddingBottom: 8,
     paddingLeft: 10,
-    borderRadius: appAppearance.appstoreRadius10,
+    borderRadius: radius.md,
     backgroundColor: app.fill,
     color: colors.grey
   },
@@ -499,8 +600,9 @@ export const styles = stylex.create({
     paddingLeft: 32,
     marginTop: -10,
     marginBottom: 24,
-    fontSize: appAppearance.appstoreFontSize12,
-    lineHeight: 1.4,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     color: colors.grey,
     textAlign: 'center'
   },
@@ -508,7 +610,7 @@ export const styles = stylex.create({
   spinner: {
     width: 18,
     height: 18,
-    borderRadius: appAppearance.appstoreRadius9,
+    borderRadius: radius.circle,
     borderWidth: 2,
     borderStyle: 'solid',
     borderColor: colors.grey3,
@@ -523,15 +625,17 @@ export const styles = stylex.create({
     paddingBottom: 0,
     paddingLeft: 0,
     color: 'inherit',
-    fontFamily: appAppearance.appstoreInheritedFontFamily,
+    fontFamily: fonts.system,
     textAlign: 'left',
     cursor: 'pointer'
   },
   stack: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
   remove: {
     color: colors.red,
-    fontSize: appAppearance.appstoreFontSize15,
-    fontWeight: appAppearance.appstoreFontWeight500,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.medium,
     cursor: 'pointer',
     width: '100%'
   },
@@ -540,7 +644,9 @@ export const styles = stylex.create({
     width: '100%',
     textAlign: 'left',
     color: app.fg,
-    fontSize: appAppearance.appstoreFontSize15
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline
   },
   linkBlue: { color: colors.blue },
   glyphGreen: { backgroundColor: colors.green },

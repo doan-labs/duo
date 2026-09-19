@@ -1,4 +1,13 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  leading,
+  motion,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const RAIL = 156
@@ -34,7 +43,7 @@ export const styles = stylex.create({
     position: 'absolute',
     inset: 0,
     pointerEvents: 'none',
-    backgroundImage: appAppearance.cameraBackgroundImage
+    backgroundImage: appAppearance.cameraGrid
   },
   flash: {
     position: 'absolute',
@@ -55,10 +64,12 @@ export const styles = stylex.create({
     paddingRight: 10,
     paddingBottom: 3,
     paddingLeft: 10,
-    borderRadius: appAppearance.calendarFontSize4,
+    borderRadius: radius.pill,
     backgroundColor: colors.red,
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
     fontVariantNumeric: 'tabular-nums'
   },
 
@@ -67,8 +78,8 @@ export const styles = stylex.create({
     height: 36,
     display: 'grid',
     placeItems: 'center',
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: appAppearance.cameraBackgroundColor,
+    borderRadius: radius.circle,
+    backgroundColor: appAppearance.cameraScrim,
     color: colors.white,
     cursor: 'pointer',
     flexShrink: 0
@@ -134,51 +145,57 @@ export const styles = stylex.create({
     paddingRight: 11,
     paddingBottom: 5,
     paddingLeft: 11,
-    borderRadius: appAppearance.musicBorderRadius,
-    fontSize: appAppearance.calendarFontSize2,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: 0.6,
+    borderRadius: radius.pill,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold,
     color: colors.white,
     cursor: 'pointer'
   },
   modeBtnLand: { writingMode: 'vertical-rl', transform: 'rotate(180deg)' },
-  modeOn: { color: colors.yellow, backgroundColor: appAppearance.cameraBackgroundColor2 },
+  modeOn: { color: colors.yellow, backgroundColor: appAppearance.cameraChip },
 
   zl: {
     width: 34,
     height: 34,
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: appAppearance.cameraBackgroundColor3,
+    borderRadius: radius.circle,
+    backgroundColor: appAppearance.cameraScrimStrong,
     display: 'grid',
     placeItems: 'center',
-    fontSize: appAppearance.calendarFontSize2,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold,
     color: colors.yellow,
     cursor: 'pointer',
     flexShrink: 0
   },
+  // The white ring is a solid border sitting outside the black one, not a shadow.
   shutter: {
     width: 64,
     height: 64,
     flexShrink: 0,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     backgroundColor: colors.white,
     borderWidth: 4,
     borderStyle: 'solid',
     borderColor: colors.black,
-    boxShadow: `0 0 0 3px ${colors.white}`,
+    outlineWidth: 3,
+    outlineStyle: 'solid',
+    outlineColor: colors.white,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color, border-radius',
-    transitionDuration: '.12s',
-    transform: { default: null, ':active': 'scale(.9)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
   shutterVideo: { backgroundColor: colors.red },
-  shutterRec: { backgroundColor: colors.red, borderRadius: appAppearance.calendarFontSize2, transform: 'scale(.6)' },
+  shutterRec: { backgroundColor: colors.red, borderRadius: radius.lg, transform: 'scale(.6)' },
   thumb: {
     width: 40,
     height: 40,
-    borderRadius: appAppearance.cameraBorderRadius,
-    backgroundColor: appAppearance.homeColor3,
+    borderRadius: radius.sm,
+    backgroundColor: appAppearance.cameraChip,
     overflow: 'hidden',
     cursor: 'pointer',
     flexShrink: 0

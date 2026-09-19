@@ -1,10 +1,19 @@
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  easing,
+  fonts,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 /** Gutter between two columns, which is also the distance one page turn travels. */
 export const GAP = 52
-
-const SERIF = '"New York",Georgia,serif'
 
 export const styles = stylex.create({
   shelf: {
@@ -16,42 +25,52 @@ export const styles = stylex.create({
     paddingInline: 18,
     paddingBottom: 24
   },
+  // The spine edge is the tighter pair of corners, the fore-edge the rounder one.
   cov: {
     aspectRatio: '2/3',
-    borderTopLeftRadius: appAppearance.booksBorderTopLeftRadius,
-    borderTopRightRadius: appAppearance.itunesBorderRadius,
-    borderBottomRightRadius: appAppearance.itunesBorderRadius,
-    borderBottomLeftRadius: appAppearance.booksBorderTopLeftRadius,
-    boxShadow: appAppearance.booksBoxShadow,
+    borderTopLeftRadius: radius.xs,
+    borderTopRightRadius: radius.md,
+    borderBottomRightRadius: radius.md,
+    borderBottomLeftRadius: radius.xs,
+    boxShadow: shadow.float,
     paddingBlock: 14,
     paddingInline: 12,
-    fontWeight: appAppearance.musicFontWeight2,
-    fontSize: appAppearance.musicBorderRadius,
-    lineHeight: 1.25,
-    fontFamily: SERIF,
-    color: appAppearance.booksColor,
+    fontFamily: fonts.serif,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
+    color: appAppearance.booksPaperInk,
     cursor: 'pointer',
     transitionProperty: 'transform',
-    transitionDuration: '.2s',
-    transform: { default: null, ':active': 'scale(.95)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
   bg: (image: string) => ({ backgroundImage: image }),
-  title: { fontSize: appAppearance.calendarFontSize2, fontWeight: appAppearance.musicFontWeight2, marginTop: 8 },
-  who: { fontSize: appAppearance.musicFontSize3 },
+  title: {
+    marginTop: 8,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold
+  },
+  who: { fontSize: typeScale.caption2, lineHeight: leading.caption2, letterSpacing: tracking.caption2 },
   readHdr: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 3,
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight3
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.medium
   },
   read: {
     position: 'absolute',
     inset: 0,
-    backgroundColor: appAppearance.booksBackgroundColor,
-    color: appAppearance.booksColor2,
+    backgroundColor: appAppearance.booksPaper,
+    color: appAppearance.booksInk,
     overflow: 'hidden'
   },
   col: {
@@ -61,13 +80,14 @@ export const styles = stylex.create({
     bottom: 40,
     left: 26,
     columnGap: GAP,
-    fontSize: appAppearance.messagesFontSize,
-    lineHeight: 1.62,
-    fontFamily: SERIF,
+    fontFamily: fonts.serif,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
     textAlign: 'justify',
     transitionProperty: 'transform',
     transitionDuration: '.42s',
-    transitionTimingFunction: appAppearance.booksTransitionTimingFunction
+    transitionTimingFunction: easing.pop
   },
   colW: (w: number) => ({ columnWidth: w }),
   shift: (x: number) => ({ transform: `translateX(${x}px)` }),
@@ -78,9 +98,10 @@ export const styles = stylex.create({
     left: 0,
     right: 0,
     textAlign: 'center',
-    fontSize: appAppearance.musicFontSize3,
-    color: appAppearance.booksColor3,
-    letterSpacing: 0.5
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: appAppearance.booksInkMuted
   },
   tap: { position: 'absolute', top: 0, bottom: 0, width: '36%', cursor: 'pointer' },
   tapL: { left: 0 },

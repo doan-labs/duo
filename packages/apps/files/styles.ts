@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, leading, motion, tracking, typeScale, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -6,16 +6,17 @@ export const styles = stylex.create({
     paddingTop: 3,
     paddingBottom: 3,
     paddingInline: 16,
-    fontWeight: appAppearance.musicFontWeight,
-    fontSize: appAppearance.calendarFontSize2,
-    lineHeight: 1.7,
-    backgroundColor: colors.fillThin,
-    color: colors.grey2,
+    fontWeight: weight.bold,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    backgroundColor: app.fill3,
+    color: app.label2,
     position: 'sticky',
     top: 0,
     zIndex: 1
   },
-  locIcon: { fontSize: appAppearance.podcastsFontSize },
+  locIcon: { fontSize: typeScale.title3 },
   dz: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill,minmax(92px,1fr))',
@@ -29,15 +30,18 @@ export const styles = stylex.create({
     display: 'grid',
     justifyItems: 'center',
     gap: 6,
-    fontSize: appAppearance.musicFontSize3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     textAlign: 'center',
     cursor: 'pointer',
     transitionProperty: 'transform',
-    transitionDuration: '.15s',
-    transform: { default: null, ':active': 'scale(.92)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
-  fIcon: { fontSize: appAppearance.filesFontSize, lineHeight: 1 },
-  size: { fontSize: appAppearance.calendarFontSize4 },
-  bigIcon: { fontSize: appAppearance.filesFontSize2 },
+  // The emoji is the artwork here, so it runs on the display steps, set solid.
+  fIcon: { fontSize: typeScale.display, lineHeight: 1 },
+  size: { fontSize: typeScale.caption2, lineHeight: leading.caption2, letterSpacing: tracking.caption2 },
+  bigIcon: { fontSize: typeScale.displayLg, lineHeight: 1 },
   count: { textAlign: 'center', paddingBlock: 6, paddingInline: 6 }
 })

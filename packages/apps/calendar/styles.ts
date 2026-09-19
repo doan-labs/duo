@@ -1,4 +1,12 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  leading,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -12,12 +20,24 @@ export const styles = stylex.create({
     rowGap: 6,
     columnGap: 0
   },
-  cell: { paddingTop: 8, paddingBottom: 8, fontSize: appAppearance.calendarFontSize },
-  wd: { fontSize: appAppearance.calendarFontSize2, color: colors.grey, fontWeight: appAppearance.musicFontWeight2 },
+  cell: {
+    paddingTop: 8,
+    paddingBottom: 8,
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout
+  },
+  wd: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    color: colors.grey,
+    fontWeight: weight.semibold
+  },
   today: {
     backgroundColor: colors.red,
     color: colors.white,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     width: 38,
     height: 38,
     display: 'grid',
@@ -27,22 +47,23 @@ export const styles = stylex.create({
     paddingBottom: 0
   },
   events: { marginTop: 24 },
-  event: { backgroundColor: colors.groupedLight },
-  tag: { width: 4, height: 36, borderRadius: appAppearance.musicBorderRadius3, backgroundColor: colors.orange },
-  title: { fontWeight: appAppearance.musicFontWeight2 },
+  event: { backgroundColor: colors.grey6 },
+  tag: { width: 4, height: 36, borderRadius: radius.xs, backgroundColor: colors.orange },
+  title: { fontWeight: weight.semibold },
   // `cal` above is the month grid, so the widget's own shell takes the longer name.
   calWidget: {
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: appAppearance.calendarBackgroundColor,
+    backgroundColor: appAppearance.calendarPaper,
     color: colors.black
   },
-  calDay: { color: colors.red, textTransform: 'uppercase', letterSpacing: 0.4 },
+  calDay: { color: colors.red, textTransform: 'uppercase', letterSpacing: tracking.caption2 },
+  // The date is a numeral, so it is set solid rather than on the ramp's leading.
   calNum: {
-    fontSize: appAppearance.calendarFontSize3,
-    fontWeight: appAppearance.musicFontWeight2,
-    lineHeight: 1.05,
-    letterSpacing: -1
+    fontSize: typeScale.largeTitle,
+    fontWeight: weight.semibold,
+    lineHeight: 1,
+    letterSpacing: tracking.largeTitle
   },
   calEv: {
     marginTop: 'auto',
@@ -50,9 +71,10 @@ export const styles = stylex.create({
     borderLeftStyle: 'solid',
     borderLeftColor: colors.orange,
     paddingLeft: 7,
-    fontSize: appAppearance.calendarFontSize4,
-    lineHeight: 1.35,
-    fontWeight: appAppearance.musicFontWeight2
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold
   },
-  calSub: { fontWeight: appAppearance.calendarFontWeight, opacity: 0.55 }
+  calSub: { fontWeight: weight.regular, opacity: 0.55 }
 })

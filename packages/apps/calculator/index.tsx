@@ -3,6 +3,7 @@ import { Screen } from '@doan-labs/duo-uikit'
 
 import type { Os } from '@doan-labs/duo-sdk'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
+import { typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { styles } from './styles.ts'
@@ -48,6 +49,7 @@ export const Calculator = (_: { os: Os }) => {
             type="button"
             key={k}
             {...stylex.props(
+              typography.title1,
               styles.key,
               /[÷×−+=]/.test(k) && styles.o,
               /[A±%]/.test(k) && styles.g,

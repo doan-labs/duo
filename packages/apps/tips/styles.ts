@@ -1,4 +1,14 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  colors,
+  easing,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -15,26 +25,38 @@ export const styles = stylex.create({
   },
   tip: {
     marginBottom: 14,
-    borderRadius: appAppearance.musicFontSize5,
+    borderRadius: radius.xl,
     overflow: 'hidden',
     backgroundColor: colors.white,
-    boxShadow: appAppearance.tipsBoxShadow,
+    boxShadow: shadow.card,
     cursor: 'pointer'
   },
-  im: { height: 150, display: 'grid', placeItems: 'center', fontSize: appAppearance.notesFontSize },
+  // The emoji is art, not text: set solid at the largest display step.
+  im: { height: 150, display: 'grid', placeItems: 'center', fontSize: typeScale.displayLg, lineHeight: 1 },
   tx: { paddingTop: 13, paddingBottom: 13, paddingInline: 15 },
-  title: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicFontSize },
-  hint: { fontSize: appAppearance.calendarFontSize2, marginTop: 2 },
+  title: {
+    fontWeight: weight.semibold,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline
+  },
+  hint: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    marginTop: 2
+  },
   more: {
-    fontSize: appAppearance.musicBorderRadius,
-    lineHeight: 1.5,
-    color: appAppearance.appstoreColor,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: app.label2,
     maxHeight: 0,
     marginTop: 0,
     overflow: 'hidden',
     transitionProperty: 'max-height, margin',
     transitionDuration: '.4s, .4s',
-    transitionTimingFunction: appAppearance.tipsTransitionTimingFunction
+    transitionTimingFunction: easing.pop
   },
   moreOpen: { maxHeight: 160, marginTop: 8 }
 })

@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, easing, leading, radius, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -7,7 +7,7 @@ export const styles = stylex.create({
   chk: {
     width: 22,
     height: 22,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     borderWidth: 1.7,
     borderStyle: 'solid',
     borderColor: colors.grey3,
@@ -32,7 +32,7 @@ export const styles = stylex.create({
       transform: 'rotate(45deg) scale(0)',
       transitionProperty: 'transform',
       transitionDuration: '.24s',
-      transitionTimingFunction: appAppearance.remindersTransitionTimingFunction
+      transitionTimingFunction: easing.bounce
     }
   },
   chkOn: {
@@ -41,7 +41,13 @@ export const styles = stylex.create({
     '::after': { transform: 'rotate(45deg) scale(1)' }
   },
   dim: { opacity: 0.45 },
-  label: { fontSize: appAppearance.calendarFontSize, transitionProperty: 'opacity', transitionDuration: '.25s' },
+  label: {
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    transitionProperty: 'opacity',
+    transitionDuration: '.25s'
+  },
   done: { opacity: 0.38, textDecorationLine: 'line-through' },
   input: {
     flexGrow: 1,
@@ -49,6 +55,8 @@ export const styles = stylex.create({
     borderStyle: 'none',
     outlineStyle: 'none',
     backgroundColor: 'transparent',
-    fontSize: appAppearance.calendarFontSize
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout
   }
 })

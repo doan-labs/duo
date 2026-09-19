@@ -1,4 +1,12 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  leading,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -11,9 +19,19 @@ export const styles = stylex.create({
     width: '100%',
     aspectRatio: '16/9',
     objectFit: 'cover',
-    borderRadius: appAppearance.calendarFontSize2,
+    borderRadius: radius.lg,
     display: 'block'
   },
-  t: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicBorderRadius },
-  c: { fontSize: appAppearance.calendarFontSize2, color: appAppearance.youtubeColor }
+  t: {
+    fontWeight: weight.semibold,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
+  c: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    color: appAppearance.youtubeMuted
+  }
 })

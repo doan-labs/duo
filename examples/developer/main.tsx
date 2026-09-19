@@ -39,7 +39,7 @@ function Gallery() {
         <Title>
           Developer{' '}
           <Title as="span" variant="accessory">
-            UI kit 0.1
+            UI kit 1.0
           </Title>
         </Title>
         <Screen aria-label="Component gallery">
@@ -50,11 +50,18 @@ function Gallery() {
           <Section>
             <Row label="Body" detail={<Text>Regular text</Text>} />
             <Row label="Caption" detail={<Text size="caption">Secondary label</Text>} />
-            <Row label="Footnote" detail={<Text size="footnote">Footnote</Text>} />
+            <Row
+              label="Footnote"
+              detail={
+                <Text size="footnote" color="secondary">
+                  Footnote
+                </Text>
+              }
+            />
             <Row
               label="Title"
               detail={
-                <Text size="title" weight="bold">
+                <Text size="title2" weight="bold">
                   Title
                 </Text>
               }
@@ -148,20 +155,20 @@ function Gallery() {
     </VStack>
   )
 }
-const light = stylex.createTheme(app, { bg: colors.groupedLight, fg: colors.black })
+const light = stylex.createTheme(app, { bg: colors.grey6, fg: colors.black })
 const styles = stylex.create({
   root: {
     position: 'absolute',
     inset: 0,
     color: colors.black,
-    backgroundColor: colors.groupedLight,
+    backgroundColor: colors.grey6,
     fontFamily: fonts.system
   },
   inset: { paddingLeft: 16, paddingRight: 16 },
   tray: { flexWrap: 'wrap', paddingTop: 11, paddingRight: 16, paddingBottom: 11, paddingLeft: 16 },
   sample: { display: 'inline-block', paddingTop: 10, paddingRight: 10, paddingBottom: 10, paddingLeft: 10 },
   widget: {
-    backgroundColor: colors.weatherNight,
+    backgroundColor: colors.grey6Dark,
     color: colors.white,
     paddingTop: 12,
     paddingRight: 12,

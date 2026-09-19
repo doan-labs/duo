@@ -6,7 +6,7 @@ import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import { poly, walk } from '@doan-labs/duo-fixtures'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
@@ -34,7 +34,7 @@ const Spark = ({ t, w, ht, animate = false }: { t: string; w: number; ht: number
         fill="none"
         strokeWidth={1.8}
         strokeLinejoin="round"
-        stroke={pts[pts.length - 1]! >= pts[0]! ? colors.greenBright : colors.redBright}
+        stroke={pts[pts.length - 1]! >= pts[0]! ? colors.greenDark : colors.redDark}
         {...stylex.props(animate && styles.draw)}
       />
     </svg>
@@ -61,7 +61,7 @@ const List = () => {
             onClick={() => push((back) => <Detail t={t} name={name} base={base} d={d} back={back} />)}
           >
             <div {...stylex.props(styles.nm)}>
-              <b {...stylex.props(styles.symbol)}>{t}</b>
+              <b {...stylex.props(typography.callout, styles.symbol)}>{t}</b>
               <Text as="div" size="caption">
                 {name}
               </Text>
@@ -71,7 +71,7 @@ const List = () => {
               <div {...stylex.props(styles.price)}>
                 <Num value={base} format={two} />
               </div>
-              <div {...stylex.props(styles.chip, d < 0 && styles.dn)}>
+              <div {...stylex.props(typography.footnote, styles.chip, d < 0 && styles.dn)}>
                 <Num value={d} format={signed} suffix="%" />
               </div>
             </div>
@@ -93,7 +93,7 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
   ]
   return (
     <VStack>
-      <Title xstyle={[styles.hdr17]}>
+      <Title xstyle={[typography.headline]}>
         <button type="button" {...stylex.props(shared.bk)} onClick={back}>
           <Sym name="back" size={20} />
           Stocks
@@ -101,14 +101,14 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
       </Title>
       <Screen>
         <div {...stylex.props(styles.quote)}>
-          <div {...stylex.props(styles.ticker)}>{t}</div>
+          <div {...stylex.props(typography.title1)}>{t}</div>
           <Text as="div" size="caption">
             {name}
           </Text>
-          <div {...stylex.props(styles.bigPrice)}>
+          <div {...stylex.props(typography.title1, styles.bigPrice)}>
             <Num value={base} format={two} />
           </div>
-          <div {...stylex.props(styles.delta, d < 0 && styles.deltaDn)}>
+          <div {...stylex.props(typography.footnote, styles.delta, d < 0 && styles.deltaDn)}>
             <Num value={(base * d) / 100} format={signed} /> (<Num value={d} format={two} suffix="%" />)
           </div>
         </div>
@@ -124,9 +124,9 @@ const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: num
         </div>
         <Section>
           {stats.map(([k, v]) => (
-            <Row key={k} xstyle={[styles.darkRow]}>
+            <Row key={k}>
               {k}
-              <span {...stylex.props(shared.rowR, styles.white)}>
+              <span {...stylex.props(shared.rowR, styles.value)}>
                 <Num value={v} format={two} />
               </span>
             </Row>

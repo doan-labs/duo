@@ -230,7 +230,88 @@ export const layout = stylex.defineConsts({
   top: '47px',
   widget: '127px',
   dock: '57px',
-  dockRight: '10px'
+  dockRight: '10px',
+  /** Apple's continuous corner on icon artwork, as a ratio so the dock's smaller icons match. */
+  iconRadius: '22.5%',
+  /**
+   * The physical glass corners, not design radii: docs/architecture.md gives
+   * inner 10.7 mm, cover free edge 11.4 mm, cover hinge edge 1.3 mm, here at
+   * 5 px/mm. The active area sits 11 px inside the glass, concentric with it.
+   */
+  glassInner: '53.5px',
+  glassCoverFree: '57px',
+  glassCoverHinge: '6.6px',
+  screenInner: '42.5px',
+  screenCoverFree: '46px',
+  screenCoverHinge: '2.5px'
+})
+
+/**
+ * The wallpapers the shell hangs on both displays, one group of colours each.
+ * `springboard/wallpaper.ts` paints them as SVG data URLs and `screen.ts` bakes
+ * the same picture, so these are consts: a `var()` would not survive either.
+ * Apple's dune ships as artwork and has no entry here.
+ */
+export const wallpaper = stylex.defineConsts({
+  duskGround: '#1b1440',
+  duskEmber: '#ff8d5a',
+  duskViolet: '#6a4ee0',
+  duskRose: '#d24f9e',
+  tideGround: '#04233d',
+  tideCrest: '#35b4ff',
+  tideDeep: '#0f6f9f',
+  tideFoam: '#8ee6ff',
+  emberGround: '#170909',
+  emberCore: '#ff4d2e',
+  emberAmber: '#ffb347',
+  emberGlow: '#ff7a45',
+  mossGround: '#0a2018',
+  mossLeaf: '#33c977',
+  mossLime: '#d5f56a',
+  mossDeep: '#1e8f6e',
+  slateGround: '#111216',
+  slateHaze: '#4b505c',
+  slateShade: '#2c2f37'
+})
+
+/**
+ * The shell's own materials: status stack, dock, switcher, Control Center, the
+ * power sheet, the lock screen and the HUD under the device. Apps never read
+ * these, and the shell never reads `appAppearance`. Colours only; sizes, radii,
+ * shadows and timing come from the scales above.
+ */
+export const chrome = stylex.defineConsts({
+  /** What Control Center, an open folder and the switcher lay over the display. */
+  scrim: 'rgba(10,10,16,.32)',
+  /** Spotlight's deeper scrim: the home screen goes quiet behind the field. */
+  scrimDeep: 'rgba(18,18,20,.5)',
+  /** The HUD pill under the device. Page chrome, not glass over a wallpaper. */
+  hud: 'rgba(28,29,34,.68)',
+  /** The wash over any wallpaper that keeps white labels legible on it. */
+  wash: 'linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.04) 40%,rgba(0,0,0,.36))',
+  /** A well punched into glass: a lock-screen button, the track behind a fill. */
+  well: 'rgba(0,0,0,.28)',
+  /** The blurred grid behind a folder's icon. */
+  folder: 'rgba(120,120,128,.42)',
+  /** systemFill over glass: a control at rest. */
+  fill: 'rgba(255,255,255,.22)',
+  /** The quieter chip, and a row under the finger. */
+  fill2: 'rgba(255,255,255,.16)',
+  /** The faintest well. */
+  fill3: 'rgba(255,255,255,.12)',
+  /** The home indicator, the grab pill, a loud glyph on glass. */
+  indicator: 'rgba(255,255,255,.75)',
+  /** The home indicator over a light app. */
+  indicatorDark: 'rgba(0,0,0,.6)',
+  /** A secondary label or glyph on glass. */
+  label: 'rgba(255,255,255,.6)',
+  /** A page dot at rest, an empty tile slot's dashed edge. */
+  label2: 'rgba(255,255,255,.35)',
+  /** The lock clock: white thinning toward the baseline, over its own bloom. */
+  clockInk: 'linear-gradient(rgba(255,255,255,.92),rgba(255,255,255,.45))',
+  clockBloom: 'drop-shadow(0 3px 14px rgba(20,20,40,.35))',
+  /** The cool white of the flashlight card's beam. */
+  beam: '#dde6ff'
 })
 
 export const easing = stylex.defineConsts({
@@ -286,6 +367,8 @@ export const appAppearance = stylex.defineConsts({
   // contacts
   contactsSelection: 'rgba(0,136,255,.12)',
   // facetime
+  /** The ring pulsing out of the caller's avatar, over the video. */
+  facetimeRipple: 'rgba(255,255,255,.45)',
   // files
   // findmy
   findmyPulse: 'rgba(0,136,255,.35)',
@@ -363,6 +446,8 @@ export const appAppearance = stylex.defineConsts({
   photosControl: 'rgba(0,0,0,.055)',
   photosViewer: 'rgba(0,0,0,.94)',
   // podcasts
+  /** The scrub track inside the mini player's dark bar. */
+  podcastsTrack: 'rgba(255,255,255,.2)',
   podcastsBar: 'rgba(28,28,30,.92)',
   podcastsBarEdge: 'rgba(255,255,255,.1)',
   // preview
@@ -370,7 +455,15 @@ export const appAppearance = stylex.defineConsts({
   // reminders
   // safari
   // settings
+  /** Flappy Duo's deletion-fee sheet: the scrim behind it, its own light material and ink, and the card chip. */
+  settingsScrim: 'rgba(0,0,0,.35)',
+  settingsPaySheet: 'rgba(255,255,255,.96)',
+  settingsPayInk: '#0b1a3a',
+  settingsPayCard:
+    'linear-gradient(115deg, rgba(255,140,200,.35), rgba(140,200,255,.35) 45%, rgba(255,230,140,.35) 80%), linear-gradient(135deg, #ffffff, #dcdce1 60%, #f2f2f5)',
   // shortcuts
+  /** The scrim that dims a shortcut tile while it runs. */
+  shortcutsScrim: 'rgba(0,0,0,.45)',
   // siri
   siriSky: 'radial-gradient(120% 70% at 50% 110%,#2a1b4d,#000)',
   siriOrb: 'conic-gradient(#0091ff,#db34f2,#ff375f,#ff9230,#30d158,#0091ff)',
@@ -387,6 +480,8 @@ export const appAppearance = stylex.defineConsts({
   // tv
   tvScrim: 'rgba(0,0,0,.55)',
   // wallet
+  /** The scrim the Apple Pay sheet drops over the card stack. */
+  walletScrim: 'rgba(0,0,0,.55)',
   walletAppleCard: 'linear-gradient(150deg,#f5f5f7,#c9c9ce)',
   walletTransit: 'linear-gradient(150deg,#0091ff,#6d7cff)',
   walletBadge: 'linear-gradient(150deg,#1c1c1e,#3a3a3c)',
@@ -394,6 +489,10 @@ export const appAppearance = stylex.defineConsts({
   // watch
   watchCase: '0 0 0 5px #6e6e73,0 16px 34px rgba(0,0,0,.45)',
   // weather
+  weatherStars:
+    'radial-gradient(1px 1px at 15% 12%,#fff,transparent),radial-gradient(1px 1px at 70% 20%,#fff,transparent),radial-gradient(1.5px 1.5px at 88% 30%,#fff,transparent),radial-gradient(1px 1px at 40% 30%,#fff,transparent),radial-gradient(1px 1px at 55% 8%,#fff,transparent),radial-gradient(1px 1px at 30% 42%,#fff,transparent)',
+  /** The ring around a temperature-range marker, a border drawn as an outline. */
+  weatherMarkerRing: 'rgba(0,0,0,.35)',
   weatherNight: '#172c47',
   weatherSun: '#ffe6a0',
   weatherRain: '#a2e1ff',

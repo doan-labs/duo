@@ -113,7 +113,7 @@ function Root({ os, host }: { os: Os; host: SettingsHost }) {
       <Section>
         <Link
           title="Apps"
-          icon={<Glyph name="grid" bg={colors.settingsIndigo} />}
+          icon={<Glyph name="grid" bg={colors.indigo} />}
           label="Apps"
           page={() => <AppsPage os={os} host={host} />}
         />

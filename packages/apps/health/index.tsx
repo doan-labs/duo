@@ -3,7 +3,7 @@ import type { Os } from '@doan-labs/duo-sdk'
 import { LargeTitle, Screen, Text } from '@doan-labs/duo-uikit'
 import { Bars, card } from '@doan-labs/duo-uikit/rings.tsx'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { styles } from './styles.ts'
@@ -56,8 +56,8 @@ export const Health = (_: { os: Os }) => (
       {new Date().toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' })}
     </Text>
     <div {...stylex.props(card.cols)}>
-      <Card cap="👟 Steps" colour={appAppearance.healthColor} val="8,412" unit="steps" i={0}>
-        <Bars values={walk('health-steps', 7)} colour={appAppearance.healthColor} />
+      <Card cap="👟 Steps" colour={colors.orange} val="8,412" unit="steps" i={0}>
+        <Bars values={walk('health-steps', 7)} colour={colors.orange} />
       </Card>
       <Card cap="❤️ Heart Rate" colour={colors.pink} val="62" unit="BPM" i={1}>
         <Line seed="health-hr" colour={colors.pink} />

@@ -7,7 +7,7 @@ import type { Os, SettingsHost } from '@doan-labs/duo-sdk'
 import { HOST_SDK } from '@doan-labs/duo-sdk/compat.ts'
 import type { Store } from '@doan-labs/duo-sdk/store.ts'
 import { Row, Section } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -20,7 +20,7 @@ const MODEL = 'iPhone Duo'
 const STUDIO = 'https://doan-labs.com'
 const SOURCE = 'https://github.com/doan-labs/iphoneduo'
 /** One colour per app in the storage bar, reused round the list. */
-const SEGMENTS = [colors.blue, colors.green, colors.orange, colors.purple, colors.teal, colors.settingsPink]
+const SEGMENTS = [colors.blue, colors.green, colors.orange, colors.purple, colors.teal, colors.pink]
 
 export function GeneralPage({ os, host }: { os: Os; host: SettingsHost }) {
   return (
@@ -141,8 +141,8 @@ function StoragePage({ store }: { store?: Store }) {
   return (
     <>
       <div {...stylex.props(shared.grp, styles.measure)}>
-        <div {...stylex.props(styles.heroTitle)}>{estimate ? size(estimate.usage) : '—'}</div>
-        <div {...stylex.props(styles.heroText)}>
+        <div {...stylex.props(typography.title1)}>{estimate ? size(estimate.usage) : '—'}</div>
+        <div {...stylex.props(typography.body, styles.heroText)}>
           used of {estimate ? size(estimate.quota) : '—'} this browser allows
         </div>
         <div {...stylex.props(styles.bar)}>
@@ -158,7 +158,7 @@ function StoragePage({ store }: { store?: Store }) {
             </>
           )}
         </div>
-        <div {...stylex.props(styles.legend)}>
+        <div {...stylex.props(typography.caption1, styles.legend)}>
           {rows.map((row, i) => (
             <span key={row.id} {...stylex.props(styles.key)}>
               <span {...stylex.props(styles.dot, styles.tint(SEGMENTS[i % SEGMENTS.length]!))} />

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
 
 const PASSES: [string, string, string][] = [
-  ['Apple Card', appAppearance.walletAppleCard, colors.darkElevated],
+  ['Apple Card', appAppearance.walletAppleCard, colors.grey6Dark],
   ['Duo Transit', appAppearance.walletTransit, colors.white],
   ['Apple Park Badge', appAppearance.walletBadge, colors.white],
   ['WWDC Pass', appAppearance.walletPass, colors.white]

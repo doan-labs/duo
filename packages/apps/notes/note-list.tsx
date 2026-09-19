@@ -1,5 +1,13 @@
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  leading,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { group, type Note, stamp } from './data.ts'
 import { useNotes, useNoteText } from './store.ts'
@@ -59,8 +67,10 @@ const styles = stylex.create({
   groups: { paddingInline: 10 },
   empty: { textAlign: 'center', paddingTop: 40, color: colors.grey },
   groupHdr: {
-    fontSize: appAppearance.calendarFontSize,
-    fontWeight: appAppearance.musicFontWeight,
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    fontWeight: weight.bold,
     paddingTop: 8,
     paddingBottom: 8,
     paddingInline: 2
@@ -73,22 +83,32 @@ const styles = stylex.create({
     gap: 7,
     paddingBlock: 8,
     paddingInline: 8,
-    borderRadius: appAppearance.calendarFontSize4,
+    borderRadius: radius.md,
     cursor: 'pointer',
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: appAppearance.notesBorderBottomColor
+    borderBottomColor: appAppearance.notesHairline
   },
-  liOn: { backgroundColor: appAppearance.notesBackgroundColor, color: colors.black, borderBottomColor: 'transparent' },
+  liOn: { backgroundColor: appAppearance.notesYellow, color: colors.black, borderBottomColor: 'transparent' },
   liTx: { minWidth: 0, flexGrow: 1 },
   liTitle: {
     display: 'block',
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
-  liSub: { display: 'flex', gap: 7, fontSize: appAppearance.musicFontSize3, opacity: 0.72, marginTop: 1 },
+  liSub: {
+    display: 'flex',
+    gap: 7,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    opacity: 0.72,
+    marginTop: 1
+  },
   when: { flexShrink: 0 }
 })

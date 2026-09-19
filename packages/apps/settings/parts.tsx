@@ -3,7 +3,7 @@
 
 import type { SettingsHost } from '@doan-labs/duo-sdk'
 import { Page, Row, type RowProps, useNav } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useSyncExternalStore } from 'react'
@@ -68,16 +68,20 @@ export const Hero = ({
     <span {...stylex.props(styles.heroIcon, styles.tint(bg))}>
       <Sym name={name} size={34} />
     </span>
-    <div {...stylex.props(styles.heroTitle)}>{title}</div>
-    <div {...stylex.props(styles.heroText)}>{children}</div>
+    <div {...stylex.props(typography.title1)}>{title}</div>
+    <div {...stylex.props(typography.body, styles.heroText)}>{children}</div>
   </div>
 )
 
 /** The grey line under a group that says what it does, or what it cannot do. */
-export const Note = ({ children }: { children: ReactNode }) => <p {...stylex.props(styles.note)}>{children}</p>
+export const Note = ({ children }: { children: ReactNode }) => (
+  <p {...stylex.props(shared.sub, styles.note)}>{children}</p>
+)
 
 /** Uppercase group heading. */
-export const Head = ({ children }: { children: ReactNode }) => <div {...stylex.props(styles.head)}>{children}</div>
+export const Head = ({ children }: { children: ReactNode }) => (
+  <div {...stylex.props(typography.footnote, styles.head)}>{children}</div>
+)
 
 /**
  * Same rounding as the Store for a release, with a GB step above it: a browser

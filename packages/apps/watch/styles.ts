@@ -1,13 +1,23 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  fonts,
+  leading,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
   face: {
     width: 132,
     height: 162,
-    borderRadius: appAppearance.watchBorderRadius,
+    borderRadius: radius.xxl,
     backgroundColor: colors.black,
-    boxShadow: appAppearance.watchBoxShadow,
+    boxShadow: appAppearance.watchCase,
     marginTop: 14,
     marginInline: 'auto',
     marginBottom: 6,
@@ -19,24 +29,28 @@ export const styles = stylex.create({
     color: colors.white
   },
   date: {
-    fontSize: appAppearance.musicFontSize3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     color: colors.orange,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: 0.6
+    fontWeight: weight.semibold
   },
+  // The clock is a numeral: set solid so the face stays centred.
   time: {
-    fontWeight: appAppearance.musicFontWeight2,
-    fontSize: appAppearance.musicFontSize4,
+    fontWeight: weight.semibold,
+    fontSize: typeScale.largeTitle,
     lineHeight: 1,
-    fontFamily: appAppearance.watchFontFamily,
-    letterSpacing: -1
+    fontFamily: fonts.system,
+    letterSpacing: tracking.largeTitle
   },
   mini: { transform: 'scale(.42)', marginBlock: -26 },
   center: { textAlign: 'center' },
-  name: { fontWeight: appAppearance.musicFontWeight2 },
-  hdrSm: { fontSize: appAppearance.musicFontSize5, marginTop: 10 },
-  darkRow: {
-    backgroundColor: appAppearance.memosBackgroundColor,
-    borderBottomColor: appAppearance.musicBorderBottomColor
-  }
+  name: { fontWeight: weight.semibold },
+  hdrSm: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    marginTop: 10
+  },
+  darkRow: { backgroundColor: app.fill3, borderBottomColor: app.separator }
 })
