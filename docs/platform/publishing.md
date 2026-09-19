@@ -3,10 +3,11 @@
 Status: the source-in-repository flow is implemented, 2026-09-18. Community apps live in
 [`community-apps/`](../../community-apps/README.md), are validated by
 `scripts/check-submissions.ts` on pull requests, and after merge are published by
-`.github/workflows/publish.yml` to the `catalog` branch, which the website build serves at
-`https://duo.doan-labs.com/catalog/`. Public npm packages remain unpublished; developers
-use the local archive workflow in [development](dev.md). A separately hosted developer
-catalog stays supported and needs no source contribution.
+`.github/workflows/publish.yml` to the `catalog` branch. The same workflow creates a
+traceable empty commit on `main` after a changed catalog push so the static website build
+reloads that branch and serves it at `https://duo.doan-labs.com/catalog/`. Public npm
+packages remain unpublished; developers use the local archive workflow in [development](dev.md).
+A separately hosted developer catalog stays supported and needs no source contribution.
 
 ## Submission contract
 
@@ -54,9 +55,11 @@ and no secrets; evidence is uploaded as the `submission-evidence` artifact and t
 summary. `publish.yml` runs on pushes to `main` touching the same paths, serialized by a
 concurrency group: a `build` job (read-only) validates and builds the changed folders; a
 `publish` job with `contents: write` only runs `scripts/publish-catalog.ts` over the built
-files and pushes the `catalog` branch. No contributor install or build script runs in the
-publishing job. Three states: checks passed → merged → published; only a green `publish` run
-means the release is live, on the site's next deploy.
+files and pushes the `catalog` branch. After a changed catalog push, it makes one empty
+`main` commit to trigger the static website builder; that commit does not touch
+`community-apps/**`, so it cannot recursively trigger publication. No contributor install
+or build script runs in the publishing job. Three states: checks passed → merged → catalog
+published → website deployed.
 
 ## Publisher behavior
 

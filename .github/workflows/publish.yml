@@ -1,7 +1,7 @@
-# Publishes merged community apps to the catalog branch, which the website build serves
-# at /catalog. Two jobs on purpose: `build` compiles contributor code with no write
-# access; `publish` only copies validated files and never runs app code or installs.
-# Merge is acceptance; only a green `publish` job means the release is live.
+# Publishes merged community apps to the catalog branch, then triggers the website build
+# that serves it at /catalog. Two jobs on purpose: `build` compiles contributor code with
+# no write access; `publish` only copies validated files and never runs app code or installs.
+# Merge is acceptance; the release is live after publication and the website deploy.
 name: Publish catalog
 on:
   push:
@@ -86,6 +86,7 @@ jobs:
             bun scripts/publish-catalog.ts .cache/empty catalog-tree --delist "${{ inputs.delist }}" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
       - name: Push the catalog branch
+        id: catalog
         # A rejected push means another publication landed first: the tree is untouched
         # remotely, so re-running this workflow republishes on top of it.
         run: |
@@ -93,11 +94,26 @@ jobs:
           git config user.name "duo-publisher"
           git config user.email "publisher@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet && { echo "Nothing new to publish" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing new to publish" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           git commit -m "Publish ${{ github.sha }}"
           git push origin HEAD:catalog
+          echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Verify the published tree
         run: |
           git -C catalog-tree fetch origin catalog
           git -C catalog-tree diff --quiet origin/catalog -- . || { echo "Remote catalog differs from the verified tree"; exit 1; }
-          echo "Published: catalog branch at $(git -C catalog-tree rev-parse --short origin/catalog). The site serves it at /catalog on its next deploy." >> "$GITHUB_STEP_SUMMARY"
+          echo "Published: catalog branch at $(git -C catalog-tree rev-parse --short origin/catalog)." >> "$GITHUB_STEP_SUMMARY"
+      - name: Trigger the website build
+        if: steps.catalog.outputs.changed == 'true'
+        run: |
+          git fetch origin main
+          git switch --detach origin/main
+          git config user.name "duo-publisher"
+          git config user.email "publisher@users.noreply.github.com"
+          git commit --allow-empty -m "chore(web): redeploy catalog ${{ github.sha }}"
+          git push origin HEAD:main
+          echo "Triggered the website build from main." >> "$GITHUB_STEP_SUMMARY"

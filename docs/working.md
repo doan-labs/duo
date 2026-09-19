@@ -281,6 +281,8 @@ for the same reason (a temp directory outside the repo cannot resolve React's tr
 `--base` on another branch. Never edit `registry.json` for someone else's id without the
 listed maintainers. The `catalog` branch holds only the published tree; do not merge it into
 `main` or rewrite its history, since release folders under `apps/` are immutable URLs.
+After a changed catalog push, publication creates an empty `main` commit to trigger the
+static website build; this is the bridge between the data branch and the deployed `/catalog`.
 `packages/web/scripts/catalog.ts` fetches it during the site build and tolerates its absence.
 
 ## Isolated document tooling
