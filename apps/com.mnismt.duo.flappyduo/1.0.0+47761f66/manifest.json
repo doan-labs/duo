@@ -1,0 +1,14 @@
+{
+  "id": "com.mnismt.duo.flappyduo",
+  "name": "Flappy Duo",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "widgets": [
+    "small"
+  ],
+  "author": "mnismt",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flappy-duo",
+  "license": "MIT"
+}

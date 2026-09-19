@@ -1,0 +1,35 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.flappyduo",
+    "name": "Flappy Duo",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "widgets": [
+      "small"
+    ],
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flappy-duo",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "0.2.0",
+    "at": "2026-09-19T10:54:31.264Z",
+    "commit": "d6df2aad4ed61437e5a34a028711bf96b2d52575",
+    "hash": "47761f66"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 300842,
+      "sha256": "f0472c3fa115a0b3432873eb1747c456f61882a57f0ad813e7557417e75d13cc"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 343035,
+      "sha256": "68df82873aec2495f8f00443b5c60403457f0722a9b4bb27b2fdc03ea545c7f3"
+    }
+  ]
+}
