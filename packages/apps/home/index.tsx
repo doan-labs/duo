@@ -86,11 +86,11 @@ const Thermostat = ({ temp, onChange }: { temp: number; onChange: (t: number) =>
       <svg viewBox="0 0 130 130" {...stylex.props(styles.dialSvg)}>
         <defs>
           <linearGradient id="hg" x1={0} y1={0} x2={1} y2={1}>
-            <stop offset={0} stopColor={appAppearance.homeColor} />
+            <stop offset={0} stopColor={appAppearance.homeAccent} />
             <stop offset={1} stopColor={colors.orange} />
           </linearGradient>
         </defs>
-        <Ring stroke={appAppearance.homeColor3} dash={C * 0.75} />
+        <Ring stroke={appAppearance.homeHairline} dash={C * 0.75} />
         <Ring stroke="url(#hg)" dash={C * 0.75 * ((temp - 12) / 18)} />
       </svg>
       <b {...stylex.props(styles.read)}>{temp}°</b>

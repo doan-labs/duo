@@ -20,7 +20,7 @@
 import { CalendarWidget } from '@doan-labs/duo-app-calendar/index.tsx'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { chrome, colors, easing, layout, motion, radius } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
 import { byName, DOCK } from '../apps.ts'
@@ -259,7 +259,7 @@ export function HomeScreen({
   )
 }
 
-const glassEase = 'cubic-bezier(.3,.8,.3,1)'
+const glassEase = easing.push
 
 const styles = stylex.create({
   // Home screen. It sits on one layer so opening an app pushes the whole thing
@@ -285,7 +285,7 @@ const styles = stylex.create({
     height: '100%',
     transitionProperty: 'transform',
     transitionDuration: '.34s',
-    transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'
+    transitionTimingFunction: easing.push
   },
   shift: (pct: number) => ({ transform: `translateX(${pct}%)` }),
   page: {
@@ -322,13 +322,13 @@ const styles = stylex.create({
   dot: {
     width: 6,
     height: 6,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(255,255,255,.35)',
+    borderRadius: radius.circle,
+    backgroundColor: chrome.label2,
     cursor: 'pointer',
     transitionProperty: 'background-color, transform',
     transitionDuration: '.25s'
   },
-  dotOn: { backgroundColor: 'rgba(255,255,255,.95)', transform: 'scale(1.15)' },
+  dotOn: { backgroundColor: colors.white, transform: 'scale(1.15)' },
   dock: {
     position: 'absolute',
     right: layout.dockRight,
@@ -340,7 +340,7 @@ const styles = stylex.create({
     gap: 9,
     paddingTop: 8,
     paddingBottom: 8,
-    borderRadius: 21
+    borderRadius: radius.xxl
   },
   srch: {
     position: 'absolute',
@@ -348,13 +348,13 @@ const styles = stylex.create({
     bottom: 15,
     width: 44,
     height: 44,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
     cursor: 'pointer',
     zIndex: 4,
     transitionProperty: 'transform',
-    transitionDuration: '.2s',
-    transform: { default: null, ':active': 'scale(.86)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   }
 })

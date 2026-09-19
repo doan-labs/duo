@@ -1,81 +1,55 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, appAppearance, colors, radius, shadow, space, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
-  hdrMd: { fontSize: appAppearance.messagesFontSize },
-  hdr18: { fontSize: appAppearance.musicFontSize5 },
-  openBtn: {
-    marginLeft: 'auto',
-    color: colors.blueDark,
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight3
-  },
+  openBtn: { marginLeft: 'auto', color: app.link, fontWeight: weight.medium },
   lead: {
-    marginInline: 16,
+    marginInline: space.lg,
     marginBottom: 14,
-    borderRadius: appAppearance.calendarFontSize,
-    paddingBlock: 16,
-    paddingInline: 16,
+    borderRadius: radius.xl,
+    paddingBlock: space.lg,
+    paddingInline: space.lg,
     color: colors.white,
     minHeight: 150,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
     cursor: 'pointer',
-    boxShadow: appAppearance.newsBoxShadow
+    boxShadow: shadow.float
   },
-  kicker: {
-    fontSize: appAppearance.musicFontSize3,
-    fontWeight: appAppearance.musicFontWeight,
-    letterSpacing: 0.8,
-    opacity: 0.8
-  },
-  leadTitle: {
-    fontSize: appAppearance.newsFontSize,
-    fontWeight: appAppearance.musicFontWeight,
-    lineHeight: 1.25,
-    marginTop: 6
-  },
-  leadMeta: { fontSize: appAppearance.calendarFontSize2, opacity: 0.8, marginTop: 8 },
+  kicker: { fontWeight: weight.bold, opacity: 0.8 },
+  leadTitle: { fontWeight: weight.bold, marginTop: 6 },
+  leadMeta: { opacity: 0.8, marginTop: space.sm },
   li: {
     display: 'flex',
     gap: 10,
     paddingTop: 11,
-    paddingInline: 16,
+    paddingInline: space.lg,
     paddingBottom: 11,
-    backgroundColor: { default: colors.white, ':active': colors.fillThin },
+    backgroundColor: { default: app.surface, ':active': app.fill3 },
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: appAppearance.messagesBorderBottomColor,
+    borderBottomColor: app.separator,
     cursor: 'pointer',
     alignItems: 'flex-start',
     transitionProperty: 'background-color',
     transitionDuration: '.15s'
   },
   tx: { minWidth: 0, flexGrow: 1, flexBasis: 0 },
-  title: { display: 'block', fontSize: appAppearance.musicFontSize, fontWeight: appAppearance.musicFontWeight2 },
-  meta: {
-    fontSize: appAppearance.musicFontSize6,
-    color: colors.grey,
-    lineHeight: 1.35,
-    maxHeight: '2.7em',
-    overflow: 'hidden'
-  },
-  thumb: { width: 56, height: 56, borderRadius: appAppearance.itunesBorderRadius, flexShrink: 0 },
+  title: { display: 'block', fontWeight: weight.semibold },
+  meta: { color: app.label2, maxHeight: '2.7em', overflow: 'hidden' },
+  thumb: { width: 56, height: 56, borderRadius: radius.md, flexShrink: 0 },
   tint: (bg: string) => ({ backgroundImage: bg }),
-  pad20: { paddingBlock: 20, paddingInline: 20 },
-  hero: { height: 130, marginInline: 16, marginBottom: 14, borderRadius: appAppearance.musicBorderRadius },
+  pad20: { paddingBlock: space.xl, paddingInline: space.xl },
+  hero: { height: 130, marginInline: space.lg, marginBottom: 14, borderRadius: radius.xl },
   head: { paddingInline: 18, paddingBottom: 14 },
-  storyTitle: { fontSize: appAppearance.newsFontSize2, fontWeight: appAppearance.musicFontWeight, lineHeight: 1.24 },
-  mt8: { marginTop: 8 },
+  mt8: { marginTop: space.sm },
   cmt: {
     paddingBlock: 10,
-    paddingInline: 16,
+    paddingInline: space.lg,
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: appAppearance.newsBorderBottomColor,
-    fontSize: appAppearance.musicBorderRadius,
-    lineHeight: 1.45
+    borderBottomColor: appAppearance.newsHairline
   },
-  cmtAuthor: { display: 'block', fontSize: appAppearance.calendarFontSize2, color: colors.grey, marginBottom: 3 }
+  cmtAuthor: { display: 'block', color: app.label2, marginBottom: 3 }
 })

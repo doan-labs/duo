@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -212,7 +212,7 @@ const styles = stylex.create({
     paddingBlock: 12,
     paddingInline: 16,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system
   },
   cover: { gap: 4, paddingBlock: 7, paddingInline: 10 },
@@ -237,9 +237,9 @@ const styles = stylex.create({
     boxSizing: 'border-box',
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.fillDark,
+    borderColor: app.fill,
     color: colors.white,
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     fontSize: 16,
     fontWeight: 800,
     transitionProperty: 'transform, background-color, border-color, color',
@@ -258,9 +258,9 @@ const styles = stylex.create({
     animationFillMode: 'both'
   },
   fitTile: (size: number) => ({ width: `${String(size)}px`, height: `${String(size)}px` }),
-  correct: { borderColor: colors.greenBright, backgroundColor: colors.green, color: colors.black },
+  correct: { borderColor: colors.greenDark, backgroundColor: colors.green, color: colors.black },
   present: { borderColor: colors.yellow, backgroundColor: colors.yellow, color: colors.black },
-  absent: { borderColor: colors.fillDark, backgroundColor: colors.fillDark, color: colors.grey3 },
+  absent: { borderColor: app.fill, backgroundColor: app.fill, color: colors.grey3 },
   keyboard: { display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 },
   keyRow: { display: 'grid', gap: 3 },
   fitKeyRow: (size: number, count: number) => ({ gridTemplateColumns: `repeat(${count}, ${String(size)}px)` }),
@@ -269,7 +269,7 @@ const styles = stylex.create({
     borderRadius: 5,
     padding: 0,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontSize: 10,
     fontWeight: 800,
     cursor: 'pointer',
@@ -285,7 +285,7 @@ const styles = stylex.create({
     paddingBlock: 6,
     paddingInline: 8,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontSize: 9,
     fontWeight: 800,
     cursor: 'pointer',

@@ -1,4 +1,14 @@
-import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  easing,
+  leading,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared's; StyleX only resolves keyframes defined in the file that uses them.
@@ -11,21 +21,21 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
-    backgroundImage: appAppearance.siriBackgroundImage
+    backgroundImage: appAppearance.siriSky
   },
   grow: { flexGrow: 1 },
   orb: {
     position: 'relative',
     width: 112,
     height: 112,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     marginInline: 'auto',
     cursor: 'pointer',
-    backgroundImage: appAppearance.siriBackgroundImage2,
-    boxShadow: appAppearance.siriBoxShadow,
+    backgroundImage: appAppearance.siriOrb,
+    boxShadow: appAppearance.siriOrbGlow,
     animationName: spin,
     animationDuration: '7s',
-    animationTimingFunction: appAppearance.musicTransitionTimingFunction,
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite',
     transitionProperty: 'transform',
     transitionDuration: '.18s',
@@ -36,37 +46,39 @@ export const styles = stylex.create({
       content: '""',
       position: 'absolute',
       inset: 0,
-      borderRadius: appAppearance.settingsBorderRadius,
-      backgroundImage: appAppearance.siriBackgroundImage3
+      borderRadius: radius.circle,
+      backgroundImage: appAppearance.siriOrbSheen
     },
     '::after': {
       content: '""',
       position: 'absolute',
       inset: 0,
-      borderRadius: appAppearance.settingsBorderRadius,
-      backgroundImage: appAppearance.siriBackgroundImage4
+      borderRadius: radius.circle,
+      backgroundImage: appAppearance.siriOrbSpark
     }
   },
   said: {
     paddingTop: 16,
     paddingBottom: 16,
     paddingInline: 22,
-    fontSize: appAppearance.mailFontSize,
-    fontWeight: appAppearance.homeFontWeight,
-    lineHeight: 1.35,
+    fontSize: typeScale.title2,
+    lineHeight: leading.title2,
+    letterSpacing: tracking.title2,
+    fontWeight: weight.regular,
     textAlign: 'center',
     minHeight: 64
   },
   out: { paddingBottom: 16 },
   ans: {
     marginInline: 18,
-    borderRadius: appAppearance.musicFontSize5,
+    borderRadius: radius.xl,
     paddingTop: 15,
     paddingBottom: 15,
     paddingInline: 17,
-    backgroundColor: colors.fillThick,
-    fontSize: appAppearance.musicFontSize,
-    lineHeight: 1.45,
+    backgroundColor: app.fill,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
     animationName: rise,
     animationDuration: '.4s',
     animationFillMode: 'backwards'
@@ -80,5 +92,5 @@ export const styles = stylex.create({
     paddingBottom: 14,
     paddingInline: 18
   },
-  chip: { backgroundColor: appAppearance.cameraBackgroundColor2, color: colors.white }
+  chip: { backgroundColor: app.fill, color: colors.white }
 })

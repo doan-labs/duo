@@ -9,7 +9,7 @@ export default function Demo() {
       <Row
         label="Title"
         detail={
-          <Text size="title" weight="bold">
+          <Text size="title2" weight="bold">
             Title
           </Text>
         }

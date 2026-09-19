@@ -1,4 +1,13 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  colors,
+  leading,
+  motion,
+  radius,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -16,23 +25,25 @@ export const styles = stylex.create({
   poster: {
     flexShrink: 0,
     width: 126,
-    borderRadius: appAppearance.calendarFontSize2,
+    borderRadius: radius.lg,
     overflow: 'hidden',
     cursor: 'pointer',
     transitionProperty: 'transform',
-    transitionDuration: '.2s',
-    transform: { default: null, ':active': 'scale(.95)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
-  cover: { aspectRatio: 1, borderRadius: appAppearance.itunesBorderRadius },
+  cover: { aspectRatio: 1, borderRadius: radius.md },
   posterTitle: {
-    fontSize: appAppearance.calendarFontSize2,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold,
     paddingTop: 6,
     paddingInline: 2,
     paddingBottom: 0
   },
-  posterArtist: { fontSize: appAppearance.musicFontSize3, paddingInline: 2 },
-  hdr18: { fontSize: appAppearance.musicFontSize5 },
+  posterArtist: { fontSize: typeScale.caption2, lineHeight: leading.caption2, paddingInline: 2 },
+  hdr18: { fontSize: typeScale.title3, lineHeight: leading.title3, letterSpacing: tracking.title3 },
   rank: {
     display: 'flex',
     alignItems: 'center',
@@ -43,34 +54,49 @@ export const styles = stylex.create({
     cursor: 'pointer',
     borderBottomWidth: 1,
     borderBottomStyle: 'solid',
-    borderBottomColor: appAppearance.messagesBorderBottomColor
+    borderBottomColor: app.separator
   },
-  n: { width: 18, textAlign: 'center', color: colors.grey, fontSize: appAppearance.musicFontSize6, flexShrink: 0 },
-  co: { width: 52, height: 52, borderRadius: appAppearance.cameraBorderRadius, flexShrink: 0 },
+  n: {
+    width: 18,
+    textAlign: 'center',
+    color: colors.grey,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    flexShrink: 0
+  },
+  co: { width: 52, height: 52, borderRadius: radius.sm, flexShrink: 0 },
   grow: { flexGrow: 1, minWidth: 0 },
-  song: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicBorderRadius },
+  song: {
+    fontWeight: weight.semibold,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
   buy: {
     paddingTop: 5,
     paddingBottom: 5,
     paddingInline: 14,
-    borderRadius: appAppearance.musicFontSize6,
-    backgroundColor: colors.fill,
-    color: colors.blue,
-    fontSize: appAppearance.calendarFontSize2,
-    fontWeight: appAppearance.musicFontWeight,
+    borderRadius: radius.pill,
+    backgroundColor: app.fill,
+    color: app.link,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.bold,
     flexShrink: 0,
     transitionProperty: 'background-color, color, transform',
-    transitionDuration: '.25s, .25s, .15s',
-    transform: { default: null, ':active': 'scale(.9)' }
+    transitionDuration: `.25s, .25s, ${motion.pressDuration}`,
+    transform: { default: null, ':active': motion.press }
   },
   own: { backgroundColor: colors.green, color: colors.white },
   ring: {
     width: 22,
     height: 22,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     borderWidth: 2.5,
     borderStyle: 'solid',
-    borderColor: appAppearance.appstoreBorderColor,
+    borderColor: app.fill,
     borderTopColor: colors.blueDark
   }
 })

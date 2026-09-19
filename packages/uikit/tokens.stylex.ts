@@ -1,100 +1,112 @@
 // Design tokens for the fake iOS. Only `defineVars` / `defineConsts` named
 // exports may live in this file; StyleX resolves them at compile time.
+//
+// Sources, checked 2026-09-19:
+// - Hues and greys: Apple HIG "Color", iOS/iPadOS system colors (the unified
+//   iOS 26 palette: blue is 0,136,255, not the iOS 13 0,122,255).
+// - Semantic labels, fills, separators, backgrounds: UIKit dynamic colors.
+// - Type ramp: HIG "Typography", Dynamic Type at the Large (default) size.
+// - Tracking: the HIG SF Pro tracking table, in points at 1x.
 import * as stylex from '@stylexjs/stylex'
 
-/** iOS system colours as they appear in Apple's palette. */
+/**
+ * iOS system colours. Plain names are the light appearance; `*Dark` is what the
+ * same colour becomes in a dark app. A hue is for tinting (an icon square, a
+ * chart, a switch) and for the one interaction colour, `blue`. Text, fills and
+ * surfaces come from `app`, never from here.
+ */
 export const colors = stylex.defineVars({
-  penRim: '#e7e7ea',
-  blue: '#007aff',
-  /** iOS 26's brighter tint for filled controls and bubbles. */
-  blueBright: '#0a7cff',
-  blueDark: '#0a84ff',
+  red: '#ff383c',
+  redDark: '#ff4245',
+  orange: '#ff8d28',
+  orangeDark: '#ff9230',
+  yellow: '#ffcc00',
+  yellowDark: '#ffd600',
   green: '#34c759',
-  greenBright: '#31d158',
-  red: '#ff3b30',
-  redBright: '#ff453a',
-  pink: '#ff375f',
-  settingsPink: '#ff2d55',
-  settingsIndigo: '#5856d6',
-  orange: '#ff9f0a',
-  yellow: '#ffd60a',
-  indigo: '#5e5ce6',
-  teal: '#00c7be',
-  cyan: '#22e0f5',
-  weatherNight: '#172c47',
-  weatherSun: '#ffe6a0',
-  weatherRain: '#a2e1ff',
-  weatherScrollThumb: 'rgba(235,247,255,.42)',
-  weatherScrollHover: 'rgba(245,251,255,.65)',
-  weatherScrollActive: 'rgba(255,255,255,.82)',
-  weatherScrollTrack: 'rgba(10,30,50,.1)',
-  weatherScrollRim: 'rgba(255,255,255,.28)',
-  purple: '#bf5af2',
-  /** Secondary label. */
+  greenDark: '#30d158',
+  mint: '#00c8b3',
+  mintDark: '#00dac3',
+  teal: '#00c3d0',
+  tealDark: '#00d2e0',
+  cyan: '#00c0e8',
+  cyanDark: '#3cd3fe',
+  /** The interaction colour: links, tinted buttons, selection, the switch. */
+  blue: '#0088ff',
+  blueDark: '#0091ff',
+  indigo: '#6155f5',
+  indigoDark: '#6d7cff',
+  purple: '#cb30e0',
+  purpleDark: '#db34f2',
+  pink: '#ff2d55',
+  pinkDark: '#ff375f',
+  brown: '#ac7f5e',
+  brownDark: '#b78a66',
+  /** systemGray .. systemGray6, light; the same steps in a dark app. */
   grey: '#8e8e93',
-  /** Section header text on grouped lists. */
-  grey2: '#6d6d72',
-  /** Placeholder / tertiary fill. */
+  grey2: '#aeaeb2',
   grey3: '#c7c7cc',
-  /** Light separator. */
-  separator: '#e5e5ea',
-  /** Grouped background, light. */
-  groupedLight: '#f2f2f7',
-  /** Toolbar background, light. */
-  barLight: '#f7f7f9',
-  /** Track for switches at rest. */
-  trackLight: '#e9e9eb',
-  /** Elevated dark surface. */
-  darkElevated: '#1c1c1e',
-  /** A step above `darkElevated`: a toolbar or sheet header in a dark app. */
-  darkElevated2: '#2c2c2e',
-  /** Hairline between rows in a dark app. */
-  separatorDark: 'rgba(255,255,255,.11)',
-  /** iOS `systemFill` at 16%; buttons and pills over any background. */
-  fill: 'rgba(120,120,128,.16)',
-  fillThin: 'rgba(120,120,128,.12)',
-  fillThick: 'rgba(120,120,128,.22)',
-  /** `systemFill` over a dark surface, where 16% does not read. */
-  fillDark: 'rgba(120,120,128,.32)',
-  /** Track for switches at rest in a dark app. */
-  trackDark: 'rgba(120,120,128,.4)',
+  grey4: '#d1d1d6',
+  grey5: '#e5e5ea',
+  grey6: '#f2f2f7',
+  grey2Dark: '#636366',
+  grey3Dark: '#48484a',
+  grey4Dark: '#3a3a3c',
+  grey5Dark: '#2c2c2e',
+  grey6Dark: '#1c1c1e',
   white: '#fff',
-  black: '#000'
+  black: '#000',
+  /** The rim of the Apple Pencil in the shell's device scene. */
+  penRim: '#e7e7ea'
 })
 
 export const fonts = stylex.defineVars({
-  system: '-apple-system,"SF Pro Text",system-ui,"Helvetica Neue",sans-serif'
+  /** SF Pro. `-apple-system` first so WebKit picks the real face with optical sizing. */
+  system: '-apple-system,BlinkMacSystemFont,system-ui,"SF Pro Text","Helvetica Neue",sans-serif',
+  /** SF Pro Rounded: the lock-screen clock, widget numerals. */
+  rounded: 'ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif',
+  /** New York: Books and Preview body text. */
+  serif: '"New York",ui-serif,Georgia,serif',
+  /** SF Mono: card numbers, code. */
+  mono: 'ui-monospace,"SF Mono",Menlo,monospace'
 })
 
 /**
- * Per-app surface. The shell themes these per app, so nav pages, sheets, rows,
- * separators and switches all pick up the right one. Apply `light` or `dark`
- * from `styles.ts` rather than hand-rolling a `createTheme`.
- *
- * The defaults are the light values the kit used to hardcode, so a component
- * that has never been themed looks exactly as it did before these existed.
+ * Per-app surface, the UIKit dynamic colours. The shell themes these per app,
+ * so nav pages, sheets, rows, separators and switches all pick up the right
+ * one. Apply `light` or `dark` from `styles.ts` rather than hand-rolling a
+ * `createTheme`. Defaults are the light grouped appearance.
  */
 export const app = stylex.defineVars({
-  bg: '#000',
-  fg: '#fff',
-  /** A row, card or grouped-list surface sitting over `bg`. */
+  /** systemGroupedBackground: the page behind grouped rows. */
+  bg: '#f2f2f7',
+  /** label. */
+  fg: '#000',
+  /** secondarySystemGroupedBackground: a row, card or grouped-list surface over `bg`. */
   surface: '#fff',
-  /** A surface that has to read as raised above `surface`: a toolbar, a sheet header. */
-  elevated: '#f7f7f9',
-  /** Secondary label over `surface`, for trailing detail and captions. */
-  label2: '#8e8e93',
-  /** Hairline between rows. */
-  separator: '#e5e5ea',
-  /** `systemFill`: pills and plain controls over any surface. */
-  fill: 'rgba(120,120,128,.16)',
-  /** A switch at rest. */
-  track: '#e9e9eb'
+  /** tertiarySystemBackground: a toolbar or sheet header that reads as raised above `surface`. */
+  elevated: '#fff',
+  /** secondaryLabel: trailing detail, captions, section headers. */
+  label2: 'rgba(60,60,67,.6)',
+  /** tertiaryLabel and placeholderText. */
+  label3: 'rgba(60,60,67,.3)',
+  /** link: the interaction colour on this surface. */
+  link: '#0088ff',
+  /** separator: the hairline between rows. */
+  separator: 'rgba(60,60,67,.29)',
+  /** systemFill: pills and plain controls over any surface. */
+  fill: 'rgba(120,120,128,.2)',
+  /** secondarySystemFill: a switch at rest, a quieter chip. */
+  fill2: 'rgba(120,120,128,.16)',
+  /** tertiarySystemFill: an input field, a search bar. */
+  fill3: 'rgba(118,118,128,.12)',
+  /** The raised segment of a segmented control. */
+  control: '#fff'
 })
 
 /**
- * The type ramp, in the px the shell actually renders at: its body text is 15,
- * not Apple's 17. `Text`'s `size` prop names these; reach for the consts
- * directly only inside an app's own block.
+ * Dynamic Type at the Large size, in CSS px. `Text`'s `size` prop names these
+ * through `typography` in `styles.ts`, which carries leading and tracking too;
+ * reach for the consts directly only inside an app's own block.
  */
 export const typeScale = stylex.defineConsts({
   largeTitle: '34px',
@@ -102,12 +114,108 @@ export const typeScale = stylex.defineConsts({
   title2: '22px',
   title3: '20px',
   headline: '17px',
-  body: '15px',
-  callout: '14px',
-  subheadline: '13px',
-  footnote: '12px',
-  caption1: '11px',
-  caption2: '10px'
+  body: '17px',
+  callout: '16px',
+  subheadline: '15px',
+  footnote: '13px',
+  caption1: '12px',
+  caption2: '11px',
+  /** Oversized numerals: a temperature, a clock, a calculator result. Set solid (line-height 1), weight thin or regular. */
+  display: '44px',
+  displayLg: '56px',
+  displayXl: '72px',
+  displayXxl: '96px'
+})
+
+/** The HIG's leading for each step, in px. */
+export const leading = stylex.defineConsts({
+  largeTitle: '41px',
+  title1: '34px',
+  title2: '28px',
+  title3: '25px',
+  headline: '22px',
+  body: '22px',
+  callout: '21px',
+  subheadline: '20px',
+  footnote: '18px',
+  caption1: '16px',
+  caption2: '13px'
+})
+
+/** SF Pro tracking per step, in px: negative through the text sizes, positive from 24 up. */
+export const tracking = stylex.defineConsts({
+  largeTitle: '0.4px',
+  title1: '0.36px',
+  title2: '-0.26px',
+  title3: '-0.45px',
+  headline: '-0.43px',
+  body: '-0.43px',
+  callout: '-0.32px',
+  subheadline: '-0.24px',
+  footnote: '-0.08px',
+  caption1: '0px',
+  caption2: '0.07px'
+})
+
+/** The weight ladder. Nothing lighter than regular except `weight.thin` for oversized numerals. */
+export const weight = stylex.defineConsts({
+  thin: 200,
+  regular: 400,
+  medium: 500,
+  semibold: 600,
+  bold: 700
+})
+
+/** 4 px grid. */
+export const space = stylex.defineConsts({
+  xxs: '2px',
+  xs: '4px',
+  sm: '8px',
+  md: '12px',
+  lg: '16px',
+  xl: '20px',
+  xxl: '24px',
+  xxxl: '32px'
+})
+
+/** Continuous corners. One radius per role; nothing in between. */
+export const radius = stylex.defineConsts({
+  /** A checkbox, a tiny thumbnail, a bar in a chart. */
+  xs: '4px',
+  /** A button, a row icon square, an inline image. */
+  sm: '8px',
+  /** An inset grouped list, a segmented control, a text field. */
+  md: '10px',
+  /** A card, a sheet, a menu. */
+  lg: '12px',
+  /** A large card or a hero tile. */
+  xl: '16px',
+  /** A home-screen widget or a glass tray. */
+  xxl: '22px',
+  pill: '999px',
+  circle: '50%'
+})
+
+/**
+ * Every shadow in the system. Elevation otherwise comes from surface change and
+ * blur; nothing else gets a shadow.
+ */
+export const shadow = stylex.defineConsts({
+  /** A card or segment resting on a light surface. */
+  card: '0 1px 3px rgba(0,0,0,.12)',
+  /** A sheet, popover, HUD or dragged tile floating over content. */
+  float: '0 8px 24px rgba(0,0,0,.24)',
+  /** A glass rim: the hairline decision 18 allows and nothing else. */
+  rim: 'inset 0 1px 0 rgba(255,255,255,.35),inset 0 0 0 .5px rgba(255,255,255,.14)',
+  /** Text sitting directly on wallpaper or photography. */
+  text: '0 1px 3px rgba(0,0,0,.4)'
+})
+
+/** Liquid glass: blur and tint, per decision 18. */
+export const glass = stylex.defineConsts({
+  blur: 'blur(18px) saturate(170%)',
+  tint: 'rgba(255,255,255,.18)',
+  tintDark: 'rgba(30,30,32,.55)'
 })
 
 /**
@@ -122,7 +230,88 @@ export const layout = stylex.defineConsts({
   top: '47px',
   widget: '127px',
   dock: '57px',
-  dockRight: '10px'
+  dockRight: '10px',
+  /** Apple's continuous corner on icon artwork, as a ratio so the dock's smaller icons match. */
+  iconRadius: '22.5%',
+  /**
+   * The physical glass corners, not design radii: docs/architecture.md gives
+   * inner 10.7 mm, cover free edge 11.4 mm, cover hinge edge 1.3 mm, here at
+   * 5 px/mm. The active area sits 11 px inside the glass, concentric with it.
+   */
+  glassInner: '53.5px',
+  glassCoverFree: '57px',
+  glassCoverHinge: '6.6px',
+  screenInner: '42.5px',
+  screenCoverFree: '46px',
+  screenCoverHinge: '2.5px'
+})
+
+/**
+ * The wallpapers the shell hangs on both displays, one group of colours each.
+ * `springboard/wallpaper.ts` paints them as SVG data URLs and `screen.ts` bakes
+ * the same picture, so these are consts: a `var()` would not survive either.
+ * Apple's dune ships as artwork and has no entry here.
+ */
+export const wallpaper = stylex.defineConsts({
+  duskGround: '#1b1440',
+  duskEmber: '#ff8d5a',
+  duskViolet: '#6a4ee0',
+  duskRose: '#d24f9e',
+  tideGround: '#04233d',
+  tideCrest: '#35b4ff',
+  tideDeep: '#0f6f9f',
+  tideFoam: '#8ee6ff',
+  emberGround: '#170909',
+  emberCore: '#ff4d2e',
+  emberAmber: '#ffb347',
+  emberGlow: '#ff7a45',
+  mossGround: '#0a2018',
+  mossLeaf: '#33c977',
+  mossLime: '#d5f56a',
+  mossDeep: '#1e8f6e',
+  slateGround: '#111216',
+  slateHaze: '#4b505c',
+  slateShade: '#2c2f37'
+})
+
+/**
+ * The shell's own materials: status stack, dock, switcher, Control Center, the
+ * power sheet, the lock screen and the HUD under the device. Apps never read
+ * these, and the shell never reads `appAppearance`. Colours only; sizes, radii,
+ * shadows and timing come from the scales above.
+ */
+export const chrome = stylex.defineConsts({
+  /** What Control Center, an open folder and the switcher lay over the display. */
+  scrim: 'rgba(10,10,16,.32)',
+  /** Spotlight's deeper scrim: the home screen goes quiet behind the field. */
+  scrimDeep: 'rgba(18,18,20,.5)',
+  /** The HUD pill under the device. Page chrome, not glass over a wallpaper. */
+  hud: 'rgba(28,29,34,.68)',
+  /** The wash over any wallpaper that keeps white labels legible on it. */
+  wash: 'linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.04) 40%,rgba(0,0,0,.36))',
+  /** A well punched into glass: a lock-screen button, the track behind a fill. */
+  well: 'rgba(0,0,0,.28)',
+  /** The blurred grid behind a folder's icon. */
+  folder: 'rgba(120,120,128,.42)',
+  /** systemFill over glass: a control at rest. */
+  fill: 'rgba(255,255,255,.22)',
+  /** The quieter chip, and a row under the finger. */
+  fill2: 'rgba(255,255,255,.16)',
+  /** The faintest well. */
+  fill3: 'rgba(255,255,255,.12)',
+  /** The home indicator, the grab pill, a loud glyph on glass. */
+  indicator: 'rgba(255,255,255,.75)',
+  /** The home indicator over a light app. */
+  indicatorDark: 'rgba(0,0,0,.6)',
+  /** A secondary label or glyph on glass. */
+  label: 'rgba(255,255,255,.6)',
+  /** A page dot at rest, an empty tile slot's dashed edge. */
+  label2: 'rgba(255,255,255,.35)',
+  /** The lock clock: white thinning toward the baseline, over its own bloom. */
+  clockInk: 'linear-gradient(rgba(255,255,255,.92),rgba(255,255,255,.45))',
+  clockBloom: 'drop-shadow(0 3px 14px rgba(20,20,40,.35))',
+  /** The cool white of the flashlight card's beam. */
+  beam: '#dde6ff'
 })
 
 export const easing = stylex.defineConsts({
@@ -130,250 +319,195 @@ export const easing = stylex.defineConsts({
   push: 'cubic-bezier(.25,.85,.28,1)',
   pop: 'cubic-bezier(.2,.9,.3,1)',
   spring: 'cubic-bezier(.2,1.25,.4,1)',
-  bounce: 'cubic-bezier(.2,1.4,.4,1)'
+  bounce: 'cubic-bezier(.2,1.4,.4,1)',
+  linear: 'linear',
+  out: 'ease-out',
+  inOut: 'ease-in-out'
 })
 
-/** Exact values harvested from official apps. Names identify their first use; no visual redesign. */
+/** The one press state: every tappable thing shrinks to this and eases back. */
+export const motion = stylex.defineConsts({
+  press: 'scale(.95)',
+  pressDuration: '.15s'
+})
+
+/**
+ * Colours that belong to one app's identity: its brand hue, its paper, its sky.
+ * Sizes, weights, radii, shadows and timing never live here; they come from the
+ * scales above. A key is prefixed with the folder name of the only app that may
+ * read it, and `scripts/check-app-tokens.ts` holds apps to that.
+ */
 export const appAppearance = stylex.defineConsts({
-  photosSidebarBackgroundColor: '#ececec',
-  photosSidebarBorderColor: 'rgba(0,0,0,.1)',
-  photosSelectionBackgroundColor: 'rgba(0,0,0,.08)',
-  photosControlBackgroundColor: 'rgba(0,0,0,.055)',
-  photosSegmentBoxShadow: '0 1px 3px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.06)',
-  photosBadgeTextShadow: '0 1px 3px rgba(0,0,0,.5)',
-  photosViewerBackgroundColor: 'rgba(0,0,0,.94)',
-  photosFontSize: '13px',
-  photosFontSize2: '11px',
-  photosFontSize3: '15px',
-  photosFontWeight: 600,
-  photosFontWeight2: 500,
-  photosBorderRadius: '5px',
-  photosBorderRadius2: '7px',
-  photosBorderRadius3: '3px',
-  weatherShadowLarge: '0 10px 30px rgba(6,20,40,.14)',
-  weatherShadowCard: '0 10px 30px rgba(6,20,40,.16)',
-  walletAppleCard: 'linear-gradient(150deg,#f5f5f7,#c9c9ce)',
-  walletTransit: 'linear-gradient(150deg,#0a84ff,#5e5ce6)',
-  walletBadge: 'linear-gradient(150deg,#1c1c1e,#3a3a3c)',
-  walletPass: 'linear-gradient(150deg,#ff375f,#ff9f0a)',
-  tipsWarm: 'linear-gradient(140deg,#ff9f0a,#ff375f)',
-  tipsCool: 'linear-gradient(140deg,#0a84ff,#5e5ce6)',
-  tipsGreen: 'linear-gradient(140deg,#34c759,#00c7be)',
-  tipsPink: 'linear-gradient(140deg,#bf5af2,#ff2d55)',
-  tipsYellow: 'linear-gradient(140deg,#ffd60a,#ff9f0a)',
-  musicBorderRadius: '14px',
-  musicBoxShadow: '0 16px 40px rgba(0,0,0,.55)',
-  musicFontWeight: 700,
-  musicColor: 'rgba(255,255,255,.92)',
-  musicFontSize: '15px',
-  musicTextShadow: '0 1px 6px rgba(0,0,0,.4)',
-  musicFontSize2: '19px',
-  musicFontWeight2: 600,
-  musicBorderRadius2: '3px',
-  musicBackgroundColor: 'rgba(255,255,255,.2)',
-  musicBackgroundColor2: 'rgba(255,255,255,.85)',
-  musicFontSize3: '11px',
-  musicFontSize4: '30px',
-  musicBorderRadius3: '2px',
-  musicTransitionTimingFunction: 'linear',
-  musicFontSize5: '18px',
-  musicBackgroundColor3: 'rgba(255,255,255,.06)',
-  musicBorderBottomColor: 'rgba(255,255,255,.08)',
-  musicBorderRadius4: '6px',
-  musicFontWeight3: 500,
-  musicFontSize6: '13px',
-  settingsBorderRadius: '50%',
-  settingsBorderRadius2: '12px',
-  settingsBorderRadius3: '7px',
-  settingsBorderRadius4: '4px',
-  settingsFontSize: '13px',
-  settingsFontSize2: '11px',
-  settingsFontSize3: '15px',
-  settingsFontSize4: '17px',
-  settingsFontSize5: '28px',
-  settingsFontSize6: '12px',
-  settingsFontWeight: 600,
-  settingsFontWeight2: 500,
-  settingsFontWeight3: 700,
+  // appstore
+  appstoreBanner: 'rgba(255,141,40,.16)',
+  appstoreBannerDev: 'rgba(0,136,255,.1)',
+  appstoreInk: '#3c3c43',
+  appstoreBorder: 'rgba(0,136,255,.22)',
+  appstoreHeroBar: 'rgba(0,0,0,.26)',
+  appstoreHeroShade: 'linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,.1) 45%,rgba(0,0,0,.5) 100%)',
+  appstoreOfficial: 'rgba(52,199,89,.14)',
+  appstorePillLight: 'rgba(255,255,255,.25)',
+  // books
+  booksPaperInk: '#fff9f0',
+  booksPaper: '#f6f1e6',
+  booksInk: '#241f18',
+  booksInkMuted: '#8a7f6d',
+  // calculator
+  calculatorKey: '#333',
+  calculatorKeyLight: '#a5a5a5',
+  // calendar
+  calendarPaper: 'rgba(255,255,255,.78)',
+  // camera
+  cameraGrid:
+    'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))',
+  cameraScrim: 'rgba(0,0,0,.4)',
+  cameraChip: 'rgba(255,255,255,.14)',
+  cameraScrimStrong: 'rgba(0,0,0,.45)',
+  // clock
+  // contacts
+  contactsSelection: 'rgba(0,136,255,.12)',
+  // facetime
+  /** The ring pulsing out of the caller's avatar, over the video. */
+  facetimeRipple: 'rgba(255,255,255,.45)',
+  // files
+  // findmy
+  findmyPulse: 'rgba(0,136,255,.35)',
+  findmyTint: '#eaf3ff',
+  /** Apple Maps: the land tone a tile paints over, the sidebar material and the floating card. */
+  // fitness
+  fitnessMove: '#fa114f',
+  fitnessExercise: '#a6f425',
+  fitnessStand: '#22e0f5',
+  // freeform
+  freeformPurple: '#af52de',
+  freeformPanel: 'rgba(250,250,252,.9)',
+  // health
+  // home
   homeGlow: 'rgba(255,206,110,.7)',
   homeGlow2: 'rgba(255,255,255,.6)',
   homeGlow3: 'rgba(150,200,255,.6)',
   homeGlow4: 'rgba(120,255,170,.6)',
   homeGlow5: 'rgba(150,220,255,.6)',
   homeGlow6: 'rgba(255,140,200,.6)',
-  homeColor: '#59c8ff',
-  homeColor3: 'rgba(255,255,255,.12)',
-  homeBackgroundColor: 'rgba(255,255,255,.09)',
-  homeColor4: '#111',
-  homeFontSize: '42px',
-  homeFontWeight: 300,
-  messagesBorderBottomColor: 'rgba(60,60,67,.14)',
-  messagesFontSize: '17px',
-  messagesBackgroundImage: 'linear-gradient(#2ca5ff,#0a7cff)',
-  messagesBackgroundColor: '#8a8a8e',
-  messagesBackgroundColor2: 'rgba(249,249,249,.94)',
-  messagesBorderTopColor: '#d7d7dc',
-  calendarFontSize: '16px',
-  calendarFontSize2: '12px',
-  calendarBackgroundColor: 'rgba(255,255,255,.78)',
-  calendarFontSize3: '31px',
-  calendarFontSize4: '10px',
-  calendarFontWeight: 400,
-  memosBorderRadius: '5px',
-  memosBackgroundColor: 'rgba(255,255,255,.07)',
-  calculatorBackgroundColor: '#333',
-  calculatorFontSize: '26px',
-  calculatorBackgroundColor2: '#a5a5a5',
-  calculatorBorderRadius: '40px',
-  calculatorFontSize2: '56px',
-  appstoreFontSize10: '10px',
-  appstoreFontSize11: '11px',
-  appstoreFontSize12: '12px',
-  appstoreFontSize13: '13px',
-  appstoreFontSize14: '14px',
-  appstoreFontSize15: '15px',
-  appstoreFontSize17: '17px',
-  appstoreFontSize18: '18px',
-  appstoreFontSize22: '22px',
-  appstoreFontSize24: '24px',
-  appstoreFontSize26: '26px',
-  appstoreFontSize32: '32px',
-  appstoreFontSize44: '44px',
-  appstoreFontSize48: '48px',
-  appstoreFontWeight500: 500,
-  appstoreFontWeight600: 600,
-  appstoreFontWeight700: 700,
-  appstoreFontWeight800: 800,
-  appstoreRadius1_5: '1.5px',
-  appstoreRadius6: '6px',
-  appstoreRadius7: '7px',
-  appstoreRadius9: '9px',
-  appstoreRadius10: '10px',
-  appstoreRadius11: '11px',
-  appstoreRadius12: '12px',
-  appstoreRadius14: '14px',
-  appstoreRadius15: '15px',
-  appstoreRadius17: '17px',
-  appstoreRadius22: '22px',
-  appstoreRadius28: '28px',
-  appstoreRadius30: '30px',
-  appstoreBannerBackground: 'rgba(255,159,10,.16)',
-  appstoreBannerDevBackground: 'rgba(0,122,255,.1)',
-  appstoreCardShadow: '0 0 0 1px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.06)',
-  appstoreDetailIconShadow: '0 10px 28px rgba(0,0,0,.18)',
-  appstoreInheritedFontFamily: 'inherit',
-  appstoreFontSize: '24px',
-  appstoreColor: '#3c3c43',
-  appstoreBorderColor: 'rgba(10,124,255,.22)',
-  appstoreEase: 'cubic-bezier(.22,.9,.26,1)',
-  appstoreHeroBarBackground: 'rgba(0,0,0,.26)',
-  appstoreHeroBigShadow: '0 18px 40px rgba(0,0,0,.35)',
-  appstoreHeroIconShadow: '0 2px 8px rgba(0,0,0,.3)',
-  appstoreHeroShade: 'linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,.1) 45%,rgba(0,0,0,.5) 100%)',
-  appstoreHeroShadow: '0 14px 36px rgba(0,0,0,.2)',
-  appstoreHeroTextShadow: '0 2px 12px rgba(0,0,0,.25)',
-  appstoreIconShadow: '0 1px 3px rgba(0,0,0,.12)',
-  appstoreOfficialBackground: 'rgba(52,199,89,.14)',
-  appstorePillLightBackground: 'rgba(255,255,255,.25)',
-  appstoreSegmentShadow: '0 1px 4px rgba(0,0,0,.12)',
-  mailFontSize: '22px',
-  cameraBackgroundImage:
-    'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))',
-  cameraBackgroundColor: 'rgba(0,0,0,.4)',
-  cameraBackgroundColor2: 'rgba(255,255,255,.14)',
-  cameraBackgroundColor3: 'rgba(0,0,0,.45)',
-  cameraBorderRadius: '8px',
-  healthColor: '#ff9500',
-  healthAnimationTimingFunction: 'cubic-bezier(.3,.9,.3,1)',
-  contactsBackgroundColor: 'rgba(10,124,255,.12)',
-  itunesBorderRadius: '9px',
-  stocksFontSize: '28px',
-  booksBorderTopLeftRadius: '4px',
-  booksBoxShadow: '0 10px 22px rgba(0,0,0,.3),inset 7px 0 12px -6px rgba(0,0,0,.45)',
-  booksColor: '#fff9f0',
-  booksBackgroundColor: '#f6f1e6',
-  booksColor2: '#241f18',
-  booksTransitionTimingFunction: 'cubic-bezier(.3,.85,.3,1)',
-  booksColor3: '#8a7f6d',
-  youtubeColor: '#aaa',
-  tvTextShadow: '0 2px 8px rgba(0,0,0,.5)',
-  tvBackgroundColor: 'rgba(0,0,0,.55)',
-  podcastsBackgroundColor: 'rgba(28,28,30,.92)',
-  podcastsBorderTopColor: 'rgba(255,255,255,.1)',
-  podcastsBorderRadius: '7px',
-  podcastsFontSize: '20px',
-  notesColor: '#c8c9cd',
-  notesColor3: '#e8453c',
-  notesColor5: '#c99a5b',
-  notesColor6: '#2c2c2e',
-  notesColor7: '#ffffff',
-  notesFontFamily: 'inherit',
-  notesFontSize: '52px',
-  notesBoxShadow: '0 12px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.1)',
-  notesBoxShadow2: 'inset 0 0 0 1px rgba(255,255,255,.22)',
-  notesBoxShadow3: '0 0 0 1.5px #2c2c2e,0 0 0 3px #fff',
-  notesBorderBottomColor: 'rgba(255,255,255,.11)',
-  notesBackgroundColor: '#e2b93b',
-  newsBoxShadow: '0 10px 26px rgba(0,0,0,.22)',
-  newsFontSize: '21px',
-  newsFontSize2: '23px',
-  newsBorderBottomColor: 'rgba(60,60,67,.12)',
-  safariBoxShadow: '0 1px 2px rgba(0,0,0,.1)',
-  safariBoxShadow2: '0 1px 3px rgba(0,0,0,.12)',
-  shortcutsFontSize: '34px',
-  tipsBoxShadow: '0 6px 18px rgba(0,0,0,.1)',
-  tipsTransitionTimingFunction: 'cubic-bezier(.3,.9,.3,1), ease',
-  walletBoxShadow: '0 -1px 0 rgba(255,255,255,.25) inset,0 14px 30px rgba(0,0,0,.4)',
-  walletFontFamily: 'ui-monospace,SFMono-Regular,monospace',
-  walletFontSize: '32px',
-  phoneFontSize: '36px',
-  phoneBackgroundColor: 'rgba(255,255,255,.4)',
-  phoneBackgroundImage: 'linear-gradient(#3a3a3c,#101012)',
-  phoneBackgroundColor2: '#5a5a5e',
-  phoneBorderColor: 'rgba(255,255,255,.45)',
-  phoneAnimationTimingFunction: 'ease-out',
-  phoneFontSize2: '27px',
-  phoneBackgroundColor3: 'rgba(255,255,255,.16)',
-  facetimeTextShadow: '0 1px 8px rgba(0,0,0,.6)',
-  facetimeBoxShadow: '0 8px 22px rgba(0,0,0,.6)',
-  freeformColor3: '#af52de',
-  freeformBackgroundColor: 'rgba(250,250,252,.9)',
-  freeformBoxShadow: '0 8px 22px rgba(0,0,0,.2)',
-  freeformBoxShadow2: '0 1px 4px rgba(0,0,0,.3)',
-  filesFontSize: '44px',
-  filesFontSize2: '64px',
-  siriBackgroundImage: 'radial-gradient(120% 70% at 50% 110%,#2a1b4d,#000)',
-  siriBackgroundImage2: 'conic-gradient(#0a84ff,#bf5af2,#ff375f,#ff9f0a,#30d158,#0a84ff)',
-  siriBoxShadow: '0 0 52px rgba(120,90,255,.6),inset -10px -14px 34px rgba(0,0,0,.45)',
-  siriBackgroundImage3: 'radial-gradient(70% 60% at 32% 26%,rgba(255,255,255,.6),rgba(255,255,255,0) 70%)',
-  siriBackgroundImage4: 'radial-gradient(16% 14% at 34% 24%,rgba(255,255,255,.95),rgba(255,255,255,0) 100%)',
-  watchBorderRadius: '38px',
-  watchBoxShadow: '0 0 0 5px #6e6e73,0 16px 34px rgba(0,0,0,.45)',
-  watchFontFamily: '-apple-system,system-ui',
-  previewBoxShadow: '0 10px 30px rgba(0,0,0,.28)',
-  previewFontFamily: '"New York",Georgia,serif',
-  previewBackgroundColor: 'rgba(60,60,67,.08)',
-  fitnessColor: '#a6f425',
-  fitnessColor2: '#fa114f',
-  weatherBorderRadius: '999px',
-  weatherTextShadow: '0 1px 2px rgba(0,20,40,.18)',
-  weatherBackgroundImage6:
+  homeAccent: '#59c8ff',
+  homeHairline: 'rgba(255,255,255,.12)',
+  homeFill: 'rgba(255,255,255,.09)',
+  homeInk: '#111',
+  // itunes
+  // mail
+  // maps
+  mapsLand: '#f2efe9',
+  mapsPanel: 'rgba(246,246,248,.82)',
+  mapsCard: 'rgba(255,255,255,.96)',
+  mapsControl: 'rgba(255,255,255,.86)',
+  mapsField: 'rgba(118,118,128,.12)',
+  mapsHairline: 'rgba(60,60,67,.13)',
+  mapsHover: 'rgba(120,120,128,.1)',
+  mapsSelected: 'rgba(0,136,255,.14)',
+  /** Map labels sit on the tiles behind a halo instead of a plate: white over the light map, black over imagery. */
+  mapsLabelHalo: '0 0 3px #fff,0 0 6px #fff,0 0 10px #fff',
+  mapsLabelHaloDark: '0 0 3px rgba(0,0,0,.9),0 1px 6px rgba(0,0,0,.7)',
+  mapsDotRing: '0 0 0 2.5px #fff,0 1px 6px rgba(0,0,0,.35)',
+  /** Apple's brown for landmark and museum pins. */
+  mapsBrown: '#a2845e',
+  // memos
+  memosFill: 'rgba(255,255,255,.07)',
+  // messages
+  messagesBubble: 'linear-gradient(#2ca5ff,#0088ff)',
+  messagesBubbleGrey: '#8a8a8e',
+  messagesBar: 'rgba(249,249,249,.94)',
+  messagesBarEdge: '#d7d7dc',
+  // music
+  musicLabel: 'rgba(255,255,255,.92)',
+  musicFill: 'rgba(255,255,255,.2)',
+  musicFillStrong: 'rgba(255,255,255,.85)',
+  musicFillFaint: 'rgba(255,255,255,.06)',
+  musicHairline: 'rgba(255,255,255,.08)',
+  // news
+  newsHairline: 'rgba(60,60,67,.12)',
+  // notes
+  notesMuted: '#c8c9cd',
+  notesRed: '#e8453c',
+  notesTan: '#c99a5b',
+  notesInk: '#2c2c2e',
+  notesPaper: '#ffffff',
+  notesHairline: 'rgba(255,255,255,.11)',
+  notesYellow: '#e2b93b',
+  // phone
+  phoneKey: 'rgba(255,255,255,.4)',
+  phoneDial: 'linear-gradient(#3a3a3c,#101012)',
+  phoneKeyDark: '#5a5a5e',
+  phoneKeyRim: 'rgba(255,255,255,.45)',
+  phoneKeyFaint: 'rgba(255,255,255,.16)',
+  // photos
+  photosSidebar: '#ececec',
+  photosSidebarBorder: 'rgba(0,0,0,.1)',
+  photosSelection: 'rgba(0,0,0,.08)',
+  photosControl: 'rgba(0,0,0,.055)',
+  photosViewer: 'rgba(0,0,0,.94)',
+  // podcasts
+  /** The scrub track inside the mini player's dark bar. */
+  podcastsTrack: 'rgba(255,255,255,.2)',
+  podcastsBar: 'rgba(28,28,30,.92)',
+  podcastsBarEdge: 'rgba(255,255,255,.1)',
+  // preview
+  previewFill: 'rgba(60,60,67,.08)',
+  // reminders
+  // safari
+  // settings
+  /** Flappy Duo's deletion-fee sheet: the scrim behind it, its own light material and ink, and the card chip. */
+  settingsScrim: 'rgba(0,0,0,.35)',
+  settingsPaySheet: 'rgba(255,255,255,.96)',
+  settingsPayInk: '#0b1a3a',
+  settingsPayCard:
+    'linear-gradient(115deg, rgba(255,140,200,.35), rgba(140,200,255,.35) 45%, rgba(255,230,140,.35) 80%), linear-gradient(135deg, #ffffff, #dcdce1 60%, #f2f2f5)',
+  // shortcuts
+  /** The scrim that dims a shortcut tile while it runs. */
+  shortcutsScrim: 'rgba(0,0,0,.45)',
+  // siri
+  siriSky: 'radial-gradient(120% 70% at 50% 110%,#2a1b4d,#000)',
+  siriOrb: 'conic-gradient(#0091ff,#db34f2,#ff375f,#ff9230,#30d158,#0091ff)',
+  siriOrbGlow: '0 0 52px rgba(120,90,255,.6),inset -10px -14px 34px rgba(0,0,0,.45)',
+  siriOrbSheen: 'radial-gradient(70% 60% at 32% 26%,rgba(255,255,255,.6),rgba(255,255,255,0) 70%)',
+  siriOrbSpark: 'radial-gradient(16% 14% at 34% 24%,rgba(255,255,255,.95),rgba(255,255,255,0) 100%)',
+  // stocks
+  // tips
+  tipsWarm: 'linear-gradient(140deg,#ff9230,#ff375f)',
+  tipsCool: 'linear-gradient(140deg,#0091ff,#6d7cff)',
+  tipsGreen: 'linear-gradient(140deg,#34c759,#00c8b3)',
+  tipsPink: 'linear-gradient(140deg,#db34f2,#ff2d55)',
+  tipsYellow: 'linear-gradient(140deg,#ffd600,#ff9230)',
+  // tv
+  tvScrim: 'rgba(0,0,0,.55)',
+  // wallet
+  /** The scrim the Apple Pay sheet drops over the card stack. */
+  walletScrim: 'rgba(0,0,0,.55)',
+  walletAppleCard: 'linear-gradient(150deg,#f5f5f7,#c9c9ce)',
+  walletTransit: 'linear-gradient(150deg,#0091ff,#6d7cff)',
+  walletBadge: 'linear-gradient(150deg,#1c1c1e,#3a3a3c)',
+  walletPass: 'linear-gradient(150deg,#ff375f,#ff9230)',
+  // watch
+  watchCase: '0 0 0 5px #6e6e73,0 16px 34px rgba(0,0,0,.45)',
+  // weather
+  weatherStars:
+    'radial-gradient(1px 1px at 15% 12%,#fff,transparent),radial-gradient(1px 1px at 70% 20%,#fff,transparent),radial-gradient(1.5px 1.5px at 88% 30%,#fff,transparent),radial-gradient(1px 1px at 40% 30%,#fff,transparent),radial-gradient(1px 1px at 55% 8%,#fff,transparent),radial-gradient(1px 1px at 30% 42%,#fff,transparent)',
+  /** The ring around a temperature-range marker, a border drawn as an outline. */
+  weatherMarkerRing: 'rgba(0,0,0,.35)',
+  weatherNight: '#172c47',
+  weatherSun: '#ffe6a0',
+  weatherRain: '#a2e1ff',
+  weatherScrollThumb: 'rgba(235,247,255,.42)',
+  weatherScrollHover: 'rgba(245,251,255,.65)',
+  weatherScrollActive: 'rgba(255,255,255,.82)',
+  weatherScrollTrack: 'rgba(10,30,50,.1)',
+  weatherScrollRim: 'rgba(255,255,255,.28)',
+  weatherHaze:
     'radial-gradient(ellipse 40% 13% at 16% 17%,rgba(227,236,246,.7),transparent),radial-gradient(ellipse 55% 18% at 90% 35%,rgba(227,236,246,.55),transparent)',
-  weatherAnimationTimingFunction: 'ease-in-out',
-  weatherBackgroundColor2: 'rgba(255,255,255,.32)',
-  weatherOutlineColor: 'rgba(255,255,255,.8)',
-  weatherFontSize: '96px',
-  weatherFontWeight: 200,
-  weatherTextShadow2: '0 4px 24px rgba(0,20,50,.22)',
-  weatherFontSize2: '11.5px',
-  weatherColor: 'rgba(255,255,255,.62)',
-  weatherBoxShadow4:
-    'inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 0.5px rgba(255,255,255,.3),0 12px 32px rgba(6,20,40,.2)',
-  weatherBoxShadow5:
-    'inset 0 1px 0 rgba(255,255,255,.55),inset 0 0 0 1.5px rgba(255,255,255,.7),0 10px 30px rgba(6,20,40,.16)',
-  weatherFontSize3: '50px',
-  weatherBackgroundColor3: 'rgba(12,26,48,.78)',
-  weatherBackgroundImage9: 'linear-gradient(#377aaf,#20395b)',
+  weatherChip: 'rgba(255,255,255,.32)',
+  weatherOutline: 'rgba(255,255,255,.8)',
+  weatherMuted: 'rgba(255,255,255,.62)',
+  weatherDeep: 'rgba(12,26,48,.78)',
+  weatherDusk: 'linear-gradient(#377aaf,#20395b)',
   // Sky scenes, one per condition family. The hero, list cards and widget share them.
   weatherSceneClear: 'linear-gradient(180deg,#2a67b8 0%,#5f9fdc 55%,#9cc7ec 100%)',
   weatherSceneNight: 'linear-gradient(180deg,#0a1730 0%,#1b3355 60%,#3a5a80 100%)',
@@ -405,30 +539,6 @@ export const appAppearance = stylex.defineConsts({
   weatherDot: 'rgba(255,255,255,.45)',
   weatherBottomBar: 'rgba(15,35,65,.55)',
   weatherMenu: 'rgba(30,50,80,.92)',
-  weatherMarker: '0 0 0 2px rgba(0,0,0,.35)',
-  weatherLinear: 'linear',
-  findmyBoxShadow: '0 2px 8px rgba(0,0,0,.4)',
-  findmyBackgroundColor: 'rgba(10,124,255,.35)',
-  findmyBackgroundColor2: '#eaf3ff',
-  remindersTransitionTimingFunction: 'cubic-bezier(.2,1.5,.4,1)',
-  /** Apple Maps: the land tone a tile paints over, the sidebar material and the floating card. */
-  mapsLand: '#f2efe9',
-  mapsPanel: 'rgba(246,246,248,.82)',
-  mapsCard: 'rgba(255,255,255,.96)',
-  mapsControl: 'rgba(255,255,255,.86)',
-  mapsField: 'rgba(118,118,128,.12)',
-  mapsHairline: 'rgba(60,60,67,.13)',
-  mapsHover: 'rgba(120,120,128,.1)',
-  mapsSelected: 'rgba(10,124,255,.14)',
-  mapsShadow: '0 8px 30px rgba(0,0,0,.18)',
-  mapsControlShadow: '0 1px 4px rgba(0,0,0,.2)',
-  mapsPinShadow: '0 1px 3px rgba(0,0,0,.3)',
-  mapsMarkerShadow: '0 3px 10px rgba(0,0,0,.35)',
-  /** Map labels sit on the tiles behind a halo instead of a plate: white over the light map, black over imagery. */
-  mapsLabelShadow: '0 0 3px #fff,0 0 6px #fff,0 0 10px #fff',
-  mapsLabelShadowDark: '0 0 3px rgba(0,0,0,.9),0 1px 6px rgba(0,0,0,.7)',
-  mapsDotShadow: '0 0 0 2.5px #fff,0 1px 6px rgba(0,0,0,.35)',
-  /** Apple's brown for landmark and museum pins. */
-  mapsBrown: '#a2845e',
-  mapsBorderRadius: '12px'
+  // youtube
+  youtubeMuted: '#aaa'
 })

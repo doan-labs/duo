@@ -1,4 +1,16 @@
-import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  easing,
+  glass,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const drift = stylex.keyframes({ from: { transform: 'translateX(-4%)' }, to: { transform: 'translateX(4%)' } })
@@ -20,22 +32,22 @@ const spin = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
 // Every card is the same tinted glass: a translucent blue over a blurred sky, a
 // half-pixel hairline and a 1px top highlight. Headers are quiet and separated
 // from the body by a hairline, as in the real app.
-const blur = 'blur(24px) saturate(160%)'
 const wide = '@container (min-width: 600px)'
-const motion = '@media (prefers-reduced-motion: reduce)'
+const reduce = '@media (prefers-reduced-motion: reduce)'
+const pressed = `${motion.pressDuration}, .2s`
 
 export const styles = stylex.create({
   scrollbar: {
     scrollbarWidth: { default: 'auto', '@supports not selector(::-webkit-scrollbar)': 'thin' },
     scrollbarColor: {
       default: 'auto',
-      '@supports not selector(::-webkit-scrollbar)': `${colors.weatherScrollThumb} ${colors.weatherScrollTrack}`
+      '@supports not selector(::-webkit-scrollbar)': `${appAppearance.weatherScrollThumb} ${appAppearance.weatherScrollTrack}`
     },
     '::-webkit-scrollbar': { width: 10, height: 10, backgroundColor: 'transparent' },
     '::-webkit-scrollbar-track': {
-      backgroundColor: colors.weatherScrollTrack,
+      backgroundColor: appAppearance.weatherScrollTrack,
       backgroundClip: 'padding-box',
-      borderRadius: appAppearance.weatherBorderRadius,
+      borderRadius: radius.pill,
       borderWidth: 2,
       borderStyle: 'solid',
       borderColor: 'transparent',
@@ -44,12 +56,12 @@ export const styles = stylex.create({
     },
     '::-webkit-scrollbar-thumb': {
       backgroundColor: {
-        default: colors.weatherScrollThumb,
-        ':hover': colors.weatherScrollHover,
-        ':active': colors.weatherScrollActive
+        default: appAppearance.weatherScrollThumb,
+        ':hover': appAppearance.weatherScrollHover,
+        ':active': appAppearance.weatherScrollActive
       },
       backgroundClip: 'padding-box',
-      borderRadius: appAppearance.weatherBorderRadius,
+      borderRadius: radius.pill,
       borderWidth: 2,
       borderStyle: 'solid',
       borderColor: 'transparent',
@@ -68,8 +80,8 @@ export const styles = stylex.create({
     overflow: 'hidden',
     color: colors.white,
     containerType: 'inline-size',
-    backgroundColor: colors.weatherNight,
-    textShadow: appAppearance.weatherTextShadow
+    backgroundColor: appAppearance.weatherNight,
+    textShadow: shadow.text
   },
 
   // Sky scenes. The root paints the gradient; layers add glare, stars, clouds or precipitation.
@@ -84,19 +96,16 @@ export const styles = stylex.create({
   layer: { pointerEvents: 'none', position: 'absolute', inset: 0 },
   glare: { backgroundImage: appAppearance.weatherGlare },
   moon: { backgroundImage: appAppearance.weatherMoonGlow },
-  stars: {
-    backgroundImage:
-      'radial-gradient(1px 1px at 15% 12%,white,transparent),radial-gradient(1px 1px at 70% 20%,white,transparent),radial-gradient(1.5px 1.5px at 88% 30%,white,transparent),radial-gradient(1px 1px at 40% 30%,white,transparent),radial-gradient(1px 1px at 55% 8%,white,transparent),radial-gradient(1px 1px at 30% 42%,white,transparent)'
-  },
+  stars: { backgroundImage: appAppearance.weatherStars },
   clouds: {
     inset: '-10%',
     opacity: 0.35,
-    backgroundImage: appAppearance.weatherBackgroundImage6,
-    animationName: { default: drift, [motion]: 'none' },
+    backgroundImage: appAppearance.weatherHaze,
+    animationName: { default: drift, [reduce]: 'none' },
     animationDuration: '28s',
     animationDirection: 'alternate',
     animationIterationCount: 'infinite',
-    animationTimingFunction: appAppearance.weatherAnimationTimingFunction
+    animationTimingFunction: easing.inOut
   },
   cloudsBack: { animationDuration: '44s', animationDirection: 'alternate-reverse', opacity: 0.22, top: '18%' },
   streaks: {
@@ -106,15 +115,15 @@ export const styles = stylex.create({
     backgroundImage: appAppearance.weatherRainStreaks,
     backgroundSize: '3px 60px, 2px 75px',
     backgroundPosition: '0 0, 17px 20px',
-    animationName: { default: fall, [motion]: 'none' },
+    animationName: { default: fall, [reduce]: 'none' },
     animationDuration: '.9s',
-    animationTimingFunction: appAppearance.weatherLinear,
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
   },
   heavy: { opacity: 0.7, animationDuration: '.6s' },
   lightning: {
     backgroundColor: colors.white,
-    animationName: { default: flash, [motion]: 'none' },
+    animationName: { default: flash, [reduce]: 'none' },
     animationDuration: '9s',
     animationIterationCount: 'infinite'
   },
@@ -123,19 +132,19 @@ export const styles = stylex.create({
     opacity: 0.85,
     backgroundImage: appAppearance.weatherSnowFlakes,
     backgroundSize: '70px 70px, 110px 110px, 160px 160px',
-    animationName: { default: snowfall, [motion]: 'none' },
+    animationName: { default: snowfall, [reduce]: 'none' },
     animationDuration: '18s',
-    animationTimingFunction: appAppearance.weatherLinear,
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
   },
   bands: {
     inset: '-10%',
     backgroundImage: appAppearance.weatherFogBands,
-    animationName: { default: drift, [motion]: 'none' },
+    animationName: { default: drift, [reduce]: 'none' },
     animationDuration: '36s',
     animationDirection: 'alternate',
     animationIterationCount: 'infinite',
-    animationTimingFunction: appAppearance.weatherAnimationTimingFunction
+    animationTimingFunction: easing.inOut
   },
 
   // Bars. Weather is an `edge` app: the status stack sits over the top padding.
@@ -163,8 +172,8 @@ export const styles = stylex.create({
     paddingBlock: 10,
     flexShrink: 0,
     backgroundColor: appAppearance.weatherBottomBar,
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     boxShadow: `inset 0 0.5px 0 ${appAppearance.weatherHairline}`
   },
   dots: { display: 'flex', alignItems: 'center', gap: 4 },
@@ -176,15 +185,15 @@ export const styles = stylex.create({
     padding: 0,
     color: appAppearance.weatherDot,
     cursor: 'pointer',
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.circle,
     outlineWidth: { default: 0, ':focus-visible': 2 },
     outlineStyle: 'solid',
-    outlineColor: appAppearance.weatherOutlineColor,
+    outlineColor: appAppearance.weatherOutline,
     '::before': {
       content: '""',
       width: 6,
       height: 6,
-      borderRadius: appAppearance.weatherBorderRadius,
+      borderRadius: radius.circle,
       backgroundColor: 'currentColor'
     }
   },
@@ -200,39 +209,41 @@ export const styles = stylex.create({
     height: 36,
     minWidth: 36,
     paddingInline: 0,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.pill,
     color: colors.white,
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.calendarFontWeight,
-    textShadow: 'none',
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.regular,
+    textShadow: null,
     whiteSpace: 'nowrap',
     backgroundColor: {
       default: appAppearance.weatherControl,
       ':hover': appAppearance.weatherControlHover,
-      ':active': appAppearance.weatherBackgroundColor2
+      ':active': appAppearance.weatherChip
     },
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     boxShadow: appAppearance.weatherCardRim,
     outlineWidth: { default: 0, ':focus-visible': 2 },
     outlineStyle: 'solid',
-    outlineColor: appAppearance.weatherOutlineColor,
+    outlineColor: appAppearance.weatherOutline,
     outlineOffset: 2,
-    opacity: { default: 1, ':disabled': 0.45 },
+    // A refreshing control keeps its glass; the spinning glyph is the state.
     cursor: { default: 'pointer', ':disabled': 'default' },
     transitionProperty: 'transform, background-color',
-    transitionDuration: '.15s, .2s',
-    transform: { default: null, ':active': 'scale(.94)' }
+    transitionDuration: pressed,
+    transform: { default: null, ':active': motion.press }
   },
   /** Text pill: Back, Retry, Use Current Location. */
   pill: { paddingInline: 14 },
-  plain: { backgroundColor: 'transparent', boxShadow: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none' },
+  plain: { backgroundColor: 'transparent', boxShadow: null, backdropFilter: null, WebkitBackdropFilter: null },
   spin: {
     display: 'grid',
     placeItems: 'center',
     animationName: spin,
     animationDuration: '1s',
-    animationTimingFunction: appAppearance.musicTransitionTimingFunction,
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
   },
 
@@ -250,55 +261,72 @@ export const styles = stylex.create({
     textAlign: 'center',
     paddingTop: { default: 22, [wide]: 12 },
     paddingBottom: { default: 44, [wide]: 30 },
-    fontWeight: appAppearance.calendarFontWeight
+    fontWeight: weight.regular
   },
   eyebrow: {
-    fontSize: appAppearance.musicFontSize6,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    // Uppercase region name: the footnote's own negative tracking closes it up,
+    // so this one opens out instead.
     letterSpacing: 1,
     opacity: 0.85
   },
   city: {
-    fontSize: appAppearance.shortcutsFontSize,
-    fontWeight: appAppearance.calendarFontWeight,
-    lineHeight: 1.15,
+    fontSize: typeScale.largeTitle,
+    lineHeight: leading.largeTitle,
+    letterSpacing: tracking.largeTitle,
+    fontWeight: weight.regular,
     marginTop: 0,
-    marginBottom: 0,
-    letterSpacing: -0.3
+    marginBottom: 0
   },
   temperature: {
-    fontSize: appAppearance.weatherFontSize,
-    lineHeight: 1.05,
+    fontSize: typeScale.displayXxl,
+    lineHeight: 1,
     letterSpacing: -2,
-    fontWeight: appAppearance.weatherFontWeight,
+    fontWeight: weight.thin,
     paddingLeft: 22,
-    textShadow: appAppearance.weatherTextShadow2
+    textShadow: shadow.text
   },
-  condition: { fontSize: appAppearance.podcastsFontSize, lineHeight: 1.3, opacity: 0.95 },
+  condition: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    opacity: 0.95
+  },
   highLow: {
     display: 'flex',
     justifyContent: 'center',
     gap: 10,
-    fontSize: appAppearance.podcastsFontSize,
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
     marginTop: 2
   },
-  localTime: { fontSize: appAppearance.musicFontSize6, opacity: 0.75, marginTop: 8 },
+  localTime: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    opacity: 0.75,
+    marginTop: 8
+  },
 
   card: {
     position: 'relative',
-    borderRadius: appAppearance.calendarFontSize2,
+    borderRadius: radius.lg,
     paddingInline: 14,
     paddingBlock: 12,
     marginBottom: 10,
     minWidth: 0,
     color: colors.white,
     backgroundColor: appAppearance.weatherCard,
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     boxShadow: appAppearance.weatherCardRim
   },
   summary: {
-    fontSize: appAppearance.musicFontSize,
-    lineHeight: 1.4,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
     paddingBottom: 12,
     marginBottom: 4,
     borderBottomWidth: 0.5,
@@ -309,9 +337,11 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: 5,
-    fontSize: appAppearance.calendarFontSize2,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: 0.4,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    // Uppercase card header, same opened-out tracking as `eyebrow`.
+    letterSpacing: 1,
+    fontWeight: weight.semibold,
     textTransform: 'uppercase',
     opacity: 0.6,
     marginTop: 0,
@@ -342,27 +372,34 @@ export const styles = stylex.create({
     minWidth: 54,
     paddingBlock: 8,
     paddingInline: 4,
-    borderRadius: appAppearance.calendarFontSize2,
+    borderRadius: radius.lg,
     color: colors.white,
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     cursor: 'pointer',
     backgroundColor: { default: 'transparent', ':hover': appAppearance.weatherControl },
     transitionProperty: 'transform, background-color',
-    transitionDuration: '.15s, .2s',
-    transform: { default: null, ':active': 'scale(.94)' }
+    transitionDuration: pressed,
+    transform: { default: null, ':active': motion.press }
   },
   hourIcon: { display: 'grid', placeItems: 'center', height: 40, color: colors.white },
-  sunColor: { color: colors.weatherSun },
-  rainColor: { color: colors.weatherRain },
+  sunColor: { color: appAppearance.weatherSun },
+  rainColor: { color: appAppearance.weatherRain },
   chance: {
-    fontSize: appAppearance.musicFontSize3,
-    color: colors.weatherRain,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.caption2,
+    color: appAppearance.weatherRain,
+    fontWeight: weight.semibold,
     lineHeight: 1,
     marginTop: -4
   },
-  hourEvent: { fontSize: appAppearance.musicFontSize6, fontWeight: appAppearance.musicFontWeight2 },
+  hourEvent: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
+  },
 
   // Wide: four columns, the ten-day card takes the left half for three rows and
   // the tiles flow around it, then continue full width below, as on iPad.
@@ -387,10 +424,12 @@ export const styles = stylex.create({
     marginInline: -8,
     paddingInline: 8,
     minHeight: 46,
-    borderRadius: appAppearance.calendarFontSize2,
+    borderRadius: radius.lg,
     color: colors.white,
-    fontSize: appAppearance.podcastsFontSize,
-    fontWeight: appAppearance.musicFontWeight3,
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.medium,
     textAlign: 'left',
     borderTopWidth: { default: 0.5, ':first-of-type': 0 },
     borderTopStyle: 'solid',
@@ -405,7 +444,7 @@ export const styles = stylex.create({
   track: {
     position: 'relative',
     height: 5,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.pill,
     backgroundColor: appAppearance.weatherBarTrack,
     overflow: 'visible'
   },
@@ -416,20 +455,24 @@ export const styles = stylex.create({
     height: '100%',
     left: `${left}%`,
     width: `${width}%`,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.pill,
     backgroundImage: appAppearance.weatherBar,
     backgroundSize: `${10000 / width}% 100%`,
     backgroundPosition: `${width >= 100 ? 0 : (left / (100 - width)) * 100}% 0`
   }),
+  // The ring around the marker is a solid border, so it is drawn as an outline
+  // rather than a shadow: the scale has no ring shadow and should not grow one.
   marker: (left: number) => ({
     position: 'absolute',
     top: -1,
     left: `calc(${left}% - 3.5px)`,
     width: 7,
     height: 7,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.circle,
     backgroundColor: colors.white,
-    boxShadow: appAppearance.weatherMarker
+    outlineWidth: 2,
+    outlineStyle: 'solid',
+    outlineColor: appAppearance.weatherMarkerRing
   }),
 
   tiles: { display: { default: 'grid', [wide]: 'contents' }, gridTemplateColumns: '1fr 1fr', gap: 10 },
@@ -442,17 +485,18 @@ export const styles = stylex.create({
   },
   tileWide: { gridColumn: { default: '1 / -1', [wide]: 'span 2' }, aspectRatio: 'auto' },
   tileValue: {
-    fontSize: appAppearance.stocksFontSize,
-    fontWeight: appAppearance.calendarFontWeight,
-    lineHeight: 1.15,
-    letterSpacing: -0.5,
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.regular,
     marginTop: 8
   },
-  tileSub: { fontSize: appAppearance.podcastsFontSize, lineHeight: 1.2 },
+  tileSub: { fontSize: typeScale.title3, lineHeight: leading.title3, letterSpacing: tracking.title3 },
   tileBody: { flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 0 },
   tileNote: {
-    fontSize: appAppearance.musicFontSize6,
-    lineHeight: 1.35,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     marginBottom: 0,
     marginTop: 'auto',
     paddingTop: 8
@@ -461,7 +505,7 @@ export const styles = stylex.create({
     position: 'relative',
     height: 5,
     marginTop: 10,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.pill,
     backgroundImage: image,
     '::after': {
       content: '""',
@@ -470,9 +514,11 @@ export const styles = stylex.create({
       left: `calc(${position}% - 3.5px)`,
       width: 7,
       height: 7,
-      borderRadius: appAppearance.weatherBorderRadius,
+      borderRadius: radius.circle,
       backgroundColor: colors.white,
-      boxShadow: appAppearance.weatherMarker
+      outlineWidth: 2,
+      outlineStyle: 'solid',
+      outlineColor: appAppearance.weatherMarkerRing
     }
   }),
   gauge: { display: 'block', width: '100%', height: 'auto', maxHeight: 96, marginTop: 6, overflow: 'visible' },
@@ -481,25 +527,32 @@ export const styles = stylex.create({
   fill: { fill: colors.white },
   svgText: {
     fill: colors.white,
-    fontSize: appAppearance.calendarFontSize4,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.caption2,
+    fontWeight: weight.semibold,
     opacity: 0.8
   },
-  compassValue: { fontSize: appAppearance.podcastsFontSize, fontWeight: appAppearance.musicFontWeight3, opacity: 1 },
+  compassValue: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.medium,
+    opacity: 1
+  },
   bars: { display: 'flex', alignItems: 'flex-end', gap: 2, height: 56, marginTop: 8 },
   bar: (height: number) => ({
     flexGrow: 1,
     minHeight: 2,
     height: `${height}%`,
-    borderRadius: appAppearance.weatherBorderRadius,
-    backgroundColor: colors.weatherRain,
+    borderRadius: radius.pill,
+    backgroundColor: appAppearance.weatherRain,
     opacity: height > 3 ? 1 : 0.4
   }),
 
   footnote: {
-    fontSize: appAppearance.weatherFontSize2,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     opacity: 0.7,
-    lineHeight: 1.7,
     textAlign: 'center',
     marginBlock: 18
   },
@@ -510,8 +563,9 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    fontSize: appAppearance.musicFontSize6,
-    lineHeight: 1.5,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     paddingBlock: 8,
     paddingLeft: 14,
     paddingRight: 8
@@ -526,9 +580,10 @@ export const styles = stylex.create({
     marginBottom: 12
   },
   listTitle: {
-    fontSize: appAppearance.shortcutsFontSize,
-    fontWeight: appAppearance.musicFontWeight,
-    letterSpacing: -0.6,
+    fontSize: typeScale.largeTitle,
+    lineHeight: leading.largeTitle,
+    letterSpacing: tracking.largeTitle,
+    fontWeight: weight.bold,
     margin: 0
   },
   menuWrap: { position: 'relative' },
@@ -539,11 +594,11 @@ export const styles = stylex.create({
     zIndex: 3,
     minWidth: 190,
     padding: 6,
-    borderRadius: appAppearance.calendarFontSize,
+    borderRadius: radius.xl,
     backgroundColor: appAppearance.weatherMenu,
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
-    boxShadow: `${appAppearance.weatherCardRim},${appAppearance.weatherShadowLarge}`
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    boxShadow: `${appAppearance.weatherCardRim},${shadow.float}`
   },
   menuItem: {
     display: 'flex',
@@ -553,9 +608,11 @@ export const styles = stylex.create({
     gap: 12,
     paddingBlock: 9,
     paddingInline: 10,
-    borderRadius: appAppearance.calendarFontSize4,
+    borderRadius: radius.md,
     color: colors.white,
-    fontSize: appAppearance.musicFontSize,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
     textAlign: 'left',
     cursor: 'pointer',
     backgroundColor: { default: 'transparent', ':hover': appAppearance.weatherControl }
@@ -577,18 +634,28 @@ export const styles = stylex.create({
     paddingLeft: 36,
     paddingRight: 14,
     borderWidth: 0,
-    borderRadius: appAppearance.calendarFontSize4,
+    borderRadius: radius.md,
     appearance: 'none',
     color: colors.white,
-    fontSize: appAppearance.messagesFontSize,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
     backgroundColor: { default: appAppearance.weatherBarTrack, ':focus': appAppearance.weatherControl },
     outlineStyle: 'none',
     transitionProperty: 'background-color',
     transitionDuration: '.2s',
-    '::placeholder': { color: appAppearance.weatherColor },
+    '::placeholder': { color: appAppearance.weatherMuted },
     '::-webkit-search-cancel-button': { display: 'none' }
   },
-  message: { fontSize: appAppearance.musicFontSize6, minHeight: 20, marginTop: 0, marginBottom: 10, opacity: 0.85 },
+  message: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    minHeight: 20,
+    marginTop: 0,
+    marginBottom: 10,
+    opacity: 0.85
+  },
   result: {
     display: 'flex',
     flexDirection: 'column',
@@ -601,18 +668,25 @@ export const styles = stylex.create({
     paddingLeft: 14,
     paddingRight: 52,
     marginBottom: 8,
-    borderRadius: appAppearance.calendarFontSize,
-    fontSize: appAppearance.musicFontSize6,
+    borderRadius: radius.xl,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     backgroundColor: { default: appAppearance.weatherCard, ':hover': appAppearance.weatherControlHover },
-    backdropFilter: blur,
-    WebkitBackdropFilter: blur,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     boxShadow: appAppearance.weatherCardRim,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',
-    transitionDuration: '.15s, .2s',
-    transform: { default: null, ':active': 'scale(.985)' }
+    transitionDuration: pressed,
+    transform: { default: null, ':active': motion.press }
   },
-  resultName: { fontSize: appAppearance.messagesFontSize, fontWeight: appAppearance.musicFontWeight2 },
+  resultName: {
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    letterSpacing: tracking.headline,
+    fontWeight: weight.semibold
+  },
   add: {
     position: 'absolute',
     right: 12,
@@ -620,7 +694,7 @@ export const styles = stylex.create({
     transform: 'translateY(-50%)',
     width: 28,
     height: 28,
-    borderRadius: appAppearance.weatherBorderRadius,
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
     backgroundColor: appAppearance.weatherControl
@@ -628,19 +702,26 @@ export const styles = stylex.create({
   /** A saved city: its own sky, name and time left, temperature right, condition and range below. */
   location: {
     position: 'relative',
-    borderRadius: appAppearance.calendarFontSize,
+    borderRadius: radius.xl,
     marginBottom: 10,
     overflow: 'hidden',
-    backgroundColor: colors.weatherNight,
+    backgroundColor: appAppearance.weatherNight,
     boxShadow: {
-      default: `${appAppearance.weatherCardRim},${appAppearance.weatherShadowCard}`,
-      ':hover': appAppearance.weatherBoxShadow4
+      default: `${appAppearance.weatherCardRim},${shadow.card}`,
+      ':hover': `${shadow.rim},${shadow.float}`
     },
     transitionProperty: 'transform, box-shadow',
     transitionDuration: '.2s',
-    transform: { default: null, ':active': 'scale(.985)' }
+    transform: { default: null, ':active': motion.press }
   },
-  locationSelected: { boxShadow: appAppearance.weatherBoxShadow5 },
+  // Selection is a ring, so it is an outline; the card keeps its glass rim.
+  locationSelected: {
+    boxShadow: `${shadow.rim},${shadow.float}`,
+    outlineWidth: 2,
+    outlineStyle: 'solid',
+    outlineColor: appAppearance.weatherOutline,
+    outlineOffset: -2
+  },
   locationMain: {
     position: 'relative',
     display: 'grid',
@@ -657,25 +738,38 @@ export const styles = stylex.create({
     paddingLeft: 16,
     paddingRight: 16,
     cursor: 'pointer',
-    fontSize: appAppearance.musicFontSize6
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
   locationName: {
-    fontSize: appAppearance.appstoreFontSize,
-    fontWeight: appAppearance.musicFontWeight2,
-    letterSpacing: -0.3,
-    lineHeight: 1.15
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.semibold
   },
-  locationTime: { fontSize: appAppearance.musicFontSize6, opacity: 0.9 },
-  locationCondition: { alignSelf: 'end', fontSize: appAppearance.musicFontSize6, opacity: 0.95 },
+  locationTime: { fontSize: typeScale.footnote, lineHeight: leading.footnote, opacity: 0.9 },
+  locationCondition: {
+    alignSelf: 'end',
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    opacity: 0.95
+  },
   locationTemp: {
     gridRow: '1 / 3',
     gridColumn: 2,
-    fontSize: appAppearance.weatherFontSize3,
-    fontWeight: appAppearance.weatherFontWeight,
+    fontSize: typeScale.display,
+    fontWeight: weight.thin,
     lineHeight: 1,
     letterSpacing: -1.5
   },
-  locationRange: { gridColumn: 2, alignSelf: 'end', justifySelf: 'end', fontSize: appAppearance.musicFontSize6 },
+  locationRange: {
+    gridColumn: 2,
+    alignSelf: 'end',
+    justifySelf: 'end',
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote
+  },
   remove: {
     position: 'absolute',
     top: 8,
@@ -691,16 +785,18 @@ export const styles = stylex.create({
     zIndex: 4,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: appAppearance.weatherBackgroundColor3,
-    backdropFilter: 'blur(30px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(30px) saturate(160%)',
-    animationName: { default: lift, [motion]: 'none' },
+    backgroundColor: appAppearance.weatherDeep,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    animationName: { default: lift, [reduce]: 'none' },
     animationDuration: '.36s',
     animationTimingFunction: easing.pop
   },
   sheetTitle: {
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     textAlign: 'center'
   },
   detailTitle: {
@@ -708,12 +804,19 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    fontSize: appAppearance.stocksFontSize,
-    fontWeight: appAppearance.calendarFontWeight,
-    letterSpacing: -0.3,
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.regular,
     marginTop: 18
   },
-  detailSummary: { textAlign: 'center', fontSize: appAppearance.calendarFontSize, lineHeight: 1.7, opacity: 0.85 },
+  detailSummary: {
+    textAlign: 'center',
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    opacity: 0.85
+  },
   dayControls: { display: 'flex', justifyContent: 'space-between', marginBottom: 16 },
   detailRow: {
     display: 'grid',
@@ -721,7 +824,9 @@ export const styles = stylex.create({
     alignItems: 'center',
     gap: 8,
     minHeight: 44,
-    fontSize: appAppearance.musicFontSize6,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     borderTopWidth: 0.5,
     borderTopStyle: 'solid',
     borderTopColor: appAppearance.weatherHairline
@@ -730,13 +835,14 @@ export const styles = stylex.create({
   widget: {
     display: 'flex',
     flexDirection: 'column',
-    backgroundImage: appAppearance.weatherBackgroundImage9,
+    backgroundImage: appAppearance.weatherDusk,
     color: colors.white,
     textAlign: 'left'
   },
   widgetTemp: {
-    fontSize: appAppearance.shortcutsFontSize,
-    fontWeight: appAppearance.homeFontWeight,
+    fontSize: typeScale.largeTitle,
+    lineHeight: leading.largeTitle,
+    fontWeight: weight.thin,
     letterSpacing: -1
   },
   widgetFoot: { marginTop: 'auto' }

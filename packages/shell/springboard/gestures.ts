@@ -113,7 +113,7 @@ export function zoom(el: HTMLElement, from: Box, out: boolean, z: Box, start?: K
     transform: `translate(${from.x + from.w / 2 - (z.x + z.w / 2)}px,${from.y + from.h / 2 - (z.y + z.h / 2)}px) scale(${sc})`,
     borderRadius: `${14 / sc}px`
   }
-  const big = start ?? { transform: 'none', borderRadius: '0px' }
+  const big = start ?? { transform: 'none', borderRadius: 0 }
   const frames: Keyframe[] = out
     ? [
         { ...big, opacity: 1 },

@@ -1,4 +1,14 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const wide = '@container (min-width: 600px)'
@@ -11,9 +21,11 @@ export const styles = stylex.create({
     minHeight: 0,
     overflow: 'hidden',
     containerType: 'inline-size',
-    backgroundColor: colors.white,
-    color: colors.black,
-    fontSize: appAppearance.photosFontSize
+    backgroundColor: app.surface,
+    color: app.fg,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
   // StyleX drops a property for a `null` condition instead of overriding it, so both values are explicit.
   wideOnly: { display: { default: 'none', [wide]: 'flex' } },
@@ -26,13 +38,13 @@ export const styles = stylex.create({
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: appAppearance.photosSidebarBackgroundColor,
+    backgroundColor: appAppearance.photosSidebar,
     borderRightWidth: 1,
     borderRightStyle: 'solid',
-    borderRightColor: appAppearance.photosSidebarBorderColor
+    borderRightColor: appAppearance.photosSidebarBorder
   },
   overlay: { position: 'absolute', inset: 0, right: 'auto', zIndex: 3 },
-  scrim: { position: 'absolute', inset: 0, zIndex: 2, backgroundColor: appAppearance.photosSelectionBackgroundColor },
+  scrim: { position: 'absolute', inset: 0, zIndex: 2, backgroundColor: appAppearance.photosSelection },
   // The window runs under the status stack (`edge`), so each column pads its own top 40px.
   sideTop: {
     display: 'flex',
@@ -47,9 +59,11 @@ export const styles = stylex.create({
     paddingTop: 12,
     paddingBottom: 3,
     paddingInline: 8,
-    fontSize: appAppearance.photosFontSize2,
-    fontWeight: appAppearance.photosFontWeight,
-    color: colors.grey
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    color: app.label2
   },
   sideRow: {
     width: '100%',
@@ -58,24 +72,31 @@ export const styles = stylex.create({
     gap: 7,
     height: 26,
     paddingInline: 8,
-    borderRadius: appAppearance.photosBorderRadius,
-    color: colors.black,
+    borderRadius: radius.xs,
+    color: app.fg,
     textAlign: 'left',
     cursor: 'default'
   },
-  sideRowOn: { backgroundColor: appAppearance.photosSelectionBackgroundColor },
-  sideSym: { display: 'flex', width: 18, justifyContent: 'center', color: colors.blueBright },
+  sideRowOn: { backgroundColor: appAppearance.photosSelection },
+  sideSym: { display: 'flex', width: 18, justifyContent: 'center', color: app.link },
   sideName: { minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
-  sideLock: { display: 'flex', marginLeft: 'auto', color: colors.grey },
+  sideLock: { display: 'flex', marginLeft: 'auto', color: app.label2 },
 
   // ---- toolbar --------------------------------------------------------------
   main: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   bar: { display: 'flex', alignItems: 'center', gap: 12, height: 92, paddingTop: 40, paddingInline: 10, flexShrink: 0 },
-  heading: { flexShrink: 0, marginRight: 'auto', lineHeight: 1.2 },
-  title: { fontSize: appAppearance.photosFontSize3, fontWeight: appAppearance.photosFontWeight },
+  heading: { flexShrink: 0, marginRight: 'auto' },
+  title: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold
+  },
   subtitle: {
-    fontSize: appAppearance.photosFontSize2,
-    color: colors.grey,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: app.label2,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
@@ -84,8 +105,8 @@ export const styles = stylex.create({
     display: 'flex',
     flexShrink: 0,
     height: 22,
-    borderRadius: appAppearance.photosBorderRadius,
-    backgroundColor: appAppearance.photosControlBackgroundColor,
+    borderRadius: radius.xs,
+    backgroundColor: appAppearance.photosControl,
     overflow: 'hidden',
     marginLeft: 'auto'
   },
@@ -94,8 +115,8 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: { default: colors.black, ':disabled': colors.grey3 },
-    backgroundColor: { default: 'transparent', ':hover': appAppearance.photosSelectionBackgroundColor }
+    color: { default: app.fg, ':disabled': app.label3 },
+    backgroundColor: { default: 'transparent', ':hover': appAppearance.photosSelection }
   },
   segments: {
     display: 'flex',
@@ -104,21 +125,23 @@ export const styles = stylex.create({
     height: 22,
     marginLeft: 'auto',
     marginRight: 'auto',
-    borderRadius: appAppearance.photosBorderRadius2,
-    backgroundColor: appAppearance.photosControlBackgroundColor,
+    borderRadius: radius.sm,
+    backgroundColor: appAppearance.photosControl,
     flexShrink: 0
   },
   segment: {
     paddingInline: 8,
-    borderRadius: appAppearance.photosBorderRadius,
-    fontSize: appAppearance.photosFontSize2,
-    fontWeight: appAppearance.photosFontWeight2,
-    color: colors.black,
+    borderRadius: radius.xs,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.medium,
+    color: app.fg,
     whiteSpace: 'nowrap',
     transitionProperty: 'background-color, box-shadow',
     transitionDuration: '.15s'
   },
-  segmentOn: { backgroundColor: colors.white, boxShadow: appAppearance.photosSegmentBoxShadow },
+  segmentOn: { backgroundColor: app.control, boxShadow: shadow.card },
   actions: { display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' },
   tool: {
     width: 28,
@@ -127,11 +150,11 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    borderRadius: appAppearance.photosBorderRadius,
-    color: { default: colors.grey2, ':disabled': colors.grey3 },
-    backgroundColor: { default: 'transparent', ':hover': appAppearance.photosControlBackgroundColor }
+    borderRadius: radius.xs,
+    color: { default: app.label2, ':disabled': app.label3 },
+    backgroundColor: { default: 'transparent', ':hover': appAppearance.photosControl }
   },
-  divider: { width: 1, height: 16, marginInline: 4, backgroundColor: appAppearance.photosSidebarBorderColor },
+  divider: { width: 1, height: 16, marginInline: 4, backgroundColor: appAppearance.photosSidebarBorder },
   searchRow: { display: 'flex', alignItems: 'center', gap: 8, paddingInline: 10, paddingBottom: 6, flexShrink: 0 },
   search: {
     display: 'flex',
@@ -140,26 +163,30 @@ export const styles = stylex.create({
     flexGrow: 1,
     height: 24,
     paddingInline: 6,
-    borderRadius: appAppearance.photosBorderRadius2,
-    backgroundColor: appAppearance.photosControlBackgroundColor,
-    color: colors.grey
+    borderRadius: radius.sm,
+    backgroundColor: appAppearance.photosControl,
+    color: app.label2
   },
-  cancel: { color: colors.blueBright, fontSize: appAppearance.photosFontSize },
+  cancel: { color: app.link, fontSize: typeScale.footnote },
   searchIn: {
     flexGrow: 1,
     minWidth: 0,
     borderWidth: 0,
     outline: 0,
     backgroundColor: 'transparent',
-    color: colors.black,
-    fontSize: appAppearance.photosFontSize
+    color: app.fg,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
 
   // ---- grid -----------------------------------------------------------------
   scroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingInline: 16, paddingTop: 4 },
   groupTitle: {
-    fontSize: appAppearance.photosFontSize3,
-    fontWeight: appAppearance.photosFontWeight,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     paddingTop: 12,
     paddingBottom: 8,
     margin: 0
@@ -172,7 +199,7 @@ export const styles = stylex.create({
     display: 'grid',
     placeItems: 'center',
     padding: 0,
-    borderRadius: appAppearance.photosBorderRadius3,
+    borderRadius: radius.xs,
     outlineWidth: 3,
     outlineStyle: 'solid',
     outlineColor: 'transparent',
@@ -180,12 +207,12 @@ export const styles = stylex.create({
     transitionProperty: 'outline-color',
     transitionDuration: '.15s'
   },
-  cellOn: { outlineColor: colors.blueBright },
+  cellOn: { outlineColor: app.link },
   // The frame takes the photo's shape so the favourite badge sits on the photo, not the square cell.
   frame: {
     position: 'relative',
     display: 'block',
-    borderRadius: appAppearance.photosBorderRadius3,
+    borderRadius: radius.xs,
     overflow: 'hidden'
   },
   ratio: (r: number) => ({ aspectRatio: r }),
@@ -199,14 +226,16 @@ export const styles = stylex.create({
     bottom: 6,
     display: 'flex',
     color: colors.white,
-    filter: `drop-shadow(${appAppearance.photosBadgeTextShadow})`
+    filter: `drop-shadow(${shadow.text})`
   },
   count: {
     textAlign: 'center',
     paddingTop: 18,
     paddingBottom: 26,
-    fontSize: appAppearance.photosFontSize,
-    fontWeight: appAppearance.photosFontWeight
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
   },
 
   // ---- viewer ---------------------------------------------------------------
@@ -216,7 +245,7 @@ export const styles = stylex.create({
     zIndex: 4,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: appAppearance.photosViewerBackgroundColor,
+    backgroundColor: appAppearance.photosViewer,
     color: colors.white
   },
   viewerBar: {
@@ -228,6 +257,6 @@ export const styles = stylex.create({
     paddingInline: 12,
     flexShrink: 0
   },
-  viewerTitle: { marginRight: 'auto', marginLeft: 6, fontWeight: appAppearance.photosFontWeight },
+  viewerTitle: { marginRight: 'auto', marginLeft: 6, fontWeight: weight.semibold },
   viewerImg: { flexGrow: 1, minHeight: 0, objectFit: 'contain', width: '100%', paddingBottom: 12 }
 })

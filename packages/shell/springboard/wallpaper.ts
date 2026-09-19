@@ -5,6 +5,7 @@
 // background and decodes into the canvas bake alike, with no asset to ship.
 
 import { WALLPAPER } from '@doan-labs/duo-uikit/icons/index.ts'
+import { wallpaper as paint } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import { useSyncExternalStore } from 'react'
 
 const KEY = 'os.wallpaper'
@@ -29,11 +30,31 @@ function paper(ground: string, ...lights: [x: number, y: number, r: number, colo
 /** What the sheet offers: Apple's dune, then five of ours. */
 export const WALLPAPERS = [
   WALLPAPER,
-  paper('#1b1440', [0.5, 1.05, 0.62, '#ff8d5a'], [0.25, 0.15, 0.5, '#6a4ee0'], [0.9, 0.4, 0.42, '#d24f9e']),
-  paper('#04233d', [0.3, -0.1, 0.72, '#35b4ff'], [0.92, 0.95, 0.5, '#0f6f9f'], [0.62, 0.52, 0.28, '#8ee6ff']),
-  paper('#170909', [0.18, 0.95, 0.62, '#ff4d2e'], [0.82, 0.08, 0.5, '#ffb347'], [0.55, 0.55, 0.3, '#ff7a45']),
-  paper('#0a2018', [0.12, 0.12, 0.55, '#33c977'], [0.9, 0.9, 0.6, '#d5f56a'], [0.58, 0.32, 0.3, '#1e8f6e']),
-  paper('#111216', [0.35, 0.28, 0.6, '#4b505c'], [0.92, 1.02, 0.5, '#2c2f37'])
+  paper(
+    paint.duskGround,
+    [0.5, 1.05, 0.62, paint.duskEmber],
+    [0.25, 0.15, 0.5, paint.duskViolet],
+    [0.9, 0.4, 0.42, paint.duskRose]
+  ),
+  paper(
+    paint.tideGround,
+    [0.3, -0.1, 0.72, paint.tideCrest],
+    [0.92, 0.95, 0.5, paint.tideDeep],
+    [0.62, 0.52, 0.28, paint.tideFoam]
+  ),
+  paper(
+    paint.emberGround,
+    [0.18, 0.95, 0.62, paint.emberCore],
+    [0.82, 0.08, 0.5, paint.emberAmber],
+    [0.55, 0.55, 0.3, paint.emberGlow]
+  ),
+  paper(
+    paint.mossGround,
+    [0.12, 0.12, 0.55, paint.mossLeaf],
+    [0.9, 0.9, 0.6, paint.mossLime],
+    [0.58, 0.32, 0.3, paint.mossDeep]
+  ),
+  paper(paint.slateGround, [0.35, 0.28, 0.6, paint.slateHaze], [0.92, 1.02, 0.5, paint.slateShade])
 ]
 
 const stored = (() => {

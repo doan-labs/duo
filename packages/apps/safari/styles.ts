@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, leading, radius, shadow, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -9,17 +9,19 @@ export const styles = stylex.create({
     paddingBlock: 8,
     paddingInline: 12,
     overflowX: 'auto',
-    backgroundColor: colors.barLight,
+    backgroundColor: app.elevated,
     flexShrink: 0
   },
   mark: {
     paddingBlock: 6,
     paddingInline: 12,
-    borderRadius: appAppearance.musicBorderRadius,
+    borderRadius: radius.xl,
     backgroundColor: colors.white,
-    fontSize: appAppearance.calendarFontSize2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     whiteSpace: 'nowrap',
-    boxShadow: appAppearance.safariBoxShadow,
+    boxShadow: shadow.card,
     color: colors.black
   },
   url: {
@@ -28,19 +30,21 @@ export const styles = stylex.create({
     paddingBlock: 8,
     paddingInline: 12,
     alignItems: 'center',
-    backgroundColor: colors.barLight,
+    backgroundColor: app.elevated,
     flexShrink: 0,
     color: colors.blue
   },
   input: {
     flexGrow: 1,
     borderWidth: 0,
-    borderRadius: appAppearance.musicFontSize3,
+    borderRadius: radius.lg,
     paddingBlock: 9,
     paddingInline: 12,
     backgroundColor: colors.white,
-    boxShadow: appAppearance.safariBoxShadow2,
-    fontSize: appAppearance.musicBorderRadius,
+    boxShadow: shadow.card,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     textAlign: 'center',
     color: colors.black,
     outline: 0
@@ -52,7 +56,7 @@ export const styles = stylex.create({
     paddingTop: 8,
     paddingInline: 20,
     paddingBottom: 10,
-    backgroundColor: colors.barLight,
+    backgroundColor: app.elevated,
     flexShrink: 0,
     color: colors.blue
   },

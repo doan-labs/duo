@@ -6,7 +6,7 @@ import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
 import { art } from '@doan-labs/duo-fixtures'
 import { type Playable, TRACKS } from '@doan-labs/duo-fixtures/tracks.ts'
 import type { Os } from '@doan-labs/duo-sdk'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -115,7 +115,7 @@ export const Podcasts = (_: { os: Os }) => {
         <div {...stylex.props(styles.shelf)}>
           {SHOWS.map(([s, w], si) => (
             <div key={s} {...stylex.props(styles.poster)} onClick={() => start(FIRST[si]!)}>
-              <div {...stylex.props(styles.im, styles.bg(art(s)))}>{s}</div>
+              <div {...stylex.props(typography.footnote, styles.im, styles.bg(art(s)))}>{s}</div>
               <Text as="div" size="caption" xstyle={[styles.posterSub]}>
                 {w}
               </Text>
@@ -124,14 +124,14 @@ export const Podcasts = (_: { os: Os }) => {
         </div>
         {SHOWS.map(([s, , list], si) => (
           <div key={s}>
-            <Title xstyle={[styles.hdr]}>{s}</Title>
+            <Title xstyle={[typography.title3]}>{s}</Title>
             <div>
               {list.map((t, ei) => (
                 <div key={t} {...stylex.props(styles.li)} onClick={() => start(FIRST[si]! + ei)}>
                   <div {...stylex.props(styles.thumb, styles.bg(art(t)))} />
                   <div {...stylex.props(styles.tx)}>
-                    <b {...stylex.props(styles.txB)}>{t}</b>
-                    <p {...stylex.props(styles.txP)}>
+                    <b {...stylex.props(typography.subheadline, styles.txB)}>{t}</b>
+                    <p {...stylex.props(typography.footnote, styles.txP)}>
                       {28 + (t.length % 30)} min · {s}
                     </p>
                   </div>
@@ -143,8 +143,8 @@ export const Podcasts = (_: { os: Os }) => {
       </Screen>
       <div {...stylex.props(styles.mini, !d.loaded && shared.hide)}>
         <div {...stylex.props(styles.art, styles.bg(art(playing)))} />
-        <div {...stylex.props(styles.title)}>{playing}</div>
-        <button type="button" {...stylex.props(styles.play)} onClick={() => d.toggle()}>
+        <div {...stylex.props(typography.footnote, styles.title)}>{playing}</div>
+        <button type="button" {...stylex.props(typography.title3)} onClick={() => d.toggle()}>
           {d.playing ? '❚❚' : '▶'}
         </button>
         <div {...stylex.props(styles.scrub)}>

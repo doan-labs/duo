@@ -3,7 +3,7 @@ import { createContext, type ReactNode, type Ref, useContext, useEffect, useRef,
 import { usePresence } from './presence.ts'
 import { animations, shared } from './styles.ts'
 import { Sym } from './sym.tsx'
-import { app, easing } from './tokens.stylex.ts'
+import { app, easing, shadow } from './tokens.stylex.ts'
 
 type Push = (make: (back: () => void) => ReactNode) => void
 const NavCtx = createContext<{ push: Push; pop: () => void }>({ push: () => {}, pop: () => {} })
@@ -123,6 +123,6 @@ const styles = stylex.create({
     transitionTimingFunction: easing.push
   },
   off: { transform: 'translateX(100%)' },
-  shadow: { boxShadow: '-8px 0 24px rgba(0,0,0,.35)' },
+  shadow: { boxShadow: shadow.float },
   under: { transform: 'translateX(-26%)', opacity: 0.5 }
 })

@@ -78,7 +78,7 @@ export const Memos = (_: { os: Os }) => {
       }
       g.setTransform(2, 0, 0, 2, 0, 0)
       g.clearRect(0, 0, w, ht)
-      g.fillStyle = colors.redBright
+      g.fillStyle = colors.redDark
       hist.current.forEach((v, i) => {
         const bh = Math.max(2, v * ht * 0.92)
         g.fillRect(i * 3, (ht - bh) / 2, 2, bh)

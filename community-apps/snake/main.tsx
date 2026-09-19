@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -175,15 +175,15 @@ const styles = stylex.create({
     paddingBlock: 14,
     paddingInline: 14,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system,
     fontSize: 14
   },
   cover: { paddingBlock: 10, paddingInline: 10, gap: 6 },
   header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexShrink: 0 },
   brandRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  kicker: { color: colors.greenBright, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
-  session: { color: colors.grey2, fontSize: 8, fontWeight: 700, letterSpacing: 1.2 },
+  kicker: { color: colors.greenDark, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
+  session: { color: colors.grey, fontSize: 8, fontWeight: 700, letterSpacing: 1.2 },
   title: { marginBlock: 0, fontSize: 38, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1.2 },
   scores: { display: 'flex', gap: 6 },
   score: {
@@ -192,10 +192,10 @@ const styles = stylex.create({
     paddingInline: 8,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.fillDark,
+    borderColor: app.fill,
     borderRadius: 10,
     color: colors.grey3,
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     textAlign: 'center',
     fontSize: 8,
     letterSpacing: 1
@@ -225,10 +225,10 @@ const styles = stylex.create({
   arrow: {
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.fillDark,
+    borderColor: app.fill,
     borderRadius: 13,
     color: colors.white,
-    backgroundColor: { default: colors.fillDark, ':hover': colors.fillThick },
+    backgroundColor: { default: app.fill, ':hover': app.fill3 },
     fontSize: 23,
     cursor: 'pointer',
     touchAction: 'manipulation',
@@ -239,7 +239,7 @@ const styles = stylex.create({
     transitionDuration: '.14s, .18s, .18s',
     transitionTimingFunction: easeOut,
     transform: { default: 'scale(1)', ':active': 'scale(.94)' },
-    ':focus-visible': { outline: `2px solid ${colors.greenBright}`, outlineOffset: 3 }
+    ':focus-visible': { outline: `2px solid ${colors.greenDark}`, outlineOffset: 3 }
   },
   fitArrow: (size: number) => ({ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(16, size * 0.6)}px` }),
   up: { gridColumn: 2, gridRow: 1 },
@@ -249,8 +249,8 @@ const styles = stylex.create({
     borderRadius: 999,
     paddingBlock: 9,
     paddingInline: 18,
-    color: colors.darkElevated,
-    backgroundColor: { default: colors.greenBright, ':hover': colors.green },
+    color: colors.grey6Dark,
+    backgroundColor: { default: colors.greenDark, ':hover': colors.green },
     fontSize: 13,
     fontWeight: 800,
     cursor: 'pointer',
@@ -274,10 +274,10 @@ const styles = stylex.create({
     paddingInline: 14,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.fillDark,
+    borderColor: app.fill,
     borderRadius: 14,
     color: colors.white,
-    backgroundColor: colors.darkElevated2,
+    backgroundColor: colors.grey5Dark,
     animationName: { default: messageIn, [motion]: 'none' },
     animationDuration: '.22s',
     animationTimingFunction: easeOut,
@@ -290,8 +290,8 @@ const styles = stylex.create({
     borderRadius: 999,
     paddingBlock: 7,
     paddingInline: 11,
-    color: colors.darkElevated,
-    backgroundColor: { default: colors.orange, ':hover': colors.weatherSun },
+    color: colors.grey6Dark,
+    backgroundColor: { default: colors.orange, ':hover': colors.yellow },
     fontWeight: 800,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',

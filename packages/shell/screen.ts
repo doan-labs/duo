@@ -130,7 +130,7 @@ function glass(
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
   ctx.save() // textAlign is centre in here and left everywhere else
-  ctx.font = `400 ${u(10.5)}px ${FONT}`
+  ctx.font = `600 ${u(11)}px ${FONT}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   ctx.shadowColor = 'rgba(0,0,0,0.5)'
@@ -240,7 +240,7 @@ function lockScreen(
   clock: string
 ) {
   const cx = X + W / 2
-  const T = u(wide ? 118 : 84)
+  const T = u(wide ? 96 : 72)
   const pad = u(wide ? 34 : 64)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -382,7 +382,7 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
   const now = new Date()
   const clock = now.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' }).replace(/ [AP]M/, '')
   ctx.fillStyle = '#fff'
-  ctx.font = `600 ${u(13)}px ${FONT}`
+  ctx.font = `600 ${u(12)}px ${FONT}`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   ctx.fillText(clock, sx, sy)
@@ -421,13 +421,13 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
 
   // Calendar widget, matching the live one in os.ts.
   glass(ctx, blur, wx(1), wtop, wsize, wsize, u(23), ['rgba(255,255,255,0.86)', 'rgba(255,255,255,0.76)'])
-  ctx.fillStyle = '#ff3b30'
+  ctx.fillStyle = '#ff383c'
   ctx.font = `600 ${u(11)}px ${FONT}`
   ctx.fillText(now.toLocaleDateString('en', { weekday: 'long' }).toUpperCase(), wx(1) + u(12), wtop + u(12))
   ctx.fillStyle = '#000'
   ctx.font = `600 ${u(31)}px ${FONT}`
   ctx.fillText(String(now.getDate()), wx(1) + u(10), wtop + u(26))
-  ctx.fillStyle = '#ff9f0a'
+  ctx.fillStyle = '#ff8d28'
   ctx.fillRect(wx(1) + u(12), wtop + wsize - u(38), u(3), u(27))
   ctx.font = `600 ${u(10)}px ${FONT}`
   ctx.fillStyle = '#000'
@@ -457,7 +457,7 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
     for (let i = 0; i < 2; i++) {
       ctx.beginPath()
       ctx.arc((X + dockx) / 2 + (i - 0.5) * u(13), Y + H - u(24), u(3), 0, Math.PI * 2)
-      ctx.fillStyle = i ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'
+      ctx.fillStyle = i ? 'rgba(255,255,255,0.35)' : '#fff'
       ctx.fill()
     }
   }

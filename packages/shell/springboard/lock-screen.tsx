@@ -4,7 +4,17 @@
 // pointer maths that dismisses it stays in the shell.
 
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  colors,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, type Ref, useRef } from 'react'
 import { clock, dateOf, useNow } from './clock.ts'
@@ -45,7 +55,7 @@ const Camera = () => (
 
 // SF Symbols lock.fill.
 const Padlock = () => (
-  <svg viewBox="0 0 14 17" width={14} height={17} fill="#fff">
+  <svg viewBox="0 0 14 17" width={14} height={17} fill="currentColor">
     <path d="M3.2 7V5.2a3.8 3.8 0 0 1 7.6 0V7H9.3V5.2a2.3 2.3 0 0 0-4.6 0V7z" />
     <rect y="6.6" width="14" height="10.4" rx="2.6" />
   </svg>
@@ -110,21 +120,27 @@ export function LockScreen({
 const styles = stylex.create({
   // Lock screen.
   lock: { position: 'absolute', inset: 0, zIndex: 5, textAlign: 'center', touchAction: 'none' },
-  ldate: { fontSize: 15, fontWeight: 600, letterSpacing: -0.1, textShadow: '0 1px 4px rgba(0,0,0,.35)' },
+  ldate: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
+    textShadow: shadow.text
+  },
   ldateWide: { paddingTop: 34 },
   ldateNarrow: { paddingTop: 64 },
   ltime: {
-    fontWeight: 700,
-    lineHeight: 1.05,
+    fontWeight: weight.bold,
+    lineHeight: 1,
     color: 'transparent',
-    backgroundImage: 'linear-gradient(rgba(255,255,255,.92),rgba(255,255,255,.45))',
+    backgroundImage: chrome.clockInk,
     WebkitBackgroundClip: 'text',
     backgroundClip: 'text',
-    filter: 'drop-shadow(0 3px 14px rgba(20,20,40,.35))'
+    filter: chrome.clockBloom
   },
-  // Letter-spacing is -3% of the size.
-  ltimeWide: { fontSize: 118, letterSpacing: -3.54 },
-  ltimeNarrow: { fontSize: 84, letterSpacing: -2.52 },
+  // The two biggest display steps; letter-spacing is -3% of the size.
+  ltimeWide: { fontSize: typeScale.displayXxl, letterSpacing: -2.88 },
+  ltimeNarrow: { fontSize: typeScale.displayXl, letterSpacing: -2.16 },
   lbtns: { position: 'absolute', right: 20, bottom: 22, display: 'flex', flexDirection: 'column', gap: 14 },
   lbtnsNarrow: {
     left: 0,
@@ -138,23 +154,23 @@ const styles = stylex.create({
   lbtn: {
     width: 46,
     height: 46,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
     cursor: 'pointer',
-    backgroundColor: 'rgba(0,0,0,.28)',
+    backgroundColor: chrome.well,
     transitionProperty: 'transform, background-color, color',
-    transitionDuration: '.15s, .25s, .25s',
-    transform: { default: null, ':active': 'scale(.9)' }
+    transitionDuration: `${motion.pressDuration}, .25s, .25s`,
+    transform: { default: null, ':active': motion.press }
   },
-  lbtnOn: { backgroundColor: 'rgba(255,255,255,.92)', color: colors.black },
+  lbtnOn: { backgroundColor: colors.white, color: colors.black },
   lpad: {
     position: 'absolute',
     left: 0,
     right: 0,
     display: 'flex',
     justifyContent: 'center',
-    filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.35))'
+    filter: `drop-shadow(${shadow.text})`
   },
   // 21 px above the date's top padding.
   lpadWide: { top: 13 },

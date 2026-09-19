@@ -1,5 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
-import { appAppearance, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { dark } from '@doan-labs/duo-uikit/styles.ts'
+import { colors, fonts, leading, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -11,7 +12,7 @@ function Screen() {
     requestAnimationFrame(() => os.ready())
   }, [])
   return (
-    <div {...stylex.props(styles.root)}>
+    <div {...stylex.props(dark, styles.root)}>
       <Weather
         os={{
           shots: [],
@@ -35,8 +36,8 @@ const styles = stylex.create({
     flexDirection: 'column',
     fontFamily: fonts.system,
     color: colors.white,
-    fontSize: appAppearance.musicFontSize,
-    lineHeight: 1.3
+    fontSize: typeScale.body,
+    lineHeight: leading.body
   }
 })
 await os.connect()

@@ -1,4 +1,15 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  glass,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -23,22 +34,22 @@ export const styles = stylex.create({
     gap: 9,
     paddingBlock: 9,
     paddingInline: 13,
-    borderRadius: appAppearance.appstoreFontSize,
-    backgroundColor: appAppearance.freeformBackgroundColor,
-    boxShadow: appAppearance.freeformBoxShadow,
+    borderRadius: radius.xxl,
+    backgroundColor: appAppearance.freeformPanel,
+    boxShadow: shadow.float,
     zIndex: 3,
-    backdropFilter: 'blur(14px)'
+    backdropFilter: glass.blur
   },
   tool: {
     width: 26,
     height: 26,
     paddingBlock: 0,
     paddingInline: 0,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     borderWidth: 2,
     borderStyle: 'solid',
     borderColor: colors.white,
-    boxShadow: appAppearance.freeformBoxShadow2,
+    boxShadow: shadow.card,
     transitionProperty: 'transform',
     transitionDuration: '.18s'
   },
@@ -47,9 +58,16 @@ export const styles = stylex.create({
   glyph: { display: 'grid', placeItems: 'center', color: colors.black },
   width: {
     backgroundColor: colors.white,
-    fontSize: appAppearance.musicFontSize6,
-    fontWeight: appAppearance.musicFontWeight
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.bold
   },
-  undo: { backgroundColor: colors.trackLight, fontSize: appAppearance.musicBorderRadius },
+  undo: {
+    backgroundColor: app.fill2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
   clear: { backgroundColor: colors.red, color: colors.white }
 })

@@ -1,4 +1,4 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors, motion, radius, typeScale, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -15,29 +15,29 @@ export const styles = stylex.create({
   },
   key: {
     aspectRatio: 1,
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: appAppearance.calculatorBackgroundColor,
-    fontSize: appAppearance.calculatorFontSize,
+    borderRadius: radius.circle,
+    backgroundColor: appAppearance.calculatorKey,
     color: colors.white,
     transitionProperty: 'transform, filter',
-    transitionDuration: '.1s',
-    transform: { default: null, ':active': 'scale(.93)' },
+    transitionDuration: `${motion.pressDuration}, .1s`,
+    transform: { default: null, ':active': motion.press },
     filter: { default: null, ':active': 'brightness(1.5)' }
   },
-  g: { backgroundColor: appAppearance.calculatorBackgroundColor2, color: colors.black },
+  g: { backgroundColor: appAppearance.calculatorKeyLight, color: colors.black },
   o: { backgroundColor: colors.orange },
+  // The zero spans two columns, so it is a capsule rather than a disc.
   z: {
     gridColumn: 'span 2',
     aspectRatio: 'auto',
-    borderRadius: appAppearance.calculatorBorderRadius,
+    borderRadius: radius.pill,
     textAlign: 'left',
     paddingLeft: 28
   },
   out: {
     gridColumn: 'span 4',
     textAlign: 'right',
-    fontSize: appAppearance.calculatorFontSize2,
-    fontWeight: appAppearance.homeFontWeight,
+    fontSize: typeScale.displayLg,
+    fontWeight: weight.thin,
     paddingInline: 10,
     paddingBottom: 4,
     height: 70,

@@ -6,7 +6,7 @@ import { Placeholder, Screen, Text, Title, VStack } from '@doan-labs/duo-uikit'
 import { art } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
@@ -37,8 +37,8 @@ const Comments = ({ id }: { id: string }) => {
     <div>
       {kids ? (
         kids.map((c) => (
-          <div key={c.id} {...stylex.props(styles.cmt)}>
-            <b {...stylex.props(styles.cmtAuthor)}>{c.author}</b>
+          <div key={c.id} {...stylex.props(typography.footnote, styles.cmt)}>
+            <b {...stylex.props(typography.caption1, styles.cmtAuthor)}>{c.author}</b>
             {detag(c.text!).slice(0, 420)}
           </div>
         ))
@@ -52,13 +52,17 @@ const Comments = ({ id }: { id: string }) => {
 /** Hand-rolled rather than `Page`: the back button carries the "Today" label and there is an Open action. */
 const StoryPage = ({ s, back, os }: { s: Story; back: () => void; os: Os }) => (
   <VStack>
-    <Title xstyle={[styles.hdrMd]}>
+    <Title xstyle={[typography.headline]}>
       <button type="button" {...stylex.props(shared.bk)} onClick={back}>
         <Sym name="back" size={20} />
         Today
       </button>
       {s.url && (
-        <button type="button" {...stylex.props(styles.openBtn)} onClick={() => os.open('Safari', s.url)}>
+        <button
+          type="button"
+          {...stylex.props(typography.subheadline, styles.openBtn)}
+          onClick={() => os.open('Safari', s.url)}
+        >
           Open
         </button>
       )}
@@ -66,12 +70,12 @@ const StoryPage = ({ s, back, os }: { s: Story; back: () => void; os: Os }) => (
     <Screen>
       <div {...stylex.props(styles.hero, styles.tint(art(s.title, 46)))} />
       <div {...stylex.props(styles.head)}>
-        <div {...stylex.props(styles.storyTitle)}>{s.title}</div>
+        <div {...stylex.props(typography.title2)}>{s.title}</div>
         <Text as="div" size="caption" xstyle={[styles.mt8]}>
           {s.author} · {s.points} points · {s.num_comments} comments
         </Text>
       </div>
-      <Title xstyle={[styles.hdr18]}>Discussion</Title>
+      <Title xstyle={[typography.title3]}>Discussion</Title>
       <Comments id={s.objectID} />
     </Screen>
   </VStack>
@@ -98,9 +102,9 @@ const Feed = ({ os }: { os: Os }) => {
     <div>
       {lead && (
         <div {...stylex.props(styles.lead, styles.tint(art(lead.title, 46)))} onClick={() => open(lead)}>
-          <div {...stylex.props(styles.kicker)}>TOP STORY</div>
-          <div {...stylex.props(styles.leadTitle)}>{lead.title}</div>
-          <div {...stylex.props(styles.leadMeta)}>
+          <div {...stylex.props(typography.caption2, styles.kicker)}>TOP STORY</div>
+          <div {...stylex.props(typography.title3, styles.leadTitle)}>{lead.title}</div>
+          <div {...stylex.props(typography.caption1, styles.leadMeta)}>
             {lead.points} points · {lead.num_comments} comments
           </div>
         </div>
@@ -108,8 +112,8 @@ const Feed = ({ os }: { os: Os }) => {
       {rest.map((s) => (
         <div key={s.objectID} {...stylex.props(styles.li)} onClick={() => open(s)}>
           <div {...stylex.props(styles.tx)}>
-            <b {...stylex.props(styles.title)}>{s.title}</b>
-            <p {...stylex.props(styles.meta)}>
+            <b {...stylex.props(typography.subheadline, styles.title)}>{s.title}</b>
+            <p {...stylex.props(typography.footnote, styles.meta)}>
               {s.author} · {s.points} points · {s.num_comments} comments
             </p>
           </div>

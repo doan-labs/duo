@@ -1,7 +1,19 @@
 import { Title, usePresence, VStack } from '@doan-labs/duo-uikit'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { appAppearance, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  easing,
+  fonts,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { longStamp, type Note } from './data.ts'
@@ -9,21 +21,14 @@ import { useNoteText } from './store.ts'
 
 /** Barrel colour per pencil; the nib is always pale. */
 const PENS = [
-  appAppearance.notesColor,
+  appAppearance.notesMuted,
   colors.blueDark,
-  appAppearance.notesColor3,
-  colors.groupedLight,
-  appAppearance.notesColor5,
-  appAppearance.notesColor6
+  appAppearance.notesRed,
+  colors.grey6,
+  appAppearance.notesTan,
+  appAppearance.notesInk
 ]
-const INKS = [
-  appAppearance.notesColor7,
-  colors.blueDark,
-  colors.green,
-  colors.yellow,
-  colors.redBright,
-  colors.darkElevated
-]
+const INKS = [appAppearance.notesPaper, colors.blueDark, colors.green, colors.yellow, colors.redDark, colors.grey6Dark]
 
 export function NotePane({
   note,
@@ -178,7 +183,9 @@ function NoteEditor({ note, ink }: { note: Note; ink?: number }) {
 
 const styles = stylex.create({
   save: {
-    fontSize: appAppearance.musicFontSize3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     color: colors.grey,
     textAlign: 'center',
     paddingTop: 10,
@@ -189,10 +196,10 @@ const styles = stylex.create({
   round: {
     width: 27,
     height: 27,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: appAppearance.podcastsBorderTopColor,
+    backgroundColor: app.fill2,
     color: colors.white,
     flexShrink: 0
   },
@@ -206,12 +213,17 @@ const styles = stylex.create({
     gap: 12,
     paddingInline: 11,
     height: 27,
-    borderRadius: appAppearance.musicBorderRadius,
-    backgroundColor: appAppearance.podcastsBorderTopColor
+    borderRadius: radius.xl,
+    backgroundColor: app.fill2
   },
-  aa: { fontSize: appAppearance.musicFontSize6, fontWeight: appAppearance.musicFontWeight3 },
+  aa: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.medium
+  },
   double: { display: 'flex' },
-  hdrMd: { fontSize: appAppearance.messagesFontSize },
+  hdrMd: { fontSize: typeScale.body, lineHeight: leading.body, letterSpacing: tracking.body },
   ta: {
     flexGrow: 1,
     borderWidth: 0,
@@ -222,9 +234,10 @@ const styles = stylex.create({
     outline: 0,
     backgroundColor: 'transparent',
     color: colors.white,
-    fontSize: appAppearance.calendarFontSize,
-    lineHeight: 1.5,
-    fontFamily: appAppearance.notesFontFamily,
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    fontFamily: fonts.system,
     transitionProperty: 'color',
     transitionDuration: '.3s'
   },
@@ -242,25 +255,25 @@ const styles = stylex.create({
     gap: 9,
     height: 58,
     paddingInline: 12,
-    borderRadius: appAppearance.messagesFontSize,
-    backgroundColor: appAppearance.notesColor6,
-    boxShadow: appAppearance.notesBoxShadow,
+    borderRadius: radius.xl,
+    backgroundColor: appAppearance.notesInk,
+    boxShadow: shadow.float,
     zIndex: 5
   },
   flat: { display: 'flex', color: colors.white, flexShrink: 0 },
   dim: { opacity: 0.35 },
   mirror: { transform: 'scaleX(-1)' },
-  bar: { width: 1, height: 26, backgroundColor: appAppearance.musicBackgroundColor },
+  bar: { width: 1, height: 26, backgroundColor: app.separator },
   pens: { display: 'flex', alignItems: 'flex-start', gap: 5, height: 58, overflow: 'hidden' },
   pen: {
     width: 14,
     height: 40,
     flexShrink: 0,
     clipPath: 'polygon(0 0,100% 0,100% 62%,50% 100%,0 62%)',
-    borderTopLeftRadius: appAppearance.musicBorderRadius2,
-    borderTopRightRadius: appAppearance.musicBorderRadius2,
+    borderTopLeftRadius: radius.xs,
+    borderTopRightRadius: radius.xs,
     // The dark barrel would be invisible against the tray without it.
-    boxShadow: appAppearance.notesBoxShadow2,
+    boxShadow: shadow.rim,
     marginTop: 13,
     transitionProperty: 'margin-top',
     transitionDuration: '.28s',
@@ -273,13 +286,20 @@ const styles = stylex.create({
     gridTemplateColumns: 'repeat(3,1fr)',
     gap: 4,
     padding: 4,
-    borderRadius: appAppearance.musicFontSize3,
-    backgroundColor: appAppearance.memosBackgroundColor
+    borderRadius: radius.lg,
+    backgroundColor: app.fill3
   },
   ink: {
     width: 14,
     height: 14,
-    borderRadius: appAppearance.settingsBorderRadius
+    borderRadius: radius.circle
   },
-  inkOn: { boxShadow: appAppearance.notesBoxShadow3, transform: 'scale(1.15)' }
+  // A ring, not a shadow: the gap shows the tray through, then a white edge.
+  inkOn: {
+    outlineWidth: 1.5,
+    outlineStyle: 'solid',
+    outlineColor: colors.white,
+    outlineOffset: 1.5,
+    transform: 'scale(1.15)'
+  }
 })

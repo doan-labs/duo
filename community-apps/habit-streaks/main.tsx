@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -136,14 +136,14 @@ const styles = stylex.create({
     paddingBlock: 16,
     paddingInline: 18,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system
   },
   cover: { gap: 6, paddingBlock: 10, paddingInline: 10 },
   header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, flexShrink: 0 },
-  kicker: { color: colors.greenBright, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
+  kicker: { color: colors.greenDark, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
   title: { marginBlock: 0, fontSize: 32, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
-  counter: { color: colors.greenBright, fontSize: 16 },
+  counter: { color: colors.greenDark, fontSize: 16 },
   hint: { marginBlock: 0, color: colors.grey3, fontSize: 12, flexShrink: 0 },
   list: { display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minHeight: 0, justifyContent: 'center' },
   habit: {
@@ -156,7 +156,7 @@ const styles = stylex.create({
     paddingBlock: 13,
     paddingInline: 12,
     color: colors.white,
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     textAlign: 'start',
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',
@@ -164,7 +164,7 @@ const styles = stylex.create({
     transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
     transform: { default: 'scale(1)', ':active': 'scale(.985)' }
   },
-  habitDone: { backgroundColor: colors.darkElevated2 },
+  habitDone: { backgroundColor: colors.grey5Dark },
   check: {
     display: 'grid',
     placeItems: 'center',
@@ -173,7 +173,7 @@ const styles = stylex.create({
     flexShrink: 0,
     borderWidth: 2,
     borderStyle: 'solid',
-    borderColor: colors.grey2,
+    borderColor: colors.grey,
     borderRadius: 999,
     color: colors.black,
     fontWeight: 900,
@@ -181,15 +181,15 @@ const styles = stylex.create({
     transitionDuration: '.18s, .18s, .16s'
   },
   checkDone: {
-    borderColor: colors.greenBright,
-    backgroundColor: colors.greenBright,
+    borderColor: colors.greenDark,
+    backgroundColor: colors.greenDark,
     animationName: { default: checkPop, [motion]: 'none' },
     animationDuration: '.22s',
     animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
     animationFillMode: 'both'
   },
   habitCopy: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 },
-  streak: { color: colors.greenBright, fontSize: 13, fontWeight: 800 },
+  streak: { color: colors.greenDark, fontSize: 13, fontWeight: 800 },
   saved: { alignSelf: 'center', color: colors.grey3, fontSize: 10, flexShrink: 0 }
 })
 

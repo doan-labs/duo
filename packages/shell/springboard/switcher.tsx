@@ -6,6 +6,16 @@
 // elements, transformed, so what you see in a card is the app, live.
 
 import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
+import {
+  colors,
+  easing,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef } from 'react'
 import type { Scene, Scenes } from './scenes.ts'
@@ -96,7 +106,7 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
     el.animate(
       [
         { transform: from, borderRadius: `${24 / SC}px` },
-        { transform: 'none', borderRadius: '0px' }
+        { transform: 'none', borderRadius: 0 }
       ],
       {
         duration: 380,
@@ -280,15 +290,17 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    fontSize: 12,
-    fontWeight: 600,
-    color: 'white',
-    textShadow: '0 1px 3px rgba(0,0,0,.5)',
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold,
+    color: colors.white,
+    textShadow: shadow.text,
     pointerEvents: 'none',
     whiteSpace: 'nowrap',
     transitionProperty: 'transform',
     transitionDuration: '.16s',
-    transitionTimingFunction: 'ease-out'
+    transitionTimingFunction: easing.out
   },
-  icon: { width: 22, height: 22, borderRadius: 6 }
+  icon: { width: 22, height: 22, borderRadius: radius.sm }
 })

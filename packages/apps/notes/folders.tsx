@@ -1,6 +1,6 @@
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, leading, radius, tracking, typeScale, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { useFolder, useFolders, useNotes } from './store.ts'
@@ -94,10 +94,10 @@ const styles = stylex.create({
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: colors.darkElevated,
+    backgroundColor: app.surface,
     borderRightWidth: 1,
     borderRightStyle: 'solid',
-    borderRightColor: appAppearance.musicBorderBottomColor
+    borderRightColor: app.separator
   },
   sideHdr: {
     display: 'flex',
@@ -105,7 +105,9 @@ const styles = stylex.create({
     height: 40,
     paddingInline: 16,
     flexShrink: 0,
-    fontSize: appAppearance.musicBorderRadius
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
   sideIcons: { display: 'flex', alignItems: 'center', gap: 14, marginLeft: 'auto' },
   scroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingBottom: 22 },
@@ -117,8 +119,10 @@ const styles = stylex.create({
     marginInline: 8,
     paddingBlock: 7,
     paddingInline: 8,
-    borderRadius: appAppearance.itunesBorderRadius,
-    fontSize: appAppearance.musicFontSize6,
+    borderRadius: radius.md,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     color: colors.yellow,
     cursor: 'pointer',
     textAlign: 'left'
@@ -132,18 +136,29 @@ const styles = stylex.create({
     outline: 0,
     backgroundColor: 'transparent',
     color: colors.white,
-    fontSize: appAppearance.musicFontSize6
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
-  folderOn: { backgroundColor: appAppearance.homeColor3 },
-  count: { marginLeft: 'auto', paddingLeft: 8, color: colors.grey, fontSize: appAppearance.musicFontSize6 },
+  folderOn: { backgroundColor: app.fill2 },
+  count: {
+    marginLeft: 'auto',
+    paddingLeft: 8,
+    color: colors.grey,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
   section: {
     display: 'flex',
     alignItems: 'center',
     paddingTop: 16,
     paddingBottom: 4,
     paddingInline: 16,
-    fontSize: appAppearance.musicFontSize,
-    fontWeight: appAppearance.musicFontWeight2
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold
   },
   chev: { display: 'flex', marginLeft: 'auto', transform: 'rotate(180deg)' }
 })

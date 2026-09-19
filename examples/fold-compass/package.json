@@ -5,7 +5,7 @@
   "type": "module",
   "dependencies": {
     "@doan-labs/duo-sdk": "0.0.0",
-    "@doan-labs/duo-uikit": "0.1.0",
+    "@doan-labs/duo-uikit": "1.0.0",
     "@stylexjs/stylex": "0.19.0",
     "react": "^19",
     "react-dom": "^19"

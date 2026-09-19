@@ -1,6 +1,6 @@
 # UI kit
 
-Private `@doan-labs/duo-uikit` 0.1.0 provides presentation components for baked apps
+Private `@doan-labs/duo-uikit` 1.0.0 provides presentation components for baked apps
 and isolated documents. The SDK separately owns host API, bridge, manifest and runtime
 compatibility. The kit's version never gates host compatibility.
 
@@ -11,10 +11,14 @@ JSON manually or maintain a second handwritten component API catalog.
 
 ## Current design
 
-The harvest preserves existing appearance and native element behavior. Typed `as` and
-StyleX `xstyle` support app composition; legacy Nav/Page/Sym/Num and style subpaths remain.
-Shared presentation values live in kit tokens. New UI uses semantic tokens; harvested
-legacy values preserve existing pixels. The AST token gate runs locally/in CI alongside
+The kit is Apple's design system for the device (decision 75): iOS 26 system hues, UIKit
+dynamic colours as the per-app `app` theme, Dynamic Type at the Large size with the HIG's
+leading and SF Pro tracking, and `space`, `radius`, `shadow`, `glass` and `motion` scales.
+Typed `as` and StyleX `xstyle` support app composition; legacy Nav/Page/Sym/Num and style
+subpaths remain. `appAppearance` holds only an app's own colours, prefixed by its folder
+name. The AST token gate (`scripts/check-app-tokens.ts`) fails any literal size, weight,
+radius, shadow, tracking, leading, font, timing or colour in `packages/apps` and
+`packages/shell`, and any cross-app `appAppearance` read; it runs locally/in CI alongside
 Biome, not as a new Biome plugin.
 
 `Screen` and `useDisplay` subscribe without opening a bridge, calling ready or owning

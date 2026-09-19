@@ -1,7 +1,7 @@
 {
   "id": "com.mnismt.duo.pomodoro",
   "name": "Pomo Timer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "lane": "community",
   "entry": "./main.tsx",
   "icon": "./icon.png",

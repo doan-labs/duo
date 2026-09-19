@@ -1,6 +1,6 @@
 import { beep, mmss } from '@doan-labs/duo-fixtures'
 import { Row, Screen, Section, Text, Title } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
@@ -107,7 +107,9 @@ export const Phone = () => {
   }
 
   return (
-    <Screen xstyle={[styles.root]}>
+    // Phone is the one dark app in the dock: the UIKit dark appearance, so rows,
+    // separators and secondary labels inside it read against black.
+    <Screen xstyle={[dark, styles.root]}>
       <div {...stylex.props(styles.panes)}>
         <Screen xstyle={[styles.pane, tab !== 0 && shared.hide]}>
           <Title>Recents</Title>

@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -115,7 +115,7 @@ const styles = stylex.create({
     paddingBlock: 18,
     paddingInline: 22,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system
   },
   cover: { gap: 7, paddingBlock: 10, paddingInline: 12 },
@@ -142,7 +142,7 @@ const styles = stylex.create({
     minHeight: 0,
     borderRadius: 20,
     padding: 18,
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     animationName: { default: cardIn, [motion]: 'none' },
     animationDuration: '.24s',
     animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
@@ -150,7 +150,7 @@ const styles = stylex.create({
   },
   phase: { color: colors.orange, fontSize: 12, fontWeight: 700, letterSpacing: 1 },
   time: { fontSize: 88, lineHeight: 0.95, fontVariantNumeric: 'tabular-nums', letterSpacing: -3 },
-  timeline: { width: '100%', height: 18, overflow: 'hidden', borderRadius: 999, backgroundColor: colors.fillDark },
+  timeline: { width: '100%', height: 18, overflow: 'hidden', borderRadius: 999, backgroundColor: app.fill },
   timelineFill: (progress: number) => ({
     width: '100%',
     height: '100%',
@@ -170,7 +170,7 @@ const styles = stylex.create({
     borderRadius: 999,
     paddingBlock: 10,
     paddingInline: 18,
-    color: colors.darkElevated,
+    color: colors.grey6Dark,
     backgroundColor: colors.orange,
     fontWeight: 800,
     cursor: 'pointer',
@@ -185,7 +185,7 @@ const styles = stylex.create({
     paddingBlock: 10,
     paddingInline: 14,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontWeight: 700,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',

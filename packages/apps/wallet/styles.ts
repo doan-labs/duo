@@ -1,4 +1,16 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  colors,
+  easing,
+  fonts,
+  glass,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared's; StyleX only resolves keyframes defined in the file that uses them.
@@ -13,7 +25,7 @@ export const styles = stylex.create({
     maxWidth: 340,
     transitionProperty: 'height',
     transitionDuration: '.45s',
-    transitionTimingFunction: appAppearance.healthAnimationTimingFunction
+    transitionTimingFunction: easing.pop
   },
   height: (px: number) => ({ height: px }),
   // A tap only ever changes the translate and z-index; the transition does the rest.
@@ -22,29 +34,40 @@ export const styles = stylex.create({
     left: 0,
     right: 0,
     height: 158,
-    borderRadius: appAppearance.messagesFontSize,
+    borderRadius: radius.xl,
     paddingTop: 15,
     paddingBottom: 15,
     paddingInline: 15,
     cursor: 'pointer',
-    boxShadow: appAppearance.walletBoxShadow,
+    boxShadow: shadow.float,
     transitionProperty: 'transform',
     transitionDuration: '.45s',
-    transitionTimingFunction: appAppearance.healthAnimationTimingFunction,
+    transitionTimingFunction: easing.pop,
     display: 'flex',
     flexDirection: 'column'
   },
   look: (bg: string, fg: string) => ({ backgroundImage: bg, color: fg }),
   place: (y: number, z: number) => ({ transform: `translateY(${y}px)`, zIndex: z }),
-  nm: { fontWeight: appAppearance.musicFontWeight2, fontSize: appAppearance.musicBorderRadius },
-  kind: { fontSize: appAppearance.musicFontSize3, opacity: 0.65 },
+  nm: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
+  },
+  kind: {
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    opacity: 0.65
+  },
+  // The card number is the one place a fixed-pitch face belongs: the groups line
+  // up across the stack however the digits fall.
   no: {
     marginTop: 'auto',
-    fontWeight: appAppearance.musicFontWeight3,
-    fontSize: appAppearance.musicFontSize,
+    fontFamily: fonts.mono,
+    fontSize: typeScale.subheadline,
     lineHeight: 1,
-    fontFamily: appAppearance.walletFontFamily,
-    letterSpacing: 1.5
+    fontWeight: weight.medium
   },
   payWrap: { textAlign: 'center', paddingTop: 18, paddingBottom: 8 },
   payBtn: {
@@ -53,13 +76,15 @@ export const styles = stylex.create({
     paddingTop: 9,
     paddingBottom: 9,
     paddingInline: 20,
-    fontSize: appAppearance.musicBorderRadius
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
   },
   pay: {
     position: 'absolute',
     inset: 0,
-    backgroundColor: appAppearance.tvBackgroundColor,
-    backdropFilter: 'blur(14px)',
+    backgroundColor: appAppearance.walletScrim,
+    backdropFilter: glass.blur,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -70,18 +95,29 @@ export const styles = stylex.create({
     animationName: pop,
     animationDuration: '.35s'
   },
-  payHint: { fontSize: appAppearance.musicFontSize, opacity: 0.7 },
-  payTitle: { fontSize: appAppearance.musicFontSize2, fontWeight: appAppearance.musicFontWeight2 },
+  payHint: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    opacity: 0.7
+  },
+  payTitle: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.semibold
+  },
   mono: {
     width: 74,
     height: 74,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     backgroundColor: colors.white,
     color: colors.white,
     display: 'grid',
     placeItems: 'center',
-    fontSize: appAppearance.walletFontSize,
-    fontWeight: appAppearance.musicFontWeight3,
+    fontSize: typeScale.largeTitle,
+    lineHeight: 1,
+    fontWeight: weight.medium,
     flexShrink: 0
   }
 })

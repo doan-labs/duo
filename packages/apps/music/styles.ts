@@ -1,4 +1,14 @@
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  appAppearance,
+  easing,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
@@ -15,8 +25,8 @@ export const styles = stylex.create({
   },
   /** Real cover art, so the card carries the artwork rather than the title over a gradient. */
   art: {
-    borderRadius: appAppearance.musicBorderRadius,
-    boxShadow: appAppearance.musicBoxShadow,
+    borderRadius: radius.xl,
+    boxShadow: shadow.float,
     aspectRatio: 1,
     display: 'block',
     objectFit: 'cover'
@@ -25,27 +35,34 @@ export const styles = stylex.create({
   credit: { opacity: 0.6 },
   bg: (image: string) => ({ backgroundImage: image }),
   center: { textAlign: 'center' },
-  title: { fontSize: appAppearance.musicFontSize2, fontWeight: appAppearance.musicFontWeight2 },
+  title: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.semibold
+  },
   scrub: {
     width: '100%',
     height: 5,
-    borderRadius: appAppearance.musicBorderRadius2,
-    backgroundColor: appAppearance.musicBackgroundColor,
+    borderRadius: radius.xs,
+    backgroundColor: appAppearance.musicFill,
     overflow: 'hidden',
     cursor: 'pointer'
   },
   fill: {
     display: 'block',
     height: '100%',
-    backgroundColor: appAppearance.musicBackgroundColor2,
-    borderRadius: appAppearance.musicBorderRadius2
+    backgroundColor: appAppearance.musicFillStrong,
+    borderRadius: radius.xs
   },
   w: (width: string) => ({ width }),
   tr: {
     display: 'flex',
     justifyContent: 'space-between',
     width: '100%',
-    fontSize: appAppearance.musicFontSize3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     opacity: 0.55,
     marginTop: -8
   },
@@ -54,32 +71,33 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 34,
-    fontSize: appAppearance.musicFontSize4
+    fontSize: typeScale.largeTitle,
+    lineHeight: 1
   },
   pb: {
     transitionProperty: 'transform',
-    transitionDuration: '.15s',
+    transitionDuration: motion.pressDuration,
     opacity: 0.95,
-    transform: { default: null, ':active': 'scale(.85)' }
+    transform: { default: null, ':active': motion.press }
   },
   eq: { display: 'flex', alignItems: 'flex-end', gap: 3, height: 20 },
   bar: {
     width: 3,
     backgroundColor: 'currentColor',
-    borderRadius: appAppearance.musicBorderRadius3,
+    borderRadius: radius.xs,
     transitionProperty: 'height',
     transitionDuration: '.12s',
-    transitionTimingFunction: appAppearance.musicTransitionTimingFunction
+    transitionTimingFunction: easing.linear
   },
   barH: (height: string) => ({ height }),
-  hdr: { fontSize: appAppearance.musicFontSize5 },
+  hdr: { fontSize: typeScale.title3, lineHeight: leading.title3, letterSpacing: tracking.title3 },
   queue: { marginTop: 4 },
   qrow: {
-    backgroundColor: appAppearance.musicBackgroundColor3,
-    borderBottomColor: appAppearance.musicBorderBottomColor,
+    backgroundColor: appAppearance.musicFillFaint,
+    borderBottomColor: appAppearance.musicHairline,
     cursor: 'pointer'
   },
-  thumb: { width: 34, height: 34, borderRadius: appAppearance.musicBorderRadius4, flexShrink: 0, objectFit: 'cover' },
-  name: { fontWeight: appAppearance.musicFontWeight3 },
-  go: { fontSize: appAppearance.musicFontSize6 }
+  thumb: { width: 34, height: 34, borderRadius: radius.sm, flexShrink: 0, objectFit: 'cover' },
+  name: { fontWeight: weight.medium },
+  go: { fontSize: typeScale.footnote, lineHeight: leading.footnote, letterSpacing: tracking.footnote }
 })

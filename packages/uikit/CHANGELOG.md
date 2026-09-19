@@ -1,3 +1,41 @@
+# 1.0.0
+
+The design system is Apple's. Every value in `tokens.stylex.ts` now traces to
+the HIG or to UIKit, and every size, weight, radius, shadow, font and timing an
+app uses comes from a scale. Removals, hence the major.
+
+Colours: `colors` is the iOS 26 system palette (`blue` is `#0088ff`, `red`
+`#ff383c`, and so on) with a `*Dark` sibling per hue, `mint` and `brown` added,
+and `grey`..`grey6` plus `grey2Dark`..`grey6Dark`. Removed `blueBright`,
+`blueDark`'s old value, `greenBright`, `redBright`, `settingsPink`,
+`settingsIndigo`, `separator`, `groupedLight`, `barLight`, `trackLight`,
+`trackDark`, `darkElevated`, `darkElevated2`, `separatorDark`, `fill`,
+`fillThin`, `fillThick`, `fillDark`, `controlDark` and the `weather*` hues.
+
+Surfaces: `app` is the UIKit dynamic colour set. Added `label3`, `link`, `fill2`,
+`fill3`; removed `track` (use `fill2`). `light` and `dark` carry UIKit's light
+and dark values. `Text` gained `color="tertiary"`.
+
+Type: `typeScale` is Dynamic Type at Large (body 17, not 15), joined by
+`leading`, `tracking` and `weight` consts and four `display` sizes. `typography`
+steps carry all four. `Text` `weight` is `regular | medium | semibold | bold`;
+`size="footnote"` and `size="title"` as colour-setting legacy names are gone
+(`footnote` is now the ramp step). `fonts` gained `rounded`, `serif`, `mono`.
+
+Scales: added `space`, `radius`, `shadow`, `glass`, `motion`; `easing` gained
+`linear`, `out`, `inOut`. Added `chrome` and `wallpaper` consts for the shell's
+glass scrims and wallpaper palettes. `shared.glass` lost its radial sheen (decision 18).
+`shared.press`, `pill`, `fab` and `widget` all press to `motion.press`.
+
+`appAppearance`: every `*FontSize*`, `*FontWeight*`, `*Radius*`, `*Shadow*`,
+`*TimingFunction*` and `*FontFamily*` key is removed; colour keys are renamed by
+role (`photosSidebarBackgroundColor` is `photosSidebar`). Keys are grouped under
+a `// <app>` line and only that app may read them.
+
+`Button variant="plain"` now presses. `Row`'s chevron is `app.label3`.
+
+No SDK protocol or host compatibility requirement changes.
+
 # 0.2.0
 
 Removed three components that were verbatim renames of something already

@@ -4,7 +4,17 @@
 // home screen's business, so it only reports.
 
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  glass,
+  layout,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { byName } from '../apps.ts'
 import type { Folder } from './grid.ts'
@@ -59,23 +69,25 @@ const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 14,
-    backgroundColor: 'rgba(0,0,0,.3)',
-    backdropFilter: 'blur(22px) saturate(140%)',
-    WebkitBackdropFilter: 'blur(22px) saturate(140%)',
+    backgroundColor: chrome.scrim,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     animationName: fade,
     animationDuration: '.22s'
   },
   name: {
     width: 220,
-    fontSize: 20,
-    fontWeight: 600,
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.semibold,
     textAlign: 'center',
     color: 'inherit',
-    textShadow: '0 1px 4px rgba(0,0,0,.4)',
-    backgroundColor: { default: 'transparent', ':focus': 'rgba(255,255,255,.18)' },
+    textShadow: shadow.text,
+    backgroundColor: { default: 'transparent', ':focus': glass.tint },
     borderWidth: 0,
     borderStyle: 'none',
-    borderRadius: 10,
+    borderRadius: radius.md,
     outlineStyle: 'none',
     paddingTop: 4,
     paddingRight: 10,
@@ -92,6 +104,6 @@ const styles = stylex.create({
     paddingRight: 14,
     paddingBottom: 6,
     paddingLeft: 14,
-    borderRadius: 30
+    borderRadius: radius.xxl
   }
 })

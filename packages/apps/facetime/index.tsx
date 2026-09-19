@@ -6,7 +6,7 @@ import { Placeholder, Row, Screen, Section, Text, Title } from '@doan-labs/duo-u
 import { art, beep } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
@@ -82,8 +82,8 @@ const Call = ({ who, onEnd }: { who: string; onEnd: () => void }) => {
           {who[0]!.toUpperCase()}
         </div>
       </div>
-      <div {...stylex.props(styles.label)}>{who}</div>
-      <div {...stylex.props(styles.state)}>{joined ? 'FaceTime Video' : 'Connecting…'}</div>
+      <div {...stylex.props(typography.title3, styles.label)}>{who}</div>
+      <div {...stylex.props(typography.footnote, styles.state)}>{joined ? 'FaceTime Video' : 'Connecting…'}</div>
       <div {...stylex.props(styles.pip)}>
         <Webcam />
       </div>

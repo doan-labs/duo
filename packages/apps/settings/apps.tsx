@@ -6,7 +6,7 @@
 import type { Os, SettingsHost } from '@doan-labs/duo-sdk'
 import type { Store, StoreRow } from '@doan-labs/duo-sdk/store.ts'
 import { Row, Section } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -27,7 +27,7 @@ const Icon = ({ row, big }: { row: StoreRow; big?: boolean }) => {
   return row.icon ? (
     <img src={row.icon} alt="" {...stylex.props(shape)} />
   ) : (
-    <span {...stylex.props(shape, styles.appLetter)}>{row.name.slice(0, 1)}</span>
+    <span {...stylex.props(shape, typography.subheadline, styles.appLetter)}>{row.name.slice(0, 1)}</span>
   )
 }
 
@@ -79,61 +79,69 @@ function PaySheet({ host, onDone, onCancel }: { host: SettingsHost; onDone: () =
   const label = FEES[step] ?? FEES[0]
   return (
     <div ref={dim} {...stylex.props(styles.payDim, styles.payTop(top))}>
-      <section role="dialog" aria-label="Duo Pay" {...stylex.props(styles.paySheet)}>
+      <section role="dialog" aria-label="Duo Pay" {...stylex.props(typography.footnote, styles.paySheet)}>
         <div {...stylex.props(styles.payHead)}>
-          <strong {...stylex.props(styles.payMark)}> Pay</strong>
+          <strong {...stylex.props(typography.headline)}> Pay</strong>
           {pay === 'sheet' && (
-            <button type="button" onClick={onCancel} {...stylex.props(styles.payCancel)}>
+            <button type="button" onClick={onCancel} {...stylex.props(typography.subheadline, styles.payCancel)}>
               Cancel
             </button>
           )}
         </div>
         <div {...stylex.props(styles.payCardRow)}>
           <span {...stylex.props(styles.payCard)} />
-          <span {...stylex.props(styles.payCardText)}>
+          <span {...stylex.props(typography.caption1, styles.payCardText)}>
             <strong>Doan Labs Card</strong>
             <span>(•••• 2399)</span>
           </span>
           <span {...stylex.props(styles.payChev)}>›</span>
         </div>
         <div {...stylex.props(styles.payRow)}>
-          <span {...stylex.props(styles.payKey)}>To Duo Store</span>
-          <span {...stylex.props(styles.payValue)}>{FEE}</span>
+          <span {...stylex.props(typography.caption2, styles.payKey)}>To Duo Store</span>
+          <span {...stylex.props(typography.caption1, styles.payValue)}>{FEE}</span>
         </div>
         <div {...stylex.props(styles.payRow, styles.payLast)}>
-          <span {...stylex.props(styles.payKey)}>{label}</span>
-          <span {...stylex.props(styles.payValue)}>{step ? 'Payment failed' : 'Required'}</span>
+          <span {...stylex.props(typography.caption2, styles.payKey)}>{label}</span>
+          <span {...stylex.props(typography.caption1, styles.payValue)}>{step ? 'Payment failed' : 'Required'}</span>
         </div>
         {pay === 'sheet' && (
           <button type="button" onClick={() => setPay('processing')} {...stylex.props(styles.payFace)}>
             <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true" {...stylex.props(styles.payGlyph)}>
-              <g fill="none" stroke="#0a84ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+              <g
+                fill="none"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                {...stylex.props(styles.payInk)}
+              >
                 <path d="M6 22V12a6 6 0 0 1 6-6h10M42 6h10a6 6 0 0 1 6 6v10M58 42v10a6 6 0 0 1-6 6H42M22 58H12a6 6 0 0 1-6-6V42" />
                 <path d="M22 26v6M42 26v6M32 26v12h-4" />
                 <path d="M22 42c3 4 7 5 10 5s7-1 10-5" />
               </g>
             </svg>
-            <span {...stylex.props(styles.payLabel)}>Face ID</span>
-            <span {...stylex.props(styles.payHint)}>Double-click side button to pay</span>
+            <span {...stylex.props(typography.footnote, styles.payLabel)}>Face ID</span>
+            <span {...stylex.props(typography.caption2, styles.payHint)}>Double-click side button to pay</span>
           </button>
         )}
         {pay === 'processing' && (
           <div {...stylex.props(styles.payFace)}>
             <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true" {...stylex.props(styles.paySpin)}>
-              <circle cx="32" cy="32" r="26" fill="none" stroke="#d1d1d6" strokeWidth="4" />
+              <circle cx="32" cy="32" r="26" fill="none" strokeWidth="4" {...stylex.props(styles.payTrack)} />
               <circle
                 cx="32"
                 cy="32"
                 r="26"
                 fill="none"
-                stroke="#0a84ff"
                 strokeWidth="4"
                 strokeLinecap="round"
                 strokeDasharray="40 124"
+                {...stylex.props(styles.payInk)}
               />
             </svg>
-            <span {...stylex.props(styles.payLabel)}>Processing…</span>
-            <span {...stylex.props(styles.payHint, styles.payStill)}>Do not fold the device during processing</span>
+            <span {...stylex.props(typography.footnote, styles.payLabel)}>Processing…</span>
+            <span {...stylex.props(typography.caption2, styles.payHint, styles.payStill)}>
+              Do not fold the device during processing
+            </span>
           </div>
         )}
         {pay === 'done' && (
@@ -141,8 +149,8 @@ function PaySheet({ host, onDone, onCancel }: { host: SettingsHost; onDone: () =
             <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true" {...stylex.props(styles.payPop)}>
               <defs>
                 <linearGradient id="okg-settings" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#0a84ff" />
-                  <stop offset="1" stopColor="#30d158" />
+                  <stop offset="0" stopColor={colors.blue} />
+                  <stop offset="1" stopColor={colors.greenDark} />
                 </linearGradient>
               </defs>
               <circle
@@ -167,8 +175,8 @@ function PaySheet({ host, onDone, onCancel }: { host: SettingsHost; onDone: () =
                 {...stylex.props(styles.payTick)}
               />
             </svg>
-            <span {...stylex.props(styles.payLabel)}>Done</span>
-            <span {...stylex.props(styles.payHint, styles.payStill)}>
+            <span {...stylex.props(typography.footnote, styles.payLabel)}>Done</span>
+            <span {...stylex.props(typography.caption2, styles.payHint, styles.payStill)}>
               {step + 1 >= FEES.length ? 'Fine. Deleting for free.' : 'Charged to Doan Labs Card'}
             </span>
           </div>
@@ -188,7 +196,7 @@ function Installed({ os, host, store }: { os: Os; host: SettingsHost; store: Sto
   const busy = rows.filter((row) => row.progress !== undefined)
   return (
     <>
-      <Hero name="grid" bg={colors.settingsIndigo} title="Apps">
+      <Hero name="grid" bg={colors.indigo} title="Apps">
         Manage the apps installed on this Duo: what each one is allowed to reach, how much room it takes and whether it
         stays.
       </Hero>
@@ -237,8 +245,8 @@ function Detail({ id, os, host, store }: { id: string; os: Os; host: SettingsHos
       {paying && <PaySheet host={host} onDone={remove} onCancel={() => setPaying(false)} />}
       <div {...stylex.props(shared.grp, styles.hero)}>
         <Icon row={row} big />
-        <div {...stylex.props(styles.heroTitle)}>{row.name}</div>
-        <div {...stylex.props(styles.heroText)}>{row.author}</div>
+        <div {...stylex.props(typography.title1)}>{row.name}</div>
+        <div {...stylex.props(typography.body, styles.heroText)}>{row.author}</div>
       </div>
       <Section>
         <Row label="Version" detail={version(row.installed)} />

@@ -1,6 +1,6 @@
 # UI kit
 
-Version **0.2.0**, private local preview. React 19 and compiled StyleX 0.19.
+Version **1.0.0**, private local preview. React 19 and compiled StyleX 0.19.
 Apps bundle their selected kit; its version does not change host compatibility.
 SDK runtime requirements remain separate. Existing Nav/Page/Sym/Num and style
 subpaths continue to work. See [CHANGELOG](CHANGELOG.md).
@@ -39,24 +39,41 @@ Use `Row as="button"` for actions. Name icon-only buttons and every Toggle.
 cross axis. Both take `gap`, `align`, `justify` and `wrap`, so a one-off
 `stylex.create` is no longer the way to put two things side by side.
 
-`Text`'s `size` names a step of the type ramp (`largeTitle`, `title1`..`title3`,
-`headline`, `body`, `callout`, `subheadline`, `footnote`, `caption1`,
-`caption2`), each carrying size, leading and weight together. `body` emits
-nothing and inherits, so a `Text` inside a header still reads at the header's
-size. `caption`, `footnote` and `title` are the original names and still render
-exactly as they did; unlike the ramp steps they also set a colour. Prefer
-`size="subheadline" color="secondary"` over `size="caption"` in new UI. The raw
-px live in `typeScale`, and `typography` in `styles.ts` holds the same steps as
-whole blocks for an app's own `stylex.create`.
+`Text`'s `size` names a step of Dynamic Type at the Large size (`largeTitle`
+34/41, `title1` 28/34, `title2` 22/28, `title3` 20/25, `headline` 17/22
+semibold, `body` 17/22, `callout` 16/21, `subheadline` 15/20, `footnote` 13/18,
+`caption1` 12/16, `caption2` 11/13), each carrying size, leading, SF Pro
+tracking and weight together. `weight` emphasises a step on the HIG ladder
+(`regular`, `medium`, `semibold`, `bold`). `body` emits nothing and inherits, so
+a `Text` inside a header still reads at the header's size. `caption` is the one
+legacy name left and is `footnote` in the secondary colour. The consts live in
+`typeScale`, `leading`, `tracking` and `weight`; `typography` in `styles.ts`
+holds the steps as whole blocks for an app's own `stylex.create`, and
+`typeScale.display`..`displayXxl` (44/56/72/96) serve oversized numerals.
+
+## Scales
+
+`space` (2..32 on a 4 px grid), `radius` (`xs` 4, `sm` 8, `md` 10, `lg` 12,
+`xl` 16, `xxl` 22, `pill`, `circle`), `shadow` (`card`, `float`, `rim`, `text`),
+`glass` (`blur`, `tint`, `tintDark`), `easing` and `motion.press` are the only
+sources of those values. `scripts/check-app-tokens.ts` fails a literal size,
+weight, radius, shadow, tracking, leading, font, timing or colour in an app or
+in the shell, and fails an app reading another app's `appAppearance` key.
+`chrome` (scrims, wells, fills and labels over glass or a wallpaper) and
+`wallpaper` (the five wallpaper palettes) are the shell's own consts; apps do
+not read them.
 
 ## Theming
 
-`app` carries the per-app surface: `bg`, `fg`, `surface`, `elevated`, `label2`,
-`separator`, `fill` and `track`. Every row, separator, switch and secondary
-label in the kit reads from it, so a dark app no longer has to avoid `Row` and
-`Section`. Apply `light` or `dark` from `styles.ts` to an app root instead of
-hand-rolling a `createTheme`. The `app` defaults are the light values the kit
-used to hardcode, so applying `light` changes nothing.
+`app` carries the per-app surface as UIKit's dynamic colours: `bg`
+(systemGroupedBackground), `fg` (label), `surface`, `elevated`, `label2`,
+`label3`, `link`, `separator`, `fill`, `fill2`, `fill3` and `control`. Every
+row, separator, switch and secondary label in the kit reads from it, so a dark
+app no longer has to avoid `Row` and `Section`. Apply `light` or `dark` from
+`styles.ts` to an app root instead of hand-rolling a `createTheme`. `colors`
+holds the iOS 26 system hues with `*Dark` siblings and `grey`..`grey6`; they tint
+icons, charts and switches, and `blue` is the one interaction colour. Text,
+fills and surfaces never come from `colors`.
 
 ## Navigation and motion
 

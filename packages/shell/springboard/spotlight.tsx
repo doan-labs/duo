@@ -5,7 +5,16 @@
 
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  colors,
+  easing,
+  glass,
+  leading,
+  radius,
+  tracking,
+  typeScale
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { APPS } from '../apps.ts'
@@ -93,9 +102,9 @@ const styles = stylex.create({
     paddingTop: 52,
     paddingLeft: 20,
     paddingRight: 20,
-    backgroundColor: 'rgba(18,18,20,.5)',
-    backdropFilter: 'blur(24px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+    backgroundColor: chrome.scrimDeep,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     opacity: 0,
     transitionProperty: 'opacity',
     transitionDuration: '.26s',
@@ -107,8 +116,8 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: 9,
     flexShrink: 0,
-    backgroundColor: 'rgba(255,255,255,.2)',
-    borderRadius: 12,
+    backgroundColor: chrome.fill,
+    borderRadius: radius.lg,
     paddingTop: 9,
     paddingBottom: 9,
     paddingLeft: 12,
@@ -116,7 +125,7 @@ const styles = stylex.create({
     transform: 'translateY(-16px)',
     transitionProperty: 'transform',
     transitionDuration: '.3s',
-    transitionTimingFunction: 'cubic-bezier(.2,.9,.3,1)'
+    transitionTimingFunction: easing.pop
   },
   fldOn: { transform: 'none' },
   field: {
@@ -128,7 +137,9 @@ const styles = stylex.create({
     backgroundColor: 'transparent',
     outlineStyle: 'none',
     color: colors.white,
-    fontSize: 16
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout
   },
   hits: { flexGrow: 1, flexBasis: 0, minHeight: 0, overflow: 'auto', marginTop: 12, paddingBottom: 16 },
   hit: {
@@ -139,9 +150,9 @@ const styles = stylex.create({
     paddingBottom: 7,
     paddingLeft: 6,
     paddingRight: 6,
-    borderRadius: 11,
+    borderRadius: radius.lg,
     cursor: 'pointer',
-    backgroundColor: { default: null, ':active': 'rgba(255,255,255,.2)' },
+    backgroundColor: { default: null, ':active': chrome.fill },
     animationName: rise,
     animationDuration: '.3s',
     animationFillMode: 'backwards'

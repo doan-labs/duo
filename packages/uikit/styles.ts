@@ -4,7 +4,21 @@
 // import, so an app that animates with its own timing defines its own
 // keyframes and reuses `shared.rise` / `shared.spin` only as whole blocks.
 import * as stylex from '@stylexjs/stylex'
-import { app, colors, easing, layout, typeScale } from './tokens.stylex.ts'
+import {
+  app,
+  colors,
+  easing,
+  glass,
+  layout,
+  leading,
+  motion,
+  radius,
+  shadow,
+  space,
+  tracking,
+  typeScale,
+  weight
+} from './tokens.stylex.ts'
 
 export const spin = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
 export const pop = stylex.keyframes({ from: { transform: 'scale(.55) translateY(12px)', opacity: 0 } })
@@ -28,7 +42,7 @@ export const animations = stylex.create({
   spin: {
     animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },
     animationDuration: '1s',
-    animationTimingFunction: 'linear',
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
   },
   rise: {
@@ -92,44 +106,47 @@ export const animations = stylex.create({
 })
 
 export const shared = stylex.create({
-  /** Anything tappable: shrinks under the finger and eases back. */
+  /** Anything tappable: shrinks under the finger and eases back. The one press state. */
   press: {
     transitionProperty: 'transform, color, background-color',
-    transitionDuration: '.15s, .2s, .2s',
-    transform: { default: 'scale(1)', ':active': 'scale(.9)' }
+    transitionDuration: `${motion.pressDuration}, .2s, .2s`,
+    transform: { default: 'scale(1)', ':active': motion.press }
   },
-  /** A selectable row: colours ease instead of snapping, with a gentler press. */
+  /** A selectable row: colours ease instead of snapping; the row itself does not shrink. */
   select: {
-    transitionProperty: 'transform, color, background-color, border-color',
-    transitionDuration: '.15s, .22s, .22s, .22s',
-    transform: { default: 'scale(1)', ':active': 'scale(.98)' }
+    transitionProperty: 'color, background-color, border-color',
+    transitionDuration: '.22s'
   },
   /** Content that swaps in place (a detail pane changing note): fades in. */
   swap: {
     animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },
     animationDuration: '.25s'
   },
-  /** Fixed app header: title left, actions right. */
+  /** Fixed app header: title left, actions right. Title 2, semibold. */
   hdr: {
     flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    paddingTop: 6,
+    gap: space.sm,
+    paddingTop: space.xs,
     paddingRight: 56,
-    paddingBottom: 10,
-    paddingLeft: 16,
-    fontSize: 22,
-    fontWeight: 700
+    paddingBottom: space.sm,
+    paddingLeft: space.lg,
+    fontSize: typeScale.title2,
+    lineHeight: leading.title2,
+    letterSpacing: tracking.title2,
+    fontWeight: weight.semibold
   },
-  /** Small trailing controls inside `hdr`. */
+  /** Small trailing controls inside `hdr`: footnote, secondary. */
   hdrSm: {
     display: 'flex',
     alignItems: 'center',
-    gap: 14,
-    fontSize: 13,
-    fontWeight: 500,
-    opacity: 0.6,
+    gap: space.md,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.regular,
+    color: app.label2,
     marginLeft: 'auto'
   },
   /** Scrolling content below the header. */
@@ -139,19 +156,19 @@ export const shared = stylex.create({
     overflow: 'auto',
     position: 'relative',
     WebkitOverflowScrolling: 'touch',
-    paddingBottom: 28
+    paddingBottom: space.xxl
   },
   /** Back chevron in a nav page header. */
-  bk: { display: 'flex', alignItems: 'center', color: colors.blue, marginLeft: -6 },
+  bk: { display: 'flex', alignItems: 'center', color: app.link, marginLeft: -6 },
   /** Grouped-list row. */
   row: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: space.md,
     paddingTop: 11,
-    paddingRight: 16,
+    paddingRight: space.lg,
     paddingBottom: 11,
-    paddingLeft: 16,
+    paddingLeft: space.lg,
     backgroundColor: app.surface,
     borderBottomWidth: { default: 1, ':last-child': 0 },
     borderBottomStyle: 'solid',
@@ -161,7 +178,7 @@ export const shared = stylex.create({
   rowIc: {
     width: 30,
     height: 30,
-    borderRadius: 7,
+    borderRadius: radius.sm,
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
@@ -170,18 +187,26 @@ export const shared = stylex.create({
   /** Trailing detail text in a row. */
   rowR: { marginLeft: 'auto', color: app.label2 },
   /** Inset group of rows. */
-  grp: { marginRight: 16, marginBottom: 20, marginLeft: 16, borderRadius: 12, overflow: 'hidden' },
+  grp: {
+    marginRight: space.lg,
+    marginBottom: space.xl,
+    marginLeft: space.lg,
+    borderRadius: radius.md,
+    overflow: 'hidden'
+  },
   /** iOS switch, an `<input type="checkbox">`. */
   sw: {
     appearance: 'none',
     width: 51,
     height: 31,
-    borderRadius: 16,
-    backgroundColor: { default: app.track, ':checked': colors.green },
+    borderRadius: radius.pill,
+    backgroundColor: { default: app.fill2, ':checked': colors.green },
     position: 'relative',
     marginLeft: 'auto',
     cursor: 'pointer',
     flexShrink: 0,
+    transitionProperty: 'background-color',
+    transitionDuration: '.2s',
     '::after': {
       content: '""',
       position: 'absolute',
@@ -189,16 +214,24 @@ export const shared = stylex.create({
       left: 2,
       width: 27,
       height: 27,
-      borderRadius: '50%',
+      borderRadius: radius.circle,
       backgroundColor: colors.white,
-      boxShadow: '0 3px 8px rgba(0,0,0,.15)',
+      boxShadow: shadow.card,
       transitionProperty: 'transform',
       transitionDuration: '.2s',
       transform: { default: null, ':checked': 'translateX(20px)' }
     }
   },
   /** Big numerals (Clock, Weather). */
-  big: { fontSize: 84, fontWeight: 200, textAlign: 'center', paddingTop: 20, paddingBottom: 10, letterSpacing: -2 },
+  big: {
+    fontSize: 84,
+    fontWeight: weight.thin,
+    lineHeight: 1,
+    textAlign: 'center',
+    paddingTop: space.xl,
+    paddingBottom: space.sm,
+    letterSpacing: -2
+  },
   /** Empty-state placeholder, centred. */
   ph: {
     flexGrow: 1,
@@ -206,61 +239,70 @@ export const shared = stylex.create({
     placeItems: 'center',
     textAlign: 'center',
     color: app.label2,
-    fontSize: 14,
-    gap: 10,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    gap: space.sm,
     alignContent: 'center'
   },
   phImg: { width: 96, height: 96 },
   /** Floating action button, bottom right. */
   fab: {
     position: 'absolute',
-    right: 16,
-    bottom: 24,
+    right: space.lg,
+    bottom: space.xxl,
     width: 52,
     height: 52,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: colors.blue,
+    backgroundColor: app.link,
     color: colors.white,
-    boxShadow: '0 8px 22px rgba(0,60,140,.4)',
+    boxShadow: shadow.float,
     zIndex: 4,
     transitionProperty: 'transform',
-    transitionDuration: '.18s',
-    transform: { default: null, ':active': 'scale(.88)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
-  /** Tinted capsule button. */
+  /** Tinted capsule button: subheadline semibold on systemFill. */
   pill: {
-    paddingTop: 6,
-    paddingRight: 15,
-    paddingBottom: 6,
-    paddingLeft: 15,
-    borderRadius: 14,
-    fontSize: 13,
-    fontWeight: 700,
+    paddingTop: 7,
+    paddingRight: space.lg,
+    paddingBottom: 7,
+    paddingLeft: space.lg,
+    borderRadius: radius.pill,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     backgroundColor: app.fill,
-    color: colors.blue,
+    color: app.link,
     transitionProperty: 'transform, background-color',
-    transitionDuration: '.15s, .2s',
-    transform: { default: null, ':active': 'scale(.9)' }
+    transitionDuration: `${motion.pressDuration}, .2s`,
+    transform: { default: null, ':active': motion.press }
   },
-  /** Secondary label. */
-  sub: { color: app.label2, fontSize: 13 },
-  /** Large title. */
+  /** Secondary label: footnote in the secondary colour. */
+  sub: {
+    color: app.label2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
+  /** Large title, bold. */
   hero: {
-    fontSize: 34,
-    fontWeight: 700,
-    letterSpacing: -0.8,
-    paddingTop: 2,
-    paddingRight: 16,
-    paddingBottom: 10,
-    paddingLeft: 16
+    fontSize: typeScale.largeTitle,
+    lineHeight: leading.largeTitle,
+    letterSpacing: tracking.largeTitle,
+    fontWeight: weight.bold,
+    paddingTop: space.xxs,
+    paddingRight: space.lg,
+    paddingBottom: space.sm,
+    paddingLeft: space.lg
   },
   /** Loading spinner. */
   spin: {
     animationName: spin,
     animationDuration: '1s',
-    animationTimingFunction: 'linear',
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
   },
   /** Entrance for cards and list items. */
@@ -270,21 +312,13 @@ export const shared = stylex.create({
   column: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
   /** Current app surface colour, for sheets and pages inside an app. */
   surface: { backgroundColor: app.bg, color: app.fg },
-  /** Liquid glass: status stack, dock, widgets, lock-screen buttons, volume HUD. */
+  /** Liquid glass: blur, tint and a rim, per decision 18. Status stack, dock, widgets, lock-screen buttons, volume HUD. */
   glass: {
     position: 'relative',
-    backdropFilter: 'blur(18px) saturate(170%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(170%)',
-    backgroundColor: 'rgba(255,255,255,.18)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 0 rgba(255,255,255,.28),0 8px 18px rgba(0,0,0,.26)',
-    '::after': {
-      content: '""',
-      position: 'absolute',
-      inset: 0,
-      borderRadius: 'inherit',
-      backgroundImage: 'radial-gradient(120% 60% at 30% -10%,rgba(255,255,255,.45),rgba(255,255,255,0) 60%)',
-      pointerEvents: 'none'
-    }
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    backgroundColor: glass.tint,
+    boxShadow: shadow.rim
   },
   // white-space and text-shadow are the enclosing tile's, meant for its label:
   // left on, the event line runs straight out through the widget's right edge.
@@ -292,65 +326,136 @@ export const shared = stylex.create({
     position: 'relative',
     width: layout.widget,
     height: layout.widget,
-    borderRadius: 23,
-    padding: 12,
+    borderRadius: radius.xxl,
+    padding: space.md,
     overflow: 'hidden',
     cursor: 'pointer',
     whiteSpace: 'normal',
     textShadow: 'none',
     transitionProperty: 'transform',
-    transitionDuration: '.15s',
-    transform: { default: null, ':active': 'scale(.95)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
-  /** Small bold label inside a widget. */
-  widgetLabel: { display: 'block', fontSize: 11, fontWeight: 600, opacity: 0.92 }
+  /** Small semibold label inside a widget. */
+  widgetLabel: {
+    display: 'block',
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    opacity: 0.92
+  }
 })
 
 /**
- * The type ramp as whole blocks: size, leading and weight together, because
- * setting one without the others is what produced 233 loose `fontSize`
- * declarations across the apps. `Text`'s `size` prop names these.
+ * The type ramp as whole blocks: Dynamic Type at the Large size, each step
+ * carrying size, leading, tracking and weight, because setting one without the
+ * others is what produced 233 loose `fontSize` declarations across the apps.
+ * `Text`'s `size` prop names these; `Text`'s `weight` prop emphasises a step.
  */
 export const typography = stylex.create({
-  largeTitle: { fontSize: typeScale.largeTitle, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.8 },
-  title1: { fontSize: typeScale.title1, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.6 },
-  title2: { fontSize: typeScale.title2, fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.4 },
-  title3: { fontSize: typeScale.title3, fontWeight: 600, lineHeight: 1.25 },
-  /** Body weight raised to semibold: the lead line of a row or card. */
-  headline: { fontSize: typeScale.headline, fontWeight: 600, lineHeight: 1.3 },
-  body: { fontSize: typeScale.body, fontWeight: 400, lineHeight: 1.4 },
-  callout: { fontSize: typeScale.callout, fontWeight: 400, lineHeight: 1.4 },
-  subheadline: { fontSize: typeScale.subheadline, fontWeight: 400, lineHeight: 1.4 },
-  footnote: { fontSize: typeScale.footnote, fontWeight: 400, lineHeight: 1.35 },
-  caption1: { fontSize: typeScale.caption1, fontWeight: 400, lineHeight: 1.3 },
-  caption2: { fontSize: typeScale.caption2, fontWeight: 400, lineHeight: 1.3 }
+  largeTitle: {
+    fontSize: typeScale.largeTitle,
+    lineHeight: leading.largeTitle,
+    letterSpacing: tracking.largeTitle,
+    fontWeight: weight.bold
+  },
+  title1: {
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.bold
+  },
+  title2: {
+    fontSize: typeScale.title2,
+    lineHeight: leading.title2,
+    letterSpacing: tracking.title2,
+    fontWeight: weight.bold
+  },
+  title3: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.semibold
+  },
+  /** Body raised to semibold: the lead line of a row or card. */
+  headline: {
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    letterSpacing: tracking.headline,
+    fontWeight: weight.semibold
+  },
+  body: {
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    fontWeight: weight.regular
+  },
+  callout: {
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    fontWeight: weight.regular
+  },
+  subheadline: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.regular
+  },
+  footnote: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.regular
+  },
+  caption1: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.regular
+  },
+  caption2: {
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.regular
+  }
 })
 
 /**
- * The two app themes. Apply one to an app's root instead of hand-rolling a
- * `createTheme`: every row, separator, switch and secondary label in the kit
- * reads from these, so a dark app no longer has to avoid `Row` and `Section`.
- * `light` restates the kit's own defaults, so applying it changes nothing.
+ * The two app themes: UIKit's light and dark dynamic colours. Apply one to an
+ * app's root instead of hand-rolling a `createTheme`: every row, separator,
+ * switch and secondary label in the kit reads from these. `light` restates the
+ * kit's own defaults, so applying it changes nothing.
  */
 export const light = stylex.createTheme(app, {
-  bg: colors.groupedLight,
+  bg: colors.grey6,
   fg: colors.black,
   surface: colors.white,
-  elevated: colors.barLight,
-  label2: colors.grey,
-  separator: colors.separator,
-  fill: colors.fill,
-  track: colors.trackLight
+  elevated: colors.white,
+  label2: 'rgba(60,60,67,.6)',
+  label3: 'rgba(60,60,67,.3)',
+  link: colors.blue,
+  separator: 'rgba(60,60,67,.29)',
+  fill: 'rgba(120,120,128,.2)',
+  fill2: 'rgba(120,120,128,.16)',
+  fill3: 'rgba(118,118,128,.12)',
+  control: colors.white
 })
 export const dark = stylex.createTheme(app, {
   bg: colors.black,
   fg: colors.white,
-  surface: colors.darkElevated,
-  elevated: colors.darkElevated2,
-  label2: colors.grey,
-  separator: colors.separatorDark,
-  fill: colors.fillDark,
-  track: colors.trackDark
+  surface: colors.grey6Dark,
+  elevated: colors.grey5Dark,
+  label2: 'rgba(235,235,245,.6)',
+  label3: 'rgba(235,235,245,.3)',
+  link: colors.blueDark,
+  separator: 'rgba(84,84,88,.6)',
+  fill: 'rgba(120,120,128,.36)',
+  fill2: 'rgba(120,120,128,.32)',
+  fill3: 'rgba(118,118,128,.24)',
+  control: colors.grey2Dark
 })
 
 /** Stagger for lists: `stylex.props(shared.rise, delay(i * 40))`. */

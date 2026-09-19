@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- Built against UI kit 1.0.0 token names.
+
 ## 1.2.0
 
 - Made the folded Duo mark the animated snake head using the exact product-icon geometry.

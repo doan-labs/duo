@@ -8,7 +8,7 @@ import * as stylex from '@stylexjs/stylex'
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react'
 import { Button, Screen, Text, VStack, useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex'
 
 export default function App() {
   const deadline = useKV(os.storage, 'deadline')
@@ -28,8 +28,8 @@ export default function App() {
   </div></Screen>
 }
 const styles = stylex.create({
-  screen: { backgroundColor: colors.groupedLight },
-  body: { height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: 24, boxSizing: 'border-box', backgroundColor: colors.groupedLight, color: colors.black, fontFamily: fonts.system },
+  screen: { backgroundColor: colors.grey6 },
+  body: { height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: 24, boxSizing: 'border-box', backgroundColor: colors.grey6, color: colors.black, fontFamily: fonts.system },
   heading: { fontSize: 36, margin: 0, fontWeight: 600 },
   clock: { fontSize: 80, fontWeight: 300, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.06em' }
 })`

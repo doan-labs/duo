@@ -2,7 +2,7 @@ import { type Os, os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Push, Text, Title, VStack } from '@doan-labs/duo-uikit'
 import { Page } from '@doan-labs/duo-uikit/nav.tsx'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
@@ -56,7 +56,7 @@ export const Notes = (_: { os: Os }) => {
     return () => ro.disconnect()
   }, [])
   return (
-    <VStack ref={root}>
+    <VStack ref={root} xstyle={[dark]}>
       {wide ? (
         <Columns m={model} />
       ) : (

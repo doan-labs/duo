@@ -10,7 +10,20 @@
 // scrubs (the unlock lift, the app zoom, the home-bar drag) is imperative on refs,
 // because a scrubbed animation has no declarative equivalent.
 
-import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+// An app wears the kit's light or dark theme, inherited by every nav page inside.
+import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
+import {
+  app,
+  chrome,
+  colors,
+  easing,
+  layout,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
@@ -344,7 +357,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
                 e.side === 'right' && styles.appRight(split * 100),
                 (drop?.id === e.id || switcher) && styles.appDrag,
                 e.parked && !switcher && styles.appParked,
-                e.a.light && light
+                e.a.light ? light : dark
               )}
             >
               {e.a.id ? <Sandbox id={e.a.id} os={e.ctx} wide={wide} side={e.side} /> : <View os={e.ctx} />}
@@ -374,9 +387,6 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   )
 }
 
-/** `light` apps: the grouped light surface, inherited by every nav page inside. */
-const light = stylex.createTheme(app, { bg: '#f2f2f7', fg: '#000' })
-
 const styles = stylex.create({
   disp: {
     position: 'absolute',
@@ -387,16 +397,14 @@ const styles = stylex.create({
     transitionProperty: 'opacity',
     transitionDuration: '.22s'
   },
-  wall: (url: string) => ({
-    backgroundImage: `linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.04) 40%,rgba(0,0,0,.36)),url("${url}")`
-  }),
-  dispWide: { backgroundPosition: 'center, center', borderRadius: 42.5 },
+  wall: (url: string) => ({ backgroundImage: `${chrome.wash},url("${url}")` }),
+  dispWide: { backgroundPosition: 'center, center', borderRadius: layout.screenInner },
   dispNarrow: {
     backgroundPosition: 'center, 22% center',
-    borderTopLeftRadius: 2.5,
-    borderTopRightRadius: 46,
-    borderBottomRightRadius: 46,
-    borderBottomLeftRadius: 2.5
+    borderTopLeftRadius: layout.screenCoverHinge,
+    borderTopRightRadius: layout.screenCoverFree,
+    borderBottomRightRadius: layout.screenCoverFree,
+    borderBottomLeftRadius: layout.screenCoverHinge
   },
   // Asleep: the panel stays where it is, black, and any tap wakes it. Powered off
   // looks the same; only the side button answers.
@@ -427,15 +435,16 @@ const styles = stylex.create({
     right: 12,
     zIndex: 2,
     pointerEvents: 'none',
-    fontSize: 10,
-    fontWeight: 600,
+    fontSize: typeScale.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
     lineHeight: 1,
     paddingTop: 4,
     paddingBottom: 4,
     paddingLeft: 8,
     paddingRight: 8,
-    borderRadius: 999,
-    color: 'white',
+    borderRadius: radius.pill,
+    color: colors.white,
     backgroundColor: colors.orange
   },
   // Split at the divider, the hinge by default, as Apple's footage shows: no seam, the two just meet.
@@ -461,9 +470,9 @@ const styles = stylex.create({
       width: 6,
       height: 56,
       marginTop: -28,
-      borderRadius: 3,
-      backgroundColor: 'rgba(255,255,255,.7)',
-      boxShadow: '0 0 0 1px rgba(0,0,0,.25)'
+      borderRadius: radius.xs,
+      backgroundColor: chrome.indicator,
+      boxShadow: shadow.card
     }
   },
   dividerAt: (pct: number) => ({ left: `${pct}%` }),
@@ -473,9 +482,9 @@ const styles = stylex.create({
   appDrag: {
     zIndex: 4,
     pointerEvents: 'none',
-    boxShadow: '0 24px 60px rgba(0,0,0,.45)',
+    boxShadow: shadow.float,
     transitionProperty: 'transform, border-radius',
     transitionDuration: '.16s',
-    transitionTimingFunction: 'ease-out'
+    transitionTimingFunction: easing.out
   }
 })

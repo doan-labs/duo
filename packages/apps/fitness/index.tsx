@@ -3,7 +3,7 @@ import type { Os } from '@doan-labs/duo-sdk'
 import { LargeTitle, Screen, Text, Title } from '@doan-labs/duo-uikit'
 import { Bars, card, RINGS, Rings } from '@doan-labs/duo-uikit/rings.tsx'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { styles } from './styles.ts'
 
@@ -30,18 +30,18 @@ export const Fitness = (_: { os: Os }) => (
     </div>
     <div {...stylex.props(card.cols)}>
       <div {...stylex.props(card.hcard, card.hcardDark, delay.ms(100))}>
-        <div {...stylex.props(card.cap, card.capTint(appAppearance.fitnessColor))}>Move · this week</div>
+        <div {...stylex.props(card.cap, card.capTint(appAppearance.fitnessExercise))}>Move · this week</div>
         <div {...stylex.props(card.val)}>
           3,411<s {...stylex.props(card.unit)}>KCAL</s>
         </div>
-        <Bars values={walk('fitness-move', 7)} colour={appAppearance.fitnessColor2} />
+        <Bars values={walk('fitness-move', 7)} colour={appAppearance.fitnessMove} />
       </div>
       <div {...stylex.props(card.hcard, card.hcardDark, delay.ms(150))}>
-        <div {...stylex.props(card.cap, card.capTint(colors.cyan))}>Stand · this week</div>
+        <div {...stylex.props(card.cap, card.capTint(appAppearance.fitnessStand))}>Stand · this week</div>
         <div {...stylex.props(card.val)}>
           68<s {...stylex.props(card.unit)}>HRS</s>
         </div>
-        <Bars values={walk('fitness-stand', 7)} colour={colors.cyan} />
+        <Bars values={walk('fitness-stand', 7)} colour={appAppearance.fitnessStand} />
       </div>
     </div>
     <Title xstyle={[styles.hdrSm]}>Workouts</Title>

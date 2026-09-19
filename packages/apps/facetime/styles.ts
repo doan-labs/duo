@@ -1,4 +1,14 @@
-import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  app,
+  appAppearance,
+  colors,
+  easing,
+  radius,
+  shadow,
+  space,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 // Same as shared.ts's. StyleX resolves a keyframe name at compile time, so one
@@ -10,19 +20,20 @@ const rip = stylex.keyframes({ to: { transform: 'scale(2.3)', opacity: 0 } })
 export const styles = stylex.create({
   flush: { paddingBottom: 0 },
   stage: { position: 'absolute', inset: 0 },
-  newBtn: { opacity: 1, color: colors.blueDark },
-  person: { backgroundColor: colors.darkElevated, borderBottomColor: appAppearance.notesColor6, cursor: 'pointer' },
+  newBtn: { opacity: 1, color: app.link },
+  /** A contact row is tappable; its surface and hairline are the grouped list's. */
+  person: { cursor: 'pointer' },
   avatar: {
     width: 38,
     height: 38,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     flexShrink: 0,
     display: 'grid',
     placeItems: 'center'
   },
   tint: (bg: string) => ({ backgroundImage: bg }),
-  name: { fontWeight: appAppearance.musicFontWeight2 },
-  blue: { color: colors.blueDark },
+  name: { fontWeight: weight.semibold },
+  blue: { color: app.link },
   ft: { position: 'absolute', inset: 0, backgroundColor: colors.black },
   remote: { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' },
   remoteJoined: { transitionProperty: 'opacity', transitionDuration: '.6s', opacity: 0.35 },
@@ -30,54 +41,47 @@ export const styles = stylex.create({
     position: 'relative',
     width: 104,
     height: 104,
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: appAppearance.phoneBackgroundColor2,
+    borderRadius: radius.circle,
+    backgroundColor: colors.grey2Dark,
     display: 'grid',
     placeItems: 'center',
-    fontSize: appAppearance.calculatorBorderRadius,
-    fontWeight: appAppearance.homeFontWeight,
+    fontSize: typeScale.display,
+    lineHeight: 1,
+    fontWeight: weight.regular,
     marginBottom: 10
   },
   rip: {
     position: 'absolute',
     inset: -4,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     borderWidth: 2,
     borderStyle: 'solid',
-    borderColor: appAppearance.phoneBorderColor,
+    borderColor: appAppearance.facetimeRipple,
     animationName: rip,
     animationDuration: '2.2s',
-    animationTimingFunction: appAppearance.phoneAnimationTimingFunction,
+    animationTimingFunction: easing.out,
     animationIterationCount: 'infinite'
   },
+  /** Caller and call state sit over the video, so both carry the text shadow. */
   label: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 58,
     textAlign: 'center',
-    fontSize: appAppearance.podcastsFontSize,
-    fontWeight: appAppearance.musicFontWeight3,
-    textShadow: appAppearance.facetimeTextShadow
+    fontWeight: weight.medium,
+    textShadow: shadow.text
   },
-  state: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 86,
-    textAlign: 'center',
-    fontSize: appAppearance.musicFontSize6,
-    opacity: 0.7
-  },
+  state: { position: 'absolute', left: 0, right: 0, top: 86, textAlign: 'center', opacity: 0.7 },
   pip: {
     position: 'absolute',
-    right: 12,
+    right: space.md,
     top: 56,
     width: 96,
     height: 132,
-    borderRadius: appAppearance.musicBorderRadius,
+    borderRadius: radius.xl,
     overflow: 'hidden',
-    boxShadow: appAppearance.facetimeBoxShadow,
+    boxShadow: shadow.float,
     zIndex: 3,
     animationName: pop,
     animationDuration: '.5s'
@@ -94,12 +98,11 @@ export const styles = stylex.create({
   ctlBtn: {
     width: 62,
     height: 62,
-    borderRadius: appAppearance.settingsBorderRadius,
-    backgroundColor: appAppearance.phoneBackgroundColor3,
+    borderRadius: radius.circle,
+    backgroundColor: app.fill,
     display: 'grid',
-    placeItems: 'center',
-    fontSize: appAppearance.podcastsFontSize
+    placeItems: 'center'
   },
-  hang: { backgroundColor: colors.redBright },
+  hang: { backgroundColor: colors.redDark },
   camMsg: { position: 'absolute', inset: 0, backgroundColor: colors.black }
 })
