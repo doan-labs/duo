@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.2048",
+    "name": "2048",
+    "version": "1.0.2",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/2048",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "0.2.0",
+    "at": "2026-09-19T02:45:49.865Z",
+    "commit": "a9e58e4354b8b5cd50f46910eb98cef959353aca",
+    "hash": "1109f019"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 262361,
+      "sha256": "25cd438192cac48d3f250871ac618a22766a9ff39117fe4c562ac75ca4d471a8"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 60621,
+      "sha256": "465b986402d5e20001a88884e92ee201557f89481a7c5fa212f5b00bb1f9e335"
+    }
+  ]
+}
