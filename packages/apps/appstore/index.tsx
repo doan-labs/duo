@@ -301,8 +301,13 @@ function Item({ row, store, open, onShow }: { row: StoreRow; store: Store; open:
           <span {...stylex.props(styles.perms)}>
             {row.development ? (
               <span {...stylex.props(styles.tag, styles.tagDev)}>DEV</span>
+            ) : row.lane === 'official' ? (
+              <span {...stylex.props(styles.tag, styles.tagOfficial)}>
+                <Sym name="check" size={10} />
+                Official
+              </span>
             ) : (
-              row.lane === 'community' && <span {...stylex.props(styles.tag)}>Community</span>
+              <span {...stylex.props(styles.tag)}>Community</span>
             )}
             {row.permissions.map((p) => (
               <span key={p} title={p} {...stylex.props(styles.tag)}>
@@ -310,12 +315,6 @@ function Item({ row, store, open, onShow }: { row: StoreRow; store: Store; open:
                 {p}
               </span>
             ))}
-            {!row.permissions.length && !row.development && (
-              <span {...stylex.props(styles.tag)}>
-                <Sym name="lock" size={10} />
-                Sandboxed
-              </span>
-            )}
           </span>
         </button>
         <Action row={row} store={store} open={open} />

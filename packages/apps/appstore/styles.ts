@@ -340,6 +340,7 @@ export const styles = stylex.create({
     fontWeight: 600
   },
   tagDev: { backgroundColor: colors.orange, color: colors.white },
+  tagOfficial: { backgroundColor: 'rgba(52,199,89,.14)', color: colors.green },
   action: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0, minWidth: 72 },
   /** GET / OPEN capsule. */
   pill: {

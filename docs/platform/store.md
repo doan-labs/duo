@@ -17,7 +17,8 @@ official release per day, rotating: the release's own icon, blown up and blurred
 artwork, with the icon floating over it when the box is wider than 600 px. Then one carousel
 per lane, **From Doan Labs**, **Community** and **Local previews**: columns of three rows that
 page sideways and snap, two columns visible in a wide box and one in a narrow one. A row is a
-60 px icon, name, `author · version`, lane and permission tags with glyphs, and the GET / OPEN /
+60 px icon, name, `author · version`, a lane tag (a green tick for Official) and permission tags
+with glyphs, and the GET / OPEN /
 UPDATE / Retry update capsule or a download ring. Notices (errors as `role="alert"`, "Updates
 when … closes", **Restore previous version**) sit under the row. Tapping an icon or name pushes
 a detail page: version, size, lane, licence and access facts, a Privacy list of the granted
