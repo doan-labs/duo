@@ -1076,6 +1076,7 @@ dark gradient: every app brings its own palette and no artwork has to be drawn o
 Whether the box is wide decides the layout, measured with a ResizeObserver as Maps and
 Camera do, not the display: a split half of the inner display is as narrow as the cover.
 Every button label, `data-store-app` and `data-store-submit` hook and notice the store
-checks drive is unchanged. The `appstore*` appearance tokens are no longer read; the
-styles use the kit's `app` and `colors` tokens and plain sizes, as the kit's own do.
+checks drive is unchanged. The `appstore*` appearance tokens were rewritten for the new
+styles: `scripts/check-app-tokens.ts` keeps every size, weight, radius and fixed colour in
+an app's styles in `tokens.stylex.ts`, so the store's live there too.
 
