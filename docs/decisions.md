@@ -1065,9 +1065,11 @@ when a half empties, since the narrow home the other half shows is always half.
 
 The first Store was a settings-style list: a gradient hero, then every app in one long
 grouped list. It worked and looked like a form. The new root page follows the App Store:
-a Today card, then one carousel per lane whose columns of three rows page sideways and
-snap, so nine apps take one screen instead of three, and a lane filter (All, Official,
-Community) beside the Apps/Updates segment, as the website's `/apps` browser has.
+a Today card, then one group per lane with its rows in two columns on a wide box, so nine
+apps take one screen instead of three, and a lane filter (All, Official, Community) beside
+the Apps/Updates segment, as the website's `/apps` browser has. A sideways carousel was
+tried first and dropped: a mouse cannot scroll it. Restore previous version moved from
+under the row to the detail page, next to Remove App, where the destructive actions live.
 
 The Today card's artwork is the featured release's own icon, blown up and blurred under a
 dark gradient: every app brings its own palette and no artwork has to be drawn or shipped.

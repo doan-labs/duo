@@ -245,28 +245,9 @@ export const styles = stylex.create({
   hTitle: { fontSize: 22, fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.15 },
   hBlurb: { fontSize: 13, color: colors.grey, marginTop: 2 },
   hCount: { fontSize: 13, fontWeight: 500, color: colors.grey, whiteSpace: 'nowrap', paddingBottom: 3 },
-  /** Columns of rows that page sideways and snap. */
-  rail: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 14,
-    paddingRight: 16,
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    scrollSnapType: 'x mandatory',
-    scrollPaddingLeft: 16,
-    scrollbarWidth: 'none',
-    WebkitOverflowScrolling: 'touch'
-  },
-  page: {
-    flexShrink: 0,
-    width: 'calc(100% - 44px)',
-    scrollSnapAlign: 'start',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  pageWide: { width: 'calc(50% - 23px)' },
-  pageFirst: { marginLeft: 16 },
+  /** The lane's rows; two columns across when the box is wide. */
+  grid: { display: 'grid', gridTemplateColumns: '1fr', columnGap: 28, paddingRight: 16, paddingLeft: 16 },
+  gridWide: { gridTemplateColumns: '1fr 1fr' },
   /** App row. */
   item: {
     borderBottomWidth: { default: 1, ':last-child': 0 },
@@ -363,15 +344,6 @@ export const styles = stylex.create({
   },
   pillFilled: { backgroundColor: colors.blue, color: colors.white },
   pillLight: { backgroundColor: 'rgba(255,255,255,.25)', color: colors.white },
-  plain: {
-    color: colors.blue,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: 'pointer',
-    paddingTop: 2,
-    paddingBottom: 2,
-    backgroundColor: 'transparent'
-  },
   /** Download ring. */
   ring: (turn: number) => ({
     width: 28,
@@ -501,6 +473,7 @@ export const styles = stylex.create({
   stack: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
   remove: { color: colors.red, fontSize: 15, fontWeight: 500, cursor: 'pointer', width: '100%' },
   link: { cursor: 'pointer', width: '100%', textAlign: 'left', color: app.fg, fontSize: 15 },
+  linkBlue: { color: colors.blue },
   glyphGreen: { backgroundColor: colors.green },
   noTop: { paddingTop: 0, marginTop: 0 }
 })

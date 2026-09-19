@@ -14,16 +14,16 @@ catalog, whose host also shows in a banner), then the Apps/Updates segment behin
 `stageUpdates` beside the lane chips **All**, **Official**, **Community** and, with a developer
 catalog loaded, **Local previews**, each with its count. A Today card features one compatible
 official release per day, rotating: the release's own icon, blown up and blurred, is the
-artwork, with the icon floating over it when the box is wider than 600 px. Then one carousel
-per lane, **From Doan Labs**, **Community** and **Local previews**: columns of three rows that
-page sideways and snap, two columns visible in a wide box and one in a narrow one. A row is a
+artwork, with the icon floating over it when the box is wider than 600 px. Then one group per
+lane, **From Doan Labs**, **Community** and **Local previews**, its rows in two columns in a wide box
+and one in a narrow one. A row is a
 60 px icon, name, `author · version`, a lane tag (a green tick for Official) and permission tags
 with glyphs, and the GET / OPEN /
 UPDATE / Retry update capsule or a download ring. Notices (errors as `role="alert"`, "Updates
-when … closes", **Restore previous version**) sit under the row. Tapping an icon or name pushes
+when … closes") sit under the row. Tapping an icon or name pushes
 a detail page: version, size, lane, licence and access facts, a Privacy list of the granted
-permissions, View source (the manifest repo, through the native bridge) and **Remove App**.
-Rows carry `data-store-app`; the checks drive those buttons by their text. The runtime gives
+permissions, View source (the manifest repo, through the native bridge), **Restore previous
+version** when a previous release is kept, and **Remove App**. Rows carry `data-store-app`; the checks drive those buttons by their text. The runtime gives
 each row `icon` (a catalog file, or an object URL for a locally installed release), `repo`,
 `bytes` and the optional release `note`.
 

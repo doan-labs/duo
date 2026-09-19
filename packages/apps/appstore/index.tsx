@@ -49,10 +49,6 @@ export function AppStore({ os, openExternal }: { os: Os; openExternal: External 
   )
 }
 
-/** Rows per column of a carousel, as the App Store pages its lists. */
-const PER_PAGE = 3
-const chunk = <T,>(xs: T[], n: number) =>
-  Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n))
 /** What a row says under its name: who made it, and what it reaches for. */
 const tagline = (row: StoreRow) =>
   row.permissions.length ? `Uses ${row.permissions.join(', ').toLowerCase()}` : 'Sandboxed, no device access'
@@ -237,7 +233,7 @@ function Featured({
   )
 }
 
-/** A lane: heading, then columns of three rows that page sideways, as the App Store lists do. */
+/** A lane: heading, then its rows, two columns across in a wide box. */
 function Group({
   title,
   blurb,
@@ -267,13 +263,9 @@ function Group({
           {rows.length} {rows.length === 1 ? 'app' : 'apps'}
         </span>
       </div>
-      <div {...stylex.props(styles.rail)}>
-        {chunk(rows, PER_PAGE).map((page, i) => (
-          <div key={page[0]!.id} {...stylex.props(styles.page, wide && styles.pageWide, i === 0 && styles.pageFirst)}>
-            {page.map((row) => (
-              <Item key={row.id} row={row} store={store} open={open} onShow={() => onShow(row)} />
-            ))}
-          </div>
+      <div {...stylex.props(styles.grid, wide && styles.gridWide)}>
+        {rows.map((row) => (
+          <Item key={row.id} row={row} store={store} open={open} onShow={() => onShow(row)} />
         ))}
       </div>
     </section>
@@ -281,7 +273,7 @@ function Group({
 }
 
 function Item({ row, store, open, onShow }: { row: StoreRow; store: Store; open: Open; onShow: () => void }) {
-  const notes = Notices(row, store)
+  const notes = Notices(row)
   return (
     <div data-store-app={row.id} {...stylex.props(styles.item)}>
       <div {...stylex.props(styles.itemRow)}>
@@ -324,8 +316,8 @@ function Item({ row, store, open, onShow }: { row: StoreRow; store: Store; open:
   )
 }
 
-/** Error, staged update and recovery notices; the checks look for these buttons next to the row. */
-function Notices(row: StoreRow, store: Store): ReactNode {
+/** Error and staged-update notices under a row; Restore lives on the detail page. */
+function Notices(row: StoreRow): ReactNode {
   const parts: ReactNode[] = []
   if (row.error)
     parts.push(
@@ -338,19 +330,6 @@ function Notices(row: StoreRow, store: Store): ReactNode {
       <span key="c" {...stylex.props(styles.note)}>
         Updates when {row.name} closes
       </span>
-    )
-  if (row.recovery)
-    parts.push(
-      <button
-        key="r"
-        type="button"
-        {...stylex.props(styles.plain)}
-        onClick={() => {
-          void store.restore(row.id)
-        }}
-      >
-        Restore previous version
-      </button>
     )
   return parts.length ? parts : null
 }
@@ -467,7 +446,7 @@ function Detail({
       row.permissions.length ? 'permissions' : 'Sandboxed'
     ]
   ]
-  const notes = Notices(row, store)
+  const notes = Notices(row)
   return (
     <Page title={row.name} back={back}>
       <div data-store-app={row.id}>
@@ -535,6 +514,18 @@ function Detail({
         </p>
         {row.installed && (
           <Section>
+            {row.recovery && (
+              <button
+                type="button"
+                {...stylex.props(shared.row, styles.link, styles.linkBlue)}
+                onClick={() => {
+                  void store.restore(row.id)
+                }}
+              >
+                <Sym name="undo" size={16} />
+                Restore previous version
+              </button>
+            )}
             <button
               type="button"
               {...stylex.props(shared.row, styles.remove)}
