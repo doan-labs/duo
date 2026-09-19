@@ -95,8 +95,10 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
     let v = 0
     let t = down.timeStamp
     let held = false
-    /** The card has moved sideways: the halves are on offer, not the switcher. */
+    /** The card has moved sideways since the hold: the halves are on offer, not the switcher. */
     let zoned = false
+    /** Where the hand was when the hold fired; a swipe up is rarely dead straight, so drift before it does not count. */
+    let hx = 0
     let over: Side | null = null
     let timer = 0
     // How far up the card sits: with the hand, but never off the top of the glass.
@@ -112,6 +114,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
     }
     const hold = () => {
       held = true
+      hx = dx
       sc = 0.4
       paint()
       // The wallpaper is the backdrop for the halves and the switcher, so the home screen goes.
@@ -125,7 +128,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       dx = (m.clientX - down.clientX) * s
       dy = ny
       if (held) {
-        if (wide && Math.abs(dx) > 40) zoned = true
+        if (wide && Math.abs(dx - hx) > 60) zoned = true
         const now = zoned ? pick() : null
         if (now !== over) {
           over = now
