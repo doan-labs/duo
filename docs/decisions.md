@@ -153,169 +153,78 @@ empty whenever the view is home, and the pill's offset (half the difference
 between the side bands) is written in `hud.tsx` and mirrored in `main.ts`.
 
 ## 23. The shell is decomposed into iOS's own shape
-2026-09-12, accepted. Amends 16. `os/os.tsx` had reached 1992 lines holding
-every layer of the shell at once, and the layer you wanted was always in the
-middle of another. It is now boot only: build the root element, render
-`<SpringBoard>`. The shell is `springboard/`, one file per layer — home screen,
-home bar, lock screen, status stack, Spotlight, Control Center, power, the
-system HUDs, the grid tile — with `springboard.tsx` keeping the layer stack and
-the state that outlives any one layer, `scenes.ts` the open apps, `gestures.ts`
-the scrubber and the zoom geometry, `clock.ts` the minute two layers read. The
-device the frame buttons reach is `device.ts`, which knows nothing about React;
-what an app is written against is `uikit/`. The names are Apple's — SpringBoard,
-scene, UIKit — because the seams already were: the code had the same three-way
-split between the thing a button presses, the shell that stacks layers and the
-framework an app links against, so naming them after the OS being imitated puts
-each file where someone who knows iOS would look for it, rather than in a
-vocabulary invented here that has to be learned first. The import direction is
-what holds the shape: `apps/` sees `uikit/` only, `springboard/` sees `uikit/`,
-`device.ts` and `apps/index.ts`, `device.ts` sees only types. Costs: five files
-became twenty, so a change that used to be a scroll is now a search; `rise` and
-`fade` are declared again in four springboard files, because StyleX resolves a
-keyframe only in the file that uses it (working.md, Gotchas), as `apps/` already
-had to; two seams pass a ref where a prop would read better — `home-screen.tsx`
-writes its page into `pageRef`, since `spot()` has to subtract a CSS transform
-`offsetLeft` cannot see, and `home-bar.tsx` takes `lockedRef`, since its hold
-timer fires 220 ms after the press and must read the lock then, not at the
-render that made the handler; and `springboard.tsx` and `home-bar.tsx` now pass
-a `Scenes` object between them where the old code closed over its own state.
+2026-09-12, accepted. Amends 16. `os/os.tsx` had reached 1992 lines holding every layer of
+the shell at once, and the layer you wanted was always in the middle of another. It is now
+boot only. The shell is `springboard/`, one file per layer, with `springboard.tsx` keeping
+the layer stack and the state that outlives any one layer, `scenes.ts` the open apps,
+`gestures.ts` the scrubber and the zoom geometry, `clock.ts` the minute two layers read;
+`device.ts` is what the frame buttons reach and knows nothing about React, and `uikit/` is
+what an app is written against. The names are Apple's because the seams already were, so
+each file sits where someone who knows iOS would look rather than in a vocabulary invented
+here. The import direction holds the shape: `apps/` sees `uikit/` only, `springboard/` sees
+`uikit/`, `device.ts` and `apps/index.ts`, `device.ts` sees only types. Cost: five files
+became twenty; `rise` and `fade` are redeclared in four files, since StyleX resolves a
+keyframe only where it is used (working.md, Gotchas); and two seams pass a ref where a prop
+would read better - `home-screen.tsx` writes its page into `pageRef` because `spot()` must
+subtract a CSS transform `offsetLeft` cannot see, and `home-bar.tsx` takes `lockedRef`
+because its hold timer fires 220 ms after the press.
 
 ## 24. The inner panel stays live through the fold, clipped where the fold takes it
-2026-09-12, accepted. Amends 3, 4 (lock shared, app state not) and the last cost
-in 21. Folding used to swap whatever was running for the baked home screen —
-close the lid a few degrees on a Wikipedia page and the big display was back to
-its icons, the app only reappearing on the cover once the hinge had stopped.
-Three changes, and the first is the one that matters.
-
-**The live inner panel no longer waits for flat.** The screen shader projects
-the flat picture from an eye and shows it along the same ray on the folded
-surface (decision 2), so the folded display is the flat picture cut off at the
-moving half's free edge. `foldClip()` in main.ts computes that edge — rotate it
-about the hinge exactly as `shaders/fold.ts` does, project it back onto the
-glass plane along the ray it leaves the eye on — and the panel is clipped there
-with `clip-path: inset()`. Flat panel, same rays, same picture: the app keeps
-running, scrolling and playing while the phone folds, and it is still the same
-DOM. Folding a little and opening again touches nothing at all. The clip is
-taken from the camera's own position and not the shader's fixed eye: the two
-agree at the default pose, and away from it this one still cuts the panel
-exactly where the folding half hides it, which is what keeps a panel with no
-depth test off the fold. The panel holds all the way to closed, so the app is
-never a black slab of glass on the way down.
-
-**The bake goes dark, and the ramp moves to the panel.** `screen.ts` can only
-draw the shell, so while the phone is bending with an app up the inner texture
-is black and the live panel is the whole picture — including the blur and
-darkening the shader ramps over the moving half, which is most of what makes a
-fold read as a fold. `ramp()` in main.ts writes the shader's own curves into
-bare divs inside the panel: the darkening as one gradient, whose alpha CSS
-honours, and the blur as six nested `backdrop-filter` layers cut by `clip-path`,
-because Chrome applies a backdrop-filter at full strength across its box —
-`mask-image` does nothing to it — and mirrors the backdrop at the box's edge, so
-one masked layer cannot taper and one sized layer folds the picture back at its
-edge. Nested from the free edge with their variances adding up to the shader's
-radius, six layers taper without a visible step. Same band, same exponent, same
-72 texels of blur, in the 5 px/mm of the live panel rather than the 12 px/mm of
-the bake, at `z-index: 11` because the OS stacks up to 10 and the fold is the
-glass over all of it. The cover gets the same ramp while it holds the app, over
-its whole width from the hinge as `uiGradient` has it. With no app up nothing
-changes: the baked home screen folds with its fade, which is the look the fold
-was built around — and no panel is live to flatten it, since a live panel
-cannot bend.
-
-**The other display mirrors the one in use.** `follow(angle > HANDOVER)` in
-device.ts, every frame: the display in use leads and the other is made to show
-the same apps (`stage()` → `mirror()`, scenes.ts), opened and closed with no
-zoom because nothing is being launched — the fold is showing the same session on
-another piece of glass. So the cover already has the app before the fold turns
-it to you, and the inner display still has it when the phone opens again. The
-lead passes at 40°, where the fold has taken 94% of the inner display's width
-and the cover has turned round to be the glass in front of you; nothing visible
-happens at the crossing, both panels were already showing it. A first version
-handed the apps over instead — closed on one display, launched on the other —
-and the launch zoom playing on the cover at 34° was exactly the clutter a real
-fold does not have.
-
-Costs: React owns the panel's children and clears the container on its first
-commit, so the ramp divs have to check their parent every frame; a `clip-path`
-and a gradient are written while the hinge moves, and six `backdrop-filter`
-layers each blur the whole panel before the clip, which is not free; an OS
-layer above `z-index: 10` would sit over the fold;
-past half way the clip has eaten the whole ramp band and the fold line is a hard
-edge, in the live panel and in the shader alike. The mirror is a second copy of
-the app, not the same DOM — two React roots cannot share one — so a Safari
-iframe loads twice, and what you do on the display in use is not reflected in
-the copy: scroll a page on the cover while closed and the inner display opens on
-the copy's own scroll position. `arg` does not travel to the copy. An app is
-told which instance it is (`os.mirror`) and the copy must start no sound — a
-video embed that autoplayed on mount played twice from 90° down until tv/index.tsx
-and youtube/index.tsx checked it; what should play once lives at module level, as
-music/index.tsx's `deck()` already did. The cover
-cannot split (21), so it mirrors the first app whole, and when the lead passes
-to it below 40° the inner display's split collapses to that one app, quietly, on
-the 9% of it still showing.
+2026-09-12, accepted. Amends 3, 4 and the last cost in 21. Folding used to swap whatever
+was running for the baked home screen. Now `foldClip()` in main.ts computes the moving
+half's free edge - rotated about the hinge exactly as `shaders/fold.ts` does, projected
+back onto the glass along the ray it leaves the eye on - and clips the live panel there.
+Same rays, same picture: the app keeps running and scrolling all the way to closed. The
+clip is taken from the camera's own position, not the shader's fixed eye, so a panel with
+no depth test stays off the fold at any pose. `screen.ts` can only draw the shell, so with
+an app up the inner bake goes black and `ramp()` writes the shader's curves into the panel:
+the darkening as one gradient, the blur as six nested `backdrop-filter` layers cut by
+`clip-path`, because Chrome applies a backdrop-filter at full strength across its box and
+mirrors the backdrop at its edge, so one masked layer cannot taper. `follow(angle >
+HANDOVER)` mirrors the session onto the other display, opened with no zoom because nothing
+is being launched; the lead passes at 40°, where the fold has taken 94% of the inner width.
+Costs: React clears the panel container on first commit, so the ramp divs check their
+parent every frame; a clip-path, a gradient and six full-panel blurs are written while the
+hinge moves; an OS layer above `z-index: 10` would sit over the fold; past half way the
+clip has eaten the ramp band and the fold line is a hard edge. The mirror is a second React
+root, so an iframe loads twice, scroll is not shared, `arg` does not travel, and the copy
+must start no sound (`os.mirror`). The cover cannot split (21), so it mirrors the first app
+whole.
 
 ## 25. Control Center is three pages, and its switches are device state
-2026-09-12, accepted. Amends 20 (the panel), which stays true about where the
-panel sits and how it opens. Apple's hands-on footage of the cover display shows
-what 20 could not: a rail of glyphs down the right edge, a page of tiles behind
-it, and a Now Playing card filling the panel when the note is picked. So the
-panel is a three-page track — tiles, Now Playing, connectivity — moved by
-tapping the rail, and the pages are one card each rather than a second tile grid.
-The status stack answers the panel while it is open: the battery ring reads the
-charge out and the Wi-Fi glyph names the network, exactly as in the footage.
-
-Nothing on the panel is decorative any more, which is the point of the change:
-
-- The switches are `springboard/toggles.ts`, a module store outside React, not
-  a panel's `useState`. Both displays run their own `<SpringBoard>`, so per-panel
-  state would let the cover be in airplane mode while the inner display still had
-  bars. The status stack draws them on both.
-- Now Playing drives the Music app's deck, hoisted in `apps/music/index.tsx` from one
-  per component to one per device. A track started in Control Center is the one
-  the app opens on, and closing the app no longer stops the audio.
-- The power glyph opens the shell's slide-to-power-off sheet, the same one the
-  side button reaches; `+` puts the grid in edit mode.
-
-Costs: `springboard/` now imports an app file directly (`apps/music/index.tsx`) and not
-only `apps/index.ts` — the direction is still shell → app, but the surface is
-wider. The deck's clock is a 4 Hz `setInterval` that outlives every listener,
-because audio has to keep time with nothing mounted; it returns immediately while
-paused. A control removed in edit mode is remembered per panel, not per device,
-and only for the session — there is no controls library to add from, so the empty
-slot is the way back. Toggles are switches, not behaviour: airplane mode empties
-the status ring but nothing here has a radio to turn off, and the flashlight
-lights its tile and no more.
+2026-09-12, accepted. Amends 20, which stays true about where the panel sits and how it
+opens. Apple's cover-display footage shows a rail of glyphs down the right edge and a Now
+Playing card filling the panel, so the panel is a three-page track - tiles, Now Playing,
+connectivity - moved by tapping the rail, one card per page rather than a second tile grid.
+The status stack answers the panel while it is open: the battery ring reads the charge out,
+the Wi-Fi glyph names the network. Nothing on it is decorative. The switches are
+`springboard/toggles.ts`, a module store outside React, because both displays run their own
+`<SpringBoard>` and per-panel state would let the cover be in airplane mode while the inner
+display still had bars. Now Playing drives the Music deck, hoisted to one per device. The
+power glyph opens the shell's power-off sheet and `+` puts the grid in edit mode. Costs:
+`springboard/` now imports `apps/music/index.tsx` directly, so the shell → app surface is
+wider; the deck's clock is a 4 Hz `setInterval` that outlives every listener, because audio
+keeps time with nothing mounted; a control removed in edit mode is remembered per panel and
+only for the session. Toggles are switches, not behaviour - airplane mode empties the
+status ring but nothing here has a radio (flashlight: see 29).
 
 ## 26. The phone gives way to the window, not the other way round
-2026-09-12, accepted. Amends 22. 22 cut the window to the silhouette the phone
-paints through a fold, which held for folding and for the front view and broke
-the moment the view turned: edge-on, the near half is close enough to the camera
-that perspective magnifies it to 19.8 cm against 11.9 flat, and tilted 40° it is
-18.7 cm wide. Holding all of that at 37 px/cm needs an 880 × 860 window — bigger
-than the 960 × 760 we set out to shrink — and holding none of it crops the phone
-at the window's edge, which is what shipped.
-
-So the window keeps its size and the phone yields. `frame()` runs every frame,
-measures where the phone's bounds land on the glass at the reference eye, and
-picks the scale that fits them into the box the bands leave, capped at 37 px/cm.
-Face on nothing moves: the cap binds and the phone is the same size it has always
-been. Turned edge-on it is 97%, tilted 45° about 70%, and it never leaves the
-window.
-
-Bounds, not pixels, because this runs per frame: one box per mesh in two piles,
-the turning half measured in the hinge's space so the group's own matrix folds it
-exactly as `shaders/fold.ts` does — the fold is a vertex shader, so a mesh's own
-bounds never see it. Apple's file also carries a 96-vertex proxy the size of the
-phone and 6.1 cm deep that paints nothing; it is `PHANTOM` in `main.ts` and
-excluded, or the phone would sit at two thirds of its size everywhere.
-
-Costs: the scale is no longer a constant, so nothing may assume 37 px/cm except
-face on; the fit is a box fit, so at a steep tilt it reserves room for a rounded
-corner the phone does not paint and comes out around 10% smaller than it strictly
-needs; the wheel is deliberately left out of it (the fit reads the camera's
-direction, not its distance), so zooming in past ~36 cm still crops, as before;
-and the frame is still anchored on the hinge, so a closed phone hangs to one
-side of its box rather than in the middle of it.
+2026-09-12, accepted. Amends 22. 22 cut the window to the silhouette a fold paints, which
+broke the moment the view turned: edge-on, perspective magnifies the near half to 19.8 cm
+against 11.9 flat. Holding that at 37 px/cm needs an 880 × 860 window, bigger than the
+960 × 760 we set out to shrink, and holding none of it crops the phone. So the window keeps
+its size and the phone yields: `frame()` measures every frame where the phone's bounds land
+on the glass at the reference eye and picks the scale that fits them into the box the bands
+leave, capped at 37 px/cm. Face on nothing moves; edge-on it is 97%, tilted 45° about 70%.
+Bounds, not pixels, because this runs per frame: one box per mesh in two piles, the turning
+half measured in the hinge's space so the group's matrix folds it as `shaders/fold.ts`
+does, since a vertex shader never reaches a mesh's own bounds. Apple's 96-vertex
+phone-sized proxy paints nothing and is excluded as `PHANTOM`, or everything sits at two
+thirds size. Costs: nothing may assume 37 px/cm except face on; the box fit reserves room
+for a rounded corner the phone does not paint, so a steep tilt comes out about 10% small;
+the wheel is left out, since the fit reads direction and not distance, so zooming past
+~36 cm still crops; and the frame is anchored on the hinge, so a closed phone hangs to one
+side.
 
 ## 27. The cover is off when the phone is open flat, and fades in with the fold
 2026-09-12, accepted. Amends 24. The mirror put the app on the cover at every
@@ -352,52 +261,38 @@ vivid; and a tile no longer frosts anything that is not already under the scrim,
 which nothing is.
 
 ## 29. The flashlight is hardware, and its card stands in for the island
-2026-09-12, accepted. Amends 25, which left the flashlight lighting its tile
-and no more. It is the one switch in Control Center with something physical to
-show: Apple's model carries the LED as a 3.4 × 1.6 mm recess beside the rear
-cameras, emitter, glass and housing as three meshes. The emitter and glass go
-emissive, a small blended halo sprite sits off the glass and a point light
-spills onto the plateau; the housing stays dark so the pill keeps its edge.
-Additive blending was tried first and clips to a flat white disc on a white
-body. The lock screen's torch button, which had a `useState` of its own, now
-flips the same device-wide switch, so the LED, the tile and the button agree
-from either display.
-
-iOS 18 answers a flip by expanding the Dynamic Island into a black card: the
-brightness arc, the beam, the torch. The Duo has no island (its inner camera is
-under the display, the cover's is a punch-hole top-right), so the card drops
-out of the top edge on its own and goes back after 1.8 s. It reacts to the
-switch and not to the tile that flipped it, so it shows on both displays and
-for the lock screen button too.
-
-Cost: `main.ts` now imports from `springboard/`, the one place the scene reads
-shell state directly; a boolean a frame, no subscription. The arc has one level
-lit or dim, as the torch has no brightness to set.
+2026-09-12, accepted. Amends 25, which left the flashlight lighting its tile and no more.
+It is the one switch in Control Center with something physical to show: Apple's model
+carries the LED as a 3.4 × 1.6 mm recess beside the rear cameras, emitter, glass and
+housing as three meshes. The emitter and glass go emissive, a small blended halo sprite
+sits off the glass and a point light spills onto the plateau; the housing stays dark so the
+pill keeps its edge. Additive blending was tried first and clips to a flat white disc on a
+white body. The lock screen's torch button flips the same device-wide switch, so the LED,
+the tile and the button agree from either display. iOS 18 answers a flip by expanding the
+Dynamic Island into a black card; the Duo has no island, so the card drops out of the top
+edge on its own and goes back after 1.8 s. It reacts to the switch and not to the tile that
+flipped it, so it shows on both displays and for the lock screen button too. Cost:
+`main.ts` now imports from `springboard/`, the one place the scene reads shell state
+directly - a boolean a frame, no subscription. The arc has one level lit or dim, as the
+torch has no brightness to set.
 
 ## 30. Notes is iPadOS on the open phone, and its handwriting is a font
-2026-09-12, accepted. The app was one `textarea` on a white sheet. Unfolded, the
-inner display is 790 × 555 px — an iPad mini's shape — so Notes now draws what
-iPadOS draws at that size: a folder sidebar, the note list, the note, and the
-pencil palette floating over all three. It picks the layout off its own box with
-a ResizeObserver, not off the display, so a split half of the inner panel gets
-the phone's one-column Notes like the cover does (the same rule camera/index.tsx
-follows). Folders and tags are Apple's sample set and filter nothing; the list
-is the ten notes the app ships with, and its titles and previews are read back
-out of the text, so an edit retitles a row as it is typed.
-
-The sidebar glyphs are real SF Symbols out of AppKit (`folder.fill`,
-`trash.fill`, `note.text`, `person.2.fill`, twelve in all), tinted with the
-system yellow Notes uses; emoji stand-ins read as another app's icons next to
-the real ones. The handwritten note is the system handwriting face at 52 px, not
-ink paths: a path per glyph would be the only hand-drawn artwork in the project,
-and the text stays a `textarea` you can edit, which paths could not be.
-
-Cost: the handwriting is Bradley Hand, which every Mac and iPhone has and no
-Windows or Linux box does — off Apple's platforms it falls back through Segoe
-Script to whatever `cursive` maps to. The palette's colours re-ink the whole
-note rather than a selection, its undo is the note's own (back to the shipped
-text, dropping the localStorage key), and it sits 26 px up so the home bar keeps
-its band.
+2026-09-12, accepted. The app was one `textarea` on a white sheet. Unfolded, the inner
+display is 790 × 555 px - an iPad mini's shape - so Notes now draws what iPadOS draws at
+that size: a folder sidebar, the note list, the note, and the pencil palette floating over
+all three. It picks the layout off its own box with a ResizeObserver, not off the display,
+so a split half gets the phone's one-column Notes like the cover does (the same rule
+camera/index.tsx follows). Folders and tags are Apple's sample set and filter nothing; the
+list's titles and previews are read back out of the text, so an edit retitles a row as it
+is typed. The sidebar glyphs are real SF Symbols out of AppKit, tinted the system yellow
+Notes uses, because emoji stand-ins read as another app's icons next to the real ones. The
+handwritten note is the system handwriting face at 52 px, not ink paths: a path per glyph
+would be the only hand-drawn artwork in the project, and the text stays an editable
+`textarea`, which paths could not be. Cost: the handwriting is Bradley Hand, which every
+Mac and iPhone has and no Windows or Linux box does, falling back through Segoe Script to
+whatever `cursive` maps to. The palette's colours re-ink the whole note rather than a
+selection, its undo is the note's own, and it sits 26 px up so the home bar keeps its
+band.
 
 ## 31. The side button never unlocks
 2026-09-13, accepted; supersedes the Touch ID half of 15. A click used to wake
@@ -657,66 +552,46 @@ build a second time to copy the simulator under `/device/`.
 
 ## 54. The launch page drives the real shell over a postMessage bridge and folds a CSS device everywhere else
 
-2026-09-18. The site was rewritten as a single launch story (hero, it works,
-real camera, App Store, the fold is input, build, SDK, first apps, open, go)
-with the product as the centrepiece. The hero, the camera scene and the store
-scene embed the real shell; `packages/shell/main.ts` now reads `?bg=` at load
-and `{ deg, yaw, bg }` by same-origin postMessage, registered before the model
-loads so a message sent at the frame's load event is queued rather than lost.
-The site posts the page's body colour so the device floats on the page in
-either theme, and posts poses instead of reloading the frame. Every other
-scene (scroll-linked fold, posture picker, live-reload loop) uses
-`packages/web/src/device.tsx`, two hinged panels in CSS 3D driven by a motion
-value, because three WebGL scenes with the 3.5 MB model are the ceiling one
-page can afford and a scroll-linked pose needs per-frame control.
-
-Two build facts came out of the rewrite. React 19 hoists stylesheet links above
-inline `<style>`, so the reset's `@layer reset` was declared after StyleX's
-priority layers and `* { margin: 0 }` beat every StyleX margin in production;
-the reset now lives in `packages/web/src/reset.css`, imported before the
-virtual StyleX sheet so Vite bundles it first. The prerender crawl's ten
-parallel fetches against its own server timed out often enough to fail one
-build in three; it runs three at a time and skips trailing-slash duplicates.
-
-Cost: the shell carries a small website-only listener, and the CSS device is a
-stylised app rather than the real OS, so those scenes show layout, not
-software. A shell rebuild (`bun scripts/simulator.ts`) is needed whenever the
-bridge changes.
+2026-09-18. The site was rewritten as a single launch story with the product as the
+centrepiece. The hero, the camera scene and the store scene embed the real shell;
+`packages/shell/main.ts` now reads `?bg=` at load and `{ deg, yaw, bg }` by same-origin
+postMessage, registered before the model loads so a message sent at the frame's load event
+is queued rather than lost. The site posts the page's body colour so the device floats in
+either theme, and posts poses instead of reloading the frame. Every other scene uses
+`packages/web/src/device.tsx`, two hinged panels in CSS 3D driven by a motion value,
+because three WebGL scenes with the 3.5 MB model are the ceiling one page can afford and a
+scroll-linked pose needs per-frame control. Two build facts came out of the rewrite. React
+19 hoists stylesheet links above inline `<style>`, so the reset's `@layer reset` was
+declared after StyleX's priority layers and `* { margin: 0 }` beat every StyleX margin in
+production; the reset now lives in `packages/web/src/reset.css`, imported before the
+virtual StyleX sheet. And the prerender crawl's ten parallel fetches timed out often enough
+to fail one build in three; it runs three at a time and skips trailing-slash duplicates.
+Cost: the shell carries a small website-only listener, the CSS device is a stylised app
+rather than the real OS, so those scenes show layout and not software, and a bridge change
+needs `bun scripts/simulator.ts`.
 
 ## 55. The page scrolls through Lenis, the camera scene asks on arrival, and the frame drops its title
 
 2026-09-18. Three follow-ups from the first review of the launch page.
 
 **Lenis smooth scroll.** The whole document sits in `ReactLenis root`
-(`packages/web/src/smooth-scroll.tsx`), the same wrapper doan-labs.com uses,
-with `anchors` and `stopInertiaOnNavigate` on. Root mode scrolls the real
-window, so `useScroll` in the fold scene reads the same position it always
-did, and the wrapper renders its children directly, so the server and client
-DOM match. Readers with reduced motion never get an instance: native scrolling
-wins. `lenis` is the one dependency added since decision 53, at the user's
-request. Cost: Lenis puts `lenis` classes on `<html>`, which the theme check
-in `check.mjs` now ignores when it compares the class list across a reload.
+(`packages/web/src/smooth-scroll.tsx`) with `anchors` and `stopInertiaOnNavigate` on. Root
+mode scrolls the real window, so `useScroll` in the fold scene reads the same position it
+always did, and the wrapper renders its children directly, so the server and client DOM
+match. Readers with reduced motion never get an instance. `lenis` is the one dependency
+added since 53, at the user's request. Cost: Lenis puts `lenis` classes on `<html>`, which
+the theme check in `check.mjs` now ignores.
 
-**The camera prompt fires on the scene, not on the frame.** The frame used to
-mount a screen early with `?app=Camera`, so the browser asked for the webcam
-while the reader was still on the previous section, and a refusal left the app
-saying "allow access and reopen" with no way to reopen. Now `home/camera.tsx`
-watches its own column; when four tenths of it is on screen the page itself
-calls `getUserMedia`, stops the stream, and only then lets the frame mount
-(`Simulator mount={asked}`). Same origin plus `allow="camera"` means the
-Camera app inside finds the permission already answered. Cost: the frame loads
-after the prompt instead of before it, so the device appears a second or two
-after the reader arrives.
+**The camera prompt fires on the scene, not on the frame.** Mounting a screen early with
+`?app=Camera` asked for the webcam while the reader was still a section away, and a refusal
+left the app saying "allow access and reopen" with no way to reopen. Now `home/camera.tsx`
+watches its own column; at four tenths on screen the page calls `getUserMedia`, stops the
+stream, and only then mounts the frame, which finds the permission already answered. Cost:
+the device appears a second or two after the reader arrives.
 
-**Embedded frames show the device alone.** The HUD's "iPhone Duo" heading and
-the display line are for the shell opened on its own; inside the site every
-scene has its own headline. `packages/shell/hud.tsx` renders them only when
-`window.self === window.top`. The hint line and the control bar stay in both.
-
-The footer credits the studio: the Doan mark (the four-shape drawing from
-doan-labs.com's handoff file, inlined so it takes `currentColor`) and "Made by
-Doan Labs" linking to doan-labs.com.
-
+**Embedded frames show the device alone.** `packages/shell/hud.tsx` renders the "iPhone
+Duo" heading and the display line only when `window.self === window.top`; the hint line and
+control bar stay in both. The footer credits the studio with the inlined Doan mark.
 
 ## 56. The site's badges follow the progress records, not the plan files' age
 
@@ -756,31 +631,25 @@ repository docs as a fourth sidebar group, which would have put the same
 
 ## 58. The bridge cues what the phone does, and the lead display follows the target angle
 
-2026-09-18. The "it behaves like a device" scroll had captions about a song, a
-screenshot and split screen over a phone showing its home screen. The bridge in
-`packages/shell/main.ts` now takes `cue` beside `app`: `{ split: 'Safari' }`
-replays the real home-bar drag through the shell's own `grab()` with synthetic
-pointer events (up, hold until it is a card, over to the left half, drop) and
-opens the named app on the free half; `{ screenshot: true }` presses the chord;
-`{ play: true }` starts the deck muted, because a page scroll is not a gesture
-to play sound on. The scripts live in `packages/shell/cues.ts`, the page never
-touches the shell's DOM, and `app` now clears the stage first so a step always
-shows one app whole. An app or cue that lands before the displays have booted
-waits for them instead of throwing.
-
-Two facts forced a change to decision 24's crossing. A launch that arrives with
-a new pose used to land on the display in use at that instant; when the hinge
-then passed 40°, the other display became the lead with an empty stage and
-mirrored the app away. `follow()` is now called with the target angle rather
-than the eased one, and the bridge calls it before launching, so a launch lands
-on the display the hinge is heading to and the lead never swings back over it.
-Nothing visible changes at the crossing, as before: both displays already show
-the session. Cost: the frame buttons act on the target side for the fraction of
-a second the hinge is still easing.
+2026-09-18. The "it behaves like a device" scroll had captions about a song, a screenshot
+and split screen over a phone showing its home screen. The bridge in
+`packages/shell/main.ts` now takes `cue` beside `app`: `{ split: 'Safari' }` replays the
+real home-bar drag through the shell's own `grab()` with synthetic pointer events (up, hold
+until it is a card, over to the left half, drop) and opens the named app on the free half;
+`{ screenshot: true }` presses the chord; `{ play: true }` starts the deck muted, because a
+page scroll is not a gesture to play sound on. The scripts live in `packages/shell/cues.ts`,
+the page never touches the shell's DOM, `app` clears the stage first so a step always shows
+one app whole, and anything that lands before the displays have booted waits instead of
+throwing. This changes decision 24's crossing: a launch arriving with a new pose used to
+land on the display in use at that instant, and the hinge then passing 40° made the other
+display the lead with an empty stage and mirrored the app away. `follow()` is now called
+with the target angle rather than the eased one, and the bridge calls it before launching.
+Cost: the frame buttons act on the target side for the fraction of a second the hinge is
+still easing.
 
 ## 59. Photos is the macOS Photos window, and baked apps keep shared state at module level
 
-Photos was a title over a square grid. It is now the macOS Photos window: a
+2026-09-18. Photos was a title over a square grid. It is now the macOS Photos window: a
 sidebar of Library and the pinned Favorites, Recently Saved and Recently
 Deleted, every row backed by a real filter; a toolbar with the − / + zoom pill, the Years / Months / All
 Photos switch, the aspect, filter, more, info, share, favourite and delete
@@ -798,6 +667,7 @@ React hook: `packages/sdk/react.ts` imports React, which resolves from
 favourites and the bin therefore live in a module-level store read through
 `useSyncExternalStore`, which is also what decision 24's mirror needs: the copy
 the other display holds during a fold reads the same library.
+
 ## 60. Maps draws its own tiles instead of embedding OpenStreetMap
 
 2026-09-18. Maps was an `<iframe>` of openstreetmap.org: it brought a foreign map's chrome
@@ -818,35 +688,31 @@ the list at load, so the session opens on a different three each time.
 
 ## 61. Community apps are source in the repository, published by a publisher that only moves data
 
-2026-09-18. The curated Store needed a path from a contributor's fork to an installable
-release. Apps now live under `community-apps/<slug>/` as independent projects (not
+2026-09-18. Apps live under `community-apps/<slug>/` as independent projects (not
 workspaces, no root lockfile edits); `community-apps/registry.json` is the ownership
 record, because an `author` string in a manifest proves nothing. Pull requests run
-`scripts/check-submissions.ts` in a job with read-only permissions and no secrets: the
-builder, the CLI checks and a headless install/launch that captures both displays are
-evidence for a reviewer, and a pass means eligible, not accepted. Empty permissions are
-required for the first curated release so publication never widens runtime privilege.
+`scripts/check-submissions.ts` with read-only permissions and no secrets, and a pass means
+eligible, not accepted. Empty permissions are required for a first curated release, so
+publication never widens runtime privilege.
 
-Publication is two jobs. The read-only one builds the merged commit; the writing one runs
-`scripts/publish-catalog.ts`, which copies validated release files as data, refuses a
-version already published with different bytes, reuses an identical release without
-touching its metadata (the builder stamps `build.at`, so a rebuild must not win), and
-assembles `index.json` from every release in the tree so one app's publication cannot
-drop another's listing. The tree is the `catalog` git branch: the site is static assets
-on the same origin, a rejected push is the conflict detection between close merges, and
-the history is the audit log. The website build unpacks that branch and merges the
-bundled Notes and Weather releases with the same publisher into `/catalog/`, which the
-Store tries before `/cdn` and `/preinstalled`. Cost: a release is live only after the
-site's next deploy, and the publish job cannot verify the hosted URL, only the branch.
-Alternatives rejected: an object bucket (credentials and a second origin, while installs
-bind updates to their origin), and committing built releases to `main` (contributor PRs
-would carry binaries and every merge would need a follow-up commit).
+Publication is two jobs: the read-only one builds the merged commit, and
+`scripts/publish-catalog.ts` copies validated release files as data, refuses a version
+already published with different bytes, reuses an identical release without touching its
+metadata (the builder stamps `build.at`, so a rebuild must not win), and assembles
+`index.json` from every release in the tree so one publication cannot drop another's
+listing. The tree is the `catalog` git branch: same origin as the static site, a rejected
+push is the conflict detection between close merges, and the history is the audit log. The
+website build merges it with the bundled Notes and Weather releases into `/catalog/`, which
+the Store tries before `/cdn` and `/preinstalled`.
 
-The Store shows which catalog it is reading and offers **Back to Duo catalog** after a
-developer catalog is loaded; an app installed from another origin is refused an update
-with both origins named and the supported transition (remove, then get), rather than a
-silent inheritance. The native **Submit your app** link goes through a new `open_url`
-command behind the `Platform` trait, so the web side never learns which OS opens URLs.
+The Store names which catalog it is reading and offers **Back to Duo catalog**; a
+cross-origin update is refused with both origins named rather than silently inherited.
+**Submit your app** goes through an `open_url` command behind the `Platform` trait, so the
+web side never learns which OS opens URLs. Cost: a release is live only after the next
+deploy, and the publish job can verify the branch but not the hosted URL. Rejected: an
+object bucket (credentials and a second origin, while installs bind updates to their
+origin), and built releases on `main` (binaries in contributor PRs, a follow-up commit per
+merge).
 
 ## 62. The Reset button is the whole orbit UI, and the phone grows to the frame it is given
 2026-09-18, accepted. Supersedes 19, amends 22. The atom minimap read as a
@@ -867,83 +733,65 @@ drawn anywhere, so a turned view is read off the phone itself, and the per-pose
 click coordinates in docs/debug.md move with the bands.
 
 ## 63. The frame is asked for first, the scene fades in, and the page and the shell shake hands
-2026-09-18, accepted. The 3.6 MB body was requested only after the icons loaded
-and both displays were baked, so the download started about three seconds into
-a page that then sat black until it arrived. It is now asked for in `index.html`
-(`rel=preload`, one request: the loader picks up the same entry) and kicked off
-at the top of `main.ts`, so it flies while the rest of the boot runs. The canvas
-and the CSS3D layer start at zero and fade in on the first frame that has the
-phone in it, and an embedding page holds a breathing outline until then.
-
-Which needs a handshake, because the shell can be drawn before the page that
-embeds it has hydrated: the shell announces `live` when it can take a message
-and `ready` when it has drawn, the page answers by sending the pose, and the
-page also sends `hello` when it starts listening, which the shell answers with
-whichever state applies. The frame's own load event is no longer the trigger:
-cross-origin it cannot be recovered after the fact, which is why the website's
-frames stayed hidden in development. A framed shell also stops painting the
-standalone page's light background, so a dark site gets the phone on its own
-backdrop rather than a white card while `bg` is in flight. Cost: two more
-message shapes on the bridge, and a page that embeds the shell without
-answering `hello` still gets the announcements, so nothing is lost if it ignores
-them.
+2026-09-18, accepted. The 3.6 MB body was requested only after the icons loaded and both
+displays were baked, so the download started about three seconds into a page that then sat
+black until it arrived. It is now asked for in `index.html` (`rel=preload`, one request:
+the loader picks up the same entry) and kicked off at the top of `main.ts`, so it flies
+while the rest of the boot runs. The canvas and the CSS3D layer start at zero and fade in
+on the first frame that has the phone in it, and an embedding page holds a breathing
+outline until then. Which needs a handshake, because the shell can be drawn before the page
+that embeds it has hydrated: the shell announces `live` when it can take a message and
+`ready` when it has drawn, the page answers by sending the pose, and the page's own `hello`
+is answered with whichever state applies. The frame's load event is no longer the trigger -
+cross-origin it cannot be recovered after the fact, which is why the website's frames
+stayed hidden in development. A framed shell also stops painting the standalone page's
+light background, so a dark site gets the phone on its own backdrop rather than a white
+card while `bg` is in flight. Cost: two more message shapes on the bridge, and a page that
+ignores `hello` still gets the announcements.
 
 ## 64. `/kit` is a showcase, the reference moves under `/kit/docs`
-2026-09-18, accepted. The UI kit's landing page was the reference itself: a lead
-paragraph, one code block and a list of 47 export names. It answered "what is
-the signature of Row" and nothing else, so a visitor who had never seen the kit
-left without seeing a single component. `/kit` is now one hero in the launch
-page's own language and nothing else: a headline whose count is read from the
-generated API, the install line, and a full-bleed strip that drifts every demo
-in `src/kit-demos/` past at the cover display's 387 points. The strip is two
-identical runs sliding one run's width, so the loop never seams; hover or focus
-pauses it, which is how a visitor presses a component before following its name
-to the reference. Under 734 px and under reduced motion the drift is off, the
-second run is not rendered and the strip is a plain scroller.
-
-A browsing page underneath the hero was tried first (a gallery at both display
-widths, a search over every export, the palette and symbol set) and cut: it
-rebuilt `/kit/docs` in a second visual language. Sending "See all components"
-straight to the reference leaves one job per page. The reference is unchanged,
-one level down at `/kit/docs` and `/kit/docs/<Export>`, and the sidebar it
-carries links back.
-
-Nothing on the page is a screenshot or a second copy: the hero reads
-`src/kit/data.ts`, which is the generated API filtered to the kit plus which
-names have a demo file, so a new export or a new demo changes the page without
-an edit. The cost is a heavier route: 18 demos mount on load, twice that on a
-wide screen because of the second run. They are DOM, not canvas, and the
-alternative was a wall of images that goes stale the first time a component
-changes.
+2026-09-18, accepted. The UI kit's landing page was the reference itself: a lead paragraph,
+one code block and a list of 47 export names. It answered "what is the signature of Row"
+and nothing else, so a visitor who had never seen the kit left without seeing a single
+component. `/kit` is now one hero in the launch page's own language: a headline whose count
+is read from the generated API, the install line, and a full-bleed strip that drifts every
+demo in `src/kit-demos/` past at the cover display's 387 points. The strip is two identical
+runs sliding one run's width, so the loop never seams; hover or focus pauses it, which is
+how a visitor presses a component before following its name to the reference. Under 734 px
+and under reduced motion the drift is off, the second run is not rendered and the strip is
+a plain scroller. Nothing on the page is a screenshot or a second copy: the hero reads
+`src/kit/data.ts`, the generated API filtered to the kit plus which names have a demo file,
+so a new export or demo changes the page without an edit. Rejected: a browsing page
+underneath the hero (a gallery at both display widths, a search over every export, the
+palette and symbol set), which rebuilt `/kit/docs` in a second visual language. Cost: 18
+demos mount on load, twice that on a wide screen. They are DOM, not canvas, and the
+alternative was a wall of images that goes stale.
 
 ## 65. One browser builder replaces the two product entry pages
 
 2026-09-18. `/build` combines a bring-your-own-key chat with the real simulator;
-`/get-started` and `/simulator` redirect there. This supersedes the separate product
-pages in decision 57 and the original website page plan. CLI setup stays in developer
-docs; `/device/` stays the embedded shell. The owner selected direct browser provider
-requests over a Cloudflare Worker proxy: credentials/prompts never pass through Duo's
-servers, at the cost of requiring provider CORS. OpenRouter is the initial default;
-custom HTTPS Chat Completions endpoints and manual model IDs remain available.
+`/get-started` and `/simulator` redirect there. This supersedes the separate product pages
+in decision 57. CLI setup stays in developer docs; `/device/` stays the embedded shell. The
+owner selected direct browser provider requests over a Cloudflare Worker proxy:
+credentials and prompts never pass through Duo's servers, at the cost of requiring provider
+CORS. OpenRouter is the initial default; custom HTTPS Chat Completions endpoints and manual
+model IDs remain available.
 
-The owner approved esbuild-wasm and Babel standalone. A worker uses StyleX's official
-browser plugin and a precompiled, fixed React/SDK/kit runtime. No runtime npm installation
-or generated code in the trusted page. Named token imports resolve against that exact
-runtime build. Whole source revisions simplify validation and recovery. Compilation is
-not a substitute for CLI type, publication or runtime checks.
+Compilation is esbuild-wasm and Babel standalone in a worker, using StyleX's official
+browser plugin and a precompiled, fixed React/SDK/kit runtime: no runtime npm installation,
+no generated code in the trusted page, and named token imports resolve against that exact
+runtime build. Whole source revisions simplify validation and recovery. This is not a
+substitute for CLI type, publication or runtime checks.
 
 Browser previews extend verified development documents with a token-bound parent channel
-and project-owned namespace. Their explicit revision activation checkpoints data, retires
-old authority and replaces app frames while keeping the phone mounted. This amends preview
-selection in decision 49, not installed update rules. Data checkpoints survive interrupted
-starts; Undo restores the corresponding data as well as code. Arbitrary React state is not
-preserved. Credentials stay in page memory, never worker/project/simulator storage. See
-the builder guide for hard limits and the review guide for measured evidence.
-
-The generated entry reports readiness after a successful React commit, including hidden
-mirrored displays whose paint callbacks Chromium can suspend. This explicitly amends the
-preview interpretation of first-paint readiness; visible pixels need separate checks.
-The existing startup deadline and authority gates are unchanged.
+and project-owned namespace. Explicit revision activation checkpoints data, retires old
+authority and replaces app frames while keeping the phone mounted; this amends preview
+selection in decision 49, not installed update rules. Undo restores the corresponding data
+as well as code, but arbitrary React state is not preserved. Credentials stay in page
+memory, never in worker, project or simulator storage. Readiness is reported after a
+successful React commit, including hidden mirrored displays whose paint callbacks Chromium
+can suspend - this amends the preview interpretation of first-paint readiness, and visible
+pixels need separate checks.
 
 ## 66. The committed headless-Chromium suite is removed, not replaced
 
@@ -972,7 +820,7 @@ of pointing at scripts that no longer exist.
 
 ## 67. The simulator is the public page again; the browser builder is parked
 
-Decision 65 made `/build` the single product entry. Its first live use showed the
+2026-09-19. Decision 65 made `/build` the single product entry. Its first live use showed the
 interaction and provider setup were not ready to ship, and the page depended on the
 simulator being healthy to become usable at all. The navigation item is now `Simulator`
 and points at `/simulator`, the standalone page where a visitor folds and taps the phone
@@ -983,10 +831,9 @@ repository as upcoming work rather than being deleted, so the next attempt start
 refined workspace instead of from zero. This supersedes the routing part of decision 65;
 its credential and preview-lifecycle guarantees still govern the parked code.
 
-
 ## 68. Music plays licensed recordings instead of invented ones
 
-The Music app and Control Center's deck shared five invented titles over SoundHelix
+2026-09-19. The Music app and Control Center's deck shared five invented titles over SoundHelix
 demo MP3s and a hashed gradient for artwork. It played, but every visible part of it
 was a placeholder, which is why the app carried the mockup pill.
 
@@ -1006,64 +853,52 @@ or names a cover with no file behind it.
 Music drops `mock`. The screen is no longer invented data. Podcasts keeps its invented
 shows and episode titles and so keeps the pill; only the audio underneath it is shared.
 
-
 ## 69. The home grid is arranged by hand and remembered, and the wallpaper with it
 
-The home screen showed `apps.ts` in its written order and the dune wallpaper, and
-Utilities was a fake app whose view drew a grid of icons. Two of the oldest iOS
-gestures were missing: hold an icon and drop it on another to make a folder, and hold
-the paper to change it.
+2026-09-19. The home screen showed `apps.ts` in its written order, and Utilities was a fake
+app whose view drew a grid of icons. Two of the oldest iOS gestures were missing: hold an
+icon onto another to make a folder, and hold the paper to change it.
 
 `grid.ts` keeps the order the finger made, per half, as app keys and folders, in
-localStorage under `os.home`. It is resolved against the registry on every read, so an
-app installed or removed since the order was saved still lands or leaves, and a folder
-left with one app dissolves into it. `apps.ts` stays the truth about what exists and
-where it ships; a factory entry with `folder` is a folder the first time, which is what
-Utilities is now. Its package is gone: a folder is grid data, not an app, and Spotlight
-skips it.
+localStorage under `os.home`, resolved against the registry on every read, so an app
+installed or removed since still lands or leaves and a folder left with one app dissolves
+into it. `apps.ts` stays the truth about what exists; a factory entry with `folder` is a
+folder the first time, which is what Utilities is now. Its package is gone: a folder is
+grid data, not an app, and Spotlight skips it. There is no edit mode and no reorder - a
+hold lifts one tile, a drop on a cell stacks, anything else springs back, and the grid
+jiggles only while a tile is up. Reordering needs cells to make room as the finger passes,
+a second gesture with its own ceiling, and nothing needs it yet.
 
-There is no edit mode and no reorder. A hold lifts the one tile; a drop on a cell stacks,
-a drop anywhere else springs back, and the rest of the grid jiggles only while a tile is
-up. Reordering would need cells to make room as the finger passes, which is a second
-gesture with its own ceiling, and nothing here needs it yet. Inside an open folder the
-same hold carries a tile out: let go outside the well and it sits down after the folder.
-
-The wallpaper is one string in `wallpaper.ts`, under `os.wallpaper`, for both displays
-and for the bake. The alternatives are SVG gradients as data URLs, so the same string
-is a CSS background and decodes into the canvas; nothing new ships. A picture off the
-disk is shrunk to 1600 px and kept as a JPEG data URL so it fits localStorage; a Camera
-shot is a `blob:` URL that dies with the page, so it hangs until reload and is not
-restored. `screen.ts` reads `grid()` and `main.ts` rebakes on either store, so the fold
-shows what the finger left.
+The wallpaper is one string in `wallpaper.ts` under `os.wallpaper`, for both displays and
+the bake. The alternatives are SVG gradients as data URLs, so the same string is a CSS
+background and decodes into the canvas; nothing new ships. `screen.ts` reads `grid()` and
+`main.ts` rebakes on either store, so the fold shows what the finger left. Cost: a picture
+off the disk is shrunk to 1600 px and kept as a JPEG data URL to fit localStorage, and a
+Camera shot is a `blob:` URL that dies with the page, so it is not restored.
 
 ## 70. Home parks an app, the switcher shows what is parked, and two halves share a divider
 
-Going Home closed the app: the scene left the list and its React tree went with it, so
-there was nothing to switch back to and no way to see what was running. iOS keeps the
-last apps alive behind the switcher, and the folding footage shows the switcher's cards
-and a split whose halves are not equal.
+2026-09-19. Going Home closed the app: the scene left the list and its React tree with it,
+so there was nothing to switch back to and no way to see what was running.
 
-A scene now has a `parked` state: off the glass, still mounted, `display: none`. Home,
-the home-bar swipe, an app's own `home()` and the lock all park; only the switcher's
-flick, one app replacing another (`swap`) and a mirror going away close. Opening a parked
-app brings the same instance back, so state survives a trip through Home and across the
-fold. Six stay parked, the oldest closes past that, and Camera closes rather than parks so
-no hidden app keeps the webcam.
+A scene now has a `parked` state: off the glass, still mounted, `display: none`. Home, the
+home-bar swipe, an app's own `home()` and the lock all park; only the switcher's flick, one
+app replacing another (`swap`) and a mirror going away close. Opening a parked app brings
+the same instance back, so state survives a trip through Home and across the fold. Six stay
+parked, the oldest closes past that, and Camera closes rather than parks so no hidden app
+keeps the webcam.
 
-The switcher reuses the hold the split gesture already had: pausing mid-swipe still makes
-a card, and what happens next depends on the hand. Let go and every mounted scene lines up
-as a card, most recent in front; drag sideways first and the halves are offered as before,
-so the site's split cue plays unchanged. The cards are the app elements themselves,
-transformed, so a card is the live app and no snapshotting is needed. The cover display
-gets the switcher too, though it still cannot split.
-
-The seam between two halves is a divider, dragged between 30% and 70%. `zone()` takes the
-ratio, so the zoom, the drop card and the home bars follow it; it returns to the middle
-when a half empties, since the narrow home the other half shows is always half.
+The switcher reuses the hold the split gesture already had: let go and every mounted scene
+lines up as a card, most recent in front; drag sideways first and the halves are offered as
+before, so the site's split cue plays unchanged. The cards are the app elements themselves,
+transformed, so no snapshotting is needed. The cover gets the switcher too, though it still
+cannot split. The seam between two halves is a divider dragged between 30% and 70%;
+`zone()` takes the ratio, so the zoom, the drop card and the home bars follow it, and it
+returns to the middle when a half empties, since the narrow home is always half.
 
 ## 71. The Store is laid out like the App Store, with the icon as the artwork
 
-The first Store was a settings-style list: a gradient hero, then every app in one long
+2026-09-19. The first Store was a settings-style list: a gradient hero, then every app in one long
 grouped list. It worked and looked like a form. The new root page follows the App Store:
 a Today card, then one group per lane with its rows in two columns on a wide box, so nine
 apps take one screen instead of three, and a lane filter (All, Official, Community) beside
