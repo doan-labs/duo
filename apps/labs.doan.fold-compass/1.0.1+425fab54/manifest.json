@@ -1,0 +1,11 @@
+{
+  "id": "labs.doan.fold-compass",
+  "name": "Fold Compass",
+  "version": "1.0.1",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "Doan Labs",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/fold-compass",
+  "license": "MIT"
+}

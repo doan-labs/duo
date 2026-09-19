@@ -7,6 +7,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/2048",
       "releases": [
         {
+          "release": "1.0.4+ab01181b",
+          "sdk": "0.0.0",
+          "bytes": 263947,
+          "sha256": "5f938aa9e638973328375e12dcab12586b9a0e60bf4afa862db8c81b042ad62c"
+        },
+        {
           "release": "1.0.3+76d3372f",
           "sdk": "0.0.0",
           "bytes": 263490,
@@ -39,6 +45,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flappy-duo",
       "releases": [
         {
+          "release": "1.0.1+e0580af9",
+          "sdk": "0.0.0",
+          "bytes": 301346,
+          "sha256": "e80d3290fc595935cb613d6d24696e2635fc1b29b69c119cbf59a0a5e9839c21"
+        },
+        {
           "release": "1.0.0+47761f66",
           "sdk": "0.0.0",
           "bytes": 300842,
@@ -52,6 +64,12 @@
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/habit-streaks",
       "releases": [
+        {
+          "release": "1.0.1+2dd374bf",
+          "sdk": "0.0.0",
+          "bytes": 255697,
+          "sha256": "ee8311dccfab8d25224607223e51db73b5d88d08b3795c1510c1ac36c91021d1"
+        },
         {
           "release": "1.0.0+33f750ec",
           "sdk": "0.0.0",
@@ -67,10 +85,30 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/memory-match",
       "releases": [
         {
+          "release": "1.0.1+e56a8c87",
+          "sdk": "0.0.0",
+          "bytes": 255069,
+          "sha256": "3a5e414fbd366376bee2236f77bea556c5d8239d9130564c052fd9d19d49ef9e"
+        },
+        {
           "release": "1.0.0+aa4ba009",
           "sdk": "0.0.0",
           "bytes": 254628,
           "sha256": "1887958c9c1ead1dbe8a84f894851e8371293dd6365caa3e28e3c26355b92bbe"
+        }
+      ]
+    },
+    "com.mnismt.duo.pomodoro": {
+      "name": "Pomo Timer",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pomodoro-timer",
+      "releases": [
+        {
+          "release": "1.0.1+c6106bf5",
+          "sdk": "0.0.0",
+          "bytes": 255126,
+          "sha256": "2b45f77a17241f06f671ce21b4bb451f3ffe7dbacbb6dd0d6bbfdc6ec4e69180"
         }
       ]
     },
@@ -80,6 +118,12 @@
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
       "releases": [
+        {
+          "release": "1.2.1+b13351ff",
+          "sdk": "0.0.0",
+          "bytes": 266925,
+          "sha256": "2bc659f24a0ed034bae387f166d467c5257c3a2f2c6f89f37b99473cc5eadf6e"
+        },
         {
           "release": "1.2.0+0d6e4523",
           "sdk": "0.0.0",
@@ -107,6 +151,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tic-tac-toe",
       "releases": [
         {
+          "release": "1.0.1+a83a158a",
+          "sdk": "0.0.0",
+          "bytes": 258634,
+          "sha256": "656c656275e217b672f166bbd0538b4d6574d573562ec027049e3ea61bb126f0"
+        },
+        {
           "release": "1.0.0+a399c53c",
           "sdk": "0.0.0",
           "bytes": 258185,
@@ -121,10 +171,30 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
       "releases": [
         {
+          "release": "1.0.1+39867db4",
+          "sdk": "0.0.0",
+          "bytes": 260495,
+          "sha256": "2893ce28d60833d3b9ad22118ef06ad0dba37d141fc6ec35df537920f7ac73a9"
+        },
+        {
           "release": "1.0.0+9f068bd9",
           "sdk": "0.0.0",
           "bytes": 260117,
           "sha256": "0459d8fa860306bf019750236cb46872ca5d5f62a913fefca4c294c364921ee4"
+        }
+      ]
+    },
+    "labs.doan.fold-compass": {
+      "name": "Fold Compass",
+      "lane": "community",
+      "author": "Doan Labs",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/fold-compass",
+      "releases": [
+        {
+          "release": "1.0.1+425fab54",
+          "sdk": "0.0.0",
+          "bytes": 233670,
+          "sha256": "b49762362349c9397f439203614e5af90e3be459ca0974d1e5213680f01c43a2"
         }
       ]
     }

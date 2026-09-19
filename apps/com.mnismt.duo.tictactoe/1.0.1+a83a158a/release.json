@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.tictactoe",
+    "name": "Tic-Tac-Toe",
+    "version": "1.0.1",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tic-tac-toe",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.0.0",
+    "at": "2026-09-19T15:45:26.664Z",
+    "commit": "dd505ac5ff1206514e43e8c5a60af893db079475",
+    "hash": "a83a158a"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 258634,
+      "sha256": "1857524d2ca666e8983e099c1ba171a53447898102fbf2a5609944a2b3c00a61"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 788809,
+      "sha256": "7efc6f12ae61edb363725c452644106dea762811584a7c529c74622109b1fc61"
+    }
+  ]
+}

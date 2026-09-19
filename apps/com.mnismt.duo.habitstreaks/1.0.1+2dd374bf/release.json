@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.habitstreaks",
+    "name": "Habit Streak",
+    "version": "1.0.1",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/habit-streaks",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.0.0",
+    "at": "2026-09-19T15:45:21.325Z",
+    "commit": "dd505ac5ff1206514e43e8c5a60af893db079475",
+    "hash": "2dd374bf"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 255697,
+      "sha256": "c23a6d900fef370abcb9d62f0fba661d02b6635a100dbb3ed358e81d45431926"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 860922,
+      "sha256": "f21a795055a18209a454a6554ad9c85aaab4224ac295853a90f46e37384f1587"
+    }
+  ]
+}

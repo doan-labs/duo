@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.snake",
+    "name": "Snake",
+    "version": "1.2.1",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.0.0",
+    "at": "2026-09-19T15:45:25.352Z",
+    "commit": "dd505ac5ff1206514e43e8c5a60af893db079475",
+    "hash": "b13351ff"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 266925,
+      "sha256": "36cdc6c8715869cd04b14cada9a3f8e5b2fb53fd7f285bd2857321d01d2b51bc"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 57691,
+      "sha256": "0410d3c30c09c91abbc0a0024e54e8d47b96aba1e316aeb68c14653774160bbd"
+    }
+  ]
+}
