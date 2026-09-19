@@ -2,6 +2,10 @@
   "$comment": "Maintainer-controlled. Maps each published app id to its folder and the GitHub logins who may change its identity, transfer it or approve its releases. Ids starting with a reserved prefix are refused in community submissions.",
   "reserved": ["labs.doan.ipduo.", "dev.example."],
   "apps": {
+    "com.mnismt.duo.habitstreaks": {
+      "folder": "habit-streaks",
+      "maintainers": ["mnismt"]
+    },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
