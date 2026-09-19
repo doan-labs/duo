@@ -32,7 +32,7 @@ const styles = stylex.create({
     inset: 0,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.groupedLight,
     color: colors.black,
     fontFamily: fonts.system,
     fontSize: appAppearance.musicFontSize,
