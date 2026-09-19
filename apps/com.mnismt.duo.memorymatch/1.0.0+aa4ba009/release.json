@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.memorymatch",
+    "name": "Memory Match",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/memory-match",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "0.2.0",
+    "at": "2026-09-19T02:47:25.458Z",
+    "commit": "cde0b264260699f3423275f461e304abce91e08b",
+    "hash": "aa4ba009"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 254628,
+      "sha256": "fbf370fa0233b8d8765f06b1727c1b82fb33e2fc58a536d70bfb3fb4c4ff6e41"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 941359,
+      "sha256": "520565800a2eaf10fe4c51fb7e337f758735eb8712c5602f639f87122ac4c82a"
+    }
+  ]
+}

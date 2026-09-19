@@ -40,6 +40,20 @@
         }
       ]
     },
+    "com.mnismt.duo.memorymatch": {
+      "name": "Memory Match",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/memory-match",
+      "releases": [
+        {
+          "release": "1.0.0+aa4ba009",
+          "sdk": "0.0.0",
+          "bytes": 254628,
+          "sha256": "1887958c9c1ead1dbe8a84f894851e8371293dd6365caa3e28e3c26355b92bbe"
+        }
+      ]
+    },
     "com.mnismt.duo.snake": {
       "name": "Snake",
       "lane": "community",
