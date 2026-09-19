@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!design",
+      "!.agents/skills",
       "!bun.lock",
       "!**/*.md",
       "!packages/web/src/route-tree.gen.ts",
