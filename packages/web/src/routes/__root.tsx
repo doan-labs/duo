@@ -12,7 +12,7 @@ import 'lenis/dist/lenis.css'
 import '../reset.css'
 import 'virtual:stylex.css'
 
-const OG_IMAGE = 'https://duo.doan-labs.com/og/duo-og-01.png'
+const OG_IMAGE = 'https://duo.doan-labs.com/og/duo-og-03.png'
 
 export const Route = createRootRoute({
   head: () => ({
