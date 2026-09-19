@@ -132,16 +132,6 @@ export const styles = stylex.create({
   alertTitle: { fontSize: 17, fontWeight: 700 },
   roast: { marginBlock: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.3 },
   fine: { marginBlock: 0, fontSize: 11, color: '#5b6b85' },
-  link: {
-    borderWidth: 0,
-    padding: 0,
-    backgroundColor: 'transparent',
-    color: '#c0392b',
-    fontSize: 11,
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: fonts.system
-  },
   stats: { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
   stat: {
     minWidth: 62,
@@ -170,7 +160,6 @@ export const styles = stylex.create({
     fontWeight: 700,
     cursor: 'pointer'
   },
-  secondary: { color: '#0b1a3a', backgroundColor: 'rgba(20,60,120,.1)' },
   // ---- the pay sheet ----
   dim: {
     position: 'absolute',

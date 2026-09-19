@@ -91,35 +91,45 @@ export const ROASTS: [number, string[]][] = [
   [
     1,
     [
-      'Zero. You dropped a $2,399 phone into the clouds.',
-      'Died before the first slab. Refund denied.',
-      'The tutorial was one tap. You failed the tutorial.'
+      'Zero folds. The hinge remains in factory condition.',
+      'The first slab was stationary. Noted.',
+      'Warranty unaffected. Nothing happened.'
     ]
   ],
-  [4, ['The slabs were standing still. You were not.', 'Hinge failure. Cause: you.', 'It was a beta. So were you.']],
+  [
+    4,
+    [
+      'The slab did not move. That was the arrangement.',
+      'Hinge failure. The cause has been identified.',
+      'Four would have been a milestone.'
+    ]
+  ],
   [
     9,
+    ['Adequate. The paperwork will say adequate.', 'The crease has seen this before.', 'Face ID declined to comment.']
+  ],
+  [
+    16,
     [
-      'Almost mediocre. The bar is on the floor and you clipped it.',
-      'The crease saw that coming.',
-      'Face ID did not recognise that attempt.'
+      'A respectable number. The hinge has filed a complaint.',
+      'Competent. Not covered.',
+      'The engineers rated it for more. So did you.'
     ]
   ],
-  [16, ['Fine. Some skill. Still dead.', 'Impressive. The hinge disagrees.', 'You have a talent. It is falling.']],
   [
     Number.POSITIVE_INFINITY,
     [
-      'Screenshot it. The support forum will not believe you.',
-      'You have folded more than most owners ever will.',
-      'Go outside. The phone would have wanted that.'
+      'Above the average owner. The average owner is not playing.',
+      'This will be described as normal wear.',
+      'Support has been notified. They are not coming.'
     ]
   ]
 ]
 
 export const FLOOR_ROASTS = [
-  'You hit the floor. The floor is fine.',
-  'Gravity: 1. You: still 0.',
-  'Face down on a glass deck. Iconic.'
+  'The floor was there the whole time.',
+  'Gravity performed as documented.',
+  'Screen down. The recommendation is screen up.'
 ]
 
 export const MEDALS: [number, string][] = [
@@ -128,7 +138,7 @@ export const MEDALS: [number, string][] = [
   [10, 'Out of warranty'],
   [20, 'Genius, allegedly'],
   [40, 'Suspiciously good'],
-  [Number.POSITIVE_INFINITY, 'Please seek help']
+  [Number.POSITIVE_INFINITY, 'Refer to a specialist']
 ]
 
 export const pick = <T>(list: T[]) => list[Math.floor(Math.random() * list.length)]!

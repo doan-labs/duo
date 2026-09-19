@@ -252,7 +252,7 @@ function Game() {
           <strong {...stylex.props(styles.alertTitle)}>Hinge Failure</strong>
           <p {...stylex.props(styles.roast)}>{roast}</p>
           <p {...stylex.props(styles.fine)}>
-            {folds} {folds === 1 ? 'fold' : 'folds'} this life. {warranty.toLocaleString()} left on the hinge. Not
+            {folds} {folds === 1 ? 'fold' : 'folds'} this life. {warranty.toLocaleString()} remaining on the hinge. Not
             covered.
           </p>
           <div {...stylex.props(styles.stats)}>
@@ -269,21 +269,12 @@ function Game() {
               <strong {...stylex.props(styles.value, styles.medalValue)}>{medalFor(score)}</strong>
             </div>
           </div>
-          {newBest && <p {...stylex.props(styles.best)}>New best. Screenshot it. Nobody will believe you.</p>}
+          {newBest && <p {...stylex.props(styles.best)}>New best. It has been recorded.</p>}
           <div {...stylex.props(styles.actions)}>
-            <button type="button" onClick={reset} {...stylex.props(styles.button, styles.secondary)}>
-              Fold again
-            </button>
             <button type="button" onClick={() => setPay('sheet')} {...stylex.props(styles.button)}>
               Buy another · ${PRICE.toLocaleString()}
             </button>
           </div>
-          <span {...stylex.props(styles.fine)}>
-            Spent so far: ${spent.toLocaleString()} ·{' '}
-            <button type="button" onClick={() => os.home()} {...stylex.props(styles.link)}>
-              Rage quit
-            </button>
-          </span>
         </section>
       )}
       {pay && (
