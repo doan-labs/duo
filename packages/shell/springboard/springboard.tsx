@@ -440,10 +440,8 @@ const styles = stylex.create({
   // Split at the divider, the hinge by default, as Apple's footage shows: no seam, the two just meet.
   appLeft: (pct: number) => ({ right: `${100 - pct}%` }),
   appRight: (pct: number) => ({ left: `${pct}%` }),
-  // Off the glass but running, for the switcher to bring back. Not `display: none`:
-  // that throws the layout away, so the switcher would rebuild every parked app in
-  // one frame as it opened, and apps would see a zero-size box while parked.
-  appParked: { visibility: 'hidden', contentVisibility: 'hidden' },
+  // Off the glass but running, for the switcher to bring back.
+  appParked: { display: 'none' },
   // The grab strip over the seam between two apps; the pill on it is the handle you see.
   divider: {
     position: 'absolute',
@@ -469,13 +467,14 @@ const styles = stylex.create({
   },
   dividerAt: (pct: number) => ({ left: `${pct}%` }),
   // On a finger: over the other app and the halves offered, deaf to the pointer
-  // so the drop lands, and on its own compositor layer so moving it a frame
-  // costs a transform, not a repaint of the app. No transition here: the
-  // gestures paint every frame, and a transition under them is what lags.
+  // so the drop lands, and a short ease so the card trails the hand instead of
+  // snapping to each pointer event.
   appDrag: {
     zIndex: 4,
     pointerEvents: 'none',
     boxShadow: '0 24px 60px rgba(0,0,0,.45)',
-    willChange: 'transform'
+    transitionProperty: 'transform, border-radius',
+    transitionDuration: '.16s',
+    transitionTimingFunction: 'ease-out'
   }
 })
