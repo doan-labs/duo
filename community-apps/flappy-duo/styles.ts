@@ -300,13 +300,14 @@ export const styles = stylex.create({
     animationFillMode: 'both'
   },
   still: { animationName: 'none' },
-  // Sits where the frame's side button is, so the eye goes to the real button.
+  // Sits where the frame's side button is: its cap spans 0.67 to 2.54 cm above the
+  // hinge centre line, on an inner display 11.10 cm tall whose top is at 5.55 cm.
   sideGlow: {
     position: 'absolute',
     right: 0,
-    top: '8%',
+    top: '27.2%',
     width: 5,
-    height: '27%',
+    height: '16.8%',
     borderStartStartRadius: 6,
     borderEndStartRadius: 6,
     backgroundImage: 'linear-gradient(180deg, #5ac8fa, #0a84ff, #5ac8fa)',
