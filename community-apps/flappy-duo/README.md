@@ -6,9 +6,8 @@ A Flappy Bird clone for the iPhone Duo. The player character is the Duo itself; 
 
 - Tap, click or press Space, ArrowUp or W to fold.
 - Folds are counted per run and for the lifetime of the install against a 200,000-fold hinge rating.
-- Difficulty steps at 3, 6, 9 and 13 points: slab gaps oscillate vertically, a periodic blur filter is applied to the scene, notification banners are drawn over the play area, and scroll speed increases by 30%.
-- Every fifth slab shows a cartoon head above the gap and a quote toast when passed.
-- Death shows a Hinge Failure dialog with score, best, medal tier, and two actions: restart, or buy another Duo.
+- Difficulty is keyed to the game number within the session and the score. Game 1 at 2 points: slab gaps oscillate. Game 2: a periodic blur filter from 1 point, notification banners from 3. Game 3: every other slab snaps shut as the phone approaches from 1 point, scroll speed rises 30% from 4. Game 4: labelled accessories are thrown from the right edge from 1 point. Each game after the first also narrows the gap and adds 5% speed, capped at 35%.
+- Death shows a Hinge Failure dialog with score, best and medal tier.
 - The only way out of the dialog is Buy another, which opens a payment sheet. While it is open the app claims the frame side button (`os.sideButton`); a double-click confirms instead of opening Wallet. The purchase adds $2,399 to a persisted total and shows a notification.
 
 ## Platform integration

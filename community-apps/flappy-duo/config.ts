@@ -1,9 +1,11 @@
 // Types, tuning numbers and every line of copy. Change the jokes here.
 
 export type Status = 'ready' | 'playing' | 'over'
-export type Cameo = 'tim' | 'steve' | 'john'
-export type Hazard = 'drift' | 'blur' | 'notify' | 'fast'
-export type Slab = { x: number; gapY: number; label: string; passed: boolean; cameo?: Cameo; n: number }
+export type Hazard = 'drift' | 'blur' | 'notify' | 'slam' | 'fast' | 'throw'
+/** slam: 0..1 progress of a slab snapping shut toward dir once the phone gets close. */
+export type Slab = { x: number; gapY: number; label: string; passed: boolean; n: number; slam: number; dir: 1 | -1 }
+/** An accessory thrown from the right edge. */
+export type Missile = { x: number; y: number; vx: number; vy: number; rot: number; label: string }
 export type Shard = { x: number; y: number; vx: number; vy: number; r: number; life: number }
 export type Cloud = { x: number; y: number; s: number; layer: number }
 export type Banner = { title: string; text: string; y: number; life: number }
@@ -16,11 +18,14 @@ export type World = {
   shards: Shard[]
   clouds: Cloud[]
   banners: Banner[]
+  missiles: Missile[]
+  /** Game number this session; each one unlocks more. */
+  run: number
   score: number
   folds: number
   scroll: number
   slow: number
-  cause: 'slab' | 'floor' | null
+  cause: 'slab' | 'floor' | 'missile' | null
 }
 
 // Vertical values are in units of canvas height, horizontal in canvas width,
@@ -70,13 +75,23 @@ export const MILESTONES: Record<number, string> = {
   50: 'Fifty. Nobody is coming to save you.'
 }
 
-// The game gets worse the better you do. Each one is announced like a software update.
-export const HAZARDS: [number, Hazard, string][] = [
-  [3, 'drift', 'Update installed. The slabs move now. You are welcome.'],
-  [6, 'blur', 'iOS 27 beta: sharp rendering is a Pro feature.'],
-  [9, 'notify', 'Notifications on. Focus mode is a paid add-on.'],
-  [13, 'fast', 'Thermal throttling detected. Compensating by going faster.']
+// The game gets worse with every game and every point. [game, score, hazard, announcement].
+export const HAZARDS: [number, number, Hazard, string][] = [
+  [1, 2, 'drift', 'Update installed. The slabs move now.'],
+  [2, 1, 'blur', 'iOS 27 beta installed overnight. Sharp rendering is a Pro feature.'],
+  [2, 3, 'notify', 'Notifications restored from backup.'],
+  [3, 1, 'slam', 'Hinge recall. Slabs may close without notice.'],
+  [3, 4, 'fast', 'Thermal throttling detected. Compensating by going faster.'],
+  [4, 1, 'throw', 'Accessories sold separately. Shipping now.']
 ]
+export const RUN_LINES = [
+  'Game 1. Rated for 200,000 folds.',
+  'Game 2. An update was installed while you were dead.',
+  'Game 3. A recall notice is attached.',
+  'Game 4. Accessories are on their way.',
+  'Game 5. Everything, at once, faster.'
+]
+export const MISSILE_LABELS = ['DONGLE', 'USB-C', 'CHARGER', 'PENCIL', 'AIRTAG']
 export const NOTICES: [string, string][] = [
   ['Storage Almost Full', 'You can manage storage in Settings. You will not.'],
   ['Screen Time', 'Your folding was up 400% last week.'],
@@ -126,6 +141,12 @@ export const ROASTS: [number, string[]][] = [
   ]
 ]
 
+export const MISSILE_ROASTS = [
+  'Struck by an accessory. Sold separately.',
+  'The dongle arrived before the phone did.',
+  'Hit by a charger. Not included in the box.'
+]
+
 export const FLOOR_ROASTS = [
   'The floor was there the whole time.',
   'Gravity performed as documented.',
@@ -144,28 +165,12 @@ export const MEDALS: [number, string][] = [
 export const pick = <T>(list: T[]) => list[Math.floor(Math.random() * list.length)]!
 export const roastFor = (score: number) => pick(ROASTS.find(([max]) => score < max)![1])
 export const medalFor = (score: number) => MEDALS.find(([max]) => score < max)![1]
-export const gapFor = (score: number) => Math.max(0.24, GAP - score * 0.003)
-export const has = (score: number, h: Hazard) => HAZARDS.some(([min, name]) => name === h && score >= min)
-export const speedFor = (score: number) => SPEED * (has(score, 'fast') ? 1.3 : 1)
-export const gapCenter = (s: Slab, score: number, scroll: number) =>
-  has(score, 'drift') ? s.gapY + Math.sin(scroll * 5 + s.n * 1.9) * 0.07 : s.gapY
-
-// Every fifth slab has an executive peeking out of it. Cartoon likenesses, for fun only.
-export const CAMEO_ORDER: Cameo[] = ['tim', 'john', 'steve']
-export const CAMEO_LINES: Record<Cameo, string[]> = {
-  tim: [
-    'Tim: "Wonderful. Just wonderful."',
-    'Tim: "This is our best Duo yet. You are not our best user."',
-    'Tim: "Good morning! Your hinge says otherwise."'
-  ],
-  john: [
-    'John: "It is the thinnest crash we have ever made."',
-    'John: "We engineered every fold. Not that one."',
-    'John: "Titanium. Still not idiot-proof."'
-  ],
-  steve: [
-    'Steve: "You are folding it wrong."',
-    'Steve: "One more thing. You are bad at this."',
-    'Steve: "It just works. You do not."'
-  ]
-}
+type Stage = { run: number; score: number }
+export const has = ({ run, score }: Stage, h: Hazard) =>
+  HAZARDS.some(([r, s, name]) => name === h && run >= r && score >= s)
+export const runLine = (run: number) => RUN_LINES[Math.min(run, RUN_LINES.length) - 1]!
+/** Every game past the first shaves the gap and adds speed, on top of the score. */
+export const gapFor = (w: Stage) => Math.max(0.2, GAP - w.score * 0.003 - (w.run - 1) * 0.012)
+export const speedFor = (w: Stage) => SPEED * (has(w, 'fast') ? 1.3 : 1) * Math.min(1.35, 1 + (w.run - 1) * 0.05)
+export const gapCenter = (s: Slab, w: Stage & { scroll: number }) =>
+  s.gapY + (has(w, 'drift') ? Math.sin(w.scroll * 5 + s.n * 1.9) * 0.07 : 0) + s.slam * 0.14 * s.dir

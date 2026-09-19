@@ -2,11 +2,11 @@
 import {
   BANNER_LIFE,
   type Banner,
-  type Cameo,
   DUO_X,
   FLOOR,
   gapCenter,
   gapFor,
+  type Missile,
   PHONE,
   SLAB_WIDTH,
   type World
@@ -163,68 +163,6 @@ export function drawSlab(
 }
 
 // Cartoon executive peeking down from behind the top slab. Skin, hair, glasses. Nothing else.
-export function drawCameo(ctx: CanvasRenderingContext2D, who: Cameo, cx: number, cy: number, r: number) {
-  ctx.save()
-  ctx.translate(cx, cy)
-  // head
-  ctx.fillStyle = '#f1c9a5'
-  ctx.beginPath()
-  ctx.arc(0, 0, r, 0, Math.PI * 2)
-  ctx.fill()
-  // hair
-  ctx.fillStyle = who === 'tim' ? '#d9d9de' : who === 'john' ? '#3b2a20' : '#9a9aa0'
-  ctx.beginPath()
-  if (who === 'steve') {
-    ctx.arc(-r * 0.85, -r * 0.1, r * 0.3, 0, Math.PI * 2)
-    ctx.arc(r * 0.85, -r * 0.1, r * 0.3, 0, Math.PI * 2)
-  } else {
-    ctx.arc(0, -r * 0.15, r, Math.PI * 1.05, Math.PI * 1.95)
-    ctx.lineTo(r * 0.95, -r * 0.35)
-    ctx.lineTo(-r * 0.95, -r * 0.35)
-  }
-  ctx.fill()
-  if (who === 'steve') {
-    // beard
-    ctx.fillStyle = 'rgba(120,120,128,.8)'
-    ctx.beginPath()
-    ctx.arc(0, r * 0.25, r * 0.85, Math.PI * 0.15, Math.PI * 0.85)
-    ctx.fill()
-  }
-  // eyes
-  ctx.fillStyle = '#1d1e26'
-  for (const ex of [-0.35, 0.35]) {
-    ctx.beginPath()
-    ctx.arc(ex * r, -r * 0.05, r * 0.08, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  // glasses
-  if (who !== 'john') {
-    ctx.strokeStyle = who === 'steve' ? '#1d1e26' : 'rgba(80,80,90,.7)'
-    ctx.lineWidth = Math.max(1, r * 0.08)
-    for (const ex of [-0.35, 0.35]) {
-      ctx.beginPath()
-      ctx.arc(ex * r, -r * 0.05, r * 0.26, 0, Math.PI * 2)
-      ctx.stroke()
-    }
-    ctx.beginPath()
-    ctx.moveTo(-r * 0.09, -r * 0.05)
-    ctx.lineTo(r * 0.09, -r * 0.05)
-    ctx.stroke()
-  }
-  // mouth
-  ctx.strokeStyle = '#8a4b3a'
-  ctx.lineWidth = Math.max(1, r * 0.08)
-  ctx.beginPath()
-  if (who === 'john') ctx.arc(0, r * 0.3, r * 0.35, Math.PI * 0.15, Math.PI * 0.85)
-  else if (who === 'tim') ctx.arc(0, r * 0.35, r * 0.25, Math.PI * 0.2, Math.PI * 0.8)
-  else {
-    ctx.moveTo(-r * 0.25, r * 0.45)
-    ctx.lineTo(r * 0.25, r * 0.45)
-  }
-  ctx.stroke()
-  ctx.restore()
-}
-
 // A fake iOS notification that drops in over the action and blocks the view.
 export function drawBanner(ctx: CanvasRenderingContext2D, b: Banner, width: number, height: number) {
   const bw = Math.min(width * 0.58, 380)
@@ -297,14 +235,13 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: World, width: number
     if (c.layer < 2)
       drawCloud(ctx, c.x * width, c.y * height, c.s * height * (0.7 + c.layer * 0.3), 0.35 + c.layer * 0.25)
 
-  const gap = gapFor(w.score)
+  const gap = gapFor(w)
   for (const s of w.slabs) {
     const x = s.x * width
     const sw = SLAB_WIDTH * width
-    const c = gapCenter(s, w.score, w.scroll)
+    const c = gapCenter(s, w)
     const top = (c - gap / 2) * height
     const bottom = (c + gap / 2) * height
-    if (s.cameo) drawCameo(ctx, s.cameo, x + sw / 2, top + sw * 0.1, sw * 0.42)
     drawSlab(ctx, x, -10, sw, top + 10, s.label, t, 'top')
     drawSlab(ctx, x, bottom, sw, height * FLOOR - bottom, s.label, t, 'bottom')
   }
@@ -341,7 +278,36 @@ export function drawWorld(ctx: CanvasRenderingContext2D, w: World, width: number
     ctx.restore()
   }
 
+  for (const m of w.missiles) drawMissile(ctx, m, m.x * width, m.y * height, PHONE * height * 0.5)
+
   drawPhone(ctx, DUO_X * width, w.y * height, PHONE * height, w.vy, w.fold, w.status === 'over', t)
+  ctx.restore()
+}
+
+// A white accessory with a stub of cable, spinning as it comes in.
+export function drawMissile(ctx: CanvasRenderingContext2D, m: Missile, x: number, y: number, size: number) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(m.rot)
+  const w = size
+  const h = size * 0.42
+  ctx.shadowColor = 'rgba(0,0,0,.25)'
+  ctx.shadowBlur = 8
+  ctx.fillStyle = '#f5f5f7'
+  roundRect(ctx, -w / 2, -h / 2, w, h, h * 0.3)
+  ctx.fill()
+  ctx.shadowBlur = 0
+  ctx.strokeStyle = '#e0e0e6'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(w / 2, 0)
+  ctx.quadraticCurveTo(w * 0.85, h, w * 1.2, h * 0.4)
+  ctx.stroke()
+  ctx.fillStyle = '#8e8e93'
+  ctx.font = `700 ${Math.max(7, h * 0.5)}px ${FONT}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(m.label, 0, 0)
   ctx.restore()
 }
 

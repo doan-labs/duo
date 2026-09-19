@@ -5,9 +5,8 @@
 - Initial release.
 - Canvas 2D game loop with the Duo as the player character; obstacles are labelled glass slabs.
 - Per-run and lifetime fold counters; best score, folds and money spent persisted via `os.storage`.
-- Difficulty steps at 3, 6, 9 and 13 points: oscillating gaps, periodic blur, notification banners, 30% speed increase.
-- Cartoon cameo on every fifth slab with a toast on pass.
-- Game-over dialog with score, best and medal tier; restart and purchase actions.
+- Difficulty keyed to game number and score: oscillating gaps, periodic blur, notification banners, slabs that snap shut, thrown accessories, speed increase; each game narrows the gap and adds speed.
+- Game-over dialog with score, best and medal tier; the only action is the purchase.
 - Payment sheet confirmed by a double-click of the frame side button, claimed through the SDK while the sheet is open. A glow marks the button position; confirmation runs processing, an animated check and a dismiss transition, then adds $2,399 to the spent total and shows a notification.
 - Small home-screen widget via `os.widget.set`.
 - Synthesised flap, score, crash and payment cues via Web Audio.

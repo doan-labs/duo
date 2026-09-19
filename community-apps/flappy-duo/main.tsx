@@ -5,16 +5,17 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { cue } from './audio.ts'
 import {
-  CAMEO_LINES,
   FLOOR_ROASTS,
   HAZARDS,
   HINGE_RATING,
   has,
   MILESTONES,
+  MISSILE_ROASTS,
   medalFor,
   PRICE,
   pick,
   roastFor,
+  runLine,
   START_LINES,
   type Status
 } from './config.ts'
@@ -29,6 +30,7 @@ function Game() {
   const world = useRef(newWorld())
   const [status, setStatus] = useState<Status>('ready')
   const [score, setScore] = useState(0)
+  const [run, setRun] = useState(1)
   const [folds, setFolds] = useState(0)
   const [best, setBest] = useState(0)
   const [lifetime, setLifetime] = useState(0)
@@ -81,7 +83,8 @@ function Game() {
   }
 
   const reset = () => {
-    world.current = { ...newWorld(), clouds: world.current.clouds }
+    world.current = { ...newWorld(world.current.run + 1), clouds: world.current.clouds }
+    setRun(world.current.run)
     setStatus('ready')
     setScore(0)
     setFolds(0)
@@ -144,20 +147,26 @@ function Game() {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       const before = world.current
-      const { world: next, scored, cameo } = step(before, dt, width / height)
+      const { world: next, scored } = step(before, dt, width / height)
       world.current = next
       if (scored) {
         cue('score')
         setScore(next.score)
-        const hazard = HAZARDS.find(([min]) => min === next.score)
-        const line = hazard ? hazard[2] : cameo ? pick(CAMEO_LINES[cameo]) : MILESTONES[next.score]
+        const hazard = HAZARDS.find(([r, s]) => next.run >= r && s === next.score)
+        const line = hazard ? hazard[3] : MILESTONES[next.score]
         if (line) say(line, hazard ? 2600 : 2000)
       }
       if (before.status === 'playing' && next.status === 'over') {
         cue('crash')
         setStatus('over')
         setToast('')
-        setRoast(next.cause === 'floor' ? pick(FLOOR_ROASTS) : roastFor(next.score))
+        setRoast(
+          next.cause === 'floor'
+            ? pick(FLOOR_ROASTS)
+            : next.cause === 'missile'
+              ? pick(MISSILE_ROASTS)
+              : roastFor(next.score)
+        )
         setBest((b) => {
           const nb = Math.max(b, next.score)
           if (nb !== b) void os.storage.set('best', String(nb))
@@ -172,7 +181,7 @@ function Game() {
       const t = now / 1000
       octx.setTransform(dpr, 0, 0, dpr, 0, 0)
       drawWorld(octx, next, width, height, t)
-      const blur = has(next.score, 'blur') && next.status === 'playing' ? Math.max(0, Math.sin(t * 1.3)) * 4 * dpr : 0
+      const blur = has(next, 'blur') && next.status === 'playing' ? Math.max(0, Math.sin(t * 1.3)) * 4 * dpr : 0
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, el.width, el.height)
       ctx.filter = blur > 0.3 ? `blur(${blur.toFixed(1)}px)` : 'none'
@@ -233,7 +242,7 @@ function Game() {
         <section {...stylex.props(styles.intro, cover && styles.introCover)}>
           <span {...stylex.props(styles.kicker)}>DUO ARCADE · FIRST CONTACT</span>
           <h1 {...stylex.props(styles.title, cover && styles.titleCover)}>Flappy Duo</h1>
-          <p {...stylex.props(styles.line, cover && styles.lineCover)}>{startLine}</p>
+          <p {...stylex.props(styles.line, cover && styles.lineCover)}>{run > 1 ? runLine(run) : startLine}</p>
           {best > 0 && (
             <p {...stylex.props(styles.best)}>
               Best {best}. Lifetime folds {lifetime.toLocaleString()} of {HINGE_RATING.toLocaleString()}.
