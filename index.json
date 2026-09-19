@@ -7,6 +7,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/2048",
       "releases": [
         {
+          "release": "1.0.1+d25da1c2",
+          "sdk": "0.0.0",
+          "bytes": 260974,
+          "sha256": "341f57113f0e39d10f5c4cdb151c7c1cbb4158feeb32281b379a617577689d27"
+        },
+        {
           "release": "1.0.0+0af6019b",
           "sdk": "0.0.0",
           "bytes": 259309,
@@ -20,6 +26,12 @@
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
       "releases": [
+        {
+          "release": "1.0.1+483ec2c5",
+          "sdk": "0.0.0",
+          "bytes": 258222,
+          "sha256": "f19ae67750fd8820f024b6d880119108b1d47c94de8c83d3be857e7f45aeacbd"
+        },
         {
           "release": "1.0.0+e50d04dd",
           "sdk": "0.0.0",
