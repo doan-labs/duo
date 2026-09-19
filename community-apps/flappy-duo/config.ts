@@ -45,14 +45,6 @@ export const BANNER_LIFE = 4.5
 /** The replacement costs more every game: 2,399, 2,999, 3,699, 4,699, 5,899… always ending in 99. */
 export const priceFor = (run: number) => Math.round((PRICE * 1.25 ** (run - 1)) / 100) * 100 - 1
 
-export const START_LINES = [
-  'Tap to fold. Every fold comes off the warranty.',
-  'Hinge rated for 200,000 folds. Let us test that.',
-  `You paid $${PRICE.toLocaleString()} for this. Make it count.`,
-  'The crease is permanent. So is your record.',
-  'Flappy Bird, but the bird cost more than your rent.'
-]
-
 export const SLAB_LABELS = [
   'CREASE',
   `$${PRICE.toLocaleString()}`,
@@ -67,44 +59,37 @@ export const SLAB_LABELS = [
 ]
 
 export const MILESTONES: Record<number, string> = {
-  1: 'One. The Genius Bar is proud of you.',
-  5: 'Five. AppleCare does not cover skill.',
-  7: 'Seven. The hinge is squeaking. Ignore it.',
-  10: 'Ten. Still cheaper than a screen repair.',
-  15: 'Fifteen. Please stop folding it.',
-  20: 'Twenty. The engineers are nervous.',
-  30: 'Thirty. HR has been notified.',
-  50: 'Fifty. Nobody is coming to save you.'
+  1: 'One slab cleared. This has been noted.',
+  5: 'Five. Within the expected range for a first-time owner.',
+  7: 'Seven. The hinge is operating outside its comfort range.',
+  10: 'Ten. Comparable to a screen repair, in cost terms.',
+  15: 'Fifteen. Continued folding is at your discretion.',
+  20: 'Twenty. Engineering has been informed.',
+  30: 'Thirty. Legal has been informed.',
+  50: 'Fifty. No further assistance is available.'
 }
 
 // The game gets worse with every game and every point. [game, score, hazard, announcement].
 export const HAZARDS: [number, number, Hazard, string][] = [
-  [1, 2, 'drift', 'Update installed. The slabs move now.'],
-  [2, 1, 'blur', 'iOS 27 beta installed overnight. Sharp rendering is a Pro feature.'],
-  [2, 3, 'notify', 'Notifications restored from backup.'],
-  [3, 1, 'slam', 'Hinge recall. Slabs may close without notice.'],
-  [3, 4, 'fast', 'Thermal throttling detected. Compensating by going faster.'],
-  [4, 1, 'throw', 'Accessories sold separately. Shipping now.']
-]
-export const RUN_LINES = [
-  'Game 1. Rated for 200,000 folds.',
-  'Game 2. An update was installed while you were dead.',
-  'Game 3. A recall notice is attached.',
-  'Game 4. Accessories are on their way.',
-  'Game 5. Everything, at once, faster.'
+  [1, 2, 'drift', 'Update installed. Slab positions are now dynamic.'],
+  [2, 1, 'blur', 'iOS 27 beta installed overnight. Sharp rendering is available on Pro models.'],
+  [2, 3, 'notify', 'Notification settings restored from backup.'],
+  [3, 1, 'slam', 'Recall notice. Slabs may close without prior notice.'],
+  [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
+  [4, 1, 'throw', 'Accessories are sold separately and shipped directly.']
 ]
 // The receipt arrives as a message from the top. `$` is replaced with the amount.
 export const RECEIPTS: [string, string][] = [
-  ['Tim Cook', 'Thank you for choosing Duo again. We noticed.'],
-  ['John Ternus', 'The hinge is rated for 200,000 folds. Not that fold.'],
-  ['Tim Cook', 'Your loyalty has been recorded. So has the $.'],
-  ['John Ternus', 'Titanium is very strong. The $ charge is stronger.'],
-  ['Tim Cook', 'This is our best Duo yet. Your previous one agreed.'],
-  ['John Ternus', 'Thinnest Duo ever. The $ invoice is not.'],
-  ['Tim Cook', 'Good morning. $ has left your account.'],
-  ['John Ternus', 'Same factory as your last one. Same outcome expected.'],
-  ['Tim Cook', 'Environmental note: your old Duo is now landfill. Our margins are not.'],
-  ['John Ternus', 'We tested the hinge against everything. Except you.']
+  ['Tim Cook', 'Thank you for choosing Duo again. Your decision has been noted.'],
+  ['John Ternus', 'The hinge is rated for 200,000 folds. That fold was not among them.'],
+  ['Tim Cook', 'Your continued loyalty has been recorded, along with the $.'],
+  ['John Ternus', 'Titanium was selected for its strength. The $ charge is final.'],
+  ['Tim Cook', 'This is our best Duo yet. The previous one was also our best Duo yet.'],
+  ['John Ternus', 'The thinnest Duo we have made. The $ invoice is standard thickness.'],
+  ['Tim Cook', 'Good morning. $ has been transferred from your account.'],
+  ['John Ternus', 'Your replacement was produced on the same line as the previous unit. Results may be similar.'],
+  ['Tim Cook', 'Environmental report: the previous unit has been recycled. The $ has not.'],
+  ['John Ternus', 'The hinge was validated against every scenario we considered.']
 ]
 export const receiptFor = (run: number, price: number): { title: string; text: string } => {
   const [title, line] = RECEIPTS[(run - 1) % RECEIPTS.length]!
@@ -112,73 +97,77 @@ export const receiptFor = (run: number, price: number): { title: string; text: s
 }
 export const MISSILE_LABELS = ['DONGLE', 'USB-C', 'CHARGER', 'PENCIL', 'AIRTAG']
 export const NOTICES: [string, string][] = [
-  ['Storage Almost Full', 'You can manage storage in Settings. You will not.'],
-  ['Screen Time', 'Your folding was up 400% last week.'],
-  ['AppleCare+', 'Your coverage ends today. Your problems do not.'],
-  ['Software Update', 'iOS 27.0.1 fixes an issue where the phone worked.'],
-  ['Battery', 'Maximum capacity 79%. Peak performance: no.'],
-  ['Find My', 'Your Duo was last seen falling.'],
-  ['Duo Store', 'Trade in your Duo for $40. Ha.']
+  ['Storage Almost Full', 'You can manage storage in Settings. Most owners do not.'],
+  ['Screen Time', 'Folding activity increased 400% compared to last week.'],
+  ['AppleCare+', 'Your coverage ends today. Your device does not know this.'],
+  ['Software Update', 'iOS 27.0.1 addresses an issue where the device functioned as expected.'],
+  ['Battery', 'Maximum capacity 79%. Peak performance capability has been disabled.'],
+  ['Find My', 'Your Duo was last seen descending.'],
+  ['Duo Store', 'Your Duo is eligible for a $40 trade-in credit.']
 ]
 
 export const ROASTS: [number, string[]][] = [
   [
     1,
     [
-      'Zero folds. The hinge remains in factory condition.',
-      'The first slab was stationary. Noted.',
-      'Warranty unaffected. Nothing happened.'
+      'Zero slabs cleared. The hinge remains in factory condition.',
+      'The first slab was stationary at the time of impact.',
+      'No warranty impact. No progress either.'
     ]
   ],
   [
     4,
     [
-      'The slab did not move. That was the arrangement.',
-      'Hinge failure. The cause has been identified.',
+      'The slab did not move. This was the arrangement.',
+      'Hinge failure. The cause has been identified as the operator.',
       'Four would have been a milestone.'
     ]
   ],
   [
     9,
-    ['Adequate. The paperwork will say adequate.', 'The crease has seen this before.', 'Face ID declined to comment.']
+    [
+      'Adequate. The report will say adequate.',
+      'The crease has recorded this outcome before.',
+      'Face ID declined to comment.'
+    ]
   ],
   [
     16,
     [
-      'A respectable number. The hinge has filed a complaint.',
+      'A respectable figure. The hinge has filed a complaint.',
       'Competent. Not covered.',
-      'The engineers rated it for more. So did you.'
+      'The device was rated for more. So were you.'
     ]
   ],
   [
     Number.POSITIVE_INFINITY,
     [
       'Above the average owner. The average owner is not playing.',
-      'This will be described as normal wear.',
-      'Support has been notified. They are not coming.'
+      'This will be recorded as normal wear.',
+      'Support has been notified. Support is not coming.'
     ]
   ]
 ]
 
 export const MISSILE_ROASTS = [
-  'Struck by an accessory. Sold separately.',
-  'The dongle arrived before the phone did.',
-  'Hit by a charger. Not included in the box.'
+  'Impact with an accessory. Accessories are sold separately.',
+  'The charging cable arrived ahead of schedule.',
+  'Struck by a charger. The charger is not included.'
 ]
 
 export const FLOOR_ROASTS = [
-  'The floor was there the whole time.',
-  'Gravity performed as documented.',
-  'Screen down. The recommendation is screen up.'
+  'The floor was present for the duration.',
+  'Gravity performed within specification.',
+  'The device is screen down. Screen up is recommended.'
 ]
 
 export const MEDALS: [number, string][] = [
   [1, 'Participation'],
   [5, 'Refurbished'],
   [10, 'Out of warranty'],
-  [20, 'Genius, allegedly'],
-  [40, 'Suspiciously good'],
-  [Number.POSITIVE_INFINITY, 'Refer to a specialist']
+  [20, 'Under review'],
+  [40, 'Under investigation'],
+  [Number.POSITIVE_INFINITY, 'Referred to a specialist']
 ]
 
 export const pick = <T>(list: T[]) => list[Math.floor(Math.random() * list.length)]!
@@ -187,7 +176,6 @@ export const medalFor = (score: number) => MEDALS.find(([max]) => score < max)![
 type Stage = { run: number; score: number }
 export const has = ({ run, score }: Stage, h: Hazard) =>
   HAZARDS.some(([r, s, name]) => name === h && run >= r && score >= s)
-export const runLine = (run: number) => RUN_LINES[Math.min(run, RUN_LINES.length) - 1]!
 /** Every game past the first shaves the gap and adds speed, on top of the score. */
 export const gapFor = (w: Stage) => Math.max(0.2, GAP - w.score * 0.003 - (w.run - 1) * 0.012)
 export const speedFor = (w: Stage) => SPEED * (has(w, 'fast') ? 1.3 : 1) * Math.min(1.35, 1 + (w.run - 1) * 0.05)

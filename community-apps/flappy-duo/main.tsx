@@ -7,7 +7,6 @@ import { cue } from './audio.ts'
 import {
   FLOOR_ROASTS,
   HAZARDS,
-  HINGE_RATING,
   has,
   MILESTONES,
   MISSILE_ROASTS,
@@ -17,8 +16,6 @@ import {
   priceFor,
   receiptFor,
   roastFor,
-  runLine,
-  START_LINES,
   type Status
 } from './config.ts'
 import { drawOverlay, drawWorld } from './draw.ts'
@@ -35,21 +32,18 @@ function Game() {
   const [run, setRun] = useState(1)
   const [folds, setFolds] = useState(0)
   const [best, setBest] = useState(0)
-  const [lifetime, setLifetime] = useState(0)
   const [spent, setSpent] = useState(PRICE)
   const [toast, setToast] = useState('')
   const [roast, setRoast] = useState('')
   const [pay, setPay] = useState<'sheet' | 'processing' | 'done' | 'leaving' | null>(null)
   const onPay = useRef(() => {})
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [startLine] = useState(() => pick(START_LINES))
   const cover = view.display === 'cover'
   const width = view.width || 740
   const height = view.height || 480
 
   useEffect(() => {
     void os.storage.get('best').then((v) => v && setBest(Number(v) || 0))
-    void os.storage.get('folds').then((v) => v && setLifetime(Number(v) || 0))
     void os.storage.get('spent').then((v) => v && setSpent(Number(v) || PRICE))
     requestAnimationFrame(() => os.ready())
   }, [])
@@ -63,12 +57,11 @@ function Game() {
         lines: [
           { role: 'label', text: 'Flappy Duo' },
           { role: 'value', text: String(best) },
-          { role: 'caption', text: `$${spent.toLocaleString()} spent` },
-          { role: 'caption', text: `hinge ${((lifetime / HINGE_RATING) * 100).toFixed(2)}% used` }
+          { role: 'caption', text: `$${spent.toLocaleString()} spent` }
         ]
       })
       .catch(() => {})
-  }, [best, spent, lifetime])
+  }, [best, spent])
 
   useEffect(() => {
     if (!notice) return
@@ -176,11 +169,6 @@ function Game() {
           if (nb !== b) void os.storage.set('best', String(nb))
           return nb
         })
-        setLifetime((l) => {
-          const nl = l + next.folds
-          void os.storage.set('folds', String(nl))
-          return nl
-        })
       }
       const t = now / 1000
       octx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -217,7 +205,6 @@ function Game() {
   })
 
   const newBest = status === 'over' && score > 0 && score >= best
-  const warranty = Math.max(0, HINGE_RATING - lifetime)
   const cost = priceFor(run)
   const price = `$${cost.toLocaleString()}.00`
 
@@ -240,19 +227,13 @@ function Game() {
           <span>
             {folds} {folds === 1 ? 'fold' : 'folds'}
           </span>
-          <span {...stylex.props(styles.hudDim)}>hinge {((1 - warranty / HINGE_RATING) * 100).toFixed(2)}% used</span>
         </div>
       )}
       {status === 'ready' && (
         <section {...stylex.props(styles.intro, cover && styles.introCover)}>
-          <span {...stylex.props(styles.kicker)}>DUO ARCADE · FIRST CONTACT</span>
+          <span {...stylex.props(styles.kicker)}>DUO ARCADE</span>
           <h1 {...stylex.props(styles.title, cover && styles.titleCover)}>Flappy Duo</h1>
-          <p {...stylex.props(styles.line, cover && styles.lineCover)}>{run > 1 ? runLine(run) : startLine}</p>
-          {best > 0 && (
-            <p {...stylex.props(styles.best)}>
-              Best {best}. Lifetime folds {lifetime.toLocaleString()} of {HINGE_RATING.toLocaleString()}.
-            </p>
-          )}
+          {best > 0 && <p {...stylex.props(styles.best)}>Best {best}</p>}
           <span {...stylex.props(styles.tap)}>Tap to fold</span>
         </section>
       )}
@@ -265,10 +246,6 @@ function Game() {
         >
           <strong {...stylex.props(styles.alertTitle)}>Hinge Failure</strong>
           <p {...stylex.props(styles.roast)}>{roast}</p>
-          <p {...stylex.props(styles.fine)}>
-            {folds} {folds === 1 ? 'fold' : 'folds'} this life. {warranty.toLocaleString()} remaining on the hinge. Not
-            covered.
-          </p>
           <div {...stylex.props(styles.stats)}>
             <div {...stylex.props(styles.stat)}>
               <span>SCORE</span>
@@ -283,7 +260,7 @@ function Game() {
               <strong {...stylex.props(styles.value, styles.medalValue)}>{medalFor(score)}</strong>
             </div>
           </div>
-          {newBest && <p {...stylex.props(styles.best)}>New best. It has been recorded.</p>}
+          {newBest && <p {...stylex.props(styles.best)}>New best. This has been recorded.</p>}
           <div {...stylex.props(styles.actions)}>
             <button type="button" onClick={() => setPay('sheet')} {...stylex.props(styles.button)}>
               Buy another · ${cost.toLocaleString()}
@@ -323,7 +300,7 @@ function Game() {
             </div>
             <div {...stylex.props(styles.row, styles.last)}>
               <span {...stylex.props(styles.rowKey)}>APPLECARE+</span>
-              <span {...stylex.props(styles.rowValue)}>DECLINED. BOLD.</span>
+              <span {...stylex.props(styles.rowValue)}>Declined</span>
             </div>
             <div {...stylex.props(styles.faceId)}>
               {pay === 'sheet' && (
@@ -336,7 +313,7 @@ function Game() {
                     </g>
                   </svg>
                   <span {...stylex.props(styles.faceLabel)}>Face ID</span>
-                  <span {...stylex.props(styles.sideHint)}>Double-press side button to pay ››</span>
+                  <span {...stylex.props(styles.sideHint)}>Double-click side button to pay</span>
                 </>
               )}
               {pay === 'processing' && (
@@ -355,7 +332,7 @@ function Game() {
                     />
                   </svg>
                   <span {...stylex.props(styles.faceLabel)}>Processing…</span>
-                  <span {...stylex.props(styles.sideHint, styles.still)}>Do not fold the device</span>
+                  <span {...stylex.props(styles.sideHint, styles.still)}>Do not fold the device during processing</span>
                 </>
               )}
               {(pay === 'done' || pay === 'leaving') && (
