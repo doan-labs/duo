@@ -78,13 +78,14 @@ export const HAZARDS: [number, number, Hazard, string][] = [
   [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
   [4, 1, 'throw', 'Accessories are sold separately and shipped directly.']
 ]
-// Only the second and third purchases are acknowledged. Later ones alternate the same two lines.
-export const receiptFor = (run: number): { title: string; text: string } | null => {
-  if (run < 2) return null
-  return run % 2 === 0
-    ? { title: 'Tim Cook', text: 'Thank you for your contribution.' }
-    : { title: 'John Ternus', text: 'We appreciate your continued support.' }
-}
+// Purchases 2 to 4 are acknowledged. Later ones repeat that sequence.
+const RECEIPTS = [
+  { title: 'Tim Cook', text: 'Thank you for your contribution.' },
+  { title: 'John Ternus', text: 'We appreciate your continued support.' },
+  { title: 'Apple', text: 'We just upgraded your iCloud to Pro for free. No worry.' }
+]
+export const receiptFor = (run: number): { title: string; text: string } | null =>
+  run < 2 ? null : RECEIPTS[(run - 2) % RECEIPTS.length]!
 export const MISSILE_LABELS = ['DONGLE', 'USB-C', 'CHARGER', 'PENCIL', 'AIRTAG']
 export const NOTICES: [string, string][] = [
   ['Storage Almost Full', 'You can manage storage in Settings. Most owners do not.'],
