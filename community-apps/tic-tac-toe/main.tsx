@@ -106,7 +106,6 @@ function Game() {
           <button
             key={CELL_KEYS[index]}
             type="button"
-            role="gridcell"
             aria-label={mark ? mark : 'Empty cell'}
             onClick={() => play(index)}
             {...stylex.props(styles.cell, mark === 'X' && styles.cellX, mark === 'O' && styles.cellO)}
@@ -204,4 +203,5 @@ const styles = stylex.create({
   }
 })
 
+await os.connect()
 createRoot(document.body).render(<Game />)
