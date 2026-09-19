@@ -1,6 +1,6 @@
 # UI kit
 
-Private `@doan-labs/duo-uikit` 1.0.0 provides presentation components for baked apps
+Private `@doan-labs/duo-uikit` 1.1.0 provides presentation components for baked apps
 and isolated documents. The SDK separately owns host API, bridge, manifest and runtime
 compatibility. The kit's version never gates host compatibility.
 
@@ -15,7 +15,8 @@ The kit is Apple's design system for the device (decision 75): iOS 26 system hue
 dynamic colours as the per-app `app` theme, Dynamic Type at the Large size with the HIG's
 leading and SF Pro tracking, and `space`, `radius`, `shadow`, `glass` and `motion` scales.
 Typed `as` and StyleX `xstyle` support app composition; legacy Nav/Page/Sym/Num and style
-subpaths remain. `appAppearance` holds only an app's own colours, prefixed by its folder
+subpaths remain. `Checkbox`, `IconButton`, `Segmented`, `TextField`, `Select` and `Sheet`
+are the desktop controls a tablet layout needs, drawn on native elements. `appAppearance` holds only an app's own colours, prefixed by its folder
 name. The AST token gate (`scripts/check-app-tokens.ts`) fails any literal size, weight,
 radius, shadow, tracking, leading, font, timing or colour in `packages/apps` and
 `packages/shell`, and any cross-app `appAppearance` read; it runs locally/in CI alongside

@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { PrimitiveProps } from './primitive.ts'
 import { appearance } from './primitive.ts'
-import { colors, easing } from './tokens.stylex.ts'
+import { colors, easing, radius } from './tokens.stylex.ts'
 
 /**
  * Native checkbox drawn as macOS Calendar's tinted square: hollow at rest, filled
@@ -21,7 +21,7 @@ const styles = stylex.create({
     height: 14,
     margin: 0,
     flexShrink: 0,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     borderWidth: 1.5,
     borderStyle: 'solid',
     borderColor: 'currentColor',

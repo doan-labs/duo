@@ -1,5 +1,5 @@
 import { os } from '@doan-labs/duo-sdk'
-import { appAppearance, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, fonts, leading, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -24,8 +24,9 @@ const styles = stylex.create({
     backgroundColor: colors.black,
     color: colors.white,
     fontFamily: fonts.system,
-    fontSize: appAppearance.musicFontSize,
-    lineHeight: 1.3
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline
   }
 })
 await os.connect()
