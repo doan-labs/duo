@@ -1,10 +1,10 @@
 {
   "package": "@doan-labs/duo-uikit",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "components": [
     {
       "name": "Button",
-      "description": "Native button with the existing tinted capsule or filled/plain variants. Icon-only buttons need aria-label.",
+      "description": "Native button: tinted capsule by default, filled with the link colour, or plain text. Icon-only buttons need aria-label.",
       "props": "type ButtonProps = PrimitiveProps<'button'> & { variant?: 'filled' | 'tinted' | 'plain' }",
       "source": "packages/uikit/button.tsx"
     },
@@ -65,7 +65,7 @@
     {
       "name": "Text",
       "description": "A step of the type ramp. `body` emits nothing, so it inherits.",
-      "props": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: Ramp | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}",
+      "props": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: Ramp | 'caption'\n  weight?: 'regular' | 'medium' | 'semibold' | 'bold'\n  color?: 'primary' | 'secondary' | 'tertiary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}",
       "source": "packages/uikit/text.tsx"
     },
     {

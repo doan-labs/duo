@@ -117,6 +117,15 @@ beats StyleX regardless of specificity. Use longhand properties, no descendant s
 no `!important`, and dynamic StyleX props rather than raw style/className. Build after
 style changes: shorthand errors can pass TypeScript and fail the Babel transform.
 
+Every size, weight, radius, shadow, tracking, leading, font, timing and colour comes from
+`packages/uikit/tokens.stylex.ts` (`typography`/`typeScale`+`leading`+`tracking`+`weight`,
+`space`, `radius`, `shadow`, `glass`, `easing`, `motion`, `colors`, `app`); a value with no
+step is snapped to the nearest one, not added. An app's own colours go under its `// <app>`
+line in `appAppearance`, named by role, and only that app reads them. The shell reads no
+`appAppearance`; its materials are `chrome`/`wallpaper` consts. `bun scripts/check-app-tokens.ts`
+is the gate; `screen.ts`, `main.ts`, `device.ts` and shaders are exempt because they paint
+canvas and WebGL, so a token change there is a second edit by hand.
+
 Keyframes must be declared in the consuming file; reusable animations are whole style
 blocks. Identical declarations deduplicate. For sandbox gallery roots, apply the public
 app token theme, not only a background color.

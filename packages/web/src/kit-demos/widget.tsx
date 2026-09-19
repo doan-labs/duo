@@ -1,5 +1,5 @@
 import { VStack, Widget } from '@doan-labs/duo-uikit'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 
@@ -24,5 +24,5 @@ export default function Demo() {
 
 // Widgets sit on a wallpaper; the gallery uses the Weather night blue.
 const styles = stylex.create({
-  night: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.weatherNight, padding: 24 }
+  night: { alignItems: 'center', justifyContent: 'center', backgroundColor: appAppearance.weatherNight, padding: 24 }
 })

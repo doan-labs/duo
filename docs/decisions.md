@@ -970,3 +970,29 @@ display the person was looking at. The bridge now arms the ready timer only whil
 unchanged because scripts run in hidden documents. Changing every app to call `ready()`
 outside a frame callback was the alternative, and it would not have covered third-party
 apps built from the template.
+
+## 75. The device's design system is Apple's, expressed as scales
+
+2026-09-19. Supersedes the "no visual redesign" clause of 48 and the 15 px body
+in 17's successor tokens. The kit's palette was iOS 13 (`#007aff`), its body text
+15 px at 1.3 leading, and 356 `appAppearance` constants named by their first use
+(`musicFontSize6`, `settingsBorderRadius3`) carried every size, weight, radius,
+shadow and timing an app wanted, so no two apps agreed on anything. The token
+module now holds what Apple publishes and nothing an app invents: the iOS 26
+system hues with their dark siblings and `grey`..`grey6`; the UIKit dynamic
+colours as the per-app `app` theme (`label2`, `label3`, `link`, `separator`,
+`fill`..`fill3`); Dynamic Type at the Large size as `typeScale` + `leading` +
+`tracking` + `weight`, with `typography` as whole steps and four `display` sizes
+for oversized numerals; a 4 px `space` scale; `radius` at 4/8/10/12/16/22/pill;
+four `shadow`s (`card`, `float`, `rim`, `text`); `glass` as blur and tint per 18;
+`motion.press` as the one press state. `appAppearance` keeps only an app's own
+colours, gradients and halos, prefixed with the app's folder name, and
+`scripts/check-app-tokens.ts` fails an app that reads another app's key, any
+literal colour, size, weight, radius, shadow, tracking, leading, font or timing
+in `packages/apps` or `packages/shell` (canvas and WebGL files exempt). Body is
+17/22 with -0.43 px tracking, so every app grew; that is the HIG's reading size
+and the deviation was not defensible. The apple.com marketing system was
+considered and rejected for the device: its `#0066cc` accent, parchment tiles
+and 56 px hero belong to a web page, not to an iPhone. Cost: a one-time
+migration of 38 apps and the shell, and the kit moves to 1.0.0 because names
+were removed.

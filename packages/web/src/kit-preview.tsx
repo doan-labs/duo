@@ -95,7 +95,7 @@ export function KitPreview({ name }: { name: string }) {
 }
 
 // The same light app theme the Developer gallery applies to its root.
-const theme = stylex.createTheme(app, { bg: colors.groupedLight, fg: colors.black })
+const theme = stylex.createTheme(app, { bg: colors.grey6, fg: colors.black })
 
 const styles = stylex.create({
   tabs: {
@@ -144,7 +144,7 @@ const styles = stylex.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderRadius: '18px',
-    backgroundColor: colors.groupedLight,
+    backgroundColor: colors.grey6,
     color: colors.black,
     // The shell's body font: 400 15px/1.4 on the system stack.
     fontFamily: fonts.system,

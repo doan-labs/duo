@@ -1,5 +1,5 @@
 import { VStack, WidgetLabel } from '@doan-labs/duo-uikit'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export default function Demo() {
@@ -12,5 +12,5 @@ export default function Demo() {
 }
 
 const styles = stylex.create({
-  night: { justifyContent: 'center', backgroundColor: colors.weatherNight, color: colors.white, padding: 24 }
+  night: { justifyContent: 'center', backgroundColor: appAppearance.weatherNight, color: colors.white, padding: 24 }
 })
