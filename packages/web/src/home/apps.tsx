@@ -74,7 +74,11 @@ const OFFICIAL: Entry[] = [
   }),
   ...CATALOG.filter((c) => c.lane === 'official' && !SHELL.some((s) => s.name === c.name)).map(fromRelease)
 ].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name))
-const COMMUNITY: Entry[] = CATALOG.filter((c) => c.lane === 'community').map(fromRelease)
+/** Hand-picked: shown first in their lane with a Hot mark. */
+const HOT = new Set(['com.mnismt.duo.flappyduo'])
+const COMMUNITY: Entry[] = CATALOG.filter((c) => c.lane === 'community')
+  .map(fromRelease)
+  .sort((a, b) => Number(HOT.has(b.key)) - Number(HOT.has(a.key)))
 function fromRelease(c: CatalogApp): Entry {
   return {
     key: c.id,
@@ -225,6 +229,7 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
                   <img src={a.icon} alt="" width={1024} height={1024} {...stylex.props(styles.iconSm)} />
                   <div>
                     <Name entry={a} row />
+                    {HOT.has(a.key) && <span {...stylex.props(styles.hot)}>Hot</span>}
                     <div {...stylex.props(styles.meta)}>
                       {a.author}
                       <Source entry={a} />
@@ -256,6 +261,7 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
               <div {...stylex.props(styles.body)}>
                 <h4 {...stylex.props(styles.name)}>
                   <Name entry={a} />
+                  {HOT.has(a.key) && <span {...stylex.props(styles.hot)}>Hot</span>}
                 </h4>
                 <p {...stylex.props(styles.meta)}>
                   {a.author}
@@ -489,6 +495,22 @@ const styles = stylex.create({
     color: color.text
   },
   link: { color: color.text, textDecorationLine: 'none' },
+  hot: {
+    marginLeft: '8px',
+    verticalAlign: 'middle',
+    paddingTop: '3px',
+    paddingBottom: '3px',
+    paddingLeft: '7px',
+    paddingRight: '7px',
+    borderRadius: '999px',
+    backgroundColor: color.redBg,
+    color: color.red,
+    fontFamily: font.sans,
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase'
+  },
   meta: { marginTop: '3px', marginBottom: 0, fontSize: '14px', lineHeight: 1.5, color: color.text2 },
   metaLink: { color: 'inherit', textDecorationLine: 'underline', textUnderlineOffset: '3px' },
   dates: {

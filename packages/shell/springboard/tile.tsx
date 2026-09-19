@@ -176,6 +176,8 @@ const styles = stylex.create({
     width: layout.icon,
     height: layout.icon,
     display: 'block',
+    // Apple's artwork carries its own rounded corners; a release icon may arrive square.
+    borderRadius: '22.5%',
     transitionProperty: 'transform',
     transitionDuration: '.12s'
   },
