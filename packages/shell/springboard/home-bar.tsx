@@ -20,6 +20,7 @@ export function HomeBar({
   split = 0.5,
   light,
   off,
+  faint,
   onPointerDown
 }: {
   side?: Side
@@ -27,6 +28,8 @@ export function HomeBar({
   split?: number
   light?: boolean
   off?: boolean
+  /** On the home screen: barely there, a hint that a swipe up finds the parked apps. */
+  faint?: boolean
   onPointerDown?: (e: ReactPointerEvent<HTMLDivElement>) => void
 }) {
   return (
@@ -36,6 +39,7 @@ export function HomeBar({
         styles.homebar,
         side && styles.homebarAt(side === 'left' ? split * 50 : 50 + split * 50),
         light && styles.homebarLight,
+        faint && styles.homebarFaint,
         off && styles.homebarOff
       )}
       onPointerDown={onPointerDown}
@@ -302,6 +306,7 @@ const styles = stylex.create({
   },
   homebarAt: (pct: number) => ({ left: `${pct}%` }),
   homebarLight: { '::after': { backgroundColor: 'rgba(0,0,0,.6)' } },
+  homebarFaint: { '::after': { opacity: { default: 0.35, ':active': 0.7 } } },
   // Nothing to go home to while the home screen is what you are looking at.
   homebarOff: { opacity: 0, pointerEvents: 'none' },
   zones: {

@@ -138,6 +138,32 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   useEffect(() => {
     if (!two) ctl.setRatio(0.5)
   }, [two])
+  /** Nothing on the glass but apps parked behind it: a swipe up from the bottom finds them. */
+  const parked = scenes.some((e) => e.parked && !e.leaving)
+  const rise = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = disp.current!
+    const s = d.clientWidth / d.getBoundingClientRect().width
+    const y0 = e.clientY
+    let dy = 0
+    let v = 0
+    let t = e.timeStamp
+    const move = (m: PointerEvent) => {
+      const ny = (y0 - m.clientY) * s
+      v = (ny - dy) / Math.max(1, m.timeStamp - t)
+      t = m.timeStamp
+      dy = ny
+    }
+    const up = () => {
+      removeEventListener('pointermove', move)
+      removeEventListener('pointerup', up)
+      removeEventListener('pointercancel', up)
+      // swipe()'s commit rule: a third of the way or a flick.
+      if (dy > 49 || v > 0.6) setSwitcher(true)
+    }
+    addEventListener('pointermove', move)
+    addEventListener('pointerup', up)
+    addEventListener('pointercancel', up)
+  }
   const divide = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = disp.current!
     const s = d.clientWidth / d.getBoundingClientRect().width
@@ -248,6 +274,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
         {switcher && <Switcher ctl={ctl} onClose={() => setSwitcher(false)} />}
         {/* Under the switcher's cards, the bar is the way back to the last app: a tap on it. */}
         {switcher && <HomeBar onPointerDown={() => setSwitcher(false)} />}
+        {!switcher && !cur.length && !locked && !cc && parked && <HomeBar faint onPointerDown={rise} />}
         {two && !switcher && (
           <div data-divider {...stylex.props(styles.divider, styles.dividerAt(split * 100))} onPointerDown={divide} />
         )}
