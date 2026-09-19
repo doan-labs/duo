@@ -247,6 +247,13 @@ not close them. No progress/archive documentation directories are maintained.
 
 ## Website verification (2026-09-18)
 
+Community catalog visibility has two deployment boundaries. A green `Publish catalog /
+publish` job proves that `origin/catalog` contains the release; it does not prove that the
+static site has rebuilt. The same workflow should create a `chore(web): redeploy catalog`
+commit on `main`. Verify that commit and then inspect `/catalog/index.json` and `/apps` for
+the release ID. If the branch is current but the site is stale, the failure is in the web
+deployment trigger or hosting propagation, not submission validation.
+
 The shared docs/UI-kit sidebar uses `data-lenis-prevent` so wheel and touch
 input scroll its overflow instead of the page's Lenis controller. At desktop
 width, wheel over the component links and verify the aside's `scrollTop`
