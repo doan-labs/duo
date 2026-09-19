@@ -32,13 +32,28 @@ import { Tv } from '@doan-labs/duo-app-tv/index.tsx'
 import { Wallet } from '@doan-labs/duo-app-wallet/index.tsx'
 import { Watch } from '@doan-labs/duo-app-watch/index.tsx'
 import { YouTube } from '@doan-labs/duo-app-youtube/index.tsx'
+import type { SettingsHost } from '@doan-labs/duo-sdk'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { createElement } from 'react'
 import { openExternal } from './native.ts'
+import { erase } from './runtime/erase.ts'
+import { BATTERY, flip, NETWORK, subscribeToggles, toggles, togglesRevision } from './springboard/toggles.ts'
 
 // An entry with an `id` is an isolated release from the preinstalled catalog: it holds the
 // slot, and runtime/registry.ts fills in its icon once the release is installed.
 const RELEASE = { view: () => null }
+// Baked apps never import the shell, so Settings is handed the device switches,
+// the eraser and the link opener the way the Store is handed `openExternal`.
+const SETTINGS_HOST: SettingsHost = {
+  switches: toggles,
+  subscribe: subscribeToggles,
+  revision: togglesRevision,
+  flip,
+  network: NETWORK,
+  battery: BATTERY,
+  erase,
+  openExternal
+}
 /** The apps inside Utilities, Apple's one shipped folder: Spotlight finds them, the grid does not. */
 const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books', 'YouTube']
 
@@ -57,7 +72,7 @@ export const LEFT: App[] = [
   { name: 'Health', mock: true, light: true, view: Health },
   { name: 'Wallet', mock: true, view: Wallet },
   { name: 'Siri', mock: true, view: Siri },
-  { name: 'Settings', mock: true, light: true, view: Settings }
+  { name: 'Settings', light: true, view: (props) => createElement(Settings, { ...props, host: SETTINGS_HOST }) }
 ]
 
 /** Right half — only on the inner display, rows 1 to 6. */

@@ -133,6 +133,16 @@ export const writeAuthority = (tx: IDBTransaction, app: Installed) =>
 export const getInstalled = (id: string) => transaction(['installed'], 'readonly', (tx) => readAuthority(tx, id))
 export const allInstalled = () =>
   transaction(['installed'], 'readonly', (tx) => result(tx.objectStore('installed').getAll()) as Promise<Installed[]>)
+/** The ids the shell seeded at boot: they come back on the next start, so no screen offers to remove them. */
+export const seededApps = () =>
+  transaction(['marks'], 'readonly', async (tx) => {
+    const marks = tx.objectStore('marks')
+    const [keys, values] = await Promise.all([
+      result(marks.getAllKeys()) as Promise<string[]>,
+      result(marks.getAll()) as Promise<{ seeded?: boolean }[]>
+    ])
+    return new Set(keys.filter((_, i) => values[i]?.seeded))
+  })
 export const getRelease = (id: ReleaseId) =>
   transaction(['releases'], 'readonly', (tx) => read<StoredRelease>(tx, 'releases', id))
 export const appLock = <T>(id: string, action: () => Promise<T>) =>

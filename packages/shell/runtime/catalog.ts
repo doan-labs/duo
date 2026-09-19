@@ -3,7 +3,7 @@ import { type Catalog, networkOrigin, record, releaseId } from '../../sdk/manife
 import { PERMISSIONS } from '../../sdk/permissions.ts'
 import { PREVIEW_FEATURES } from '../../sdk/preview-features.ts'
 import type { Store, StoreRow, StoreState } from '../../sdk/store.ts'
-import { allInstalled, changes, getRelease } from './database.ts'
+import { allInstalled, changes, getRelease, seededApps } from './database.ts'
 import { development, removeDevelopment } from './development.ts'
 import { install, restore, retry, uninstall } from './lifecycle.ts'
 import { boundedFetch } from './releases.ts'
@@ -61,6 +61,7 @@ function valid(value: unknown): value is Catalog {
 }
 async function sync() {
   const installed = await allInstalled()
+  const seeded = await seededApps()
   const local: StoreRow[] = []
   for (const app of installed) {
     if (app.state === 'removing' || catalog.apps[app.id]) continue
@@ -79,6 +80,7 @@ async function sync() {
       failed: app.failedVersion,
       recovery: !!app.recovery,
       compatible: supports(bundle.release.build.sdk),
+      preinstalled: seeded.has(app.id),
       error: errors.get(app.id),
       icon: localIcon(app.id, app.current, bundle.icons[0]),
       repo: manifest.repo
@@ -120,6 +122,7 @@ async function sync() {
           failed: current?.failedVersion,
           recovery: !!current?.recovery,
           compatible: !!release,
+          preinstalled: seeded.has(id),
           progress: progress.get(id),
           error: errors.get(id),
           icon: release ? `${source}/apps/${id}/${release.release}/icon-1024.png` : undefined,

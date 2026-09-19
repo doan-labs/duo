@@ -915,3 +915,32 @@ checks drive is unchanged. The `appstore*` appearance tokens were rewritten for 
 styles: `scripts/check-app-tokens.ts` keeps every size, weight, radius and fixed colour in
 an app's styles in `tokens.stylex.ts`, so the store's live there too.
 
+## 72. Settings is real, or the row is not there
+
+2026-09-19. Settings was 75 lines of decoration: four switches wired to nothing
+and sixteen chevrons that went nowhere. It is now a `Nav` stack where every row
+does something, and Apple's rows with nothing behind them are absent rather
+than drawn. The radios flip `springboard/toggles.ts`, the store both status
+stacks and Control Center already read, so Airplane Mode in Settings empties
+the bars on both displays. Apps lists `os.store`'s installed releases with
+their real version, size, source and permissions, and removes one through the
+same `store.remove` the App Store calls. About reads the catalog and
+`navigator.storage.estimate()`; Duo Storage divides the measured usage rather
+than the quota, because a browser hands out gigabytes and a release is
+kilobytes. Transfer or Reset runs `runtime/erase.ts`: clear every object store
+in `ipduo`, drop the `os.` and `duo.` localStorage keys, reload — the next boot
+reseeds the preinstalled catalog exactly as a first visit does.
+
+Baked apps never import the shell, so the switches, the eraser and the link
+opener arrive as one `SettingsHost` prop from apps.ts, the way the Store gets
+`openExternal`; `Switches` moves to the SDK so the shell's store and the app
+cannot drift apart. Costs: Settings drops `mock` but is far shorter than iOS's
+root, so a reader looking for Display & Brightness will not find it. The erase
+is deliberately not `localStorage.clear()` — the shell shares an origin with
+the website, whose `ipduo-theme` and `duo-builder-*` keys have to survive a
+phone being wiped. And uninstalling a preinstalled app is undone by the next
+reload, because `bootRegistry` reseeds any bundled release that is not
+installed. Rather than change the reseed, the button goes: `StoreRow` gains
+`preinstalled`, read from the `seeded` mark the boot install writes, and
+neither Settings nor the App Store draws Remove App for a row that carries it.
+A dead button is worse than a missing one.

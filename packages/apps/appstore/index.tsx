@@ -512,7 +512,7 @@ function Detail({
             : 'Runs in its own sandbox: no camera, microphone or embedded pages. Storage stays on this device.'}
           {row.recovery && ' Restore keeps newer edits aside; those edits may be missing in the previous version.'}
         </p>
-        {row.installed && (
+        {row.installed && (row.recovery || !row.preinstalled) && (
           <Section>
             {row.recovery && (
               <button
@@ -526,17 +526,20 @@ function Detail({
                 Restore previous version
               </button>
             )}
-            <button
-              type="button"
-              {...stylex.props(shared.row, styles.remove)}
-              onClick={() => {
-                void store.remove(row.id)
-                back()
-              }}
-            >
-              <Sym name="trash" size={16} />
-              Remove App
-            </button>
+            {/* A preinstalled app reinstalls itself at the next start; removing it would undo itself. */}
+            {!row.preinstalled && (
+              <button
+                type="button"
+                {...stylex.props(shared.row, styles.remove)}
+                onClick={() => {
+                  void store.remove(row.id)
+                  back()
+                }}
+              >
+                <Sym name="trash" size={16} />
+                Remove App
+              </button>
+            )}
           </Section>
         )}
       </div>

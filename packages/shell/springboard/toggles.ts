@@ -6,20 +6,11 @@
 // No React import beyond the subscription hook, and nothing here knows what a
 // switch looks like — control-center.tsx draws them, status-bar.tsx reports them.
 
+import type { Switches } from '@doan-labs/duo-sdk'
 import { useSyncExternalStore } from 'react'
 
-export type Toggles = {
-  airplane: boolean
-  cell: boolean
-  wifi: boolean
-  bt: boolean
-  drop: boolean
-  hotspot: boolean
-  rotate: boolean
-  mirror: boolean
-  focus: boolean
-  torch: boolean
-}
+/** The shape lives in the SDK so the Settings app, which cannot import the shell, shares it. */
+export type Toggles = Switches
 
 /** The Wi-Fi network, named the same by the status stack and the connectivity page. */
 export const NETWORK = 'pm1'
@@ -72,3 +63,7 @@ export function useToggles(): Readonly<Toggles> {
   useSyncExternalStore(sub, () => rev)
   return state
 }
+
+/** The same subscription for code that cannot use the hook: Settings is handed these by apps.ts. */
+export const subscribeToggles = sub
+export const togglesRevision = () => rev

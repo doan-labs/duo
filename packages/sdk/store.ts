@@ -11,6 +11,8 @@ export type StoreRow = {
   recovery: boolean
   compatible: boolean
   development?: boolean
+  /** Seeded by the shell at boot. It reinstalls itself on the next start, so nothing offers to remove it. */
+  preinstalled?: boolean
   progress?: number
   error?: string
   /** Release icon URL: a catalog file, or an object URL for a release only installed locally. */

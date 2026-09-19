@@ -25,3 +25,40 @@ export type Os = {
   /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */
   camera: { current: CameraHooks | null }
 }
+
+/**
+ * The device switches Control Center and Settings both flip. One definition, so
+ * the shell's store (springboard/toggles.ts) and the baked Settings app cannot
+ * drift apart.
+ */
+export type Switches = {
+  airplane: boolean
+  cell: boolean
+  wifi: boolean
+  bt: boolean
+  drop: boolean
+  hotspot: boolean
+  rotate: boolean
+  mirror: boolean
+  focus: boolean
+  torch: boolean
+}
+
+/**
+ * What the shell hands the Settings app. Baked apps never import the shell, so
+ * the switches, the eraser and the link opener arrive as a prop from apps.ts,
+ * the way the Store gets `openExternal`.
+ */
+export type SettingsHost = {
+  /** The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`. */
+  switches: Readonly<Switches>
+  subscribe: (cb: () => void) => () => void
+  revision: () => number
+  flip: (key: keyof Switches, value?: boolean) => void
+  /** The Wi-Fi network and the charge the status stack reports. */
+  network: string
+  battery: number
+  /** Erase All Content and Settings: clears device storage and reloads the shell. */
+  erase: () => Promise<void>
+  openExternal: (url: string) => void
+}
