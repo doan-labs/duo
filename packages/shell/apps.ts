@@ -62,7 +62,7 @@ const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books'
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
   { name: 'FaceTime', mock: true, view: FaceTime },
-  { name: 'Calendar', id: 'labs.doan.ipduo.calendar', light: true, ...RELEASE },
+  { name: 'Calendar', id: 'labs.doan.ipduo.calendar', ...RELEASE },
   { name: 'Photos', id: 'labs.doan.ipduo.photos', light: true, ...RELEASE },
   { name: 'Camera', view: Camera },
   { name: 'Mail', mock: true, light: true, view: Mail },
