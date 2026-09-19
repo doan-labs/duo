@@ -12,7 +12,10 @@ import type { Scene, Scenes } from './scenes.ts'
 
 /** Cards are this much of the display. */
 const SC = 0.56
-const GAP = 22
+/** How much of the card behind shows past the one in front, as a fraction of its width: the iOS stack. */
+const PEEK = 0.34
+/** Each step back is this much of the one before, so a deep stack still fits the glass. */
+const DECAY = 0.72
 
 export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void }) {
   const cards = ctl.recent()
@@ -23,13 +26,14 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
   // Closing: the parking and unparking below re-render this layer before it unmounts, and a repaint then would undo `clear()`.
   const done = useRef(false)
 
-  /** Where card `i`'s centre sits at offset 0: the front card in the middle, the rest off to the left. */
+  /** Where card `i`'s centre sits at offset 0: the front card at the right edge, the rest stacked behind it to the left. */
   const centres = () => {
     const xs: number[] = []
-    let x = W / 2
+    let x = W - (ctl.box(cards[0]?.side).w * SC) / 2 - 16
     cards.forEach((e, i) => {
       const w = ctl.box(e.side).w * SC
-      if (i > 0) x -= (ctl.box(cards[i - 1]!.side).w * SC + w) / 2 + GAP
+      // Step by the peek of the card behind, measured from its own width, so a half-width card still shows.
+      if (i > 0) x -= (ctl.box(cards[i - 1]!.side).w * SC - w) / 2 + w * PEEK * DECAY ** (i - 1)
       xs.push(x)
     })
     return xs
@@ -53,6 +57,8 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
       if (el) {
         el.style.transform = `translateY(${up}px) ${pose(e, cx + off)}`
         el.style.borderRadius = `${24 / SC}px`
+        // Newest on top: the stack reads front to back.
+        el.style.zIndex = String(4 + cards.length - i)
         el.style.opacity = i === lifting ? String(Math.max(0, 1 + lift / (H * 0.6))) : ''
       }
       const l = labels.current.get(e.id)
@@ -83,6 +89,7 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
       el.style.transform = ''
       el.style.borderRadius = ''
       el.style.opacity = ''
+      el.style.zIndex = ''
     }
   }
   const grow = (el: HTMLElement, from: string) =>
