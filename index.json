@@ -61,6 +61,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
       "releases": [
         {
+          "release": "1.2.0+0d6e4523",
+          "sdk": "0.0.0",
+          "bytes": 266471,
+          "sha256": "c19205d1beb8b00ab1af2cdf2add91a82f418b8d02a8a3bd22e37dc6ed681232"
+        },
+        {
           "release": "1.0.1+483ec2c5",
           "sdk": "0.0.0",
           "bytes": 258222,
