@@ -325,7 +325,7 @@ created ──hello ok──▶ bootstrapping ──ack──▶ connected ─�
 ```
 
 Revocation, in this order, for every reason (scene closed, no hello in 10 s,
-no ready in 10 s, `error` before ready, `E_PROTOCOL`, navigation, uninstall,
+no ready within 10 s of being visible, `error` before ready, `E_PROTOCOL`, navigation, uninstall,
 update activation, split collapse):
 
 1. `state = revoked`; the record's generation is retired. From here the host

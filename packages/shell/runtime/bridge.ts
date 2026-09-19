@@ -173,6 +173,13 @@ export function launchFrame(
     e: error instanceof PlatformError ? error.code : 'E_STORAGE',
     msg: String(error instanceof Error ? error.message : error)
   })
+  // A hidden display's root is display:none, so its document never paints and an app
+  // that reports ready from a frame callback cannot. The deadline runs only while visible.
+  function armReady() {
+    clearTimeout(readyTimer)
+    if (launch.state === 'connected' && view.info.visible)
+      readyTimer = setTimeout(() => fail('App did not become ready'), 10000)
+  }
   function receive(data: unknown) {
     if (launch.state === 'revoked') return
     if (!record(data) || !envelope(data)) return fail('Invalid message')
@@ -180,7 +187,7 @@ export function launchFrame(
       if (data.ev === 'ack' && launch.state === 'bootstrapping') {
         clearTimeout(helloTimer)
         state('connected')
-        readyTimer = setTimeout(() => fail('App did not become ready'), 10000)
+        armReady()
         session.deliver()
         return
       }
@@ -315,8 +322,10 @@ export function launchFrame(
     launch,
     update(next: ViewInfo) {
       if (JSON.stringify(view.info) !== JSON.stringify(next)) {
+        const shown = next.visible !== view.info.visible
         view.info = next
         view.send({ ev: 'view', p: next })
+        if (shown) armReady()
       }
     },
     close: () => view.revoke('closed')

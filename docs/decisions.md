@@ -957,3 +957,16 @@ other display cannot swallow it, and the bridge drops the claim on revoke. Singl
 long press and volume stay with the shell; forwarding every button was considered and
 skipped until an app needs it. Older SDKs never send `side.claim`, so they never receive
 `side` and keep treating unknown events as a protocol error safely.
+
+## 73. The ready deadline only runs while the view is visible
+
+A deep link (`?app=`) opens the app on both displays, and the display not in use keeps
+its root at `display:none` so the sandbox document stays alive. Nothing in that document
+paints, so an app that reports ready from `requestAnimationFrame`, as every first-party
+app and the CLI template do, never reports it there. The hidden view was the session
+owner, its 10 s deadline failed it, and the session ended with reason `error` on the
+display the person was looking at. The bridge now arms the ready timer only while
+`ViewInfo.visible` is true and re-arms when visibility flips; the hello deadline is
+unchanged because scripts run in hidden documents. Changing every app to call `ready()`
+outside a frame callback was the alternative, and it would not have covered third-party
+apps built from the template.
