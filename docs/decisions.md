@@ -1035,3 +1035,48 @@ disk is shrunk to 1600 px and kept as a JPEG data URL so it fits localStorage; a
 shot is a `blob:` URL that dies with the page, so it hangs until reload and is not
 restored. `screen.ts` reads `grid()` and `main.ts` rebakes on either store, so the fold
 shows what the finger left.
+
+## 70. Home parks an app, the switcher shows what is parked, and two halves share a divider
+
+Going Home closed the app: the scene left the list and its React tree went with it, so
+there was nothing to switch back to and no way to see what was running. iOS keeps the
+last apps alive behind the switcher, and the folding footage shows the switcher's cards
+and a split whose halves are not equal.
+
+A scene now has a `parked` state: off the glass, still mounted, `display: none`. Home,
+the home-bar swipe, an app's own `home()` and the lock all park; only the switcher's
+flick, one app replacing another (`swap`) and a mirror going away close. Opening a parked
+app brings the same instance back, so state survives a trip through Home and across the
+fold. Six stay parked, the oldest closes past that, and Camera closes rather than parks so
+no hidden app keeps the webcam.
+
+The switcher reuses the hold the split gesture already had: pausing mid-swipe still makes
+a card, and what happens next depends on the hand. Let go and every mounted scene lines up
+as a card, most recent in front; drag sideways first and the halves are offered as before,
+so the site's split cue plays unchanged. The cards are the app elements themselves,
+transformed, so a card is the live app and no snapshotting is needed. The cover display
+gets the switcher too, though it still cannot split.
+
+The seam between two halves is a divider, dragged between 30% and 70%. `zone()` takes the
+ratio, so the zoom, the drop card and the home bars follow it; it returns to the middle
+when a half empties, since the narrow home the other half shows is always half.
+
+## 71. The Store is laid out like the App Store, with the icon as the artwork
+
+The first Store was a settings-style list: a gradient hero, then every app in one long
+grouped list. It worked and looked like a form. The new root page follows the App Store:
+a Today card, then one group per lane with its rows in two columns on a wide box, so nine
+apps take one screen instead of three, and a lane filter (All, Official, Community) beside
+the Apps/Updates segment, as the website's `/apps` browser has. A sideways carousel was
+tried first and dropped: a mouse cannot scroll it. Restore previous version moved from
+under the row to the detail page, next to Remove App, where the destructive actions live.
+
+The Today card's artwork is the featured release's own icon, blown up and blurred under a
+dark gradient: every app brings its own palette and no artwork has to be drawn or shipped.
+Whether the box is wide decides the layout, measured with a ResizeObserver as Maps and
+Camera do, not the display: a split half of the inner display is as narrow as the cover.
+Every button label, `data-store-app` and `data-store-submit` hook and notice the store
+checks drive is unchanged. The `appstore*` appearance tokens were rewritten for the new
+styles: `scripts/check-app-tokens.ts` keeps every size, weight, radius and fixed colour in
+an app's styles in `tokens.stylex.ts`, so the store's live there too.
+

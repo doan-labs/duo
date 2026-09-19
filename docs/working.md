@@ -50,10 +50,19 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | `Esc` / Home | Return home on both displays |
 | `L`, `C`, `↑`/`↓` | Side, Camera Control, volume buttons |
 | Control Center | Pull down from the top 26 px; home-bar swipe, scrim, Esc or Home dismisses |
-| Split (inner display) | Swipe home bar up, hold ≥220 ms, drop on a half; occupied halves swap, hinge drop cancels |
+| App switcher | Swipe home bar up, hold ≥220 ms, let go: every running app as a card. Drag or wheel to scroll, tap a card to bring it back, flick one up to quit it, tap the wallpaper for Home |
+| Split (inner display) | Swipe home bar up, hold ≥220 ms, drag sideways, drop on a half; occupied halves swap, hinge drop cancels |
+| Split divider | With an app on each half, drag the pill on the seam; 30-70%, back to the middle when one leaves |
 | Folder | Hold an icon 0.5 s, carry it onto another icon or folder, let go; elsewhere it springs back. Tap a folder to open it, tap its name to rename; hold an icon inside and let go outside the well to take it out. A folder down to one app dissolves |
 | Wallpaper | Hold the paper itself 0.5 s; tap a swatch (dune, gradients, Camera shots, `+` for a picture off the disk), tap outside to close |
 | Reset / minimap | Return yaw and camera to the default view |
+
+Going Home parks an app rather than closing it: it stays mounted, `display: none`, so the
+switcher can show it live and put it back with its state. The six most recent stay; older
+ones close, and Camera always closes so a parked app cannot hold the webcam. A layer
+that lays scenes out through `ctl.els` (the switcher) must do so from a passive effect:
+the shell re-creates the scenes' ref callbacks every render, so React empties the map in
+the mutation phase and refills it in the layout phase, after a child's layout effect.
 
 The active display changes at 40°. Ordinary folding keeps the existing views; split
 collapse replaces the inner half view. Camera gestures and clicks use screen-space

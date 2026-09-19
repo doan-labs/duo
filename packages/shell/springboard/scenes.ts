@@ -10,14 +10,32 @@
 import type { CameraHooks, Os } from '@doan-labs/duo-sdk'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
 import { device, type Stage } from '../device.ts'
 import { store } from '../runtime/catalog.ts'
 import { type Box, type Side, settle, spot, zone, zoom } from './gestures.ts'
 import type { Open } from './tile.tsx'
 
-/** `side` unset is the whole display; `from` is the icon it grew out of and shrinks back into. */
-export type Scene = { id: number; a: App; ctx: Os; leaving: boolean; side?: Side; from: Box }
+/**
+ * `side` unset is the whole display; `from` is the icon it grew out of and
+ * shrinks back into. A `parked` scene is off the glass but still mounted, so the
+ * app switcher can show it and put it back with its state intact; `used` orders
+ * the switcher, most recent first.
+ */
+export type Scene = {
+  id: number
+  a: App
+  ctx: Os
+  leaving: boolean
+  parked?: boolean
+  used: number
+  side?: Side
+  from: Box
+}
+
+/** Apps kept mounted off the glass. Past this the oldest goes, so iframes do not pile up. */
+const PARKED = 6
 
 let seq = 0
 
@@ -44,7 +62,17 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     live.current = next
     setScenes(next)
   }
-  const onStage = () => live.current.filter((e) => !e.leaving)
+  const onStage = () => live.current.filter((e) => !e.leaving && !e.parked)
+  /** Everything mounted, on the glass or parked, most recently used first: the switcher's cards. */
+  const recent = () => live.current.filter((e) => !e.leaving).sort((a, b) => b.used - a.used)
+  // Where the divider between two halves sits, as a fraction of the width. A ref
+  // for the gestures, which read it between renders; state for the layout.
+  const [split, setSplit] = useState(0.5)
+  const splitRef = useRef(0.5)
+  const setRatio = (v: number) => {
+    splitRef.current = v
+    setSplit(v)
+  }
   /** Nothing of the home screen shows: one app over all of it, or one on each half. */
   const covered = () => {
     const on = onStage()
@@ -54,6 +82,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
   // `?app=` opens before the panel is in the document, where clientWidth is 0
   // and the scale factor comes out infinite. Fall back to the known size.
   const panel = () => [disp.current?.clientWidth || w - 22, disp.current?.clientHeight || hgt - 22] as const
+  const box = (side: Side | undefined) => zone(side, ...panel(), splitRef.current)
   const at = (el: HTMLElement) => spot(el, disp.current!, pageRef.current)
 
   /**
@@ -66,7 +95,10 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (on.some((e) => !e.side)) return
     if (!side && on[0]) side = on[0].side === 'left' ? 'right' : 'left'
     if (on.some((e) => e.side === side)) return
-    const z = zone(side, ...panel())
+    // Already parked: the app comes back as it was, not as a second copy.
+    const kept = live.current.find((e) => e.parked && !e.leaving && same(e, a))
+    if (kept) return unpark(kept.id, side)
+    const z = box(side)
     from ??= { x: z.x + z.w / 2 - 30, y: z.y + z.h / 2 - 30, w: 60, h: 60 }
     const id = ++seq
     if (quiet) zoomed.current.add(id)
@@ -74,25 +106,62 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
       store,
       shots,
       open: (name, g) => swap(id, name, g),
-      home: () => close(id),
+      home: () => park(id),
       arg,
       mirror: quiet || undefined,
       camera: { current: null }
     }
-    setList([...live.current, { id, a, ctx, leaving: false, side, from }])
+    setList([...live.current, { id, a, ctx, leaving: false, used: Date.now(), side, from }])
+  }
+  const same = (e: Scene, a: App) => (a.id ? e.a.id === a.id : e.a.name === a.name)
+  /**
+   * Off the glass, still running: the Home gesture. Plays `anims` (the zoom back
+   * into its icon by default) and then hides it. The camera is the exception
+   * and closes, so a parked Camera cannot keep the webcam on.
+   */
+  function park(id: number, anims?: Animation[]) {
+    const e = live.current.find((x) => x.id === id && !x.leaving && !x.parked)
+    if (!e) return
+    if (e.ctx.camera.current) return close(id, anims)
+    setList(live.current.map((x) => (x === e ? { ...x, leaving: true } : x)))
+    const el = els.current.get(e.id)
+    settle(anims ?? (el ? [zoom(el, e.from, true, box(e.side))] : []), () => {
+      setList(live.current.map((x) => (x.id === e.id ? { ...x, leaving: false, parked: true } : x)))
+      const parked = live.current.filter((x) => x.parked).sort((a, b) => a.used - b.used)
+      for (const old of parked.slice(0, Math.max(0, parked.length - PARKED))) close(old.id, [])
+    })
+  }
+  /**
+   * Back on the glass, over the whole display unless `side` says otherwise. Plays
+   * `anims` if given (the switcher's card growing into place), else the icon zoom.
+   */
+  function unpark(id: number, side?: Side, anims?: Animation[] | ((el: HTMLElement) => Animation[])) {
+    const e = live.current.find((x) => x.id === id && x.parked && !x.leaving)
+    if (!e) return
+    flushSync(() => setList(live.current.map((x) => (x === e ? { ...x, parked: false, side, used: Date.now() } : x))))
+    const el = els.current.get(e.id)
+    if (!el) return
+    const list = typeof anims === 'function' ? anims(el) : (anims ?? [zoom(el, e.from, false, box(side))])
+    Promise.all(list.map((a) => a.finished)).then(
+      () => {
+        for (const a of list) a.cancel()
+      },
+      () => {}
+    )
   }
   function close(id: number, anims?: Animation[]) {
     const e = live.current.find((x) => x.id === id && !x.leaving)
     if (!e) return
     setList(live.current.map((x) => (x === e ? { ...x, leaving: true } : x)))
     const el = els.current.get(e.id)
-    settle(anims ?? (el ? [zoom(el, e.from, true, zone(e.side, ...panel()))] : []), () => {
+    settle(anims ?? (el ? [zoom(el, e.from, true, box(e.side))] : []), () => {
       zoomed.current.delete(e.id)
       setList(live.current.filter((x) => x.id !== e.id))
     })
   }
-  const closeAll = () => {
-    for (const e of onStage()) close(e.id)
+  /** Home: everything on the glass is parked. */
+  const parkAll = () => {
+    for (const e of onStage()) park(e.id)
   }
   /** One app opening another in its place (Siri, Contacts, Shortcuts, News → Safari). */
   function swap(id: number, name: string, arg?: string) {
@@ -109,7 +178,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (device.asleep) device.wake()
     const a = byName(name)
     const on = onStage()
-    if (!a || on.some((e) => (a.id ? e.a.id === a.id : e.a.name === a.name))) return
+    if (!a || on.some((e) => same(e, a))) return
     // Into the free half if there is one; otherwise in place of the app under
     // the status stack, the one iOS would call frontmost.
     const victim = on.find((e) => !e.side) ?? (on.length === 2 ? on.find((e) => e.side === 'right') : undefined)
@@ -148,7 +217,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
       if (!el) continue
       // Its last frame is the resting style, so it can go once it has played:
       // left in place, a `fill: both` animation would beat the transform grab() writes.
-      const a = zoom(el, e.from, false, zone(e.side, ...panel()))
+      const a = zoom(el, e.from, false, box(e.side))
       a.finished.then(
         () => a.cancel(),
         () => {}
@@ -165,12 +234,19 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     els,
     disp,
     onStage,
+    recent,
     covered,
     panel,
+    box,
+    split,
+    splitRef,
+    setRatio,
     at,
     open,
     close,
-    closeAll,
+    park,
+    unpark,
+    parkAll,
     swap,
     openFrom,
     launch,

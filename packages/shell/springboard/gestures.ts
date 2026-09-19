@@ -70,9 +70,14 @@ export function settle(list: Animation[], remove: () => void) {
 export type Box = { x: number; y: number; w: number; h: number }
 export type Side = 'left' | 'right'
 
-/** The part of the display an app fills: one half, or all of it when `side` is unset. */
-export const zone = (side: Side | undefined, W: number, H: number): Box =>
-  side ? { x: side === 'right' ? W / 2 : 0, y: 0, w: W / 2, h: H } : { x: 0, y: 0, w: W, h: H }
+/**
+ * The part of the display an app fills: one side of the divider, or all of it
+ * when `side` is unset. `split` is where the divider sits, as a fraction of the width.
+ */
+export const zone = (side: Side | undefined, W: number, H: number, split = 0.5): Box =>
+  side
+    ? { x: side === 'right' ? W * split : 0, y: 0, w: W * (side === 'right' ? 1 - split : split), h: H }
+    : { x: 0, y: 0, w: W, h: H }
 
 /**
  * Where a tile sits inside the display, in layout px. getBoundingClientRect is in
