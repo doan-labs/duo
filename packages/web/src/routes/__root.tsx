@@ -12,6 +12,8 @@ import 'lenis/dist/lenis.css'
 import '../reset.css'
 import 'virtual:stylex.css'
 
+const OG_IMAGE = 'https://duo.doan-labs.com/og/duo-og-01.png'
+
 export const Route = createRootRoute({
   head: () => ({
     links: [
@@ -28,15 +30,29 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Duo - Apple’s folding iPhone, simulated, that you can build apps for' },
+      { title: 'Duo - Folding iPhone simulator for app builders' },
       {
         name: 'description',
         content:
           'A working simulator of Apple’s iPhone Duo: hold it, fold it, install apps, and build your own with the SDK.'
       },
-      { property: 'og:image', content: 'https://duo.doan-labs.com/icon-512.png' },
-      { name: 'twitter:card', content: 'summary' },
-      { name: 'twitter:image', content: 'https://duo.doan-labs.com/icon-512.png' }
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: 'Duo' },
+      { property: 'og:title', content: 'Duo - Folding iPhone simulator for app builders' },
+      {
+        property: 'og:description',
+        content: 'Hold it. Fold it. Build apps for a working browser simulator of Apple’s iPhone Duo.'
+      },
+      { property: 'og:image', content: OG_IMAGE },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: 'Duo - Folding iPhone simulator for app builders' },
+      {
+        name: 'twitter:description',
+        content: 'Hold it. Fold it. Build apps for a working browser simulator of Apple’s iPhone Duo.'
+      },
+      { name: 'twitter:image', content: OG_IMAGE }
     ]
   }),
   component: Root,
