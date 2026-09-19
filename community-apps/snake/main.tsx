@@ -4,100 +4,20 @@ import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { type Direction, fitLayout, newGame, nextGame, type Status } from './game.ts'
+import { GameBoard } from './game-board.tsx'
 
-type Point = { x: number; y: number }
-type Direction = 'up' | 'down' | 'left' | 'right'
-type Status = 'ready' | 'playing' | 'over'
-type Game = { snake: Point[]; food: Point; score: number; status: Status }
-type ViewDimensions = { display: 'inner' | 'cover'; width: number; height: number }
-
-const BOARD_SIZE = 14
-const STARTING_SNAKE: Point[] = [
-  { x: 6, y: 7 },
-  { x: 5, y: 7 },
-  { x: 4, y: 7 }
-]
-
-const pointKey = (point: Point) => `${point.x}:${point.y}`
-const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y
-
-function openFood(snake: Point[]) {
-  const occupied = new Set(snake.map(pointKey))
-  const free: Point[] = []
-  for (let y = 0; y < BOARD_SIZE; y += 1) {
-    for (let x = 0; x < BOARD_SIZE; x += 1) {
-      if (!occupied.has(`${x}:${y}`)) free.push({ x, y })
-    }
-  }
-  return free[Math.floor(Math.random() * free.length)] ?? { x: 10, y: 7 }
-}
-
-function newGame(): Game {
-  return { snake: STARTING_SNAKE, food: { x: 10, y: 7 }, score: 0, status: 'ready' }
-}
-
-function nextGame(game: Game, direction: Direction): Game {
-  const head = game.snake[0]!
-  const nextHead = {
-    x: head.x + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0),
-    y: head.y + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
-  }
-  const outside = nextHead.x < 0 || nextHead.x >= BOARD_SIZE || nextHead.y < 0 || nextHead.y >= BOARD_SIZE
-  const hitsBody = game.snake.slice(0, -1).some((point) => samePoint(point, nextHead))
-  if (outside || hitsBody) return { ...game, status: 'over' }
-
-  const ate = samePoint(nextHead, game.food)
-  const snake = ate ? [nextHead, ...game.snake] : [nextHead, ...game.snake.slice(0, -1)]
-  return {
-    snake,
-    food: ate ? openFood(snake) : game.food,
-    score: game.score + (ate ? 1 : 0),
-    status: 'playing'
-  }
-}
-
-function fitLayout(view: ViewDimensions, headerHeight: number) {
-  const cover = view.display === 'cover'
-  const padding = cover ? 10 : 14
-  const gap = cover ? 6 : 8
-  const control = 32
-  const fixedHeight = padding * 2 + headerHeight + 22 + control * 2 + 6 + 36 + gap * 4
-  const width = view.width || 740
-  const height = view.height || 480
-  return {
-    board: Math.max(0, Math.floor(Math.min(width - padding * 2, height - fixedHeight))),
-    control
-  }
-}
-
-function GameBoard({ game, size }: { game: Game; size: number }) {
-  const snake = new Set(game.snake.map(pointKey))
-  const head = pointKey(game.snake[0]!)
-  const food = pointKey(game.food)
-  return (
-    <div aria-label="Snake board" role="grid" {...stylex.props(styles.board, styles.fitBoard(size))}>
-      {Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => {
-        const point = { x: index % BOARD_SIZE, y: Math.floor(index / BOARD_SIZE) }
-        const key = pointKey(point)
-        const isSnake = snake.has(key)
-        return (
-          <div
-            key={key}
-            aria-label={key === food ? 'Food' : isSnake ? 'Snake' : 'Empty'}
-            role="gridcell"
-            tabIndex={-1}
-            {...stylex.props(
-              styles.cell,
-              isSnake && styles.snake,
-              key === head && styles.head,
-              key === food && styles.food
-            )}
-          />
-        )
-      })}
-    </div>
-  )
-}
+const motion = '@media (prefers-reduced-motion: reduce)'
+const easeOut = 'cubic-bezier(.23, 1, .32, 1)'
+const scorePop = stylex.keyframes({
+  from: { opacity: 0.55, transform: 'translateY(3px) scale(.92)' },
+  '70%': { opacity: 1, transform: 'translateY(-1px) scale(1.06)' },
+  to: { opacity: 1, transform: 'translateY(0) scale(1)' }
+})
+const messageIn = stylex.keyframes({
+  from: { opacity: 0, transform: 'translateY(8px) scale(.98)' },
+  to: { opacity: 1, transform: 'translateY(0) scale(1)' }
+})
 
 function Game() {
   const view = useDisplay()
@@ -105,11 +25,11 @@ function Game() {
   const [best, setBest] = useState(0)
   const direction = useRef<Direction>('right')
   const cover = view.display === 'cover'
-  const fit = fitLayout(view, 42)
+  const fit = fitLayout(view, 50)
 
   const reset = () => {
     direction.current = 'right'
-    setGame(newGame())
+    setGame((current) => newGame(current.round + 1))
   }
 
   const steer = useCallback((next: Direction) => {
@@ -156,32 +76,35 @@ function Game() {
     requestAnimationFrame(() => os.ready())
   }, [])
 
+  const hint = getHint(game.status, cover)
+
   return (
     <main {...stylex.props(styles.root, cover && styles.cover)}>
       <header {...stylex.props(styles.header)}>
         <div>
-          <span {...stylex.props(styles.kicker)}>DUO ARCADE</span>
+          <div {...stylex.props(styles.brandRow)}>
+            <span {...stylex.props(styles.kicker)}>DUO ARCADE</span>
+            <span {...stylex.props(styles.session)}>NIGHT RUN</span>
+          </div>
           <h1 {...stylex.props(styles.title)}>Snake</h1>
         </div>
         <div {...stylex.props(styles.scores)}>
           <div {...stylex.props(styles.score)}>
             <span>SCORE</span>
-            <strong>{game.score}</strong>
+            <strong key={game.score} {...stylex.props(styles.scoreValue, game.score > 0 && styles.scoreAnimated)}>
+              {game.score}
+            </strong>
           </div>
           <div {...stylex.props(styles.score)}>
             <span>BEST</span>
-            <strong>{best}</strong>
+            <strong key={best} {...stylex.props(styles.scoreValue, best > 0 && styles.scoreAnimated)}>
+              {best}
+            </strong>
           </div>
         </div>
       </header>
-      <p {...stylex.props(styles.hint)}>
-        {game.status === 'ready'
-          ? cover
-            ? 'Tap an arrow to start'
-            : 'Press an arrow key or tap to start'
-          : 'Eat the fruit. Avoid the walls.'}
-      </p>
-      <GameBoard game={game} size={fit.board} />
+      <p {...stylex.props(styles.hint, game.status === 'over' && styles.hintOver)}>{hint}</p>
+      <GameBoard game={game} size={fit.board} onSteer={steer} />
       <div role="group" {...stylex.props(styles.controls, styles.fitControls(fit.control))} aria-label="Move controls">
         <button
           type="button"
@@ -217,11 +140,14 @@ function Game() {
         </button>
       </div>
       <button type="button" onClick={reset} {...stylex.props(styles.newGame)}>
-        New game
+        New run
       </button>
       {game.status === 'over' && (
         <section {...stylex.props(styles.message)}>
-          <strong>Game over</strong>
+          <div {...stylex.props(styles.messageCopy)}>
+            <span {...stylex.props(styles.messageKicker)}>RUN COMPLETE</span>
+            <strong>Score {game.score}</strong>
+          </div>
           <button type="button" onClick={reset} {...stylex.props(styles.continue)}>
             Try again
           </button>
@@ -229,6 +155,12 @@ function Game() {
       )}
     </main>
   )
+}
+
+function getHint(status: Status, cover: boolean) {
+  if (status === 'ready') return cover ? 'Swipe or tap an arrow to begin' : 'Use the arrows, swipe, or your keyboard'
+  if (status === 'over') return 'The path ended. Start a fresh run.'
+  return 'Keep the line clean. Follow the glow.'
 }
 
 const styles = stylex.create({
@@ -243,68 +175,71 @@ const styles = stylex.create({
     paddingBlock: 14,
     paddingInline: 14,
     color: colors.white,
-    backgroundColor: colors.black,
+    backgroundColor: colors.darkElevated,
     fontFamily: fonts.system,
     fontSize: 14
   },
   cover: { paddingBlock: 10, paddingInline: 10, gap: 6 },
   header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexShrink: 0 },
+  brandRow: { display: 'flex', alignItems: 'center', gap: 8 },
   kicker: { color: colors.greenBright, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
-  title: { marginBlock: 0, fontSize: 36, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
+  session: { color: colors.grey2, fontSize: 8, fontWeight: 700, letterSpacing: 1.2 },
+  title: { marginBlock: 0, fontSize: 38, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1.2 },
   scores: { display: 'flex', gap: 6 },
   score: {
-    minWidth: 52,
+    minWidth: 54,
     paddingBlock: 6,
     paddingInline: 8,
-    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: colors.fillDark,
+    borderRadius: 10,
     color: colors.grey3,
-    backgroundColor: colors.fillDark,
+    backgroundColor: colors.fillThin,
     textAlign: 'center',
     fontSize: 8,
     letterSpacing: 1
   },
+  scoreValue: {
+    display: 'block',
+    marginBlockStart: 2,
+    color: colors.white,
+    fontSize: 17,
+    fontWeight: 800,
+    lineHeight: 1,
+    fontVariantNumeric: 'tabular-nums'
+  },
+  scoreAnimated: {
+    animationName: { default: scorePop, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: easeOut,
+    animationFillMode: 'both'
+  },
   hint: { marginBlock: 0, color: colors.grey3, fontSize: 12, flexShrink: 0 },
-  board: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(14, minmax(0, 1fr))',
-    gridTemplateRows: 'repeat(14, minmax(0, 1fr))',
-    gap: 2,
-    paddingBlock: 7,
-    paddingInline: 7,
-    borderRadius: 14,
-    backgroundColor: colors.darkElevated2,
-    aspectRatio: 1,
-    overflow: 'hidden',
-    flexShrink: 0
-  },
-  fitBoard: (size: number) => ({ width: `${size}px`, height: `${size}px`, alignSelf: 'center' }),
-  cell: {
-    borderRadius: 3,
-    backgroundColor: colors.fillThin,
-    width: '100%',
-    height: '100%',
-    minWidth: 0,
-    minHeight: 0
-  },
-  snake: { backgroundColor: colors.green },
-  head: { borderRadius: 5, backgroundColor: colors.greenBright },
-  food: { borderRadius: 999, backgroundColor: colors.orange },
+  hintOver: { color: colors.orange },
   controls: { display: 'grid', justifyContent: 'center', gap: 6, flexShrink: 0 },
   fitControls: (size: number) => ({
     gridTemplateColumns: `repeat(3, ${size}px)`,
     gridTemplateRows: `repeat(2, ${size}px)`
   }),
   arrow: {
-    borderWidth: 0,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: colors.fillDark,
+    borderRadius: 13,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: { default: colors.fillDark, ':hover': colors.fillThick },
     fontSize: 23,
     cursor: 'pointer',
     touchAction: 'manipulation',
     paddingBlock: 0,
     paddingInline: 0,
-    gridRow: 2
+    gridRow: 2,
+    transitionProperty: 'transform, background-color, border-color',
+    transitionDuration: '.14s, .18s, .18s',
+    transitionTimingFunction: easeOut,
+    transform: { default: 'scale(1)', ':active': 'scale(.94)' },
+    ':focus-visible': { outline: `2px solid ${colors.greenBright}`, outlineOffset: 3 }
   },
   fitArrow: (size: number) => ({ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(16, size * 0.6)}px` }),
   up: { gridColumn: 2, gridRow: 1 },
@@ -312,14 +247,19 @@ const styles = stylex.create({
     alignSelf: 'center',
     borderWidth: 0,
     borderRadius: 999,
-    paddingBlock: 8,
-    paddingInline: 16,
-    color: colors.black,
-    backgroundColor: colors.greenBright,
+    paddingBlock: 9,
+    paddingInline: 18,
+    color: colors.darkElevated,
+    backgroundColor: { default: colors.greenBright, ':hover': colors.green },
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 800,
     cursor: 'pointer',
-    flexShrink: 0
+    flexShrink: 0,
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transitionTimingFunction: easeOut,
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' },
+    ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 3 }
   },
   message: {
     position: 'absolute',
@@ -330,21 +270,35 @@ const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    paddingBlock: 10,
+    paddingBlock: 11,
     paddingInline: 14,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: colors.fillDark,
+    borderRadius: 14,
     color: colors.white,
-    backgroundColor: colors.fillDark
+    backgroundColor: colors.darkElevated2,
+    animationName: { default: messageIn, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: easeOut,
+    animationFillMode: 'both'
   },
+  messageCopy: { display: 'flex', flexDirection: 'column', gap: 2 },
+  messageKicker: { color: colors.orange, fontSize: 8, fontWeight: 700, letterSpacing: 1.2 },
   continue: {
     borderWidth: 0,
     borderRadius: 999,
-    paddingBlock: 6,
-    paddingInline: 10,
-    color: colors.black,
-    backgroundColor: colors.greenBright,
-    fontWeight: 700,
-    cursor: 'pointer'
+    paddingBlock: 7,
+    paddingInline: 11,
+    color: colors.darkElevated,
+    backgroundColor: { default: colors.orange, ':hover': colors.weatherSun },
+    fontWeight: 800,
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transitionTimingFunction: easeOut,
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' },
+    ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 3 }
   }
 })
 
