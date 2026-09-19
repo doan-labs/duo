@@ -9,6 +9,10 @@
     "com.mnismt.duo.2048": {
       "folder": "2048",
       "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.snake": {
+      "folder": "snake",
+      "maintainers": ["mnismt"]
     }
   }
 }
