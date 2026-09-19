@@ -159,4 +159,5 @@ const styles = stylex.create({
   }
 })
 
+await os.connect()
 createRoot(document.body).render(<Timer />)
