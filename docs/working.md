@@ -57,12 +57,22 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | Wallpaper | Hold the paper itself 0.5 s; tap a swatch (dune, gradients, Camera shots, `+` for a picture off the disk), tap outside to close |
 | Reset / minimap | Return yaw and camera to the default view |
 
-Going Home parks an app rather than closing it: it stays mounted, `display: none`, so the
-switcher can show it live and put it back with its state. The six most recent stay; older
-ones close, and Camera always closes so a parked app cannot hold the webcam. A layer
-that lays scenes out through `ctl.els` (the switcher) must do so from a passive effect:
-the shell re-creates the scenes' ref callbacks every render, so React empties the map in
-the mutation phase and refills it in the layout phase, after a child's layout effect.
+Going Home parks an app rather than closing it: it stays mounted, hidden with
+`visibility` and `content-visibility` rather than `display: none`, so the switcher can show
+it live and put it back with its state. `display: none` would throw the layout away, so
+opening the switcher would rebuild every parked app in one frame and parked apps would see
+a zero-size box. The six most recent stay; older ones close, and Camera always closes so a
+parked app cannot hold the webcam. A layer that lays scenes out through `ctl.els` (the
+switcher) must do so from a passive effect: the shell re-creates the scenes' ref callbacks
+every render, so React empties the map in the mutation phase and refills it in the layout
+phase, after a child's layout effect.
+
+Anything a gesture paints every frame (the home-bar card, the switcher's stack) must carry
+no CSS transition on `transform`: each pointer event would restart it and the card lags the
+hand. Ease with a one-keyframe `el.animate([from], ...)` on release instead, which runs from
+`from` to whatever the inline style is by then. Those elements also carry
+`will-change: transform` so a move is a compositor transform, not a repaint of the app, and
+the switcher paints once per animation frame however many pointer events arrive.
 
 The active display changes at 40°. Ordinary folding keeps the existing views; split
 collapse replaces the inner half view. Camera gestures and clicks use screen-space

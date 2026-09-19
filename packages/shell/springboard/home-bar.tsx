@@ -119,8 +119,11 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
     const hold = () => {
       held = true
       hx = dx
+      // Shrink to the card from where the app is; the inline pose stays the target, so the hand still leads.
+      const from: Keyframe = { transform: el.style.transform, borderRadius: el.style.borderRadius }
       sc = 0.4
       paint()
+      el.animate([from], { duration: 220, easing: 'cubic-bezier(.22,.9,.26,1)' })
       // The wallpaper is the backdrop for the halves and the switcher, so the home screen goes.
       home?.reverse()
       onDrop({ id: e.id, side: null })

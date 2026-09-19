@@ -84,7 +84,7 @@ driver is privileged test inspection, not an installed-app capability.
 | --- | --- |
 | Open Control Center | At flat yaw 0, drag from display rect.right−60, rect.top+10 down ~190 px; wait ≥1.5 s |
 | Split | Mouse down at app centre/display bottom−8; move up, hold 1.5 s for slow rendering, move to half, release. Send no zero-motion moves during the hold: each move resets the 220 ms timer |
-| App switcher | Same, but release without a sideways move; `[data-switcher]` is on the display and every mounted `[data-app]` carries a `scale(0.56)` transform |
+| App switcher | Same, but release without a sideways move; `[data-switcher]` is on the display and every mounted `[data-app]` carries a `scale(0.56)` transform. Right after opening each card has one entry animation (`getAnimations().length`), gone within 340 ms; a sideways flick keeps changing the transforms after `pointerup` until the stack ends. Cards behind the front one are mostly covered: hit-test where the peek shows, not at their centre |
 | Divider | `[data-divider]` exists only with two halves on the glass; drag it and read the halves' `offsetWidth` |
 | Flick home | Use one move without a pause; slow CDP calls can cross the 220 ms split threshold |
 | Reset orbit | Click button[title="Reset view"]; allow ~8 s under SwiftShader before asserting the button is disabled again |

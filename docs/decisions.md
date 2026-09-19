@@ -1043,7 +1043,8 @@ there was nothing to switch back to and no way to see what was running. iOS keep
 last apps alive behind the switcher, and the folding footage shows the switcher's cards
 and a split whose halves are not equal.
 
-A scene now has a `parked` state: off the glass, still mounted, `display: none`. Home,
+A scene now has a `parked` state: off the glass, still mounted, hidden (`display: none` at
+first; 70 changes how). Home,
 the home-bar swipe, an app's own `home()` and the lock all park; only the switcher's
 flick, one app replacing another (`swap`) and a mirror going away close. Opening a parked
 app brings the same instance back, so state survives a trip through Home and across the
@@ -1061,3 +1062,23 @@ The seam between two halves is a divider, dragged between 30% and 70%. `zone()` 
 ratio, so the zoom, the drop card and the home bars follow it; it returns to the middle
 when a half empties, since the narrow home the other half shows is always half.
 
+## 70. The switcher moves on the compositor, with no transition under the hand
+
+The first switcher felt sluggish for four reasons that were each small. The drag card style
+kept a 160 ms `transform` transition from the split gesture, so every scroll frame started
+a transition it never finished and the stack trailed the finger. The cards had no
+compositor layer, so each frame repainted six live apps. Parked apps were `display: none`,
+so opening the switcher laid out and painted every one of them in the same frame. And
+nothing eased: cards snapped into place on open, stopped dead on release, and dropped back
+after a half flick.
+
+The style loses its transition and gains `will-change: transform`; the hold's shrink, which
+the transition used to animate, is a one-keyframe Web Animation from the pre-hold pose. The
+switcher coalesces pointer events to one paint a frame and writes only what moves
+(transform, opacity, the label); radius and z-order are set once. Opening plays a
+one-keyframe animation per card from the hold's pose or from below the glass, a sideways
+release glides on with exponential decay until the stack ends, and a half flick eases back.
+Parked apps hide with `visibility: hidden` and `content-visibility: hidden`, which keeps
+their layout and rendering state so un-hiding is cheap and they never see a zero-size box.
+Supersedes the `display: none` in 69. Momentum does not snap to a card; add paging if the
+stack ever needs it.

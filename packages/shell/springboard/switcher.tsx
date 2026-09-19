@@ -16,6 +16,9 @@ const SC = 0.56
 const PEEK = 0.34
 /** Each step back is this much of the one before, so a deep stack still fits the glass. */
 const DECAY = 0.72
+const EASE = 'cubic-bezier(.22,.9,.26,1)'
+/** Momentum: how much of a flick's speed is left after a frame. */
+const DRAG = 0.95
 
 export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void }) {
   const cards = ctl.recent()
@@ -25,6 +28,11 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
   const state = useRef({ off: 0, lift: 0, lifting: -1 })
   // Closing: the parking and unparking below re-render this layer before it unmounts, and a repaint then would undo `clear()`.
   const done = useRef(false)
+  // The frame in flight, a paint or a glide: one per frame however many pointer events arrive.
+  const raf = useRef(0)
+  /** The cards settling into place as the switcher opens; a touch takes over from them. */
+  const entering = useRef<Animation[]>([])
+  const opened = useRef(false)
 
   /** Where card `i`'s centre sits at offset 0: the front card at the right edge, the rest stacked behind it to the left. */
   const centres = () => {
@@ -47,6 +55,7 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
     const z = ctl.box(e.side)
     return `translate(${cx - (z.x + z.w / 2)}px,0) scale(${SC})`
   }
+  /** What moves a frame: the pose of each card and its label, nothing else. */
   const paint = () => {
     if (done.current) return
     const { off, lift, lifting } = state.current
@@ -56,9 +65,6 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
       const up = i === lifting ? lift : 0
       if (el) {
         el.style.transform = `translateY(${up}px) ${pose(e, cx + off)}`
-        el.style.borderRadius = `${24 / SC}px`
-        // Newest on top: the stack reads front to back.
-        el.style.zIndex = String(4 + cards.length - i)
         el.style.opacity = i === lifting ? String(Math.max(0, 1 + lift / (H * 0.6))) : ''
       }
       const l = labels.current.get(e.id)
@@ -66,12 +72,49 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
         l.style.transform = `translate(${cx + off - ctl.box(e.side).w * SC * 0.5}px,${(H * (1 - SC)) / 2 - 34 + up}px)`
     })
   }
+  /** Paints once the browser is ready to show it, however many pointer events land before then. */
+  const schedule = () => {
+    if (raf.current) return
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0
+      paint()
+    })
+  }
+  const stop = () => {
+    cancelAnimationFrame(raf.current)
+    raf.current = 0
+    for (const a of entering.current) a.cancel()
+    entering.current = []
+  }
   // A passive effect, not a layout one: the shell re-creates the scenes' ref
   // callbacks every render, so React empties `els` in the mutation phase and
   // refills it in the layout phase, after this component's own layout effect.
   // biome-ignore lint/correctness/useExhaustiveDependencies: lays out on every render; the list of cards is what changes
-  useEffect(paint)
-
+  useEffect(() => {
+    // Opening: the poses the shell left, before paint() replaces them. Only the card in hand has one.
+    const was = opened.current ? null : new Map(cards.map((e) => [e.id, ctl.els.current.get(e.id)?.style.transform]))
+    opened.current = true
+    paint()
+    cards.forEach((e, i) => {
+      const el = ctl.els.current.get(e.id)
+      if (!el) return
+      el.style.borderRadius = `${24 / SC}px`
+      // Newest on top: the stack reads front to back.
+      el.style.zIndex = String(4 + cards.length - i)
+    })
+    if (!was) return
+    // The card in hand glides from where the hold left it; the rest rise from below.
+    const xs = centres()
+    entering.current = cards.flatMap((e, i) => {
+      const el = ctl.els.current.get(e.id)
+      if (!el) return []
+      const held = !e.parked && was.get(e.id)
+      const from = held || `translateY(${H * 0.5}px) ${pose(e, xs[i]! + state.current.off)}`
+      return [el.animate([{ transform: from, opacity: held ? 1 : 0 }], { duration: 340, easing: EASE })]
+    })
+  })
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `stop` only touches refs
+  useEffect(() => stop, [])
   /** Which card is under a point of the display, if any. */
   const hit = (x: number, y: number) => {
     const { off } = state.current
@@ -165,6 +208,7 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
     const from = el?.style.transform || 'none'
     state.current.lifting = -1
     state.current.lift = 0
+    stop()
     ctl.close(
       e.id,
       el
@@ -198,15 +242,22 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
     const y0 = ev.nativeEvent.offsetY
     const i = hit(x0, y0)
     const off0 = state.current.off
+    // A finger down takes over from whatever was still moving.
+    stop()
     let axis: 'x' | 'y' | null = null
+    let dx = 0
     let dy = 0
+    let vx = 0
     let v = 0
     let t = ev.timeStamp
     const move = (m: PointerEvent) => {
-      const dx = (m.clientX - ev.clientX) * s
+      const nx = (m.clientX - ev.clientX) * s
       const ny = (m.clientY - ev.clientY) * s
-      v = (dy - ny) / Math.max(1, m.timeStamp - t)
+      const dt = Math.max(1, m.timeStamp - t)
+      vx = (nx - dx) / dt
+      v = (dy - ny) / dt
       t = m.timeStamp
+      dx = nx
       dy = ny
       if (!axis && Math.hypot(dx, dy) > 6) axis = Math.abs(dx) > Math.abs(dy) || i < 0 ? 'x' : 'y'
       if (axis === 'x') state.current.off = Math.min(maxOff(), Math.max(0, off0 + dx))
@@ -214,7 +265,7 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
         state.current.lifting = i
         state.current.lift = Math.min(0, dy)
       }
-      paint()
+      schedule()
     }
     const up = () => {
       removeEventListener('pointermove', move)
@@ -223,18 +274,40 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
       if (!axis) return i >= 0 ? pick(i) : home()
       if (axis === 'y') {
         if (-dy > 90 || v > 0.6) return quit(i)
+        // Not far enough: back to its slot, eased from where the hand let go.
+        const el = ctl.els.current.get(cards[i]!.id)
+        const from: Keyframe = { transform: el?.style.transform ?? 'none', opacity: el?.style.opacity || 1 }
         state.current.lifting = -1
         state.current.lift = 0
         paint()
-      }
+        el?.animate([from], { duration: 240, easing: EASE })
+      } else glide(vx)
     }
     addEventListener('pointermove', move)
     addEventListener('pointerup', up)
     addEventListener('pointercancel', up)
   }
+  /** The flick carries on and dies down, or stops at the end of the stack. */
+  const glide = (v0: number) => {
+    let v = v0
+    let last = performance.now()
+    const step = (now: number) => {
+      raf.current = 0
+      const dt = now - last
+      last = now
+      const { off } = state.current
+      const next = Math.min(maxOff(), Math.max(0, off + v * dt))
+      state.current.off = next
+      v *= DRAG ** (dt / 8)
+      paint()
+      if (Math.abs(v) > 0.01 && next !== 0 && next !== maxOff()) raf.current = requestAnimationFrame(step)
+    }
+    if (Math.abs(v) > 0.05) raf.current = requestAnimationFrame(step)
+  }
   const wheel = (ev: React.WheelEvent) => {
+    stop()
     state.current.off = Math.min(maxOff(), Math.max(0, state.current.off + ev.deltaX + ev.deltaY))
-    paint()
+    schedule()
   }
 
   return (
@@ -285,10 +358,7 @@ const styles = stylex.create({
     color: 'white',
     textShadow: '0 1px 3px rgba(0,0,0,.5)',
     pointerEvents: 'none',
-    whiteSpace: 'nowrap',
-    transitionProperty: 'transform',
-    transitionDuration: '.16s',
-    transitionTimingFunction: 'ease-out'
+    whiteSpace: 'nowrap'
   },
   icon: { width: 22, height: 22, borderRadius: 6 }
 })
