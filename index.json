@@ -1,0 +1,18 @@
+{
+  "apps": {
+    "com.mnismt.duo.2048": {
+      "name": "2048",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/2048",
+      "releases": [
+        {
+          "release": "1.0.0+0af6019b",
+          "sdk": "0.0.0",
+          "bytes": 259309,
+          "sha256": "4874b34ef3957100ca2e8834bae8bc3e801c24c4ea6847e9de11b2fd8a4deed4"
+        }
+      ]
+    }
+  }
+}
