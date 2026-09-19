@@ -253,7 +253,7 @@ function Game() {
               Best {best}. Lifetime folds {lifetime.toLocaleString()} of {HINGE_RATING.toLocaleString()}.
             </p>
           )}
-          <span {...stylex.props(styles.tap)}>{cover ? 'Tap to fold' : 'Tap or press space to fold'}</span>
+          <span {...stylex.props(styles.tap)}>Tap to fold</span>
         </section>
       )}
       {toast && status !== 'over' && <div {...stylex.props(styles.toast, cover && styles.toastCover)}>{toast}</div>}
