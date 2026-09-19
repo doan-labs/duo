@@ -13,6 +13,10 @@
     "com.mnismt.duo.snake": {
       "folder": "snake",
       "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.wordlemini": {
+      "folder": "wordle-mini",
+      "maintainers": ["mnismt"]
     }
   }
 }
