@@ -13,7 +13,19 @@
 import { useNowPlaying } from '@doan-labs/duo-app-music/index.tsx'
 import { mmss } from '@doan-labs/duo-fixtures'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  colors,
+  easing,
+  glass,
+  leading,
+  motion,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, type PointerEvent as ReactPointerEvent, type Ref, useState } from 'react'
 import { flip, NETWORK, type Toggles, useToggles } from './toggles.ts'
@@ -578,9 +590,9 @@ const styles = stylex.create({
   scrim: {
     position: 'absolute',
     inset: 0,
-    backgroundColor: 'rgba(10,10,16,.32)',
-    backdropFilter: 'blur(42px) saturate(165%)',
-    WebkitBackdropFilter: 'blur(42px) saturate(165%)'
+    backgroundColor: chrome.scrim,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur
   },
   // Taps between tiles fall through to the scrim and close the panel, as on an
   // iPhone, where the panel is the whole display.
@@ -637,24 +649,24 @@ const styles = stylex.create({
     position: 'relative',
     width: '100%',
     height: '100%',
-    borderRadius: 22,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(255,255,255,.18)',
+    backgroundColor: glass.tint,
     // Inset only: an outer shadow spills into the page box, which clips it at its
     // edge and shows up as a faint rectangle around the grid.
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.32),inset 0 0 0 0.5px rgba(255,255,255,.14)',
+    boxShadow: shadow.rim,
     color: colors.white,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color, color',
-    transitionDuration: '.15s, .25s, .25s',
-    transform: { default: null, ':active': 'scale(.94)' }
+    transitionDuration: `${motion.pressDuration}, .25s, .25s`,
+    transform: { default: null, ':active': motion.press }
   },
   tint: (c: string) => ({ backgroundColor: c }),
-  lit: { backgroundColor: 'rgba(255,255,255,.94)', color: colors.black },
-  round: { width: 34, height: 34, borderRadius: '50%', pointerEvents: 'auto' },
-  turn: { backgroundColor: 'rgba(255,255,255,.94)', color: colors.black, transform: 'rotate(45deg)' },
+  lit: { backgroundColor: colors.white, color: colors.black },
+  round: { width: 34, height: 34, borderRadius: radius.circle, pointerEvents: 'auto' },
+  turn: { backgroundColor: colors.white, color: colors.black, transform: 'rotate(45deg)' },
 
   // Edit mode: the wobble is the tile's, the badge the slot's, so a tile keeps
   // its own :active scale while it shakes.
@@ -662,7 +674,7 @@ const styles = stylex.create({
     animationName: wobble,
     animationDuration: '.26s',
     animationIterationCount: 'infinite',
-    animationTimingFunction: 'ease-in-out'
+    animationTimingFunction: easing.inOut
   },
   wobbleAt: (n: number) => ({ animationDelay: `${n * -70}ms` }),
   minus: {
@@ -671,22 +683,22 @@ const styles = stylex.create({
     left: -4,
     width: 21,
     height: 21,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(240,240,245,.96)',
-    boxShadow: '0 2px 6px rgba(0,0,0,.3)',
+    backgroundColor: colors.white,
+    boxShadow: shadow.card,
     cursor: 'pointer'
   },
   minusBar: { width: 9, height: 2, borderRadius: 1, backgroundColor: colors.black },
   slot: {
-    borderRadius: 22,
+    borderRadius: radius.xxl,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,.4)',
+    borderColor: chrome.label2,
     display: 'grid',
     placeItems: 'center',
-    color: 'rgba(255,255,255,.55)',
+    color: chrome.label,
     cursor: 'pointer'
   },
 
@@ -699,13 +711,13 @@ const styles = stylex.create({
   radio: {
     width: T - 8,
     height: T - 8,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(255,255,255,.14)',
+    backgroundColor: chrome.fill3,
     transitionProperty: 'background-color, transform',
-    transitionDuration: '.25s, .15s',
-    transform: { default: null, ':active': 'scale(.9)' }
+    transitionDuration: `.25s, ${motion.pressDuration}`,
+    transform: { default: null, ':active': motion.press }
   },
 
   playing: {
@@ -722,16 +734,19 @@ const styles = stylex.create({
   playText: { minWidth: 0, overflow: 'hidden' },
   playTitle: {
     display: 'block',
-    fontSize: 13,
-    fontWeight: 600,
-    letterSpacing: -0.1,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
     paddingTop: 2,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
   playSub: {
-    fontSize: 11,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
     opacity: 0.6,
     paddingTop: 1,
     whiteSpace: 'nowrap',
@@ -745,8 +760,8 @@ const styles = stylex.create({
     padding: 4,
     cursor: 'pointer',
     transitionProperty: 'transform',
-    transitionDuration: '.12s',
-    transform: { default: null, ':active': 'scale(.85)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
   hitWide: { paddingRight: 12, paddingLeft: 12 },
   dim: { opacity: 0.45 },
@@ -757,7 +772,7 @@ const styles = stylex.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,.96)',
+    backgroundColor: colors.white,
     transitionProperty: 'height',
     transitionDuration: '.12s'
   },
@@ -774,7 +789,7 @@ const styles = stylex.create({
     transitionProperty: 'color',
     transitionDuration: '.12s'
   },
-  sglyphIn: { color: 'rgba(60,60,67,.7)' },
+  sglyphIn: { color: colors.grey },
 
   focus: {
     gridTemplateColumns: 'auto auto',
@@ -782,17 +797,22 @@ const styles = stylex.create({
     columnGap: 8,
     paddingLeft: 14
   },
-  focusLabel: { fontSize: 13, fontWeight: 600, letterSpacing: -0.1 },
+  focusLabel: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
+  },
 
   // Pages two and three are one card each, milkier than a tile so the page
   // reads as a single sheet of glass rather than a tile grown large.
   card: {
     pointerEvents: 'auto',
     height: '100%',
-    borderRadius: 34,
+    borderRadius: radius.xxl,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,.24)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.4),inset 0 0 0 0.5px rgba(255,255,255,.16)'
+    backgroundColor: chrome.fill,
+    boxShadow: shadow.rim
   },
   media: {
     display: 'flex',
@@ -807,26 +827,35 @@ const styles = stylex.create({
   cover: {
     flexGrow: 1,
     minHeight: 0,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,.22)',
+    borderRadius: radius.xxl,
+    backgroundColor: chrome.fill,
     backgroundSize: 'cover',
     cursor: 'pointer',
-    boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,.2)',
+    boxShadow: shadow.rim,
     transitionProperty: 'transform',
-    transitionDuration: '.15s',
-    transform: { default: null, ':active': 'scale(.98)' }
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
   },
   coverArt: (image: string) => ({ backgroundImage: image }),
   mTitle: {
     display: 'block',
-    fontSize: 15,
-    fontWeight: 600,
-    letterSpacing: -0.2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
-  times: { display: 'flex', justifyContent: 'space-between', fontSize: 10, opacity: 0.5, marginTop: -6 },
+  times: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    opacity: 0.5,
+    marginTop: -6
+  },
   volRow: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 },
 
   // Never flex: in the media card's column a growing bar would eat the artwork.
@@ -844,11 +873,11 @@ const styles = stylex.create({
     pointerEvents: 'none',
     width: '100%',
     height: 7,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,.28)'
+    backgroundColor: chrome.fill
   },
-  trkFill: { pointerEvents: 'none', display: 'block', height: '100%', backgroundColor: 'rgba(255,255,255,.95)' },
+  trkFill: { pointerEvents: 'none', display: 'block', height: '100%', backgroundColor: colors.white },
   barW: (pct: number) => ({ width: `${pct}%` }),
 
   list: { display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: 12 },
@@ -856,27 +885,37 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 16,
+    borderRadius: radius.xl,
     paddingTop: 7,
     paddingRight: 10,
     paddingBottom: 7,
     paddingLeft: 10,
     cursor: 'pointer',
-    backgroundColor: { default: 'transparent', ':active': 'rgba(255,255,255,.16)' }
+    backgroundColor: { default: 'transparent', ':active': chrome.fill2 }
   },
   rowIc: {
     width: 34,
     height: 34,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     flexShrink: 0,
     display: 'grid',
     placeItems: 'center',
-    backgroundColor: 'rgba(255,255,255,.16)',
+    backgroundColor: chrome.fill2,
     transitionProperty: 'background-color',
     transitionDuration: '.25s'
   },
-  rowName: { fontSize: 14, fontWeight: 600, letterSpacing: -0.1 },
-  rowVal: { fontSize: 11, opacity: 0.6 },
+  rowName: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
+  },
+  rowVal: {
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    opacity: 0.6
+  },
 
   // The page rail, on the panel's right edge like the iPad's. The active page is
   // a filled circle with its glyph knocked out.
@@ -893,16 +932,16 @@ const styles = stylex.create({
   pip: {
     width: RAIL,
     height: RAIL,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     display: 'grid',
     placeItems: 'center',
-    color: 'rgba(255,255,255,.72)',
+    color: chrome.indicator,
     cursor: 'pointer',
     transitionProperty: 'background-color, color',
     transitionDuration: '.25s'
   },
-  pipOn: { backgroundColor: 'rgba(255,255,255,.95)', color: 'rgba(30,30,34,.9)' },
-  dot: { width: 7, height: 7, borderRadius: '50%', backgroundColor: 'currentColor' },
+  pipOn: { backgroundColor: colors.white, color: colors.black },
+  dot: { width: 7, height: 7, borderRadius: radius.circle, backgroundColor: 'currentColor' },
 
   // The home indicator, and the strip you grab to swipe the panel back up.
   grab: {
@@ -920,8 +959,8 @@ const styles = stylex.create({
       marginLeft: 'auto',
       marginRight: 'auto',
       marginTop: 14,
-      borderRadius: 3,
-      backgroundColor: 'rgba(255,255,255,.75)'
+      borderRadius: radius.xs,
+      backgroundColor: chrome.indicator
     }
   }
 })

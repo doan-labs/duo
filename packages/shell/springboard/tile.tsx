@@ -7,7 +7,19 @@
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { ICONS } from '@doan-labs/duo-uikit/icons/index.ts'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
-import { colors, layout } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  colors,
+  easing,
+  glass,
+  layout,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import type { StyleXStyles } from '@stylexjs/stylex'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, type Ref, useRef, useState } from 'react'
@@ -161,11 +173,11 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: 4,
-    fontSize: 10.5,
-    lineHeight: 1.2,
-    fontWeight: 400,
-    letterSpacing: 0.02,
-    textShadow: '0 1px 3px rgba(0,0,0,.5)',
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    textShadow: shadow.text,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     // A held tile is carried by pointer events; the page must not scroll under a finger instead.
@@ -177,26 +189,30 @@ const styles = stylex.create({
     height: layout.icon,
     display: 'block',
     // Apple's artwork carries its own rounded corners; a release icon may arrive square.
-    borderRadius: '22.5%',
+    borderRadius: layout.iconRadius,
     transitionProperty: 'transform',
     transitionDuration: '.12s'
   },
   iconWrap: {
     position: 'relative',
-    borderRadius: 16,
-    transitionProperty: 'background-color, box-shadow',
+    borderRadius: radius.xl,
+    // The well is drawn with an outline, not a spread shadow: a ring with no blur is a border.
+    outlineWidth: 5,
+    outlineStyle: 'solid',
+    outlineColor: 'transparent',
+    transitionProperty: 'background-color, outline-color',
     transitionDuration: '.15s'
   },
   // The cell a carried tile is over: a well behind the icon and the icon grown a
   // little, the way iOS offers to stack the two.
-  iconWrapHot: { backgroundColor: 'rgba(255,255,255,.32)', boxShadow: '0 0 0 5px rgba(255,255,255,.32)' },
+  iconWrapHot: { backgroundColor: chrome.fill, outlineColor: chrome.fill },
   iconHot: { transform: 'scale(1.1)' },
   // Arranging: every other tile wobbles while one is on a finger.
   shake: {
     animationName: { default: shake, '@media (prefers-reduced-motion: reduce)': 'none' },
     animationDuration: '.3s',
     animationIterationCount: 'infinite',
-    animationTimingFunction: 'ease-in-out'
+    animationTimingFunction: easing.inOut
   },
   // Marks the tiles whose app is invented data, so a visitor knows before tapping.
   mockDot: {
@@ -205,34 +221,41 @@ const styles = stylex.create({
     right: -3,
     width: 9,
     height: 9,
-    borderRadius: 5,
+    borderRadius: radius.xs,
     backgroundColor: colors.orange,
     borderWidth: 1.5,
     borderStyle: 'solid',
-    borderColor: 'white'
+    borderColor: colors.white
   },
   iconDock: { width: 41, height: 41 },
   iconPressed: { transform: 'scale(.88)' },
   // Folder tile: a blurred well showing the grid it holds.
   fold: {
-    borderRadius: 14,
+    borderRadius: radius.xl,
     display: 'grid',
     gridTemplateColumns: 'repeat(3,1fr)',
     gap: 2,
     padding: 4,
-    backgroundColor: 'rgba(120,120,128,.42)',
-    backdropFilter: 'blur(8px)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.4)'
+    backgroundColor: chrome.folder,
+    backdropFilter: glass.blur,
+    boxShadow: shadow.rim
   },
   // Sized off the column, never the row: WebKit resolves a percentage height
   // against the artwork's own size here and spills the last row under the label.
-  foldImg: { width: '100%', height: 'auto', aspectRatio: '1', minWidth: 0, borderRadius: 3, objectFit: 'contain' },
+  foldImg: {
+    width: '100%',
+    height: 'auto',
+    aspectRatio: '1',
+    minWidth: 0,
+    borderRadius: radius.xs,
+    objectFit: 'contain'
+  },
   wtile: { gridColumnStart: 'span 2', gridRowStart: 'span 2', alignSelf: 'start', marginTop: -4 },
   // Icons land one after another on first paint. Runs once, on mount.
   land: {
     animationName: rise,
     animationDuration: '.5s',
     animationFillMode: 'backwards',
-    animationTimingFunction: 'cubic-bezier(.2,.9,.3,1)'
+    animationTimingFunction: easing.pop
   }
 })

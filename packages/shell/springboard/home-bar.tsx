@@ -9,6 +9,7 @@
 // springs back; pause and it becomes a card: let go and the app switcher opens
 // around it, drag it sideways and the halves are offered to drop it on (grab()).
 
+import { chrome, glass, radius, shadow } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { flushSync } from 'react-dom'
@@ -174,7 +175,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
         return park(e.id, [zoom(el, e.from, true, z, start), ...(home ? [home] : [])])
       }
       const back = [
-        el.animate([start, { transform: 'none', borderRadius: '0px' }], {
+        el.animate([start, { transform: 'none', borderRadius: 0 }], {
           duration: 300,
           easing: 'ease-out',
           fill: 'both'
@@ -222,7 +223,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
               transform: `translate(${card.x - (z2.x + z2.w / 2)}px,${card.y - (z2.y + z2.h / 2)}px) scale(${sc})`,
               borderRadius: `${24 / sc}px`
             },
-            { transform: 'none', borderRadius: '0px' }
+            { transform: 'none', borderRadius: 0 }
           ],
           opts
         )
@@ -297,15 +298,15 @@ const styles = stylex.create({
       right: 30,
       bottom: 7,
       height: 5,
-      borderRadius: 3,
-      backgroundColor: 'rgba(255,255,255,.75)',
+      borderRadius: radius.xs,
+      backgroundColor: chrome.indicator,
       transitionProperty: 'opacity',
       transitionDuration: '.2s',
       opacity: { default: null, ':active': 0.45 }
     }
   },
   homebarAt: (pct: number) => ({ left: `${pct}%` }),
-  homebarLight: { '::after': { backgroundColor: 'rgba(0,0,0,.6)' } },
+  homebarLight: { '::after': { backgroundColor: chrome.indicatorDark } },
   homebarFaint: { '::after': { opacity: { default: 0.35, ':active': 0.7 } } },
   // Nothing to go home to while the home screen is what you are looking at.
   homebarOff: { opacity: 0, pointerEvents: 'none' },
@@ -327,13 +328,13 @@ const styles = stylex.create({
   zone: {
     flexGrow: 1,
     flexBasis: 0,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,.16)',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.35)',
-    backdropFilter: 'blur(14px)',
-    WebkitBackdropFilter: 'blur(14px)',
+    borderRadius: radius.xxl,
+    backgroundColor: chrome.fill2,
+    boxShadow: shadow.rim,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     transitionProperty: 'background-color',
     transitionDuration: '.18s'
   },
-  zoneOn: { backgroundColor: 'rgba(255,255,255,.38)' }
+  zoneOn: { backgroundColor: chrome.fill }
 })

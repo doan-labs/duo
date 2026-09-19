@@ -7,7 +7,7 @@
 
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { chrome, colors, easing, radius, shadow } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useEffect, useId, useRef, useState } from 'react'
 import { device } from '../device.ts'
@@ -15,7 +15,15 @@ import { useToggles } from './toggles.ts'
 
 // SF Symbols speaker.wave.2.fill.
 const Speaker = () => (
-  <svg viewBox="0 0 24 24" width={16} height={16} fill="#fff" stroke="#fff" strokeWidth={2} strokeLinecap="round">
+  <svg
+    viewBox="0 0 24 24"
+    width={16}
+    height={16}
+    fill="currentColor"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+  >
     <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
     <path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.3 6.4a8 8 0 0 1 0 11.2" fill="none" />
   </svg>
@@ -122,12 +130,12 @@ export function TorchHud() {
   const id = useId()
   return (
     <div data-hud="torch" data-on={torch || undefined} {...stylex.props(styles.torch, show && styles.torchIn)}>
-      <svg viewBox="0 0 230 300" width={230} height={300} fill="none" stroke="#fff" strokeLinecap="round">
+      <svg viewBox="0 0 230 300" width={230} height={300} fill="none" stroke="currentColor" strokeLinecap="round">
         <defs>
           <linearGradient id={`${id}b`} x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stopColor="#fff" stopOpacity=".95" />
-            <stop offset=".35" stopColor="#dde6ff" stopOpacity=".45" />
-            <stop offset="1" stopColor="#dde6ff" stopOpacity="0" />
+            <stop offset="0" stopColor="currentColor" stopOpacity=".95" />
+            <stop offset=".35" stopColor={chrome.beam} stopOpacity=".45" />
+            <stop offset="1" stopColor={chrome.beam} stopOpacity="0" />
           </linearGradient>
           <filter id={`${id}f`} x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="4" />
@@ -171,7 +179,7 @@ const styles = stylex.create({
     top: 14,
     width: 140,
     height: 36,
-    borderRadius: 18,
+    borderRadius: radius.pill,
     zIndex: 9,
     display: 'flex',
     alignItems: 'center',
@@ -187,12 +195,12 @@ const styles = stylex.create({
   volWide: { left: 630 - 70 },
   volNarrow: { left: 141 - 70 },
   volOn: { opacity: 1, transform: 'none', transitionDuration: '.12s' },
-  trk: { flexGrow: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,.28)', overflow: 'hidden' },
+  trk: { flexGrow: 1, height: 8, borderRadius: radius.xs, backgroundColor: chrome.well, overflow: 'hidden' },
   fill: {
     display: 'block',
     height: '100%',
     backgroundColor: colors.white,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     transitionProperty: 'width',
     transitionDuration: '.1s'
   },
@@ -215,20 +223,20 @@ const styles = stylex.create({
     left: 14,
     bottom: 30,
     zIndex: 9,
-    borderRadius: 9,
+    borderRadius: radius.md,
     overflow: 'hidden',
     borderWidth: 2,
     borderStyle: 'solid',
     borderColor: colors.white,
-    boxShadow: '0 6px 18px rgba(0,0,0,.45)',
+    boxShadow: shadow.float,
     transformOrigin: '0 100%',
     animationName: shrink,
     animationDuration: '.5s',
-    animationTimingFunction: 'cubic-bezier(.2,.9,.3,1)',
+    animationTimingFunction: easing.pop,
     animationFillMode: 'both',
     transitionProperty: 'transform, opacity',
     transitionDuration: '.35s',
-    transitionTimingFunction: 'ease-in, ease'
+    transitionTimingFunction: `${easing.inOut}, ${easing.out}`
   },
   thumbOut: { transform: 'translateX(-130%)', opacity: 0 },
   size: (w: number, h: number) => ({ width: w, height: h }),
@@ -243,7 +251,7 @@ const styles = stylex.create({
     width: 230,
     height: 300,
     marginLeft: -115,
-    borderRadius: 44,
+    borderRadius: radius.xxl,
     zIndex: 9,
     backgroundColor: colors.black,
     overflow: 'hidden',
@@ -253,12 +261,12 @@ const styles = stylex.create({
     transformOrigin: '50% 0',
     transitionProperty: 'opacity, transform',
     transitionDuration: '.3s, .4s',
-    transitionTimingFunction: 'ease-in, cubic-bezier(.4,0,.8,.6)'
+    transitionTimingFunction: `${easing.inOut}, ${easing.push}`
   },
   torchIn: {
     opacity: 1,
     transform: 'none',
-    transitionTimingFunction: 'ease-out, cubic-bezier(.2,.9,.3,1.08)'
+    transitionTimingFunction: `${easing.out}, ${easing.spring}`
   },
   torchSun: { position: 'absolute', top: 62, left: 186, opacity: 0.85 },
   torchGlyph: { position: 'absolute', top: 196, left: 0, right: 0, display: 'flex', justifyContent: 'center' },
@@ -271,7 +279,7 @@ const styles = stylex.create({
     transformOrigin: '50% 100%',
     transitionProperty: 'opacity, transform',
     transitionDuration: '.45s',
-    transitionTimingFunction: 'ease-out'
+    transitionTimingFunction: easing.out
   },
   beamOn: { opacity: 1, transform: 'none', transitionDelay: '.2s' },
 

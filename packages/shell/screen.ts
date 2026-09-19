@@ -421,7 +421,7 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
 
   // Calendar widget, matching the live one in os.ts.
   glass(ctx, blur, wx(1), wtop, wsize, wsize, u(23), ['rgba(255,255,255,0.86)', 'rgba(255,255,255,0.76)'])
-  ctx.fillStyle = '#ff3b30'
+  ctx.fillStyle = '#ff383c'
   ctx.font = `600 ${u(11)}px ${FONT}`
   ctx.fillText(now.toLocaleDateString('en', { weekday: 'long' }).toUpperCase(), wx(1) + u(12), wtop + u(12))
   ctx.fillStyle = '#000'

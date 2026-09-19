@@ -4,6 +4,17 @@
 // sheet stays up to compare, and a tap outside it puts it away.
 
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import {
+  chrome,
+  colors,
+  easing,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useSyncExternalStore } from 'react'
 import { photoRevision, shots, subscribePhotos } from '../runtime/photos.ts'
@@ -75,39 +86,51 @@ const styles = stylex.create({
     maxWidth: 440,
     marginLeft: 'auto',
     marginRight: 'auto',
-    borderRadius: 26,
+    borderRadius: radius.xxl,
     paddingTop: 14,
     paddingRight: 14,
     paddingBottom: 12,
     paddingLeft: 14,
     animationName: up,
     animationDuration: '.34s',
-    animationTimingFunction: 'cubic-bezier(.2,.9,.3,1)'
+    animationTimingFunction: easing.pop
   },
-  title: { fontSize: 15, fontWeight: 600, marginBottom: 10, textShadow: '0 1px 3px rgba(0,0,0,.35)' },
+  title: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
+    marginBottom: 10,
+    textShadow: shadow.text
+  },
   strip: { display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 },
   // Portrait, cropped like the cover display, so a swatch shows what the folded phone will.
   swatch: {
     flexShrink: 0,
     width: 56,
     height: 80,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     backgroundSize: 'cover',
     backgroundPosition: '22% center',
     cursor: 'pointer',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)',
-    transitionProperty: 'transform, box-shadow',
+    boxShadow: shadow.rim,
+    // The ring around the chosen paper is a border, not a shadow: no blur, no spread of its own.
+    outlineWidth: 2.5,
+    outlineStyle: 'solid',
+    outlineColor: 'transparent',
+    transitionProperty: 'transform, outline-color',
     transitionDuration: '.18s'
   },
   paper: (url: string) => ({ backgroundImage: `url("${url}")` }),
-  swatchOn: { boxShadow: '0 0 0 2.5px #fff', transform: 'scale(1.06)' },
+  swatchOn: { outlineColor: colors.white, transform: 'scale(1.06)' },
   more: {
     display: 'grid',
     placeItems: 'center',
-    fontSize: 28,
-    fontWeight: 300,
+    fontSize: typeScale.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.regular,
     lineHeight: 1,
-    backgroundColor: 'rgba(255,255,255,.14)'
+    backgroundColor: chrome.fill3
   },
   file: { display: 'none' }
 })

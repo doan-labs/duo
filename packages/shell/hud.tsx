@@ -2,7 +2,19 @@
 // owns the numbers (hinge angle, yaw, camera pose); this file only draws them
 // and reports the controls back through `HudEvents`.
 
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  colors,
+  easing,
+  fonts,
+  glass,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -222,26 +234,42 @@ const HomeButton = ({ onClick }: { onClick: () => void }) => (
   </button>
 )
 
-const dim = '#6b7064'
-const spring = 'cubic-bezier(0.34, 1.56, 0.64, 1)'
-const ease = 'cubic-bezier(0.4, 0, 0.2, 1)'
-const glassBlur = 'blur(20px) saturate(1.6)'
-const font = '-apple-system, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif'
+const dim = colors.grey
+const spring = easing.bounce
+const ease = easing.inOut
+const glassBlur = glass.blur
+const font = fonts.system
 const reduce = '@media (prefers-reduced-motion: reduce)'
 
 const spin = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
 
 const styles = stylex.create({
   ui: { position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none', textAlign: 'center', fontFamily: font },
-  h1: { position: 'absolute', top: 28, left: 32, fontSize: 28, letterSpacing: '-0.03em', fontWeight: 600 },
-  p: { position: 'absolute', top: 64, left: 32, color: dim, fontSize: 14 },
+  h1: {
+    position: 'absolute',
+    top: 28,
+    left: 32,
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.semibold
+  },
+  p: {
+    position: 'absolute',
+    top: 64,
+    left: 32,
+    color: dim,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
   hint: {
     position: 'absolute',
     bottom: '13vh',
     left: 0,
     right: 0,
     color: dim,
-    fontSize: { default: 13, '@media (max-width: 600px)': 10 },
+    fontSize: { default: typeScale.footnote, '@media (max-width: 600px)': typeScale.caption2 },
     whiteSpace: 'normal',
     transitionProperty: 'opacity',
     transitionDuration: '0.5s'
@@ -254,11 +282,10 @@ const styles = stylex.create({
   liquid: {
     position: 'relative',
     isolation: 'isolate',
-    backgroundColor: 'rgba(28, 29, 34, 0.68)',
+    backgroundColor: chrome.hud,
     backdropFilter: glassBlur,
     WebkitBackdropFilter: glassBlur,
-    boxShadow:
-      'inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 14px rgba(255, 255, 255, 0.07), 0 1px 1px rgba(0, 0, 0, 0.08), 0 16px 40px -16px rgba(0, 0, 0, 0.45)'
+    boxShadow: `${shadow.rim},${shadow.float}`
   },
 
   hud: {
@@ -273,9 +300,11 @@ const styles = stylex.create({
     paddingRight: 8,
     paddingBottom: 6,
     paddingLeft: { default: 16, '@media (max-width: 600px)': 8 },
-    borderRadius: 26,
+    borderRadius: radius.pill,
     color: colors.white,
-    fontSize: 13,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     whiteSpace: 'nowrap',
     pointerEvents: 'auto',
     cursor: { default: 'grab', ':active': 'grabbing' }
@@ -286,7 +315,7 @@ const styles = stylex.create({
     width: 1,
     height: 20,
     marginInline: { default: 8, '@media (max-width: 600px)': 4 },
-    backgroundColor: 'rgba(255, 255, 255, 0.16)'
+    backgroundColor: chrome.fill2
   },
   label: {
     display: 'flex',
@@ -305,23 +334,23 @@ const styles = stylex.create({
     strokeLinejoin: 'round',
     overflow: 'visible'
   },
-  deg: { minWidth: '4ch', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 500 },
+  deg: { minWidth: '4ch', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: weight.medium },
 
   range: {
     appearance: 'none',
     WebkitAppearance: 'none',
     width: { default: 140, '@media (max-width: 600px)': 'clamp(24px, calc(100vw - 342px), 140px)' },
     height: 4,
-    borderRadius: 2,
+    borderRadius: radius.xs,
     outlineStyle: 'none',
     cursor: 'pointer',
     '::-webkit-slider-thumb': {
       WebkitAppearance: 'none',
       width: 18,
       height: 18,
-      borderRadius: '50%',
+      borderRadius: radius.circle,
       backgroundColor: colors.white,
-      boxShadow: '0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.06)',
+      boxShadow: shadow.card,
       transitionProperty: 'transform',
       transitionDuration: { default: '0.2s', [reduce]: '0s' },
       transitionTimingFunction: ease,
@@ -330,23 +359,19 @@ const styles = stylex.create({
   },
   /** iOS fills the track up to the knob. */
   fill: (pct: number) => ({
-    backgroundImage: `linear-gradient(90deg, rgba(255, 255, 255, 0.9) ${pct}%, rgba(255, 255, 255, 0.22) ${pct}%)`
+    backgroundImage: `linear-gradient(90deg, ${colors.white} ${pct}%, ${chrome.fill} ${pct}%)`
   }),
 
   button: {
     width: { default: 38, '@media (max-width: 600px)': 34 },
     height: 38,
     padding: 0,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     cursor: 'pointer',
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': 'rgba(255, 255, 255, 0.12)',
-      ':active': 'rgba(255, 255, 255, 0.16)'
-    },
+    backgroundColor: { default: 'transparent', ':hover': chrome.fill3, ':active': chrome.fill2 },
     transitionProperty: 'transform, background-color, opacity',
     transitionDuration: { default: '0.2s', ':active': '0.08s', [reduce]: '0s' },
     transitionTimingFunction: ease,
@@ -373,7 +398,7 @@ const styles = stylex.create({
   orbiting: {
     animationName: { default: spin, [reduce]: 'none' },
     animationDuration: '3s',
-    animationTimingFunction: 'linear',
+    animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
   },
 
@@ -382,10 +407,10 @@ const styles = stylex.create({
     WebkitAppearance: 'none',
     width: 30,
     height: 18,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     position: 'relative',
     cursor: 'pointer',
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: chrome.fill,
     transitionProperty: 'background-color',
     transitionDuration: { default: '0.25s', [reduce]: '0s' },
     '::after': {
@@ -395,9 +420,9 @@ const styles = stylex.create({
       left: 2,
       width: 14,
       height: 14,
-      borderRadius: '50%',
+      borderRadius: radius.circle,
       backgroundColor: colors.white,
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+      boxShadow: shadow.card,
       transitionProperty: 'transform',
       transitionDuration: { default: '0.25s', [reduce]: '0s' },
       transitionTimingFunction: ease

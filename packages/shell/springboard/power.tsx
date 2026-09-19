@@ -2,20 +2,39 @@
 // Its own file because neither belongs to anything on screen — they are the
 // device itself taking the whole display, and the shell only decides when.
 
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import {
+  chrome,
+  colors,
+  easing,
+  glass,
+  leading,
+  radius,
+  shadow,
+  tracking,
+  typeScale,
+  weight
+} from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useRef, useState } from 'react'
 
 // SF Symbols power.
 const Power = () => (
-  <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="#fff" strokeWidth={2.4} strokeLinecap="round">
+  <svg
+    viewBox="0 0 24 24"
+    width={26}
+    height={26}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.4}
+    strokeLinecap="round"
+  >
     <path d="M12 3.5v8.5" />
     <path d="M7.3 6.6a7 7 0 1 0 9.4 0" />
   </svg>
 )
 // The boot logo as a path, not the  glyph: that codepoint is empty off macOS.
 const Apple = () => (
-  <svg viewBox="0 0 24 24" width={64} height={64} fill="#fff">
+  <svg viewBox="0 0 24 24" width={64} height={64} fill="currentColor">
     <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
   </svg>
 )
@@ -120,9 +139,8 @@ const styles = stylex.create({
     paddingLeft: 40,
     paddingRight: 40,
     backgroundColor: colors.black,
-    borderRadius: 'inherit',
     color: colors.white,
-    fontSize: 76,
+    fontSize: typeScale.displayXl,
     lineHeight: 1,
     animationName: fade,
     animationDuration: '1s',
@@ -131,35 +149,35 @@ const styles = stylex.create({
   bootOut: {
     animationName: fadeOut,
     animationDuration: `${BOOT_FADE_MS}ms`,
-    animationTimingFunction: 'ease-in-out',
+    animationTimingFunction: easing.inOut,
     animationFillMode: 'forwards',
     pointerEvents: 'none'
   },
   track: {
     width: 160,
     height: 4,
-    borderRadius: 2,
+    borderRadius: radius.xs,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,.2)'
+    backgroundColor: chrome.fill
   },
   fill: {
     width: '100%',
     height: '100%',
-    borderRadius: 'inherit',
     backgroundColor: colors.white,
     transformOrigin: 'left center',
     animationName: fill,
     animationDuration: '14s',
-    animationTimingFunction: 'cubic-bezier(.05,.7,.1,1)',
+    animationTimingFunction: easing.out,
     animationFillMode: 'both'
   },
   bootError: {
     margin: 0,
     maxWidth: 320,
-    fontSize: 13,
-    lineHeight: 1.4,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     textAlign: 'center',
-    color: 'rgba(255,255,255,.6)'
+    color: chrome.label
   },
 
   poff: {
@@ -172,9 +190,9 @@ const styles = stylex.create({
     justifyContent: 'space-between',
     paddingTop: 40,
     paddingBottom: 34,
-    backgroundColor: 'rgba(30,30,34,.55)',
-    backdropFilter: 'blur(30px) saturate(140%)',
-    WebkitBackdropFilter: 'blur(30px) saturate(140%)',
+    backgroundColor: glass.tintDark,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
     animationName: fade,
     animationDuration: '.3s',
     animationFillMode: 'both'
@@ -183,13 +201,15 @@ const styles = stylex.create({
     position: 'relative',
     width: 260,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,.22)',
+    borderRadius: radius.pill,
+    backgroundColor: chrome.fill,
     display: 'grid',
     placeItems: 'center',
-    fontSize: 16,
-    fontWeight: 500,
-    color: 'rgba(255,255,255,.85)',
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    fontWeight: weight.medium,
+    color: colors.white,
     overflow: 'hidden',
     touchAction: 'none'
   },
@@ -199,27 +219,28 @@ const styles = stylex.create({
     top: 4,
     width: 56,
     height: 56,
-    borderRadius: '50%',
+    borderRadius: radius.circle,
     backgroundColor: colors.red,
     display: 'grid',
     placeItems: 'center',
     cursor: 'grab',
     transitionProperty: 'transform',
     transitionDuration: '.3s',
-    transitionTimingFunction: 'cubic-bezier(.2,.9,.3,1)',
-    boxShadow: '0 2px 8px rgba(0,0,0,.3)'
+    transitionTimingFunction: easing.pop,
+    boxShadow: shadow.card
   },
   knobDrag: { transitionProperty: 'none' },
   shiftX: (x: number) => ({ transform: `translateX(${x}px)` }),
   cancel: {
     width: 56,
     height: 56,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(255,255,255,.22)',
+    borderRadius: radius.circle,
+    backgroundColor: chrome.fill,
     display: 'grid',
     placeItems: 'center',
     cursor: 'pointer',
-    fontSize: 26,
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
     color: colors.white
   }
 })

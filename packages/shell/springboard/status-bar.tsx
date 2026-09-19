@@ -9,7 +9,7 @@
 
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, leading, radius, tracking, typeScale, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { clock, useNow } from './clock.ts'
@@ -108,12 +108,13 @@ const styles = stylex.create({
     zIndex: 6,
     pointerEvents: 'none',
     color: colors.white,
-    fontWeight: 600,
-    fontSize: 13,
-    letterSpacing: -0.1
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.semibold
   },
   statusLight: { color: colors.black },
-  hole: { width: 23, height: 23, borderRadius: '50%', backgroundColor: colors.black, marginBottom: 2 },
-  read: { fontSize: 12, marginTop: -4 },
+  hole: { width: 23, height: 23, borderRadius: radius.circle, backgroundColor: colors.black, marginBottom: 2 },
+  read: { fontSize: typeScale.caption1, marginTop: -4 },
   marks: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, paddingTop: 3 }
 })
