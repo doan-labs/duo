@@ -6,6 +6,15 @@ import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 type Mode = 'focus' | 'break'
+const motion = '@media (prefers-reduced-motion: reduce)'
+const cardIn = stylex.keyframes({
+  from: { opacity: 0, transform: 'translateY(8px) scale(.98)' },
+  to: { opacity: 1, transform: 'translateY(0) scale(1)' }
+})
+const modeIn = stylex.keyframes({
+  from: { opacity: 0, transform: 'translateY(-4px)' },
+  to: { opacity: 1, transform: 'translateY(0)' }
+})
 
 const DURATIONS: Record<Mode, number> = { focus: 25 * 60, break: 5 * 60 }
 
@@ -60,7 +69,9 @@ function Timer() {
           <span {...stylex.props(styles.kicker)}>DUO FOCUS</span>
           <h1 {...stylex.props(styles.title)}>Pomodoro</h1>
         </div>
-        <span {...stylex.props(styles.mode)}>{mode === 'focus' ? 'FOCUS' : 'BREAK'}</span>
+        <span key={mode} {...stylex.props(styles.mode)}>
+          {mode === 'focus' ? 'FOCUS' : 'BREAK'}
+        </span>
       </header>
       <section {...stylex.props(styles.timerCard)}>
         <span {...stylex.props(styles.phase)}>{mode === 'focus' ? 'Deep work' : 'Reset break'}</span>
@@ -111,7 +122,16 @@ const styles = stylex.create({
   header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexShrink: 0 },
   kicker: { color: colors.orange, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
   title: { marginBlock: 0, fontSize: 34, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
-  mode: { color: colors.grey3, fontSize: 10, fontWeight: 700, letterSpacing: 1.2 },
+  mode: {
+    color: colors.grey3,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 1.2,
+    animationName: { default: modeIn, [motion]: 'none' },
+    animationDuration: '.18s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
+  },
   timerCard: {
     display: 'flex',
     flexDirection: 'column',
@@ -122,16 +142,25 @@ const styles = stylex.create({
     minHeight: 0,
     borderRadius: 20,
     padding: 18,
-    backgroundColor: colors.fillThin
+    backgroundColor: colors.fillThin,
+    animationName: { default: cardIn, [motion]: 'none' },
+    animationDuration: '.24s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
   },
   phase: { color: colors.orange, fontSize: 12, fontWeight: 700, letterSpacing: 1 },
   time: { fontSize: 88, lineHeight: 0.95, fontVariantNumeric: 'tabular-nums', letterSpacing: -3 },
   timeline: { width: '100%', height: 18, overflow: 'hidden', borderRadius: 999, backgroundColor: colors.fillDark },
   timelineFill: (progress: number) => ({
-    width: String(progress) + '%',
+    width: '100%',
     height: '100%',
     borderRadius: 999,
-    backgroundColor: colors.orange
+    backgroundColor: colors.orange,
+    transformOrigin: 'left center',
+    transform: 'scaleX(' + String(progress / 100) + ')',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.35s, .2s',
+    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)'
   }),
   caption: { color: colors.grey3, fontSize: 12 },
   controls: { display: 'flex', justifyContent: 'center', gap: 8, flexShrink: 0 },
@@ -144,7 +173,10 @@ const styles = stylex.create({
     color: colors.darkElevated,
     backgroundColor: colors.orange,
     fontWeight: 800,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   },
   secondary: {
     minWidth: 72,
@@ -155,7 +187,10 @@ const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.fillDark,
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   }
 })
 
