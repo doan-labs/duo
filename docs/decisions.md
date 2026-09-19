@@ -1061,7 +1061,7 @@ The seam between two halves is a divider, dragged between 30% and 70%. `zone()` 
 ratio, so the zoom, the drop card and the home bars follow it; it returns to the middle
 when a half empties, since the narrow home the other half shows is always half.
 
-## 70. The Store is laid out like the App Store, with the icon as the artwork
+## 71. The Store is laid out like the App Store, with the icon as the artwork
 
 The first Store was a settings-style list: a gradient hero, then every app in one long
 grouped list. It worked and looked like a form. The new root page follows the App Store:
