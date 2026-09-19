@@ -958,7 +958,7 @@ long press and volume stay with the shell; forwarding every button was considere
 skipped until an app needs it. Older SDKs never send `side.claim`, so they never receive
 `side` and keep treating unknown events as a protocol error safely.
 
-## 73. The ready deadline only runs while the view is visible
+## 74. The ready deadline only runs while the view is visible
 
 A deep link (`?app=`) opens the app on both displays, and the display not in use keeps
 its root at `display:none` so the sandbox document stays alive. Nothing in that document
