@@ -20,6 +20,12 @@ const WIN_LINES: [number, number, number][] = [
   [2, 4, 6]
 ]
 const CELL_KEYS = ['a1', 'b1', 'c1', 'a2', 'b2', 'c2', 'a3', 'b3', 'c3']
+const motion = '@media (prefers-reduced-motion: reduce)'
+const markPop = stylex.keyframes({
+  from: { opacity: 0, transform: 'scale(.78)' },
+  '70%': { opacity: 1, transform: 'scale(1.06)' },
+  to: { opacity: 1, transform: 'scale(1)' }
+})
 
 function winner(board: Array<Mark | null>) {
   for (const [a, b, c] of WIN_LINES) {
@@ -45,6 +51,7 @@ function Game() {
   const [board, setBoard] = useState<Array<Mark | null>>(Array(9).fill(null))
   const [turn, setTurn] = useState<Mark>('X')
   const [scores, setScores] = useState<Scores>({ X: 0, O: 0 })
+  const [moveNumber, setMoveNumber] = useState(0)
   const result = winner(board)
   const draw = !result && board.every(Boolean)
   const finished = Boolean(result || draw)
@@ -68,6 +75,7 @@ function Game() {
     next[index] = turn
     const nextWinner = winner(next)
     setBoard(next)
+    setMoveNumber((current) => current + 1)
     if (!nextWinner && next.some((cell) => cell === null)) setTurn(turn === 'X' ? 'O' : 'X')
     if (nextWinner) {
       const nextScores = { ...scores, [nextWinner]: scores[nextWinner] + 1 }
@@ -79,6 +87,7 @@ function Game() {
   const resetRound = () => {
     setBoard(Array(9).fill(null))
     setTurn('X')
+    setMoveNumber((current) => current + 1)
   }
 
   const resetScores = () => {
@@ -104,11 +113,16 @@ function Game() {
       <div role="grid" aria-label="Tic-Tac-Toe board" {...stylex.props(styles.board, styles.fitBoard(boardSize))}>
         {board.map((mark, index) => (
           <button
-            key={CELL_KEYS[index]}
+            key={mark ? `${CELL_KEYS[index]}-${moveNumber}` : CELL_KEYS[index]}
             type="button"
             aria-label={mark ? mark : 'Empty cell'}
             onClick={() => play(index)}
-            {...stylex.props(styles.cell, mark === 'X' && styles.cellX, mark === 'O' && styles.cellO)}
+            {...stylex.props(
+              styles.cell,
+              mark && styles.cellMark,
+              mark === 'X' && styles.cellX,
+              mark === 'O' && styles.cellO
+            )}
           >
             {mark}
           </button>
@@ -176,7 +190,17 @@ const styles = stylex.create({
     backgroundColor: colors.fillDark,
     fontSize: 42,
     fontWeight: 800,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color, color',
+    transitionDuration: '.16s, .2s, .2s',
+    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
+  },
+  cellMark: {
+    animationName: { default: markPop, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
   },
   cellX: { color: colors.cyan, backgroundColor: colors.fillThin },
   cellO: { color: colors.orange, backgroundColor: colors.fillThin },
@@ -189,7 +213,10 @@ const styles = stylex.create({
     color: colors.darkElevated,
     backgroundColor: colors.cyan,
     fontWeight: 800,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   },
   secondary: {
     borderWidth: 0,
@@ -199,7 +226,10 @@ const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.fillDark,
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   }
 })
 
