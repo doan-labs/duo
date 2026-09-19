@@ -67,6 +67,20 @@
           "sha256": "1a3fe5824b3cbb72935adbb2fa1299e60c58f17932a60b105abf565edaf77e8d"
         }
       ]
+    },
+    "com.mnismt.duo.wordlemini": {
+      "name": "Wordle Mini",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
+      "releases": [
+        {
+          "release": "1.0.0+9f068bd9",
+          "sdk": "0.0.0",
+          "bytes": 260117,
+          "sha256": "0459d8fa860306bf019750236cb46872ca5d5f62a913fefca4c294c364921ee4"
+        }
+      ]
     }
   }
 }
