@@ -103,7 +103,9 @@ const styles = stylex.create({
     marginBottom: 10,
     textShadow: shadow.text
   },
-  strip: { display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 },
+  // Padding and a matching negative margin: the chosen swatch's ring and scale
+  // need room inside the strip's own scroll clip.
+  strip: { display: 'flex', gap: 10, overflowX: 'auto', padding: 6, margin: -6 },
   // Portrait, cropped like the cover display, so a swatch shows what the folded phone will.
   swatch: {
     flexShrink: 0,

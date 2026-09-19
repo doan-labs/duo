@@ -229,7 +229,7 @@ export const styles = stylex.create({
     outlineStyle: 'solid',
     outlineColor: appAppearance.weatherOutline,
     outlineOffset: 2,
-    opacity: { default: 1, ':disabled': 0.45 },
+    // A refreshing control keeps its glass; the spinning glyph is the state.
     cursor: { default: 'pointer', ':disabled': 'default' },
     transitionProperty: 'transform, background-color',
     transitionDuration: pressed,

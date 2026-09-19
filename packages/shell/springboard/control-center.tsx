@@ -18,6 +18,7 @@ import {
   colors,
   easing,
   glass,
+  layout,
   leading,
   motion,
   radius,
@@ -484,7 +485,11 @@ export function ControlCenter({
 
   return (
     <div data-cc data-hud="cc" {...stylex.props(styles.root)}>
-      <div ref={scrimRef} {...stylex.props(styles.scrim)} onClick={onClose} />
+      <div
+        ref={scrimRef}
+        {...stylex.props(styles.scrim, wide ? styles.scrimWide : styles.scrimNarrow)}
+        onClick={onClose}
+      />
       <div ref={panelRef} {...stylex.props(styles.panel, wide ? styles.panelWide : styles.panelNarrow)}>
         <div {...stylex.props(styles.main, !wide && styles.mainNarrow)}>
           <div {...stylex.props(styles.stack)}>
@@ -593,6 +598,15 @@ const styles = stylex.create({
     backgroundColor: chrome.scrim,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur
+  },
+  // The scrim wears the display's own corners: a backdrop blur samples past a
+  // square edge into the bezel, and that read as a dark arc in each corner.
+  scrimWide: { borderRadius: layout.screenInner },
+  scrimNarrow: {
+    borderTopLeftRadius: layout.screenCoverHinge,
+    borderTopRightRadius: layout.screenCoverFree,
+    borderBottomRightRadius: layout.screenCoverFree,
+    borderBottomLeftRadius: layout.screenCoverHinge
   },
   // Taps between tiles fall through to the scrim and close the panel, as on an
   // iPhone, where the panel is the whole display.
