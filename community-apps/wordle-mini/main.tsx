@@ -66,8 +66,8 @@ function Game() {
   const [guesses, setGuesses] = useState<string[]>([])
   const [current, setCurrent] = useState('')
   const [status, setStatus] = useState<GameStatus>('playing')
-  const tile = Math.max(22, Math.floor((view.height || 480) / (cover ? 15 : 14)))
-  const keySize = cover ? 27 : 32
+  const tile = cover ? 18 : Math.max(22, Math.floor((view.height || 480) / 14))
+  const keySize = cover ? 22 : 32
 
   useEffect(() => {
     if (stored.status === 'hydrating') return
@@ -264,4 +264,5 @@ const styles = stylex.create({
   }
 })
 
+await os.connect()
 createRoot(document.body).render(<Game />)
