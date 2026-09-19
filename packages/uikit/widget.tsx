@@ -1,7 +1,7 @@
 import type { WidgetSnapshot } from '@doan-labs/duo-sdk/protocol.ts'
 import * as stylex from '@stylexjs/stylex'
 import { shared } from './styles.ts'
-import { colors } from './tokens.stylex.ts'
+import { colors, leading, space, tracking, typeScale } from './tokens.stylex.ts'
 
 export function widgetAge(updatedAt: number, now = Date.now()) {
   const age = now - updatedAt
@@ -46,9 +46,16 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'flex-start',
     overflow: 'hidden',
-    padding: 12
+    padding: space.md
   },
-  line: { fontSize: 12, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  value: { fontSize: 38, lineHeight: 1.15 },
-  caption: { fontSize: 10 }
+  line: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  value: { fontSize: typeScale.largeTitle, lineHeight: leading.largeTitle, letterSpacing: tracking.largeTitle },
+  caption: { fontSize: typeScale.caption2, lineHeight: leading.caption2 }
 })

@@ -3,7 +3,7 @@ import type { ElementType, ReactNode } from 'react'
 import { appearance, type PrimitiveProps } from './primitive.ts'
 import { shared } from './styles.ts'
 import { Sym } from './sym.tsx'
-import { app, colors } from './tokens.stylex.ts'
+import { app, leading, tracking, typeScale } from './tokens.stylex.ts'
 
 /**
  * Grouped row with an optional leading icon, a secondary line under the label
@@ -64,9 +64,14 @@ const styles = stylex.create({
   // A row is a centred flex line, so the label column stacks on its own and
   // keeps the first line where a single-line label would have put it.
   pair: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 },
-  subtitle: { fontSize: 13, color: app.label2 },
+  subtitle: {
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: app.label2
+  },
   trail: { display: 'flex', alignItems: 'center', gap: 6 },
   // `Sym` masks `currentColor`, so the chevron is tinted by its own wrapper:
   // iOS's tertiary grey, a step lighter than the detail text beside it.
-  chevron: { display: 'flex', color: colors.grey3 }
+  chevron: { display: 'flex', color: app.label3 }
 })

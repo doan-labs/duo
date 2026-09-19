@@ -2,7 +2,7 @@
 // else lives here. The shell is springboard/, the device is device.ts, and the
 // framework the apps link against is uikit/.
 
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, fonts, leading, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { createRoot } from 'react-dom/client'
 import { device } from './device.ts'
@@ -64,8 +64,9 @@ const styles = stylex.create({
     backgroundColor: colors.black,
     overflow: 'hidden',
     fontFamily: fonts.system,
-    fontSize: 15,
-    lineHeight: 1.3,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
     color: colors.white,
     pointerEvents: 'auto',
     backfaceVisibility: 'hidden',

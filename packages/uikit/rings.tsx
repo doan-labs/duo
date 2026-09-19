@@ -1,13 +1,13 @@
 // Activity rings and the weekly bar chart, shared by Fitness, Health and Watch.
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
-import { colors } from './tokens.stylex.ts'
+import { app, appAppearance, easing, leading, radius, shadow, tracking, typeScale, weight } from './tokens.stylex.ts'
 
 /** label, colour, done, goal, unit */
 export const RINGS: [string, string, number, number, string][] = [
-  ['Move', '#fa114f', 486, 620, 'KCAL'],
-  ['Exercise', '#a6f425', 41, 30, 'MIN'],
-  ['Stand', '#22e0f5', 9, 12, 'HRS']
+  ['Move', appAppearance.fitnessMove, 486, 620, 'KCAL'],
+  ['Exercise', appAppearance.fitnessExercise, 41, 30, 'MIN'],
+  ['Stand', appAppearance.fitnessStand, 9, 12, 'HRS']
 ]
 
 /**
@@ -105,7 +105,7 @@ const styles = stylex.create({
   arc: {
     transitionProperty: 'stroke-dashoffset',
     transitionDuration: '1.15s',
-    transitionTimingFunction: 'cubic-bezier(.2,.85,.3,1)'
+    transitionTimingFunction: easing.pop
   },
   tint: (c: string) => ({ color: c }),
   bars: {
@@ -119,20 +119,28 @@ const styles = stylex.create({
   bar: {
     flexGrow: 1,
     flexBasis: 0,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     backgroundColor: 'currentColor',
     transformOrigin: 'bottom',
     animationName: grow,
     animationDuration: '.75s',
     animationFillMode: 'backwards',
-    animationTimingFunction: 'cubic-bezier(.2,.9,.3,1)'
+    animationTimingFunction: easing.pop
   },
   barAt: (height: string, delayMs: number, opacity: number) => ({
     height,
     animationDelay: `${delayMs}ms`,
     opacity
   }),
-  barsX: { display: 'flex', gap: 7, paddingTop: 5, paddingInline: 4, fontSize: 10, color: colors.grey },
+  barsX: {
+    display: 'flex',
+    gap: 7,
+    paddingTop: 5,
+    paddingInline: 4,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    color: app.label2
+  },
   barLabel: { flexGrow: 1, flexBasis: 0, textAlign: 'center' }
 })
 
@@ -151,21 +159,40 @@ export const card = stylex.create({
   hcard: {
     marginInline: 0,
     marginBottom: 12,
-    borderRadius: 16,
+    borderRadius: radius.xl,
     paddingTop: 14,
     paddingRight: 14,
     paddingBottom: 14,
     paddingLeft: 14,
-    backgroundColor: colors.white,
-    boxShadow: '0 2px 10px rgba(0,0,0,.06)',
+    backgroundColor: app.surface,
+    boxShadow: shadow.card,
     animationName: rise,
     animationDuration: '.45s',
     animationFillMode: 'backwards'
   },
   /** Cards on the black Fitness surface. */
-  hcardDark: { backgroundColor: 'rgba(255,255,255,.08)' },
-  cap: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 },
+  hcardDark: { backgroundColor: app.fill3, boxShadow: 'none' },
+  cap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold
+  },
   capTint: (c: string) => ({ color: c }),
-  val: { fontSize: 27, fontWeight: 600, letterSpacing: -0.5 },
-  unit: { textDecorationLine: 'none', fontSize: 14, fontWeight: 500, opacity: 0.55, marginLeft: 3 }
+  val: {
+    fontSize: typeScale.title1,
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
+    fontWeight: weight.semibold
+  },
+  unit: {
+    textDecorationLine: 'none',
+    fontSize: typeScale.subheadline,
+    fontWeight: weight.medium,
+    opacity: 0.55,
+    marginLeft: 3
+  }
 })
