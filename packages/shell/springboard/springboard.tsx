@@ -19,13 +19,14 @@ import { addDisplay, type Display, device, lockState, unlockAll } from '../devic
 import { Sandbox } from '../runtime/sandbox.tsx'
 import { ControlCenter } from './control-center.tsx'
 import { settle, swipe } from './gestures.ts'
-import { type Drop, HomeBars } from './home-bar.tsx'
+import { type Drop, HomeBar, HomeBars } from './home-bar.tsx'
 import { HomeScreen } from './home-screen.tsx'
 import { LockScreen } from './lock-screen.tsx'
 import { BootScreen, PowerSheet } from './power.tsx'
 import { useScenes } from './scenes.ts'
 import { Spotlight } from './spotlight.tsx'
 import { StatusBar } from './status-bar.tsx'
+import { Switcher } from './switcher.tsx'
 import { Flash, Thumbs, TorchHud, useScreenshot, useVolumeHud, Veil, VolumeHud } from './system-hud.tsx'
 import { useWallpaper } from './wallpaper.ts'
 
@@ -43,9 +44,10 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   const pageNow = useRef(0)
 
   const ctl = useScenes({ w, hgt, shots, disp, pageRef: pageNow })
-  const { at, close, closeAll, launch, open, openFrom, scenes } = ctl
+  const { at, parkAll, launch, open, openFrom, scenes, split } = ctl
 
   const [drop, setDrop] = useState<Drop>(null)
+  const [switcher, setSwitcher] = useState(false)
   const [land, setLand] = useState(0)
   const [locked, setLocked] = useState(lockState.locked)
   const hasLock = useRef(lockState.locked)
@@ -89,7 +91,8 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
 
   function lock() {
     if (hasLock.current) return
-    closeAll()
+    setSwitcher(false)
+    parkAll()
     hasLock.current = true
     setLocked(true)
     setLockOn(true)
@@ -117,8 +120,8 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
     }, 2200)
   }
 
-  const cur = scenes.filter((e) => !e.leaving)
-  const away = cur.length === 2 || cur.some((e) => !e.side)
+  const cur = scenes.filter((e) => !e.leaving && !e.parked)
+  const away = switcher || cur.length === 2 || cur.some((e) => !e.side)
   // The status stack sits top-right, so the app under it decides its colour.
   const topRight = cur.find((e) => e.side !== 'left')
   const lit = !!topRight?.a.light
@@ -128,6 +131,29 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   const half = cur.filter((e) => e.side)
   const holder = half.length === 1 ? half[0] : half.length === 0 ? scenes.find((e) => e.leaving && e.side) : undefined
   const homeSide = holder ? (holder.side === 'left' ? 'right' : 'left') : undefined
+  // The divider is only there with an app on each side, and goes back to the
+  // middle once one leaves: the narrow home the other half shows is always half.
+  const two = half.length === 2
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setRatio writes a ref and a setter, never stale
+  useEffect(() => {
+    if (!two) ctl.setRatio(0.5)
+  }, [two])
+  const divide = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = disp.current!
+    const s = d.clientWidth / d.getBoundingClientRect().width
+    const from = ctl.splitRef.current
+    const x0 = e.clientX
+    const move = (m: PointerEvent) =>
+      ctl.setRatio(Math.min(0.7, Math.max(0.3, from + ((m.clientX - x0) * s) / d.clientWidth)))
+    const up = () => {
+      removeEventListener('pointermove', move)
+      removeEventListener('pointerup', up)
+      removeEventListener('pointercancel', up)
+    }
+    addEventListener('pointermove', move)
+    addEventListener('pointerup', up)
+    addEventListener('pointercancel', up)
+  }
 
   // ---------- Control Center ----------
 
@@ -177,7 +203,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
       power: () => setPoff(true),
       boot: powerOn
     }
-    const detach = addDisplay(d, { home: [closeAll, ccClose], lock, unlock })
+    const detach = addDisplay(d, { home: [() => setSwitcher(false), parkAll, ccClose], lock, unlock })
     const first = boot && byName(boot)
     if (first) open(first)
     return detach
@@ -209,7 +235,22 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
           onSearch={() => setSearching(true)}
         />
 
-        <HomeBars ctl={ctl} wide={wide} lockedRef={hasLock} reveal={reveal} off={cc} drop={drop} onDrop={setDrop} />
+        <HomeBars
+          ctl={ctl}
+          wide={wide}
+          lockedRef={hasLock}
+          reveal={reveal}
+          off={cc || switcher}
+          drop={drop}
+          onDrop={setDrop}
+          onSwitch={() => setSwitcher(true)}
+        />
+        {switcher && <Switcher ctl={ctl} onClose={() => setSwitcher(false)} />}
+        {/* Under the switcher's cards, the bar is the way back to the last app: a tap on it. */}
+        {switcher && <HomeBar onPointerDown={() => setSwitcher(false)} />}
+        {two && !switcher && (
+          <div data-divider {...stylex.props(styles.divider, styles.dividerAt(split * 100))} onPointerDown={divide} />
+        )}
 
         {lockOn && (
           <LockScreen
@@ -271,9 +312,10 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
               {...stylex.props(
                 styles.app,
                 !e.a.edge && styles.appPad,
-                e.side === 'left' && styles.appLeft,
-                e.side === 'right' && styles.appRight,
-                drop?.id === e.id && styles.appDrag,
+                e.side === 'left' && styles.appLeft(split * 100),
+                e.side === 'right' && styles.appRight(split * 100),
+                (drop?.id === e.id || switcher) && styles.appDrag,
+                e.parked && !switcher && styles.appParked,
                 e.a.light && light
               )}
             >
@@ -368,9 +410,35 @@ const styles = stylex.create({
     color: 'white',
     backgroundColor: colors.orange
   },
-  // Split at the hinge, as Apple's footage shows: no seam, the two just meet.
-  appLeft: { right: '50%' },
-  appRight: { left: '50%' },
+  // Split at the divider, the hinge by default, as Apple's footage shows: no seam, the two just meet.
+  appLeft: (pct: number) => ({ right: `${100 - pct}%` }),
+  appRight: (pct: number) => ({ left: `${pct}%` }),
+  // Off the glass but running, for the switcher to bring back.
+  appParked: { display: 'none' },
+  // The grab strip over the seam between two apps; the pill on it is the handle you see.
+  divider: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 18,
+    marginLeft: -9,
+    zIndex: 3,
+    cursor: 'col-resize',
+    touchAction: 'none',
+    '::after': {
+      content: '""',
+      position: 'absolute',
+      top: '50%',
+      left: 6,
+      width: 6,
+      height: 56,
+      marginTop: -28,
+      borderRadius: 3,
+      backgroundColor: 'rgba(255,255,255,.7)',
+      boxShadow: '0 0 0 1px rgba(0,0,0,.25)'
+    }
+  },
+  dividerAt: (pct: number) => ({ left: `${pct}%` }),
   // On a finger: over the other app and the halves offered, deaf to the pointer
   // so the drop lands, and a short ease so the card trails the hand instead of
   // snapping to each pointer event.

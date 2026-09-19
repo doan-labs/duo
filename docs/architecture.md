@@ -16,9 +16,10 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 | `os.tsx` | Create each display root and mount SpringBoard |
 | `springboard/springboard.tsx` | Layer stack and state that outlives individual layers |
 | `springboard/scenes.ts` | Per-display apps, split placement and mirrored scenes |
-| `springboard/gestures.ts`, `home-bar.tsx` | WAAPI scrubbing/zoom geometry, hold-to-split gesture and the lift that carries a held tile |
+| `springboard/gestures.ts`, `home-bar.tsx` | WAAPI scrubbing/zoom geometry, the hold-to-switch/split gesture and the lift that carries a held tile |
 | `springboard/grid.ts`, `wallpaper.ts` | Device-wide, persisted home order (apps and folders) and wallpaper; both displays and the bake read them |
 | `springboard/folder.tsx`, `wallpaper-sheet.tsx` | The open-folder layer and the wallpaper picker, mounted by the home screen |
+| `springboard/switcher.tsx` | App switcher: parked and on-glass scenes as scrollable live cards |
 | `springboard/control-center.tsx`, `toggles.ts`, `clock.ts` | Control UI, device-wide switches and minute clock |
 | `apps.ts` | Trusted baked registry and default positions |
 | `screen.ts`, `shaders/` | Baked shell textures, fold geometry and fixed-eye projection |
@@ -99,12 +100,15 @@ texture rebakes each minute. Sleep blacks both live and baked displays; powered-
 accepts only the held side button. Control Center drives volume, brightness veil, transport
 and power; most radio/focus switches are visual state only.
 
-Each display has its own SpringBoard/scenes. The inner display holds at most two apps;
-a free half shows narrow home. `follow()` mirrors the active display without launch zoom.
+Each display has its own SpringBoard/scenes. The inner display holds at most two apps
+on the glass, split at a draggable divider (`split` in scenes.ts; a free half shows narrow
+home at the middle). Going Home parks a scene: mounted, hidden, listed by the app
+switcher (`springboard/switcher.tsx`), which transforms the live app elements into cards. `follow()` mirrors the active display without launch zoom.
 The lead changes at 40°; the cover takes the first split app and the inner split collapses
 to it. `goHome()` closes both. Baked apps share module state but retain local component
 state; sandbox views share only SDK state. Gesture scrubbing uses `swipe()`/`settle()`;
-a 220 ms home-bar hold offers split drop zones.
+a 220 ms home-bar hold makes a card: released, it opens the switcher; dragged sideways, it
+offers the split drop zones.
 
 Both display roots attach to CSS3DRenderer's final camera container before apps mount.
 Reparenting would reload iframes. Ordinary folding must retain document/view identity;

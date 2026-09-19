@@ -6,21 +6,25 @@
 //
 // One bar per app, under it. Drag it up and the app shrinks toward its icon
 // under your finger, the home screen surfacing behind; let go early and it
-// springs back; pause and it becomes a card to drop on a half (grab()).
+// springs back; pause and it becomes a card: let go and the app switcher opens
+// around it, drag it sideways and the halves are offered to drop it on (grab()).
 
 import * as stylex from '@stylexjs/stylex'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { flushSync } from 'react-dom'
-import { type Box, type Side, zone, zoom } from './gestures.ts'
+import { type Box, type Side, zoom } from './gestures.ts'
 import type { Scene, Scenes } from './scenes.ts'
 
 export function HomeBar({
   side,
+  split = 0.5,
   light,
   off,
   onPointerDown
 }: {
   side?: Side
+  /** Where the divider sits, so a half's bar stays centred on its half. */
+  split?: number
   light?: boolean
   off?: boolean
   onPointerDown?: (e: ReactPointerEvent<HTMLDivElement>) => void
@@ -30,8 +34,7 @@ export function HomeBar({
       data-homebar=""
       {...stylex.props(
         styles.homebar,
-        side === 'left' && styles.homebarLeft,
-        side === 'right' && styles.homebarRight,
+        side && styles.homebarAt(side === 'left' ? split * 50 : 50 + split * 50),
         light && styles.homebarLight,
         off && styles.homebarOff
       )}
@@ -58,18 +61,21 @@ type Props = {
   off: boolean
   drop: Drop
   onDrop: (d: Drop) => void
+  /** The finger let the card go without choosing a half: the switcher takes over from where it is. */
+  onSwitch: () => void
 }
 
-export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Props) {
-  const { els, live, setList, panel, covered, close } = ctl
+export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSwitch }: Props) {
+  const { els, live, setList, panel, covered, park, box } = ctl
 
   /**
    * The home bar under an app. Swipe up and let go: the app shrinks back into
-   * its icon. Pause mid-swipe instead and it becomes a card on your finger,
-   * with the two halves of the display offered underneath: drop it on one to
-   * split the screen, on the half another app holds and the two trade places,
-   * over the hinge and it goes back where it was. Only the inner display is
-   * wide enough to split; the cover keeps swipe-to-close.
+   * its icon. Pause mid-swipe instead and it becomes a card on your finger.
+   * Let go there and the app switcher opens with it. Drag it sideways and the
+   * two halves of the display are offered underneath: drop it on one to split
+   * the screen, on the half another app holds and the two trade places, over
+   * the hinge and it goes back where it was. Only the inner display is wide
+   * enough to split; the cover's card only leads to the switcher.
    */
   function grab(down: PointerEvent, e: Scene) {
     const el = els.current.get(e.id)
@@ -80,7 +86,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
     // Pointer deltas are screen px; the panel is scaled in 3D.
     const s = d.clientWidth / d.getBoundingClientRect().width
     const [W, H] = panel()
-    const z = zone(e.side, W, H)
+    const z = box(e.side)
     const home = covered() ? reveal() : null
     home?.pause()
     let dx = 0
@@ -89,6 +95,8 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
     let v = 0
     let t = down.timeStamp
     let held = false
+    /** The card has moved sideways: the halves are on offer, not the switcher. */
+    let zoned = false
     let over: Side | null = null
     let timer = 0
     // How far up the card sits: with the hand, but never off the top of the glass.
@@ -105,11 +113,10 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
     const hold = () => {
       held = true
       sc = 0.4
-      over = pick()
       paint()
-      // The wallpaper is the backdrop for the halves, so the home screen goes.
+      // The wallpaper is the backdrop for the halves and the switcher, so the home screen goes.
       home?.reverse()
-      onDrop({ id: e.id, side: over })
+      onDrop({ id: e.id, side: null })
     }
     const move = (m: PointerEvent) => {
       const ny = (down.clientY - m.clientY) * s
@@ -118,7 +125,8 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
       dx = (m.clientX - down.clientX) * s
       dy = ny
       if (held) {
-        const now = pick()
+        if (wide && Math.abs(dx) > 40) zoned = true
+        const now = zoned ? pick() : null
         if (now !== over) {
           over = now
           onDrop({ id: e.id, side: over })
@@ -127,7 +135,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
         sc = Math.max(0.4, 1 - Math.max(0, dy) / (H * 0.5))
         if (home) home.currentTime = Math.min(1, Math.max(0, dy / 140)) * 420
         clearTimeout(timer)
-        if (wide && !lockedRef.current && dy > 60) timer = setTimeout(hold, 220)
+        if (!lockedRef.current && dy > 60) timer = setTimeout(hold, 220)
       }
       paint()
     }
@@ -136,6 +144,12 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
       removeEventListener('pointerup', up)
       removeEventListener('pointercancel', up)
       clearTimeout(timer)
+      // Let go as a card in hand: the switcher lays it out from where it is, so the transform stays.
+      if (held && !zoned) {
+        home?.cancel()
+        onDrop(null)
+        return onSwitch()
+      }
       const start: Keyframe = { transform: el.style.transform || 'none', borderRadius: el.style.borderRadius || '0px' }
       el.style.transform = ''
       el.style.borderRadius = ''
@@ -150,7 +164,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
       }
       // swipe()'s commit rule, a third of the way or a flick, plus a press that never moved: the Home tap.
       if (dy > 49 || v > 0.6 || Math.abs(dy) < 4 * s) {
-        return close(e.id, [zoom(el, e.from, true, z, start), ...(home ? [home] : [])])
+        return park(e.id, [zoom(el, e.from, true, z, start), ...(home ? [home] : [])])
       }
       const back = [
         el.animate([start, { transform: 'none', borderRadius: '0px' }], {
@@ -181,9 +195,8 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
    * display px; `home` is the home screen's reveal, scrubbed by the swipe.
    */
   function place(e: Scene, side: Side | undefined, card: Box, home: Animation | null) {
-    const [W, H] = panel()
-    const z = zone(e.side, W, H)
-    const z2 = zone(side, W, H)
+    const z = box(e.side)
+    const z2 = box(side)
     const other = live.current.find((x) => !x.leaving && x !== e && x.side === side)
     // Synchronous, so the element is in its new half before the frames below
     // pretend it is still the card.
@@ -230,11 +243,12 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop }: Pr
   return (
     <>
       {ctl.scenes
-        .filter((e) => !e.leaving)
+        .filter((e) => !e.leaving && !e.parked)
         .map((e) => (
           <HomeBar
             key={e.id}
             side={e.side}
+            split={ctl.split}
             light={e.a.light}
             off={off || !!drop}
             onPointerDown={(ev) => grab(ev.nativeEvent, e)}
@@ -283,8 +297,7 @@ const styles = stylex.create({
       opacity: { default: null, ':active': 0.45 }
     }
   },
-  homebarLeft: { left: '25%' },
-  homebarRight: { left: '75%' },
+  homebarAt: (pct: number) => ({ left: `${pct}%` }),
   homebarLight: { '::after': { backgroundColor: 'rgba(0,0,0,.6)' } },
   // Nothing to go home to while the home screen is what you are looking at.
   homebarOff: { opacity: 0, pointerEvents: 'none' },

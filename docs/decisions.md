@@ -1035,3 +1035,29 @@ disk is shrunk to 1600 px and kept as a JPEG data URL so it fits localStorage; a
 shot is a `blob:` URL that dies with the page, so it hangs until reload and is not
 restored. `screen.ts` reads `grid()` and `main.ts` rebakes on either store, so the fold
 shows what the finger left.
+
+## 70. Home parks an app, the switcher shows what is parked, and two halves share a divider
+
+Going Home closed the app: the scene left the list and its React tree went with it, so
+there was nothing to switch back to and no way to see what was running. iOS keeps the
+last apps alive behind the switcher, and the folding footage shows the switcher's cards
+and a split whose halves are not equal.
+
+A scene now has a `parked` state: off the glass, still mounted, `display: none`. Home,
+the home-bar swipe, an app's own `home()` and the lock all park; only the switcher's
+flick, one app replacing another (`swap`) and a mirror going away close. Opening a parked
+app brings the same instance back, so state survives a trip through Home and across the
+fold. Six stay parked, the oldest closes past that, and Camera closes rather than parks so
+no hidden app keeps the webcam.
+
+The switcher reuses the hold the split gesture already had: pausing mid-swipe still makes
+a card, and what happens next depends on the hand. Let go and every mounted scene lines up
+as a card, most recent in front; drag sideways first and the halves are offered as before,
+so the site's split cue plays unchanged. The cards are the app elements themselves,
+transformed, so a card is the live app and no snapshotting is needed. The cover display
+gets the switcher too, though it still cannot split.
+
+The seam between two halves is a divider, dragged between 30% and 70%. `zone()` takes the
+ratio, so the zoom, the drop card and the home bars follow it; it returns to the middle
+when a half empties, since the narrow home the other half shows is always half.
+
