@@ -61,4 +61,6 @@ export type SettingsHost = {
   /** Erase All Content and Settings: clears device storage and reloads the shell. */
   erase: () => Promise<void>
   openExternal: (url: string) => void
+  /** Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press. */
+  claimSide: (claim: () => boolean) => () => void
 }

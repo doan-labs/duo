@@ -1,6 +1,24 @@
 import { app, appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
+// The Flappy Duo deletion sheet copies the game's own Pay sheet, keyframes included;
+// StyleX only resolves keyframes defined in the file that uses them.
+const fadeIn = stylex.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
+const rise = stylex.keyframes({ from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } })
+const pulse = stylex.keyframes({ '0%': { opacity: 0.6 }, '50%': { opacity: 1 }, '100%': { opacity: 0.6 } })
+const breathe = stylex.keyframes({
+  '0%': { transform: 'scale(1)' },
+  '50%': { transform: 'scale(1.1)' },
+  '100%': { transform: 'scale(1)' }
+})
+const turn = stylex.keyframes({ from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } })
+const draw = stylex.keyframes({ from: { strokeDashoffset: 100 }, to: { strokeDashoffset: 0 } })
+const popIn = stylex.keyframes({
+  '0%': { transform: 'scale(.6)', opacity: 0 },
+  '60%': { transform: 'scale(1.08)', opacity: 1 },
+  '100%': { transform: 'scale(1)', opacity: 1 }
+})
+
 export const styles = stylex.create({
   /** The coloured square behind a row's glyph. */
   tint: (bg: string) => ({ backgroundColor: bg }),
@@ -103,5 +121,129 @@ export const styles = stylex.create({
   /** The version line under an app's name on its own page. */
   sub: { fontSize: appAppearance.settingsFontSize, color: app.label2 },
   stack: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
-  wrap: { whiteSpace: 'normal', overflowWrap: 'anywhere' }
+  wrap: { whiteSpace: 'normal', overflowWrap: 'anywhere' },
+
+  /** The deletion sheet Flappy Duo puts up: the game's own Pay sheet, pinned over the page. */
+  payDim: {
+    position: 'absolute',
+    insetInline: 0,
+    height: '100%',
+    zIndex: 6,
+    backgroundColor: 'rgba(0,0,0,.35)',
+    animationName: fadeIn,
+    animationDuration: '.3s'
+  },
+  payTop: (y: number) => ({ top: y }),
+  paySheet: {
+    position: 'absolute',
+    insetInline: 0,
+    bottom: 0,
+    marginInline: 'auto',
+    maxWidth: 420,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    paddingBlock: 14,
+    paddingInline: 18,
+    paddingBottom: 22,
+    borderStartStartRadius: 24,
+    borderStartEndRadius: 24,
+    backgroundColor: 'rgba(255,255,255,.96)',
+    color: '#0b1a3a',
+    fontSize: 13,
+    boxShadow: '0 -12px 40px rgba(0,0,0,.25)',
+    animationName: rise,
+    animationDuration: '.42s',
+    animationTimingFunction: 'cubic-bezier(.18,.9,.22,1.02)'
+  },
+  payHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4 },
+  payMark: { fontSize: 17, fontWeight: 600, letterSpacing: -0.3 },
+  payCancel: { color: colors.blueBright, fontSize: 15, cursor: 'pointer' },
+  payCardRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    paddingBlock: 10,
+    borderBottomWidth: 1,
+    borderBottomStyle: 'solid',
+    borderBottomColor: 'rgba(60,60,67,.18)'
+  },
+  payCard: {
+    flexShrink: 0,
+    width: 36,
+    height: 24,
+    borderRadius: 4,
+    backgroundImage:
+      'linear-gradient(115deg, rgba(255,140,200,.35), rgba(140,200,255,.35) 45%, rgba(255,230,140,.35) 80%), linear-gradient(135deg, #ffffff, #dcdce1 60%, #f2f2f5)',
+    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.12)'
+  },
+  payCardText: { flex: 1, display: 'flex', flexDirection: 'column', fontSize: 12, lineHeight: 1.2 },
+  payChev: { color: '#c7c7cc', fontSize: 22, lineHeight: 1 },
+  payRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    paddingBlock: 9,
+    paddingLeft: 48,
+    borderBottomWidth: 1,
+    borderBottomStyle: 'solid',
+    borderBottomColor: 'rgba(60,60,67,.18)'
+  },
+  payLast: { borderBottomWidth: 0 },
+  payKey: { color: '#8a8a8e', fontSize: 11, fontWeight: 500, letterSpacing: 0.4, textTransform: 'uppercase' },
+  payValue: { fontSize: 12, fontWeight: 500 },
+  payFace: {
+    marginTop: 6,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    color: '#0b1a3a',
+    cursor: 'pointer',
+    width: '100%'
+  },
+  payLabel: { fontSize: 13, fontWeight: 500 },
+  payHint: {
+    marginTop: 2,
+    fontSize: 11,
+    color: '#8a8a8e',
+    animationName: pulse,
+    animationDuration: '1.2s',
+    animationIterationCount: 'infinite'
+  },
+  payStill: { animationName: 'none' },
+  payGlyph: {
+    animationName: breathe,
+    animationDuration: '1.6s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out'
+  },
+  paySpin: {
+    animationName: turn,
+    animationDuration: '.9s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'linear'
+  },
+  payPop: {
+    animationName: popIn,
+    animationDuration: '.45s',
+    animationTimingFunction: 'cubic-bezier(.2,.9,.3,1.3)',
+    animationFillMode: 'both'
+  },
+  payRing: {
+    strokeDasharray: 100,
+    animationName: draw,
+    animationDuration: '.55s',
+    animationTimingFunction: 'ease-out',
+    animationFillMode: 'both'
+  },
+  payTick: {
+    strokeDasharray: 100,
+    animationName: draw,
+    animationDuration: '.35s',
+    animationDelay: '.4s',
+    animationTimingFunction: 'ease-out',
+    animationFillMode: 'both'
+  }
 })

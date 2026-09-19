@@ -35,6 +35,7 @@ import { YouTube } from '@doan-labs/duo-app-youtube/index.tsx'
 import type { SettingsHost } from '@doan-labs/duo-sdk'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { createElement } from 'react'
+import { claimSide } from './device.ts'
 import { openExternal } from './native.ts'
 import { erase } from './runtime/erase.ts'
 import { BATTERY, flip, NETWORK, subscribeToggles, toggles, togglesRevision } from './springboard/toggles.ts'
@@ -52,7 +53,8 @@ const SETTINGS_HOST: SettingsHost = {
   network: NETWORK,
   battery: BATTERY,
   erase,
-  openExternal
+  openExternal,
+  claimSide
 }
 /** The apps inside Utilities, Apple's one shipped folder: Spotlight finds them, the grid does not. */
 const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books', 'YouTube']
