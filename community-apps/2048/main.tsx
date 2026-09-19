@@ -2,11 +2,12 @@ import { os } from '@doan-labs/duo-sdk'
 import { useDisplay } from '@doan-labs/duo-uikit'
 import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 type Direction = 'left' | 'right' | 'up' | 'down'
 type GameStatus = 'playing' | 'won' | 'over'
+type ViewDimensions = { display: 'inner' | 'cover'; width: number; height: number }
 
 const SIZE = 4
 const CELL_COUNT = SIZE * SIZE
@@ -83,13 +84,27 @@ function hasMoves(board: number[]) {
   return false
 }
 
-function Board({ board, onMove }: { board: number[]; onMove: (direction: Direction) => void }) {
+function fitLayout(view: ViewDimensions, headerHeight: number) {
+  const cover = view.display === 'cover'
+  const padding = cover ? 10 : 14
+  const gap = cover ? 6 : 8
+  const control = 32
+  const fixedHeight = padding * 2 + headerHeight + 22 + control * 2 + 6 + 36 + gap * 4
+  const width = view.width || 740
+  const height = view.height || 480
+  return {
+    board: Math.max(0, Math.floor(Math.min(width - padding * 2, height - fixedHeight))),
+    control
+  }
+}
+
+function Board({ board, size, onMove }: { board: number[]; size: number; onMove: (direction: Direction) => void }) {
   const touchStart = useRef<{ x: number; y: number } | null>(null)
   return (
     <div
       aria-label="2048 board"
       role="grid"
-      {...stylex.props(styles.board)}
+      {...stylex.props(styles.board, styles.fitBoard(size))}
       onTouchStart={(event) => {
         const touch = event.touches[0]
         if (touch) touchStart.current = { x: touch.clientX, y: touch.clientY }
@@ -105,16 +120,21 @@ function Board({ board, onMove }: { board: number[]; onMove: (direction: Directi
         onMove(Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : y > 0 ? 'down' : 'up')
       }}
     >
-      {board.map((value, index) => (
-        <div
-          key={index}
-          aria-label={value ? `${value} tile` : 'Empty tile'}
-          role="gridcell"
-          {...stylex.props(styles.tile, tileStyle(value), value >= 1000 && styles.compact)}
-        >
-          {value || ''}
-        </div>
-      ))}
+      {board.map((value, index) => {
+        const row = Math.floor(index / SIZE)
+        const column = index % SIZE
+        return (
+          <div
+            key={`${row}-${column}`}
+            aria-label={value ? `${value} tile` : 'Empty tile'}
+            role="gridcell"
+            tabIndex={-1}
+            {...stylex.props(styles.tile, tileStyle(value), value >= 1000 && styles.compact)}
+          >
+            {value || ''}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -126,21 +146,25 @@ function Game() {
   const [best, setBest] = useState(0)
   const [status, setStatus] = useState<GameStatus>('playing')
   const cover = view.display === 'cover'
+  const fit = fitLayout(view, 48)
 
-  const handleMove = (direction: Direction) => {
-    if (status === 'over') return
-    const result = move(board, direction)
-    if (!result.moved) {
-      if (!hasMoves(board)) setStatus('over')
-      return
-    }
-    const nextScore = score + result.score
-    setBoard(result.board)
-    setScore(nextScore)
-    setBest((current) => Math.max(current, nextScore))
-    if (result.board.includes(2048)) setStatus('won')
-    else if (!hasMoves(result.board)) setStatus('over')
-  }
+  const handleMove = useCallback(
+    (direction: Direction) => {
+      if (status === 'over') return
+      const result = move(board, direction)
+      if (!result.moved) {
+        if (!hasMoves(board)) setStatus('over')
+        return
+      }
+      const nextScore = score + result.score
+      setBoard(result.board)
+      setScore(nextScore)
+      setBest((current) => Math.max(current, nextScore))
+      if (result.board.includes(2048)) setStatus('won')
+      else if (!hasMoves(result.board)) setStatus('over')
+    },
+    [board, score, status]
+  )
 
   const reset = () => {
     setBoard(newGame())
@@ -167,7 +191,7 @@ function Game() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [board, score, status])
+  }, [handleMove])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -192,18 +216,38 @@ function Game() {
         </div>
       </header>
       <p {...stylex.props(styles.hint)}>{cover ? 'Swipe or tap the arrows' : 'Swipe, tap, or use your keyboard'}</p>
-      <Board board={board} onMove={handleMove} />
-      <div {...stylex.props(styles.controls)} aria-label="Move controls">
-        <button type="button" aria-label="Move up" onClick={() => handleMove('up')} {...stylex.props(styles.arrow, styles.up)}>
+      <Board board={board} size={fit.board} onMove={handleMove} />
+      <div role="group" {...stylex.props(styles.controls, styles.fitControls(fit.control))} aria-label="Move controls">
+        <button
+          type="button"
+          aria-label="Move up"
+          onClick={() => handleMove('up')}
+          {...stylex.props(styles.arrow, styles.fitArrow(fit.control), styles.up)}
+        >
           ↑
         </button>
-        <button type="button" aria-label="Move left" onClick={() => handleMove('left')} {...stylex.props(styles.arrow)}>
+        <button
+          type="button"
+          aria-label="Move left"
+          onClick={() => handleMove('left')}
+          {...stylex.props(styles.arrow, styles.fitArrow(fit.control))}
+        >
           ←
         </button>
-        <button type="button" aria-label="Move down" onClick={() => handleMove('down')} {...stylex.props(styles.arrow)}>
+        <button
+          type="button"
+          aria-label="Move down"
+          onClick={() => handleMove('down')}
+          {...stylex.props(styles.arrow, styles.fitArrow(fit.control))}
+        >
           ↓
         </button>
-        <button type="button" aria-label="Move right" onClick={() => handleMove('right')} {...stylex.props(styles.arrow)}>
+        <button
+          type="button"
+          aria-label="Move right"
+          onClick={() => handleMove('right')}
+          {...stylex.props(styles.arrow, styles.fitArrow(fit.control))}
+        >
           →
         </button>
       </div>
@@ -213,7 +257,11 @@ function Game() {
       {status !== 'playing' && (
         <section {...stylex.props(styles.message)}>
           <strong>{status === 'won' ? 'You made 2048!' : 'No more moves'}</strong>
-          <button type="button" onClick={status === 'won' ? () => setStatus('playing') : reset} {...stylex.props(styles.continue)}>
+          <button
+            type="button"
+            onClick={status === 'won' ? () => setStatus('playing') : reset}
+            {...stylex.props(styles.continue)}
+          >
             {status === 'won' ? 'Keep going' : 'Try again'}
           </button>
         </section>
@@ -226,19 +274,20 @@ const styles = stylex.create({
   root: {
     position: 'absolute',
     inset: 0,
-    overflowY: 'auto',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
-    paddingBlock: 22,
-    paddingInline: 22,
+    gap: 8,
+    paddingBlock: 14,
+    paddingInline: 14,
     color: colors.white,
     backgroundColor: colors.darkElevated,
     fontFamily: fonts.system,
     fontSize: 14
   },
-  cover: { paddingBlock: 14, paddingInline: 16, gap: 8 },
-  header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 },
+  cover: { paddingBlock: 10, paddingInline: 10, gap: 6 },
+  header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexShrink: 0 },
   kicker: { color: colors.orange, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
   title: { marginBlock: 0, fontSize: 42, lineHeight: 0.95, fontWeight: 800, letterSpacing: -2 },
   scores: { display: 'flex', gap: 6 },
@@ -253,17 +302,21 @@ const styles = stylex.create({
     fontSize: 8,
     letterSpacing: 1
   },
-  hint: { marginBlock: 0, color: colors.grey3, fontSize: 12 },
+  hint: { marginBlock: 0, color: colors.grey3, fontSize: 12, flexShrink: 0 },
   board: {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gridTemplateRows: 'repeat(4, minmax(0, 1fr))',
     gap: 6,
     paddingBlock: 7,
     paddingInline: 7,
     borderRadius: 14,
     backgroundColor: colors.fillDark,
-    touchAction: 'none'
+    touchAction: 'none',
+    overflow: 'hidden',
+    flexShrink: 0
   },
+  fitBoard: (size: number) => ({ width: `${size}px`, height: `${size}px`, alignSelf: 'center' }),
   tile: {
     display: 'flex',
     alignItems: 'center',
@@ -273,7 +326,11 @@ const styles = stylex.create({
     color: colors.white,
     fontSize: 26,
     fontWeight: 800,
-    lineHeight: 1
+    lineHeight: 1,
+    width: '100%',
+    height: '100%',
+    minWidth: 0,
+    minHeight: 0
   },
   compact: { fontSize: 18 },
   tileEmpty: { backgroundColor: colors.fillThin },
@@ -288,7 +345,11 @@ const styles = stylex.create({
   tile512: { backgroundColor: colors.teal },
   tile1024: { backgroundColor: colors.green },
   tile2048: { backgroundColor: colors.yellow, color: colors.darkElevated },
-  controls: { display: 'grid', gridTemplateColumns: 'repeat(3, 44px)', gridTemplateRows: 'repeat(2, 44px)', justifyContent: 'center', gap: 6 },
+  controls: { display: 'grid', justifyContent: 'center', gap: 6, flexShrink: 0 },
+  fitControls: (size: number) => ({
+    gridTemplateColumns: `repeat(3, ${size}px)`,
+    gridTemplateRows: `repeat(2, ${size}px)`
+  }),
   arrow: {
     borderWidth: 0,
     borderRadius: 12,
@@ -297,8 +358,11 @@ const styles = stylex.create({
     fontSize: 23,
     cursor: 'pointer',
     touchAction: 'manipulation',
+    paddingBlock: 0,
+    paddingInline: 0,
     gridRow: 2
   },
+  fitArrow: (size: number) => ({ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(16, size * 0.6)}px` }),
   up: { gridColumn: 2, gridRow: 1 },
   newGame: {
     alignSelf: 'center',
@@ -310,9 +374,14 @@ const styles = stylex.create({
     backgroundColor: colors.orange,
     fontSize: 13,
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    flexShrink: 0
   },
   message: {
+    position: 'absolute',
+    insetInline: 12,
+    bottom: 12,
+    zIndex: 2,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -323,7 +392,16 @@ const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.fillDark
   },
-  continue: { borderWidth: 0, borderRadius: 999, paddingBlock: 6, paddingInline: 10, color: colors.darkElevated, backgroundColor: colors.yellow, fontWeight: 700, cursor: 'pointer' }
+  continue: {
+    borderWidth: 0,
+    borderRadius: 999,
+    paddingBlock: 6,
+    paddingInline: 10,
+    color: colors.darkElevated,
+    backgroundColor: colors.yellow,
+    fontWeight: 700,
+    cursor: 'pointer'
+  }
 })
 
 const TILE_STYLES = {
