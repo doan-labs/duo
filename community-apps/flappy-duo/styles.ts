@@ -4,10 +4,6 @@ import * as stylex from '@stylexjs/stylex'
 const pulse = stylex.keyframes({ '0%': { opacity: 0.6 }, '50%': { opacity: 1 }, '100%': { opacity: 0.6 } })
 const rise = stylex.keyframes({ from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } })
 const drop = stylex.keyframes({ from: { transform: 'translateY(-140%)' }, to: { transform: 'translateY(0)' } })
-const glow = stylex.keyframes({
-  '0%': { boxShadow: '0 0 0 0 rgba(255,255,255,.9)' },
-  '100%': { boxShadow: '0 0 0 14px rgba(255,255,255,0)' }
-})
 
 export const styles = stylex.create({
   root: {
@@ -256,21 +252,6 @@ export const styles = stylex.create({
     backgroundColor: '#1f8f4e',
     color: colors.white,
     fontSize: 24
-  },
-  sideButton: {
-    position: 'absolute',
-    right: 0,
-    top: '8%',
-    width: 18,
-    height: '27%',
-    borderWidth: 0,
-    borderStartStartRadius: 10,
-    borderEndStartRadius: 10,
-    backgroundImage: 'linear-gradient(90deg, #4a4b55, #1d1e26)',
-    cursor: 'pointer',
-    animationName: glow,
-    animationDuration: '1.1s',
-    animationIterationCount: 'infinite'
   },
   // ---- the notification after paying ----
   notice: {

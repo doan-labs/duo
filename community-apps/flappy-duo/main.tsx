@@ -27,7 +27,6 @@ function Game() {
   const view = useDisplay()
   const canvas = useRef<HTMLCanvasElement>(null)
   const world = useRef(newWorld())
-  const lastPress = useRef(0)
   const [status, setStatus] = useState<Status>('ready')
   const [score, setScore] = useState(0)
   const [folds, setFolds] = useState(0)
@@ -37,6 +36,7 @@ function Game() {
   const [toast, setToast] = useState('')
   const [roast, setRoast] = useState('')
   const [pay, setPay] = useState<'sheet' | 'done' | null>(null)
+  const onPay = useRef(() => {})
   const [notice, setNotice] = useState<Notice | null>(null)
   const [startLine] = useState(() => pick(START_LINES))
   const cover = view.display === 'cover'
@@ -103,15 +103,18 @@ function Game() {
     }, 900)
   }
 
-  // Two presses within 450ms on the side button, like the real thing.
-  const sidePress = () => {
+  onPay.current = confirmPay
+
+  // The frame's side button: claim its double-click while the sheet is up, else Wallet gets it.
+  useEffect(() => {
     if (pay !== 'sheet') return
-    const now = performance.now()
-    if (now - lastPress.current < 450) {
-      lastPress.current = 0
-      confirmPay()
-    } else lastPress.current = now
-  }
+    void os.sideButton.claim()
+    const off = os.sideButton.onDouble(() => onPay.current())
+    return () => {
+      off()
+      void os.sideButton.release()
+    }
+  }, [pay])
 
   useEffect(() => {
     const el = canvas.current!
@@ -314,7 +317,7 @@ function Game() {
                 <span {...stylex.props(styles.faceLabel)}>Done</span>
               </div>
             ) : (
-              <button type="button" onPointerDown={sidePress} {...stylex.props(styles.faceId)}>
+              <div {...stylex.props(styles.faceId)}>
                 <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
                   <g fill="none" stroke="#0a84ff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6 22V12a6 6 0 0 1 6-6h10M42 6h10a6 6 0 0 1 6 6v10M58 42v10a6 6 0 0 1-6 6H42M22 58H12a6 6 0 0 1-6-6V42" />
@@ -324,17 +327,9 @@ function Game() {
                 </svg>
                 <span {...stylex.props(styles.faceLabel)}>Face ID</span>
                 <span {...stylex.props(styles.sideHint)}>Double-press side button to pay ››</span>
-              </button>
+              </div>
             )}
           </section>
-          {pay === 'sheet' && (
-            <button
-              type="button"
-              aria-label="Side button"
-              onPointerDown={sidePress}
-              {...stylex.props(styles.sideButton)}
-            />
-          )}
         </>
       )}
       {notice && (
