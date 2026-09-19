@@ -1005,3 +1005,33 @@ or names a cover with no file behind it.
 
 Music drops `mock`. The screen is no longer invented data. Podcasts keeps its invented
 shows and episode titles and so keeps the pill; only the audio underneath it is shared.
+
+
+## 69. The home grid is arranged by hand and remembered, and the wallpaper with it
+
+The home screen showed `apps.ts` in its written order and the dune wallpaper, and
+Utilities was a fake app whose view drew a grid of icons. Two of the oldest iOS
+gestures were missing: hold an icon and drop it on another to make a folder, and hold
+the paper to change it.
+
+`grid.ts` keeps the order the finger made, per half, as app keys and folders, in
+localStorage under `os.home`. It is resolved against the registry on every read, so an
+app installed or removed since the order was saved still lands or leaves, and a folder
+left with one app dissolves into it. `apps.ts` stays the truth about what exists and
+where it ships; a factory entry with `folder` is a folder the first time, which is what
+Utilities is now. Its package is gone: a folder is grid data, not an app, and Spotlight
+skips it.
+
+There is no edit mode and no reorder. A hold lifts the one tile; a drop on a cell stacks,
+a drop anywhere else springs back, and the rest of the grid jiggles only while a tile is
+up. Reordering would need cells to make room as the finger passes, which is a second
+gesture with its own ceiling, and nothing here needs it yet. Inside an open folder the
+same hold carries a tile out: let go outside the well and it sits down after the folder.
+
+The wallpaper is one string in `wallpaper.ts`, under `os.wallpaper`, for both displays
+and for the bake. The alternatives are SVG gradients as data URLs, so the same string
+is a CSS background and decodes into the canvas; nothing new ships. A picture off the
+disk is shrunk to 1600 px and kept as a JPEG data URL so it fits localStorage; a Camera
+shot is a `blob:` URL that dies with the page, so it hangs until reload and is not
+restored. `screen.ts` reads `grid()` and `main.ts` rebakes on either store, so the fold
+shows what the finger left.

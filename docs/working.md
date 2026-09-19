@@ -51,6 +51,8 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | `L`, `C`, `↑`/`↓` | Side, Camera Control, volume buttons |
 | Control Center | Pull down from the top 26 px; home-bar swipe, scrim, Esc or Home dismisses |
 | Split (inner display) | Swipe home bar up, hold ≥220 ms, drop on a half; occupied halves swap, hinge drop cancels |
+| Folder | Hold an icon 0.5 s, carry it onto another icon or folder, let go; elsewhere it springs back. Tap a folder to open it, tap its name to rename; hold an icon inside and let go outside the well to take it out. A folder down to one app dissolves |
+| Wallpaper | Hold the paper itself 0.5 s; tap a swatch (dune, gradients, Camera shots, `+` for a picture off the disk), tap outside to close |
 | Reset / minimap | Return yaw and camera to the default view |
 
 The active display changes at 40°. Ordinary folding keeps the existing views; split
@@ -115,6 +117,10 @@ area; Notes' palette clears it by 26 px. OS layers stay at z-index ≤10 beneath
 ramp at 11. `getBoundingClientRect()` is screen space; use `spot()`'s offset chain for
 panel coordinates, including home-page transforms. Chromium can lose rounded image clips
 inside CSS3D; existing widgets use text/gradients.
+
+The grid order and the wallpaper persist in localStorage (`os.home`, `os.wallpaper`); clear
+them for a factory home. `screen.ts` bakes from the same `grid()` snapshot the live home
+renders, so a change to either must keep the two reading the same data.
 
 ## Notes maintenance
 

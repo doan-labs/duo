@@ -42,7 +42,9 @@ export function Spotlight({ onPick, onClose }: { onPick: (a: App) => void; onClo
     setTimeout(onClose, 280)
   }
   const s = q.trim().toLowerCase()
-  const list = (s ? APPS.filter((a) => a.name.toLowerCase().includes(s)) : APPS).slice(0, 12)
+  // Apps only: a folder is a place on the grid, not something to open from here.
+  const apps = APPS.filter((a) => !a.folder)
+  const list = (s ? apps.filter((a) => a.name.toLowerCase().includes(s)) : apps).slice(0, 12)
   return (
     <div {...stylex.props(styles.spot, on && styles.spotOn)} onClick={(e) => e.target === e.currentTarget && shut()}>
       <div {...stylex.props(styles.fld, on && styles.fldOn)}>

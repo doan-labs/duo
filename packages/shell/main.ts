@@ -1,4 +1,4 @@
-import { loadIcons, WALLPAPER } from '@doan-labs/duo-uikit/icons/index.ts'
+import { loadIcons, loadImage, WALL_KEY } from '@doan-labs/duo-uikit/icons/index.ts'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
@@ -13,12 +13,13 @@ import { isDesktop } from './native.ts'
 import { os } from './os.tsx'
 import { startBuilderPreview } from './runtime/builder-preview.ts'
 import { updateDisplays } from './runtime/display.ts'
-import { subscribeRegistry } from './runtime/registry.ts'
 import { subscribeWidgets, widgetSnapshot } from './runtime/widgets.tsx'
 import { screen } from './screen.ts'
 import foldGlsl from './shaders/fold.ts'
 import screenGlsl from './shaders/screen.ts'
+import { subscribeGrid } from './springboard/grid.ts'
 import { toggles } from './springboard/toggles.ts'
+import { subscribeWallpaper, wallpaper } from './springboard/wallpaper.ts'
 
 // Units are centimetres: Apple's USDZ is in metres and gets scaled by 100, then
 // dropped by 5.8974 so the hinge sits at the origin. The body is Apple's own
@@ -141,7 +142,7 @@ phone.add(body)
 const bend = { value: 0 }
 
 // Screen textures, baked by packages/shell/screen.ts (metres in, canvas out).
-const icons = await loadIcons()
+const icons = await loadIcons(wallpaper())
 function screenMaterial(tex: THREE.Texture, frame: THREE.Vector4, gradient: [number, number]) {
   const img = tex.image as HTMLCanvasElement
   return {
@@ -161,23 +162,31 @@ const bake = (lock: boolean) => {
   return t
 }
 let home = bake(false)
+let lockshot = bake(true)
+/** Draws the home screen again; the textures it replaces go, GPU copies and all. */
+const rebake = () => {
+  const previous = home
+  home = bake(false)
+  previous.inner.dispose()
+  previous.outer.dispose()
+}
 let weatherSnapshot = JSON.stringify(widgetSnapshot())
 subscribeWidgets(() => {
   const next = JSON.stringify(widgetSnapshot())
   if (next === weatherSnapshot) return
   weatherSnapshot = next
-  const previous = home
-  home = bake(false)
-  previous.inner.dispose()
-  previous.outer.dispose()
+  rebake()
 })
-subscribeRegistry(() => {
-  const previous = home
-  home = bake(false)
-  previous.inner.dispose()
-  previous.outer.dispose()
+// The grid follows the registry as well as the finger, so one subscription covers both.
+subscribeGrid(rebake)
+// A new wallpaper is under everything, the lock screen included.
+subscribeWallpaper(async () => {
+  icons[WALL_KEY] = await loadImage(wallpaper())
+  rebake()
+  lockshot.inner.dispose()
+  lockshot.outer.dispose()
+  lockshot = bake(true)
 })
-let lockshot = bake(true)
 const screens = {
   inner: screenMaterial(home.inner, INNER, [0.5, 0]),
   outer: screenMaterial(home.outer, OUTER, [0, 1])
@@ -356,7 +365,7 @@ lockState.locked = !new URLSearchParams(location.search).get('app')
 function live(w: number, h: number) {
   // Pre-attach hidden roots to the renderer's camera layer: moving a live iframe reloads its document.
   const container = css.domElement.firstElementChild!.firstElementChild as HTMLElement
-  const o = new CSS3DObject(os(w, h, WALLPAPER, container, new URLSearchParams(location.search).get('app')))
+  const o = new CSS3DObject(os(w, h, container, new URLSearchParams(location.search).get('app')))
   o.scale.setScalar(PXCM)
   return o
 }

@@ -27,13 +27,15 @@ import { useScenes } from './scenes.ts'
 import { Spotlight } from './spotlight.tsx'
 import { StatusBar } from './status-bar.tsx'
 import { Flash, Thumbs, TorchHud, useScreenshot, useVolumeHud, Veil, VolumeHud } from './system-hud.tsx'
+import { useWallpaper } from './wallpaper.ts'
 
-export type SpringBoardProps = { w: number; hgt: number; wall: string; boot?: string | null; shots: string[] }
+export type SpringBoardProps = { w: number; hgt: number; boot?: string | null; shots: string[] }
 
-export function SpringBoard({ w, hgt, wall, boot, shots }: SpringBoardProps) {
+export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   // Folded, the cover display shows the left half of both the grid and the
   // wallpaper, so the picture does not jump when the hinge closes.
   const wide = w > 600
+  const wall = useWallpaper()
   const disp = useRef<HTMLDivElement>(null)
   const shell = useRef<HTMLDivElement>(null)
   const lockEl = useRef<HTMLDivElement>(null)
@@ -316,7 +318,7 @@ const styles = stylex.create({
     transitionDuration: '.22s'
   },
   wall: (url: string) => ({
-    backgroundImage: `linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.04) 40%,rgba(0,0,0,.36)),url(${url})`
+    backgroundImage: `linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,.04) 40%,rgba(0,0,0,.36)),url("${url}")`
   }),
   dispWide: { backgroundPosition: 'center, center', borderRadius: 42.5 },
   dispNarrow: {

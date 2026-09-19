@@ -410,16 +410,18 @@ export const SYM = {
 /** The wallpaper rides along under this key: screen.ts needs it decoded too. */
 export const WALL_KEY = '@wallpaper'
 
-/** Decoded app icons, for painting the baked display textures. */
-export function loadIcons() {
-  const one = ([name, src]: [string, string]) =>
-    new Promise<[string, HTMLImageElement]>((done) => {
-      const img = new Image()
-      img.onload = img.onerror = () => done([name, img])
-      img.src = src
-    })
-  const all = { ...ICONS, [WALL_KEY]: WALLPAPER }
-  return Promise.all(Object.entries(all).map(one)).then(
+/** Decodes one image; a URL that fails still resolves, to an element with no width. */
+export const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((done) => {
+    const img = new Image()
+    img.onload = img.onerror = () => done(img)
+    img.src = src
+  })
+
+/** Decoded app icons, for painting the baked display textures, with `wall` under WALL_KEY. */
+export function loadIcons(wall = WALLPAPER) {
+  const all = { ...ICONS, [WALL_KEY]: wall }
+  return Promise.all(Object.entries(all).map(async ([name, src]) => [name, await loadImage(src)] as const)).then(
     (got) => Object.fromEntries(got) as Record<string, HTMLImageElement>
   )
 }

@@ -29,7 +29,6 @@ import { Siri } from '@doan-labs/duo-app-siri/index.tsx'
 import { Stocks } from '@doan-labs/duo-app-stocks/index.tsx'
 import { Tips } from '@doan-labs/duo-app-tips/index.tsx'
 import { Tv } from '@doan-labs/duo-app-tv/index.tsx'
-import { IN_FOLDER, Utilities } from '@doan-labs/duo-app-utilities/index.tsx'
 import { Wallet } from '@doan-labs/duo-app-wallet/index.tsx'
 import { Watch } from '@doan-labs/duo-app-watch/index.tsx'
 import { YouTube } from '@doan-labs/duo-app-youtube/index.tsx'
@@ -40,6 +39,8 @@ import { openExternal } from './native.ts'
 // An entry with an `id` is an isolated release from the preinstalled catalog: it holds the
 // slot, and runtime/registry.ts fills in its icon once the release is installed.
 const RELEASE = { view: () => null }
+/** The apps inside Utilities, Apple's one shipped folder: Spotlight finds them, the grid does not. */
+const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books', 'YouTube']
 
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
@@ -70,7 +71,8 @@ export const RIGHT: App[] = [
   { name: 'Reminders', id: 'labs.doan.ipduo.reminders', light: true, ...RELEASE },
   { name: 'Files', mock: true, light: true, view: Files },
   { name: 'Preview', mock: true, light: true, view: Preview },
-  { name: 'Utilities', view: Utilities, folder: IN_FOLDER },
+  // A folder opens on the home screen, never as a scene; springboard/grid.ts reads what it holds.
+  { name: 'Utilities', folder: UTILITIES, view: () => null },
   { name: 'Contacts', mock: true, light: true, view: Contacts },
   { name: 'iTunes Store', mock: true, light: true, view: Itunes },
   { name: 'Freeform', id: 'labs.doan.ipduo.freeform', light: true, ...RELEASE },
