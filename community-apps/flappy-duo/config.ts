@@ -76,15 +76,15 @@ export const HAZARDS: [number, number, Hazard, string][] = [
   [2, 3, 'notify', 'Notification settings restored from backup.'],
   [3, 1, 'slam', 'Recall notice. Slabs may close without prior notice.'],
   [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
-  [4, 1, 'throw', 'Accessories are sold separately and shipped directly.']
+  [3, 1, 'throw', 'Accessories are sold separately and shipped directly.']
 ]
-// Only purchases 2 to 4 are acknowledged.
+// The first three purchases are acknowledged; the notice lands as the next game opens.
 const RECEIPTS = [
   { title: 'Tim Cook', text: 'Thank you for your contribution.' },
   { title: 'John Ternus', text: 'We appreciate your continued support.' },
   { title: 'Apple', text: 'We just upgraded your iCloud to Pro for free. No worry.' }
 ]
-export const receiptFor = (run: number): { title: string; text: string } | null => RECEIPTS[run - 2] ?? null
+export const receiptFor = (run: number): { title: string; text: string } | null => RECEIPTS[run - 1] ?? null
 export const MISSILE_LABELS = ['DONGLE', 'USB-C', 'CHARGER', 'PENCIL', 'AIRTAG']
 export const NOTICES: [string, string][] = [
   ['Storage Almost Full', 'You can manage storage in Settings. Most owners do not.'],
