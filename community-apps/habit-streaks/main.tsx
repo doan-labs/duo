@@ -7,6 +7,12 @@ import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 
 type Habit = { id: string; name: string; detail: string; dates: string[] }
+const motion = '@media (prefers-reduced-motion: reduce)'
+const checkPop = stylex.keyframes({
+  from: { opacity: 0, transform: 'scale(.72)' },
+  '70%': { opacity: 1, transform: 'scale(1.08)' },
+  to: { opacity: 1, transform: 'scale(1)' }
+})
 
 const DEFAULT_HABITS: Habit[] = [
   { id: 'move', name: 'Move 10 minutes', detail: 'A short walk or stretch', dates: [] },
@@ -152,7 +158,11 @@ const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.fillThin,
     textAlign: 'start',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.16s, .2s',
+    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    transform: { default: 'scale(1)', ':active': 'scale(.985)' }
   },
   habitDone: { backgroundColor: colors.darkElevated2 },
   check: {
@@ -166,9 +176,18 @@ const styles = stylex.create({
     borderColor: colors.grey2,
     borderRadius: 999,
     color: colors.black,
-    fontWeight: 900
+    fontWeight: 900,
+    transitionProperty: 'background-color, border-color, transform',
+    transitionDuration: '.18s, .18s, .16s'
   },
-  checkDone: { borderColor: colors.greenBright, backgroundColor: colors.greenBright },
+  checkDone: {
+    borderColor: colors.greenBright,
+    backgroundColor: colors.greenBright,
+    animationName: { default: checkPop, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
+  },
   habitCopy: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 },
   streak: { color: colors.greenBright, fontSize: 13, fontWeight: 800 },
   saved: { alignSelf: 'center', color: colors.grey3, fontSize: 10, flexShrink: 0 }
