@@ -2,10 +2,13 @@
 
 ## 1.0.0
 
-- Added Flappy Duo: the iPhone Duo flaps its halves through glass slabs above the clouds.
-- Added the fold counter against a 200,000-fold hinge rating, a Hinge Failure alert with roasts and medals, and a Buy another button that tracks money spent.
-- Added cartoon executive cameos on every fifth slab with quote toasts.
-- Added difficulty updates at 3, 6, 9 and 13 points: drifting slabs, a pulsing beta blur, fake notifications that cover the view, and a speed boost, each announced like a software update.
-- Added a Duo Pay sheet for Buy another: double-press the on-screen side button, get charged, and receive a notification that says so.
-- Added a small home-screen widget with best score, money spent and hinge wear, plus a Rage quit link that goes home.
-- Added slow-motion shatter on death, synthesised sound cues, and layouts for the inner and cover displays with tap, click and keyboard flapping.
+- Initial release.
+- Canvas 2D game loop with the Duo as the player character; obstacles are labelled glass slabs.
+- Per-run and lifetime fold counters; best score, folds and money spent persisted via `os.storage`.
+- Difficulty steps at 3, 6, 9 and 13 points: oscillating gaps, periodic blur, notification banners, 30% speed increase.
+- Cartoon cameo on every fifth slab with a toast on pass.
+- Game-over dialog with score, best and medal tier; restart and purchase actions.
+- Payment sheet confirmed by a double press of the on-screen side button; adds $2,399 to the spent total and shows a notification.
+- Small home-screen widget via `os.widget.set`.
+- Synthesised flap, score, crash and payment cues via Web Audio.
+- Supports the inner and cover displays.
