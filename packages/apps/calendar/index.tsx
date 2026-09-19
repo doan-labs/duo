@@ -1,77 +1,197 @@
-import { Row, Screen, Section, Text, Title, WidgetLabel } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { IconButton, Segmented, TextField } from '@doan-labs/duo-uikit'
+import { dark } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { type Event, VIEWS } from './data.ts'
+import { addDays, addMonths, local, monthYear, startOfMonth, time, week } from './dates.ts'
+import { EventSheet } from './event-sheet.tsx'
+import { MonthView } from './month-view.tsx'
+import { Sidebar } from './sidebar.tsx'
+import { useCalendars, useEvents, useSelection } from './store.ts'
 import { styles } from './styles.ts'
+import { TimeGrid } from './time-grid.tsx'
+import { YearView } from './year-view.tsx'
 
-// Name and initial, since Sunday and Saturday share a letter and a key must not.
-const WEEKDAYS: [string, string][] = [
-  ['Sun', 'S'],
-  ['Mon', 'M'],
-  ['Tue', 'T'],
-  ['Wed', 'W'],
-  ['Thu', 'T'],
-  ['Fri', 'F'],
-  ['Sat', 'S']
-]
+const STEP = { Day: 1, Week: 7 }
 
 export const Calendar = () => {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth()
-  const first = new Date(y, m, 1).getDay()
-  const n = new Date(y, m + 1, 0).getDate()
-  const today = now.getDate()
-  // Leading blanks are the non-positive numbers, so every cell has a distinct key.
-  const days = Array.from({ length: first + n }, (_, i) => i + 1 - first)
-  return (
-    <Screen xstyle={[styles.root]}>
-      <Title xstyle={[styles.hdr]}>
-        {now.toLocaleDateString('en', { month: 'long' })}
-        <Title as="span" variant="accessory">
-          {y}
-        </Title>
-      </Title>
-      <div {...stylex.props(styles.cal)}>
-        {WEEKDAYS.map(([k, d]) => (
-          <span key={k} {...stylex.props(styles.cell, styles.wd)}>
-            {d}
-          </span>
-        ))}
-        {days.map((d) => (
-          <span key={d} {...stylex.props(styles.cell, d === today && styles.today)}>
-            {d > 0 && d}
-          </span>
-        ))}
-      </div>
-      <Section xstyle={[styles.events]}>
-        <Row xstyle={[styles.event]}>
-          <div {...stylex.props(styles.tag)} />
-          <div>
-            <div {...stylex.props(styles.title)}>iPhone Duo keynote</div>
-            <Text as="div" size="caption">
-              Apple Park · 10:00
-            </Text>
-          </div>
-        </Row>
-      </Section>
-    </Screen>
-  )
-}
-
-export function CalendarWidget({ onOpen }: { onOpen: (from: HTMLElement) => void }) {
-  const el = useRef<HTMLDivElement>(null)
+  const root = useRef<HTMLDivElement>(null)
+  const [wide, setWide] = useState(false)
+  const [query, setQuery] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Event | null>(null)
+  const { view, setView, date, setDate, sidebar, setSidebar } = useSelection()
+  const { calendars, hidden, toggle } = useCalendars()
+  const { events, save, remove } = useEvents()
   const today = new Date()
+  const colors = new Map(calendars.map((c) => [c.id, c.color]))
+  const visible = events.filter((e) => !hidden.has(e.calendar))
+  const isNew = !!draft && !events.some((e) => e.id === draft.id)
+  // The box decides, not the display: a split half is as narrow as the cover and drops the sidebar.
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setWide(e!.contentRect.width > 600))
+    ro.observe(root.current!)
+    return () => ro.disconnect()
+  }, [])
+  const shift = (n: number) =>
+    setDate(
+      view === 'Month'
+        ? addMonths(date, n)
+        : view === 'Year'
+          ? new Date(date.getFullYear() + n, 0, 1)
+          : addDays(date, n * STEP[view])
+    )
+  const compose = (at: Date, allDay = false) =>
+    setDraft({
+      id: Date.now().toString(36),
+      title: '',
+      calendar: calendars[0]?.id ?? 'home',
+      start: local(at),
+      end: local(allDay ? at : new Date(at.getTime() + 3600e3)),
+      allDay
+    })
+  const plus = () => compose(new Date(date.getFullYear(), date.getMonth(), date.getDate(), today.getHours() + 1))
+  const jump = (d: Date, v = view) => {
+    setDate(d)
+    setView(v)
+  }
+  const title =
+    view === 'Year'
+      ? String(date.getFullYear())
+      : view === 'Day'
+        ? date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        : monthYear(view === 'Week' ? week(date)[3]! : date)
+  const hits =
+    query?.trim() &&
+    events
+      .filter((e) =>
+        `${e.title} ${e.location ?? ''} ${e.notes ?? ''}`.toLowerCase().includes(query.trim().toLowerCase())
+      )
+      .sort((a, b) => a.start.localeCompare(b.start))
   return (
-    <div ref={el} {...stylex.props(shared.glass, shared.widget, styles.calWidget)} onClick={() => onOpen(el.current!)}>
-      <WidgetLabel xstyle={[styles.calDay]}>{today.toLocaleDateString('en', { weekday: 'long' })}</WidgetLabel>
-      <div {...stylex.props(styles.calNum)}>{today.getDate()}</div>
-      {/* Short enough for one line each: screen.ts bakes the same widget on canvas,
-          which does not wrap, and a line that wraps here would not wrap there. */}
-      <div {...stylex.props(styles.calEv)}>
-        Duo keynote
-        <div {...stylex.props(styles.calSub)}>10:00 Apple Park</div>
+    <div ref={root} {...stylex.props(dark, styles.root)}>
+      {wide && sidebar && (
+        <Sidebar
+          calendars={calendars}
+          hidden={hidden}
+          toggle={toggle}
+          date={date}
+          today={today}
+          setDate={(d) => jump(d, view === 'Year' ? 'Month' : view)}
+          hide={() => setSidebar(false)}
+        />
+      )}
+      <div {...stylex.props(styles.main)}>
+        <div {...stylex.props(styles.topBar)}>
+          <div {...stylex.props(styles.barSide)}>
+            {wide && !sidebar && (
+              <IconButton name="sidebar" aria-label="Show sidebar" onClick={() => setSidebar(true)} />
+            )}
+            <IconButton name="plus" size={14} aria-label="New event" onClick={plus} />
+          </div>
+          <Segmented options={VIEWS} value={view} onChange={setView} />
+          <div {...stylex.props(styles.barSide, styles.barEnd)}>
+            {query !== null && (
+              <TextField
+                type="search"
+                aria-label="Search events"
+                placeholder="Search"
+                value={query}
+                autoFocus
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Escape' && setQuery(null)}
+                xstyle={[styles.search]}
+              />
+            )}
+            <IconButton
+              name={query === null ? 'search' : 'close'}
+              size={query === null ? 17 : 13}
+              aria-label={query === null ? 'Search' : 'Close search'}
+              onClick={() => setQuery(query === null ? '' : null)}
+            />
+          </div>
+        </div>
+        <div {...stylex.props(styles.titleRow, !wide && styles.titleRowSm)}>
+          <h1 {...stylex.props(styles.title, !wide && styles.titleSm)}>
+            {view === 'Day' || view === 'Year' ? (
+              <b>{title}</b>
+            ) : (
+              <>
+                <b>{title.split(' ')[0]}</b> {title.split(' ')[1]}
+              </>
+            )}
+          </h1>
+          <div {...stylex.props(styles.nav)}>
+            <IconButton name="back" size={11} variant="round" aria-label="Previous" onClick={() => shift(-1)} />
+            <button type="button" onClick={() => setDate(today)} {...stylex.props(styles.todayBtn)}>
+              Today
+            </button>
+            <IconButton name="forward" size={11} variant="round" aria-label="Next" onClick={() => shift(1)} />
+          </div>
+        </div>
+        {hits ? (
+          <div {...stylex.props(styles.results)}>
+            {hits.length === 0 && <span {...stylex.props(styles.dim)}>No Results</span>}
+            {hits.map((e) => (
+              <button
+                type="button"
+                key={e.id}
+                onClick={() => {
+                  jump(new Date(e.start), 'Day')
+                  setDraft(e)
+                }}
+                {...stylex.props(styles.result)}
+              >
+                <i {...stylex.props(styles.dot, styles.tint(colors.get(e.calendar)))} />
+                <span {...stylex.props(styles.chipTitle)}>{e.title || 'New Event'}</span>
+                <span {...stylex.props(styles.dim)}>
+                  {new Date(e.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {!e.allDay && ` ${time(e.start)}`}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : view === 'Month' ? (
+          <MonthView
+            month={startOfMonth(date)}
+            today={today}
+            events={visible}
+            colors={colors}
+            onDay={(d) => compose(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9))}
+            onEvent={setDraft}
+          />
+        ) : view === 'Year' ? (
+          <YearView
+            year={date.getFullYear()}
+            today={today}
+            onMonth={(d) => jump(d, 'Month')}
+            onDay={(d) => jump(d, 'Day')}
+          />
+        ) : (
+          <TimeGrid
+            key={view}
+            days={view === 'Week' ? week(date) : [date]}
+            today={today}
+            events={visible}
+            colors={colors}
+            onSlot={(d) => compose(d)}
+            onEvent={setDraft}
+          />
+        )}
       </div>
+      <EventSheet
+        draft={draft}
+        isNew={isNew}
+        calendars={calendars}
+        onSave={(e) => {
+          save(e)
+          setDraft(null)
+        }}
+        onDelete={(id) => {
+          remove(id)
+          setDraft(null)
+        }}
+        onClose={() => setDraft(null)}
+      />
     </div>
   )
 }
