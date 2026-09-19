@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Both merging tiles now glide into the target cell; the merged value appears on arrival.
+
 ## 1.0.2
 
 - Added responsive tile reveals, press feedback, and a gentle game-state transition.
