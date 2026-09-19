@@ -11,6 +11,16 @@ type ViewDimensions = { display: 'inner' | 'cover'; width: number; height: numbe
 
 const SIZE = 4
 const CELL_COUNT = SIZE * SIZE
+const motion = '@media (prefers-reduced-motion: reduce)'
+const tilePop = stylex.keyframes({
+  from: { opacity: 0.35, transform: 'scale(.88)' },
+  '70%': { opacity: 1, transform: 'scale(1.04)' },
+  to: { opacity: 1, transform: 'scale(1)' }
+})
+const messageIn = stylex.keyframes({
+  from: { opacity: 0, transform: 'translateY(8px) scale(.98)' },
+  to: { opacity: 1, transform: 'translateY(0) scale(1)' }
+})
 
 const emptyBoard = () => Array.from({ length: CELL_COUNT }, () => 0)
 
@@ -98,7 +108,17 @@ function fitLayout(view: ViewDimensions, headerHeight: number) {
   }
 }
 
-function Board({ board, size, onMove }: { board: number[]; size: number; onMove: (direction: Direction) => void }) {
+function Board({
+  board,
+  size,
+  animationTick,
+  onMove
+}: {
+  board: number[]
+  size: number
+  animationTick: number
+  onMove: (direction: Direction) => void
+}) {
   const touchStart = useRef<{ x: number; y: number } | null>(null)
   return (
     <div
@@ -125,11 +145,16 @@ function Board({ board, size, onMove }: { board: number[]; size: number; onMove:
         const column = index % SIZE
         return (
           <div
-            key={`${row}-${column}`}
+            key={value ? `${row}-${column}-${animationTick}` : `${row}-${column}`}
             aria-label={value ? `${value} tile` : 'Empty tile'}
             role="gridcell"
             tabIndex={-1}
-            {...stylex.props(styles.tile, tileStyle(value), value >= 1000 && styles.compact)}
+            {...stylex.props(
+              styles.tile,
+              tileStyle(value),
+              value ? styles.tileAnimated : null,
+              value >= 1000 && styles.compact
+            )}
           >
             {value || ''}
           </div>
@@ -145,6 +170,7 @@ function Game() {
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(0)
   const [status, setStatus] = useState<GameStatus>('playing')
+  const [animationTick, setAnimationTick] = useState(0)
   const cover = view.display === 'cover'
   const fit = fitLayout(view, 48)
 
@@ -158,6 +184,7 @@ function Game() {
       }
       const nextScore = score + result.score
       setBoard(result.board)
+      setAnimationTick((current) => current + 1)
       setScore(nextScore)
       setBest((current) => Math.max(current, nextScore))
       if (result.board.includes(2048)) setStatus('won')
@@ -170,6 +197,7 @@ function Game() {
     setBoard(newGame())
     setScore(0)
     setStatus('playing')
+    setAnimationTick((current) => current + 1)
   }
 
   useEffect(() => {
@@ -216,7 +244,7 @@ function Game() {
         </div>
       </header>
       <p {...stylex.props(styles.hint)}>{cover ? 'Swipe or tap the arrows' : 'Swipe, tap, or use your keyboard'}</p>
-      <Board board={board} size={fit.board} onMove={handleMove} />
+      <Board board={board} size={fit.board} animationTick={animationTick} onMove={handleMove} />
       <div role="group" {...stylex.props(styles.controls, styles.fitControls(fit.control))} aria-label="Move controls">
         <button
           type="button"
@@ -330,7 +358,16 @@ const styles = stylex.create({
     width: '100%',
     height: '100%',
     minWidth: 0,
-    minHeight: 0
+    minHeight: 0,
+    transitionProperty: 'background-color, color, transform',
+    transitionDuration: '.18s, .18s, .16s',
+    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)'
+  },
+  tileAnimated: {
+    animationName: { default: tilePop, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
   },
   compact: { fontSize: 18 },
   tileEmpty: { backgroundColor: colors.fillThin },
@@ -360,7 +397,10 @@ const styles = stylex.create({
     touchAction: 'manipulation',
     paddingBlock: 0,
     paddingInline: 0,
-    gridRow: 2
+    gridRow: 2,
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.94)' }
   },
   fitArrow: (size: number) => ({ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(16, size * 0.6)}px` }),
   up: { gridColumn: 2, gridRow: 1 },
@@ -375,7 +415,10 @@ const styles = stylex.create({
     fontSize: 13,
     fontWeight: 700,
     cursor: 'pointer',
-    flexShrink: 0
+    flexShrink: 0,
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   },
   message: {
     position: 'absolute',
@@ -390,7 +433,11 @@ const styles = stylex.create({
     paddingInline: 14,
     borderRadius: 12,
     color: colors.white,
-    backgroundColor: colors.fillDark
+    backgroundColor: colors.fillDark,
+    animationName: { default: messageIn, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
   },
   continue: {
     borderWidth: 0,
@@ -400,7 +447,10 @@ const styles = stylex.create({
     color: colors.darkElevated,
     backgroundColor: colors.yellow,
     fontWeight: 700,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   }
 })
 
