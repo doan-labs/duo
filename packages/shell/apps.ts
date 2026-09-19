@@ -96,7 +96,7 @@ export const APPS: App[] = [
   { name: 'Shortcuts', mock: true, light: true, view: Shortcuts },
   { name: 'Podcasts', mock: true, light: true, view: Podcasts },
   { name: 'Books', mock: true, light: true, view: Books },
-  { name: 'YouTube', light: true, view: YouTube }
+  { name: 'YouTube', mock: true, light: true, view: YouTube }
 ]
 
 /** Look an app up by name, case-insensitively; undefined if nothing matches. */
