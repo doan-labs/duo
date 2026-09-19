@@ -357,6 +357,13 @@ export const appAppearance = stylex.defineConsts({
   calculatorKeyLight: '#a5a5a5',
   // calendar
   calendarPaper: 'rgba(255,255,255,.78)',
+  calendarSidebar: '#1b1b1d',
+  calendarPane: '#1f1f21',
+  calendarGrid: 'rgba(255,255,255,.12)',
+  calendarWeekend: 'rgba(255,255,255,.025)',
+  calendarSegment: 'rgba(255,255,255,.08)',
+  calendarSegmentOn: '#5c5c60',
+  calendarHover: 'rgba(255,255,255,.06)',
   // camera
   cameraGrid:
     'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))',
