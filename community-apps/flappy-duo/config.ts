@@ -78,18 +78,19 @@ export const HAZARDS: [number, number, Hazard, string][] = [
   [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
   [4, 1, 'throw', 'Accessories are sold separately and shipped directly.']
 ]
-// The receipt arrives as a message from the top. `$` is replaced with the amount.
+// The receipt is written the way Apple writes. Nothing in it is a joke on its own.
+// `$` is replaced with the amount.
 export const RECEIPTS: [string, string][] = [
-  ['Tim Cook', 'Thank you for choosing Duo again. Your decision has been noted.'],
-  ['John Ternus', 'The hinge is rated for 200,000 folds. That fold was not among them.'],
-  ['Tim Cook', 'Your continued loyalty has been recorded, along with the $.'],
-  ['John Ternus', 'Titanium was selected for its strength. The $ charge is final.'],
-  ['Tim Cook', 'This is our best Duo yet. The previous one was also our best Duo yet.'],
-  ['John Ternus', 'The thinnest Duo we have made. The $ invoice is standard thickness.'],
-  ['Tim Cook', 'Good morning. $ has been transferred from your account.'],
-  ['John Ternus', 'Your replacement was produced on the same line as the previous unit. Results may be similar.'],
-  ['Tim Cook', 'Environmental report: the previous unit has been recycled. The $ has not.'],
-  ['John Ternus', 'The hinge was validated against every scenario we considered.']
+  ['Tim Cook', 'Thank you for choosing iPhone Duo again. Your order of $ has been confirmed.'],
+  ['John Ternus', 'The iPhone Duo hinge is engineered for 200,000 folds. Your new unit begins at zero.'],
+  ['Tim Cook', 'iPhone Duo is the best iPhone we have ever made. We are glad you agree, again.'],
+  ['John Ternus', 'Grade 5 titanium. Ceramic Shield. Your replacement carries the same specifications.'],
+  ['Tim Cook', 'Every iPhone Duo is built to last. Your next one ships today.'],
+  ['John Ternus', 'We validated the hinge across a wide range of real-world conditions.'],
+  ['Tim Cook', 'Privacy is a fundamental human right. Your purchase history is safe with us.'],
+  ['John Ternus', 'The thinnest iPhone we have ever made. It performs best in one piece.'],
+  ['Tim Cook', 'A payment of $ has been received. We look forward to serving you again.'],
+  ['John Ternus', 'Every component in your new iPhone Duo has been redesigned. The price has been revised.']
 ]
 export const receiptFor = (run: number, price: number): { title: string; text: string } => {
   const [title, line] = RECEIPTS[(run - 1) % RECEIPTS.length]!
