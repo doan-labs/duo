@@ -45,35 +45,11 @@ export const BANNER_LIFE = 4.5
 /** The replacement costs more every game: 2,399, 2,999, 3,699, 4,699, 5,899… always ending in 99. */
 export const priceFor = (run: number) => Math.round((PRICE * 1.25 ** (run - 1)) / 100) * 100 - 1
 
-export const SLAB_LABELS = [
-  'CREASE',
-  `$${PRICE.toLocaleString()}`,
-  'GENIUS BAR',
-  'APPLECARE+',
-  'iOS 27 BETA',
-  'HINGE',
-  'NO CHARGER',
-  'PRE-ORDER',
-  'DONGLE',
-  'BATTERY 79%'
-]
-
-export const MILESTONES: Record<number, string> = {
-  1: 'One slab cleared. This has been noted.',
-  5: 'Five. Within the expected range for a first-time owner.',
-  7: 'Seven. The hinge is operating outside its comfort range.',
-  10: 'Ten. Comparable to a screen repair, in cost terms.',
-  15: 'Fifteen. Continued folding is at your discretion.',
-  20: 'Twenty. Engineering has been informed.',
-  30: 'Thirty. Legal has been informed.',
-  50: 'Fifty. No further assistance is available.'
-}
-
 // The game gets worse with every game and every point. [game, score, hazard, announcement].
 export const HAZARDS: [number, number, Hazard, string][] = [
   [1, 2, 'drift', 'Update installed. Slab positions are now dynamic.'],
   [2, 1, 'blur', 'iOS 27 beta installed overnight. Sharp rendering is available on Pro models.'],
-  [2, 3, 'notify', 'Notification settings restored from backup.'],
+  [1, 3, 'notify', 'Notification settings restored from backup.'],
   [3, 1, 'slam', 'Recall notice. Slabs may close without prior notice.'],
   [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
   [3, 1, 'throw', 'Accessories are sold separately and shipped directly.']

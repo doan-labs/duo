@@ -14,7 +14,6 @@ import {
   PHONE,
   pick,
   type Shard,
-  SLAB_LABELS,
   SLAB_SPACING,
   SLAB_WIDTH,
   type Slab,
@@ -51,7 +50,7 @@ export const spawn = (x: number, n: number): Slab => ({
   x,
   n,
   gapY: 0.22 + Math.random() * 0.44,
-  label: pick(SLAB_LABELS),
+  label: String(n + 1),
   passed: false,
   slam: 0,
   dir: n % 4 === 1 ? 1 : -1

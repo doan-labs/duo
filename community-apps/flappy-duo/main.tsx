@@ -9,7 +9,6 @@ import {
   FLOOR_ROASTS,
   HAZARDS,
   has,
-  MILESTONES,
   MISSILE_ROASTS,
   medalFor,
   PRICE,
@@ -151,8 +150,7 @@ function Game() {
         cue('score')
         setScore(next.score)
         const hazard = HAZARDS.find(([r, s]) => next.run >= r && s === next.score)
-        const line = hazard ? hazard[3] : MILESTONES[next.score]
-        if (line) say(line, hazard ? 2600 : 2000)
+        if (hazard) say(hazard[3], 2600)
       }
       if (before.status === 'playing' && next.status === 'over') {
         cue('crash')

@@ -3,7 +3,7 @@
 ## 1.0.0
 
 - Initial release.
-- Canvas 2D game loop with the Duo as the player character; obstacles are labelled glass slabs.
+- Canvas 2D game loop with the Duo as the player character; obstacles are numbered glass slabs.
 - Per-run fold counter; best score and money spent persisted via `os.storage`.
 - Difficulty keyed to game number and score: oscillating gaps, periodic blur, notification banners, slabs that snap shut, thrown accessories, speed increase; each game narrows the gap and adds speed.
 - Game-over dialog with score, best and medal tier; the only action is the purchase.
