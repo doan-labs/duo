@@ -96,7 +96,6 @@ function Habits() {
           return (
             <button
               type="button"
-              role="listitem"
               aria-pressed={done}
               key={habit.id}
               onClick={() => toggle(habit.id)}
@@ -175,4 +174,5 @@ const styles = stylex.create({
   saved: { alignSelf: 'center', color: colors.grey3, fontSize: 10, flexShrink: 0 }
 })
 
+await os.connect()
 createRoot(document.body).render(<Habits />)
