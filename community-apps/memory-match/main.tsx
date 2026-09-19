@@ -7,6 +7,12 @@ import { createRoot } from 'react-dom/client'
 
 const SYMBOLS = ['🍎', '🌙', '⭐', '🌈', '🎵', '🚀']
 type Card = { id: number; symbol: string }
+const motion = '@media (prefers-reduced-motion: reduce)'
+const cardReveal = stylex.keyframes({
+  from: { opacity: 0.7, transform: 'scale(.92) rotateY(-8deg)' },
+  '70%': { opacity: 1, transform: 'scale(1.03) rotateY(2deg)' },
+  to: { opacity: 1, transform: 'scale(1) rotateY(0)' }
+})
 
 function createDeck() {
   const cards = [...SYMBOLS, ...SYMBOLS].map((symbol, index) => ({ id: index, symbol }))
@@ -144,9 +150,19 @@ const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.fillDark,
     fontSize: 26,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color, color',
+    transitionDuration: '.16s, .2s, .2s',
+    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    transform: { default: 'scale(1)', ':active': 'scale(.95)' }
   },
-  cardOpen: { backgroundColor: colors.fillThin },
+  cardOpen: {
+    backgroundColor: colors.fillThin,
+    animationName: { default: cardReveal, [motion]: 'none' },
+    animationDuration: '.24s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
+  },
   cardMatched: { color: colors.greenBright, backgroundColor: colors.darkElevated2 },
   reset: {
     borderWidth: 0,
@@ -157,6 +173,9 @@ const styles = stylex.create({
     backgroundColor: colors.purple,
     fontWeight: 800,
     cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' },
     flexShrink: 0
   }
 })
