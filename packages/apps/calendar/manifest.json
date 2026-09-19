@@ -1,7 +1,7 @@
 {
   "id": "labs.doan.ipduo.calendar",
   "name": "Calendar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "lane": "official",
   "entry": "./main.tsx",
   "icon": "./icon.png",

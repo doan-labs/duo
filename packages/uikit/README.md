@@ -1,6 +1,6 @@
 # UI kit
 
-Version **1.0.0**, private local preview. React 19 and compiled StyleX 0.19.
+Version **1.1.0**, private local preview. React 19 and compiled StyleX 0.19.
 Apps bundle their selected kit; its version does not change host compatibility.
 SDK runtime requirements remain separate. Existing Nav/Page/Sym/Num and style
 subpaths continue to work. See [CHANGELOG](CHANGELOG.md).
@@ -31,7 +31,7 @@ Components accept native attributes, `as` where appropriate, `animate` for
 CSS-only presets and `xstyle` for compiled StyleX extensions. They intentionally
 exclude raw `style` and `className`. Defaults preserve the original app geometry;
 use semantic elements (`Title as="h1"`, `Row as="li"` inside `List`) for new UI.
-Use `Row as="button"` for actions. Name icon-only buttons and every Toggle.
+Use `Row as="button"` for actions. Name icon-only buttons and every Toggle or Checkbox. `Checkbox` is the tinted square from macOS Calendar; `Toggle` is the iOS switch.
 
 ## Layout and type
 

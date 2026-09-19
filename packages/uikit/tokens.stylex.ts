@@ -364,6 +364,7 @@ export const appAppearance = stylex.defineConsts({
   calendarSegment: 'rgba(255,255,255,.08)',
   calendarSegmentOn: '#5c5c60',
   calendarHover: 'rgba(255,255,255,.06)',
+  calendarHourLines: 'linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px)',
   // camera
   cameraGrid:
     'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))',
