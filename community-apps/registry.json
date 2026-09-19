@@ -22,6 +22,10 @@
       "folder": "tic-tac-toe",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.memorymatch": {
+      "folder": "memory-match",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.snake": {
       "folder": "snake",
       "maintainers": ["mnismt"]
