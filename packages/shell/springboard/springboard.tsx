@@ -10,8 +10,8 @@
 // scrubs (the unlock lift, the app zoom, the home-bar drag) is imperative on refs,
 // because a scrubbed animation has no declarative equivalent.
 
-// `light` apps wear the kit's light theme, inherited by every nav page inside.
-import { light } from '@doan-labs/duo-uikit/styles.ts'
+// An app wears the kit's light or dark theme, inherited by every nav page inside.
+import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
 import {
   app,
   chrome,
@@ -357,7 +357,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
                 e.side === 'right' && styles.appRight(split * 100),
                 (drop?.id === e.id || switcher) && styles.appDrag,
                 e.parked && !switcher && styles.appParked,
-                e.a.light && light
+                e.a.light ? light : dark
               )}
             >
               {e.a.id ? <Sandbox id={e.a.id} os={e.ctx} wide={wide} side={e.side} /> : <View os={e.ctx} />}

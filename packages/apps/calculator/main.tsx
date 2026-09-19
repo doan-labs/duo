@@ -1,4 +1,5 @@
 import { os } from '@doan-labs/duo-sdk'
+import { dark } from '@doan-labs/duo-uikit/styles.ts'
 import { colors, fonts, leading, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
@@ -10,7 +11,7 @@ function Screen() {
     requestAnimationFrame(() => os.ready())
   }, [])
   return (
-    <div {...stylex.props(styles.root)}>
+    <div {...stylex.props(dark, styles.root)}>
       <Calculator
         os={{
           shots: [],
