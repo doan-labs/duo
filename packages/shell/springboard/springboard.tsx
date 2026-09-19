@@ -22,7 +22,7 @@ import { settle, swipe } from './gestures.ts'
 import { type Drop, HomeBar, HomeBars } from './home-bar.tsx'
 import { HomeScreen } from './home-screen.tsx'
 import { LockScreen } from './lock-screen.tsx'
-import { BootScreen, PowerSheet } from './power.tsx'
+import { BOOT_FADE_MS, BOOT_MS, BootScreen, PowerSheet } from './power.tsx'
 import { useScenes } from './scenes.ts'
 import { Spotlight } from './spotlight.tsx'
 import { StatusBar } from './status-bar.tsx'
@@ -56,7 +56,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   const [asleep, setAsleep] = useState(false)
   const [searching, setSearching] = useState(false)
   const [poff, setPoff] = useState(false)
-  const [booting, setBooting] = useState(false)
+  const [booting, setBooting] = useState<false | 'up' | 'leaving'>(false)
   const [cc, setCc] = useState(false)
   const ccOn = useRef(false)
   const ccScrim = useRef<HTMLDivElement>(null)
@@ -113,11 +113,12 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
     })
   }
   const powerOn = () => {
-    setBooting(true)
+    setBooting('up')
     setTimeout(() => {
       device.wake()
-      setBooting(false)
-    }, 2200)
+      setBooting('leaving')
+      setTimeout(() => setBooting(false), BOOT_FADE_MS)
+    }, BOOT_MS)
   }
 
   const cur = scenes.filter((e) => !e.leaving && !e.parked)
@@ -368,7 +369,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
           />
         )}
       </div>
-      {booting && <BootScreen />}
+      {booting && <BootScreen leaving={booting === 'leaving'} />}
     </>
   )
 }

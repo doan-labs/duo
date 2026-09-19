@@ -25,8 +25,16 @@ const Apple = () => (
  * when. The bar is indeterminate — nothing here knows how far along a boot is,
  * so it eases out and crawls rather than claiming progress it can't see.
  */
-export const BootScreen = ({ error }: { error?: string }) => (
-  <div data-boot {...stylex.props(styles.boot)}>
+/**
+ * How long the logo stays up at minimum. Only on localhost, where demos are
+ * recorded: a visitor's boot takes exactly as long as the load.
+ */
+export const BOOT_MS = typeof location !== 'undefined' && location.hostname === 'localhost' ? 3000 : 0
+/** The logo's fade into the booted screen; the caller keeps it mounted this long with `leaving`. */
+export const BOOT_FADE_MS = 700
+
+export const BootScreen = ({ error, leaving }: { error?: string; leaving?: boolean }) => (
+  <div data-boot {...stylex.props(styles.boot, leaving && styles.bootOut)}>
     <Apple />
     {error ? (
       <p {...stylex.props(styles.bootError)}>{error}</p>
@@ -94,6 +102,7 @@ export function PowerSheet({
 // Same frame as styles.ts's fade: StyleX only resolves keyframes defined in the
 // file that uses them or in a .stylex file, and identical frames share a name.
 const fade = stylex.keyframes({ from: { opacity: 0 } })
+const fadeOut = stylex.keyframes({ to: { opacity: 0 } })
 // Fast at first, then a crawl: the bar is always moving and never quite lands,
 // so a slow boot reads as working rather than stuck.
 const fill = stylex.keyframes({ from: { transform: 'scaleX(0)' }, to: { transform: 'scaleX(0.96)' } })
@@ -118,6 +127,13 @@ const styles = stylex.create({
     animationName: fade,
     animationDuration: '1s',
     animationFillMode: 'both'
+  },
+  bootOut: {
+    animationName: fadeOut,
+    animationDuration: `${BOOT_FADE_MS}ms`,
+    animationTimingFunction: 'ease-in-out',
+    animationFillMode: 'forwards',
+    pointerEvents: 'none'
   },
   track: {
     width: 160,

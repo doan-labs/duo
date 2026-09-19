@@ -9,7 +9,7 @@ import { device } from './device.ts'
 import { development } from './runtime/development.ts'
 import { shots } from './runtime/photos.ts'
 import { bootRegistry } from './runtime/registry.ts'
-import { BootScreen } from './springboard/power.tsx'
+import { BOOT_FADE_MS, BOOT_MS, BootScreen } from './springboard/power.tsx'
 import { SpringBoard } from './springboard/springboard.tsx'
 
 /** Builds one display's OS. `w`/`hgt` in CSS px. */
@@ -37,10 +37,20 @@ export function os(w: number, hgt: number, container: HTMLElement, boot?: string
   // device shows coming out of a restart until the springboard can take over.
   const view = createRoot(root)
   view.render(<BootScreen />)
-  void bootRegistry()
+  void Promise.all([bootRegistry(), new Promise((r) => setTimeout(r, BOOT_MS))])
     .then(() => {
       const dev = [...development].find(([, value]) => value.bundle.release.manifest.id === boot)
-      view.render(<SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} shots={shots} />)
+      const board = <SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} shots={shots} />
+      // The logo fades over the springboard rather than cutting to it; same fragment
+      // shape both times so React keeps the one SpringBoard instance.
+      view.render(
+        <>
+          {board}
+          <BootScreen leaving />
+        </>
+      )
+      // biome-ignore lint/complexity/noUselessFragments: a bare `board` would change the root's type and remount it
+      setTimeout(() => view.render(<>{board}</>), BOOT_FADE_MS)
     })
     .catch((error) => {
       view.render(<BootScreen error={`Apps unavailable: ${error.message}. Reload to retry.`} />)
