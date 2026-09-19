@@ -29,25 +29,50 @@ function deck(list: Track[]) {
   const emit = () => {
     for (const f of subs) f()
   }
+  // Out loud when the browser allows it; a page that starts a song on a scroll
+  // has no gesture behind it, and there the browser only lets a muted track go.
+  const start = () => {
+    a.muted = false
+    void a.play().catch(() => {
+      a.muted = true
+      void a.play().catch(() => {})
+    })
+  }
   const load = (n: number) => {
     i = ((n % list.length) + list.length) % list.length
     t = 0
     a.src = list[i]!.src
-    if (on) void a.play().catch(() => {})
+    if (on) start()
     emit()
   }
   const skip = (d: number) => load(i + d)
   const toggle = () => {
     if (!a.src) load(i)
     on = !on
-    if (on) void a.play().catch(() => {})
+    if (on) start()
     else a.pause()
     emit()
   }
+  // Before the file has reported a length, the published one stands in and the
+  // seek becomes the position playback starts from once the file is in.
   const seek = (frac: number) => {
     t = frac * (a.duration || len())
-    if (a.duration) a.currentTime = t
+    a.currentTime = t
     emit()
+  }
+  // A volume ramp; one at a time, so a fade out that lands mid fade in wins.
+  let ramp = 0
+  const fade = (to: number, ms: number, then?: () => void) => {
+    clearInterval(ramp)
+    const [from, t0] = [a.volume, performance.now()]
+    ramp = window.setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / ms)
+      a.volume = from + (to - from) * p
+      if (p >= 1) {
+        clearInterval(ramp)
+        then?.()
+      }
+    }, 40)
   }
   a.addEventListener('ended', () => skip(1))
   // The clock outlives every listener: audio keeps playing with the app closed
@@ -79,9 +104,21 @@ function deck(list: Track[]) {
     skip,
     toggle,
     seek,
-    /** Silent from here on; the embed bridge starts a song on a page scroll, which is no gesture to play out loud. */
-    mute() {
-      a.muted = true
+    /** Starts, if stopped, rising from silence over `ms`. */
+    fadeIn(ms: number) {
+      if (!on) {
+        a.volume = 0
+        toggle()
+      }
+      fade(1, ms)
+    },
+    /** Falls to silence over `ms`, then stops, at full volume for the next press. */
+    fadeOut(ms: number) {
+      if (!on) return
+      fade(0, ms, () => {
+        toggle()
+        a.volume = 1
+      })
     },
     /** Reports every change to `onChange`; returns the unsubscribe. */
     watch(onChange: () => void) {

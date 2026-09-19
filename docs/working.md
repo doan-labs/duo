@@ -259,7 +259,9 @@ bun run api            # only the TSDoc reference
   `app` clears the stage and launches an app by home screen name (empty string
   is Home), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
   `split` drags it onto the left half by synthetic pointer events and opens the
-  named app beside it, `screenshot`, `play` starts the deck muted). The shell
+  named app beside it, `switcher` holds the home bar and lets go, `folder` resets
+  the grid and carries Find My onto Stocks, `wallpaper` holds the paper and taps
+  the next swatch, `screenshot`, `play` starts the deck muted). The shell
   also accepts a localhost parent on another port, so `vite dev` on 3001 can
   drive the root dev server on 3000; anything else must be the same origin. `src/simulator.tsx` posts the body colour and
   its `deg`, `yaw`, `app` and `cue` props, and never puts a live pose in the

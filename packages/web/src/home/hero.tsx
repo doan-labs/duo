@@ -36,6 +36,20 @@ export function Hero() {
             <Button to="/get-started" outline>
               Build an app
             </Button>
+            <a
+              href="https://www.producthunt.com/products/duo-9?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-duo-536"
+              target="_blank"
+              rel="noopener noreferrer"
+              {...stylex.props(styles.hunt)}
+            >
+              <img
+                alt="Duo - An iPhone Duo simulator you can build apps for | Product Hunt"
+                width="250"
+                height="54"
+                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1254308&theme=light&t=1789724483407"
+                {...stylex.props(styles.huntImg)}
+              />
+            </a>
           </motion.div>
         </div>
         <motion.div
@@ -98,7 +112,10 @@ const styles = stylex.create({
     lineHeight: 1.4,
     color: color.text2
   },
-  actions: { display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '36px' },
+  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginTop: '36px' },
+  // Product Hunt draws the badge 54 px tall; shrunk a little to sit level with the buttons.
+  hunt: { display: 'block', marginLeft: { default: 'auto', [SMALL]: 0 } },
+  huntImg: { display: 'block', height: '48px', width: 'auto' },
   // The shell's camera leaves headroom above the phone; pull the frame up under the buttons and let the section clip it.
   stage: { marginTop: { default: '-40px', [SMALL]: '32px' } },
   video: { display: 'block', width: '100%', height: 'auto', aspectRatio: '16 / 9', borderRadius: '20px' },

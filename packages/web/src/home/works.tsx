@@ -1,6 +1,6 @@
 // "It behaves like a device": one real shell, sticky, that folds, turns and
 // opens again as the page scrolls, then crosses to the other side for the
-// hardware and App Store steps. Six captions take turns; the visitor keeps the
+// hardware and App Store steps. Nine captions take turns; the visitor keeps the
 // scroll and only the device's pose and app are linked to it.
 import * as stylex from '@stylexjs/stylex'
 import { type MotionValue, motion, useMotionValueEvent, useReducedMotion, useScroll, useTransform } from 'motion/react'
@@ -28,13 +28,32 @@ const STEPS: Step[] = [
     text: ['Take a screenshot.'],
     note: 'Side button and volume up, like the phone in your pocket.',
     app: 'Music',
-    cue: { screenshot: true }
+    // `play` again, or this step would end the song the last one started.
+    cue: { screenshot: true, play: true }
   },
   {
     text: ['Drag an app into split screen.'],
     note: 'Swipe up from the home bar and hold: the app becomes a card. Drop it on a half and open the next one beside it.',
     app: 'Notes',
     cue: { split: 'Safari' }
+  },
+  {
+    text: ['Or pause, and let go.'],
+    note: 'Every running app is a card. Tap one to bring it back, flick one up to quit it.',
+    app: 'Notes',
+    cue: { switcher: true }
+  },
+  {
+    text: ['Stack two icons.'],
+    note: 'Hold an icon on the home screen, carry it onto another, let go: a folder. Hold one inside to take it out again.',
+    app: '',
+    cue: { folder: true }
+  },
+  {
+    text: ['Hold the wallpaper.'],
+    note: 'Apple’s dune, a few gradients, and any shot the Camera took. Both displays change at once.',
+    app: '',
+    cue: { wallpaper: true }
   },
   {
     cap: '02 · Real hardware',
@@ -49,10 +68,10 @@ const STEPS: Step[] = [
     app: 'App Store'
   }
 ]
-/** The first step that puts the device on the right and the words on the left. */
-const CROSS = 4
+/** The steps that put the device on the right and the words on the left: a loose zigzag down the page. */
+const RIGHT = new Set([1, 2, 4, 6, 7])
 /** The last step goes full width: words on top, the phone large beneath them. */
-const FULL = 5
+const FULL = 8
 /** The step whose cue follows the scroll instead of playing on its own clock. */
 const SPLIT = 3
 const N = STEPS.length
@@ -71,8 +90,12 @@ export function Works() {
   const stacked = useMedia('(max-width: 1068px)')
   const ref = useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] })
-  // The fold story runs over the first four bands; the device stays open after.
-  const open = useTransform(scrollYProgress, [0, 0.15, 0.28, 0.37, 0.48, 1], [1, 0.55, 0, 0, 1, 1])
+  // The fold story runs over the first three bands; the device stays open after.
+  const open = useTransform(
+    scrollYProgress,
+    [0, 0.9, 1.68, 2.22, 2.88, N].map((b) => b / N),
+    [1, 0.55, 0, 0, 1, 1]
+  )
   const spin = useTransform(scrollYProgress, [0, 0.33, 0.66, 1], [-10, 26, 4, -6])
   // The shell eases toward each pose itself, so whole degrees are enough and
   // keep the frame from being messaged on every scroll pixel.
@@ -110,8 +133,9 @@ export function Works() {
   }, [current.app, cam])
   // Camera opens once the browser has answered; the other steps switch on their own.
   const app = current.app === 'Camera' && cam !== 'granted' && cam !== 'denied' ? '' : (current.app ?? '')
-  const cue = step === SPLIT ? { ...current.cue, at } : current.cue
-  const crossed = step >= CROSS && step < FULL && !stacked
+  // Every step sends one, even an empty one: the shell ends a song the last step started when the next cue has no `play`.
+  const cue = step === SPLIT ? { ...current.cue, at } : (current.cue ?? {})
+  const crossed = RIGHT.has(step) && step < FULL && !stacked
   const full = step >= FULL && !stacked
 
   if (still) {

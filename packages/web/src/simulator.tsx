@@ -6,7 +6,14 @@ import { color } from './tokens.stylex'
 const BASE = import.meta.env.VITE_SIMULATOR_URL ?? (import.meta.env.DEV ? 'http://localhost:3000/' : '/device/')
 
 /** Something for the phone to do once its app is up; the shell's side is packages/shell/cues.ts. */
-export type Cue = { split?: string; screenshot?: boolean; play?: boolean }
+export type Cue = {
+  split?: string
+  switcher?: boolean
+  folder?: boolean
+  wallpaper?: boolean
+  screenshot?: boolean
+  play?: boolean
+}
 
 /**
  * The real shell in a frame, sitting on the page rather than in a card. It
@@ -36,7 +43,7 @@ export function Simulator({
   yaw?: number
   /** The app to show, by its home screen name; the empty string is Home. Changes after load go by postMessage. */
   app?: string
-  /** The split-screen drag toward `split`, a screenshot, or a song, replayed whenever the cue changes. */
+  /** A gesture for the phone to play: the split drag toward `split`, the switcher, a folder, the wallpaper, a screenshot, a song. Replayed whenever the cue changes. */
   cue?: Cue
   /** Mount at once instead of waiting for the viewport (the hero). */
   eager?: boolean

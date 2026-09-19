@@ -145,3 +145,6 @@ export function rename(folder: Folder, name: string) {
   const swap = (slots: Slot[]) => slots.map((s) => (s === folder ? { ...s, name } : s))
   save({ left: swap(grid().left), right: swap(grid().right) })
 }
+
+/** Back to the factory layout: nothing saved resolves to apps.ts's own order. */
+export const reset = () => save({ left: [], right: [] })
