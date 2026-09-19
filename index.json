@@ -39,6 +39,20 @@
           "sha256": "eca2ddb75864b930bf9f33f8bc49138a9fca5160b12e2739c964117891ee4076"
         }
       ]
+    },
+    "com.mnismt.duo.tictactoe": {
+      "name": "Tic-Tac-Toe",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tic-tac-toe",
+      "releases": [
+        {
+          "release": "1.0.0+a399c53c",
+          "sdk": "0.0.0",
+          "bytes": 258185,
+          "sha256": "1a3fe5824b3cbb72935adbb2fa1299e60c58f17932a60b105abf565edaf77e8d"
+        }
+      ]
     }
   }
 }
