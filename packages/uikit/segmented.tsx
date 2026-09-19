@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { PrimitiveProps } from './primitive.ts'
 import { appearance } from './primitive.ts'
-import { app } from './tokens.stylex.ts'
+import { app, radius, typeScale } from './tokens.stylex.ts'
 
 /**
  * Segmented control: one of a few views or filters, the selected segment raised
@@ -39,16 +39,16 @@ export function Segmented<T extends string>({
 }
 
 const styles = stylex.create({
-  track: { display: 'inline-flex', padding: 2, borderRadius: 7, backgroundColor: app.fill },
+  track: { display: 'inline-flex', padding: 2, borderRadius: radius.md, backgroundColor: app.fill },
   seg: {
     height: 22,
     paddingInline: 12,
     borderWidth: 0,
-    borderRadius: 5,
+    borderRadius: radius.sm,
     backgroundColor: 'transparent',
     color: 'inherit',
     fontFamily: 'inherit',
-    fontSize: 13,
+    fontSize: typeScale.footnote,
     cursor: 'pointer'
   },
   on: { backgroundColor: app.control, boxShadow: '0 1px 3px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.06)' }

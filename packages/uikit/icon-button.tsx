@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { PrimitiveProps } from './primitive.ts'
 import { appearance } from './primitive.ts'
 import { Sym, type SymProps } from './sym.tsx'
-import { app } from './tokens.stylex.ts'
+import { app, radius } from './tokens.stylex.ts'
 
 /**
  * A toolbar button that is only a symbol: the plus, the chevrons, the sidebar
@@ -48,7 +48,7 @@ const styles = stylex.create({
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
-    borderRadius: 7,
+    borderRadius: radius.sm,
     backgroundColor: 'transparent',
     color: 'inherit',
     cursor: 'pointer',
@@ -56,5 +56,5 @@ const styles = stylex.create({
     opacity: { default: 1, ':active': 0.6, ':disabled': 0.35 }
   },
   tinted: { backgroundColor: app.fill },
-  round: { width: 24, height: 24, borderRadius: '50%', backgroundColor: app.fill }
+  round: { width: 24, height: 24, borderRadius: radius.circle, backgroundColor: app.fill }
 })

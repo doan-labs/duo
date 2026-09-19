@@ -6,7 +6,8 @@ with a white tick), `IconButton` (a symbol-only toolbar button in `plain`,
 `tinted` and `round` variants), `Segmented` (a radio group of views or filters),
 `TextField` and `Select` (native fields over `fill`, any input type, `multiline`
 for a textarea) and `Sheet` (a modal card on a native `<dialog>`). `Toggle`
-stays the iOS switch.
+stays the iOS switch. `Checkbox` animates the way macOS draws it: the fill fades
+in, the tick springs up from half size, and the box squashes while pressed.
 
 # 1.0.0
 

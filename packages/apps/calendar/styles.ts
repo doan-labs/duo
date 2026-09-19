@@ -1,4 +1,4 @@
-import { app, appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, appAppearance, colors, fonts, radius, typeScale, weight } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 const HAIRLINE = { borderStyle: 'solid', borderColor: appAppearance.calendarGrid } as const
@@ -10,7 +10,7 @@ export const styles = stylex.create({
     minHeight: 0,
     backgroundColor: appAppearance.calendarPane,
     color: colors.white,
-    fontSize: appAppearance.settingsFontSize,
+    fontSize: typeScale.footnote,
     userSelect: 'none'
   },
   dim: { color: colors.grey },
@@ -35,8 +35,8 @@ export const styles = stylex.create({
   sideList: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingInline: 10 },
   group: {
     color: colors.grey,
-    fontSize: appAppearance.settingsFontSize2,
-    fontWeight: appAppearance.settingsFontWeight,
+    fontSize: typeScale.caption2,
+    fontWeight: weight.semibold,
     paddingTop: 12,
     paddingBottom: 6,
     paddingLeft: 10
@@ -47,7 +47,7 @@ export const styles = stylex.create({
     gap: 8,
     height: 28,
     paddingInline: 10,
-    borderRadius: appAppearance.settingsBorderRadius3,
+    borderRadius: radius.sm,
     cursor: 'pointer',
     backgroundColor: { default: 'transparent', ':hover': appAppearance.calendarHover }
   },
@@ -58,26 +58,26 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
-    fontWeight: appAppearance.settingsFontWeight,
+    fontWeight: weight.semibold,
     color: colors.grey
   },
   miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', rowGap: 6, textAlign: 'center' },
   miniWd: {
-    fontSize: appAppearance.calendarFontSize4,
-    fontWeight: appAppearance.settingsFontWeight,
+    fontSize: typeScale.caption2,
+    fontWeight: weight.semibold,
     color: colors.grey
   },
   miniDay: {
-    fontSize: appAppearance.calendarFontSize4,
-    fontWeight: appAppearance.settingsFontWeight,
-    fontFamily: 'inherit',
+    fontSize: typeScale.caption2,
+    fontWeight: weight.semibold,
+    fontFamily: fonts.system,
     width: 18,
     height: 18,
     padding: 0,
     borderWidth: 0,
     display: 'grid',
     placeItems: 'center',
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     justifySelf: 'center',
     color: 'inherit',
     backgroundColor: 'transparent',
@@ -119,20 +119,20 @@ export const styles = stylex.create({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    fontSize: appAppearance.settingsFontSize5,
-    fontWeight: appAppearance.calendarFontWeight
+    fontSize: typeScale.title1,
+    fontWeight: weight.regular
   },
-  titleSm: { fontSize: appAppearance.podcastsFontSize },
+  titleSm: { fontSize: typeScale.title3 },
   nav: { display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 },
   todayBtn: {
     height: 24,
     paddingInline: 12,
     borderWidth: 0,
-    borderRadius: appAppearance.settingsBorderRadius2,
+    borderRadius: radius.lg,
     backgroundColor: app.fill,
     color: 'inherit',
-    fontFamily: 'inherit',
-    fontSize: appAppearance.settingsFontSize,
+    fontFamily: fonts.system,
+    fontSize: typeScale.footnote,
     cursor: 'pointer'
   },
   // Month
@@ -147,8 +147,8 @@ export const styles = stylex.create({
   wd: {
     textAlign: 'right',
     paddingRight: 16,
-    fontSize: appAppearance.settingsFontSize3,
-    fontWeight: appAppearance.settingsFontWeight2
+    fontSize: typeScale.subheadline,
+    fontWeight: weight.medium
   },
   grid: {
     flexGrow: 1,
@@ -185,11 +185,11 @@ export const styles = stylex.create({
     textOverflow: 'ellipsis',
     display: 'grid',
     placeItems: 'center',
-    fontSize: appAppearance.settingsFontSize4,
-    fontWeight: appAppearance.settingsFontWeight2,
-    borderRadius: appAppearance.settingsBorderRadius2
+    fontSize: typeScale.body,
+    fontWeight: weight.medium,
+    borderRadius: radius.lg
   },
-  today: { backgroundColor: colors.red, color: colors.white, fontWeight: appAppearance.settingsFontWeight },
+  today: { backgroundColor: colors.red, color: colors.white, fontWeight: weight.semibold },
   chip: {
     display: 'flex',
     alignItems: 'center',
@@ -197,21 +197,21 @@ export const styles = stylex.create({
     height: 18,
     paddingInline: 4,
     borderWidth: 0,
-    borderRadius: appAppearance.settingsBorderRadius4,
+    borderRadius: radius.xs,
     backgroundColor: { default: 'transparent', ':hover': appAppearance.calendarHover },
     color: 'inherit',
-    fontFamily: 'inherit',
-    fontSize: appAppearance.settingsFontSize2,
+    fontFamily: fonts.system,
+    fontSize: typeScale.caption2,
     textAlign: 'left',
     cursor: 'pointer',
     flexShrink: 0
   },
-  chipAllDay: { color: colors.white, fontWeight: appAppearance.settingsFontWeight2 },
+  chipAllDay: { color: colors.white, fontWeight: weight.medium },
   chipTitle: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   dot: {
     width: 8,
     height: 8,
-    borderRadius: appAppearance.settingsBorderRadius,
+    borderRadius: radius.circle,
     borderWidth: 1.5,
     borderStyle: 'solid',
     borderColor: 'transparent',
@@ -225,11 +225,11 @@ export const styles = stylex.create({
     height: 24,
     display: 'grid',
     placeItems: 'center',
-    fontSize: appAppearance.settingsFontSize4,
-    fontWeight: appAppearance.settingsFontWeight2,
-    borderRadius: appAppearance.settingsBorderRadius2
+    fontSize: typeScale.body,
+    fontWeight: weight.medium,
+    borderRadius: radius.lg
   },
-  allDayLabel: { fontSize: appAppearance.calendarFontSize4, color: colors.grey, textAlign: 'right', paddingRight: 4 },
+  allDayLabel: { fontSize: typeScale.caption2, color: colors.grey, textAlign: 'right', paddingRight: 4 },
   allDay: { minHeight: 20, display: 'flex', flexDirection: 'column', gap: 2, paddingInline: 2, paddingBottom: 2 },
   tgScroll: { flexGrow: 1, minHeight: 0, overflow: 'auto' },
   tgBody: { display: 'grid', height: 44 * 24 },
@@ -239,7 +239,7 @@ export const styles = stylex.create({
     height: 44,
     paddingRight: 6,
     textAlign: 'right',
-    fontSize: appAppearance.calendarFontSize4,
+    fontSize: typeScale.caption2,
     color: colors.grey,
     transform: 'translateY(-6px)'
   },
@@ -262,10 +262,10 @@ export const styles = stylex.create({
     paddingTop: 3,
     paddingInline: 6,
     borderWidth: 0,
-    borderRadius: appAppearance.settingsBorderRadius4,
+    borderRadius: radius.xs,
     color: colors.white,
-    fontFamily: 'inherit',
-    fontSize: appAppearance.settingsFontSize2,
+    fontFamily: fonts.system,
+    fontSize: typeScale.caption2,
     textAlign: 'left',
     overflow: 'hidden',
     opacity: 0.9,
@@ -285,7 +285,7 @@ export const styles = stylex.create({
       top: -3,
       width: 8,
       height: 8,
-      borderRadius: '50%',
+      borderRadius: radius.circle,
       backgroundColor: colors.red
     }
   },
@@ -307,9 +307,9 @@ export const styles = stylex.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: 'inherit',
-    fontFamily: 'inherit',
-    fontSize: appAppearance.settingsFontSize4,
-    fontWeight: appAppearance.settingsFontWeight,
+    fontFamily: fonts.system,
+    fontSize: typeScale.body,
+    fontWeight: weight.semibold,
     cursor: 'pointer'
   },
   // Search
@@ -322,16 +322,16 @@ export const styles = stylex.create({
     height: 32,
     paddingInline: 8,
     borderWidth: 0,
-    borderRadius: appAppearance.settingsBorderRadius3,
+    borderRadius: radius.sm,
     backgroundColor: { default: 'transparent', ':hover': appAppearance.calendarHover },
     color: 'inherit',
-    fontFamily: 'inherit',
-    fontSize: appAppearance.settingsFontSize,
+    fontFamily: fonts.system,
+    fontSize: typeScale.footnote,
     textAlign: 'left',
     cursor: 'pointer'
   },
   // Event sheet
   form: { display: 'flex', flexDirection: 'column', gap: 10, padding: 16 },
-  titleField: { fontSize: appAppearance.settingsFontSize4, fontWeight: appAppearance.settingsFontWeight, height: 32 },
+  titleField: { fontSize: typeScale.body, fontWeight: weight.semibold, height: 32 },
   fieldLabel: { width: 60, color: colors.grey, flexShrink: 0 }
 })

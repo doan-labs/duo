@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { animations } from './animations.ts'
 import type { PrimitiveProps } from './primitive.ts'
 import { appearance } from './primitive.ts'
-import { app } from './tokens.stylex.ts'
+import { app, radius } from './tokens.stylex.ts'
 
 /**
  * A modal card over the app: a native `<dialog>`, so focus, Escape and the
@@ -47,7 +47,7 @@ const styles = stylex.create({
     maxWidth: 'calc(100vw - 32px)',
     padding: 0,
     borderWidth: 0,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     backgroundColor: app.elevated,
     color: app.fg,
     boxShadow: '0 18px 50px rgba(0,0,0,.45)',
