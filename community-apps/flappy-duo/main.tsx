@@ -4,6 +4,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { cue } from './audio.ts'
+import { AVATARS } from './avatars.ts'
 import {
   FLOOR_ROASTS,
   HAZARDS,
@@ -91,7 +92,7 @@ function Game() {
   const confirmPay = () => {
     setPay('processing')
     const cost = priceFor(world.current.run)
-    const receipt = receiptFor(world.current.run, cost)
+    const receipt = receiptFor(world.current.run)
     window.setTimeout(() => {
       setPay('done')
       cue('pay')
@@ -103,7 +104,7 @@ function Game() {
     window.setTimeout(() => setPay('leaving'), 2500)
     window.setTimeout(() => {
       setPay(null)
-      setNotice(receipt)
+      if (receipt) setNotice(receipt)
       reset()
     }, 2850)
   }
@@ -377,12 +378,7 @@ function Game() {
       )}
       {notice && (
         <div role="status" {...stylex.props(styles.notice, cover && styles.noticeCover)}>
-          <span {...stylex.props(styles.noticeIcon)}>
-            {notice.title
-              .split(' ')
-              .map((n) => n[0])
-              .join('')}
-          </span>
+          <img src={AVATARS[notice.title]} alt="" {...stylex.props(styles.noticeIcon)} />
           <div {...stylex.props(styles.noticeText)}>
             <strong>{notice.title}</strong>
             <span>{notice.text}</span>

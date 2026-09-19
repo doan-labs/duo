@@ -78,23 +78,12 @@ export const HAZARDS: [number, number, Hazard, string][] = [
   [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
   [4, 1, 'throw', 'Accessories are sold separately and shipped directly.']
 ]
-// The receipt is written the way Apple writes. Nothing in it is a joke on its own.
-// `$` is replaced with the amount.
-export const RECEIPTS: [string, string][] = [
-  ['Tim Cook', 'Thank you for choosing iPhone Duo again. Your order of $ has been confirmed.'],
-  ['John Ternus', 'The iPhone Duo hinge is engineered for 200,000 folds. Your new unit begins at zero.'],
-  ['Tim Cook', 'iPhone Duo is the best iPhone we have ever made. We are glad you agree, again.'],
-  ['John Ternus', 'Grade 5 titanium. Ceramic Shield. Your replacement carries the same specifications.'],
-  ['Tim Cook', 'Every iPhone Duo is built to last. Your next one ships today.'],
-  ['John Ternus', 'We validated the hinge across a wide range of real-world conditions.'],
-  ['Tim Cook', 'Privacy is a fundamental human right. Your purchase history is safe with us.'],
-  ['John Ternus', 'The thinnest iPhone we have ever made. It performs best in one piece.'],
-  ['Tim Cook', 'A payment of $ has been received. We look forward to serving you again.'],
-  ['John Ternus', 'Every component in your new iPhone Duo has been redesigned. The price has been revised.']
-]
-export const receiptFor = (run: number, price: number): { title: string; text: string } => {
-  const [title, line] = RECEIPTS[(run - 1) % RECEIPTS.length]!
-  return { title, text: line.replace('$', `$${price.toLocaleString()}`) }
+// Only the second and third purchases are acknowledged. Later ones alternate the same two lines.
+export const receiptFor = (run: number): { title: string; text: string } | null => {
+  if (run < 2) return null
+  return run % 2 === 0
+    ? { title: 'Tim Cook', text: 'Thank you for your contribution.' }
+    : { title: 'John Ternus', text: 'We appreciate your continued support.' }
 }
 export const MISSILE_LABELS = ['DONGLE', 'USB-C', 'CHARGER', 'PENCIL', 'AIRTAG']
 export const NOTICES: [string, string][] = [

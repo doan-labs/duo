@@ -345,13 +345,7 @@ export const styles = stylex.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 12,
-    fontWeight: 700,
-    color: colors.white,
-    backgroundImage: 'linear-gradient(135deg, #1d5fa8, #8be7ff)'
+    objectFit: 'cover'
   },
   noticeText: { display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 },
   noticeTime: { alignSelf: 'flex-start', fontSize: 11, color: '#8a95a8' }
