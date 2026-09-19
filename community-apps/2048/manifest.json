@@ -1,7 +1,7 @@
 {
   "id": "com.mnismt.duo.2048",
   "name": "2048",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "lane": "community",
   "entry": "./main.tsx",
   "icon": "./icon.png",

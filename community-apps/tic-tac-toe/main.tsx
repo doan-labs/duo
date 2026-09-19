@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -153,7 +153,7 @@ const styles = stylex.create({
     paddingBlock: 16,
     paddingInline: 18,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system
   },
   cover: { gap: 6, paddingBlock: 10, paddingInline: 10 },
@@ -187,7 +187,7 @@ const styles = stylex.create({
     borderWidth: 0,
     borderRadius: 12,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontSize: 42,
     fontWeight: 800,
     cursor: 'pointer',
@@ -202,15 +202,15 @@ const styles = stylex.create({
     animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
     animationFillMode: 'both'
   },
-  cellX: { color: colors.cyan, backgroundColor: colors.fillThin },
-  cellO: { color: colors.orange, backgroundColor: colors.fillThin },
+  cellX: { color: colors.cyan, backgroundColor: app.fill3 },
+  cellO: { color: colors.orange, backgroundColor: app.fill3 },
   controls: { display: 'flex', justifyContent: 'center', gap: 8, flexShrink: 0 },
   primary: {
     borderWidth: 0,
     borderRadius: 999,
     paddingBlock: 9,
     paddingInline: 16,
-    color: colors.darkElevated,
+    color: colors.grey6Dark,
     backgroundColor: colors.cyan,
     fontWeight: 800,
     cursor: 'pointer',
@@ -224,7 +224,7 @@ const styles = stylex.create({
     paddingBlock: 9,
     paddingInline: 14,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontWeight: 700,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',

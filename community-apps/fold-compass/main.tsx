@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -94,7 +94,7 @@ const styles = stylex.create({
     paddingBottom: 42,
     fontFamily: fonts.system,
     color: colors.white,
-    backgroundColor: colors.weatherNight,
+    backgroundColor: colors.grey6Dark,
     fontSize: 14
   },
   pocket: { paddingInline: 20, gap: 8 },
@@ -110,28 +110,28 @@ const styles = stylex.create({
   board: {
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.weatherScrollRim,
+    borderColor: app.fill,
     borderRadius: 20,
     paddingInline: 20,
     paddingBlock: 12,
-    backgroundColor: colors.fillThin
+    backgroundColor: app.fill3
   },
   mode: { fontSize: 15, marginBlock: 0 },
   angle: { fontSize: 74, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' },
   degrees: { color: colors.cyan, fontSize: 38 },
-  track: { height: 6, borderRadius: 3, backgroundColor: colors.fillThick, overflow: 'hidden', marginBlock: 12 },
+  track: { height: 6, borderRadius: 3, backgroundColor: app.fill, overflow: 'hidden', marginBlock: 12 },
   fill: (angle: number) => ({ width: `${(angle / 180) * 100}%`, height: '100%', backgroundColor: colors.cyan }),
   details: { display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.grey3 },
   label: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 },
   input: {
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.weatherScrollRim,
+    borderColor: app.fill,
     borderRadius: 10,
     paddingBlock: 10,
     paddingInline: 12,
     color: colors.white,
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     fontSize: 15
   }
 })

@@ -1,4 +1,4 @@
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useRef } from 'react'
 import { DuoLogo } from './duo-logo.tsx'
@@ -111,9 +111,9 @@ const styles = stylex.create({
     gridTemplateRows: 'repeat(14, minmax(0, 1fr))',
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: colors.fillDark,
+    borderColor: app.fill,
     borderRadius: 18,
-    backgroundColor: colors.darkElevated2,
+    backgroundColor: colors.grey5Dark,
     overflow: 'hidden',
     flexShrink: 0,
     animationName: { default: boardIn, [motion]: 'none' },
@@ -131,7 +131,7 @@ const styles = stylex.create({
   }),
   cell: {
     borderRadius: 4,
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     width: '100%',
     height: '100%',
     minWidth: 0,
@@ -139,8 +139,8 @@ const styles = stylex.create({
     opacity: 0.58
   },
   cellOccupied: { opacity: 0.78 },
-  cellHead: { backgroundColor: colors.fillDark, opacity: 0.9 },
-  cellFood: { backgroundColor: colors.fillDark, opacity: 0.9 },
+  cellHead: { backgroundColor: app.fill, opacity: 0.9 },
+  cellFood: { backgroundColor: app.fill, opacity: 0.9 },
   playfield: { position: 'absolute', inset: 0, pointerEvents: 'none' },
   segment: {
     position: 'absolute',
@@ -176,7 +176,7 @@ const styles = stylex.create({
     width: '32%',
     height: '32%',
     borderRadius: 999,
-    backgroundColor: colors.weatherSun,
+    backgroundColor: colors.yellow,
     animationName: { default: foodEnter, [motion]: 'none' },
     animationDuration: '.24s',
     animationTimingFunction: easeOut,

@@ -136,7 +136,7 @@ export const styles = stylex.create({
     paddingBlock: 8,
     paddingInline: 14,
     color: colors.white,
-    backgroundColor: colors.blueBright,
+    backgroundColor: colors.blue,
     fontSize: 13,
     fontWeight: 700,
     cursor: 'pointer'
@@ -186,7 +186,7 @@ export const styles = stylex.create({
   cancel: {
     borderWidth: 0,
     backgroundColor: 'transparent',
-    color: colors.blueBright,
+    color: colors.blue,
     fontSize: 15,
     fontWeight: 400,
     cursor: 'pointer',

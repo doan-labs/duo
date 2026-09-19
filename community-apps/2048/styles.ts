@@ -1,4 +1,4 @@
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { SIZE } from './game.ts'
 
@@ -31,7 +31,7 @@ export const styles = stylex.create({
     paddingBlock: 14,
     paddingInline: 14,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system,
     fontSize: 14
   },
@@ -46,7 +46,7 @@ export const styles = stylex.create({
     paddingInline: 8,
     borderRadius: 8,
     color: colors.grey3,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     textAlign: 'center',
     fontSize: 8,
     letterSpacing: 1
@@ -57,7 +57,7 @@ export const styles = stylex.create({
     paddingBlock: BOARD_PAD,
     paddingInline: BOARD_PAD,
     borderRadius: 14,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     touchAction: 'none',
     overflow: 'hidden',
     flexShrink: 0
@@ -68,7 +68,7 @@ export const styles = stylex.create({
     left: 0,
     top: 0,
     borderRadius: 8,
-    backgroundColor: colors.fillThin
+    backgroundColor: app.fill3
   },
   tile: {
     position: 'absolute',
@@ -96,9 +96,9 @@ export const styles = stylex.create({
     animationFillMode: 'both'
   },
   compact: { fontSize: 18 },
-  tileEmpty: { backgroundColor: colors.fillThin },
-  tile2: { backgroundColor: colors.grey3, color: colors.darkElevated },
-  tile4: { backgroundColor: colors.weatherSun, color: colors.darkElevated },
+  tileEmpty: { backgroundColor: app.fill3 },
+  tile2: { backgroundColor: colors.grey3, color: colors.grey6Dark },
+  tile4: { backgroundColor: colors.yellow, color: colors.grey6Dark },
   tile8: { backgroundColor: colors.orange },
   tile16: { backgroundColor: colors.red },
   tile32: { backgroundColor: colors.pink },
@@ -107,7 +107,7 @@ export const styles = stylex.create({
   tile256: { backgroundColor: colors.blue },
   tile512: { backgroundColor: colors.teal },
   tile1024: { backgroundColor: colors.green },
-  tile2048: { backgroundColor: colors.yellow, color: colors.darkElevated },
+  tile2048: { backgroundColor: colors.yellow, color: colors.grey6Dark },
   controls: { display: 'grid', justifyContent: 'center', gap: 6, flexShrink: 0 },
   fitControls: (size: number) => ({
     gridTemplateColumns: `repeat(3, ${size}px)`,
@@ -117,7 +117,7 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: 12,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontSize: 23,
     cursor: 'pointer',
     touchAction: 'manipulation',
@@ -159,7 +159,7 @@ export const styles = stylex.create({
     paddingInline: 14,
     borderRadius: 12,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     animationName: { default: messageIn, [motion]: 'none' },
     animationDuration: '.22s',
     animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
@@ -170,7 +170,7 @@ export const styles = stylex.create({
     borderRadius: 999,
     paddingBlock: 6,
     paddingInline: 10,
-    color: colors.darkElevated,
+    color: colors.grey6Dark,
     backgroundColor: colors.yellow,
     fontWeight: 700,
     cursor: 'pointer',

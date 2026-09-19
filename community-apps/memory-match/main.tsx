@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useDisplay } from '@doan-labs/duo-uikit'
-import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -116,7 +116,7 @@ const styles = stylex.create({
     paddingBlock: 16,
     paddingInline: 18,
     color: colors.white,
-    backgroundColor: colors.darkElevated,
+    backgroundColor: colors.grey6Dark,
     fontFamily: fonts.system
   },
   cover: { gap: 5, paddingBlock: 9, paddingInline: 10 },
@@ -148,7 +148,7 @@ const styles = stylex.create({
     borderWidth: 0,
     borderRadius: 10,
     color: colors.white,
-    backgroundColor: colors.fillDark,
+    backgroundColor: app.fill,
     fontSize: 26,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color, color',
@@ -157,19 +157,19 @@ const styles = stylex.create({
     transform: { default: 'scale(1)', ':active': 'scale(.95)' }
   },
   cardOpen: {
-    backgroundColor: colors.fillThin,
+    backgroundColor: app.fill3,
     animationName: { default: cardReveal, [motion]: 'none' },
     animationDuration: '.24s',
     animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
     animationFillMode: 'both'
   },
-  cardMatched: { color: colors.greenBright, backgroundColor: colors.darkElevated2 },
+  cardMatched: { color: colors.greenDark, backgroundColor: colors.grey5Dark },
   reset: {
     borderWidth: 0,
     borderRadius: 999,
     paddingBlock: 9,
     paddingInline: 18,
-    color: colors.darkElevated,
+    color: colors.grey6Dark,
     backgroundColor: colors.purple,
     fontWeight: 800,
     cursor: 'pointer',

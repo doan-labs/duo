@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- Built against UI kit 1.0.0 token names.
+
 ## 1.0.3
 
 - Both merging tiles now glide into the target cell; the merged value appears on arrival.
