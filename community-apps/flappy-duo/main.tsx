@@ -7,7 +7,6 @@ import { cue } from './audio.ts'
 import { AVATARS } from './avatars.ts'
 import {
   FLOOR_ROASTS,
-  HAZARDS,
   has,
   MISSILE_ROASTS,
   medalFor,
@@ -33,7 +32,6 @@ function Game() {
   const [folds, setFolds] = useState(0)
   const [best, setBest] = useState(0)
   const [spent, setSpent] = useState(PRICE)
-  const [toast, setToast] = useState('')
   const [roast, setRoast] = useState('')
   const [pay, setPay] = useState<'sheet' | 'processing' | 'done' | 'leaving' | null>(null)
   const onPay = useRef(() => {})
@@ -84,7 +82,6 @@ function Game() {
     setScore(0)
     setFolds(0)
     setRoast('')
-    setToast('')
   }
 
   // Apple Pay's beat: a moment of processing, the check draws in, the sheet drops, then the receipt.
@@ -134,12 +131,6 @@ function Game() {
     const octx = off.getContext('2d')!
     let last = performance.now()
     let frame = 0
-    let toastTimer = 0
-    const say = (line: string, ms = 2000) => {
-      setToast(line)
-      window.clearTimeout(toastTimer)
-      toastTimer = window.setTimeout(() => setToast(''), ms)
-    }
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
@@ -149,13 +140,10 @@ function Game() {
       if (scored) {
         cue('score')
         setScore(next.score)
-        const hazard = HAZARDS.find(([r, s]) => next.run >= r && s === next.score)
-        if (hazard) say(hazard[3], 2600)
       }
       if (before.status === 'playing' && next.status === 'over') {
         cue('crash')
         setStatus('over')
-        setToast('')
         setRoast(
           next.cause === 'floor'
             ? pick(FLOOR_ROASTS)
@@ -186,7 +174,6 @@ function Game() {
     frame = requestAnimationFrame(tick)
     return () => {
       cancelAnimationFrame(frame)
-      window.clearTimeout(toastTimer)
     }
   }, [width, height])
 
@@ -236,7 +223,6 @@ function Game() {
           <span {...stylex.props(styles.tap)}>Tap to fold</span>
         </section>
       )}
-      {toast && status !== 'over' && <div {...stylex.props(styles.toast, cover && styles.toastCover)}>{toast}</div>}
       {status === 'over' && !pay && (
         <section
           role="alertdialog"

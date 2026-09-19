@@ -89,25 +89,6 @@ export const styles = stylex.create({
     animationDuration: '1.4s',
     animationIterationCount: 'infinite'
   },
-  toast: {
-    position: 'absolute',
-    insetInline: 0,
-    top: '24%',
-    marginInline: 'auto',
-    width: 'fit-content',
-    maxWidth: '80%',
-    paddingBlock: 6,
-    paddingInline: 12,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,.85)',
-    color: '#0b1a3a',
-    fontSize: 13,
-    fontWeight: 700,
-    textAlign: 'center',
-    pointerEvents: 'none',
-    boxShadow: '0 6px 20px rgba(20,60,120,.25)'
-  },
-  toastCover: { fontSize: 11, top: '28%' },
   alert: {
     position: 'absolute',
     insetInline: 16,

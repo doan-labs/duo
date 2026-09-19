@@ -45,14 +45,14 @@ export const BANNER_LIFE = 4.5
 /** The replacement costs more every game: 2,399, 2,999, 3,699, 4,699, 5,899… always ending in 99. */
 export const priceFor = (run: number) => Math.round((PRICE * 1.25 ** (run - 1)) / 100) * 100 - 1
 
-// The game gets worse with every game and every point. [game, score, hazard, announcement].
-export const HAZARDS: [number, number, Hazard, string][] = [
-  [1, 2, 'drift', 'Update installed. Slab positions are now dynamic.'],
-  [2, 1, 'blur', 'iOS 27 beta installed overnight. Sharp rendering is available on Pro models.'],
-  [1, 3, 'notify', 'Notification settings restored from backup.'],
-  [3, 1, 'slam', 'Recall notice. Slabs may close without prior notice.'],
-  [3, 4, 'fast', 'Thermal condition detected. Scroll speed increased to compensate.'],
-  [3, 1, 'throw', 'Accessories are sold separately and shipped directly.']
+// The game gets worse with every game and every point. [game, score, hazard].
+export const HAZARDS: [number, number, Hazard][] = [
+  [1, 2, 'drift'],
+  [1, 3, 'notify'],
+  [2, 1, 'blur'],
+  [3, 1, 'slam'],
+  [3, 1, 'throw'],
+  [3, 4, 'fast']
 ]
 // The first three purchases are acknowledged; the notice lands as the next game opens.
 const RECEIPTS = [
