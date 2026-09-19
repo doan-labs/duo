@@ -20,6 +20,20 @@
         }
       ]
     },
+    "com.mnismt.duo.habitstreaks": {
+      "name": "Habit Streak",
+      "lane": "community",
+      "author": "mnismt",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/habit-streaks",
+      "releases": [
+        {
+          "release": "1.0.0+33f750ec",
+          "sdk": "0.0.0",
+          "bytes": 255201,
+          "sha256": "a65c65ada4ff7a0fa0aeacae07f4c37711804a74266293617c3eabd79a3fa1f0"
+        }
+      ]
+    },
     "com.mnismt.duo.snake": {
       "name": "Snake",
       "lane": "community",
