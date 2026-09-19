@@ -1,7 +1,7 @@
 {
   "id": "labs.doan.ipduo.calculator",
   "name": "Calculator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "lane": "official",
   "entry": "./main.tsx",
   "icon": "./icon.png",

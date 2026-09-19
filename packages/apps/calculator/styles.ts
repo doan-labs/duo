@@ -2,10 +2,12 @@ import { appAppearance, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
 export const styles = stylex.create({
-  body: { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' },
+  // The pad reads its height off the body, so the readout is never pushed off the top.
+  body: { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', containerType: 'size' },
   calc: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4,72px)',
+    // 72px keys when they fit, else what is left after the 70px readout, five 9px gaps and the bottom padding.
+    gridTemplateColumns: 'repeat(4, min(72px, (100cqh - 127px) / 5))',
     justifyContent: 'center',
     gap: 9,
     paddingInline: 14,
@@ -38,7 +40,8 @@ export const styles = stylex.create({
     fontWeight: appAppearance.homeFontWeight,
     paddingInline: 10,
     paddingBottom: 4,
-    minHeight: 70,
+    height: 70,
+    lineHeight: 1,
     display: 'flex',
     alignItems: 'flex-end',
     justifyContent: 'flex-end',
