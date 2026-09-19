@@ -7,6 +7,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/2048",
       "releases": [
         {
+          "release": "1.0.3+76d3372f",
+          "sdk": "0.0.0",
+          "bytes": 263490,
+          "sha256": "7733840c292eb9b09d601bba1354dc56d8c6a5daafd418b2c76e14bed7cf7a02"
+        },
+        {
           "release": "1.0.2+1109f019",
           "sdk": "0.0.0",
           "bytes": 262361,
