@@ -53,6 +53,7 @@ StyleX classes are unstable; use shell data attributes:
 | HUD/hardware | data-hud=vol/thumb/poff/flash/torch/cc/dim; data-on; data-torch; data-boot |
 | Control Center | data-cc; data-cc-slider=bright/volume; data-cc-pull; data-cc-page=0/1/2 |
 | Split | data-drop=left/right/none |
+| Home grid | data-tile; data-cell=left:i/right:i; data-folder, data-folder-well while a folder is open; data-wallpapers, data-paper, data-on for the sheet; `localStorage['os.home']`, `['os.wallpaper']` |
 | Sandbox | data-view/session/generation/state/owner; select frames by data-view, never frame-list order |
 
 ```js

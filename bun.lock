@@ -359,16 +359,6 @@
         "react": "^19",
       },
     },
-    "packages/apps/utilities": {
-      "name": "@doan-labs/duo-app-utilities",
-      "version": "0.0.0",
-      "dependencies": {
-        "@doan-labs/duo-sdk": "workspace:*",
-        "@doan-labs/duo-uikit": "workspace:*",
-        "@stylexjs/stylex": "0.19.0",
-        "react": "^19",
-      },
-    },
     "packages/apps/wallet": {
       "name": "@doan-labs/duo-app-wallet",
       "version": "0.0.0",
@@ -462,7 +452,6 @@
         "@doan-labs/duo-app-stocks": "workspace:*",
         "@doan-labs/duo-app-tips": "workspace:*",
         "@doan-labs/duo-app-tv": "workspace:*",
-        "@doan-labs/duo-app-utilities": "workspace:*",
         "@doan-labs/duo-app-wallet": "workspace:*",
         "@doan-labs/duo-app-watch": "workspace:*",
         "@doan-labs/duo-app-weather": "workspace:*",
@@ -631,8 +620,6 @@
     "@doan-labs/duo-app-tips": ["@doan-labs/duo-app-tips@workspace:packages/apps/tips"],
 
     "@doan-labs/duo-app-tv": ["@doan-labs/duo-app-tv@workspace:packages/apps/tv"],
-
-    "@doan-labs/duo-app-utilities": ["@doan-labs/duo-app-utilities@workspace:packages/apps/utilities"],
 
     "@doan-labs/duo-app-wallet": ["@doan-labs/duo-app-wallet@workspace:packages/apps/wallet"],
 

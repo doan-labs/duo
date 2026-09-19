@@ -12,8 +12,8 @@ import { bootRegistry } from './runtime/registry.ts'
 import { BootScreen } from './springboard/power.tsx'
 import { SpringBoard } from './springboard/springboard.tsx'
 
-/** Builds one display's OS. `w`/`hgt` in CSS px; `wall` is a wallpaper URL. */
-export function os(w: number, hgt: number, wall: string, container: HTMLElement, boot?: string | null): HTMLElement {
+/** Builds one display's OS. `w`/`hgt` in CSS px. */
+export function os(w: number, hgt: number, container: HTMLElement, boot?: string | null): HTMLElement {
   const wide = w > 600
   // The root is handed to CSS3DObject before React has rendered anything, so
   // its own look is applied here by hand; everything inside is React.
@@ -40,7 +40,7 @@ export function os(w: number, hgt: number, wall: string, container: HTMLElement,
   void bootRegistry()
     .then(() => {
       const dev = [...development].find(([, value]) => value.bundle.release.manifest.id === boot)
-      view.render(<SpringBoard w={w} hgt={hgt} wall={wall} boot={dev?.[0] ?? boot} shots={shots} />)
+      view.render(<SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} shots={shots} />)
     })
     .catch((error) => {
       view.render(<BootScreen error={`Apps unavailable: ${error.message}. Reload to retry.`} />)

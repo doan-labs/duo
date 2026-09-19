@@ -1,8 +1,9 @@
 import { WALL_KEY } from '@doan-labs/duo-uikit/icons/index.ts'
 import * as THREE from 'three'
 import { widgetAge } from '../uikit/widget.tsx'
-import { DOCK, LEFT, RIGHT } from './apps.ts'
+import { byName, DOCK } from './apps.ts'
 import { widgetSnapshot } from './runtime/widgets.tsx'
+import { grid, isFolder, type Slot } from './springboard/grid.ts'
 
 // Scene units are metres; PX converts a millimetre to canvas pixels.
 const PX = 12
@@ -52,7 +53,7 @@ function grad(
 }
 
 /**
- * Apple's Star White dunes, `background-size:cover` in canvas form. `posX` is
+ * The wallpaper, `background-size:cover` in canvas form. `posX` is
  * the horizontal anchor, matching --wpos: the cover display shows the same part
  * of the picture the inner display's left half does, so folding moves nothing.
  */
@@ -157,7 +158,7 @@ function cell(
   label(ctx, name, x + u(ICON) / 2, y + u(ICON) + u(4))
 }
 
-/** The Utilities tile: a translucent slab holding its first nine icons. */
+/** A folder tile: a translucent slab holding its first nine icons. */
 function folder(
   ctx: CanvasRenderingContext2D,
   blur: HTMLCanvasElement,
@@ -222,7 +223,7 @@ function radios(ctx: CanvasRenderingContext2D, cx: number, top: number) {
 }
 
 /**
- * Bakes a display: black bezel with rounded glass corners, Apple's wallpaper and
+ * Bakes a display: black bezel with rounded glass corners, the wallpaper and
  * the iPhone Duo home screen. `width`/`height` are the glass size in metres;
  * `wide` picks the inner display, which also shows the right half of the grid.
  */
@@ -436,16 +437,18 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
   ctx.fillText('10:00 Apple Park', wx(1) + u(19), wtop + wsize - u(23))
 
   // Left half sits under the widgets, from row 3; the right half starts at row 1
-  // one seam further across, so nothing lands on the hinge.
-  LEFT.forEach((a, i) => cell(ctx, imgs, a.name, i % 4, 2 + Math.floor(i / 4), x0, y0))
-  if (wide) {
-    const rx = x0 + 4 * u(CELL) + u(SEAM)
-    RIGHT.forEach((a, i) => {
-      const [col, row] = [i % 4, Math.floor(i / 4)]
-      if (a.folder) folder(ctx, blur, imgs, a.folder, a.name, col, row, rx, y0)
-      else cell(ctx, imgs, a.name, col, row, rx, y0)
+  // one seam further across, so nothing lands on the hinge. The cells are the
+  // grid as arranged, folders and all: the same snapshot the live home draws.
+  const cells = grid()
+  const named = (k: string) => byName(k)?.name ?? k
+  const half = (slots: Slot[], x: number, row0: number) =>
+    slots.forEach((s, i) => {
+      const [col, row] = [i % 4, row0 + Math.floor(i / 4)]
+      if (isFolder(s)) folder(ctx, blur, imgs, s.apps.map(named), s.name, col, row, x, y0)
+      else cell(ctx, imgs, named(s), col, row, x, y0)
     })
-  }
+  half(cells.left, x0, 2)
+  if (wide) half(cells.right, x0 + 4 * u(CELL) + u(SEAM), 0)
 
   // Page dots, centred on the content rather than the glass: folded, the second
   // page is the half the cover display cannot show.
