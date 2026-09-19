@@ -10,6 +10,10 @@
       "folder": "2048",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.tictactoe": {
+      "folder": "tic-tac-toe",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.snake": {
       "folder": "snake",
       "maintainers": ["mnismt"]
