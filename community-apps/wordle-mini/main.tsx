@@ -8,6 +8,12 @@ import { createRoot } from 'react-dom/client'
 
 type GameStatus = 'playing' | 'won' | 'lost'
 type TileState = 'empty' | 'correct' | 'present' | 'absent'
+const motion = '@media (prefers-reduced-motion: reduce)'
+const tileReveal = stylex.keyframes({
+  from: { opacity: 0, transform: 'scale(.86)' },
+  '70%': { opacity: 1, transform: 'scale(1.04)' },
+  to: { opacity: 1, transform: 'scale(1)' }
+})
 
 const WORDS = [
   'APPLE',
@@ -133,7 +139,11 @@ function Game() {
         {Array.from({ length: 6 }, (_, row) => {
           const word = guesses[row] ?? (row === guesses.length ? current : '')
           return (
-            <div role="row" key={ROW_KEYS[row]} {...stylex.props(styles.row, styles.fitRow(tile))}>
+            <div
+              role="row"
+              key={ROW_KEYS[row]}
+              {...stylex.props(styles.row, styles.fitRow(tile), row < guesses.length && styles.submitted)}
+            >
               {Array.from({ length: 5 }, (_, column) => (
                 <div
                   role="gridcell"
@@ -141,6 +151,7 @@ function Game() {
                   key={COLUMN_KEYS[column]}
                   {...stylex.props(
                     styles.tile,
+                    Boolean(word[column]) && styles.filled,
                     styles.fitTile(tile),
                     tileState(word, column, solution) === 'correct' && styles.correct,
                     tileState(word, column, solution) === 'present' && styles.present,
@@ -230,7 +241,21 @@ const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.fillThin,
     fontSize: 16,
-    fontWeight: 800
+    fontWeight: 800,
+    transitionProperty: 'transform, background-color, border-color, color',
+    transitionDuration: '.16s, .2s, .2s, .2s',
+    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)'
+  },
+  filled: {
+    animationName: { default: tileReveal, [motion]: 'none' },
+    animationDuration: '.2s',
+    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
+    animationFillMode: 'both'
+  },
+  submitted: {
+    animationName: { default: tileReveal, [motion]: 'none' },
+    animationDuration: '.22s',
+    animationFillMode: 'both'
   },
   fitTile: (size: number) => ({ width: `${String(size)}px`, height: `${String(size)}px` }),
   correct: { borderColor: colors.greenBright, backgroundColor: colors.green, color: colors.black },
@@ -247,7 +272,10 @@ const styles = stylex.create({
     backgroundColor: colors.fillDark,
     fontSize: 10,
     fontWeight: 800,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color, color',
+    transitionDuration: '.14s, .18s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.94)' }
   },
   fitKey: (size: number) => ({ width: `${String(size)}px`, height: `${String(size)}px` }),
   actionRow: { gridTemplateColumns: '1fr 1fr' },
@@ -260,7 +288,10 @@ const styles = stylex.create({
     backgroundColor: colors.fillDark,
     fontSize: 9,
     fontWeight: 800,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: '.14s, .18s',
+    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
   }
 })
 
