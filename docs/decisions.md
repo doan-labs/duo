@@ -944,3 +944,16 @@ installed. Rather than change the reseed, the button goes: `StoreRow` gains
 `preinstalled`, read from the `seeded` mark the boot install writes, and
 neither Settings nor the App Store draws Remove App for a row that carries it.
 A dead button is worse than a missing one.
+
+## 73. An app can claim the side button's double-click while a sheet is up
+
+Apps received no hardware button events: the frame's side button double-click always
+launched Wallet from `device.ts`. Flappy Duo's Duo Pay sheet needed the same gesture as
+Apple Pay, and a fake side button drawn inside the app is not the frame's button. The
+minimal route is a claim: `side.claim` and `side.release` on the bridge, a `side` event
+back, and a registry in `device.ts` that `wallet()` consults before launching Wallet. Only
+a claiming view that is visible and active receives the press, so a background app or the
+other display cannot swallow it, and the bridge drops the claim on revoke. Single clicks,
+long press and volume stay with the shell; forwarding every button was considered and
+skipped until an app needs it. Older SDKs never send `side.claim`, so they never receive
+`side` and keep treating unknown events as a protocol error safely.

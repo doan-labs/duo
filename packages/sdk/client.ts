@@ -37,6 +37,7 @@ export function createClient() {
   const views = new Set<(v: ViewInfo) => void>()
   const owners = new Set<(o: { epoch: number } | null) => void>()
   const args = new Set<(arg: string) => void>()
+  const sides = new Set<() => void>()
   const watches = { storage: new Set<(c: Change) => void>(), session: new Set<(c: Change) => void>() }
   const commands = new Set<(c: Command) => Promise<void> | void>()
   const commandWaiters = new Map<string, { resolve: () => void; reject: (e: Error) => void }>()
@@ -155,6 +156,10 @@ export function createClient() {
         if (event.p !== null && (!record(event.p) || !Number.isSafeInteger(event.p.epoch))) return stop('E_PROTOCOL')
         client.owner = event.p
         for (const cb of owners) cb(event.p)
+        break
+      case 'side':
+        if (!record(event.p) || event.p.action !== 'double') return stop('E_PROTOCOL')
+        for (const cb of sides) cb()
         break
       case 'arg':
         if (event.p.argSeq <= argSeq) return
@@ -298,6 +303,11 @@ export function createClient() {
     },
     open: (id: string, arg?: string) => request<void>('open', { id, arg }),
     home: () => request<void>('home'),
+    sideButton: {
+      claim: () => request<void>('side.claim'),
+      release: () => request<void>('side.release'),
+      onDouble: (cb: () => void) => subscribe(sides, cb)
+    },
     photos: {
       list: () => request<Photo[]>('photos.list'),
       get: (id: string) => request<Blob>('photos.get', { id }),

@@ -3,6 +3,7 @@ import { envelope, PlatformError, requestValid, widgetValid } from '../../sdk/gu
 import { record } from '../../sdk/manifest.ts'
 import { frameAllow, mutatingService, servicePermission } from '../../sdk/permissions.ts'
 import { type Change, LIMITS, PROTOCOL, type Req, type Res, type ViewInfo } from '../../sdk/protocol.ts'
+import { claimSide } from '../device.ts'
 import { authority, broadcast, put, transaction } from './database.ts'
 import { photoService } from './photos.ts'
 import type { Session, SessionView } from './sessions.ts'
@@ -46,6 +47,7 @@ export function launchFrame(
     frame.dataset.state = value
     hooks.state(value, error)
   }
+  let releaseSide: (() => void) | undefined
   const view: SessionView = {
     id: crypto.randomUUID(),
     info,
@@ -57,6 +59,7 @@ export function launchFrame(
     },
     revoke(reason) {
       if (launch.state === 'revoked') return
+      releaseSide?.()
       state('revoked', reason === 'closed' ? undefined : reason)
       launch.generation++
       clearTimeout(helloTimer)
@@ -147,6 +150,19 @@ export function launchFrame(
     }
     if (req.m === 'home') {
       setTimeout(hooks.home, 0)
+      return {}
+    }
+    if (req.m === 'side.claim') {
+      releaseSide ??= claimSide(() => {
+        if (!view.info.visible || !view.info.active) return false
+        view.send({ ev: 'side', p: { action: 'double' } })
+        return true
+      })
+      return {}
+    }
+    if (req.m === 'side.release') {
+      releaseSide?.()
+      releaseSide = undefined
       return {}
     }
     throw new PlatformError('E_ARGS')

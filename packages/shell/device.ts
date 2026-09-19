@@ -98,7 +98,10 @@ export const device = {
   /** An app by name on the display in use; the embed bridge in main.ts uses this. */
   open: (name: string) => inUse().launch(name),
   siri: () => inUse().launch('Siri'),
-  wallet: () => inUse().launch('Wallet'),
+  wallet: () => {
+    for (const claim of sideClaims) if (claim()) return
+    inUse().launch('Wallet')
+  },
   camera: () => inUse().launch('Camera'),
   cameraOpen: () => !!inUse().cam(),
   shoot: () => inUse().cam()?.shoot(),
@@ -143,5 +146,15 @@ export function addDisplay(
     for (const f of hooks.home) pull(homes, f)
     pull(locks, hooks.lock)
     pull(unlocks, hooks.unlock)
+  }
+}
+
+// A foreground app with a confirmation sheet up can claim the side button's
+// double-click; each claim returns whether it consumed the press.
+const sideClaims = new Set<() => boolean>()
+export const claimSide = (claim: () => boolean) => {
+  sideClaims.add(claim)
+  return () => {
+    sideClaims.delete(claim)
   }
 }
