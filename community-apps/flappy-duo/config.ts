@@ -42,6 +42,8 @@ export const FLOOR = 0.88
 export const HINGE_RATING = 200000
 export const PRICE = 2399
 export const BANNER_LIFE = 4.5
+/** The replacement costs more every game: 2,399, 2,999, 3,699, 4,699, 5,899… always ending in 99. */
+export const priceFor = (run: number) => Math.round((PRICE * 1.25 ** (run - 1)) / 100) * 100 - 1
 
 export const START_LINES = [
   'Tap to fold. Every fold comes off the warranty.',
@@ -91,6 +93,23 @@ export const RUN_LINES = [
   'Game 4. Accessories are on their way.',
   'Game 5. Everything, at once, faster.'
 ]
+// The receipt arrives as a message from the top. `$` is replaced with the amount.
+export const RECEIPTS: [string, string][] = [
+  ['Tim Cook', 'Thank you for choosing Duo again. We noticed.'],
+  ['John Ternus', 'The hinge is rated for 200,000 folds. Not that fold.'],
+  ['Tim Cook', 'Your loyalty has been recorded. So has the $.'],
+  ['John Ternus', 'Titanium is very strong. The $ charge is stronger.'],
+  ['Tim Cook', 'This is our best Duo yet. Your previous one agreed.'],
+  ['John Ternus', 'Thinnest Duo ever. The $ invoice is not.'],
+  ['Tim Cook', 'Good morning. $ has left your account.'],
+  ['John Ternus', 'Same factory as your last one. Same outcome expected.'],
+  ['Tim Cook', 'Environmental note: your old Duo is now landfill. Our margins are not.'],
+  ['John Ternus', 'We tested the hinge against everything. Except you.']
+]
+export const receiptFor = (run: number, price: number): { title: string; text: string } => {
+  const [title, line] = RECEIPTS[(run - 1) % RECEIPTS.length]!
+  return { title, text: line.replace('$', `$${price.toLocaleString()}`) }
+}
 export const MISSILE_LABELS = ['DONGLE', 'USB-C', 'CHARGER', 'PENCIL', 'AIRTAG']
 export const NOTICES: [string, string][] = [
   ['Storage Almost Full', 'You can manage storage in Settings. You will not.'],

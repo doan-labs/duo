@@ -14,6 +14,8 @@ import {
   medalFor,
   PRICE,
   pick,
+  priceFor,
+  receiptFor,
   roastFor,
   runLine,
   START_LINES,
@@ -95,18 +97,20 @@ function Game() {
   // Apple Pay's beat: a moment of processing, the check draws in, the sheet drops, then the receipt.
   const confirmPay = () => {
     setPay('processing')
+    const cost = priceFor(world.current.run)
+    const receipt = receiptFor(world.current.run, cost)
     window.setTimeout(() => {
       setPay('done')
       cue('pay')
       setSpent((s) => {
-        void os.storage.set('spent', String(s + PRICE))
-        return s + PRICE
+        void os.storage.set('spent', String(s + cost))
+        return s + cost
       })
     }, 1100)
     window.setTimeout(() => setPay('leaving'), 2500)
     window.setTimeout(() => {
       setPay(null)
-      setNotice({ title: 'Duo Store', text: `You're charged $${PRICE.toLocaleString()}! Genius.` })
+      setNotice(receipt)
       reset()
     }, 2850)
   }
@@ -214,7 +218,8 @@ function Game() {
 
   const newBest = status === 'over' && score > 0 && score >= best
   const warranty = Math.max(0, HINGE_RATING - lifetime)
-  const price = `$${PRICE.toLocaleString()}.00`
+  const cost = priceFor(run)
+  const price = `$${cost.toLocaleString()}.00`
 
   return (
     <main
@@ -281,7 +286,7 @@ function Game() {
           {newBest && <p {...stylex.props(styles.best)}>New best. It has been recorded.</p>}
           <div {...stylex.props(styles.actions)}>
             <button type="button" onClick={() => setPay('sheet')} {...stylex.props(styles.button)}>
-              Buy another · ${PRICE.toLocaleString()}
+              Buy another · ${cost.toLocaleString()}
             </button>
           </div>
         </section>
@@ -395,7 +400,12 @@ function Game() {
       )}
       {notice && (
         <div role="status" {...stylex.props(styles.notice, cover && styles.noticeCover)}>
-          <span {...stylex.props(styles.noticeIcon)} />
+          <span {...stylex.props(styles.noticeIcon)}>
+            {notice.title
+              .split(' ')
+              .map((n) => n[0])
+              .join('')}
+          </span>
           <div {...stylex.props(styles.noticeText)}>
             <strong>{notice.title}</strong>
             <span>{notice.text}</span>
