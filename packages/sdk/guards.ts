@@ -34,7 +34,7 @@ export function requestValid(value: unknown): value is Req {
     Number(value.id) > 0 &&
     typeof value.m === 'string' &&
     (/^(storage|session)\.(get|set|del|keys|snapshot|watch|unwatch)$/.test(value.m) ||
-      ['cmd.send', 'cmd.ack', 'widget.set', 'open', 'home'].includes(value.m) ||
+      ['cmd.send', 'cmd.ack', 'widget.set', 'open', 'home', 'side.claim', 'side.release'].includes(value.m) ||
       !!servicePermission(value.m)) &&
     (value.epoch === undefined || (Number.isSafeInteger(value.epoch) && Number(value.epoch) > 0)) &&
     envelope(value)

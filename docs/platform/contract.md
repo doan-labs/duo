@@ -291,6 +291,7 @@ export type Evt =
   | { ev: 'kv'; p: { space: 'storage' | 'session'; rev: number; k: string; v: string | null } }
   | { ev: 'arg'; p: { arg: string; argSeq: number } }
   | { ev: 'owner'; p: { epoch: number } | null }
+  | { ev: 'side'; p: { action: 'double' } }                 // only to a view that claimed it, §3.8
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
   | { ev: 'command-result'; p: { cmdId: string } }
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }
@@ -305,6 +306,7 @@ export type Method =
   | 'cmd.send' | 'cmd.ack'
   | 'widget.set'
   | 'open' | 'home'
+  | 'side.claim' | 'side.release'
   | ServiceMethod                                       // §6, gated by the manifest's permissions
 
 export type ErrCode =
@@ -323,7 +325,7 @@ created ──hello ok──▶ bootstrapping ──ack──▶ connected ─�
 ```
 
 Revocation, in this order, for every reason (scene closed, no hello in 10 s,
-no ready in 10 s, `error` before ready, `E_PROTOCOL`, navigation, uninstall,
+no ready within 10 s of being visible, `error` before ready, `E_PROTOCOL`, navigation, uninstall,
 update activation, split collapse):
 
 1. `state = revoked`; the record's generation is retired. From here the host
@@ -355,7 +357,7 @@ the last 256 completed ids with their results per view; a repeated id returns
 the recorded result without re-executing. The SDK's timeout (5 s) retries a
 mutating request once with the same id, then surfaces `E_TIMEOUT`; the app
 then reads back (`get`) to reconcile, because a timeout does not prove the
-write failed. `open` and `home` are never retried.
+write failed. `open`, `home`, `side.claim` and `side.release` are never retried.
 
 | Limit | Value | Error |
 | --- | --- | --- |
@@ -473,6 +475,8 @@ export const os: {
   widget: { set(size: 'small' | 'medium', snapshot: WidgetSnapshot): Promise<void> }   // owner only
   open(id: string, arg?: string): Promise<void>
   home(): Promise<void>
+  /** The frame's side button (§3.8). While claimed and this view is visible and active, a double-click reaches onDouble instead of opening Wallet. */
+  sideButton: { claim(): Promise<void>; release(): Promise<void>; onDouble(cb: () => void): () => void }
   /** Host services (§6). Present on the object; each call is E_DENIED unless declared. */
   photos: { list(): Promise<Photo[]>; get(id: string): Promise<Blob>; add(blob: Blob): Promise<Photo> }
 }
@@ -703,6 +707,15 @@ that key is forwarded; typed text never crosses the bridge. `open(id, arg)`
 from a view swaps the app in place on that view's display, as `swap()` does
 today, and `follow()` brings the other display along; `home()` closes the
 session's views on both displays.
+
+The frame's side button double-click opens Wallet. A view may claim it with
+`side.claim` while it shows something a double-click should confirm, such as a
+payment sheet. On the next double-click the shell asks each claiming view in
+claim order; the first whose `ViewInfo` is visible and active receives
+`{ev:'side', p:{action:'double'}}` and Wallet does not open. If no claiming view
+qualifies, Wallet opens as before. Single clicks, long press and the volume
+buttons are never forwarded. `side.release` drops the claim; revocation drops
+it too, so a closed or crashed app cannot keep the button.
 
 ## 4. Storage and release lifecycle
 

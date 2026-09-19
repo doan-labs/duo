@@ -50,6 +50,8 @@ export type Method =
   | 'widget.set'
   | 'open'
   | 'home'
+  | 'side.claim'
+  | 'side.release'
   | ServiceMethod
 export type Hello = { t: 'hello'; protocol: number; sdk: string; nonce: string }
 export type Welcome = {
@@ -68,6 +70,7 @@ export type Evt =
   | { ev: 'kv'; p: Change & { space: 'storage' | 'session' } }
   | { ev: 'arg'; p: { arg: string; argSeq: number } }
   | { ev: 'owner'; p: { epoch: number } | null }
+  | { ev: 'side'; p: { action: 'double' } }
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
   | { ev: 'command-result'; p: { cmdId: string } }
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }

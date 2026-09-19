@@ -3,6 +3,7 @@ import { envelope, PlatformError, requestValid, widgetValid } from '../../sdk/gu
 import { record } from '../../sdk/manifest.ts'
 import { frameAllow, mutatingService, servicePermission } from '../../sdk/permissions.ts'
 import { type Change, LIMITS, PROTOCOL, type Req, type Res, type ViewInfo } from '../../sdk/protocol.ts'
+import { claimSide } from '../device.ts'
 import { authority, broadcast, put, transaction } from './database.ts'
 import { photoService } from './photos.ts'
 import type { Session, SessionView } from './sessions.ts'
@@ -46,6 +47,7 @@ export function launchFrame(
     frame.dataset.state = value
     hooks.state(value, error)
   }
+  let releaseSide: (() => void) | undefined
   const view: SessionView = {
     id: crypto.randomUUID(),
     info,
@@ -57,6 +59,7 @@ export function launchFrame(
     },
     revoke(reason) {
       if (launch.state === 'revoked') return
+      releaseSide?.()
       state('revoked', reason === 'closed' ? undefined : reason)
       launch.generation++
       clearTimeout(helloTimer)
@@ -149,6 +152,19 @@ export function launchFrame(
       setTimeout(hooks.home, 0)
       return {}
     }
+    if (req.m === 'side.claim') {
+      releaseSide ??= claimSide(() => {
+        if (!view.info.visible || !view.info.active) return false
+        view.send({ ev: 'side', p: { action: 'double' } })
+        return true
+      })
+      return {}
+    }
+    if (req.m === 'side.release') {
+      releaseSide?.()
+      releaseSide = undefined
+      return {}
+    }
     throw new PlatformError('E_ARGS')
   }
   const errorResponse = (id: number, error: unknown): Res => ({
@@ -157,6 +173,13 @@ export function launchFrame(
     e: error instanceof PlatformError ? error.code : 'E_STORAGE',
     msg: String(error instanceof Error ? error.message : error)
   })
+  // A hidden display's root is display:none, so its document never paints and an app
+  // that reports ready from a frame callback cannot. The deadline runs only while visible.
+  function armReady() {
+    clearTimeout(readyTimer)
+    if (launch.state === 'connected' && view.info.visible)
+      readyTimer = setTimeout(() => fail('App did not become ready'), 10000)
+  }
   function receive(data: unknown) {
     if (launch.state === 'revoked') return
     if (!record(data) || !envelope(data)) return fail('Invalid message')
@@ -164,7 +187,7 @@ export function launchFrame(
       if (data.ev === 'ack' && launch.state === 'bootstrapping') {
         clearTimeout(helloTimer)
         state('connected')
-        readyTimer = setTimeout(() => fail('App did not become ready'), 10000)
+        armReady()
         session.deliver()
         return
       }
@@ -299,8 +322,10 @@ export function launchFrame(
     launch,
     update(next: ViewInfo) {
       if (JSON.stringify(view.info) !== JSON.stringify(next)) {
+        const shown = next.visible !== view.info.visible
         view.info = next
         view.send({ ev: 'view', p: next })
+        if (shown) armReady()
       }
     },
     close: () => view.revoke('closed')

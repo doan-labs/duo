@@ -944,3 +944,29 @@ installed. Rather than change the reseed, the button goes: `StoreRow` gains
 `preinstalled`, read from the `seeded` mark the boot install writes, and
 neither Settings nor the App Store draws Remove App for a row that carries it.
 A dead button is worse than a missing one.
+
+## 73. An app can claim the side button's double-click while a sheet is up
+
+Apps received no hardware button events: the frame's side button double-click always
+launched Wallet from `device.ts`. Flappy Duo's Duo Pay sheet needed the same gesture as
+Apple Pay, and a fake side button drawn inside the app is not the frame's button. The
+minimal route is a claim: `side.claim` and `side.release` on the bridge, a `side` event
+back, and a registry in `device.ts` that `wallet()` consults before launching Wallet. Only
+a claiming view that is visible and active receives the press, so a background app or the
+other display cannot swallow it, and the bridge drops the claim on revoke. Single clicks,
+long press and volume stay with the shell; forwarding every button was considered and
+skipped until an app needs it. Older SDKs never send `side.claim`, so they never receive
+`side` and keep treating unknown events as a protocol error safely.
+
+## 74. The ready deadline only runs while the view is visible
+
+A deep link (`?app=`) opens the app on both displays, and the display not in use keeps
+its root at `display:none` so the sandbox document stays alive. Nothing in that document
+paints, so an app that reports ready from `requestAnimationFrame`, as every first-party
+app and the CLI template do, never reports it there. The hidden view was the session
+owner, its 10 s deadline failed it, and the session ended with reason `error` on the
+display the person was looking at. The bridge now arms the ready timer only while
+`ViewInfo.visible` is true and re-arms when visibility flips; the hello deadline is
+unchanged because scripts run in hidden documents. Changing every app to call `ready()`
+outside a frame callback was the alternative, and it would not have covered third-party
+apps built from the template.
