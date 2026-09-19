@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Added responsive tile reveals, press feedback, and a gentle game-state transition.
+
 ## 1.0.1
 
 - Constrained the board, controls, and game-over message to the active display.
