@@ -28,6 +28,9 @@ export function stylexPlugin(dev: boolean, aliases?: Record<string, string>) {
                 dev,
                 runtimeInjection: dev,
                 treeshakeCompensation: true,
+                // StyleX 0.19 media-query reorder pass corrupts its tokenizer after a few
+                // transforms in one process; the sequential CI builds hit it. No style here needs it.
+                enableMediaQueryOrder: false,
                 aliases,
                 unstable_moduleResolution: { type: 'commonJS', rootDir: import.meta.dir }
               }
