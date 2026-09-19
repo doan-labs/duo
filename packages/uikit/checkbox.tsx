@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { PrimitiveProps } from './primitive.ts'
 import { appearance } from './primitive.ts'
-import { colors } from './tokens.stylex.ts'
+import { colors, easing } from './tokens.stylex.ts'
 
 /**
  * Native checkbox drawn as macOS Calendar's tinted square: hollow at rest, filled
@@ -26,6 +26,10 @@ const styles = stylex.create({
     borderStyle: 'solid',
     borderColor: 'currentColor',
     backgroundColor: { default: 'transparent', ':checked': 'currentColor' },
+    transform: { default: 'scale(1)', ':active': 'scale(.92)' },
+    transitionProperty: 'background-color, transform',
+    transitionDuration: '.18s, .12s',
+    transitionTimingFunction: easing.pop,
     cursor: 'pointer',
     '::after': {
       content: '""',
@@ -36,7 +40,11 @@ const styles = stylex.create({
       maskSize: 'contain',
       maskPosition: 'center',
       maskRepeat: 'no-repeat',
-      opacity: { default: 0, ':checked': 1 }
+      opacity: { default: 0, ':checked': 1 },
+      transform: { default: 'scale(.5)', ':checked': 'scale(1)' },
+      transitionProperty: 'opacity, transform',
+      transitionDuration: '.18s',
+      transitionTimingFunction: easing.spring
     }
   },
   tint: (c: string) => ({ color: c })
