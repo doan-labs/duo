@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_response.filePath // .tool_input.file_path' | { read -r f; bunx biome check --write --files-ignore-unknown=true --no-errors-on-unmatched \"$f\"; } 2>/dev/null || true",
+            "statusMessage": "Formatting with Biome"
+          }
+        ]
+      }
+    ]
+  }
+}

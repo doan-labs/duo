@@ -3,6 +3,9 @@ dist/
 .cache/
 .DS_Store
 
+# Claude Code worktrees: full checkouts that live inside the repo
+.claude/worktree/
+
 # Apple's iPhone Duo model, fetched per clone: python3 scripts/prepare-model.py
 # No trailing slash: a worktree usually links this at the main checkout's copy.
 public/model
