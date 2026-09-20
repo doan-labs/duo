@@ -100,25 +100,45 @@ export const styles = stylex.create({
   /** A calendar that is off keeps its colour in the box and loses it in the name, as macOS greys it. */
   off: { color: app.label3 },
   inbox: { padding: 16, width: 220, textAlign: 'center' },
-  mini: { flexShrink: 0, marginInline: 10, paddingTop: 10, paddingBottom: 10, borderTopWidth: 1, ...EDGE },
-  miniHdr: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    fontWeight: weight.semibold,
-    color: colors.grey
+  // Apple's mini month is not a card. It has no box, no rule and no well: the
+  // sidebar's own ground carries it and the air above the header is the whole
+  // separation. A stroked rounded rect here is the single thing that reads as a
+  // web widget instead of a sidebar.
+  mini: { flexShrink: 0, paddingInline: 10, paddingTop: 6, paddingBottom: 14 },
+  /** The gap under the month is one more row of the grid, no larger: Apple's stack is even top to bottom. */
+  miniHdr: { display: 'flex', alignItems: 'center', paddingBottom: 2 },
+  /** The month reads as a title, in the label's own white; only the chevrons are grey. */
+  miniTitle: {
+    flexGrow: 1,
+    textAlign: 'center',
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.medium,
+    color: colors.white
   },
-  miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', rowGap: 5, textAlign: 'center' },
+  // Apple's cell is wider than it is tall, about 27 points of column to 24 of
+  // row, and every number in it is book weight. Setting them semibold is what
+  // made this thumbnail read as a table of data rather than a calendar.
+  miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', rowGap: 6, textAlign: 'center' },
   miniWd: {
-    fontSize: typeScale.caption2,
-    fontWeight: weight.semibold,
-    color: colors.grey
+    height: 18,
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: typeScale.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.regular,
+    color: app.label2
   },
   miniDay: {
-    fontSize: typeScale.caption2,
-    fontWeight: weight.semibold,
+    fontSize: typeScale.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.regular,
     fontFamily: fonts.system,
+    // Tabular: a column of 1s must sit under a column of 28s, or the grid wobbles.
+    fontVariantNumeric: 'tabular-nums',
+    // Two thirds of the column, the proportion Apple gives the disc: any fatter
+    // and today's red touches the days either side of it.
     width: 18,
     height: 18,
     padding: 0,
@@ -137,6 +157,12 @@ export const styles = stylex.create({
   },
   /** A day the year grid leaves blank still holds its row, so twelve months line up. */
   miniGap: { height: 18 },
+  /**
+   * A day from the next month is as quiet as the weekday letter over it, not
+   * quieter: Apple still expects you to read the 1st of October off this grid.
+   * Declared above today, so the 20th keeps white on red in a month it spills into.
+   */
+  miniOut: { color: app.label2 },
   miniToday: { backgroundColor: colors.red, color: colors.white },
   miniPicked: { backgroundColor: app.fill },
   // Main pane

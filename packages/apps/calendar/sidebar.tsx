@@ -51,12 +51,12 @@ export function Sidebar({ calendars, hidden, toggle, date, today, setDate, hide 
         <div {...stylex.props(styles.miniHdr)}>
           <IconButton
             name="back"
-            size={11}
+            size={13}
             aria-label="Previous month"
             onClick={() => setMonth(addMonths(month, -1))}
           />
-          {monthYear(month)}
-          <IconButton name="forward" size={11} aria-label="Next month" onClick={() => setMonth(addMonths(month, 1))} />
+          <span {...stylex.props(styles.miniTitle)}>{monthYear(month)}</span>
+          <IconButton name="forward" size={13} aria-label="Next month" onClick={() => setMonth(addMonths(month, 1))} />
         </div>
         <div {...stylex.props(styles.miniGrid)}>
           {WEEKDAYS.map((d) => (
@@ -71,7 +71,7 @@ export function Sidebar({ calendars, hidden, toggle, date, today, setDate, hide 
               onClick={() => setDate(d)}
               {...stylex.props(
                 styles.miniDay,
-                d.getMonth() !== month.getMonth() && styles.dim,
+                d.getMonth() !== month.getMonth() && styles.miniOut,
                 sameDay(d, date) && !sameDay(d, today) && styles.miniPicked,
                 sameDay(d, today) && styles.miniToday
               )}
