@@ -341,11 +341,10 @@ export const appAppearance = stylex.defineConsts({
   // appstore
   appstoreBanner: 'rgba(255,141,40,.16)',
   appstoreBannerDev: 'rgba(0,136,255,.1)',
-  appstoreInk: '#3c3c43',
-  appstoreBorder: 'rgba(0,136,255,.22)',
   appstoreHeroBar: 'rgba(0,0,0,.26)',
   appstoreHeroShade: 'linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,.1) 45%,rgba(0,0,0,.5) 100%)',
-  appstoreOfficial: 'rgba(52,199,89,.14)',
+  /** The sidebar and the tab bar: glass the page shows through, not paper. The Store is baked light, so one value is the value. */
+  appstorePanel: 'rgba(255,255,255,.6)',
   appstorePillLight: 'rgba(255,255,255,.25)',
   // books
   booksPaperInk: '#fff9f0',

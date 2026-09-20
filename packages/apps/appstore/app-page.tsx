@@ -18,12 +18,14 @@ export function AppPage({
   store,
   open,
   openExternal,
+  wide,
   back
 }: {
   id: string
   store: Store
   open: Open
   openExternal: External
+  wide?: boolean
   back: () => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
@@ -149,7 +151,14 @@ export function AppPage({
                   open={open}
                   onShow={() =>
                     push((pop) => (
-                      <AppPage id={other.id} store={store} open={open} openExternal={openExternal} back={pop} />
+                      <AppPage
+                        id={other.id}
+                        store={store}
+                        open={open}
+                        openExternal={openExternal}
+                        wide={wide}
+                        back={pop}
+                      />
                     ))
                   }
                 />
@@ -193,6 +202,8 @@ export function AppPage({
             : 'Installed releases are checked against the catalog hash, which verifies the bytes and not the publisher.'}
           {row.recovery && ' Restore keeps newer edits aside; those edits may be missing in the previous version.'}
         </p>
+        {/* The cover's tab bar floats over this page, so the last line scrolls clear of it. */}
+        {!wide && <div {...stylex.props(styles.paneScroll)} />}
       </div>
     </Page>
   )

@@ -25,9 +25,14 @@ export const styles = stylex.create({
   shell: { position: 'relative', display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, minWidth: 0 },
   shellWide: { flexDirection: 'row' },
   pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
-  /** Room for the panel that floats over this edge. */
+  /**
+   * Room for the panel that floats over this edge. The sidebar takes its column
+   * out of the layout, since a list scrolling down never passes behind a panel
+   * standing beside it. The tab bar crosses the scroll, so its clearance goes in
+   * the scroller instead and the list runs under the glass to the last row.
+   */
   paneSide: { paddingLeft: 202 },
-  paneTabs: { paddingBottom: 78 },
+  paneScroll: { paddingBottom: 78 },
 
   /** Sidebar: search, the sections, and the catalog they all came from. */
   side: {
@@ -48,7 +53,7 @@ export const styles = stylex.create({
     paddingBottom: 8,
     paddingLeft: 8,
     borderRadius: radius.xxl,
-    backgroundColor: app.surface,
+    backgroundColor: appAppearance.appstorePanel,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: shadow.float
@@ -87,34 +92,29 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    paddingTop: 8,
-    paddingRight: 4,
-    paddingLeft: 4,
-    borderTopWidth: 1,
-    borderTopStyle: 'solid',
-    borderTopColor: app.separator
-  },
-  sideFootIc: {
-    width: 26,
-    height: 26,
-    borderRadius: radius.circle,
-    display: 'grid',
-    placeItems: 'center',
     flexShrink: 0,
-    color: app.label2,
+    paddingTop: 7,
+    paddingRight: 9,
+    paddingBottom: 7,
+    paddingLeft: 10,
+    borderRadius: radius.md,
     backgroundColor: app.fill
   },
-  sideFootDev: { backgroundColor: colors.orange, color: colors.white },
+  sideFootDev: { backgroundColor: appAppearance.appstoreBanner },
+  sideFootIc: { display: 'flex', flexShrink: 0, color: app.label2 },
+  sideFootDevIc: { color: colors.orange },
+  sideFootGo: { display: 'flex', flexShrink: 0, color: colors.blue, cursor: 'pointer' },
   sideFootText: {
     flexGrow: 1,
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    fontSize: typeScale.caption1,
-    lineHeight: leading.caption1,
-    letterSpacing: tracking.caption1,
-    color: app.label2
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.medium,
+    color: app.fg
   },
 
   /** The cover's tab bar, floating clear of the home bar's bottom 22 px. */
@@ -129,7 +129,7 @@ export const styles = stylex.create({
     paddingTop: 8,
     paddingBottom: 8,
     borderRadius: radius.xxl,
-    backgroundColor: app.surface,
+    backgroundColor: appAppearance.appstorePanel,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: shadow.float
@@ -194,19 +194,6 @@ export const styles = stylex.create({
   },
   title: { paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0, marginRight: 'auto' },
 
-  /** A round toolbar button: Refresh in the sidebar, Share on an app page. */
-  round: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.circle,
-    display: 'grid',
-    placeItems: 'center',
-    flexShrink: 0,
-    color: colors.blue,
-    backgroundColor: app.fill,
-    cursor: 'pointer'
-  },
-  roundDev: { backgroundColor: colors.orange, color: colors.white },
   /** Trailing header action on an app page: flat, so it pairs with the kit's back chevron. */
   share: { marginLeft: 'auto', display: 'flex', alignItems: 'center', color: app.link },
 

@@ -17,10 +17,12 @@ Wider than 600 px, a **sidebar** holds the search field, the sections and, at it
 catalog everything came from with Refresh beside it (both turn orange on a developer catalog,
 whose host also shows in a banner). Narrower, the sidebar becomes a **tab bar** and the search
 field moves beside the large title. Both float over the pane rather than taking a column or a
-strip out of it: inset from the edges, rounded at `radius.xxl`, on `app.surface` under
-[decision 18](../decisions.md)'s glass recipe and `shadow.float`, with the pane padding itself
-clear of whichever one is showing. The sidebar runs up under the status stack and stops 8 px
-from the top, clear of the clock on the inner display's far right; the tab bar clears the home
+strip out of it: inset from the edges, rounded at `radius.xxl`, on a translucent
+`appstorePanel` under [decision 18](../decisions.md)'s glass recipe and `shadow.float`. The
+sidebar runs up under the status stack and stops 8 px from the top, clear of the clock on the
+inner display's far right, and takes its column out of the layout, since a list scrolling down
+never passes behind a panel standing beside it. The tab bar crosses the scroll, so its
+clearance is in the scroller and the list runs under the glass to the last row, above the home
 bar's bottom 22 px.
 
 The sections are **Discover**, **Apps**, **Official**, **Community**, **Previews** with a

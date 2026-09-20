@@ -81,7 +81,7 @@ function Shelf({ store, open, openExternal }: { store: Store; open: Open; openEx
           developer={state.developer}
         />
       )}
-      <div {...stylex.props(styles.pane, wide ? styles.paneSide : styles.paneTabs)}>
+      <div {...stylex.props(styles.pane, wide && styles.paneSide)}>
         {/* Keyed on the section: picking another one in the sidebar drops the app page that was over it. */}
         <Nav key={view}>
           <Pane
@@ -144,21 +144,22 @@ function Sidebar({
           </button>
         ))}
       </div>
-      <div {...stylex.props(styles.sideFoot)}>
-        <span {...stylex.props(styles.sideFootIc, developer && styles.sideFootDev)}>
-          <Sym name="tabs" size={13} />
+      {/* The catalog reads as a control, like the search field at the other end of the panel. */}
+      <div {...stylex.props(styles.sideFoot, developer && styles.sideFootDev)}>
+        <span {...stylex.props(styles.sideFootIc, developer && styles.sideFootDevIc)}>
+          <Sym name="tabs" size={14} />
         </span>
         <span {...stylex.props(styles.sideFootText)}>{developer ? new URL(source).host : 'Duo catalog'}</span>
         <button
           type="button"
           aria-label="Refresh catalog"
           title={source}
-          {...stylex.props(styles.round, developer && styles.roundDev, shared.press)}
+          {...stylex.props(styles.bare, styles.sideFootGo, developer && styles.sideFootDevIc, shared.press)}
           onClick={() => {
             void store.refresh()
           }}
         >
-          <Sym name="reload" size={14} />
+          <Sym name="reload" size={15} />
         </button>
       </div>
     </nav>
@@ -239,7 +240,9 @@ function Pane({
 }) {
   const { push } = useNav()
   const show = (row: StoreRow) =>
-    push((back) => <AppPage id={row.id} store={store} open={open} openExternal={openExternal} back={back} />)
+    push((back) => (
+      <AppPage id={row.id} store={store} open={open} openExternal={openExternal} wide={wide} back={back} />
+    ))
   // The pane's title already announces the section, so the group that opens it
   // drops the hairline and the space a second heading would otherwise cost.
   const groups = (list: [string, string, StoreRow[]][]) =>
@@ -292,7 +295,7 @@ function Pane({
   else if (view === 'development') body = groups([lanes[2]!])
   else body = found ? groups(lanes) : <Placeholder xstyle={styles.center}>No apps found.</Placeholder>
   return (
-    <Screen>
+    <Screen xstyle={!wide && styles.paneScroll}>
       <div {...stylex.props(styles.top)}>
         <LargeTitle as="h1" xstyle={styles.title}>
           {title}

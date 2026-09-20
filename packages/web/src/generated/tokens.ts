@@ -953,16 +953,6 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "appstoreInk",
-    "value": "#3c3c43",
-    "doc": ""
-  },
-  {
-    "name": "appstoreBorder",
-    "value": "rgba(0,136,255,.22)",
-    "doc": ""
-  },
-  {
     "name": "appstoreHeroBar",
     "value": "rgba(0,0,0,.26)",
     "doc": ""
@@ -973,9 +963,9 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "appstoreOfficial",
-    "value": "rgba(52,199,89,.14)",
-    "doc": ""
+    "name": "appstorePanel",
+    "value": "rgba(255,255,255,.6)",
+    "doc": "The sidebar and the tab bar: glass the page shows through, not paper. The Store is baked light, so one value is the value."
   },
   {
     "name": "appstorePillLight",

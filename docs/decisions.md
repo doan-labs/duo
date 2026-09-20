@@ -1074,3 +1074,13 @@ named the section, and a second heading under it cost a fifth of the display bef
 app. Rows lost their lane chip, since every group is one lane and its heading says which; DEV
 and the permission chips stay, and the chip line is only drawn when it holds something. The
 Store also moved from the right page into the dock, where its traffic belongs.
+
+The panels then stopped being paper. `app.surface` is opaque white, so the blur on them had
+been decoration: nothing showed through. They sit on `appstorePanel` now, a translucent white,
+which is safe to fix because the Store is a baked light app and has no dark sibling to be
+wrong in. Where the glass earns it differs by axis: the tab bar crosses the scroll, so its
+clearance moved out of the pane and into the scroller and the list genuinely passes under it;
+the sidebar stands beside a list scrolling down, which never passes behind it, so it keeps its
+column and shows the page's tone rather than moving content. The catalog at its foot became a
+control instead of two grey discs around a label, matching the search field at the panel's
+other end.
