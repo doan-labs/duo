@@ -7,7 +7,8 @@ import {
   radius,
   shadow,
   tracking,
-  typeScale
+  typeScale,
+  weight
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
@@ -20,6 +21,45 @@ export const styles = stylex.create({
   // Cover: the chrome is a column on the right and the page keeps the rest.
   bodyRail: { flexDirection: 'row' },
   page: { position: 'relative', display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
+  // The start page a new tab opens on: favourites as a grid of tiles.
+  start: { flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: 16, backgroundColor: app.surface },
+  startTitle: {
+    paddingBottom: 12,
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    letterSpacing: tracking.headline,
+    fontWeight: weight.semibold,
+    color: colors.black
+  },
+  favs: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 12 },
+  fav: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 0, color: colors.black },
+  favIcon: {
+    display: 'grid',
+    placeItems: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    backgroundColor: app.fill,
+    boxShadow: shadow.card,
+    fontSize: typeScale.title2,
+    fontWeight: weight.semibold
+  },
+  favName: {
+    maxWidth: '100%',
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  peekStart: {
+    display: 'grid',
+    placeItems: 'center',
+    height: '100%',
+    fontSize: typeScale.caption1,
+    color: app.label2
+  },
   // The URL bar's parent: the bookmark strip slides up out of it without moving the page.
   foot: { position: 'relative', flexShrink: 0 },
   marks: {

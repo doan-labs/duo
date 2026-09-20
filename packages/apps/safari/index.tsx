@@ -24,7 +24,10 @@ const host = (url: string) => url.replace(/^https?:\/\//, '').split('/')[0]!
 // Cross-origin frames hide their own history, so each tab keeps its own list.
 type Tab = { id: number; hist: string[]; at: number }
 let seq = 0
-const tab = (url: string): Tab => ({ id: seq++, hist: [url], at: 0 })
+// A tab with no history shows the start page: favourites and a focused address bar.
+const tab = (url?: string): Tab => ({ id: seq++, hist: url ? [url] : [], at: 0 })
+const at = (x: Tab) => x.hist[x.at]
+const name = (x: Tab) => (at(x) ? host(at(x)!) : 'Start Page')
 
 export const Safari = ({ os }: { os: Os }) => {
   const [tabs, setTabs] = useState(() => [tab(os.arg ?? HOME)])
@@ -34,9 +37,11 @@ export const Safari = ({ os }: { os: Os }) => {
   const strip = usePresence(marks)
   const cards = usePresence(grid)
   const t = tabs[cur]!
-  const url = t.hist[t.at]!
-  const [text, setText] = useState(() => host(url))
+  const url = at(t)
+  const [text, setText] = useState(() => (url ? host(url) : ''))
   const frame = useRef<HTMLIFrameElement>(null)
+  const field = useRef<HTMLInputElement>(null)
+  const fresh = (x: Tab) => setText(at(x) ? host(at(x)!) : '')
   const show = (hist: string[], at: number) => {
     setTabs(tabs.map((x, i) => (i === cur ? { ...x, hist, at } : x)))
     setText(host(hist[at]!))
@@ -55,28 +60,29 @@ export const Safari = ({ os }: { os: Os }) => {
   }
   // Re-assigning the same src is how an iframe reloads; React would see no change.
   const reload = () => {
-    if (frame.current) frame.current.src = url
-    setText(host(url))
+    if (frame.current && url) frame.current.src = url
+    if (url) setText(host(url))
   }
   const pick = (i: number) => {
     setCur(i)
-    setText(host(tabs[i]!.hist[tabs[i]!.at]!))
+    fresh(tabs[i]!)
     setGrid(false)
   }
   const open = () => {
-    setTabs([...tabs, tab(HOME)])
+    setTabs([...tabs, tab()])
     setCur(tabs.length)
-    setText(host(HOME))
+    setText('')
     setGrid(false)
+    setTimeout(() => field.current?.focus())
   }
   // Closing the last tab leaves a fresh one, as Safari does.
   const close = (i: number) => {
     const rest = tabs.filter((_, j) => j !== i)
-    if (!rest.length) rest.push(tab(HOME))
+    if (!rest.length) rest.push(tab())
     const n = Math.min(cur > i ? cur - 1 : cur, rest.length - 1)
     setTabs(rest)
     setCur(n)
-    setText(host(rest[n]!.hist[rest[n]!.at]!))
+    fresh(rest[n]!)
   }
   // The cover's camera column: Apple runs Safari's buttons down beside the status
   // stack there, and the page keeps the rest. The row bar is the inner display's.
@@ -89,20 +95,38 @@ export const Safari = ({ os }: { os: Os }) => {
   return (
     <Screen xstyle={[styles.body, rail && styles.bodyRail]}>
       <div {...stylex.props(styles.page)}>
-        <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" />
+        {url ? (
+          <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" />
+        ) : (
+          <div {...stylex.props(styles.start, animations.fade)}>
+            <div {...stylex.props(styles.startTitle)}>Favourites</div>
+            <div {...stylex.props(styles.favs)}>
+              {MARKS.map(([n, u]) => (
+                <button type="button" key={u} {...stylex.props(styles.fav)} onClick={() => go(u)}>
+                  <span {...stylex.props(styles.favIcon)}>{n[0]}</span>
+                  <span {...stylex.props(styles.favName)}>{n}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {cards.mounted && (
           <div {...stylex.props(styles.grid, cards.closing ? animations.floatOut : animations.float)}>
             {tabs.map((x, i) => {
-              const u = x.hist[x.at]!
+              const u = at(x)
               return (
                 <div key={x.id} {...stylex.props(styles.card)}>
                   <button
                     type="button"
                     {...stylex.props(styles.cardPick, i === cur && styles.cardOn)}
                     onClick={() => pick(i)}
-                    aria-label={host(u)}
+                    aria-label={name(x)}
                   >
-                    <iframe title={host(u)} src={u} referrerPolicy="no-referrer" {...stylex.props(styles.peek)} />
+                    {u ? (
+                      <iframe title={name(x)} src={u} referrerPolicy="no-referrer" {...stylex.props(styles.peek)} />
+                    ) : (
+                      <span {...stylex.props(styles.peekStart)}>{name(x)}</span>
+                    )}
                   </button>
                   <button
                     type="button"
@@ -112,7 +136,7 @@ export const Safari = ({ os }: { os: Os }) => {
                   >
                     <Sym name="close" size={9} />
                   </button>
-                  <div {...stylex.props(styles.cardName)}>{host(u)}</div>
+                  <div {...stylex.props(styles.cardName)}>{name(x)}</div>
                 </div>
               )
             })}
@@ -130,7 +154,9 @@ export const Safari = ({ os }: { os: Os }) => {
           )}
           <div {...stylex.props(styles.url)}>
             <input
+              ref={field}
               {...stylex.props(styles.input)}
+              placeholder="Search or enter website name"
               value={text}
               spellCheck={false}
               onChange={(e) => setText(e.currentTarget.value)}
@@ -159,7 +185,7 @@ export const Safari = ({ os }: { os: Os }) => {
         <div {...stylex.props(styles.bar)}>
           <Btn name="back" disabled={t.at === 0} onClick={() => step(-1)} />
           <Btn name="forward" disabled={t.at === t.hist.length - 1} onClick={() => step(1)} />
-          <Btn name="share" onClick={() => navigator.clipboard?.writeText(url)} />
+          <Btn name="share" onClick={() => url && navigator.clipboard?.writeText(url)} />
           <Btn name="book" onClick={() => setMarks((m) => !m)} />
           <Btn name="tabs" onClick={() => setGrid((g) => !g)} />
         </div>
