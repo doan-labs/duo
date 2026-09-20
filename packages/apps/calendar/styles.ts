@@ -216,10 +216,13 @@ export const styles = stylex.create({
     overflow: 'hidden',
     display: 'grid',
     gridTemplateColumns: 'repeat(7,1fr)',
-    // The number row, then the lanes month-view.tsx packs events into. The lanes
-    // share what the week has left, so a five-week month breathes and a six-week
-    // one tightens instead of running its last row off the bottom of the sheet.
-    gridTemplateRows: 'auto repeat(3,minmax(0,1fr))',
+    // The number row, then the lanes month-view.tsx packs events into. A lane is
+    // one line of caption text and nothing more: sharing the week between three
+    // of them gave each a 38px slab on the inner display, which is not an event,
+    // it is a box. They cap at 18 and the leftover falls to the foot of the day,
+    // the way a month sheet leaves air under a Tuesday with one thing on it. The
+    // minmax lets a six-week month tighten them rather than run off the bottom.
+    gridTemplateRows: 'auto repeat(6,minmax(0,18px)) 1fr',
     rowGap: 1,
     paddingTop: 2,
     borderTopWidth: 1,
@@ -400,7 +403,9 @@ export const styles = stylex.create({
     borderLeftWidth: 2,
     borderLeftStyle: 'solid',
     borderLeftColor: 'currentColor',
-    borderRadius: radius.xs,
+    // A block is 44px for an hour and taller for a meeting. The 4px corner that
+    // suits an 18px month chip is a square edge at that size; this is the step up.
+    borderRadius: radius.sm,
     fontFamily: fonts.system,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
@@ -426,8 +431,8 @@ export const styles = stylex.create({
   nowPill: {
     position: 'absolute',
     left: 2,
-    paddingInline: 4,
-    borderRadius: radius.xs,
+    paddingInline: 5,
+    borderRadius: radius.pill,
     backgroundColor: colors.red,
     color: colors.white,
     fontSize: typeScale.caption2,

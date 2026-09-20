@@ -21,8 +21,12 @@ type Props = {
   onEvent: (e: Event) => void
 }
 
-/** Event rows a week shows before the rest become a count; styles.ts repeats the number in the row template. */
-const LANES = 3
+/**
+ * Event rows a week shows before the rest become a count; styles.ts repeats the
+ * number in the row template. Six, because that is what an 850pt display fits at
+ * Apple's row height: three left most days saying "2 more" over 90px of nothing.
+ */
+const LANES = 6
 /** Monday-first, so Saturday and Sunday are the last two columns. */
 const isWeekend = (i: number) => i > 4
 
