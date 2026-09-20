@@ -100,7 +100,7 @@ export const RIGHT: App[] = [
 
 export const DOCK: App[] = [
   { name: 'Phone', mock: true, view: Phone },
-  { name: 'Safari', light: true, view: Safari },
+  { name: 'Safari', light: true, rail: true, view: Safari },
   { name: 'Messages', mock: true, light: true, view: Messages },
   { name: 'Music', view: Music }
 ]

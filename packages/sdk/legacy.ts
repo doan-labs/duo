@@ -15,6 +15,8 @@ export type Os = {
   open: (name: string, arg?: string) => void
   home: () => void
   arg?: string
+  /** The glass this instance draws on: the folded cover or the open inner display. */
+  display?: 'inner' | 'cover'
   /**
    * This instance is the copy the other display holds while the phone folds
    * (docs/decisions.md 24); the one in use is running too. A copy draws

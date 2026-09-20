@@ -56,6 +56,7 @@ const battery = '/icons/sym/battery-100.webp'
 const bolt = '/icons/sym/bolt-fill.webp'
 const boltOff = '/icons/sym/bolt-slash-fill.webp'
 const book = '/icons/sym/book-fill.webp'
+const bookOutline = '/icons/sym/book.webp'
 const filters = '/icons/sym/camera-filters.webp'
 const cellular = '/icons/sym/cellularbars.webp'
 const checklist = '/icons/sym/checklist.webp'
@@ -332,6 +333,7 @@ export const SYM = {
   back,
   forward,
   book,
+  bookOutline,
   share,
   tabs,
   search,

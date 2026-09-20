@@ -108,6 +108,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
       open: (name, g) => swap(id, name, g),
       home: () => park(id),
       arg,
+      display: w > 600 ? 'inner' : 'cover',
       mirror: quiet || undefined,
       camera: { current: null }
     }

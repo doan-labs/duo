@@ -370,7 +370,8 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
 
   // Status stack, top right: camera, time, radios. The inner camera is
   // under-display, so only the cover half draws the punch-hole.
-  const sx = X + W - u(24) - u(17)
+  // The cover's camera is 5.5 mm from the free edge, so its stack sits 11 px in; the inner keeps 24.
+  const sx = X + W - u(wide ? 24 : 11) - u(17)
   let sy = Y + u(18)
   if (!wide) {
     ctx.beginPath()

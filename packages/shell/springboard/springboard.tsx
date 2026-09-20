@@ -139,6 +139,8 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   // The status stack sits top-right, so the app under it decides its colour.
   const topRight = cur.find((e) => e.side !== 'left')
   const lit = !!topRight?.a.light
+  // A `rail` app on the cover runs its chrome down the punch-hole column, so the stack stays whole.
+  const railed = !wide && !!topRight?.a.rail
   // One half taken, the home screen squeezes into the other as a whole narrow
   // home, like the cover display's. An app still shrinking out of a half keeps
   // the home there until it is gone, so it lands on the icon it is aiming at.
@@ -260,7 +262,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
           asleep && styles.dispAsleep
         )}
       >
-        <StatusBar wide={wide} light={lit && !cc} covered={!!topRight} cc={cc} />
+        <StatusBar wide={wide} light={lit && !cc} covered={!!topRight && !railed} cc={cc} />
 
         <HomeScreen
           ref={shell}
@@ -352,7 +354,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
               }}
               {...stylex.props(
                 styles.app,
-                !e.a.edge && styles.appPad,
+                !e.a.edge && !(e.a.rail && !wide) && styles.appPad,
                 e.side === 'left' && styles.appLeft(split * 100),
                 e.side === 'right' && styles.appRight(split * 100),
                 (drop?.id === e.id || switcher) && styles.appDrag,
