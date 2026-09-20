@@ -10,6 +10,8 @@ export type App = {
   light?: boolean
   /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */
   edge?: boolean
+  /** On the cover, keeps the right column free for the status stack, which stays whole; the shell adds no band. */
+  rail?: boolean
   view: ComponentType<{ os: Os }>
   /** Invented data behind a static screen: the tile shows a dot and the app a 'Mockup' pill. */
   mock?: boolean

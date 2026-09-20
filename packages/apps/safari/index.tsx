@@ -4,7 +4,7 @@ import { Screen } from '@doan-labs/duo-uikit'
 
 import type { Os } from '@doan-labs/duo-sdk'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useRef, useState } from 'react'
 import { styles } from './styles.ts'
@@ -49,51 +49,56 @@ export const Safari = ({ os }: { os: Os }) => {
     if (frame.current) frame.current.src = url
     setText(host(url))
   }
+  // The cover's camera column: Apple runs Safari's buttons down beside the status
+  // stack there, and the page keeps the rest. The row bar is the inner display's.
+  const rail = os.display === 'cover'
+  const Btn = ({ name, ...p }: { name: SymProps['name']; disabled?: boolean; onClick?: () => void }) => (
+    <button type="button" {...stylex.props(styles.barBtn)} {...p}>
+      <Sym name={name} size={22} />
+    </button>
+  )
   return (
-    <Screen xstyle={[styles.body]}>
-      <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" />
-      <div {...stylex.props(styles.marks, !marks && shared.hide)}>
-        {MARKS.map(([n, u]) => (
-          <button type="button" key={u} {...stylex.props(styles.mark)} onClick={() => go(u)}>
-            {n}
+    <Screen xstyle={[styles.body, rail && styles.bodyRail]}>
+      <div {...stylex.props(styles.page)}>
+        <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" />
+        <div {...stylex.props(styles.marks, !marks && shared.hide)}>
+          {MARKS.map(([n, u]) => (
+            <button type="button" key={u} {...stylex.props(styles.mark)} onClick={() => go(u)}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <div {...stylex.props(styles.url)}>
+          <input
+            {...stylex.props(styles.input)}
+            value={text}
+            spellCheck={false}
+            onChange={(e) => setText(e.currentTarget.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => e.key === 'Enter' && go(text)}
+          />
+          <button type="button" onClick={reload}>
+            <Sym name="reload" size={20} />
           </button>
-        ))}
+        </div>
       </div>
-      <div {...stylex.props(styles.url)}>
-        <input
-          {...stylex.props(styles.input)}
-          value={text}
-          spellCheck={false}
-          onChange={(e) => setText(e.currentTarget.value)}
-          onFocus={(e) => e.currentTarget.select()}
-          onKeyDown={(e) => e.key === 'Enter' && go(text)}
-        />
-        <button type="button" onClick={reload}>
-          <Sym name="reload" size={20} />
-        </button>
-      </div>
-      <div {...stylex.props(styles.bar)}>
-        <button type="button" {...stylex.props(styles.barBtn)} disabled={at === 0} onClick={() => step(-1)}>
-          <Sym name="back" size={22} />
-        </button>
-        <button
-          type="button"
-          {...stylex.props(styles.barBtn)}
-          disabled={at === hist.length - 1}
-          onClick={() => step(1)}
-        >
-          <Sym name="forward" size={22} />
-        </button>
-        <button type="button" {...stylex.props(styles.barBtn)} onClick={() => navigator.clipboard?.writeText(url)}>
-          <Sym name="share" size={22} />
-        </button>
-        <button type="button" {...stylex.props(styles.barBtn)} onClick={() => setMarks((m) => !m)}>
-          <Sym name="book" size={22} />
-        </button>
-        <button type="button" {...stylex.props(styles.barBtn)}>
-          <Sym name="tabs" size={22} />
-        </button>
-      </div>
+      {rail ? (
+        <div {...stylex.props(styles.rail)}>
+          <Btn name="back" disabled={at === 0} onClick={() => step(-1)} />
+          <Btn name="book" onClick={() => setMarks((m) => !m)} />
+          <div {...stylex.props(styles.railGap)} />
+          <Btn name="plus" onClick={() => go(start)} />
+          <Btn name="tabs" />
+        </div>
+      ) : (
+        <div {...stylex.props(styles.bar)}>
+          <Btn name="back" disabled={at === 0} onClick={() => step(-1)} />
+          <Btn name="forward" disabled={at === hist.length - 1} onClick={() => step(1)} />
+          <Btn name="share" onClick={() => navigator.clipboard?.writeText(url)} />
+          <Btn name="book" onClick={() => setMarks((m) => !m)} />
+          <Btn name="tabs" />
+        </div>
+      )}
     </Screen>
   )
 }
