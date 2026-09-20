@@ -199,6 +199,8 @@ export const styles = stylex.create({
   // faint enough that a multi-day bar reads as one bar straight over them.
   // The last week clears the home indicator the shell draws over the app.
   month: { flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 14 },
+  /** The weeks alone, so month-view.tsx can ask their height without the weekday row in it. */
+  sheet: { flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
   wds: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', flexShrink: 0, paddingBottom: 5 },
   wd: {
     textAlign: 'center',
@@ -216,18 +218,22 @@ export const styles = stylex.create({
     overflow: 'hidden',
     display: 'grid',
     gridTemplateColumns: 'repeat(7,1fr)',
-    // The number row, then the lanes month-view.tsx packs events into. A lane is
-    // one line of caption text and nothing more: sharing the week between three
-    // of them gave each a 38px slab on the inner display, which is not an event,
-    // it is a box. They cap at 18 and the leftover falls to the foot of the day,
-    // the way a month sheet leaves air under a Tuesday with one thing on it. The
-    // minmax lets a six-week month tighten them rather than run off the bottom.
-    gridTemplateRows: 'auto repeat(6,minmax(0,18px)) 1fr',
+    // The lanes come from styles.lanes: month-view.tsx counts how many the week
+    // can hold. Dividing the week between a fixed number instead gave each lane
+    // whatever was left over, which is a 38px slab on a tall sheet and an 11px
+    // slot on a six-week one, and 11px cuts the descenders off its own title.
+    gridTemplateRows: 'auto 1fr',
     rowGap: 1,
     paddingTop: 2,
     borderTopWidth: 1,
     ...RULE
   },
+  /**
+   * A lane is one line of caption text, never a share of the week: the events
+   * sit under the number at the size Apple draws them and the day keeps the
+   * rest as air. LANE in month-view.tsx is this height plus the row gap.
+   */
+  lanes: (n: number) => ({ gridTemplateRows: `auto repeat(${n},18px) 1fr` }),
   // On the cover a title would be four letters and an ellipsis, so the day keeps
   // its dots and opens on Day, the way iPhone draws a month: no column rules, no
   // weekend shading, the number centred in its week with its dots under it.
