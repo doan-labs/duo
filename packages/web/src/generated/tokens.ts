@@ -1033,8 +1033,18 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
+    "name": "calendarGrid",
+    "value": "rgba(255,255,255,.07)",
+    "doc": "The sheet's rules. A calendar is almost all lines, so they sit far under the UIKit separator."
+  },
+  {
+    "name": "calendarWeekend",
+    "value": "rgba(255,255,255,.024)",
+    "doc": "Saturday and Sunday, shaded the way Apple shades them in the month and the week."
+  },
+  {
     "name": "calendarHourLines",
-    "value": "linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px)",
+    "value": "linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px)",
     "doc": ""
   },
   {

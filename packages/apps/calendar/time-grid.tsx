@@ -3,13 +3,17 @@ import { useEffect, useRef } from 'react'
 import type { Event } from './data.ts'
 import { eventsOn, HOUR, minutes, sameDay, time } from './dates.ts'
 import { pack } from './lanes.ts'
-import { styles } from './styles.ts'
+import { enter, styles } from './styles.ts'
 
 type Props = {
   days: Date[]
   today: Date
   events: Event[]
   colors: Map<string, string>
+  /** Which way the last move went, so the sheet comes in from that side. */
+  dir: number
+  /** The page being shown. Changing it replays the entrance without remounting the scroller. */
+  stamp: string
   onSlot: (d: Date) => void
   onEvent: (e: Event) => void
 }
@@ -17,30 +21,43 @@ type Props = {
 const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`)
 
 /** Day and Week are the same grid with one or seven columns. */
-export function TimeGrid({ days, today, events, colors, onSlot, onEvent }: Props) {
+export function TimeGrid({ days, today, events, colors, dir, stamp, onSlot, onEvent }: Props) {
   const scroll = useRef<HTMLDivElement>(null)
+  // The weekend is shaded to set it off from the working week, so a lone Sunday in
+  // Day view has nothing to be set off from and stays the colour of the sheet.
+  const wash = (d: Date) => days.length > 1 && (d.getDay() === 0 || d.getDay() === 6)
   // Open on the working morning, as Apple does, rather than at midnight.
   useEffect(() => {
     scroll.current!.scrollTop = HOUR * 7.5
   }, [])
   const now = today.getHours() * 60 + today.getMinutes()
+  const here = days.some((d) => sameDay(d, today))
+  const slide = enter(dir)
   const pick = (d: Date, e: React.MouseEvent<HTMLDivElement>) => {
     const y = e.clientY - e.currentTarget.getBoundingClientRect().top
     onSlot(new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(y / HOUR)))
   }
   return (
     <>
-      <div {...stylex.props(styles.tgHead, styles.cols(days.length))}>
-        <span />
-        {days.map((d) => (
-          <div key={d.getTime()} {...stylex.props(styles.tgDay)}>
-            <span {...stylex.props(styles.dim)}>{d.toLocaleDateString('en', { weekday: 'short' })}</span>
+      <div key={stamp} {...stylex.props(styles.tgHead, styles.cols(days.length), styles.anim, slide)}>
+        <span {...stylex.props(styles.tgGutter)} />
+        {days.map((d, i) => (
+          <div key={d.getTime()} {...stylex.props(styles.tgDay, styles.colAt(i + 1), wash(d) && styles.weekend)}>
+            <span {...stylex.props(wash(d) ? styles.off : styles.dim)}>
+              {d.toLocaleDateString('en', { weekday: 'short' })}
+            </span>
             <span {...stylex.props(styles.tgNum, sameDay(d, today) && styles.today)}>{d.getDate()}</span>
           </div>
         ))}
         <span {...stylex.props(styles.allDayLabel)}>all-day</span>
-        {/* One bar per event across the days it covers, rather than the same title in every column. */}
-        <div {...stylex.props(styles.allDay, styles.laneCols(days.length), styles.spanCols(days.length))}>
+        {/* The empty days carry the rules; the lanes span them so one bar covers its whole run. */}
+        {days.map((d, i) => (
+          <span
+            key={d.getTime()}
+            {...stylex.props(styles.allDayCell, styles.colAt(i + 1), wash(d) && styles.weekend)}
+          />
+        ))}
+        <div {...stylex.props(styles.allDay, styles.laneCols(days.length), styles.slot(1, days.length, 2))}>
           {pack(
             days,
             events.filter((e) => e.allDay)
@@ -62,10 +79,10 @@ export function TimeGrid({ days, today, events, colors, onSlot, onEvent }: Props
         </div>
       </div>
       <div ref={scroll} {...stylex.props(styles.tgScroll)}>
-        <div {...stylex.props(styles.tgBody, styles.cols(days.length))}>
+        <div key={stamp} {...stylex.props(styles.tgBody, styles.cols(days.length), styles.anim, slide)}>
           <div {...stylex.props(styles.hours)}>
-            {hours.map((h) => (
-              <span key={h} {...stylex.props(styles.hour)}>
+            {hours.map((h, i) => (
+              <span key={h} {...stylex.props(styles.hour, styles.at(i * 60))}>
                 {h}
               </span>
             ))}
@@ -78,7 +95,7 @@ export function TimeGrid({ days, today, events, colors, onSlot, onEvent }: Props
               role="button"
               tabIndex={0}
               aria-label={d.toDateString()}
-              {...stylex.props(styles.col)}
+              {...stylex.props(styles.col, wash(d) && styles.weekend)}
             >
               {eventsOn(events, d)
                 .filter((e) => !e.allDay)
@@ -103,6 +120,15 @@ export function TimeGrid({ days, today, events, colors, onSlot, onEvent }: Props
               {sameDay(d, today) && <i {...stylex.props(styles.now, styles.at(now))} />}
             </div>
           ))}
+          {/* Now runs pale across the week and reads as a time in the gutter, as Apple draws it. */}
+          {here && (
+            <>
+              <i {...stylex.props(styles.nowFaint, styles.at(now))} />
+              <span {...stylex.props(styles.nowPill, styles.at(now))}>
+                {today.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </>

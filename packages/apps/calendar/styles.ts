@@ -2,8 +2,10 @@ import {
   app,
   appAppearance,
   colors,
+  easing,
   fonts,
   leading,
+  motion,
   radius,
   tracking,
   typeScale,
@@ -11,7 +13,17 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
-const HAIRLINE = { borderStyle: 'solid', borderColor: app.separator } as const
+/** The sheet's own rule, a third of the weight of the UIKit separator: seven of these cross every week. */
+const RULE = { borderStyle: 'solid', borderColor: appAppearance.calendarGrid } as const
+/** The chrome around the sheet: the sidebar's edge, where a real separator belongs. */
+const EDGE = { borderStyle: 'solid', borderColor: app.separator } as const
+
+// Paging a calendar moves the sheet the way you asked it to, so back and forward
+// come in from the side they point at and a new view rises into place.
+const fromLeft = stylex.keyframes({ from: { opacity: 0, transform: 'translateX(-22px)' } })
+const fromRight = stylex.keyframes({ from: { opacity: 0, transform: 'translateX(22px)' } })
+const rise = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(8px)' } })
+const slideIn = stylex.keyframes({ from: { opacity: 0, transform: 'translateX(-100%)' } })
 
 export const styles = stylex.create({
   root: {
@@ -27,16 +39,18 @@ export const styles = stylex.create({
   red: { color: colors.red },
   grow: { flexGrow: 1, minWidth: 0 },
   tint: (c?: string) => ({ backgroundColor: c }),
-  /** A hidden calendar keeps its colour as a ring rather than a fill, the way iOS marks one off. */
-  ring: (c?: string) => ({ backgroundColor: 'transparent', borderWidth: 1.5, borderStyle: 'solid', borderColor: c }),
   /** A block in Day and Week: the calendar's colour as a wash, with its own text on top, as iOS draws them. */
   soft: (c?: string) => ({ backgroundColor: `color-mix(in srgb, ${c} 35%, transparent)`, color: c }),
   // minmax(0,1fr): a long event title must not widen its day past the pane.
   cols: (n: number) => ({ gridTemplateColumns: `44px repeat(${n},minmax(0,1fr))` }),
   laneCols: (n: number) => ({ gridTemplateColumns: `repeat(${n},minmax(0,1fr))` }),
-  spanCols: (n: number) => ({ gridColumn: `2 / span ${n}` }),
   span: (from: number, len: number) => ({ top: (from / 60) * 44, height: (len / 60) * 44 }),
   at: (min: number) => ({ top: (min / 60) * 44 }),
+  // Paging a sheet slides it; arriving at a new view raises it.
+  anim: { animationDuration: '.26s', animationTimingFunction: easing.pop, animationFillMode: 'both' },
+  fromLeft: { animationName: fromLeft },
+  fromRight: { animationName: fromRight },
+  rise: { animationName: rise },
   // Sidebar
   side: {
     width: 210,
@@ -45,10 +59,13 @@ export const styles = stylex.create({
     flexDirection: 'column',
     backgroundColor: appAppearance.calendarSidebar,
     borderRightWidth: 1,
-    ...HAIRLINE
+    ...EDGE,
+    animationName: slideIn,
+    animationDuration: '.28s',
+    animationTimingFunction: easing.pop
   },
   sideBar: { display: 'flex', justifyContent: 'flex-end', gap: 4, paddingTop: 8, paddingRight: 10, paddingBottom: 8 },
-  sideList: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingInline: 10 },
+  sideList: { flexGrow: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', paddingInline: 10 },
   group: {
     color: app.label2,
     fontSize: typeScale.footnote,
@@ -57,15 +74,15 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     paddingTop: 14,
     paddingBottom: 4,
-    paddingLeft: 10
+    paddingLeft: 8
   },
   cal: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     width: '100%',
-    height: 30,
-    paddingInline: 10,
+    height: 28,
+    paddingInline: 8,
     borderWidth: 0,
     borderRadius: radius.sm,
     backgroundColor: { default: 'transparent', ':hover': appAppearance.calendarHover },
@@ -74,15 +91,16 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     letterSpacing: tracking.subheadline,
     textAlign: 'left',
+    transitionProperty: 'background-color',
+    transitionDuration: '.15s',
+    transitionTimingFunction: easing.out,
     cursor: 'pointer'
   },
-  /** The calendar's colour, filled when it is showing and hollow when it is not, as iOS lists them. */
-  calDot: { width: 10, height: 10, borderRadius: radius.circle, flexShrink: 0 },
   calName: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  calCheck: { display: 'flex', color: app.link },
+  /** A calendar that is off keeps its colour in the box and loses it in the name, as macOS greys it. */
   off: { color: app.label3 },
   inbox: { padding: 16, width: 220, textAlign: 'center' },
-  mini: { flexShrink: 0, marginInline: 10, paddingTop: 10, paddingBottom: 10, borderTopWidth: 1, ...HAIRLINE },
+  mini: { flexShrink: 0, marginInline: 10, paddingTop: 10, paddingBottom: 10, borderTopWidth: 1, ...EDGE },
   miniHdr: {
     display: 'flex',
     alignItems: 'center',
@@ -91,7 +109,7 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     color: colors.grey
   },
-  miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', rowGap: 6, textAlign: 'center' },
+  miniGrid: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', rowGap: 5, textAlign: 'center' },
   miniWd: {
     fontSize: typeScale.caption2,
     fontWeight: weight.semibold,
@@ -110,15 +128,20 @@ export const styles = stylex.create({
     borderRadius: radius.circle,
     justifySelf: 'center',
     color: 'inherit',
-    backgroundColor: 'transparent',
+    backgroundColor: { default: 'transparent', ':hover': appAppearance.calendarHover },
+    transform: { default: 'scale(1)', ':active': motion.press },
+    transitionProperty: 'background-color, color, transform',
+    transitionDuration: '.18s',
+    transitionTimingFunction: easing.pop,
     cursor: 'pointer'
   },
+  /** A day the year grid leaves blank still holds its row, so twelve months line up. */
+  miniGap: { height: 18 },
   miniToday: { backgroundColor: colors.red, color: colors.white },
   miniPicked: { backgroundColor: app.fill },
   // Main pane
   main: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   topBar: {
-    position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -131,15 +154,15 @@ export const styles = stylex.create({
   },
   barSide: { display: 'flex', alignItems: 'center', gap: 4, flexBasis: 0, flexGrow: 1 },
   barEnd: { justifyContent: 'flex-end' },
-  search: { position: 'absolute', right: 44, top: 6, width: 160, height: 24 },
+  search: { flexGrow: 1, minWidth: 0, maxWidth: 280, height: 26 },
   titleRow: {
     display: 'flex',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingTop: 10,
+    paddingTop: 8,
     paddingRight: 14,
-    paddingBottom: 8,
-    paddingLeft: 30,
+    paddingBottom: 10,
+    paddingLeft: 16,
     flexShrink: 0
   },
   titleRowSm: { paddingLeft: 14 },
@@ -150,35 +173,42 @@ export const styles = stylex.create({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     fontSize: typeScale.title1,
+    // The ramp's own leading: without it the line box clips the p in September.
+    lineHeight: leading.title1,
+    letterSpacing: tracking.title1,
     fontWeight: weight.regular
   },
-  titleSm: { fontSize: typeScale.title3 },
+  titleSm: { fontSize: typeScale.title3, lineHeight: leading.title3, letterSpacing: tracking.title3 },
   nav: { display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 },
   todayBtn: {
     height: 24,
     paddingInline: 12,
     borderWidth: 0,
     borderRadius: radius.lg,
-    backgroundColor: app.fill,
+    backgroundColor: { default: app.fill, ':hover': appAppearance.calendarHover },
     color: 'inherit',
     fontFamily: fonts.system,
     fontSize: typeScale.footnote,
+    transform: { default: 'scale(1)', ':active': motion.press },
+    transitionProperty: 'background-color, transform',
+    transitionDuration: motion.pressDuration,
+    transitionTimingFunction: easing.pop,
     cursor: 'pointer'
   },
-  // Month. A sheet ruled week by week, not a spreadsheet: only the week hairline
-  // is drawn, so a multi-day event can run across the days it covers as one bar.
+  // Month. Apple's sheet is ruled both ways and shades the weekend; the rules are
+  // faint enough that a multi-day bar reads as one bar straight over them.
   // The last week clears the home indicator the shell draws over the app.
   month: { flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 14 },
-  wds: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', flexShrink: 0, paddingBottom: 6 },
+  wds: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', flexShrink: 0, paddingBottom: 5 },
   wd: {
     textAlign: 'center',
-    textTransform: 'uppercase',
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
     letterSpacing: tracking.caption2,
     fontWeight: weight.semibold,
     color: app.label2
   },
+  wdOff: { color: app.label3 },
   week: {
     flexGrow: 1,
     flexBasis: 0,
@@ -186,30 +216,46 @@ export const styles = stylex.create({
     overflow: 'hidden',
     display: 'grid',
     gridTemplateColumns: 'repeat(7,1fr)',
-    // The number row, then the lanes month-view.tsx packs events into.
-    gridTemplateRows: 'auto repeat(3,15px)',
-    columnGap: 2,
+    // The number row, then the lanes month-view.tsx packs events into. The lanes
+    // share what the week has left, so a five-week month breathes and a six-week
+    // one tightens instead of running its last row off the bottom of the sheet.
+    gridTemplateRows: 'auto repeat(3,minmax(0,1fr))',
     rowGap: 1,
-    paddingTop: 3,
+    paddingTop: 2,
     borderTopWidth: 1,
-    ...HAIRLINE
+    ...RULE
   },
   // On the cover a title would be four letters and an ellipsis, so the day keeps
-  // its dots and opens on Day, the way iPhone draws a month.
-  weekSm: { gridTemplateRows: 'auto 12px' },
+  // its dots and opens on Day, the way iPhone draws a month: no column rules, no
+  // weekend shading, the number centred in its week with its dots under it.
+  weekSm: { gridTemplateRows: 'auto 12px', alignContent: 'center' },
   dots: { gridRow: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, overflow: 'hidden' },
   colAt: (i: number) => ({ gridColumn: i + 1 }),
   slot: (col: number, span: number, row: number) => ({
     gridColumn: `${col + 1} / span ${span}`,
     gridRow: row
   }),
-  cell: { gridRow: '1 / -1', cursor: 'default' },
+  /** The day itself, and the wash that marks it off or picks it. */
+  cell: {
+    gridRow: '1 / -1',
+    transitionProperty: 'background-color',
+    transitionDuration: '.2s',
+    transitionTimingFunction: easing.out,
+    cursor: 'default'
+  },
+  /** The rule down a day's left edge. The Mac sheet is ruled both ways; the phone's is not. */
+  rule: { borderLeftWidth: 1, ...RULE },
+  weekend: { backgroundColor: appAppearance.calendarWeekend },
+  /** macOS lifts the whole picked day, not just its number. */
+  cellPicked: { backgroundColor: app.fill },
   num: {
     gridRow: 1,
-    justifySelf: 'center',
-    minWidth: 22,
-    height: 22,
-    paddingInline: 6,
+    // Apple sets the month's numbers against the right edge of their day.
+    justifySelf: 'end',
+    marginInline: 5,
+    minWidth: 20,
+    height: 20,
+    paddingInline: 5,
     display: 'grid',
     placeItems: 'center',
     whiteSpace: 'nowrap',
@@ -217,19 +263,24 @@ export const styles = stylex.create({
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
     fontWeight: weight.medium,
-    borderRadius: radius.pill
+    borderRadius: radius.pill,
+    transitionProperty: 'background-color, color',
+    transitionDuration: '.2s',
+    transitionTimingFunction: easing.pop
   },
   numOut: { color: app.label3 },
-  // Today and the picked day are discs, not pills: fixed square box, no padding to stretch it.
-  disc: { width: 22, minWidth: 0, paddingInline: 0, borderRadius: radius.circle },
+  /** The phone centres its numbers over the dots; only the Mac sheet hangs them right. */
+  numMid: { justifySelf: 'center', marginInline: 0 },
+  // Today is a disc, not a pill: a fixed square box with no padding to stretch it.
+  disc: { width: 20, minWidth: 0, paddingInline: 0, borderRadius: radius.circle },
   today: { backgroundColor: colors.red, color: colors.white, fontWeight: weight.semibold },
-  picked: { backgroundColor: app.fill },
   item: {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
     minWidth: 0,
-    height: 15,
+    // No height of its own: the lane it lands in sets it, month and all-day row alike.
+    marginInline: 3,
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: 'inherit',
@@ -239,57 +290,97 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     textAlign: 'left',
     overflow: 'hidden',
+    transform: { default: 'scale(1)', ':active': motion.press },
+    transitionProperty: 'background-color, transform',
+    transitionDuration: motion.pressDuration,
+    transitionTimingFunction: easing.pop,
     cursor: 'pointer'
   },
   /** All-day and multi-day: the calendar's colour carries the title, the way Apple bars them. */
   bar: { paddingInline: 6, borderRadius: radius.xs, color: colors.white, fontWeight: weight.medium },
   /** A timed event is its dot and its title; the time is in the day itself. */
   plain: {
-    paddingInline: 2,
+    paddingInline: 3,
     borderRadius: radius.xs,
     backgroundColor: { default: 'transparent', ':hover': appAppearance.calendarHover }
   },
-  more: { paddingInline: 6, color: app.label2, backgroundColor: appAppearance.calendarPane },
+  more: { paddingInline: 3, color: app.label2, fontWeight: weight.medium },
   chipTitle: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  /** A hollow ring, the way Apple marks a timed event in the month sheet. */
+  ring: (c?: string) => ({ borderColor: c }),
+  ringDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.circle,
+    borderWidth: 1.5,
+    borderStyle: 'solid',
+    flexShrink: 0
+  },
   dot: { width: 5, height: 5, borderRadius: radius.circle, flexShrink: 0 },
   // Day and Week
-  tgHead: { display: 'grid', flexShrink: 0, borderBottomWidth: 1, ...HAIRLINE },
-  tgDay: { display: 'flex', alignItems: 'center', gap: 6, paddingInline: 8, paddingBottom: 4 },
+  tgHead: { display: 'grid', flexShrink: 0, borderBottomWidth: 1, ...RULE },
+  tgDay: {
+    gridRow: 1,
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 2,
+    paddingBottom: 5,
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    ...RULE
+  },
   tgNum: {
-    minWidth: 24,
-    height: 24,
+    minWidth: 22,
+    height: 22,
     display: 'grid',
     placeItems: 'center',
-    fontSize: typeScale.body,
+    fontSize: typeScale.subheadline,
     fontWeight: weight.medium,
-    borderRadius: radius.lg
+    borderRadius: radius.circle,
+    transitionProperty: 'background-color, color',
+    transitionDuration: '.2s',
+    transitionTimingFunction: easing.pop
   },
-  allDayLabel: { fontSize: typeScale.caption2, color: colors.grey, textAlign: 'right', paddingRight: 4 },
-  allDay: {
-    minHeight: 20,
-    display: 'grid',
-    gridAutoRows: 15,
-    columnGap: 2,
-    rowGap: 1,
-    paddingInline: 2,
-    paddingBottom: 2
-  },
-  tgScroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingBottom: 14 },
-  tgBody: { display: 'grid', height: 44 * 24 },
-  hours: { position: 'relative' },
-  hour: {
-    display: 'block',
-    height: 44,
-    paddingRight: 6,
-    textAlign: 'right',
+  /** The gutter above the hours: no rule, so the head's hairline starts at the first day. */
+  tgGutter: { gridRow: 1, gridColumn: 1, borderBottomWidth: 1, ...RULE },
+  allDayLabel: {
+    gridRow: 2,
+    gridColumn: 1,
+    alignSelf: 'center',
     fontSize: typeScale.caption2,
-    color: colors.grey,
-    transform: 'translateY(-6px)'
+    color: app.label2,
+    textAlign: 'right',
+    paddingRight: 6
+  },
+  /** The empty day behind the all-day lanes, there to carry the column rule and the weekend wash. */
+  allDayCell: { gridRow: 2, borderLeftWidth: 1, ...RULE },
+  allDay: {
+    gridRow: 2,
+    display: 'grid',
+    gridAutoRows: 16,
+    rowGap: 1,
+    minHeight: 22,
+    paddingTop: 3,
+    paddingBottom: 3
+  },
+  // No scrollbar: the head is a second grid, and a gutter here would knock the two out of line.
+  tgScroll: { flexGrow: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', paddingBottom: 14 },
+  tgBody: { position: 'relative', display: 'grid', height: 44 * 24 },
+  hours: { position: 'relative' },
+  // Pinned to its own line and centred on it, the way Apple hangs the hours.
+  hour: {
+    position: 'absolute',
+    right: 6,
+    fontSize: typeScale.caption2,
+    color: app.label2,
+    transform: 'translateY(-50%)'
   },
   col: {
     position: 'relative',
     borderLeftWidth: 1,
-    ...HAIRLINE,
+    ...RULE,
     backgroundImage: appAppearance.calendarHourLines,
     backgroundSize: '100% 44px',
     cursor: 'default'
@@ -305,6 +396,10 @@ export const styles = stylex.create({
     paddingTop: 3,
     paddingInline: 6,
     borderWidth: 0,
+    // The solid edge in the calendar's own colour, the way a block is banded in Calendar.
+    borderLeftWidth: 2,
+    borderLeftStyle: 'solid',
+    borderLeftColor: 'currentColor',
     borderRadius: radius.xs,
     fontFamily: fonts.system,
     fontSize: typeScale.caption2,
@@ -312,22 +407,48 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     textAlign: 'left',
     overflow: 'hidden',
+    transform: { default: 'scale(1)', ':active': motion.press },
+    transitionProperty: 'transform, filter',
+    transitionDuration: motion.pressDuration,
+    transitionTimingFunction: easing.pop,
+    filter: { default: null, ':hover': 'brightness(1.15)' },
     cursor: 'pointer'
+  },
+  /** Now, drawn the way Apple draws it: pale across the week, solid with a dot on today. */
+  nowFaint: {
+    position: 'absolute',
+    left: 44,
+    right: 0,
+    height: 1,
+    backgroundColor: `color-mix(in srgb, ${colors.red} 45%, transparent)`,
+    pointerEvents: 'none'
+  },
+  nowPill: {
+    position: 'absolute',
+    left: 2,
+    paddingInline: 4,
+    borderRadius: radius.xs,
+    backgroundColor: colors.red,
+    color: colors.white,
+    fontSize: typeScale.caption2,
+    fontWeight: weight.semibold,
+    transform: 'translateY(-50%)',
+    pointerEvents: 'none'
   },
   now: {
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 2,
+    height: 1.5,
     backgroundColor: colors.red,
     pointerEvents: 'none',
     '::before': {
       content: '""',
       position: 'absolute',
-      left: -4,
+      left: -3,
       top: -3,
-      width: 8,
-      height: 8,
+      width: 7,
+      height: 7,
       borderRadius: radius.circle,
       backgroundColor: colors.red
     }
@@ -336,11 +457,12 @@ export const styles = stylex.create({
   year: {
     flexGrow: 1,
     minHeight: 0,
-    overflow: 'auto',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))',
     gap: 16,
-    paddingInline: 30,
+    paddingInline: 16,
     paddingBottom: 20
   },
   yMonth: { display: 'flex', flexDirection: 'column', gap: 6 },
@@ -353,10 +475,13 @@ export const styles = stylex.create({
     fontFamily: fonts.system,
     fontSize: typeScale.body,
     fontWeight: weight.semibold,
+    transitionProperty: 'color',
+    transitionDuration: '.15s',
+    transitionTimingFunction: easing.out,
     cursor: 'pointer'
   },
   // Search
-  results: { flexGrow: 1, minHeight: 0, overflow: 'auto', paddingInline: 30, paddingTop: 4 },
+  results: { flexGrow: 1, minHeight: 0, overflowY: 'auto', scrollbarWidth: 'none', paddingInline: 16, paddingTop: 4 },
   result: {
     display: 'flex',
     alignItems: 'center',
@@ -371,6 +496,9 @@ export const styles = stylex.create({
     fontFamily: fonts.system,
     fontSize: typeScale.footnote,
     textAlign: 'left',
+    transitionProperty: 'background-color',
+    transitionDuration: '.15s',
+    transitionTimingFunction: easing.out,
     cursor: 'pointer'
   },
   // Event sheet
@@ -378,3 +506,6 @@ export const styles = stylex.create({
   titleField: { fontSize: typeScale.body, fontWeight: weight.semibold, height: 32 },
   fieldLabel: { width: 60, color: colors.grey, flexShrink: 0 }
 })
+
+/** Back and forward come in from the side their arrow points at; anything else rises into place. */
+export const enter = (dir: number) => (dir < 0 ? styles.fromLeft : dir > 0 ? styles.fromRight : styles.rise)

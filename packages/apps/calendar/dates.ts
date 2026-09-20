@@ -17,10 +17,18 @@ export const startOfWeek = (d: Date) => addDays(d, -((d.getDay() + 6) % 7))
 export const time = (s: string) => new Date(s).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 export const monthYear = (d: Date) => `${d.toLocaleDateString('en', { month: 'long' })} ${d.getFullYear()}`
 
-/** Six Monday-first weeks covering the month, the way Apple's month grid always draws them. */
-export const weeks = (month: Date) => {
-  const start = startOfWeek(startOfMonth(month))
-  return Array.from({ length: 42 }, (_, i) => addDays(start, i))
+/**
+ * The Monday-first weeks a month actually spans, five or six, so the sheet gives
+ * its rows the height it has rather than ruling an empty week at the bottom.
+ * `rows` pads back up: a thumbnail that changes height every month makes the
+ * sidebar and the year grid jump.
+ */
+export const weeks = (month: Date, rows = 0) => {
+  const first = startOfMonth(month)
+  const span = ((first.getDay() + 6) % 7) + new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+  const n = Math.max(Math.ceil(span / 7), rows)
+  const start = startOfWeek(first)
+  return Array.from({ length: n * 7 }, (_, i) => addDays(start, i))
 }
 export const week = (d: Date) => Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(d), i))
 

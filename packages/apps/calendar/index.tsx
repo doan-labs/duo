@@ -3,12 +3,12 @@ import { dark } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { type Event, VIEWS } from './data.ts'
-import { addDays, addMonths, local, monthYear, startOfMonth, time, week } from './dates.ts'
+import { addDays, addMonths, local, monthYear, startOfMonth, time, week, ymd } from './dates.ts'
 import { EventSheet } from './event-sheet.tsx'
 import { MonthView } from './month-view.tsx'
 import { Sidebar } from './sidebar.tsx'
 import { useCalendars, useEvents, useSelection } from './store.ts'
-import { styles } from './styles.ts'
+import { enter, styles } from './styles.ts'
 import { TimeGrid } from './time-grid.tsx'
 import { YearView } from './year-view.tsx'
 
@@ -19,6 +19,8 @@ export const Calendar = () => {
   const [wide, setWide] = useState(false)
   const [query, setQuery] = useState<string | null>(null)
   const [draft, setDraft] = useState<Event | null>(null)
+  /** -1 back, 1 forward, 0 a jump: which way the sheet that is arriving should come from. */
+  const [dir, setDir] = useState(0)
   const { view, setView, date, setDate, sidebar, setSidebar } = useSelection()
   const { calendars, hidden, toggle } = useCalendars()
   const { events, save, remove } = useEvents()
@@ -32,7 +34,8 @@ export const Calendar = () => {
     ro.observe(root.current!)
     return () => ro.disconnect()
   }, [])
-  const shift = (n: number) =>
+  const shift = (n: number) => {
+    setDir(n)
     setDate(
       view === 'Month'
         ? addMonths(date, n)
@@ -40,6 +43,7 @@ export const Calendar = () => {
           ? new Date(date.getFullYear() + n, 0, 1)
           : addDays(date, n * STEP[view])
     )
+  }
   const compose = (at: Date, allDay = false) =>
     setDraft({
       id: Date.now().toString(36),
@@ -51,9 +55,13 @@ export const Calendar = () => {
     })
   const plus = () => compose(new Date(date.getFullYear(), date.getMonth(), date.getDate(), today.getHours() + 1))
   const jump = (d: Date, v = view) => {
+    setDir(0)
     setDate(d)
     setView(v)
   }
+  // The page on screen. Month and Year redraw whole; Day and Week keep the scroller
+  // they are in, so paging replays the slide without throwing you back to the morning.
+  const stamp = view === 'Month' ? monthYear(date) : view === 'Year' ? String(date.getFullYear()) : ymd(date)
   const title =
     view === 'Year'
       ? String(date.getFullYear())
@@ -88,20 +96,23 @@ export const Calendar = () => {
             )}
             <IconButton name="plus" size={14} aria-label="New event" onClick={plus} />
           </div>
-          <Segmented options={VIEWS} value={view} onChange={setView} />
+          {/* The field takes the bar rather than floating over it: at this width there is
+              room for the views or for a search, and never for both at once. */}
+          {query === null ? (
+            <Segmented options={VIEWS} value={view} onChange={setView} />
+          ) : (
+            <TextField
+              type="search"
+              aria-label="Search events"
+              placeholder="Search"
+              value={query}
+              autoFocus
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setQuery(null)}
+              xstyle={[styles.search]}
+            />
+          )}
           <div {...stylex.props(styles.barSide, styles.barEnd)}>
-            {query !== null && (
-              <TextField
-                type="search"
-                aria-label="Search events"
-                placeholder="Search"
-                value={query}
-                autoFocus
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Escape' && setQuery(null)}
-                xstyle={[styles.search]}
-              />
-            )}
             <IconButton
               name={query === null ? 'search' : 'close'}
               size={query === null ? 17 : 13}
@@ -122,14 +133,14 @@ export const Calendar = () => {
           </h1>
           <div {...stylex.props(styles.nav)}>
             <IconButton name="back" size={11} variant="round" aria-label="Previous" onClick={() => shift(-1)} />
-            <button type="button" onClick={() => setDate(today)} {...stylex.props(styles.todayBtn)}>
+            <button type="button" onClick={() => jump(today)} {...stylex.props(styles.todayBtn)}>
               Today
             </button>
             <IconButton name="forward" size={11} variant="round" aria-label="Next" onClick={() => shift(1)} />
           </div>
         </div>
         {hits ? (
-          <div {...stylex.props(styles.results)}>
+          <div {...stylex.props(styles.results, styles.anim, styles.rise)}>
             {hits.length === 0 && <span {...stylex.props(styles.dim)}>No Results</span>}
             {hits.map((e) => (
               <button
@@ -152,10 +163,12 @@ export const Calendar = () => {
           </div>
         ) : view === 'Month' ? (
           <MonthView
+            key={stamp}
             month={startOfMonth(date)}
             today={today}
             selected={date}
             wide={wide}
+            dir={dir}
             events={visible}
             colors={colors}
             onPick={setDate}
@@ -165,8 +178,10 @@ export const Calendar = () => {
           />
         ) : view === 'Year' ? (
           <YearView
+            key={stamp}
             year={date.getFullYear()}
             today={today}
+            dir={dir}
             onMonth={(d) => jump(d, 'Month')}
             onDay={(d) => jump(d, 'Day')}
           />
@@ -177,6 +192,8 @@ export const Calendar = () => {
             today={today}
             events={visible}
             colors={colors}
+            dir={dir}
+            stamp={stamp}
             onSlot={(d) => compose(d)}
             onEvent={setDraft}
           />

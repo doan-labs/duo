@@ -1,12 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
 import { sameDay, WEEKDAYS, weeks } from './dates.ts'
-import { styles } from './styles.ts'
+import { enter, styles } from './styles.ts'
 
-type Props = { year: number; today: Date; onMonth: (d: Date) => void; onDay: (d: Date) => void }
+type Props = { year: number; today: Date; dir: number; onMonth: (d: Date) => void; onDay: (d: Date) => void }
 
-export function YearView({ year, today, onMonth, onDay }: Props) {
+export function YearView({ year, today, dir, onMonth, onDay }: Props) {
   return (
-    <div {...stylex.props(styles.year)}>
+    <div {...stylex.props(styles.year, styles.anim, enter(dir))}>
       {Array.from({ length: 12 }, (_, m) => new Date(year, m, 1)).map((month) => (
         <div key={month.getMonth()} {...stylex.props(styles.yMonth)}>
           <button
@@ -25,7 +25,7 @@ export function YearView({ year, today, onMonth, onDay }: Props) {
                 {d[0]}
               </span>
             ))}
-            {weeks(month).map((d) =>
+            {weeks(month, 6).map((d) =>
               d.getMonth() === month.getMonth() ? (
                 <button
                   type="button"
@@ -36,7 +36,7 @@ export function YearView({ year, today, onMonth, onDay }: Props) {
                   {d.getDate()}
                 </button>
               ) : (
-                <span key={d.getTime()} />
+                <span key={d.getTime()} {...stylex.props(styles.miniGap)} />
               )
             )}
           </div>

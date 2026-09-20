@@ -1,8 +1,8 @@
-import { IconButton, Sheet, Sym, Text } from '@doan-labs/duo-uikit'
+import { Checkbox, IconButton, Sheet, Text } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Cal } from './data.ts'
-import { addMonths, monthYear, sameDay, WEEKDAYS, weeks } from './dates.ts'
+import { addMonths, monthYear, sameDay, startOfMonth, WEEKDAYS, weeks } from './dates.ts'
 import { styles } from './styles.ts'
 
 type Props = {
@@ -16,9 +16,12 @@ type Props = {
 }
 
 export function Sidebar({ calendars, hidden, toggle, date, today, setDate, hide }: Props) {
-  const [month, setMonth] = useState(() => addMonths(date, 0))
+  const [month, setMonth] = useState(() => startOfMonth(date))
   const [inbox, setInbox] = useState(false)
   const groups = [...new Set(calendars.map((c) => c.group))]
+  // The mini month follows the pane. Paging it on its own is fine; the next move
+  // upstairs brings it back, rather than leaving February under a September sheet.
+  useEffect(() => setMonth(startOfMonth(date)), [date])
   return (
     <aside {...stylex.props(styles.side)}>
       <div {...stylex.props(styles.sideBar)}>
@@ -34,22 +37,11 @@ export function Sidebar({ calendars, hidden, toggle, date, today, setDate, hide 
               .map((c) => {
                 const shown = !hidden.has(c.id)
                 return (
-                  <button
-                    type="button"
-                    key={c.id}
-                    role="switch"
-                    aria-checked={shown}
-                    onClick={() => toggle(c.id)}
-                    {...stylex.props(styles.cal)}
-                  >
-                    <i {...stylex.props(styles.calDot, shown ? styles.tint(c.color) : styles.ring(c.color))} />
+                  // The box is the calendar's colour and the only control, the way macOS lists them.
+                  <label key={c.id} {...stylex.props(styles.cal)}>
+                    <Checkbox tint={c.color} checked={shown} onChange={() => toggle(c.id)} />
                     <span {...stylex.props(styles.calName, !shown && styles.off)}>{c.name}</span>
-                    {shown && (
-                      <span {...stylex.props(styles.calCheck)}>
-                        <Sym name="check" size={13} />
-                      </span>
-                    )}
-                  </button>
+                  </label>
                 )
               })}
           </div>
@@ -72,7 +64,7 @@ export function Sidebar({ calendars, hidden, toggle, date, today, setDate, hide 
               {d[0]}
             </span>
           ))}
-          {weeks(month).map((d) => (
+          {weeks(month, 6).map((d) => (
             <button
               type="button"
               key={d.getTime()}

@@ -1080,3 +1080,42 @@ A fresh install seeds a working month around today (`seed.ts`), the keynote the
 home-screen widget draws included, so the tile and the app agree. The first edit
 writes the whole list to storage and it is the person's calendar from then on. Work
 is orange, not red: the only red on the sheet should be today.
+
+## 78. Calendar is two sheets, not one, and the rule weight is the whole argument
+
+Decision 77 dropped the column rules from the month, reasoning that a vertical line
+every 80 px would cut a multi-day bar into pieces. Held against the real thing, that
+was wrong: macOS Calendar rules its month both ways and still runs a bar straight
+over the rules, because the rule is a seventh of the weight of a separator. The
+mistake was not drawing the line, it was drawing it at `app.separator`, which is
+sized for one hairline between two rows, not for seven crossing every week. So
+`appAppearance.calendarGrid` exists and every rule in the app is on it, and
+`calendarWeekend` shades Saturday and Sunday the way both sheets do.
+
+The month is now two sheets from one component. Inside, it is the Mac's: ruled both
+ways, weekend shaded, the number hung on the right of its day, the picked day lifted
+whole. On the cover it is the phone's: no rules, no shading, the number centred over
+its dots. Rule 1 says design for the cover first, and the cover is not a small Mac.
+
+The month also stopped ruling an empty sixth week. `weeks()` returns the weeks a
+month actually spans, so a five-week month gives its rows the height it has, and the
+lanes are `1fr` rather than a fixed 16 px, which is what kept the third lane on the
+sheet in a six-week month instead of off the bottom of it. The thumbnail in the
+sidebar and the twelve in Year pad back to six, because a grid that changes height
+every month jumps.
+
+Day and Week hang their hours on their own lines rather than near them, and draw now
+the way Calendar does: pale across the week, solid with a dot on today, the time
+itself in a pill in the gutter. The head is one grid with the body, and the scroller
+has no scrollbar, because a gutter on one and not the other is what knocked the two
+out of line.
+
+The sidebar's calendars are the kit's `Checkbox`, which was written as macOS
+Calendar's tinted square and had drifted out of use. A dot plus a trailing checkmark
+was iOS's pattern wearing a Mac layout.
+
+`Sheet` now leaves the way it arrives. It popped in and vanished, because a native
+`<dialog>` closes the moment `close()` is called. `usePresence` holds the close back
+200 ms so `popOut` and the backdrop's fade can play, and `onCancel` is intercepted so
+Escape goes through React rather than closing the dialog out from under the
+animation. Every popover in the repo is this component, so they all gained the exit.
