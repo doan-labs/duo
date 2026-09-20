@@ -53,8 +53,8 @@ export const Safari = ({ os }: { os: Os }) => {
   // stack there, and the page keeps the rest. The row bar is the inner display's.
   const rail = os.display === 'cover'
   const Btn = ({ name, ...p }: { name: SymProps['name']; disabled?: boolean; onClick?: () => void }) => (
-    <button type="button" {...stylex.props(styles.barBtn)} {...p}>
-      <Sym name={name} size={22} />
+    <button type="button" {...stylex.props(styles.barBtn, rail && styles.railBtn)} {...p}>
+      <Sym name={name} size={rail ? 17 : 22} />
     </button>
   )
   return (
@@ -84,11 +84,15 @@ export const Safari = ({ os }: { os: Os }) => {
       </div>
       {rail ? (
         <div {...stylex.props(styles.rail)}>
-          <Btn name="back" disabled={at === 0} onClick={() => step(-1)} />
-          <Btn name="book" onClick={() => setMarks((m) => !m)} />
+          <div {...stylex.props(styles.railPill)}>
+            <Btn name="back" disabled={at === 0} onClick={() => step(-1)} />
+            <Btn name="bookOutline" onClick={() => setMarks((m) => !m)} />
+          </div>
           <div {...stylex.props(styles.railGap)} />
-          <Btn name="plus" onClick={() => go(start)} />
-          <Btn name="tabs" />
+          <div {...stylex.props(styles.railPill)}>
+            <Btn name="plus" onClick={() => go(start)} />
+            <Btn name="tabs" />
+          </div>
         </div>
       ) : (
         <div {...stylex.props(styles.bar)}>

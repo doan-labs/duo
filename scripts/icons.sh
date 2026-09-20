@@ -21,7 +21,7 @@ xcrun swift scripts/appicons.swift "$out" 192 \
 xcrun swift scripts/symbols.swift "$out/sym" 128 \
   cellularbars wifi battery.100 airplane dot.radiowaves.left.and.right antenna.radiowaves.left.and.right \
   gear sun.max.fill speaker.wave.3.fill moon.fill iphone hand.raised.fill lock.fill \
-  chevron.left chevron.right book.fill square.and.arrow.up square.on.square magnifyingglass \
+  chevron.left chevron.right book.fill book square.and.arrow.up square.on.square magnifyingglass \
   arrow.clockwise xmark plus location.fill ellipsis.circle person.crop.circle \
   bolt.fill bolt.slash.fill square.grid.3x3 arrow.triangle.2.circlepath.camera.fill aspectratio camera.filters \
   plusminus.circle livephoto chevron.up flashlight.on.fill flashlight.off.fill \

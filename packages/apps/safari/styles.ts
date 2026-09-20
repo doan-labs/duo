@@ -69,13 +69,30 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 6,
     width: 82,
-    paddingTop: 118,
-    paddingBottom: 14,
+    paddingTop: 138,
+    paddingBottom: 16,
     backgroundColor: app.elevated,
-    color: colors.blue,
+    color: colors.black,
     flexShrink: 0
+  },
+  // Two glass pills of two circles each, as Apple's cover Safari: back and
+  // bookmarks under the status stack, new tab and tabs at the bottom.
+  railPill: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    padding: 3,
+    borderRadius: radius.pill,
+    boxShadow: '0 0 0 .5px rgba(0,0,0,.06)'
+  },
+  railBtn: {
+    width: 40,
+    height: 40,
+    padding: 0,
+    borderRadius: radius.circle,
+    backgroundColor: 'rgba(255,255,255,.7)',
+    boxShadow: `0 1px 2px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.08), ${shadow.rim}`
   },
   railGap: { flexGrow: 1 },
   barBtn: {
