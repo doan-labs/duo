@@ -7,12 +7,12 @@ import { art } from '@doan-labs/duo-fixtures'
 import type { Os } from '@doan-labs/duo-sdk'
 import { PREVIEW_FEATURES } from '@doan-labs/duo-sdk/preview-features.ts'
 import type { Store, StoreRow } from '@doan-labs/duo-sdk/store.ts'
-import { LargeTitle, Placeholder, Screen, Section, VStack } from '@doan-labs/duo-uikit'
+import { LargeTitle, Placeholder, Screen, Section, useWide, VStack } from '@doan-labs/duo-uikit'
 import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type ReactNode, useState, useSyncExternalStore } from 'react'
 import { styles } from './styles.ts'
 
 /** Where app authors go to publish; opened outside the device, so the shell hands us the opener. */
@@ -56,15 +56,8 @@ const tagline = (row: StoreRow) =>
 function Shelf({ store, open, openExternal }: { store: Store; open: Open; openExternal: External }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const { push } = useNav()
-  // The box decides, not the display: a split half is as narrow as the cover. Wide
-  // gets two carousel pages side by side and a hero with room for its icon.
-  const head = useRef<HTMLDivElement>(null)
-  const [wide, setWide] = useState(false)
-  useEffect(() => {
-    const ro = new ResizeObserver(([e]) => setWide(e!.contentRect.width > 600))
-    ro.observe(head.current!)
-    return () => ro.disconnect()
-  }, [])
+  // Wide gets two carousel pages side by side and a hero with room for its icon.
+  const [head, wide] = useWide()
   const [tab, setTab] = useState('Apps')
   const [lane, setLane] = useState('all')
   const [query, setQuery] = useState('')

@@ -39,6 +39,12 @@ Use `Row as="button"` for actions. Name icon-only buttons and every Toggle or Ch
 cross axis. Both take `gap`, `align`, `justify` and `wrap`, so a one-off
 `stylex.create` is no longer the way to put two things side by side.
 
+`useWide(at = 600)` returns `[ref, wide]`: attach the ref to the element the
+layout lives in and branch on `wide` for a two-column arrangement. Use it rather
+than `useDisplay()` for layout, because the box decides and the display does not.
+A split half of the inner panel is as narrow as the cover, and an app that reads
+`display === 'inner'` there lays out two columns in a space that holds one.
+
 `Text`'s `size` names a step of Dynamic Type at the Large size (`largeTitle`
 34/41, `title1` 28/34, `title2` 22/28, `title3` 20/25, `headline` 17/22
 semibold, `body` 17/22, `callout` 16/21, `subheadline` 15/20, `footnote` 13/18,

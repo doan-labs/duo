@@ -1,22 +1,22 @@
-import { IconButton, Segmented, TextField } from '@doan-labs/duo-uikit'
+import { IconButton, Segmented, TextField, useWide } from '@doan-labs/duo-uikit'
 import { dark } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { type Event, VIEWS } from './data.ts'
 import { addDays, addMonths, local, monthYear, startOfMonth, time, week, ymd } from './dates.ts'
 import { EventSheet } from './event-sheet.tsx'
 import { MonthView } from './month-view.tsx'
 import { Sidebar } from './sidebar.tsx'
 import { useCalendars, useEvents, useSelection } from './store.ts'
-import { enter, styles } from './styles.ts'
+import { styles } from './styles.ts'
 import { TimeGrid } from './time-grid.tsx'
 import { YearView } from './year-view.tsx'
 
 const STEP = { Day: 1, Week: 7 }
 
 export const Calendar = () => {
-  const root = useRef<HTMLDivElement>(null)
-  const [wide, setWide] = useState(false)
+  // The box decides, not the display: a split half is as narrow as the cover and drops the sidebar.
+  const [root, wide] = useWide()
   const [query, setQuery] = useState<string | null>(null)
   const [draft, setDraft] = useState<Event | null>(null)
   /** -1 back, 1 forward, 0 a jump: which way the sheet that is arriving should come from. */
@@ -28,12 +28,6 @@ export const Calendar = () => {
   const colors = new Map(calendars.map((c) => [c.id, c.color]))
   const visible = events.filter((e) => !hidden.has(e.calendar))
   const isNew = !!draft && !events.some((e) => e.id === draft.id)
-  // The box decides, not the display: a split half is as narrow as the cover and drops the sidebar.
-  useEffect(() => {
-    const ro = new ResizeObserver(([e]) => setWide(e!.contentRect.width > 600))
-    ro.observe(root.current!)
-    return () => ro.disconnect()
-  }, [])
   const shift = (n: number) => {
     setDir(n)
     setDate(

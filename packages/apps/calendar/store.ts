@@ -1,38 +1,35 @@
 import { os } from '@doan-labs/duo-sdk'
-import { useKV } from '@doan-labs/duo-sdk/react.ts'
+import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
 import { type Cal, DEFAULT_CALENDARS, type Event, VIEWS, type View } from './data.ts'
 import { ymd } from './dates.ts'
 import { seedEvents } from './seed.ts'
 
-const parse = <T>(raw: string | null, fallback: T): T => (raw ? JSON.parse(raw) : fallback)
-
 /** The calendar list and which ones are hidden; both displays share one copy. */
 export function useCalendars() {
-  const list = useKV(os.storage, 'calendars')
-  const off = useKV(os.storage, 'hidden')
-  const calendars = parse<Cal[]>(list.value, DEFAULT_CALENDARS)
-  const hidden = new Set(parse<string[]>(off.value, []))
+  const list = useJSON<Cal[]>(os.storage, 'calendars', DEFAULT_CALENDARS)
+  const off = useJSON<string[]>(os.storage, 'hidden', [])
+  const calendars = list.value
+  const hidden = new Set(off.value)
   return {
     calendars,
     hidden,
     toggle: (id: string) => {
       hidden.has(id) ? hidden.delete(id) : hidden.add(id)
-      off.set(JSON.stringify([...hidden]))
+      off.set([...hidden])
     },
-    add: (cal: Cal) => list.set(JSON.stringify([...calendars, cal]))
+    add: (cal: Cal) => list.set([...calendars, cal])
   }
 }
 
 // ponytail: one JSON key holds every event, good to ~1500 of them under the 256 KB value cap; shard by month past that.
 export function useEvents() {
-  const kv = useKV(os.storage, 'events')
   // Nothing written yet means a fresh install, not an empty calendar: seed it.
-  const events = parse<Event[]>(kv.value, seedEvents(new Date()))
-  const write = (next: Event[]) => kv.set(JSON.stringify(next))
+  const kv = useJSON<Event[]>(os.storage, 'events', seedEvents(new Date()))
+  const events = kv.value
   return {
     events,
-    save: (e: Event) => write([...events.filter((x) => x.id !== e.id), e]),
-    remove: (id: string) => write(events.filter((x) => x.id !== id))
+    save: (e: Event) => kv.set([...events.filter((x) => x.id !== e.id), e]),
+    remove: (id: string) => kv.set(events.filter((x) => x.id !== id))
   }
 }
 

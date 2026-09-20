@@ -4,7 +4,7 @@ import { Row, Screen, Section, Title } from '@doan-labs/duo-uikit'
 
 import { beep } from '@doan-labs/duo-fixtures'
 import { os } from '@doan-labs/duo-sdk'
-import { useKV } from '@doan-labs/duo-sdk/react.ts'
+import { useJSON } from '@doan-labs/duo-sdk/react.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type KeyboardEvent, useState } from 'react'
 import { styles } from './styles.ts'
@@ -20,19 +20,18 @@ const DEFAULTS: Task[] = [
 ]
 
 export const Reminders = () => {
-  const kv = useKV(os.storage, 'tasks')
-  const items: Task[] = kv.value ? JSON.parse(kv.value) : DEFAULTS
+  const kv = useJSON<Task[]>(os.storage, 'tasks', DEFAULTS)
+  const items = kv.value
   const [draft, setDraft] = useState('')
-  const update = (next: Task[]) => kv.set(JSON.stringify(next))
   const flip = (i: number) => {
     const next = items.map((task, j) => (j === i ? { ...task, done: !task.done } : task))
-    update(next)
+    kv.set(next)
     if (next[i]!.done) beep([1320, 1760], 0.05, 0.05)
   }
   const add = (e: KeyboardEvent<HTMLInputElement>) => {
     const t = draft.trim()
     if (e.key !== 'Enter' || !t) return
-    update([...items, { t, done: false }])
+    kv.set([...items, { t, done: false }])
     setDraft('')
   }
   return (

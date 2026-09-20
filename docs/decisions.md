@@ -1119,3 +1119,30 @@ was iOS's pattern wearing a Mac layout.
 200 ms so `popOut` and the backdrop's fade can play, and `onCancel` is intercepted so
 Escape goes through React rather than closing the dialog out from under the
 animation. Every popover in the repo is this component, so they all gained the exit.
+
+## 79. The fold rule and the JSON encoding each get one home
+
+2026-09-20. Calendar's layout branch was the fourth copy of the same eleven lines:
+a `ResizeObserver` on the app's own root, a comparison against 600, a `wide`
+boolean. App Store, Notes and Photos had written it out too, each with its own
+version of the comment explaining why it measures a box instead of reading
+`useDisplay()`. The rule is a design decision, not app code: a split half of the
+inner panel is as narrow as the cover, so the room an app has is the only thing
+that can choose its columns. It is now `useWide(at = 600)` in the kit, returning
+`[ref, wide]`, and in all four apps the ref existed for nothing else, so each lost
+six lines and the threshold stopped being four separate numbers.
+
+The same argument settled the second copy. `useKV` is strings-only by contract and
+that is right, but every app storing a list had wrapped it in the same three lines:
+parse or fall back, stringify on write. Calendar and Notes each kept a private
+`parse` helper and Reminders inlined it. `useJSON(space, key, fallback)` in the SDK
+is that wrapper, next to `useKV` rather than in the kit, because it is storage and
+not presentation. `fallback` is the useful half: nothing written yet is a fresh
+install rather than an empty list, so Calendar seeds its month there and Reminders
+ships its five tasks there instead of at the call site.
+
+Neither is a new capability and neither is a component. The bar for moving
+something into the kit is a second consumer that already exists, which is why the
+calendar's date helpers, its lane packer and its sidebar chrome stayed in the app:
+one caller each, and a sidebar whose width, ground and border differ per app is
+four lines of flex pretending to be a component.

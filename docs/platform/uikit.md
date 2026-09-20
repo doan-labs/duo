@@ -24,7 +24,9 @@ Biome, not as a new Biome plugin.
 
 `Screen` and `useDisplay` subscribe without opening a bridge, calling ready or owning
 network/audio work. Apps own connection, readiness and effects. Layout follows the view's
-box, including cover and split widths. Navigation handles cleanup and reduced motion.
+box, including cover and split widths. `useWide` is that rule as a hook: it observes an
+element's own box against a 600 px default, so an app branches on the room it has rather
+than on which display it is. Navigation handles cleanup and reduced motion.
 Widget rendering consumes bounded snapshots; it does not fetch or wake app sessions.
 
 Each sandbox bundles its own React, kit, assets and compiled styles. It cannot inherit

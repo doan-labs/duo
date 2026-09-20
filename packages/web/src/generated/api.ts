@@ -1425,6 +1425,15 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
+    "name": "useWide",
+    "kind": "hook",
+    "file": "packages/uikit/wide.ts",
+    "line": 11,
+    "doc": "Watches the returned ref's own box and reports whether it is wider than `at`.\n\nThe box decides, not the display: a split half of the inner panel is as narrow\nas the cover, so an app that branches on `useDisplay()` gets a two-column\nlayout in a space that cannot hold one. Attach the ref to whatever element the\nlayout actually lives in.",
+    "signature": "function useWide<T extends HTMLElement = HTMLDivElement>(at = 600)"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Widget",
     "kind": "component",
     "file": "packages/uikit/widget.tsx",
