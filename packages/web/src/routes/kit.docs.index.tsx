@@ -3,9 +3,9 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { versions } from '../generated/api'
 import { kit } from '../kit/data'
 import { Prose } from '../layout'
-import { Code, PageTop, Pre } from '../page-parts'
+import { Code, PageTop, Pre, Reveal } from '../page-parts'
 import { blob } from '../site'
-import { color, font, radius } from '../tokens.stylex'
+import { color, ease, font, radius } from '../tokens.stylex'
 
 export const Route = createFileRoute('/kit/docs/')({
   head: () => ({ meta: [{ title: 'UI kit reference · Duo' }] }),
@@ -30,7 +30,7 @@ function Index() {
           </>
         }
       />
-      <Pre>{`import {
+      <Pre lang="tsx">{`import {
   Button, Row, Screen, Section, Text, Title, useDisplay
 } from '@doan-labs/duo-uikit'
 
@@ -61,18 +61,20 @@ function App() {
         </a>{' '}
         is an installable app that renders every export at both display widths.
       </p>
-      <h2 {...stylex.props(styles.h2)}>Exports</h2>
-      <ul {...stylex.props(styles.list)}>
-        {listed.map((e) => (
-          <li key={e.name}>
-            <Link to="/kit/docs/$name" params={{ name: e.name }} {...stylex.props(styles.row)}>
-              <span {...stylex.props(styles.name)}>{e.name}</span>
-              <span {...stylex.props(styles.kind)}>{e.kind}</span>
-              <span {...stylex.props(styles.summary)}>{e.doc.split('\n')[0]}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <Reveal>
+        <h2 {...stylex.props(styles.h2)}>Exports</h2>
+        <ul {...stylex.props(styles.list)}>
+          {listed.map((e) => (
+            <li key={e.name}>
+              <Link to="/kit/docs/$name" params={{ name: e.name }} {...stylex.props(styles.row)}>
+                <span {...stylex.props(styles.name)}>{e.name}</span>
+                <span {...stylex.props(styles.kind)}>{e.kind}</span>
+                <span {...stylex.props(styles.summary)}>{e.doc.split('\n')[0]}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
       <h2 {...stylex.props(styles.h2)}>Tokens</h2>
       <p {...stylex.props(styles.p)}>
         Colours, type and easing live in{' '}
@@ -114,20 +116,42 @@ const styles = stylex.create({
     borderColor: { default: color.border, ':hover': color.borderStrong },
     borderRadius: radius.md,
     textDecoration: 'none',
-    transitionProperty: 'border-color',
-    transitionDuration: '0.2s'
+    willChange: 'transform',
+    transitionProperty: 'border-color, transform, box-shadow, outline-color',
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out,
+    transform: { default: 'translateY(0)', ':hover': 'translateY(-2px)' },
+    boxShadow: { default: 'none', ':hover': color.shadow },
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
   },
-  name: { fontFamily: font.mono, fontSize: '15px', color: color.accent },
+  name: { fontFamily: font.mono, fontSize: '15px', fontWeight: 500, color: color.accent },
   kind: {
     fontFamily: font.mono,
-    fontSize: '11px',
+    fontSize: '10.5px',
+    fontWeight: 500,
+    lineHeight: 1,
     color: color.text3,
+    backgroundColor: color.grayBg,
+    borderRadius: radius.pill,
+    paddingTop: '5px',
+    paddingBottom: '5px',
+    paddingLeft: '9px',
+    paddingRight: '9px',
     textTransform: 'uppercase',
     letterSpacing: '0.1em'
   },
   summary: { fontSize: '15px', lineHeight: 1.5, color: color.text2, flexBasis: '100%' },
   link: {
     color: { default: color.accent, ':hover': color.accentHover },
-    textDecoration: { default: 'none', ':hover': 'underline' }
+    textDecoration: { default: 'none', ':hover': 'underline' },
+    textUnderlineOffset: '3px',
+    borderRadius: '4px',
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px'
   }
 })

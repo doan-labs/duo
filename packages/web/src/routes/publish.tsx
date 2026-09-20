@@ -1,9 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { motion, useReducedMotion } from 'motion/react'
 import { Button, Section } from '../layout'
-import { Code, PageTop, Pre, SectionTop, Table, Td, Th } from '../page-parts'
+import { CURVE } from '../motion'
+import { Code, PageTop, Pre, SectionTop, Table, Td, Th, Tr } from '../page-parts'
 import { blob, CATALOG, SUBMIT } from '../site'
-import { color, font, radius } from '../tokens.stylex'
+import { color, ease, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
 // shared breakpoint is declared here (see tokens.stylex.ts).
@@ -40,7 +42,7 @@ function Page() {
             You need Bun and a clone of the repository. The SDK, the UI kit and the CLI are not on npm, so a submission
             is built against local archives:
           </p>
-          <Pre>{`bun install
+          <Pre lang="sh">{`bun install
 bun scripts/package-platform.ts          # local SDK, kit and CLI archives, once
 bun packages/cli/index.mjs create my-app --packages .cache/platform-packages/artifacts.json
 cd my-app && bun install
@@ -63,55 +65,55 @@ bun run check                            # import boundaries, strict TypeScript,
               </tr>
             </thead>
             <tbody>
-              <tr>
+              <Tr>
                 <Td nowrap>Both displays</Td>
                 <Td>Runs on the inner display and on the cover. Cover support is required, not optional.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Public API only</Td>
                 <Td>
                   Only exports of <Code>@doan-labs/duo-sdk</Code> and <Code>@doan-labs/duo-uikit</Code>. No shell
                   imports, no imports from another app.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Complete metadata</Td>
                 <Td>
                   A 1024 px <Code>icon.png</Code>, <Code>screenshots/inner.png</Code> and{' '}
                   <Code>screenshots/cover.png</Code>, a <Code>README.md</Code> and a <Code>CHANGELOG.md</Code>.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Existing limits</Td>
                 <Td>
                   The built document stays under the 4 MiB cap <Code>check</Code> enforces.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Lane</Td>
                 <Td>
                   <Code>"lane": "community"</Code> in the manifest.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>No permissions</Td>
                 <Td>
                   <Code>permissions</Code> is empty. Apps that need a device permission are not eligible yet.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Declared network</Td>
                 <Td>
                   Every origin the app contacts is listed in <Code>network</Code>. Nothing else is reachable from the
                   sandbox.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>MIT licence</Td>
                 <Td>
                   A <Code>LICENSE</Code> file with the MIT text in the app folder.
                 </Td>
-              </tr>
+              </Tr>
             </tbody>
           </Table>
         </Step>
@@ -133,44 +135,44 @@ bun run check                            # import boundaries, strict TypeScript,
               </tr>
             </thead>
             <tbody>
-              <tr>
+              <Tr>
                 <Td nowrap>manifest.json</Td>
                 <Td>Identity, version, lane, permissions, declared network origins.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>main.tsx</Td>
                 <Td>The entry, plus whatever other source files it imports.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>package.json</Td>
                 <Td>
                   Dependencies. <Code>bun.lock</Code> as well, but only when you add something beyond the platform set:{' '}
                   <Code>@doan-labs/duo-sdk</Code>, <Code>@doan-labs/duo-uikit</Code>, <Code>@stylexjs/stylex</Code>,{' '}
                   <Code>react</Code>, <Code>react-dom</Code>.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>icon.png</Td>
                 <Td>1024 px square.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>screenshots/</Td>
                 <Td>
                   <Code>inner.png</Code> and <Code>cover.png</Code>, both required.
                 </Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>README.md</Td>
                 <Td>What the app does and how it behaves across the fold.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>CHANGELOG.md</Td>
                 <Td>One entry per version, newest first.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>LICENSE</Td>
                 <Td>MIT.</Td>
-              </tr>
+              </Tr>
             </tbody>
           </Table>
           <p {...stylex.props(styles.p)}>
@@ -189,7 +191,7 @@ bun run check                            # import boundaries, strict TypeScript,
             <Code>author</Code> and <Code>repo</Code> strings in a manifest are labels, not proof of ownership.
           </p>
           <p {...stylex.props(styles.p)}>Run the same check CI runs, before you push:</p>
-          <Pre>{'bun scripts/check-submissions.ts community-apps/<app-slug>'}</Pre>
+          <Pre lang="sh">{'bun scripts/check-submissions.ts community-apps/<app-slug>'}</Pre>
         </Step>
         <Step n={4} title="Open your PR">
           <p {...stylex.props(styles.p)}>
@@ -214,21 +216,21 @@ bun run check                            # import boundaries, strict TypeScript,
               </tr>
             </thead>
             <tbody>
-              <tr>
+              <Tr>
                 <Td nowrap>Checks passed</Td>
                 <Td>Eligible for review. Not acceptance.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Merged</Td>
                 <Td>Accepted. The source is in the repository.</Td>
-              </tr>
-              <tr>
+              </Tr>
+              <Tr>
                 <Td nowrap>Published</Td>
                 <Td>
                   The publish workflow run succeeded and the release is in the curated catalog at <Code>{CATALOG}</Code>
                   . Only then is the app installable.
                 </Td>
-              </tr>
+              </Tr>
             </tbody>
           </Table>
           <p {...stylex.props(styles.p)}>
@@ -271,14 +273,22 @@ bun run check                            # import boundaries, strict TypeScript,
 
 /** One step on the vertical timeline: a mono number sitting on the rule, then the body. */
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  const still = useReducedMotion()
   return (
-    <li {...stylex.props(styles.step)}>
+    // One step behind the next, so the timeline reads as a sequence. On mount
+    // rather than on scroll, for the reason spelled out on `Reveal`.
+    <motion.li
+      {...stylex.props(styles.step)}
+      initial={{ opacity: 0, transform: 'translateY(16px)' }}
+      animate={{ opacity: 1, transform: 'translateY(0px)' }}
+      transition={still ? { duration: 0 } : { duration: 0.5, delay: (n - 1) * 0.06, ease: CURVE }}
+    >
       <span {...stylex.props(styles.n)} aria-hidden="true">
         {String(n).padStart(2, '0')}
       </span>
       <h2 {...stylex.props(styles.stepTitle)}>{title}</h2>
       {children}
-    </li>
+    </motion.li>
   )
 }
 
@@ -355,5 +365,17 @@ const styles = stylex.create({
     color: color.text
   },
   item: { marginBottom: '8px' },
-  link: { color: color.accent, textDecorationLine: 'underline', textUnderlineOffset: '3px' }
+  link: {
+    color: { default: color.accent, ':hover': color.accentHover },
+    textDecorationLine: 'underline',
+    textUnderlineOffset: '3px',
+    borderRadius: '4px',
+    transitionProperty: 'color, outline-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px'
+  }
 })

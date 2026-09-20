@@ -89,6 +89,7 @@ driver is privileged test inspection, not an installed-app capability.
 | Flick home | Use one move without a pause; slow CDP calls can cross the 220 ms split threshold |
 | Reset orbit | Click button[title="Reset view"]; allow ~8 s under SwiftShader before asserting the button is disabled again |
 | Type | Click/focus the actual field, check document.activeElement, then type/paste; AX set-value may not trigger React |
+| Touch drag or tap inside the embedded shell | No CLI path reaches it: `agent-browser frame @eN` then `eval` still targets the top page. Attach to the page target, `Runtime.enable`, and evaluate against the child frame's `executionContextId` (the shell is a context, not a target: same site, different port), then drive gestures with `Input.synthesizeScrollGesture` or `Input.dispatchTouchEvent` on the page session |
 
 For scripted React range changes, use the native input value setter before dispatching
 input; direct assignment can update React's tracker without notifying its handler.
@@ -219,6 +220,10 @@ The full Linux build reproduces it; `BUN_JSC_useFTLJIT=false` fixes that reprodu
 | Camera cannot shoot headless | No videoWidth without a webcam; test fallback/UI, not real still capture |
 | Gallery navigation has wrong colors | Apply the app token theme to its root, not only background color |
 | Old code after checkout/stash/HMR | Restart the task-owned test window/server before trusting results |
+| A `touch-action` change has no effect | Chromium computes touch-action regions at paint, so restyling a live element leaves the old region swallowing gestures. Reload the frame or restart the shell for a fresh document before trusting any touch measurement |
+| A gesture over an embedded frame moves nothing | Hand-rolled `Input.dispatchTouchEvent` does not hit-test into frames and reports a silent zero for every point over one. Use `Input.synthesizeScrollGesture`, which goes through the real gesture pipeline |
+| A clean console that should not be | `agent-browser console` does not record `console.error`. Register a shim as an init script before the first navigation, and do not truncate each entry: React's hydration diff, the part that names the element, comes after several hundred characters of boilerplate |
+| A hydration mismatch in a component that looks correct | `useReducedMotion()` is `null` on the server and a boolean on the first client render, so anything gated on it (a prop, a class, an `initial` pose, a branch of the tree) changes the markup between the two. `?? false` does not help: the divergence is server-`null` against client-`true`. Note also that a component returning `children` unwrapped on one path shifts the React tree depth, which desynchronises every `useId` below it and surfaces in the component that called `useId`, not in the one that branched |
 
 ## Platform checks
 

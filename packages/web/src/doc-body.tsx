@@ -1,13 +1,16 @@
 import * as stylex from '@stylexjs/stylex'
 import { Link } from '@tanstack/react-router'
+import { motion, useReducedMotion } from 'motion/react'
 import { type Doc, docs, known } from './docs'
 import { Prose, Title } from './layout'
 import { type LinkCtx, outline, parse, render } from './markdown'
+import { CURVE } from './motion'
 import { blob } from './site'
-import { color, font, radius } from './tokens.stylex'
+import { color, ease, font, radius } from './tokens.stylex'
 
 /** One documentation page: the title, an outline when it is long, the body, then previous and next. */
 export function DocBody({ doc }: { doc: Doc }) {
+  const still = useReducedMotion()
   const ctx: LinkCtx = { from: doc.path, known }
   const blocks = parse(doc.body)
   const body = blocks.filter((b) => !(b.t === 'h' && b.level === 1))
@@ -18,27 +21,37 @@ export function DocBody({ doc }: { doc: Doc }) {
   const next = docs[i + 1]
   return (
     <Prose>
-      <p {...stylex.props(styles.group)}>{doc.group}</p>
-      <Title>{doc.title}</Title>
-      {toc.length > 5 && (
-        <nav aria-label="On this page" {...stylex.props(styles.toc)}>
-          <h2 {...stylex.props(styles.tocTitle)}>On this page</h2>
-          <ul {...stylex.props(styles.tocList)}>
-            {toc.map((h) => (
-              <li key={h.id} {...stylex.props(styles.tocItem, h.level === 3 && styles.tocSub)}>
-                <a href={`#${h.id}`} {...stylex.props(styles.tocLink)}>
-                  {h.text.replace(/[`*]/g, '')}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
-      {render(body, ctx)}
+      {/* Keyed by slug so moving between pages settles rather than snapping to the new text. */}
+      <motion.div
+        key={doc.slug}
+        initial={{ opacity: 0, transform: 'translateY(8px)' }}
+        animate={{ opacity: 1, transform: 'translateY(0px)' }}
+        transition={{ duration: still ? 0 : 0.34, ease: CURVE }}
+      >
+        <p {...stylex.props(styles.group)}>{doc.group}</p>
+        <Title>{doc.title}</Title>
+        {toc.length > 5 && (
+          <nav aria-label="On this page" {...stylex.props(styles.toc)}>
+            <h2 {...stylex.props(styles.tocTitle)}>On this page</h2>
+            <ul {...stylex.props(styles.tocList)}>
+              {toc.map((h) => (
+                <li key={h.id} {...stylex.props(styles.tocItem, h.level === 3 && styles.tocSub)}>
+                  <a href={`#${h.id}`} {...stylex.props(styles.tocLink)}>
+                    {h.text.replace(/[`*]/g, '')}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+        {render(body, ctx)}
+      </motion.div>
       <nav aria-label="Pages" {...stylex.props(styles.pager)}>
         {prev ? (
           <Link to="/docs/$" params={{ _splat: prev.slug }} {...stylex.props(styles.pageLink)}>
-            <span {...stylex.props(styles.pageLabel)}>Previous</span>
+            <span {...stylex.props(styles.pageLabel)}>
+              <span aria-hidden="true">&#8592;</span> Previous
+            </span>
             <span {...stylex.props(styles.pageTitle)}>{prev.title}</span>
           </Link>
         ) : (
@@ -46,7 +59,9 @@ export function DocBody({ doc }: { doc: Doc }) {
         )}
         {next && (
           <Link to="/docs/$" params={{ _splat: next.slug }} {...stylex.props(styles.pageLink, styles.pageNext)}>
-            <span {...stylex.props(styles.pageLabel)}>Next</span>
+            <span {...stylex.props(styles.pageLabel)}>
+              Next <span aria-hidden="true">&#8594;</span>
+            </span>
             <span {...stylex.props(styles.pageTitle)}>{next.title}</span>
           </Link>
         )}
@@ -99,8 +114,21 @@ const styles = stylex.create({
   },
   tocList: { listStyleType: 'none', margin: 0, padding: 0, columnCount: { default: 2, [SMALL]: 1 }, columnGap: '28px' },
   tocItem: { fontSize: '14px', lineHeight: 1.45, paddingTop: '4px', paddingBottom: '4px', breakInside: 'avoid' },
-  tocSub: { paddingLeft: '16px', color: color.text3 },
-  tocLink: { color: color.text2, textDecoration: { default: 'none', ':hover': 'underline' } },
+  tocSub: { paddingLeft: '16px' },
+  tocLink: {
+    display: 'inline-block',
+    color: { default: color.text2, ':hover': color.accent },
+    textDecoration: 'none',
+    borderRadius: '4px',
+    transitionProperty: 'color, transform, outline-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out,
+    transform: { default: 'translateX(0)', ':hover': 'translateX(2px)' },
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px'
+  },
   pager: {
     display: 'grid',
     gridTemplateColumns: { default: '1fr 1fr', [SMALL]: '1fr' },
@@ -125,8 +153,16 @@ const styles = stylex.create({
     borderColor: { default: color.border, ':hover': color.borderStrong },
     borderRadius: radius.md,
     textDecoration: 'none',
-    transitionProperty: 'border-color',
-    transitionDuration: '0.2s'
+    willChange: 'transform',
+    transitionProperty: 'border-color, transform, box-shadow, outline-color',
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out,
+    transform: { default: 'translateY(0)', ':hover': 'translateY(-2px)' },
+    boxShadow: { default: 'none', ':hover': color.shadow },
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
   },
   pageNext: { textAlign: 'right' },
   pageLabel: {
@@ -138,5 +174,16 @@ const styles = stylex.create({
   },
   pageTitle: { fontFamily: font.sans, fontSize: '16px', fontWeight: 500, color: color.text },
   edit: { marginTop: '28px', marginBottom: 0, fontFamily: font.mono, fontSize: '12px' },
-  editLink: { color: { default: color.text3, ':hover': color.accent }, textDecoration: 'none' }
+  editLink: {
+    color: { default: color.text3, ':hover': color.accent },
+    textDecoration: 'none',
+    borderRadius: '4px',
+    transitionProperty: 'color, outline-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px'
+  }
 })

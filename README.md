@@ -107,7 +107,9 @@ packages/
     src/kit-demos/  one live demo per UI kit component, rendered on /kit and shown as source on /kit/docs/<name>
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
     src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
-    src/device.tsx  a CSS-3D Duo driven by a motion value, for scroll and posture scenes
+    src/segmented.tsx  the sliding-thumb group button, shared by every filter and tab strip
+    src/side-nav.tsx  the docs sidebar: sliding hover and active indicators, a disclosure when narrow
+    src/motion.ts   the shared easing curve, springs and press scale
     src/smooth-scroll.tsx  Lenis on the window, off under reduced motion
     scripts/        API generation, simulator/catalog copy, browser compiler assets and website checks
     video/          Remotion project for the hero loop (own bun.lock), renders to public/hero.*

@@ -1,8 +1,7 @@
 // The smallest useful SDK: four primitives as four rows.
 import * as stylex from '@stylexjs/stylex'
-import { Link } from '@tanstack/react-router'
 import { color, font } from '../tokens.stylex'
-import { Block, Cap, Headline, Lede, Reveal } from './parts'
+import { Block, Cap, Headline, Lede, Rise, Stagger, TextLink } from './parts'
 
 const MID = '@media (max-width: 1068px)'
 
@@ -16,34 +15,41 @@ const API = [
 export function Sdk() {
   return (
     <Block labelledBy="sdk-title">
-      <Cap>05 · SDK</Cap>
-      <Headline id="sdk-title" lines={['Four primitives.', 'That is the whole surface.']} />
-      <Lede>
-        Enough to build a real app, small enough to read in a minute. The rest is React and the platform you already
-        know.{' '}
-        <Link to="/docs/sdk" {...stylex.props(styles.link)}>
-          Read the SDK page
-        </Link>{' '}
-        for the full client.
-      </Lede>
-      <dl {...stylex.props(styles.rows)}>
-        {API.map((a, i) => (
-          <Reveal key={a.sig} delay={i * 0.05}>
-            <div {...stylex.props(styles.row)}>
+      {/* The three lines of the introduction arrive in reading order rather than as one slab. */}
+      <Stagger gap={0.09} amount={0.4}>
+        <Rise>
+          <Cap>05 · SDK</Cap>
+        </Rise>
+        <Rise>
+          <Headline id="sdk-title" lines={['Four primitives.', 'That is the whole surface.']} />
+        </Rise>
+        <Rise>
+          <Lede>
+            Enough to build a real app, small enough to read in a minute. The rest is React and the platform you already
+            know. <TextLink to="/docs/sdk">Read the SDK page</TextLink> for the full client.
+          </Lede>
+        </Rise>
+      </Stagger>
+      {/* The rows are a list, so they come in from the side: the eye reads down the
+          rule while each signature slides up to it. */}
+      <dl {...stylex.props(styles.list)}>
+        <Stagger gap={0.08} amount={0.15} styles={styles.rows}>
+          {API.map((a) => (
+            <Rise key={a.sig} move="left" styles={styles.row}>
               <dt {...stylex.props(styles.area)}>{a.area}</dt>
               <dd {...stylex.props(styles.sig)}>{a.sig}</dd>
               <dd {...stylex.props(styles.text)}>{a.text}</dd>
-            </div>
-          </Reveal>
-        ))}
+            </Rise>
+          ))}
+        </Stagger>
       </dl>
     </Block>
   )
 }
 
 const styles = stylex.create({
-  link: { color: color.text, textDecorationLine: 'underline', textUnderlineOffset: '3px' },
-  rows: { margin: 0, marginTop: '72px', borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: color.border },
+  list: { margin: 0 },
+  rows: { marginTop: '72px', borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: color.border },
   row: {
     display: 'grid',
     gridTemplateColumns: { default: 'minmax(0, 2fr) minmax(0, 4fr) minmax(0, 6fr)', [MID]: 'minmax(0, 1fr)' },

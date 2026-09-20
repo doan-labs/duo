@@ -2,7 +2,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { REPO } from '../site'
 import { color, font } from '../tokens.stylex'
-import { Block, Cap, Columns, Headline, Lede, Reveal } from './parts'
+import { Block, Cap, Columns, Headline, Lede, Rise, Stagger, TextLink } from './parts'
 
 const FACTS = [
   'Apps live in the repository.',
@@ -11,35 +11,55 @@ const FACTS = [
   'No developer account. No payments. No gatekeeping.'
 ]
 
+const STEPS = ['fork', 'pull request', 'review', 'Duo Store']
+
 export function Open() {
   return (
     <Block cinema labelledBy="open-title">
       <Columns align="start">
+        <Stagger gap={0.09} amount={0.4}>
+          <Rise>
+            <Cap>07 · Open</Cap>
+          </Rise>
+          <Rise>
+            <Headline id="open-title" lines={['The platform is open.', 'So are the apps.']} />
+          </Rise>
+          <Rise>
+            <Lede>
+              Someone in Berlin can build a calculator, open a pull request, and after review it can appear in the Duo
+              Store for everyone.
+            </Lede>
+          </Rise>
+        </Stagger>
         <div>
-          <Cap>07 · Open</Cap>
-          <Headline id="open-title" lines={['The platform is open.', 'So are the apps.']} />
-          <Lede>
-            Someone in Berlin can build a calculator, open a pull request, and after review it can appear in the Duo
-            Store for everyone.
-          </Lede>
-        </div>
-        <Reveal>
-          <ul {...stylex.props(styles.facts)}>
+          {/* Each fact lands on its own rule, one after the next, so the column
+              reads as four statements rather than a block that appeared. */}
+          <Stagger as="ul" gap={0.1} amount={0.2} styles={styles.facts}>
             {FACTS.map((f) => (
-              <li key={f} {...stylex.props(styles.fact)}>
+              <Rise key={f} as="li" styles={styles.fact}>
                 {f}
-              </li>
+              </Rise>
             ))}
-          </ul>
-          <p {...stylex.props(styles.flow)}>
-            fork <span {...stylex.props(styles.arrow)}>→</span> pull request{' '}
-            <span {...stylex.props(styles.arrow)}>→</span> review <span {...stylex.props(styles.arrow)}>→</span> Duo
-            Store
-          </p>
-          <a href={REPO} {...stylex.props(styles.link)}>
-            Read the source on GitHub
-          </a>
-        </Reveal>
+          </Stagger>
+          <Stagger gap={0.06} delay={0.15} amount={0.5}>
+            {/* The pipeline is one step per beat: the arrows trace the route as it is read. */}
+            <p {...stylex.props(styles.flow)}>
+              {STEPS.map((s, i) => (
+                <Rise key={s} as="span" move="in" styles={styles.stepWrap}>
+                  {i > 0 && <span {...stylex.props(styles.arrow)}>→</span>}
+                  {s}
+                </Rise>
+              ))}
+            </p>
+            <Rise>
+              <p {...stylex.props(styles.linkRow)}>
+                <TextLink href={REPO} lead>
+                  Read the source on GitHub
+                </TextLink>
+              </p>
+            </Rise>
+          </Stagger>
+        </div>
       </Columns>
     </Block>
   )
@@ -61,6 +81,9 @@ const styles = stylex.create({
     color: color.text
   },
   flow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     marginTop: '32px',
     marginBottom: 0,
     fontFamily: font.mono,
@@ -68,13 +91,7 @@ const styles = stylex.create({
     letterSpacing: '0.04em',
     color: color.text2
   },
-  arrow: { color: color.text3, paddingLeft: '6px', paddingRight: '6px' },
-  link: {
-    display: 'inline-block',
-    marginTop: '32px',
-    fontSize: '16px',
-    color: color.text,
-    textDecorationLine: 'underline',
-    textUnderlineOffset: '4px'
-  }
+  stepWrap: { display: 'inline-flex', alignItems: 'center' },
+  arrow: { color: color.text3, paddingLeft: '8px', paddingRight: '8px' },
+  linkRow: { margin: 0, marginTop: '32px' }
 })

@@ -4,8 +4,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { Line } from '../highlight'
+import { Segmented } from '../segmented'
 import { Simulator } from '../simulator'
-import { color, font, radius } from '../tokens.stylex'
+import { color, font } from '../tokens.stylex'
 import { Block, Cap, Columns, Headline, Lede } from './parts'
 
 const SMALL = '@media (max-width: 734px)'
@@ -30,7 +31,9 @@ const CODE = [
 ]
 
 export function Fold() {
-  const [s, setS] = useState(OPEN)
+  // The hinge angle is the identity of a posture, so the control can key on a plain value.
+  const [deg, setDeg] = useState(OPEN.deg)
+  const s = STATES.find((st) => st.deg === deg) ?? OPEN
 
   return (
     <Block cinema labelledBy="fold-title">
@@ -44,20 +47,13 @@ export function Fold() {
       <div {...stylex.props(styles.scene)}>
         <Columns align="start">
           <div>
-            <fieldset {...stylex.props(styles.states)} aria-label="Posture">
-              {STATES.map((st) => (
-                <button
-                  key={st.deg}
-                  type="button"
-                  aria-pressed={st === s}
-                  onClick={() => setS(st)}
-                  {...stylex.props(styles.state, st === s && styles.stateOn)}
-                >
-                  <span {...stylex.props(styles.deg)}>{st.deg}°</span>
-                  <span>{st.name}</span>
-                </button>
-              ))}
-            </fieldset>
+            <Segmented
+              id="fold-posture"
+              label="Posture"
+              value={deg}
+              onChange={(d) => setDeg(d)}
+              options={STATES.map((st) => ({ value: st.deg, label: st.name }))}
+            />
 
             <div {...stylex.props(styles.code)}>
               <div {...stylex.props(styles.codeTitle)}>app.tsx</div>
@@ -104,39 +100,8 @@ function Field({ k, v }: { k: string; v: string }) {
 
 const styles = stylex.create({
   scene: { marginTop: { default: '72px', [SMALL]: '48px' } },
-  states: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    margin: 0,
-    marginBottom: '24px',
-    padding: 0,
-    borderWidth: 0,
-    minWidth: 0
-  },
-  state: {
-    display: 'inline-flex',
-    alignItems: 'baseline',
-    gap: '8px',
-    paddingTop: '9px',
-    paddingBottom: '9px',
-    paddingLeft: '14px',
-    paddingRight: '14px',
-    borderRadius: radius.pill,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: { default: color.border, ':hover': color.borderStrong },
-    backgroundColor: 'transparent',
-    color: color.text2,
-    fontFamily: font.sans,
-    fontSize: '14px',
-    cursor: 'pointer',
-    transitionProperty: 'border-color, background-color, color',
-    transitionDuration: '0.2s'
-  },
-  stateOn: { backgroundColor: color.text, borderColor: color.text, color: color.bg },
-  deg: { fontFamily: font.mono, fontSize: '12px' },
   code: {
+    marginTop: '24px',
     borderWidth: '1px',
     borderStyle: 'solid',
     borderColor: color.border,
