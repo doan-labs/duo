@@ -3,8 +3,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ApiCard } from '../api-card'
 import { api, versions } from '../generated/api'
 import { Prose } from '../layout'
-import { Code, PageTop, Pre } from '../page-parts'
-import { color, font, radius } from '../tokens.stylex'
+import { Code, PageTop, Pre, Reveal } from '../page-parts'
+import { color, ease, font, radius } from '../tokens.stylex'
 
 // StyleX 0.19 cannot resolve an imported string as a media-query key, so the
 // shared breakpoint is declared here (see tokens.stylex.ts).
@@ -59,23 +59,35 @@ os.open('labs.doan.ipduo.maps', 'q=1')
 import { useKV } from '@doan-labs/duo-sdk/react'
 const note = useKV(os.storage, 'note')   // { value, status, set, del }`}</Pre>
 
-        <h2 {...stylex.props(styles.h2)}>Guides</h2>
-        <ul {...stylex.props(styles.list)}>
-          {GUIDES.map(([title, text, slug]) => (
-            <li key={slug}>
-              <Link to="/docs/$" params={{ _splat: slug }} {...stylex.props(styles.row)}>
-                <span {...stylex.props(styles.rowTitle)}>{title}</span>
-                <span {...stylex.props(styles.text)}>{text}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <Reveal>
+          <h2 {...stylex.props(styles.h2)}>Guides</h2>
+          <ul {...stylex.props(styles.list)}>
+            {GUIDES.map(([title, text, slug]) => (
+              <li key={slug}>
+                <Link to="/docs/$" params={{ _splat: slug }} {...stylex.props(styles.row)}>
+                  <span {...stylex.props(styles.rowTitle)}>{title}</span>
+                  <span {...stylex.props(styles.text)}>{text}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
 
-        <h2 {...stylex.props(styles.h2)}>Reference</h2>
-        <p {...stylex.props(styles.p)}>
-          Every export of the package, generated from the source and its TSDoc. Version{' '}
-          <Code>{versions.sdk?.version}</Code>, protocol 1.
-        </p>
+        <Reveal>
+          <h2 {...stylex.props(styles.h2)}>Reference</h2>
+          <p {...stylex.props(styles.p)}>
+            Every export of the package, generated from the source and its TSDoc. Version{' '}
+            <Code>{versions.sdk?.version}</Code>, protocol 1.
+          </p>
+          {/* Every card is an anchor already; this is the way back up to them from the middle of the page. */}
+          <nav aria-label="Exports" {...stylex.props(styles.jump)}>
+            {sdk.map((e) => (
+              <a key={e.name} href={`#${e.name}`} {...stylex.props(styles.chip)}>
+                {e.name}
+              </a>
+            ))}
+          </nav>
+        </Reveal>
         {sdk.map((e) => (
           <ApiCard key={e.name} entry={e} />
         ))}
@@ -112,9 +124,41 @@ const styles = stylex.create({
     borderColor: { default: color.border, ':hover': color.borderStrong },
     borderRadius: radius.md,
     textDecoration: 'none',
-    transitionProperty: 'border-color',
-    transitionDuration: '0.2s'
+    willChange: 'transform',
+    transitionProperty: 'border-color, transform, box-shadow, outline-color',
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out,
+    transform: { default: 'translateY(0)', ':hover': 'translateY(-2px)' },
+    boxShadow: { default: 'none', ':hover': color.shadow },
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
   },
   rowTitle: { fontSize: '17px', fontWeight: 500, color: color.text },
-  text: { fontSize: '15px', lineHeight: 1.5, color: color.text2 }
+  text: { fontSize: '15px', lineHeight: 1.5, color: color.text2 },
+  jump: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '20px', marginBottom: '44px' },
+  chip: {
+    fontFamily: font.mono,
+    fontSize: '12.5px',
+    lineHeight: 1,
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '11px',
+    paddingRight: '11px',
+    borderRadius: radius.pill,
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: { default: color.border, ':hover': color.accent },
+    backgroundColor: { default: color.well, ':hover': color.accentSoft },
+    color: { default: color.text2, ':hover': color.accent },
+    textDecoration: 'none',
+    transitionProperty: 'background-color, border-color, color, outline-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
+  }
 })

@@ -7,7 +7,8 @@ import * as stylex from '@stylexjs/stylex'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
-import { color, font } from '../tokens.stylex'
+import { Segmented } from '../segmented'
+import { color, ease, font } from '../tokens.stylex'
 import { Block, Cap, Headline, Lede, Reveal } from './parts'
 
 const MID = '@media (max-width: 1068px)'
@@ -134,36 +135,26 @@ export function Browser() {
   return (
     <>
       <div {...stylex.props(styles.bar)}>
-        <fieldset aria-label="Lane" {...stylex.props(styles.segment)}>
-          {[{ key: 'all' as const, label: 'All', n: total }, ...LANES.map((l) => ({ ...l, n: l.apps.length }))].map(
-            (l) => (
-              <button
-                key={l.key}
-                type="button"
-                aria-pressed={lane === l.key}
-                onClick={() => setLane(l.key)}
-                {...stylex.props(styles.seg, lane === l.key && styles.segOn)}
-              >
-                {l.label}
-                <span {...stylex.props(styles.count)}>{l.n}</span>
-              </button>
-            )
-          )}
-        </fieldset>
-        <fieldset aria-label="Layout" {...stylex.props(styles.segment)}>
-          {(['grid', 'list'] as const).map((l) => (
-            <button
-              key={l}
-              type="button"
-              aria-label={l === 'grid' ? 'Grid' : 'List'}
-              aria-pressed={layout === l}
-              onClick={() => setLayout(l)}
-              {...stylex.props(styles.seg, styles.segIcon, layout === l && styles.segOn)}
-            >
-              <Glyph name={l} />
-            </button>
-          ))}
-        </fieldset>
+        <Segmented
+          id="apps-lane"
+          label="Lane"
+          value={lane}
+          onChange={(l) => setLane(l)}
+          options={[
+            { value: 'all' as const, label: 'All', count: total },
+            ...LANES.map((l) => ({ value: l.key, label: l.label, count: l.apps.length }))
+          ]}
+        />
+        <Segmented
+          id="apps-layout"
+          label="Layout"
+          value={layout}
+          onChange={(l) => setLayout(l)}
+          options={[
+            { value: 'grid' as const, label: 'Grid', icon: <Glyph name="grid" /> },
+            { value: 'list' as const, label: 'List', icon: <Glyph name="list" /> }
+          ]}
+        />
       </div>
       {shown.map((l) => (
         <section key={l.key} aria-labelledby={`lane-${l.key}`} {...stylex.props(styles.lane)}>
@@ -384,34 +375,6 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: '12px'
   },
-  segment: {
-    display: 'inline-flex',
-    margin: 0,
-    borderWidth: 0,
-    padding: '3px',
-    gap: '2px',
-    borderRadius: '999px',
-    backgroundColor: color.well
-  },
-  seg: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    paddingTop: '7px',
-    paddingBottom: '7px',
-    paddingLeft: '14px',
-    paddingRight: '12px',
-    borderRadius: '999px',
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: color.text2,
-    fontFamily: font.sans,
-    fontSize: '14px',
-    fontWeight: 500,
-    cursor: 'pointer'
-  },
-  segIcon: { paddingLeft: '10px', paddingRight: '10px' },
-  segOn: { backgroundColor: color.surface, color: color.text, boxShadow: '0 1px 2px rgba(20,20,19,0.08)' },
   count: { fontFamily: font.mono, fontSize: '12px', color: color.text3 },
   lane: { marginTop: '56px' },
   laneTitle: {
@@ -441,7 +404,8 @@ const styles = stylex.create({
     display: 'inline-flex',
     color: color.text3,
     transitionProperty: 'transform',
-    transitionDuration: '0.15s'
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out
   },
   chevronOpen: { transform: 'rotate(90deg)' },
   groupText: { color: color.text2 },
@@ -479,8 +443,13 @@ const styles = stylex.create({
     backgroundColor: color.surface,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: color.border,
-    minHeight: '100%'
+    borderColor: { default: color.border, ':hover': color.borderStrong },
+    minHeight: '100%',
+    // The card lifts under the pointer rather than only changing colour on contact.
+    transform: { default: 'translateY(0)', ':hover': 'translateY(-2px)' },
+    transitionProperty: 'transform, border-color',
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out
   },
   icon: { width: '56px', height: '56px', flexShrink: 0, borderRadius: '13px' },
   iconSm: { width: '36px', height: '36px', flexShrink: 0, borderRadius: '8px' },

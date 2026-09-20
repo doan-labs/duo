@@ -7,8 +7,9 @@ import * as stylex from '@stylexjs/stylex'
 import { Link } from '@tanstack/react-router'
 import { Fragment, type ReactNode } from 'react'
 import { ROOT, slugOf } from './docs'
+import { Pre } from './page-parts'
 import { blob } from './site'
-import { color, font, radius } from './tokens.stylex'
+import { color, ease, font, radius } from './tokens.stylex'
 
 export type Block =
   | { t: 'h'; level: number; text: string; id: string }
@@ -268,10 +269,12 @@ export function render(bs: Block[], ctx: LinkCtx): ReactNode {
           </p>
         )
       case 'code':
+        // The same block the hand-written pages use, so a fence in docs/ and a
+        // sample in a route are one shape: file tab, copy button, colour.
         return (
-          <pre key={key} data-lang={b.lang || undefined} {...stylex.props(md.pre)}>
-            <code {...stylex.props(md.preCode)}>{b.code}</code>
-          </pre>
+          <Pre key={key} lang={b.lang}>
+            {b.code}
+          </Pre>
         )
       case 'list': {
         const Tag = b.ordered ? 'ol' : 'ul'
@@ -300,7 +303,7 @@ export function render(bs: Block[], ctx: LinkCtx): ReactNode {
               </thead>
               <tbody>
                 {b.rows.map((r, j) => (
-                  <tr key={j}>
+                  <tr key={j} {...stylex.props(md.tr)}>
                     {r.map((c, x) => (
                       <td key={x} {...stylex.props(md.td)}>
                         {inline(c, ctx)}
@@ -360,17 +363,58 @@ const md = stylex.create({
     borderTopStyle: 'solid',
     borderTopColor: color.border
   },
-  h3: { fontSize: '20px', lineHeight: 1.25, marginTop: '36px', marginBottom: '10px' },
-  h4: { fontSize: '17px', lineHeight: 1.35, marginTop: '26px', marginBottom: '6px' },
-  anchor: { color: 'inherit', textDecoration: { default: 'none', ':hover': 'underline' } },
-  p: { marginTop: 0, marginBottom: '18px', fontSize: '17px', lineHeight: 1.6, color: color.text },
+  h3: { fontSize: '21px', lineHeight: 1.25, marginTop: '40px', marginBottom: '10px' },
+  h4: {
+    fontSize: '15px',
+    lineHeight: 1.35,
+    marginTop: '28px',
+    marginBottom: '8px',
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    color: color.text2
+  },
+  // The link wraps the whole heading, so its own `:hover` is the heading's; a
+  // descendant selector would be needed otherwise, and StyleX has none.
+  anchor: {
+    position: 'relative',
+    color: 'inherit',
+    textDecoration: 'none',
+    borderRadius: radius.sm,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '6px',
+    '::after': {
+      content: '"#"',
+      marginLeft: '0.32em',
+      fontFamily: font.mono,
+      fontWeight: 400,
+      fontSize: '0.62em',
+      color: color.accent,
+      // It holds its space at zero opacity, so revealing it never reflows the line.
+      opacity: { default: 0, ':hover': 1, ':focus-visible': 1 },
+      transitionProperty: 'opacity',
+      transitionDuration: '0.2s',
+      transitionTimingFunction: ease.out
+    }
+  },
+  p: { marginTop: 0, marginBottom: '20px', fontSize: '17px', lineHeight: 1.65, color: color.text },
   a: {
     color: { default: color.accent, ':hover': color.accentHover },
     textDecoration: 'none',
     textUnderlineOffset: '3px',
+    borderRadius: '3px',
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
-    borderBottomColor: { default: 'transparent', ':hover': color.accent }
+    borderBottomColor: { default: color.accentSoft, ':hover': color.accent },
+    transitionProperty: 'color, border-bottom-color, outline-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px'
   },
   strong: { fontWeight: 600 },
   code: {
@@ -385,46 +429,45 @@ const md = stylex.create({
     paddingBottom: '2px',
     paddingLeft: '6px',
     paddingRight: '6px',
-    overflowWrap: 'anywhere'
+    overflowWrap: 'break-word'
   },
-  pre: {
-    fontFamily: font.mono,
-    fontSize: '13px',
-    lineHeight: 1.6,
-    backgroundColor: color.surface,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: color.border,
-    borderRadius: radius.md,
-    color: color.text,
-    paddingTop: '18px',
-    paddingBottom: '18px',
-    paddingLeft: '20px',
-    paddingRight: '20px',
-    marginTop: 0,
-    marginBottom: '24px',
-    overflowX: 'auto',
-    tabSize: 2
-  },
-  preCode: { fontFamily: font.mono, whiteSpace: 'pre' },
   list: {
     marginTop: 0,
-    marginBottom: '18px',
-    paddingLeft: '22px',
+    marginBottom: '20px',
+    paddingLeft: '24px',
     fontSize: '17px',
-    lineHeight: 1.6,
+    lineHeight: 1.65,
     color: color.text
   },
-  li: { marginBottom: '8px' },
+  li: { marginBottom: '10px', paddingLeft: '4px', '::marker': { color: color.text3 } },
   tableWrap: {
     overflowX: 'auto',
+    // `overflow-x: auto` alone computes `overflow-y` to `auto` as well, and the
+    // table's -1px bottom margin is then a 1px vertical overflow with a scrollbar.
+    overflowY: 'hidden',
+    overscrollBehaviorX: 'contain',
     marginBottom: '28px',
+    backgroundColor: color.surface,
     borderWidth: '1px',
     borderStyle: 'solid',
     borderColor: color.border,
     borderRadius: radius.md
   },
-  table: { borderCollapse: 'collapse', width: '100%', fontSize: '14px', lineHeight: 1.5 },
+  table: {
+    borderCollapse: 'collapse',
+    width: '100%',
+    // The last row's rule would otherwise double up with the box's own bottom edge.
+    marginBottom: '-1px',
+    minWidth: '440px',
+    fontSize: '14.5px',
+    lineHeight: 1.55
+  },
+  tr: {
+    backgroundColor: { default: 'transparent', ':hover': color.well },
+    transitionProperty: 'background-color',
+    transitionDuration: '0.15s',
+    transitionTimingFunction: ease.out
+  },
   th: {
     textAlign: 'left',
     fontFamily: font.mono,
@@ -452,16 +495,22 @@ const md = stylex.create({
     borderBottomStyle: 'solid',
     borderBottomColor: color.border,
     verticalAlign: 'top',
-    color: color.text2
+    color: color.text
   },
   quote: {
     marginTop: 0,
-    marginBottom: '20px',
+    marginBottom: '24px',
     marginLeft: 0,
     marginRight: 0,
-    paddingTop: '4px',
-    paddingBottom: '4px',
+    paddingTop: '18px',
+    // The last paragraph inside brings its own 20px margin; a zero here would let
+    // that margin collapse out of the box and cut the wash off at the baseline.
+    paddingBottom: '2px',
     paddingLeft: '20px',
+    paddingRight: '20px',
+    backgroundColor: color.well,
+    borderTopRightRadius: radius.sm,
+    borderBottomRightRadius: radius.sm,
     borderLeftWidth: '2px',
     borderLeftStyle: 'solid',
     borderLeftColor: color.accent,
@@ -472,7 +521,7 @@ const md = stylex.create({
     borderTopWidth: '1px',
     borderTopStyle: 'solid',
     borderTopColor: color.border,
-    marginTop: '40px',
-    marginBottom: '40px'
+    marginTop: '48px',
+    marginBottom: '48px'
   }
 })

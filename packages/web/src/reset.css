@@ -1,3 +1,8 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: the reduced-motion block
+   at the foot of this file is the exception the rule exists to protect. It has
+   to beat every StyleX layer above it, and a reader who asked the operating
+   system for less motion outranks any animation the site would rather play. */
+
 /* Page-level rules for the elements React never renders. Colours live on <body>
    as StyleX so the theme tokens drive them; everything here is structural.
    Imported before the StyleX sheet so its layer is declared first and loses. */
@@ -9,7 +14,20 @@
   }
   html {
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     color-scheme: light dark;
+    /* Reserve the scrollbar's width always, so a short route and a tall one
+       centre their content on the same axis and navigating does not nudge the
+       page sideways. A no-op where scrollbars overlay. */
+    scrollbar-gutter: stable;
+  }
+  /* Lenis owns smooth scrolling and sets `.lenis` on <html> while it runs; the
+     two must never both animate the same scroll. This covers the pages Lenis is
+     not mounted on, and readers who have asked for less motion get neither. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:not(.lenis) {
+      scroll-behavior: smooth;
+    }
   }
   body {
     min-height: 100vh;
@@ -21,6 +39,19 @@
     font: inherit;
     color: inherit;
   }
+  /* Keyboard focus is never removed, only made legible: `currentColor` reads on
+     a card, on the near-black sections and in both themes. Components that want
+     the accent ring override this from a StyleX layer, which wins. */
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  /* A heading reached by an anchor stops below the 60 px sticky nav rather than
+     under it. Lenis reads this too, so the clearance is stated once and holds
+     on both paths; doc headings set their own and win, being in a later layer. */
+  :where(h1, h2, h3, h4, h5, h6)[id] {
+    scroll-margin-top: 84px;
+  }
   /* The kit's frame on the UI kit pages: the same button reset the shell's index.html applies. */
   [data-kit-frame] button {
     border: 0;
@@ -29,5 +60,19 @@
   }
   ::selection {
     background: rgba(143, 143, 255, 0.28);
+  }
+  /* The floor under every CSS animation on the site. Components drop their own
+     motion through `useReducedMotion`; this catches the transitions and
+     keyframes that never pass through React. `!important` in the lowest layer
+     outranks every layer above it, which is the one time that is the point. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Browser } from '../home/apps'
 import { Block, Cap, Headline, Lede } from '../home/parts'
 import { Button } from '../layout'
-import { color } from '../tokens.stylex'
+import { color, ease } from '../tokens.stylex'
 
 export const Route = createFileRoute('/apps')({
   head: () => ({ meta: [{ title: 'Apps · Duo' }] }),
@@ -31,6 +31,18 @@ function Page() {
 }
 
 const styles = stylex.create({
-  link: { color: color.text, textDecorationLine: 'underline', textUnderlineOffset: '3px' },
+  link: {
+    color: { default: color.text, ':hover': color.accent },
+    textDecorationLine: 'underline',
+    textUnderlineOffset: '3px',
+    borderRadius: '4px',
+    transitionProperty: 'color, outline-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px'
+  },
   action: { marginTop: '28px' }
 })

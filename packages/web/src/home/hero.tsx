@@ -1,23 +1,32 @@
 // First viewport: the name, one headline, two buttons, and the real device
-// filling the rest. Under 734 px the WebGL shell gives way to the rendered loop.
+// filling the rest at every width, phone included. The caption waits for the
+// shell to report a picture, so it never labels an empty stage.
 import * as stylex from '@stylexjs/stylex'
 import { motion, useReducedMotion } from 'motion/react'
+import { useCallback, useState } from 'react'
 import { Button } from '../layout'
-import { useNarrow } from '../media'
+import { CURVE } from '../motion'
 import { Simulator } from '../simulator'
 import { color, font } from '../tokens.stylex'
-import { CURVE } from './parts'
 
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
 
+// Reduced motion cuts the duration, never the `initial` pose. `useReducedMotion()`
+// is null on the server and a boolean on the client, so gating `initial` on it
+// renders opacity 0 into the HTML and opacity 1 into the hydration, which fails the
+// whole tree for exactly the readers least able to absorb a re-render.
+const NONE = { duration: 0 }
+
 export function Hero() {
-  const still = useReducedMotion()
-  const narrow = useNarrow()
+  const still = useReducedMotion() ?? false
+  const [painted, setPainted] = useState(false)
+  // Stable, so the simulator's effect fires on the handover and not on every render.
+  const paint = useCallback(() => setPainted(true), [])
   const rise = (i: number) => ({
-    initial: still ? false : { opacity: 0, y: 16 },
+    initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.8, delay: 0.1 + i * 0.08, ease: CURVE }
+    transition: still ? NONE : { duration: 0.8, delay: 0.08 + i * 0.09, ease: CURVE }
   })
   return (
     <section {...stylex.props(styles.hero)} aria-labelledby="hero-title">
@@ -54,28 +63,19 @@ export function Hero() {
         </div>
         <motion.div
           {...stylex.props(styles.stage)}
-          initial={still ? false : { opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, delay: 0.35, ease: CURVE }}
+          transition={still ? NONE : { duration: 1.2, delay: 0.5, ease: CURVE }}
         >
-          {narrow ? (
-            <video
-              aria-label="Duo folding open and shut"
-              autoPlay={!still}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster="/hero-poster.jpg"
-              {...stylex.props(styles.video)}
-            >
-              <source src="/hero.webm" type="video/webm" />
-              <source src="/hero.mp4" type="video/mp4" />
-            </video>
-          ) : (
-            <Simulator deg={180} eager tall spin />
-          )}
-          <p {...stylex.props(styles.hint)}>Drag to turn. Use the slider to fold. Tap an icon to open an app.</p>
+          <Simulator deg={180} eager tall spin onPainted={paint} />
+          <motion.p
+            {...stylex.props(styles.hint)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: painted ? 1 : 0 }}
+            transition={still ? NONE : { duration: 0.6, ease: CURVE }}
+          >
+            Drag to turn. Use the slider to fold. Tap an icon to open an app.
+          </motion.p>
         </motion.div>
       </div>
     </section>
@@ -116,16 +116,19 @@ const styles = stylex.create({
   // Product Hunt draws the badge 54 px tall; shrunk a little to sit level with the buttons.
   hunt: { display: 'block', marginLeft: { default: 'auto', [SMALL]: 0 } },
   huntImg: { display: 'block', height: '48px', width: 'auto' },
-  // The shell's camera leaves headroom above the phone; pull the frame up under the buttons and let the section clip it.
-  stage: { marginTop: { default: '-40px', [SMALL]: '32px' } },
-  video: { display: 'block', width: '100%', height: 'auto', aspectRatio: '16 / 9', borderRadius: '20px' },
+  // The shell's camera leaves headroom above the phone; pull the frame up under the
+  // buttons and let the section clip it. The frame can take the full width on a phone
+  // because the shell asks the canvas for `touch-action: pan-y` (packages/shell/main.ts),
+  // so a vertical drag on the device scrolls the page instead of being eaten by the orbit.
+  stage: { marginTop: { default: '-40px', [SMALL]: '16px' } },
   hint: {
-    marginTop: '16px',
+    marginTop: { default: '16px', [SMALL]: '12px' },
     marginBottom: 0,
     fontFamily: font.mono,
     fontSize: '12px',
     letterSpacing: '0.02em',
     color: color.text3,
-    textAlign: 'center'
+    textAlign: 'center',
+    textWrap: 'balance'
   }
 })

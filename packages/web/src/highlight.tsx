@@ -42,8 +42,10 @@ const KEYWORDS = new Set([
   'any'
 ])
 // Order matters: comments and strings first so their insides are never split.
+// The final alternative is a catch-all: `matchAll` skips whatever no group
+// matches, so without it a stray `@` or `%` would vanish from the rendered line.
 const TOKEN =
-  /(\/\/.*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|(<\/?[A-Za-z][\w.]*|\/?>)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)|([{}()[\],;:.=<>!&|+\-*/?]+)|(\s+)/g
+  /(\/\/.*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|(<\/?[A-Za-z][\w.]*|\/?>)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)|([{}()[\],;:.=<>!&|+\-*/?]+)|(\s+)|[\s\S]/g
 
 export function tokens(code: string): { kind: Kind; text: string }[] {
   const out: { kind: Kind; text: string }[] = []

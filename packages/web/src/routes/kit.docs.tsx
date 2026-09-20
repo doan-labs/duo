@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { kit } from '../kit/data'
-import { SideLink, SideList, Split } from '../layout'
+import { SideLink, SideList, Split } from '../side-nav'
 
 export const Route = createFileRoute('/kit/docs')({ component: Layout })
 
@@ -13,6 +13,10 @@ function Layout() {
           <SideList title="UI kit">
             <SideLink to="/kit">Showcase</SideLink>
             <SideLink to="/kit/docs">Overview</SideLink>
+            {/* The guidelines are the kit's other half: the colours, type and
+                easings every component below is drawn from. They keep their own
+                top-level route, and this is where they are looked for. */}
+            <SideLink to="/guidelines">Guidelines</SideLink>
           </SideList>
           {(
             [

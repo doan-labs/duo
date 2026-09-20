@@ -6,7 +6,17 @@ export const Route = createFileRoute('/simulator')({
   validateSearch: (search: Record<string, unknown>): { app?: string } => ({
     app: typeof search.app === 'string' && search.app ? search.app : undefined
   }),
-  head: () => ({ meta: [{ title: 'Simulator - Duo' }] }),
+  // Every other page separates with a middle dot; this one was the odd one out.
+  head: () => ({
+    meta: [
+      { title: 'Simulator · Duo' },
+      {
+        name: 'description',
+        content:
+          'The phone in the browser: open an app, fold it, and watch the cover display and the inner display hand the session between them.'
+      }
+    ]
+  }),
   component: Page
 })
 

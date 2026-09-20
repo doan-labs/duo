@@ -234,10 +234,10 @@ nothing is published, no host is chosen, no CI deploys it.
 | # | Section | What is on screen | How it is made |
 | --- | --- | --- | --- |
 | 0 | Hero | "A phone Apple hasn't shipped, that you can build apps for." Try Duo, Build an app, the real shell full width | `home/hero.tsx`; `Simulator eager tall`; under 734 px the Remotion loop `public/hero.*` |
-| 1 | Not a mockup | "It looks like a concept. It behaves like a device." A device that folds, turns and opens as the page scrolls; four captions take turns | `home/works.tsx`; `useScroll` on a 320 vh track, `Device` from `device.tsx`; reduced motion gets a still device and the captions as a list |
+| 1 | Not a mockup | "It looks like a concept. It behaves like a device." A device that folds, turns and opens as the page scrolls; four captions take turns | `home/works.tsx`; `useScroll` on a 320 vh track driving a sticky `Simulator` by pose; reduced motion gets a still device and the captions as a list |
 | 2 | Real hardware | "Your imaginary phone can use your real camera." The shell running Camera; "The apps are fake. The capabilities aren't." | `home/camera.tsx`, near-black palette via the `dark` theme class; the page asks for the webcam when the scene is on screen, then mounts `Simulator app="Camera" mount`, `allow="camera"` |
 | 3 | The twist | "And then we gave it an App Store." The shell on the App Store, six steps from Get to launch | `home/store.tsx`; a mono note says the runtime and store are real (stages 2–5) and the frame's store lists the bundled Notes and Weather until a developer catalog URL is pasted |
-| 4 | The core idea | "The fold is not a breakpoint. It is input." Four postures, `useDisplay()` code, a live readout | `home/fold.tsx`; `animate(open, deg / 180)` on the CSS device |
+| 4 | The core idea | "The fold is not a breakpoint. It is input." Four postures, `useDisplay()` code, a live readout | `home/fold.tsx`; a `Segmented` posture control easing the real shell to each `deg` |
 | 5 | Build | "Build software for hardware that doesn't exist yet." Terminal, editor beside the device; a colour line changes and the phone folds on a loop; "Change code. Fold the phone. See what breaks." | `home/build.tsx` |
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
 | 7 | The apps | The catalog (`/catalog/index.json`) and the shell's home-screen list, read at build time into `src/generated/catalog.ts`. `/apps` groups the official lane by status behind `<details>`: Published (open), Built in and In development (folded) | `home/apps.tsx`, reused by `routes/apps.tsx` |
@@ -262,10 +262,10 @@ hairlines only where a list needs them, mono only for code and captions.
   every load and on theme change, and follows its `deg` prop by message. The
   device now floats on the page in both themes; `/simulator` folds without a
   reload.
-- **A CSS-3D Duo** (`src/device.tsx`) for scenes that need per-frame control:
-  two hinged panels, the cover on the back of the moving one, a stylised app
-  that hands over from one column to two as the hinge passes 90°. Driven by a
-  motion value, so scroll, buttons and a timer all use the same component.
+- **A CSS-3D Duo** (`src/device.tsx`) carried the scroll and posture scenes
+  while three WebGL frames were judged too many for one page. Both scenes moved
+  back to the real shell and the component was deleted on 2026-09-20; see
+  decision 76.
 - **`src/reset.css`** replaces the inline reset. See decision 39: React hoists
   the stylesheet link above inline `<style>`, so the reset layer was declared
   last and won, zeroing every StyleX margin in the build only.

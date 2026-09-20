@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { docs, groups } from '../docs'
-import { SideLink, SideList, Split } from '../layout'
+import { SideLink, SideList, Split } from '../side-nav'
 
 export const Route = createFileRoute('/docs')({ component: Layout })
 

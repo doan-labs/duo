@@ -95,6 +95,142 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-sdk",
+    "name": "SettingsHost",
+    "kind": "type",
+    "file": "packages/sdk/legacy.ts",
+    "line": 52,
+    "doc": "What the shell hands the Settings app. Baked apps never import the shell, so\nthe switches, the eraser and the link opener arrive as a prop from apps.ts,\nthe way the Store gets `openExternal`.",
+    "signature": "type SettingsHost = {\n  /** The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`. */\n  switches: Readonly<Switches>\n  subscribe: (cb: () => void) => () => void\n  revision: () => number\n  flip: (key: keyof Switches, value?: boolean) => void\n  /** The Wi-Fi network and the charge the status stack reports. */\n  network: string\n  battery: number\n  /** Erase All Content and Settings: clears device storage and reloads the shell. */\n  erase: () => Promise<void>\n  openExternal: (url: string) => void\n  /** Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press. */\n  claimSide: (claim: () => boolean) => () => void\n}",
+    "members": [
+      {
+        "name": "switches",
+        "type": "Readonly<Switches>",
+        "optional": false,
+        "doc": "The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`."
+      },
+      {
+        "name": "subscribe",
+        "type": "(cb: () => void) => () => void",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "revision",
+        "type": "() => number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "flip",
+        "type": "(key: keyof Switches, value?: boolean) => void",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "network",
+        "type": "string",
+        "optional": false,
+        "doc": "The Wi-Fi network and the charge the status stack reports."
+      },
+      {
+        "name": "battery",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "erase",
+        "type": "() => Promise<void>",
+        "optional": false,
+        "doc": "Erase All Content and Settings: clears device storage and reloads the shell."
+      },
+      {
+        "name": "openExternal",
+        "type": "(url: string) => void",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "claimSide",
+        "type": "(claim: () => boolean) => () => void",
+        "optional": false,
+        "doc": "Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press."
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "Switches",
+    "kind": "type",
+    "file": "packages/sdk/legacy.ts",
+    "line": 34,
+    "doc": "The device switches Control Center and Settings both flip. One definition, so\nthe shell's store (springboard/toggles.ts) and the baked Settings app cannot\ndrift apart.",
+    "signature": "type Switches = {\n  airplane: boolean\n  cell: boolean\n  wifi: boolean\n  bt: boolean\n  drop: boolean\n  hotspot: boolean\n  rotate: boolean\n  mirror: boolean\n  focus: boolean\n  torch: boolean\n}",
+    "members": [
+      {
+        "name": "airplane",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "cell",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "wifi",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "bt",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "drop",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "hotspot",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "rotate",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "mirror",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "focus",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "torch",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Manifest",
     "kind": "type",
     "file": "packages/sdk/manifest.ts",
@@ -284,7 +420,7 @@ export const api: ApiEntry[] = [
     "name": "KV",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 80,
+    "line": 83,
     "doc": "",
     "signature": "type KV = {\n  get(k: string): Promise<string | null>\n  set(k: string, v: string): Promise<{ rev: number }>\n  del(k: string): Promise<{ rev: number }>\n  keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>\n  snapshot(cursor?: string): Promise<Snapshot>\n  watch(since: number, cb: (e: Change) => void): () => void\n}",
     "members": []
@@ -421,9 +557,9 @@ export const api: ApiEntry[] = [
     "name": "animations",
     "kind": "value",
     "file": "packages/uikit/styles.ts",
-    "line": 27,
+    "line": 41,
     "doc": "",
-    "signature": "animations = stylex.create({\n  spin: {\n    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationTimingFunction: 'linear',\n    animationIterationCount: 'infinite'\n  },\n  rise: {\n    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.5s',\n    animationFillMode: 'backwards'\n  },\n  pop: {\n    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.4s',\n    animationTimingFunction: easing.pop\n  },\n  fade: {\n    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.25s'\n  },\n  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },\n  draw: {\n    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s'\n  },\n  bob: {\n    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationIterationCount: 'infinite'\n  },\n  glow: {\n    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '2s',\n    animationIterationCount: 'infinite'\n  },\n  /** A row that just appeared in a list: settles down from above. */\n  row: {\n    animationName: { default: drop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.3s',\n    animationTimingFunction: easing.pop\n  },\n  /** A floating tray or toolbar entering from below; pair with `floatOut` under `usePresence`. */\n  float: {\n    animationName: { default: lift, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.34s',\n    animationTimingFunction: easing.pop\n  },\n  floatOut: {\n    animationName: { default: sink, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.34s',\n    animationFillMode: 'forwards'\n  },\n  /** A page pushed over another, sliding in from the right; `Push` in nav.tsx applies these. */\n  sheet: {\n    animationName: { default: slideIn, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.38s',\n    animationTimingFunction: easing.push\n  },\n  sheetOut: {\n    animationName: { default: slideOut, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.38s',\n    animationTimingFunction: easing.push,\n    animationFillMode: 'forwards'\n  }\n})"
+    "signature": "animations = stylex.create({\n  spin: {\n    animationName: { default: spin, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationTimingFunction: easing.linear,\n    animationIterationCount: 'infinite'\n  },\n  rise: {\n    animationName: { default: rise, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.5s',\n    animationFillMode: 'backwards'\n  },\n  pop: {\n    animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.4s',\n    animationTimingFunction: easing.pop\n  },\n  fade: {\n    animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.25s'\n  },\n  rip: { animationName: { default: rip, '@media (prefers-reduced-motion: reduce)': 'none' }, animationDuration: '.6s' },\n  draw: {\n    animationName: { default: draw, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s'\n  },\n  bob: {\n    animationName: { default: bob, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '1s',\n    animationIterationCount: 'infinite'\n  },\n  glow: {\n    animationName: { default: glow, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '2s',\n    animationIterationCount: 'infinite'\n  },\n  /** A row that just appeared in a list: settles down from above. */\n  row: {\n    animationName: { default: drop, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.3s',\n    animationTimingFunction: easing.pop\n  },\n  /** A floating tray or toolbar entering from below; pair with `floatOut` under `usePresence`. */\n  float: {\n    animationName: { default: lift, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.34s',\n    animationTimingFunction: easing.pop\n  },\n  floatOut: {\n    animationName: { default: sink, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.34s',\n    animationFillMode: 'forwards'\n  },\n  /** A page pushed over another, sliding in from the right; `Push` in nav.tsx applies these. */\n  sheet: {\n    animationName: { default: slideIn, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.38s',\n    animationTimingFunction: easing.push\n  },\n  sheetOut: {\n    animationName: { default: slideOut, '@media (prefers-reduced-motion: reduce)': 'none' },\n    animationDuration: '.38s',\n    animationTimingFunction: easing.push,\n    animationFillMode: 'forwards'\n  }\n})"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -490,7 +626,7 @@ export const api: ApiEntry[] = [
     "kind": "component",
     "file": "packages/uikit/button.tsx",
     "line": 9,
-    "doc": "Native button with the existing tinted capsule or filled/plain variants. Icon-only buttons need aria-label.",
+    "doc": "Native button: tinted capsule by default, filled with the link colour, or plain text. Icon-only buttons need aria-label.",
     "signature": "function Button({ variant = 'tinted', xstyle, animate, as: _as, type = 'button', ...props }: ButtonProps)",
     "members": [
       {
@@ -511,7 +647,7 @@ export const api: ApiEntry[] = [
     "kind": "type",
     "file": "packages/uikit/button.tsx",
     "line": 8,
-    "doc": "Native button with the existing tinted capsule or filled/plain variants. Icon-only buttons need aria-label.",
+    "doc": "Native button: tinted capsule by default, filled with the link colour, or plain text. Icon-only buttons need aria-label.",
     "signature": "type ButtonProps = PrimitiveProps<'button'> & { variant?: 'filled' | 'tinted' | 'plain' }"
   },
   {
@@ -948,26 +1084,26 @@ export const api: ApiEntry[] = [
     "name": "Text",
     "kind": "component",
     "file": "packages/uikit/text.tsx",
-    "line": 29,
-    "doc": "Inline text or a formatted animated number.\n\n`size` names a step of the type ramp, which carries size, leading and weight\ntogether. `caption`, `footnote` and `title` are the kit's original names and\nstill render exactly as they did; unlike the ramp steps they also set a\ncolour. Prefer `size=\"subheadline\" color=\"secondary\"` over `size=\"caption\"`\nin new UI.",
+    "line": 28,
+    "doc": "Inline text or a formatted animated number.\n\n`size` names a step of Dynamic Type, which carries size, leading, tracking\nand weight together. `weight` emphasises the step on the HIG ladder. `caption`\nis the kit's original name for `shared.sub` and still renders as it did;\nprefer `size=\"footnote\" color=\"secondary\"` in new UI.",
     "signature": "function Text<T extends ElementType = 'span'>({\n  as,\n  size = 'body',\n  weight,\n  color,\n  value,\n  format,\n  suffix,\n  children,\n  xstyle,\n  animate,\n  ...props\n}: TextProps<T>)",
     "members": [
       {
         "name": "size",
-        "type": "Ramp | 'caption' | 'footnote' | 'title'",
+        "type": "Ramp | 'caption'",
         "optional": true,
         "doc": "",
         "default": "'body'"
       },
       {
         "name": "weight",
-        "type": "'regular' | 'medium' | 'bold'",
+        "type": "'regular' | 'medium' | 'semibold' | 'bold'",
         "optional": true,
         "doc": ""
       },
       {
         "name": "color",
-        "type": "'primary' | 'secondary' | 'accent'",
+        "type": "'primary' | 'secondary' | 'tertiary' | 'accent'",
         "optional": true,
         "doc": ""
       },
@@ -999,9 +1135,9 @@ export const api: ApiEntry[] = [
     "name": "TextProps",
     "kind": "type",
     "file": "packages/uikit/text.tsx",
-    "line": 21,
-    "doc": "Inline text or a formatted animated number.\n\n`size` names a step of the type ramp, which carries size, leading and weight\ntogether. `caption`, `footnote` and `title` are the kit's original names and\nstill render exactly as they did; unlike the ramp steps they also set a\ncolour. Prefer `size=\"subheadline\" color=\"secondary\"` over `size=\"caption\"`\nin new UI.",
-    "signature": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: Ramp | 'caption' | 'footnote' | 'title'\n  weight?: 'regular' | 'medium' | 'bold'\n  color?: 'primary' | 'secondary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}"
+    "line": 20,
+    "doc": "Inline text or a formatted animated number.\n\n`size` names a step of Dynamic Type, which carries size, leading, tracking\nand weight together. `weight` emphasises the step on the HIG ladder. `caption`\nis the kit's original name for `shared.sub` and still renders as it did;\nprefer `size=\"footnote\" color=\"secondary\"` in new UI.",
+    "signature": "type TextProps<T extends ElementType = 'span'> = PrimitiveProps<T> & {\n  size?: Ramp | 'caption'\n  weight?: 'regular' | 'medium' | 'semibold' | 'bold'\n  color?: 'primary' | 'secondary' | 'tertiary' | 'accent'\n  value?: number\n  format?: Intl.NumberFormatOptions\n  suffix?: string\n}"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -1166,8 +1302,8 @@ export const versions: Record<string, { name: string; version: string; changelog
   },
   "uikit": {
     "name": "@doan-labs/duo-uikit",
-    "version": "0.2.0",
-    "changelog": "# 0.2.0\n\nRemoved three components that were verbatim renames of something already\nexported: `Hero` (`LargeTitle`), `Symbol` (`Sym`) and `NavigationStack` (`Nav`).\n`Sym` now carries the `SymProps` type and the TSDoc that `Symbol` existed to\nhold. `NavigationLink` stays; unlike the other three it manages destination and\nreturn focus, which `Nav` and `Page` do not.\n\nAdded `HStack`, and `gap` / `align` / `justify` / `wrap` on both stacks. The kit\nhad no horizontal primitive, so the apps carried roughly 530 hand-written flex\ndeclarations.\n\nAdded the type ramp. `Text`'s `size` names a step (`largeTitle`,\n`title1`..`title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`,\n`caption1`, `caption2`), each with size, leading and weight together; `typeScale`\nholds the raw px and `typography` the same steps as whole blocks. `caption`,\n`footnote` and `title` still render exactly as before and are now documented as\nthe original names to migrate off.\n\nAdded the per-app surface. `app` gained `surface`, `elevated`, `label2`,\n`separator`, `fill` and `track`, and `shared` reads from them instead of\nhardcoding light values, so a dark app can theme `Row`, `Section`, `Toggle` and\nsecondary labels rather than avoiding them. `light` and `dark` ship as themes;\nthe `app` defaults are the values the kit used to hardcode, so applying `light`\nchanges nothing.\n\n`Row` gained `subtitle`, the second line most iOS rows have, and `chevron` now\nrenders the SF chevron through `Sym` instead of a typed `›`.\n\nMoved invented data and feedback out of the kit into `@doan-labs/duo-fixtures`:\n`hue`, `art`, `walk`, `poly`, `mmss`, `beep` and the sample tracks. `Bars` in\n`rings.tsx` takes the values to plot instead of generating them from a seed, so\nthe kit no longer depends on fixture data to draw a chart.\n\nRemoved four `shared` blocks with no consumer anywhere in the repo (`grid`,\n`gridImg`, `viewer`, `viewerImg`), and 35 `appAppearance` constants: 19 that\nwere never referenced and 16 that were exact duplicates of a palette colour\n(`notesColor10` was `colors.darkElevated`, `healthColor3` was `colors.indigo`,\nand so on). The remaining 224 are still per-app values in a shared module and\nstill want moving into the app that owns them.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
+    "version": "1.0.0",
+    "changelog": "# 1.0.0\n\nThe design system is Apple's. Every value in `tokens.stylex.ts` now traces to\nthe HIG or to UIKit, and every size, weight, radius, shadow, font and timing an\napp uses comes from a scale. Removals, hence the major.\n\nColours: `colors` is the iOS 26 system palette (`blue` is `#0088ff`, `red`\n`#ff383c`, and so on) with a `*Dark` sibling per hue, `mint` and `brown` added,\nand `grey`..`grey6` plus `grey2Dark`..`grey6Dark`. Removed `blueBright`,\n`blueDark`'s old value, `greenBright`, `redBright`, `settingsPink`,\n`settingsIndigo`, `separator`, `groupedLight`, `barLight`, `trackLight`,\n`trackDark`, `darkElevated`, `darkElevated2`, `separatorDark`, `fill`,\n`fillThin`, `fillThick`, `fillDark`, `controlDark` and the `weather*` hues.\n\nSurfaces: `app` is the UIKit dynamic colour set. Added `label3`, `link`, `fill2`,\n`fill3`; removed `track` (use `fill2`). `light` and `dark` carry UIKit's light\nand dark values. `Text` gained `color=\"tertiary\"`.\n\nType: `typeScale` is Dynamic Type at Large (body 17, not 15), joined by\n`leading`, `tracking` and `weight` consts and four `display` sizes. `typography`\nsteps carry all four. `Text` `weight` is `regular | medium | semibold | bold`;\n`size=\"footnote\"` and `size=\"title\"` as colour-setting legacy names are gone\n(`footnote` is now the ramp step). `fonts` gained `rounded`, `serif`, `mono`.\n\nScales: added `space`, `radius`, `shadow`, `glass`, `motion`; `easing` gained\n`linear`, `out`, `inOut`. Added `chrome` and `wallpaper` consts for the shell's\nglass scrims and wallpaper palettes. `shared.glass` lost its radial sheen (decision 18).\n`shared.press`, `pill`, `fab` and `widget` all press to `motion.press`.\n\n`appAppearance`: every `*FontSize*`, `*FontWeight*`, `*Radius*`, `*Shadow*`,\n`*TimingFunction*` and `*FontFamily*` key is removed; colour keys are renamed by\nrole (`photosSidebarBackgroundColor` is `photosSidebar`). Keys are grouped under\na `// <app>` line and only that app may read them.\n\n`Button variant=\"plain\"` now presses. `Row`'s chevron is `app.label3`.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.2.0\n\nRemoved three components that were verbatim renames of something already\nexported: `Hero` (`LargeTitle`), `Symbol` (`Sym`) and `NavigationStack` (`Nav`).\n`Sym` now carries the `SymProps` type and the TSDoc that `Symbol` existed to\nhold. `NavigationLink` stays; unlike the other three it manages destination and\nreturn focus, which `Nav` and `Page` do not.\n\nAdded `HStack`, and `gap` / `align` / `justify` / `wrap` on both stacks. The kit\nhad no horizontal primitive, so the apps carried roughly 530 hand-written flex\ndeclarations.\n\nAdded the type ramp. `Text`'s `size` names a step (`largeTitle`,\n`title1`..`title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`,\n`caption1`, `caption2`), each with size, leading and weight together; `typeScale`\nholds the raw px and `typography` the same steps as whole blocks. `caption`,\n`footnote` and `title` still render exactly as before and are now documented as\nthe original names to migrate off.\n\nAdded the per-app surface. `app` gained `surface`, `elevated`, `label2`,\n`separator`, `fill` and `track`, and `shared` reads from them instead of\nhardcoding light values, so a dark app can theme `Row`, `Section`, `Toggle` and\nsecondary labels rather than avoiding them. `light` and `dark` ship as themes;\nthe `app` defaults are the values the kit used to hardcode, so applying `light`\nchanges nothing.\n\n`Row` gained `subtitle`, the second line most iOS rows have, and `chevron` now\nrenders the SF chevron through `Sym` instead of a typed `›`.\n\nMoved invented data and feedback out of the kit into `@doan-labs/duo-fixtures`:\n`hue`, `art`, `walk`, `poly`, `mmss`, `beep` and the sample tracks. `Bars` in\n`rings.tsx` takes the values to plot instead of generating them from a seed, so\nthe kit no longer depends on fixture data to draw a chart.\n\nRemoved four `shared` blocks with no consumer anywhere in the repo (`grid`,\n`gridImg`, `viewer`, `viewerImg`), and 35 `appAppearance` constants: 19 that\nwere never referenced and 16 that were exact duplicates of a palette colour\n(`notesColor10` was `colors.darkElevated`, `healthColor3` was `colors.indigo`,\nand so on). The remaining 224 are still per-app values in a shared module and\nstill want moving into the app that owns them.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
   },
   "shell": {
     "name": "@doan-labs/duo-shell",

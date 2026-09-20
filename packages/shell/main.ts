@@ -125,6 +125,11 @@ const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 250)
 camera.position.copy(EYE)
 
 const controls = new OrbitControls(camera, renderer.domElement)
+// OrbitControls.connect() sets `touch-action: none` on the canvas, which claims
+// every touch for orbiting. The canvas covers the whole frame, so on a phone the
+// page behind it could not be scrolled at all. Hand vertical drags back: turning
+// the phone is a horizontal gesture anyway, and taps still reach the icons.
+renderer.domElement.style.touchAction = 'pan-y'
 controls.enableDamping = true
 controls.enablePan = false
 controls.minDistance = 21

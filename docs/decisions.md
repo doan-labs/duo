@@ -996,3 +996,31 @@ considered and rejected for the device: its `#0066cc` accent, parchment tiles
 and 56 px hero belong to a web page, not to an iPhone. Cost: a one-time
 migration of 38 apps and the shell, and the kit moves to 1.0.0 because names
 were removed.
+
+## 76. The CSS-3D device is gone; the real shell carries every scene
+
+2026-09-20. Decision 54 chose a CSS-3D Duo (`packages/web/src/device.tsx`) for the
+scroll and posture scenes, on the reasoning that three WebGL frames carrying the
+3.5 MB model were the ceiling one page could afford and that a scroll-linked pose
+needed per-frame control. Both scenes have since moved back to the real shell:
+`home/works.tsx` drives a sticky `Simulator` by pose over the postMessage bridge and
+`home/fold.tsx` eases it between four postures. The component was left exporting a
+`Device` nothing imported, so it was deleted. This supersedes the second half of
+decision 55; the embed bridge it also established stands unchanged.
+
+The reasoning that produced it was sound and may return: a second stylised device
+is the right answer if a scene ever needs a pose the shell cannot be asked for, or
+if frame count becomes a measured problem again. Git history holds the component.
+
+Two things came out of the same pass. Three.js `OrbitControls.connect()` sets
+`touch-action: none` on the canvas it is given, and the shell's canvas covers the
+whole frame, so once the hero showed the real device at phone width a touch drag on
+it scrolled nothing at all; `packages/shell/main.ts` now sets `touch-action: pan-y`
+after the constructor, which returns vertical drags to the page and keeps the
+horizontal drag that actually turns the phone. And `motion` renders `tabIndex` as a
+real SSR attribute for any element carrying a gesture prop, while `useReducedMotion()`
+returns `null` on the server and a boolean on the first client render: gating a
+gesture prop, a style or an `initial` pose on that value changes the markup between
+the two and aborts hydration for the whole tree. Props stay present, `tabIndex` is
+stated, and only values are gated. Note that `?? false` does not fix this, because
+the divergence is server-`null` against client-`true`.

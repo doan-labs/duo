@@ -1,7 +1,10 @@
 import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { type ComponentType, useState } from 'react'
 import { Line } from './highlight'
+import { CURVE } from './motion'
+import { Segmented } from './segmented'
 import { color, font, radius } from './tokens.stylex'
 
 // One file per component in kit-demos/: `button.tsx` is the Button demo. The
@@ -45,51 +48,65 @@ export function KitPreview({ name }: { name: string }) {
   const demo = demos.get(name)
   const [tab, setTab] = useState<Tab>('preview')
   const [open, setOpen] = useState(false)
+  const still = useReducedMotion()
   if (!demo) return null
+  // One control per component page, so the thumb of a Button page never chases a Card page's.
+  const id = `kit-${name}`
   return (
     <div>
-      <div role="tablist" {...stylex.props(styles.tabs)}>
-        {(['preview', 'usage'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            {...stylex.props(styles.tab, tab === t && styles.tabOn)}
-          >
-            {t === 'preview' ? 'Preview' : 'Usage'}
-          </button>
-        ))}
+      <div {...stylex.props(styles.tabs)}>
+        <Segmented
+          id={id}
+          label="Component view"
+          semantics="tablist"
+          value={tab}
+          onChange={(t) => setTab(t)}
+          options={[
+            { value: 'preview' as const, label: 'Preview' },
+            { value: 'usage' as const, label: 'Usage' }
+          ]}
+        />
       </div>
-      {tab === 'preview' ? (
-        <div {...stylex.props(styles.stage)}>
-          <KitFrame name={name} />
-        </div>
-      ) : (
-        <div {...stylex.props(styles.codeCard)}>
-          <div {...stylex.props(styles.codeHead)}>
-            <span {...stylex.props(styles.lang)}>TSX</span>
-            <span {...stylex.props(styles.path)}>{demo.path}</span>
-          </div>
-          <div {...stylex.props(styles.codeWrap, !open && styles.collapsed)}>
-            <pre {...stylex.props(styles.pre)}>
-              <code>
-                <Line code={demo.code.trimEnd()} />
-              </code>
-            </pre>
-            {demo.code.split('\n').length > 12 && (
-              <button
-                type="button"
-                onClick={() => setOpen((o) => !o)}
-                {...stylex.props(styles.toggle, open && styles.toggleOpen)}
-              >
-                {open ? 'Collapse code' : 'Expand code'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <AnimatePresence initial={false} mode="wait">
+        <motion.div
+          key={tab}
+          role="tabpanel"
+          aria-labelledby={`${id}-${tab}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: still ? 0 : 0.15, ease: CURVE }}
+        >
+          {tab === 'preview' ? (
+            <div {...stylex.props(styles.stage)}>
+              <KitFrame name={name} />
+            </div>
+          ) : (
+            <div {...stylex.props(styles.codeCard)}>
+              <div {...stylex.props(styles.codeHead)}>
+                <span {...stylex.props(styles.lang)}>TSX</span>
+                <span {...stylex.props(styles.path)}>{demo.path}</span>
+              </div>
+              <div {...stylex.props(styles.codeWrap, !open && styles.collapsed)}>
+                <pre {...stylex.props(styles.pre)}>
+                  <code>
+                    <Line code={demo.code.trimEnd()} />
+                  </code>
+                </pre>
+                {demo.code.split('\n').length > 12 && (
+                  <button
+                    type="button"
+                    onClick={() => setOpen((o) => !o)}
+                    {...stylex.props(styles.toggle, open && styles.toggleOpen)}
+                  >
+                    {open ? 'Collapse code' : 'Expand code'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }
@@ -98,30 +115,7 @@ export function KitPreview({ name }: { name: string }) {
 const theme = stylex.createTheme(app, { bg: colors.grey6, fg: colors.black })
 
 const styles = stylex.create({
-  tabs: {
-    display: 'inline-flex',
-    gap: '2px',
-    padding: '3px',
-    marginBottom: '16px',
-    borderRadius: radius.md,
-    backgroundColor: color.well
-  },
-  tab: {
-    fontFamily: font.sans,
-    fontSize: '14px',
-    fontWeight: 500,
-    lineHeight: 1,
-    paddingTop: '8px',
-    paddingBottom: '8px',
-    paddingLeft: '16px',
-    paddingRight: '16px',
-    borderWidth: 0,
-    borderRadius: radius.sm,
-    backgroundColor: 'transparent',
-    color: { default: color.text2, ':hover': color.text },
-    cursor: 'pointer'
-  },
-  tabOn: { backgroundColor: color.surface, color: color.text, boxShadow: color.shadow },
+  tabs: { marginBottom: '16px' },
   stage: {
     display: 'flex',
     justifyContent: 'center',

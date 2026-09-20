@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Segmented } from '../segmented'
 import { Simulator } from '../simulator'
 import { color, font, radius } from '../tokens.stylex'
 import { compile } from './compiler'
@@ -327,23 +328,25 @@ export function Workspace({ upcoming = false, app }: { upcoming?: boolean; app?:
               : 'Fold it. Try both screens.'}
           </span>
         </div>
-        {/* biome-ignore lint/a11y/useSemanticElements: a fieldset does not lay out as a grid item in WebKit. */}
-        <div role="group" aria-label="Mode" {...stylex.props(styles.seg)}>
-          {(['simulator', 'build'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              onClick={() => {
-                setMode(m)
-                setTab(m === 'build' ? 'chat' : 'preview')
-              }}
-              {...stylex.props(styles.segButton, mode === m && styles.segOn)}
-            >
-              {m === 'simulator' ? 'Simulator' : 'Build'}
-              {m === 'build' && upcoming && <span {...stylex.props(styles.segNote)}>soon</span>}
-            </button>
-          ))}
+        <div {...stylex.props(styles.seg)}>
+          <Segmented
+            id="builder-mode"
+            label="Mode"
+            size="sm"
+            value={mode}
+            onChange={(m) => {
+              setMode(m)
+              setTab(m === 'build' ? 'chat' : 'preview')
+            }}
+            options={[
+              { value: 'simulator' as const, label: 'Simulator' },
+              {
+                value: 'build' as const,
+                label: 'Build',
+                count: upcoming ? <span {...stylex.props(styles.segNote)}>soon</span> : undefined
+              }
+            ]}
+          />
         </div>
         <div {...stylex.props(styles.toolbarSide, styles.toolbarEnd)}>
           {!upcoming && (
@@ -370,22 +373,17 @@ export function Workspace({ upcoming = false, app }: { upcoming?: boolean; app?:
         </div>
       </div>
       <div {...stylex.props(styles.mobileTabs, mode === 'simulator' && styles.hidden)}>
-        <button
-          type="button"
-          aria-pressed={tab === 'chat'}
-          onClick={() => setTab('chat')}
-          {...stylex.props(styles.button, tab === 'chat' && styles.buttonOn)}
-        >
-          Chat
-        </button>
-        <button
-          type="button"
-          aria-pressed={tab === 'preview'}
-          onClick={() => setTab('preview')}
-          {...stylex.props(styles.button, tab === 'preview' && styles.buttonOn)}
-        >
-          Preview
-        </button>
+        <Segmented
+          id="builder-panel"
+          label="Panel"
+          size="sm"
+          value={tab}
+          onChange={(t) => setTab(t)}
+          options={[
+            { value: 'chat' as const, label: 'Chat' },
+            { value: 'preview' as const, label: 'Preview' }
+          ]}
+        />
       </div>
       <div {...stylex.props(styles.columns, mode === 'simulator' && styles.expanded)}>
         <div
@@ -944,33 +942,8 @@ const styles = stylex.create({
   buttonOn: { backgroundColor: color.accentSoft, borderColor: color.accent },
   iconButton: { width: 32, paddingLeft: 0, paddingRight: 0, fontSize: 12 },
   desktopOnly: { display: { default: 'inline-flex', [MOBILE]: 'none' } },
-  seg: {
-    display: 'inline-flex',
-    padding: 3,
-    gap: 2,
-    borderRadius: radius.pill,
-    backgroundColor: color.well,
-    justifySelf: 'center'
-  },
-  segButton: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    height: 30,
-    paddingLeft: 16,
-    paddingRight: 16,
-    borderWidth: 0,
-    borderRadius: radius.pill,
-    backgroundColor: 'transparent',
-    color: { default: color.text2, ':hover': color.text },
-    fontFamily: font.sans,
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: 'pointer',
-    transitionProperty: 'background-color, color',
-    transitionDuration: '0.15s'
-  },
-  segOn: { backgroundColor: color.surface, color: color.text, boxShadow: color.shadow },
+  // The control centres itself in the toolbar's middle grid column.
+  seg: { display: 'flex', justifyContent: 'center', minWidth: 0 },
   segNote: {
     fontFamily: font.mono,
     fontSize: 10,

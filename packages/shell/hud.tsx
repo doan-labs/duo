@@ -132,7 +132,13 @@ function Hud({
       )}
       {web && (
         <div {...stylex.props(styles.hint, !s.hint && styles.hintHidden)}>
-          Tap the screen to use it · Press the buttons on the frame · Drag outside to orbit · Wheel to zoom
+          {/* Two lines, one per input. The long one wrapped to three lines on a
+              phone and ran into the device, and half of it named gestures a
+              touch screen does not have. */}
+          <span {...stylex.props(styles.hintWide)}>
+            Tap the screen to use it · Press the buttons on the frame · Drag outside to orbit · Wheel to zoom
+          </span>
+          <span {...stylex.props(styles.hintNarrow)}>Tap the screen to use it · Drag to turn</span>
         </div>
       )}
       {/* The HUD floats under the device; its padding drags the frameless window. */}
@@ -271,10 +277,14 @@ const styles = stylex.create({
     color: dim,
     fontSize: { default: typeScale.footnote, '@media (max-width: 600px)': typeScale.caption2 },
     whiteSpace: 'normal',
+    paddingLeft: 16,
+    paddingRight: 16,
     transitionProperty: 'opacity',
     transitionDuration: '0.5s'
   },
   hintHidden: { opacity: 0 },
+  hintWide: { display: { default: 'inline', '@media (max-width: 600px)': 'none' } },
+  hintNarrow: { display: { default: 'none', '@media (max-width: 600px)': 'inline' } },
 
   // Liquid glass, the quiet kind: a blurred, smoked body, a 1px hairline, one
   // highlight along the top edge and a faint inner glow where the edge would

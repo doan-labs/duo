@@ -1,8 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
+import { type ReactNode, useEffect } from 'react'
 import { Footer } from '../footer'
 import { Button, Eyebrow } from '../layout'
+import { CURVE } from '../motion'
 import { Nav } from '../nav'
 import { SmoothScroll } from '../smooth-scroll'
 import { BOOT } from '../theme'
@@ -53,7 +55,13 @@ export const Route = createRootRoute({
         content: 'Hold it. Fold it. Build apps for a working browser simulator of Apple’s iPhone Duo.'
       },
       { name: 'twitter:image', content: OG_IMAGE }
-    ]
+    ],
+    // The saved theme, painted before anything else renders. It goes through
+    // the router's head rather than a `<script>` written into `<Document>`:
+    // React refuses to create a script element on the client and logs about it
+    // on every load, while the router's own head script renders on the server,
+    // hydrates against that markup, and then steps aside.
+    scripts: [{ children: BOOT }]
   }),
   component: Root,
   notFoundComponent: NotFound
@@ -69,16 +77,16 @@ function Root() {
       {workspace ? (
         <>
           <Nav />
-          <main>
+          <Page>
             <Outlet />
-          </main>
+          </Page>
         </>
       ) : (
         <SmoothScroll>
           <Nav />
-          <main>
+          <Page>
             <Outlet />
-          </main>
+          </Page>
           <Footer />
         </SmoothScroll>
       )}
@@ -86,13 +94,52 @@ function Root() {
   )
 }
 
+// Module scope, not a ref: it means "the client has painted once", and it has
+// to survive the remount that moving in or out of the workspace layout causes.
+// The server never runs the effect, so server renders never fade.
+let painted = false
+
+/**
+ * Route changes fade instead of cutting. Two deliberate limits:
+ *
+ * Opacity only. A transform on `<main>` would make it the containing block for
+ * every fixed child and would shift the sticky scroll scenes and the
+ * `getBoundingClientRect` reads that drive them. A fade touches none of that.
+ *
+ * Keyed on the first path segment, not the whole path. Sections such as `/docs`
+ * own a `layoutId` indicator in their sidebar; re-keying on every sub-page
+ * would remount it and the indicator would jump instead of slide. Moving
+ * inside a section swaps the body under a mounted sidebar; only leaving the
+ * section fades. The nav's own indicator sits outside `<main>`, untouched.
+ *
+ * There is no exit half, so two pages can never be on screen at once and a
+ * fast run of clicks cannot queue up a backlog: each arrival is a fresh
+ * element starting from zero, and the one before it is already gone.
+ */
+function Page({ children }: { children: ReactNode }) {
+  const section = useRouterState({ select: (state) => state.location.pathname.split('/')[1] ?? '' })
+  const still = useReducedMotion()
+  useEffect(() => {
+    painted = true
+  }, [])
+  const fade = painted && !still
+  return (
+    <motion.main
+      key={section}
+      initial={fade ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: CURVE }}
+    >
+      {children}
+    </motion.main>
+  )
+}
+
 function Document({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* First in <head>: paints the saved theme before anything else renders. */}
-        {/** biome-ignore lint/security/noDangerouslySetInnerHtml: the boot snippet is a build-time constant. */}
-        <script dangerouslySetInnerHTML={{ __html: BOOT }} />
+        {/* Carries the theme boot script too; see the route's `head`. */}
         <HeadContent />
       </head>
       <body {...stylex.props(styles.body)}>

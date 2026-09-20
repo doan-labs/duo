@@ -1,6 +1,7 @@
 // The kit's only viewport: what it is, one line to install it, and every
-// component drifting past as the real thing. Hovering stops the strip, so a
-// visitor can press what caught their eye before following it to the reference.
+// component drifting past as the real thing. Nothing on the page says the strip
+// can be held still and pressed; hovering does it, and the card lifting under
+// the pointer is the whole of the instruction.
 import * as stylex from '@stylexjs/stylex'
 import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
@@ -9,15 +10,21 @@ import { versions } from '../generated/api'
 import { KitFrame } from '../kit-preview'
 import { Button } from '../layout'
 import { useNarrow } from '../media'
-import { color, font, radius } from '../tokens.stylex'
+import { CURVE, TAP } from '../motion'
+import { color, ease, font, radius } from '../tokens.stylex'
 import { counts, kit, live, summary } from './data'
 
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
 const REDUCE = '@media (prefers-reduced-motion: reduce)'
-const CURVE = [0.22, 1, 0.36, 1] as const
 
 const INSTALL = 'bun add @doan-labs/duo-uikit'
+
+// Reduced motion cuts the duration, never the `initial` pose. `useReducedMotion()`
+// is null on the server and a boolean on the client, so gating `initial` on it
+// renders opacity 0 into the HTML and opacity 1 into the hydration, which fails the
+// whole tree for exactly the readers least able to absorb a re-render.
+const NONE = { duration: 0 }
 
 const STATS = [
   `${counts.components} components`,
@@ -28,12 +35,12 @@ const STATS = [
 ]
 
 export function KitHero() {
-  const still = useReducedMotion()
+  const still = useReducedMotion() ?? false
   const narrow = useNarrow()
   const rise = (i: number) => ({
-    initial: still ? false : { opacity: 0, y: 16 },
+    initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.8, delay: 0.1 + i * 0.08, ease: CURVE }
+    transition: still ? NONE : { duration: 0.8, delay: 0.1 + i * 0.08, ease: CURVE }
   })
   return (
     <section {...stylex.props(styles.hero)} aria-labelledby="kit-title">
@@ -52,14 +59,17 @@ export function KitHero() {
         </motion.p>
         <motion.div {...stylex.props(styles.actions)} {...rise(3)}>
           <Button to="/kit/docs">See all components</Button>
+          <Button to="/guidelines" outline>
+            Human Interface Guidelines
+          </Button>
           <Install />
         </motion.div>
       </div>
       <motion.div
         {...stylex.props(styles.strip)}
-        initial={still ? false : { opacity: 0 }}
+        initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 0.45, ease: CURVE }}
+        transition={still ? NONE : { duration: 1, delay: 0.45, ease: CURVE }}
       >
         {/* Two identical runs: the track slides exactly one run, then repeats.
             Narrow screens scroll the strip by hand, so one run is the whole of it. */}
@@ -69,14 +79,17 @@ export function KitHero() {
         </div>
       </motion.div>
       <div {...stylex.props(styles.inner)}>
-        <p {...stylex.props(styles.hint)}>
-          Hover to hold the strip still. Every card is live: press a button, flip a switch, push a page.
-        </p>
         <ul {...stylex.props(styles.stats)}>
-          {STATS.map((s) => (
-            <li key={s} {...stylex.props(styles.stat)}>
+          {STATS.map((s, i) => (
+            <motion.li
+              key={s}
+              {...stylex.props(styles.stat)}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={still ? NONE : { duration: 0.5, delay: 0.6 + i * 0.05, ease: CURVE }}
+            >
               {s}
-            </li>
+            </motion.li>
           ))}
         </ul>
       </div>
@@ -107,23 +120,41 @@ function Run({ copy = false }: { copy?: boolean }) {
   )
 }
 
-/** The install line, copied on click. */
+/**
+ * The install line, copied on click. The confirmation is the whole control
+ * answering, not one word swapping: the tag turns green and takes a beat, and
+ * the line it copied stays on screen to be checked against the clipboard.
+ */
 function Install() {
+  const still = useReducedMotion() ?? false
   const [copied, setCopied] = useState(false)
   return (
-    <button
+    <motion.button
       type="button"
-      {...stylex.props(styles.install)}
+      // Stated, not left to motion: it writes `tabIndex` into the HTML for any
+      // element carrying a gesture prop, so a `whileTap` that disappears under
+      // reduced motion would take the attribute with it and break hydration.
+      tabIndex={0}
+      {...stylex.props(styles.install, copied && styles.installDone)}
+      whileTap={{ scale: still ? 1 : TAP }}
       onClick={() => {
         navigator.clipboard?.writeText(INSTALL)
         setCopied(true)
-        setTimeout(() => setCopied(false), 1600)
+        setTimeout(() => setCopied(false), 1800)
       }}
     >
       <span {...stylex.props(styles.prompt)}>$</span>
       <code {...stylex.props(styles.cmd)}>{INSTALL}</code>
-      <span {...stylex.props(styles.copyTag)}>{copied ? 'Copied' : 'Copy'}</span>
-    </button>
+      <motion.span
+        {...stylex.props(styles.copyTag, copied && styles.copyTagDone)}
+        aria-live="polite"
+        initial={false}
+        animate={{ scale: copied && !still ? [1, 1.16, 1] : 1 }}
+        transition={still ? NONE : { duration: 0.4, ease: CURVE }}
+      >
+        {copied ? 'Copied ✓' : 'Copy'}
+      </motion.span>
+    </motion.button>
   )
 }
 
@@ -186,31 +217,59 @@ const styles = stylex.create({
     borderStyle: 'solid',
     borderColor: { default: color.border, ':hover': color.borderStrong },
     backgroundColor: color.surface,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '3px',
+    transitionProperty: 'border-color, background-color',
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out
   },
+  installDone: { borderColor: color.green, backgroundColor: color.greenBg },
   prompt: { fontFamily: font.mono, fontSize: '13px', color: color.text3 },
   cmd: { fontFamily: font.mono, fontSize: '13px', color: color.text },
+  // A fixed width: the row must not reflow around the word that changes.
   copyTag: {
     fontFamily: font.mono,
     fontSize: '11px',
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
+    minWidth: '86px',
+    textAlign: 'center',
     paddingTop: '5px',
     paddingBottom: '5px',
     paddingLeft: '9px',
     paddingRight: '9px',
     borderRadius: radius.pill,
     backgroundColor: color.accentSoft,
-    color: color.accent
+    color: color.accent,
+    transitionProperty: 'background-color, color',
+    transitionDuration: '0.25s',
+    transitionTimingFunction: ease.out
   },
+  copyTagDone: { backgroundColor: color.greenBg, color: color.green },
   // Full bleed: the strip runs off both edges of the page and fades out there.
   // Where the drift is off there is nothing to hover, so the strip becomes a
   // plain scroller the visitor pushes themselves.
   strip: {
-    marginTop: { default: '72px', [SMALL]: '48px' },
+    marginTop: { default: '62px', [SMALL]: '38px' },
+    // Room for the lift and the shadow a hovered card grows. It is not
+    // decoration: `overflow-x: auto` below takes `overflow-y` off `visible` by
+    // the spec's own rule, and a card flush with that edge had its top three
+    // pixels cut off the moment the pointer picked it up, with no scrollbar to
+    // say so. The margin above is shortened by the same amount.
+    paddingTop: '10px',
+    paddingBottom: '10px',
     overflowX: { default: 'visible', [SMALL]: 'auto', [REDUCE]: 'auto' },
+    // Where the strip is pushed by hand, the push stops at its own ends rather
+    // than becoming the browser's back gesture.
+    overscrollBehaviorX: 'contain',
+    // Three stops rather than two: a straight ramp reads as a grey wash over the
+    // cards, and the cards should look like they are leaving, not fading.
     maskImage: {
-      default: 'linear-gradient(to right, transparent, #000 120px, #000 calc(100% - 120px), transparent)',
+      default:
+        'linear-gradient(to right, transparent 0, rgba(0,0,0,0.35) 44px, #000 156px, #000 calc(100% - 156px), rgba(0,0,0,0.35) calc(100% - 44px), transparent 100%)',
       [SMALL]: 'none'
     }
   },
@@ -237,8 +296,13 @@ const styles = stylex.create({
     borderStyle: 'solid',
     borderColor: { default: color.border, ':hover': color.borderStrong },
     backgroundColor: color.surface,
-    transitionProperty: 'border-color',
-    transitionDuration: '0.2s'
+    // The strip is already still under the pointer; the card under it lifts so
+    // the one that will answer a press is obvious before the press.
+    transform: { default: 'translateY(0)', ':hover': 'translateY(-3px)' },
+    boxShadow: { default: 'none', ':hover': color.shadow },
+    transitionProperty: 'border-color, box-shadow, transform',
+    transitionDuration: { default: '0.24s', [REDUCE]: '0s' },
+    transitionTimingFunction: ease.out
   },
   head: { maxWidth: '387px' },
   name: {
@@ -260,20 +324,13 @@ const styles = stylex.create({
     WebkitLineClamp: 1,
     overflow: 'hidden'
   },
-  hint: {
-    marginTop: { default: '32px', [SMALL]: '24px' },
-    marginBottom: 0,
-    fontFamily: font.mono,
-    fontSize: '12px',
-    color: color.text3
-  },
   stats: {
     listStyleType: 'none',
     display: 'flex',
     flexWrap: 'wrap',
     gap: '10px',
     margin: 0,
-    marginTop: '28px',
+    marginTop: { default: '56px', [SMALL]: '40px' },
     padding: 0,
     paddingTop: '24px',
     borderTopWidth: '1px',

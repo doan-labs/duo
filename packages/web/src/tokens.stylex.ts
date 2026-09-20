@@ -22,6 +22,16 @@ export const color = stylex.defineVars({
   accentSoft: { default: 'rgba(90,90,214,0.10)', [DARK]: 'rgba(143,143,255,0.14)' },
   onAccent: { default: '#ffffff', [DARK]: '#0b0b0a' },
   navBg: { default: 'rgba(250,249,246,0.72)', [DARK]: 'rgba(11,11,10,0.72)' },
+  /** Focus ring: the accent, soft enough to sit outside a control without shouting. */
+  ring: { default: 'rgba(90,90,214,0.45)', [DARK]: 'rgba(143,143,255,0.5)' },
+  /** Behind a sheet or a menu. Black in both themes: a light veil under a light sheet reads as fog, not depth. */
+  scrim: { default: 'rgba(20,20,19,0.28)', [DARK]: 'rgba(0,0,0,0.5)' },
+  /** The moving pill in a segmented control. It has to lift off `well` in both themes, so it is not `surface`. */
+  thumb: { default: '#ffffff', [DARK]: '#33332f' },
+  thumbShadow: {
+    default: '0 1px 2px rgba(20,20,19,0.10), 0 2px 8px rgba(20,20,19,0.06)',
+    [DARK]: '0 1px 2px rgba(0,0,0,0.5)'
+  },
   shadow: {
     default: '0 1px 2px rgba(20,20,19,0.06), 0 12px 40px rgba(20,20,19,0.10)',
     [DARK]: '0 1px 2px rgba(0,0,0,0.4), 0 12px 40px rgba(0,0,0,0.5)'
@@ -41,8 +51,11 @@ export const color = stylex.defineVars({
   synTag: { default: '#1a5fb4', [DARK]: '#7fb8ff' },
   synFn: { default: '#5b3fbf', [DARK]: '#a8a8ff' },
   synProp: { default: '#3b5b7a', [DARK]: '#9fc5e8' },
-  synPunct: { default: '#8a897f', [DARK]: '#7c7b73' },
-  synCmt: { default: '#8a897f', [DARK]: '#7c7b73' }
+  // Punctuation and comments are the quietest ink in a code block, but they were
+  // the only two tokens under the 4.5:1 floor (3.52:1 light, 4.33:1 dark measured
+  // on the live page). These sit beside the line numbers at 5.2 and 5.5:1.
+  synPunct: { default: '#6e6d64', [DARK]: '#8d8c83' },
+  synCmt: { default: '#6e6d64', [DARK]: '#8d8c83' }
 })
 
 /** Explicit overrides when the visitor picks a theme; each flattens the media query away. */
@@ -60,6 +73,10 @@ export const light = stylex.createTheme(color, {
   accentSoft: 'rgba(90,90,214,0.10)',
   onAccent: '#ffffff',
   navBg: 'rgba(250,249,246,0.72)',
+  ring: 'rgba(90,90,214,0.45)',
+  scrim: 'rgba(20,20,19,0.28)',
+  thumb: '#ffffff',
+  thumbShadow: '0 1px 2px rgba(20,20,19,0.10), 0 2px 8px rgba(20,20,19,0.06)',
   shadow: '0 1px 2px rgba(20,20,19,0.06), 0 12px 40px rgba(20,20,19,0.10)',
   green: '#1f7a3f',
   greenBg: 'rgba(31,122,63,0.10)',
@@ -75,8 +92,8 @@ export const light = stylex.createTheme(color, {
   synTag: '#1a5fb4',
   synFn: '#5b3fbf',
   synProp: '#3b5b7a',
-  synPunct: '#8a897f',
-  synCmt: '#8a897f'
+  synPunct: '#6e6d64',
+  synCmt: '#6e6d64'
 })
 
 export const dark = stylex.createTheme(color, {
@@ -93,6 +110,10 @@ export const dark = stylex.createTheme(color, {
   accentSoft: 'rgba(143,143,255,0.14)',
   onAccent: '#0b0b0a',
   navBg: 'rgba(11,11,10,0.72)',
+  ring: 'rgba(143,143,255,0.5)',
+  scrim: 'rgba(0,0,0,0.5)',
+  thumb: '#33332f',
+  thumbShadow: '0 1px 2px rgba(0,0,0,0.5)',
   shadow: '0 1px 2px rgba(0,0,0,0.4), 0 12px 40px rgba(0,0,0,0.5)',
   green: '#5ecf84',
   greenBg: 'rgba(94,207,132,0.12)',
@@ -108,8 +129,8 @@ export const dark = stylex.createTheme(color, {
   synTag: '#7fb8ff',
   synFn: '#a8a8ff',
   synProp: '#9fc5e8',
-  synPunct: '#7c7b73',
-  synCmt: '#7c7b73'
+  synPunct: '#8d8c83',
+  synCmt: '#8d8c83'
 })
 
 export const font = stylex.defineVars({

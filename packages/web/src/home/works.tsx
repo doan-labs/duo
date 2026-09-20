@@ -7,8 +7,8 @@ import { type MotionValue, motion, useMotionValueEvent, useReducedMotion, useScr
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useMedia } from '../media'
 import { type Cue, Simulator } from '../simulator'
-import { color, font } from '../tokens.stylex'
-import { Block, Cap, Headline, Lede } from './parts'
+import { color, ease, font, radius } from '../tokens.stylex'
+import { Block, Cap, Headline, Lede, Rise, Stagger } from './parts'
 
 const RAD = Math.PI / 180
 const MID = '@media (max-width: 1068px)'
@@ -86,7 +86,13 @@ const CAM_SAYS: Record<Cam, string> = {
 }
 
 export function Works() {
-  const still = useReducedMotion()
+  const still = useReducedMotion() ?? false
+  // This branch swaps the whole section, not a few props, so it has to wait for
+  // the client to settle. The server cannot read the media query and always
+  // renders the scroll scene; switching during hydration would hand React a
+  // different tree and it would throw away the markup and start over.
+  const [settled, setSettled] = useState(false)
+  useEffect(() => setSettled(true), [])
   const stacked = useMedia('(max-width: 1068px)')
   const ref = useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] })
@@ -138,7 +144,7 @@ export function Works() {
   const crossed = RIGHT.has(step) && step < FULL && !stacked
   const full = step >= FULL && !stacked
 
-  if (still) {
+  if (still && settled) {
     return (
       <Block labelledBy="works-title">
         <Intro />
@@ -189,13 +195,19 @@ export function Works() {
 
 function Intro() {
   return (
-    <>
-      <Cap>01 · Not a mockup</Cap>
-      <Headline id="works-title" lines={['It looks like a concept.', 'It behaves like a device.']} />
-      <Lede>
-        Every pose, button and gesture below is the shell itself, driven by the same code the desktop app runs.
-      </Lede>
-    </>
+    <Stagger gap={0.09} amount={0.4}>
+      <Rise>
+        <Cap>01 · Not a mockup</Cap>
+      </Rise>
+      <Rise>
+        <Headline id="works-title" lines={['It looks like a concept.', 'It behaves like a device.']} />
+      </Rise>
+      <Rise>
+        <Lede>
+          Every pose, button and gesture below is the shell itself, driven by the same code the desktop app runs.
+        </Lede>
+      </Rise>
+    </Stagger>
   )
 }
 
@@ -317,11 +329,17 @@ const styles = stylex.create({
   captionsLeft: { gridColumn: 1 },
   captionsTop: { gridColumn: 1, gridRow: 1, minHeight: '220px' },
   slide: { position: 'absolute', insetInlineStart: 0, top: 0, maxWidth: '520px' },
+  // Centred by pinning both edges and letting the auto margins share what is
+  // left. The old fixed width plus a -380 px margin was measured against the
+  // full-width row, so on every earlier step, where this slide is parked
+  // invisibly inside the half-width column, it hung 56 px past the page and put
+  // a horizontal scrollbar under the whole site.
   slideCentre: {
-    insetInlineStart: '50%',
-    width: '760px',
+    insetInlineEnd: 0,
+    width: 'auto',
     maxWidth: '760px',
-    marginInlineStart: '-380px',
+    marginInlineStart: 'auto',
+    marginInlineEnd: 'auto',
     textAlign: 'center'
   },
   cap: {
@@ -365,7 +383,7 @@ const styles = stylex.create({
   button: {
     appearance: 'none',
     borderWidth: 0,
-    borderRadius: '999px',
+    borderRadius: radius.pill,
     paddingTop: '10px',
     paddingBottom: '10px',
     paddingLeft: '18px',
@@ -376,7 +394,17 @@ const styles = stylex.create({
     color: color.bg,
     backgroundColor: color.text,
     cursor: { default: 'pointer', ':disabled': 'default' },
-    opacity: { default: 1, ':hover': 0.85, ':disabled': 1 },
+    opacity: { default: 1, ':hover': 0.88, ':disabled': 1 },
+    // `:disabled` comes last: a disabled button still matches `:hover`, and it
+    // should not lean toward a press it cannot accept.
+    transform: { default: 'scale(1)', ':hover': 'scale(1.02)', ':active': 'scale(0.97)', ':disabled': 'scale(1)' },
+    outlineWidth: '2px',
+    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
+    outlineColor: color.ring,
+    outlineOffset: '3px',
+    transitionProperty: 'transform, opacity, background-color, color',
+    transitionDuration: { default: '0.24s', ':active': '0.07s' },
+    transitionTimingFunction: ease.out,
     display: 'inline-flex',
     alignItems: 'center',
     gap: '8px'
