@@ -13,10 +13,21 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
-/** The sheet's own rule, a third of the weight of the UIKit separator: seven of these cross every week. */
-const RULE = { borderStyle: 'solid', borderColor: appAppearance.calendarGrid } as const
+/**
+ * The sheet's own rule, a third of the weight of the UIKit separator: seven of
+ * these cross every week.
+ *
+ * The four zeroes are load-bearing. `border-style: solid` on its own gives every
+ * side CSS's initial `border-width`, which is `medium` and computes to 3px: a
+ * side collapses to nothing only when its *style* is `none`. So a cell asking
+ * for one hairline down its left drew three fat ones on its other edges, and a
+ * week boundary came out as the cell's 3px bottom, a 2px gap and the next week's
+ * top: a double line. Spread this first, then name the one side that gets a width.
+ */
+const ZERO = { borderTopWidth: 0, borderRightWidth: 0, borderBottomWidth: 0, borderLeftWidth: 0 } as const
+const RULE = { borderStyle: 'solid', borderColor: appAppearance.calendarGrid, ...ZERO } as const
 /** The chrome around the sheet: the sidebar's edge, where a real separator belongs. */
-const EDGE = { borderStyle: 'solid', borderColor: app.separator } as const
+const EDGE = { borderStyle: 'solid', borderColor: app.separator, ...ZERO } as const
 
 // Paging a calendar moves the sheet the way you asked it to, so back and forward
 // come in from the side they point at and a new view rises into place.
@@ -58,8 +69,8 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: appAppearance.calendarSidebar,
-    borderRightWidth: 1,
     ...EDGE,
+    borderRightWidth: 1,
     animationName: slideIn,
     animationDuration: '.28s',
     animationTimingFunction: easing.pop
@@ -251,8 +262,8 @@ export const styles = stylex.create({
     gridTemplateRows: 'auto 1fr',
     rowGap: 1,
     paddingTop: 2,
-    borderTopWidth: 1,
-    ...RULE
+    ...RULE,
+    borderTopWidth: 1
   },
   /**
    * A lane is one line of caption text, never a share of the week: the events
@@ -279,7 +290,7 @@ export const styles = stylex.create({
     cursor: 'default'
   },
   /** The rule down a day's left edge. The Mac sheet is ruled both ways; the phone's is not. */
-  rule: { borderLeftWidth: 1, ...RULE },
+  rule: { ...RULE, borderLeftWidth: 1 },
   weekend: { backgroundColor: appAppearance.calendarWeekend },
   /** macOS lifts the whole picked day, not just its number. */
   cellPicked: { backgroundColor: app.fill },
@@ -353,7 +364,7 @@ export const styles = stylex.create({
   },
   dot: { width: 5, height: 5, borderRadius: radius.circle, flexShrink: 0 },
   // Day and Week
-  tgHead: { display: 'grid', flexShrink: 0, borderBottomWidth: 1, ...RULE },
+  tgHead: { display: 'grid', flexShrink: 0, ...RULE, borderBottomWidth: 1 },
   tgDay: {
     gridRow: 1,
     display: 'flex',
@@ -362,9 +373,9 @@ export const styles = stylex.create({
     gap: 6,
     paddingTop: 2,
     paddingBottom: 5,
+    ...RULE,
     borderLeftWidth: 1,
-    borderBottomWidth: 1,
-    ...RULE
+    borderBottomWidth: 1
   },
   tgNum: {
     minWidth: 22,
@@ -379,7 +390,7 @@ export const styles = stylex.create({
     transitionTimingFunction: easing.pop
   },
   /** The gutter above the hours: no rule, so the head's hairline starts at the first day. */
-  tgGutter: { gridRow: 1, gridColumn: 1, borderBottomWidth: 1, ...RULE },
+  tgGutter: { gridRow: 1, gridColumn: 1, ...RULE, borderBottomWidth: 1 },
   allDayLabel: {
     gridRow: 2,
     gridColumn: 1,
@@ -390,7 +401,7 @@ export const styles = stylex.create({
     paddingRight: 6
   },
   /** The empty day behind the all-day lanes, there to carry the column rule and the weekend wash. */
-  allDayCell: { gridRow: 2, borderLeftWidth: 1, ...RULE },
+  allDayCell: { gridRow: 2, ...RULE, borderLeftWidth: 1 },
   allDay: {
     gridRow: 2,
     display: 'grid',
@@ -414,8 +425,8 @@ export const styles = stylex.create({
   },
   col: {
     position: 'relative',
-    borderLeftWidth: 1,
     ...RULE,
+    borderLeftWidth: 1,
     backgroundImage: appAppearance.calendarHourLines,
     backgroundSize: '100% 44px',
     cursor: 'default'
