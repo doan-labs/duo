@@ -228,34 +228,21 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption1,
     color: app.label2
   },
+  // The kit's `Menu` is the sheet itself; what is left here is where it sits,
+  // the glass it wears and the separators between Safari's rows.
   moreMenu: {
     position: 'absolute',
     top: 12,
     right: 12,
     zIndex: 4,
-    display: 'flex',
-    flexDirection: 'column',
     minWidth: 150,
-    overflow: 'hidden',
-    borderRadius: radius.lg,
-    backgroundColor: appAppearance.safariMenu,
-    boxShadow: shadow.float,
-    backdropFilter: glass.blur,
-    WebkitBackdropFilter: glass.blur
+    backgroundColor: appAppearance.safariMenu
   },
   moreItem: {
-    paddingTop: 11,
-    paddingRight: 14,
-    paddingBottom: 11,
-    paddingLeft: 14,
     borderBottomWidth: { default: 1, ':last-child': 0 },
     borderBottomStyle: 'solid',
     borderBottomColor: app.separator,
-    textAlign: 'left',
-    color: colors.black,
-    transform: { default: 'scale(1)', ':active': 'scale(.97)' },
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.2s'
+    color: colors.black
   },
   bookmarkEmpty: {
     display: 'flex',
@@ -274,22 +261,7 @@ export const styles = stylex.create({
   // A transparent scrim over the page takes the tap that dismisses it — the page
   // is a cross-origin frame and never reports a click of its own.
   pageScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
-  pageMenu: {
-    display: 'flex',
-    flexDirection: 'column',
-    marginRight: 12,
-    marginBottom: 6,
-    marginLeft: 12,
-    overflow: 'hidden',
-    borderRadius: radius.lg,
-    backgroundColor: appAppearance.safariMenu,
-    boxShadow: shadow.float,
-    backdropFilter: glass.blur,
-    WebkitBackdropFilter: glass.blur,
-    pointerEvents: 'auto'
-  },
-  pageMenuItem: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  pageMenuGone: { pointerEvents: 'none' },
+  pageMenu: { marginRight: 12, marginBottom: 6, marginLeft: 12, backgroundColor: appAppearance.safariMenu },
   // No toolbar under it on the cover, so the pill clears the home indicator itself.
   footRail: { paddingBottom: 16 },
   url: {

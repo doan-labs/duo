@@ -587,24 +587,19 @@ export const styles = stylex.create({
     margin: 0
   },
   menuWrap: { position: 'relative' },
+  // Where the kit's `Menu` hangs off the title row, and the night glass it wears;
+  // the sheet, the tick and the float in and out are the kit's.
   menu: {
     position: 'absolute',
     right: 0,
     top: 42,
-    zIndex: 3,
     minWidth: 190,
     padding: 6,
     borderRadius: radius.xl,
     backgroundColor: appAppearance.weatherMenu,
-    backdropFilter: glass.blur,
-    WebkitBackdropFilter: glass.blur,
     boxShadow: `${appAppearance.weatherCardRim},${shadow.float}`
   },
   menuItem: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
     gap: 12,
     paddingBlock: 9,
     paddingInline: 10,
@@ -613,8 +608,6 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     lineHeight: leading.subheadline,
     letterSpacing: tracking.subheadline,
-    textAlign: 'left',
-    cursor: 'pointer',
     backgroundColor: { default: 'transparent', ':hover': appAppearance.weatherControl }
   },
   searchBox: { position: 'relative', marginBottom: 12 },

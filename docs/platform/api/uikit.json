@@ -1,6 +1,6 @@
 {
   "package": "@doan-labs/duo-uikit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "components": [
     {
       "name": "Button",
@@ -61,6 +61,12 @@
       "description": "Semantic list. Use Row as=\"li\" for direct children, or place Sections inside list items.",
       "props": "type ListProps<T extends ElementType = 'ul'> = PrimitiveProps<T>",
       "source": "packages/uikit/list.tsx"
+    },
+    {
+      "name": "Menu",
+      "description": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.",
+      "props": "type MenuProps = Omit<PrimitiveProps<'div'>, 'children' | 'as'> & {\n  open: boolean\n  onClose: () => void\n  items: MenuItem[]\n  /** Row glyph size; a menu set in a smaller type step wants a smaller one. */\n  size?: number\n  itemStyle?: KitStyle\n}",
+      "source": "packages/uikit/menu.tsx"
     },
     {
       "name": "NavigationLink",

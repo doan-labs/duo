@@ -12,6 +12,7 @@ const components = [
   'h-stack',
   'large-title',
   'list',
+  'menu',
   'navigation-link',
   'placeholder',
   'row',

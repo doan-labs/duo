@@ -1151,3 +1151,31 @@ something into the kit is a second consumer that already exists, which is why th
 calendar's date helpers, its lane packer and its sidebar chrome stayed in the app:
 one caller each, and a sidebar whose width, ground and border differ per app is
 four lines of flex pretending to be a component.
+
+## 81. The pop-up menu is the kit's, not each app's
+
+2026-09-20. Four menus had been written by hand — Safari's page actions and its
+bookmarks overflow, Maps' map type, Weather's units — and each was the same
+sheet: absolutely placed glass, `shadow.float`, a column of rows with a glyph on
+the trailing edge. Only Safari's knew how to leave. `Menu` in the kit is now the
+control: it owns `role="menu"`, the radio row and its tick, staying mounted
+through `floatOut` and going dead to the pointer while it sinks. `MenuItem` is
+`label`, `icon`, `checked`, `disabled`, `name` and `onSelect`; nothing about
+where the sheet is.
+
+Placement and tint stay with the app, through `xstyle` on the sheet and
+`itemStyle` on a row, because a menu over a map wants a near-opaque white at a
+corner of the map's chrome and one over a night sky wants dark glass under a
+title. That is the same split the kit already uses for `Button` and `Toggle`:
+the kit carries the control, the app carries where it sits. The alternative, an
+`anchor` prop enumerating corners, would have had to grow a case for Safari's,
+which is not anchored to anything — it stacks above the address bar in the
+floating toolbar's own flow.
+
+The sheet draws no scrim. Safari needs one because its page is a cross-origin
+frame that never reports a click, Maps closes on the map's own pointer handler,
+and Weather's list closes on its rows; a scrim in the kit would have been right
+for one of the three and in the way of the other two. Cost: a new menu has to
+decide for itself what dismisses it, and Maps and Weather changed appearance
+slightly: both gained the exit they never had, and Weather's typed `✓` is now
+the same `app.link` tick Maps was already drawing.

@@ -1,4 +1,4 @@
-import { Screen, usePresence } from '@doan-labs/duo-uikit'
+import { Menu, type MenuItem, Screen, usePresence } from '@doan-labs/duo-uikit'
 // A real browser in an iframe. Sites that refuse to be framed show blank; the
 // bookmarks are ones that don't.
 
@@ -45,7 +45,6 @@ export const Safari = ({ os }: { os: Os }) => {
   const [pageMenu, setPageMenu] = useState(false)
   const [urlCompact, setUrlCompact] = useState(false)
   const bookmarkPage = usePresence(bookmarks)
-  const menu = usePresence(pageMenu)
   const cards = usePresence(grid)
   const t = tabs[cur]!
   const url = at(t)
@@ -139,12 +138,12 @@ export const Safari = ({ os }: { os: Os }) => {
   // Safari's page menu. Text size, Find on Page and Request Desktop Site are the
   // rest of Apple's list and none of them can reach into a cross-origin frame, so
   // the menu holds what the shell can actually carry out.
-  const actions: [SymProps['name'], string, () => void][] = [
-    ['reload', 'Reload Page', reload],
-    ['share', 'Copy Link', () => url && navigator.clipboard?.writeText(url)],
-    ['bookOutline', 'Bookmarks', () => setBookmarks(true)],
-    ['plus', 'New Tab', open],
-    ['eye', 'Hide Toolbar', () => setUrlCompact(true)]
+  const actions: MenuItem[] = [
+    { icon: 'reload', label: 'Reload Page', onSelect: reload },
+    { icon: 'share', label: 'Copy Link', onSelect: () => url && navigator.clipboard?.writeText(url) },
+    { icon: 'bookOutline', label: 'Bookmarks', onSelect: () => setBookmarks(true) },
+    { icon: 'plus', label: 'New Tab', onSelect: open },
+    { icon: 'eye', label: 'Hide Toolbar', onSelect: () => setUrlCompact(true) }
   ]
   // The cover's camera column: Apple runs Safari's buttons down beside the status
   // stack there, and the page keeps the rest. The row bar is the inner display's.
@@ -212,15 +211,17 @@ export const Safari = ({ os }: { os: Os }) => {
               })}
             </div>
           )}
-          {moreOpen && bookmarks && (
-            <div {...stylex.props(styles.moreMenu)}>
-              <button type="button" {...stylex.props(styles.moreItem)} onClick={open}>
-                New Tab
-              </button>
-              <button type="button" {...stylex.props(styles.moreItem)} onClick={() => setBookmarks(false)}>
-                Close Bookmarks
-              </button>
-            </div>
+          {bookmarks && (
+            <Menu
+              open={moreOpen}
+              onClose={() => setMoreOpen(false)}
+              xstyle={styles.moreMenu}
+              itemStyle={styles.moreItem}
+              items={[
+                { label: 'New Tab', onSelect: open },
+                { label: 'Close Bookmarks', onSelect: () => setBookmarks(false) }
+              ]}
+            />
           )}
         </div>
         {pageMenu && (
@@ -233,32 +234,14 @@ export const Safari = ({ os }: { os: Os }) => {
         )}
         {!bookmarks && (
           <div {...stylex.props(styles.foot, rail && styles.footRail)}>
-            {menu.mounted && (
-              <div
-                {...stylex.props(
-                  styles.pageMenu,
-                  menu.closing ? animations.floatOut : animations.float,
-                  // It is still on screen while it sinks; a tap through it now
-                  // was meant for the page under it.
-                  menu.closing && styles.pageMenuGone
-                )}
-              >
-                {actions.map(([icon, label, run]) => (
-                  <button
-                    type="button"
-                    key={label}
-                    {...stylex.props(styles.moreItem, styles.pageMenuItem)}
-                    onClick={() => {
-                      setPageMenu(false)
-                      run()
-                    }}
-                  >
-                    {label}
-                    <Sym name={icon} size={18} />
-                  </button>
-                ))}
-              </div>
-            )}
+            <Menu
+              open={pageMenu}
+              onClose={() => setPageMenu(false)}
+              size={18}
+              xstyle={styles.pageMenu}
+              itemStyle={styles.moreItem}
+              items={actions}
+            />
             <div {...stylex.props(styles.url, urlCompact && styles.urlCompact)}>
               <button
                 type="button"
