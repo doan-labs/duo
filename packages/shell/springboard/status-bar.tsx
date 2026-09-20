@@ -49,17 +49,24 @@ const Time = () => <span>{clock(useNow())}</span>
  * `covered` means an app occupies the top-right corner, so the hole and the
  * radios get out of its way. `cc` is Control Center open: iOS spells the status
  * out while it is, so the time gives way to the charge and the network.
+ *
+ * `open` is what the two shortcuts here call — the time opens the Clock and the
+ * radio ring opens Settings at Wi-Fi, as iOS does. Left out while the screen is
+ * locked, and then the stack takes no taps at all: the lock screen's swipes run
+ * across this corner and must reach it.
  */
 export const StatusBar = ({
   wide,
   light,
   covered,
-  cc
+  cc,
+  open
 }: {
   wide: boolean
   light: boolean
   covered: boolean
   cc: boolean
+  open?: (name: string, arg?: string) => void
 }) => {
   const t = useToggles()
   return (
@@ -75,9 +82,23 @@ export const StatusBar = ({
         </>
       ) : (
         <>
-          <Time />
+          <button
+            type="button"
+            {...stylex.props(styles.tap, open && styles.tapOn)}
+            aria-label="Clock"
+            onClick={() => open?.('Clock')}
+          >
+            <Time />
+          </button>
           <div {...stylex.props(covered && shared.hide)}>
-            <Ring inner={t.wifi ? WIFI : null} dots={t.cell} />
+            <button
+              type="button"
+              {...stylex.props(styles.tap, open && styles.tapOn)}
+              aria-label="Wi‑Fi settings"
+              onClick={() => open?.('Settings', 'wifi')}
+            >
+              <Ring inner={t.wifi ? WIFI : null} dots={t.cell} />
+            </button>
             {/* iOS keeps the plane where the bars were, and the rest of the row
                 is what is switched on: lock, moon, mirror. */}
             <div {...stylex.props(styles.marks)}>
@@ -118,5 +139,16 @@ const styles = stylex.create({
   statusLight: { color: colors.black },
   hole: { width: 23, height: 23, borderRadius: radius.circle, backgroundColor: colors.black, marginBottom: 2 },
   read: { fontSize: typeScale.caption1, marginTop: -4 },
+  // The shortcuts take a tap without changing the stack's shape: the stack is
+  // dead to the pointer, and only these two opt back in.
+  tap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    transform: { default: 'scale(1)', ':active': 'scale(.9)' },
+    transitionProperty: 'transform',
+    transitionDuration: '.2s'
+  },
+  tapOn: { pointerEvents: 'auto' },
   marks: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, paddingTop: 3 }
 })

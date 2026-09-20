@@ -468,6 +468,14 @@ export const appAppearance = stylex.defineConsts({
   safariPillEdge: '0 0 0 .5px rgba(0,0,0,.06)',
   safariDot: 'rgba(255,255,255,.85)',
   safariDotShadow: '0 1px 3px rgba(0,0,0,.2)',
+  /** The floating address bar: its glass, the light along its top edge, the field inside it and the grey it compacts to. */
+  safariBar: 'rgba(255,255,255,.62)',
+  safariBarSheen: 'inset 0 1px 0 rgba(255,255,255,.55)',
+  safariBarField: 'rgba(255,255,255,.35)',
+  safariBarCompact: 'rgba(210,210,212,.88)',
+  /** The sheet a menu lands on, and the tile behind a saved link's glyph. */
+  safariMenu: 'rgba(255,255,255,.8)',
+  safariMarkTile: '#d7f0ff',
   // shortcuts
   /** The scrim that dims a shortcut tile while it runs. */
   shortcutsScrim: 'rgba(0,0,0,.45)',

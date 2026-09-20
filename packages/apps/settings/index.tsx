@@ -9,12 +9,12 @@
 // once for both, so a row is never described twice.
 
 import type { Os, SettingsHost, Switches } from '@doan-labs/duo-sdk'
-import { Nav, Page, Toggle, useWide } from '@doan-labs/duo-uikit'
+import { Nav, Page, Toggle, useNav, useWide } from '@doan-labs/duo-uikit'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { Fragment, type ReactNode, useState, useSyncExternalStore } from 'react'
+import { Fragment, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { AppsPage } from './apps.tsx'
 import { GeneralPage, SOFTWARE } from './general.tsx'
 import {
@@ -37,9 +37,14 @@ import { styles } from './styles.ts'
 export function Settings({ os, host }: { os: Os; host: SettingsHost }) {
   // The kit's default is the width iPadOS shows two columns at; the cover stays under it.
   const [root, wide] = useWide()
-  const [picked, setPicked] = useState('general')
   const groups = rootList(os, host, useSwitches(host))
-  const current = groups.flatMap((group) => group.rows).find((row) => row.id === picked)
+  const rows = groups.flatMap((group) => group.rows)
+  // `os.arg` names a destination: the status stack's radio ring asks for Wi-Fi.
+  // Unfolded that is simply what the sidebar starts on; folded, the pane has to
+  // push itself, since there is no sidebar to have selected it.
+  const deep = rows.find((row) => row.id === os.arg && row.page)
+  const [picked, setPicked] = useState(deep?.id ?? 'general')
+  const current = rows.find((row) => row.id === picked)
   return (
     <div ref={root} {...stylex.props(styles.split)}>
       {wide && <Sidebar groups={groups} current={picked} pick={setPicked} />}
@@ -55,7 +60,7 @@ export function Settings({ os, host }: { os: Os; host: SettingsHost }) {
         ) : (
           <Nav>
             <Page title="Settings">
-              <Folded groups={groups} />
+              <Folded groups={groups} open={deep} />
             </Page>
           </Nav>
         )}
@@ -160,7 +165,20 @@ function rootList(os: Os, host: SettingsHost, sw: Switches): Group[] {
 }
 
 /** The folded root: the account card, then every group as an inset section. */
-function Folded({ groups }: { groups: Group[] }) {
+function Folded({ groups, open }: { groups: Group[]; open?: Dest }) {
+  const { push } = useNav()
+  // Once only: `push` is a fresh closure on every render of the Nav above, and
+  // the pane it pushes keeps its own subscription, as a tapped row's does.
+  const pushed = useRef(false)
+  useEffect(() => {
+    if (pushed.current || !open?.page) return
+    pushed.current = true
+    push((back) => (
+      <Page title={open.label} back={back}>
+        {open.page?.()}
+      </Page>
+    ))
+  }, [open, push])
   return (
     <>
       <Section>

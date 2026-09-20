@@ -94,6 +94,12 @@ driver is privileged test inspection, not an installed-app capability.
 For scripted React range changes, use the native input value setter before dispatching
 input; direct assignment can update React's tracker without notifying its handler.
 For layout checks, finish only finite shell animations, never infinite app animations.
+Safari's URL pill is covered by a real embedded-page scroll check: select the visible Safari app,
+scroll inside `iframe[title="Page"]` down to assert the compact gray pill, then up to assert
+the expanded translucent pill. The Duo site sends the direction through its
+`duo-safari-scroll` parent message because the iframe is cross-origin. Test a second external
+site only for navigation and interaction; without the bridge, its private scroll cannot drive
+Safari chrome.
 Control Center child paths, when needed: + `[1,0,0,0,0]`, power `[1,0,0,0,1]`, rail
 `[1,0,1,i]`, grid `[1,0,0,1,0,0,0,n]` (tile child 0, minus child 1), radio
 `[1,0,0,1,0,0,0,0,0,j]`; recheck against current DOM before relying on them.

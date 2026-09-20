@@ -6,10 +6,16 @@ import type { Os } from '@doan-labs/duo-sdk'
 import { animations } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Bookmarks } from './bookmarks.tsx'
 import { styles } from './styles.ts'
 
 const HOME = 'https://duo.doan-labs.com'
+// The home page is our own site, and only our own site can run the scroll
+// bridge. In dev it is the web package's vite server, and the shell is often
+// reached through a proxy host like duo.localhost rather than localhost itself.
+const DEV_HOME = 'http://localhost:3001'
+const isDev = (h: string) => h === 'localhost' || h === '127.0.0.1' || h.endsWith('.localhost')
 const MARKS: [string, string][] = [
   ['Duo', 'duo.doan-labs.com'],
   ['Wikipedia', 'en.m.wikipedia.org'],
@@ -30,18 +36,55 @@ const at = (x: Tab) => x.hist[x.at]
 const name = (x: Tab) => (at(x) ? host(at(x)!) : 'Start Page')
 
 export const Safari = ({ os }: { os: Os }) => {
-  const [tabs, setTabs] = useState(() => [tab(os.arg ?? HOME)])
+  const home = typeof window !== 'undefined' && isDev(window.location.hostname) ? DEV_HOME : HOME
+  const [tabs, setTabs] = useState(() => [tab(os.arg ?? home)])
   const [cur, setCur] = useState(0)
   const [grid, setGrid] = useState(false)
-  const [marks, setMarks] = useState(false)
-  const strip = usePresence(marks)
+  const [bookmarks, setBookmarks] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [pageMenu, setPageMenu] = useState(false)
+  const [urlCompact, setUrlCompact] = useState(false)
+  const bookmarkPage = usePresence(bookmarks)
+  const menu = usePresence(pageMenu)
   const cards = usePresence(grid)
   const t = tabs[cur]!
   const url = at(t)
   const [text, setText] = useState(() => (url ? host(url) : ''))
+  const surface = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const field = useRef<HTMLInputElement>(null)
+  const scrollTop = useRef(0)
+  const travel = useRef(0)
   const fresh = (x: Tab) => setText(at(x) ? host(at(x)!) : '')
+  useEffect(() => {
+    const currentUrl = url
+    if (!currentUrl) return
+    const origin = new URL(currentUrl).origin
+    // One flick arrives as a stream of small deltas, and a smooth-scrolled page
+    // ends its easing with a sub-pixel bounce the other way. Flipping the pill
+    // on each of those flickers, so commit only after 24 px one way; the top of
+    // a page always shows the full bar, as Safari does.
+    const drive = (top: number) => {
+      const step = top - scrollTop.current
+      scrollTop.current = top
+      if (top < 24) {
+        travel.current = 0
+        return setUrlCompact(false)
+      }
+      travel.current = travel.current * step > 0 ? travel.current + step : step
+      if (Math.abs(travel.current) > 24) setUrlCompact(travel.current > 0)
+    }
+    const onMessage = (event: MessageEvent<{ type?: string; top?: number }>) => {
+      if (event.source !== frame.current?.contentWindow || event.origin !== origin) return
+      if (event.data?.type !== 'duo-safari-scroll' || typeof event.data.top !== 'number') return
+      drive(event.data.top)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [url])
+  useEffect(() => {
+    if (bookmarks) surface.current?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [bookmarks])
   const show = (hist: string[], at: number) => {
     setTabs(tabs.map((x, i) => (i === cur ? { ...x, hist, at } : x)))
     setText(host(hist[at]!))
@@ -56,7 +99,10 @@ export const Safari = ({ os }: { os: Os }) => {
         : `https://${v}`
     const h = [...t.hist.slice(0, t.at + 1), v]
     show(h, h.length - 1)
-    setMarks(false)
+    setBookmarks(false)
+    setMoreOpen(false)
+    setPageMenu(false)
+    setUrlCompact(false)
   }
   // Re-assigning the same src is how an iframe reloads; React would see no change.
   const reload = () => {
@@ -67,12 +113,16 @@ export const Safari = ({ os }: { os: Os }) => {
     setCur(i)
     fresh(tabs[i]!)
     setGrid(false)
+    setUrlCompact(false)
   }
   const open = () => {
     setTabs([...tabs, tab()])
     setCur(tabs.length)
     setText('')
+    setBookmarks(false)
+    setMoreOpen(false)
     setGrid(false)
+    setUrlCompact(false)
     setTimeout(() => field.current?.focus())
   }
   // Closing the last tab leaves a fresh one, as Safari does.
@@ -83,7 +133,19 @@ export const Safari = ({ os }: { os: Os }) => {
     setTabs(rest)
     setCur(n)
     fresh(rest[n]!)
+    setMoreOpen(false)
+    setUrlCompact(false)
   }
+  // Safari's page menu. Text size, Find on Page and Request Desktop Site are the
+  // rest of Apple's list and none of them can reach into a cross-origin frame, so
+  // the menu holds what the shell can actually carry out.
+  const actions: [SymProps['name'], string, () => void][] = [
+    ['reload', 'Reload Page', reload],
+    ['share', 'Copy Link', () => url && navigator.clipboard?.writeText(url)],
+    ['bookOutline', 'Bookmarks', () => setBookmarks(true)],
+    ['plus', 'New Tab', open],
+    ['eye', 'Hide Toolbar', () => setUrlCompact(true)]
+  ]
   // The cover's camera column: Apple runs Safari's buttons down beside the status
   // stack there, and the page keeps the rest. The row bar is the inner display's.
   const rail = os.display === 'cover'
@@ -95,98 +157,193 @@ export const Safari = ({ os }: { os: Os }) => {
   return (
     <Screen xstyle={[styles.body, rail && styles.bodyRail]}>
       <div {...stylex.props(styles.page)}>
-        {url ? (
-          <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" />
-        ) : (
-          <div {...stylex.props(styles.start, animations.fade)}>
-            <div {...stylex.props(styles.startTitle)}>Favourites</div>
-            <div {...stylex.props(styles.favs)}>
-              {MARKS.map(([n, u]) => (
-                <button type="button" key={u} {...stylex.props(styles.fav)} onClick={() => go(u)}>
-                  <span {...stylex.props(styles.favIcon)}>{n[0]}</span>
-                  <span {...stylex.props(styles.favName)}>{n}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {cards.mounted && (
-          <div {...stylex.props(styles.grid, cards.closing ? animations.floatOut : animations.float)}>
-            {tabs.map((x, i) => {
-              const u = at(x)
-              return (
-                <div key={x.id} {...stylex.props(styles.card)}>
-                  <button
-                    type="button"
-                    {...stylex.props(styles.cardPick, i === cur && styles.cardOn)}
-                    onClick={() => pick(i)}
-                    aria-label={name(x)}
-                  >
-                    {u ? (
-                      <iframe title={name(x)} src={u} referrerPolicy="no-referrer" {...stylex.props(styles.peek)} />
-                    ) : (
-                      <span {...stylex.props(styles.peekStart)}>{name(x)}</span>
-                    )}
+        <div ref={surface} {...stylex.props(styles.scroll)}>
+          {url ? (
+            <iframe ref={frame} title="Page" src={url} referrerPolicy="no-referrer" {...stylex.props(styles.frame)} />
+          ) : (
+            <div {...stylex.props(styles.start, animations.fade)}>
+              <div {...stylex.props(styles.startTitle)}>Favourites</div>
+              <div {...stylex.props(styles.favs)}>
+                {MARKS.map(([n, u]) => (
+                  <button type="button" key={u} {...stylex.props(styles.fav)} onClick={() => go(u)}>
+                    <span {...stylex.props(styles.favIcon)}>{n[0]}</span>
+                    <span {...stylex.props(styles.favName)}>{n}</span>
                   </button>
-                  <button
-                    type="button"
-                    {...stylex.props(styles.cardClose)}
-                    onClick={() => close(i)}
-                    aria-label="Close tab"
-                  >
-                    <Sym name="close" size={9} />
-                  </button>
-                  <div {...stylex.props(styles.cardName)}>{name(x)}</div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-        <div {...stylex.props(styles.foot)}>
-          {strip.mounted && (
-            <div {...stylex.props(styles.marks, strip.closing && styles.marksOut)}>
-              {MARKS.map(([n, u]) => (
-                <button type="button" key={u} {...stylex.props(styles.mark)} onClick={() => go(u)}>
-                  {n}
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
           )}
-          <div {...stylex.props(styles.url)}>
-            <input
-              ref={field}
-              {...stylex.props(styles.input)}
-              placeholder="Search or enter website name"
-              value={text}
-              spellCheck={false}
-              onChange={(e) => setText(e.currentTarget.value)}
-              onFocus={(e) => e.currentTarget.select()}
-              onKeyDown={(e) => e.key === 'Enter' && go(text)}
-            />
-            <button type="button" onClick={reload}>
-              <Sym name="reload" size={20} />
-            </button>
-          </div>
+          {bookmarkPage.mounted && (
+            <div
+              {...stylex.props(styles.bookmarkLayer, bookmarkPage.closing ? styles.bookmarksOut : styles.bookmarksIn)}
+            >
+              <Bookmarks onNavigate={go} />
+            </div>
+          )}
+          {cards.mounted && (
+            <div {...stylex.props(styles.grid, cards.closing ? animations.floatOut : animations.float)}>
+              {tabs.map((x, i) => {
+                const u = at(x)
+                return (
+                  <div key={x.id} {...stylex.props(styles.card)}>
+                    <button
+                      type="button"
+                      {...stylex.props(styles.cardPick, i === cur && styles.cardOn)}
+                      onClick={() => pick(i)}
+                      aria-label={name(x)}
+                    >
+                      {u ? (
+                        <iframe title={name(x)} src={u} referrerPolicy="no-referrer" {...stylex.props(styles.peek)} />
+                      ) : (
+                        <span {...stylex.props(styles.peekStart)}>{name(x)}</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      {...stylex.props(styles.cardClose)}
+                      onClick={() => close(i)}
+                      aria-label="Close tab"
+                    >
+                      <Sym name="close" size={9} />
+                    </button>
+                    <div {...stylex.props(styles.cardName)}>{name(x)}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {moreOpen && bookmarks && (
+            <div {...stylex.props(styles.moreMenu)}>
+              <button type="button" {...stylex.props(styles.moreItem)} onClick={open}>
+                New Tab
+              </button>
+              <button type="button" {...stylex.props(styles.moreItem)} onClick={() => setBookmarks(false)}>
+                Close Bookmarks
+              </button>
+            </div>
+          )}
         </div>
+        {pageMenu && (
+          <button
+            type="button"
+            {...stylex.props(styles.pageScrim)}
+            aria-label="Close page menu"
+            onClick={() => setPageMenu(false)}
+          />
+        )}
+        {!bookmarks && (
+          <div {...stylex.props(styles.foot, rail && styles.footRail)}>
+            {menu.mounted && (
+              <div
+                {...stylex.props(
+                  styles.pageMenu,
+                  menu.closing ? animations.floatOut : animations.float,
+                  // It is still on screen while it sinks; a tap through it now
+                  // was meant for the page under it.
+                  menu.closing && styles.pageMenuGone
+                )}
+              >
+                {actions.map(([icon, label, run]) => (
+                  <button
+                    type="button"
+                    key={label}
+                    {...stylex.props(styles.moreItem, styles.pageMenuItem)}
+                    onClick={() => {
+                      setPageMenu(false)
+                      run()
+                    }}
+                  >
+                    {label}
+                    <Sym name={icon} size={18} />
+                  </button>
+                ))}
+              </div>
+            )}
+            <div {...stylex.props(styles.url, urlCompact && styles.urlCompact)}>
+              <button
+                type="button"
+                {...stylex.props(styles.urlMenu, urlCompact && styles.urlSideOff)}
+                aria-label="Page actions"
+                aria-expanded={pageMenu}
+                tabIndex={urlCompact ? -1 : undefined}
+                onClick={() => setPageMenu((o) => !o)}
+              >
+                <span {...stylex.props(styles.menuLine)} />
+                <span {...stylex.props(styles.menuLine)} />
+                <span {...stylex.props(styles.menuLine)} />
+              </button>
+              <input
+                ref={field}
+                {...stylex.props(styles.input, urlCompact && styles.inputCompact)}
+                placeholder="Search or enter website name"
+                value={text}
+                spellCheck={false}
+                onChange={(e) => setText(e.currentTarget.value)}
+                onFocus={(e) => {
+                  setUrlCompact(false)
+                  e.currentTarget.select()
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && go(text)}
+              />
+              <button
+                type="button"
+                {...stylex.props(styles.urlReload, urlCompact && styles.urlSideOff)}
+                aria-label="Reload page"
+                tabIndex={urlCompact ? -1 : undefined}
+                onClick={reload}
+              >
+                <Sym name="reload" size={20} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       {rail ? (
         <div {...stylex.props(styles.rail)}>
-          <div {...stylex.props(styles.railPill)}>
-            <Btn name="back" disabled={t.at === 0} onClick={() => step(-1)} />
-            <Btn name="bookOutline" onClick={() => setMarks((m) => !m)} />
-          </div>
-          <div {...stylex.props(styles.railGap)} />
-          <div {...stylex.props(styles.railPill)}>
-            <Btn name="plus" onClick={open} />
-            <Btn name="tabs" onClick={() => setGrid((g) => !g)} />
-          </div>
+          {bookmarks ? (
+            <div {...stylex.props(styles.railPill)}>
+              <Btn name="more" onClick={() => setMoreOpen((open) => !open)} />
+              <Btn
+                name="close"
+                onClick={() => {
+                  setBookmarks(false)
+                  setMoreOpen(false)
+                }}
+              />
+            </div>
+          ) : (
+            <>
+              <div {...stylex.props(styles.railPill)}>
+                <Btn name="back" disabled={t.at === 0} onClick={() => step(-1)} />
+                <Btn
+                  name="bookOutline"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setBookmarks(true)
+                  }}
+                />
+              </div>
+              <div {...stylex.props(styles.railGap)} />
+              <div {...stylex.props(styles.railPill)}>
+                <Btn name="plus" onClick={open} />
+                <Btn name="tabs" onClick={() => setGrid((g) => !g)} />
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div {...stylex.props(styles.bar)}>
           <Btn name="back" disabled={t.at === 0} onClick={() => step(-1)} />
           <Btn name="forward" disabled={t.at === t.hist.length - 1} onClick={() => step(1)} />
           <Btn name="share" onClick={() => url && navigator.clipboard?.writeText(url)} />
-          <Btn name="book" onClick={() => setMarks((m) => !m)} />
+          {/* The row bar has no Done button of its own, so the book button is the toggle. */}
+          <Btn
+            name="book"
+            onClick={() => {
+              setMoreOpen(false)
+              setBookmarks((b) => !b)
+            }}
+          />
           <Btn name="tabs" onClick={() => setGrid((g) => !g)} />
         </div>
       )}
