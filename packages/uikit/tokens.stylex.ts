@@ -454,6 +454,12 @@ export const appAppearance = stylex.defineConsts({
   previewFill: 'rgba(60,60,67,.08)',
   // reminders
   // safari
+  /** The cover rail's glass: circle fill, its hairline and drop, the pill's hairline, the tab card's close dot and its drop. */
+  safariGlass: 'rgba(255,255,255,.7)',
+  safariGlassEdge: '0 1px 2px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.08)',
+  safariPillEdge: '0 0 0 .5px rgba(0,0,0,.06)',
+  safariDot: 'rgba(255,255,255,.85)',
+  safariDotShadow: '0 1px 3px rgba(0,0,0,.2)',
   // settings
   /** Flappy Duo's deletion-fee sheet: the scrim behind it, its own light material and ink, and the card chip. */
   settingsScrim: 'rgba(0,0,0,.35)',
