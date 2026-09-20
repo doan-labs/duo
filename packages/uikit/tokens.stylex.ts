@@ -359,10 +359,6 @@ export const appAppearance = stylex.defineConsts({
   calendarPaper: 'rgba(255,255,255,.78)',
   calendarSidebar: '#1b1b1d',
   calendarPane: '#1f1f21',
-  calendarGrid: 'rgba(255,255,255,.12)',
-  calendarWeekend: 'rgba(255,255,255,.025)',
-  calendarSegment: 'rgba(255,255,255,.08)',
-  calendarSegmentOn: '#5c5c60',
   calendarHover: 'rgba(255,255,255,.06)',
   calendarHourLines: 'linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px)',
   // camera

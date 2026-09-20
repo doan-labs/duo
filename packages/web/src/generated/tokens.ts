@@ -1028,26 +1028,6 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "calendarGrid",
-    "value": "rgba(255,255,255,.12)",
-    "doc": ""
-  },
-  {
-    "name": "calendarWeekend",
-    "value": "rgba(255,255,255,.025)",
-    "doc": ""
-  },
-  {
-    "name": "calendarSegment",
-    "value": "rgba(255,255,255,.08)",
-    "doc": ""
-  },
-  {
-    "name": "calendarSegmentOn",
-    "value": "#5c5c60",
-    "doc": ""
-  },
-  {
     "name": "calendarHover",
     "value": "rgba(255,255,255,.06)",
     "doc": ""

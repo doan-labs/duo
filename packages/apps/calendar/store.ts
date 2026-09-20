@@ -2,6 +2,7 @@ import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { type Cal, DEFAULT_CALENDARS, type Event, VIEWS, type View } from './data.ts'
 import { ymd } from './dates.ts'
+import { seedEvents } from './seed.ts'
 
 const parse = <T>(raw: string | null, fallback: T): T => (raw ? JSON.parse(raw) : fallback)
 
@@ -25,7 +26,8 @@ export function useCalendars() {
 // ponytail: one JSON key holds every event, good to ~1500 of them under the 256 KB value cap; shard by month past that.
 export function useEvents() {
   const kv = useKV(os.storage, 'events')
-  const events = parse<Event[]>(kv.value, [])
+  // Nothing written yet means a fresh install, not an empty calendar: seed it.
+  const events = parse<Event[]>(kv.value, seedEvents(new Date()))
   const write = (next: Event[]) => kv.set(JSON.stringify(next))
   return {
     events,

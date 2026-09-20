@@ -1,4 +1,4 @@
-import { Checkbox, IconButton, Sheet, Text } from '@doan-labs/duo-uikit'
+import { IconButton, Sheet, Sym, Text } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { Cal } from './data.ts'
@@ -31,17 +31,27 @@ export function Sidebar({ calendars, hidden, toggle, date, today, setDate, hide 
             <div {...stylex.props(styles.group)}>{g}</div>
             {calendars
               .filter((c) => c.group === g)
-              .map((c) => (
-                <label key={c.id} htmlFor={`cal-${c.id}`} {...stylex.props(styles.cal)}>
-                  <Checkbox
-                    id={`cal-${c.id}`}
-                    tint={c.color}
-                    checked={!hidden.has(c.id)}
-                    onChange={() => toggle(c.id)}
-                  />
-                  {c.name}
-                </label>
-              ))}
+              .map((c) => {
+                const shown = !hidden.has(c.id)
+                return (
+                  <button
+                    type="button"
+                    key={c.id}
+                    role="switch"
+                    aria-checked={shown}
+                    onClick={() => toggle(c.id)}
+                    {...stylex.props(styles.cal)}
+                  >
+                    <i {...stylex.props(styles.calDot, shown ? styles.tint(c.color) : styles.ring(c.color))} />
+                    <span {...stylex.props(styles.calName, !shown && styles.off)}>{c.name}</span>
+                    {shown && (
+                      <span {...stylex.props(styles.calCheck)}>
+                        <Sym name="check" size={13} />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
           </div>
         ))}
       </div>

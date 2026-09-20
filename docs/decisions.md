@@ -1051,3 +1051,32 @@ the row hairline is inset to where the label starts instead of running edge to
 edge. All three live in `styles.ts` and reach every pane through the `Row` and
 `Section` wrappers in `parts.tsx`, so no call site states them. Cost: Settings
 and the other grouped lists in the shell no longer match row for row.
+
+## 78. Calendar's month is a sheet ruled by the week, and it opens with a life in it
+
+2026-09-20. The first month view drew a full grid: a rule on every cell edge, a wash
+on the weekend columns, and the date set at body size in the top right. On a fresh
+install it also drew nothing else, because `useEvents` fell back to an empty list.
+Both together read as a spreadsheet someone had forgotten to fill in, which is not
+what the app is.
+
+Apple's month view is a sheet ruled only by the week. There are no column rules, and
+that is not decoration: a multi-day event is one bar running across the days it
+covers, and a vertical rule every 80 px would cut it into pieces. So the week is now
+a grid of seven columns and a few 15 px lanes, and `lanes.ts` packs each event into
+the first lane free for its whole run. Day and Week use the same packer for their
+all-day row, which is why `Cupertino trip` is one bar there too instead of the same
+title repeated in four columns. A week that runs out of lanes counts what it dropped
+and opens the day, so nothing is hidden silently. Day numbers are the footnote step,
+centred, and today and the picked day are discs rather than pills, which is why the
+disc drops the `1 Sep` month label: the label would stretch it.
+
+The cover gets dots. At 387 points a title is four letters and an ellipsis, so the
+narrow month draws up to four dots under each number and a tap opens the day, which
+is what iPhone does and what rule 1 asks for. Nothing is cover-only or inner-only;
+the same events are reachable from both.
+
+A fresh install seeds a working month around today (`seed.ts`), the keynote the
+home-screen widget draws included, so the tile and the app agree. The first edit
+writes the whole list to storage and it is the person's calendar from then on. Work
+is orange, not red: the only red on the sheet should be today.

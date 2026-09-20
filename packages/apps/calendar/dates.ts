@@ -2,7 +2,6 @@ import type { Event } from './data.ts'
 
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 /** Pixels per hour in the time grid; styles.ts repeats the number because StyleX cannot import it. */
-/** Pixels per hour in the time grid; styles.ts repeats the number because StyleX cannot import it. */
 export const HOUR = 44
 
 const pad = (n: number) => String(n).padStart(2, '0')

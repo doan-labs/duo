@@ -154,9 +154,13 @@ export const Calendar = () => {
           <MonthView
             month={startOfMonth(date)}
             today={today}
+            selected={date}
+            wide={wide}
             events={visible}
             colors={colors}
-            onDay={(d) => compose(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9))}
+            onPick={setDate}
+            onNew={(d) => compose(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9))}
+            onOpen={(d) => jump(d, 'Day')}
             onEvent={setDraft}
           />
         ) : view === 'Year' ? (

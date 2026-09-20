@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef } from 'react'
 import type { Event } from './data.ts'
 import { eventsOn, HOUR, minutes, sameDay, time } from './dates.ts'
+import { pack } from './lanes.ts'
 import { styles } from './styles.ts'
 
 type Props = {
@@ -38,22 +39,27 @@ export function TimeGrid({ days, today, events, colors, onSlot, onEvent }: Props
           </div>
         ))}
         <span {...stylex.props(styles.allDayLabel)}>all-day</span>
-        {days.map((d) => (
-          <div key={d.getTime()} {...stylex.props(styles.allDay)}>
-            {eventsOn(events, d)
-              .filter((e) => e.allDay)
-              .map((e) => (
-                <button
-                  type="button"
-                  key={e.id}
-                  onClick={() => onEvent(e)}
-                  {...stylex.props(styles.chip, styles.chipAllDay, styles.tint(colors.get(e.calendar)))}
-                >
-                  <span {...stylex.props(styles.chipTitle)}>{e.title || 'New Event'}</span>
-                </button>
-              ))}
-          </div>
-        ))}
+        {/* One bar per event across the days it covers, rather than the same title in every column. */}
+        <div {...stylex.props(styles.allDay, styles.laneCols(days.length), styles.spanCols(days.length))}>
+          {pack(
+            days,
+            events.filter((e) => e.allDay)
+          ).placed.map((p) => (
+            <button
+              type="button"
+              key={p.e.id}
+              onClick={() => onEvent(p.e)}
+              {...stylex.props(
+                styles.item,
+                styles.bar,
+                styles.slot(p.col, p.span, p.lane + 1),
+                styles.tint(colors.get(p.e.calendar))
+              )}
+            >
+              <span {...stylex.props(styles.chipTitle)}>{p.e.title || 'New Event'}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <div ref={scroll} {...stylex.props(styles.tgScroll)}>
         <div {...stylex.props(styles.tgBody, styles.cols(days.length))}>
@@ -87,7 +93,7 @@ export function TimeGrid({ days, today, events, colors, onSlot, onEvent }: Props
                         ev.stopPropagation()
                         onEvent(e)
                       }}
-                      {...stylex.props(styles.block, styles.tint(colors.get(e.calendar)), styles.span(from, to - from))}
+                      {...stylex.props(styles.block, styles.soft(colors.get(e.calendar)), styles.span(from, to - from))}
                     >
                       <b>{e.title || 'New Event'}</b>
                       <span>{time(e.start)}</span>
