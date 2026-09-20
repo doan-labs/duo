@@ -1024,3 +1024,30 @@ gesture prop, a style or an `initial` pose on that value changes the markup betw
 the two and aborts hydration for the whole tree. Props stay present, `tabIndex` is
 stated, and only values are gated. Note that `?? false` does not fix this, because
 the divergence is server-`null` against client-`true`.
+
+## 77. Settings splits on the unfolded display
+
+2026-09-20. Decision 72 made Settings a `Nav` stack, which is the right shape for
+the cover and wrong for 790 px of inner glass: one column of rows with half the
+width empty. It is now iPadOS's split view above 600 px of measured width, the
+threshold Photos and Weather already switch at. The root list is written once, as
+`rootList()` in `index.tsx` returning `Group[]`; `sidebar.tsx` draws it as
+destinations and `Folded` draws it as pushing rows, so a row cannot exist in one
+layout and not the other. Selecting a destination is a keyed `Nav`, which drops
+whatever the last pane had pushed and replays `shared.swap` on the fresh mount.
+The sidebar's field filters the same list rather than opening a search pane.
+
+Settings gains `edge` in apps.ts so the sidebar's material reaches the top corner
+the way Apple's footage shows it, and each column pads its own 40 px. The pad goes
+on the flex parent of `Nav`, never inside it: `Nav`'s pages are absolutely
+positioned at `inset: 0`, which resolves against the padding box and would cover
+the band. Nothing behind a row changed, and decision 72's rule stands: the panes
+Apple has that this device does not are still absent rather than drawn.
+
+Three geometry values are the app's own rather than the kit's, because the kit's
+row is a phone list and this is iPadOS: cards take `radius.xl`, rows are 44 px
+whatever they carry (the kit's 11 px padding makes 52 with a glyph in it), and
+the row hairline is inset to where the label starts instead of running edge to
+edge. All three live in `styles.ts` and reach every pane through the `Row` and
+`Section` wrappers in `parts.tsx`, so no call site states them. Cost: Settings
+and the other grouped lists in the shell no longer match row for row.

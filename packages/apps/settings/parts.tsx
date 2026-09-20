@@ -1,13 +1,44 @@
 // The pieces every Settings pane uses: the coloured glyph square, a row that
 // pushes a page, the pane header iOS puts above a group, and the two formatters.
+//
+// `Row` and `Section` re-wrap the kit's with iPadOS geometry - a 44 px row and a
+// rounder card - so no pane has to say so at the call site. Every Settings file
+// imports both from here rather than from the kit.
 
 import type { SettingsHost } from '@doan-labs/duo-sdk'
-import { Page, Row, type RowProps, useNav } from '@doan-labs/duo-uikit'
+import {
+  Row as KitRow,
+  Section as KitSection,
+  Page,
+  type RowProps,
+  type SectionProps,
+  useNav
+} from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useSyncExternalStore } from 'react'
+import type { ElementType, ReactNode } from 'react'
+import { useSyncExternalStore } from 'react'
 import { styles } from './styles.ts'
+
+/**
+ * One row of the root list: a sidebar destination when the display is unfolded,
+ * a pushing row when it is not. `page` is what the detail pane shows; a row
+ * without one is read-only, the way Battery only reports a level.
+ */
+export type Dest = {
+  id: string
+  label: string
+  glyph: SymProps['name']
+  tint: string
+  /** Trailing value, as iOS names the joined network beside Wi-Fi. */
+  detail?: ReactNode
+  /** A switch in place of the chevron. The row stops being a destination. */
+  control?: ReactNode
+  page?: () => ReactNode
+}
+/** Rows the list keeps together, and the line iOS prints under them. */
+export type Group = { rows: Dest[]; note?: ReactNode }
 
 /** The runtime names a permission; the glyph is ours, as in the Store. */
 export const PERM_GLYPH: Record<string, SymProps['name']> = {
@@ -15,6 +46,17 @@ export const PERM_GLYPH: Record<string, SymProps['name']> = {
   Photos: 'grid',
   'Read clipboard': 'note',
   'Write clipboard': 'compose'
+}
+
+/** The kit's grouped row at the 44 px iPadOS gives it, whatever it carries. */
+export function Row<T extends ElementType = 'div'>({ xstyle, ...rest }: RowProps<T>) {
+  const props = rest as RowProps<T>
+  return <KitRow {...props} xstyle={[styles.row, props.icon != null && styles.rowGlyph, xstyle]} />
+}
+
+/** The kit's inset group on iPadOS's larger corner. */
+export function Section<T extends ElementType = 'div'>({ xstyle, ...rest }: SectionProps<T>) {
+  return <KitSection {...(rest as SectionProps<T>)} xstyle={[styles.card, xstyle]} />
 }
 
 /** The tinted rounded square that opens a Settings row. */
@@ -26,8 +68,8 @@ export const Glyph = ({ name, bg }: { name: SymProps['name']; bg: string }) => (
 
 /**
  * A row that pushes a pane. `page` is called at the push, not at render, so the
- * pane subscribes to its own data and keeps updating behind the chevron — a
- * node captured here would freeze at whatever the list held when it was drawn.
+ * pane subscribes to its own data and keeps updating behind the chevron: a node
+ * captured here would freeze at whatever the list held when it was drawn.
  */
 export function Link({
   title,
@@ -64,11 +106,11 @@ export const Hero = ({
   title: string
   children: ReactNode
 }) => (
-  <div {...stylex.props(shared.grp, styles.hero)}>
+  <div {...stylex.props(shared.grp, styles.card, styles.hero)}>
     <span {...stylex.props(styles.heroIcon, styles.tint(bg))}>
-      <Sym name={name} size={34} />
+      <Sym name={name} size={32} />
     </span>
-    <div {...stylex.props(typography.title1)}>{title}</div>
+    <div {...stylex.props(typography.title2)}>{title}</div>
     <div {...stylex.props(typography.body, styles.heroText)}>{children}</div>
   </div>
 )

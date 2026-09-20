@@ -74,7 +74,13 @@ export const LEFT: App[] = [
   { name: 'Health', mock: true, light: true, view: Health },
   { name: 'Wallet', mock: true, view: Wallet },
   { name: 'Siri', mock: true, view: Siri },
-  { name: 'Settings', light: true, view: (props) => createElement(Settings, { ...props, host: SETTINGS_HOST }) }
+  // `edge`: the sidebar's material runs to the top corner, so each column pads its own status band.
+  {
+    name: 'Settings',
+    light: true,
+    edge: true,
+    view: (props) => createElement(Settings, { ...props, host: SETTINGS_HOST })
+  }
 ]
 
 /** Right half — only on the inner display, rows 1 to 6. */
