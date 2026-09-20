@@ -7,6 +7,7 @@ the root README remains the only repository file tree.
 
 | Task | Read |
 | --- | --- |
+| Change anything visual, anywhere | [Design rules](../DESIGN.md) first, always |
 | Understand responsibilities or change the renderer/shell | [Architecture](architecture.md) |
 | Set up, extend or maintain the project | [Working guide](working.md) |
 | Verify browser/native behavior | [Debugging](debug.md), [platform review](platform/review.md) |

@@ -332,7 +332,10 @@ const styles = stylex.create({
   dock: {
     position: 'absolute',
     right: layout.dockRight,
-    top: 'calc(52.5% - 104px)',
+    // Centred on the content, not measured: the column grows with DOCK and the
+    // baked one in screen.ts derives the same centre from its own height.
+    top: '52.5%',
+    transform: 'translateY(-50%)',
     width: layout.dock,
     display: 'flex',
     flexDirection: 'column',

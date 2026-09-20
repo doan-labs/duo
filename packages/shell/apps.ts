@@ -93,16 +93,17 @@ export const RIGHT: App[] = [
   { name: 'Contacts', mock: true, light: true, view: Contacts },
   { name: 'iTunes Store', mock: true, light: true, view: Itunes },
   { name: 'Freeform', id: 'labs.doan.ipduo.freeform', light: true, ...RELEASE },
-  { name: 'Tips', mock: true, light: true, view: Tips },
-  // Baked apps never import the shell, so the Store gets its link opener as a prop.
-  { name: 'App Store', light: true, view: (props) => createElement(AppStore, { ...props, openExternal }) }
+  { name: 'Tips', mock: true, light: true, view: Tips }
 ]
 
+/** The vertical dock on the hinge-free edge. A dock app is not also on a page. */
 export const DOCK: App[] = [
   { name: 'Phone', mock: true, view: Phone },
   { name: 'Safari', light: true, rail: true, view: Safari },
   { name: 'Messages', mock: true, light: true, view: Messages },
-  { name: 'Music', view: Music }
+  { name: 'Music', view: Music },
+  // Baked apps never import the shell, so the Store gets its link opener as a prop.
+  { name: 'App Store', light: true, view: (props) => createElement(AppStore, { ...props, openExternal }) }
 ]
 
 /** Everything openable by name, including what only lives inside Utilities. */

@@ -464,8 +464,8 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
   }
 
   // Dock: vertical, clear glass, hugging the hinge-free edge.
-  const dockh = u(8 + 4 * 41 + 3 * 9 + 8)
-  const docky = Y + H * 0.525 - u(104)
+  const dockh = u(8 + DOCK.length * 41 + (DOCK.length - 1) * 9 + 8)
+  const docky = Y + H * 0.525 - dockh / 2
   glass(ctx, blur, dockx, docky, u(DOCKW), dockh, u(21))
   DOCK.forEach((a, i) => {
     const img = imgs[a.name]

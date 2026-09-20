@@ -82,6 +82,7 @@ testing scope and limitations.
 
 | Guide | What it covers |
 | --- | --- |
+| [Design rules](DESIGN.md) | The hard rules every visual change follows |
 | [Documentation index](docs/README.md) | All project and platform guides |
 | [Architecture](docs/architecture.md) | The scene, displays, shell, and native boundaries |
 | [Working guide](docs/working.md) | Commands, controls, and contributor conventions |
@@ -132,6 +133,7 @@ stylex-plugin.ts    shared Bun StyleX compilation
 bunfig.toml         development plugin registration
 tsconfig.json       shared strict TypeScript configuration
 .cargo/             shared Rust cache configuration and shell-check alias
+DESIGN.md           hard design rules for every visual change
 docs/               maintainer guides and documentation index
   platform/         current platform references, roadmap, publication/website plans
     api/            generated UI-kit API data
