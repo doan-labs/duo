@@ -460,13 +460,6 @@ export const appAppearance = stylex.defineConsts({
   safariPillEdge: '0 0 0 .5px rgba(0,0,0,.06)',
   safariDot: 'rgba(255,255,255,.85)',
   safariDotShadow: '0 1px 3px rgba(0,0,0,.2)',
-  // settings
-  /** Flappy Duo's deletion-fee sheet: the scrim behind it, its own light material and ink, and the card chip. */
-  settingsScrim: 'rgba(0,0,0,.35)',
-  settingsPaySheet: 'rgba(255,255,255,.96)',
-  settingsPayInk: '#0b1a3a',
-  settingsPayCard:
-    'linear-gradient(115deg, rgba(255,140,200,.35), rgba(140,200,255,.35) 45%, rgba(255,230,140,.35) 80%), linear-gradient(135deg, #ffffff, #dcdce1 60%, #f2f2f5)',
   // shortcuts
   /** The scrim that dims a shortcut tile while it runs. */
   shortcutsScrim: 'rgba(0,0,0,.45)',

@@ -1353,23 +1353,28 @@ export const appAppearance: Token[] = [
     "doc": "preview"
   },
   {
-    "name": "settingsScrim",
-    "value": "rgba(0,0,0,.35)",
-    "doc": "Flappy Duo's deletion-fee sheet: the scrim behind it, its own light material and ink, and the card chip."
+    "name": "safariGlass",
+    "value": "rgba(255,255,255,.7)",
+    "doc": "The cover rail's glass: circle fill, its hairline and drop, the pill's hairline, the tab card's close dot and its drop."
   },
   {
-    "name": "settingsPaySheet",
-    "value": "rgba(255,255,255,.96)",
+    "name": "safariGlassEdge",
+    "value": "0 1px 2px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.08)",
     "doc": ""
   },
   {
-    "name": "settingsPayInk",
-    "value": "#0b1a3a",
+    "name": "safariPillEdge",
+    "value": "0 0 0 .5px rgba(0,0,0,.06)",
     "doc": ""
   },
   {
-    "name": "settingsPayCard",
-    "value": "linear-gradient(115deg, rgba(255,140,200,.35), rgba(140,200,255,.35) 45%, rgba(255,230,140,.35) 80%), linear-gradient(135deg, #ffffff, #dcdce1 60%, #f2f2f5)",
+    "name": "safariDot",
+    "value": "rgba(255,255,255,.85)",
+    "doc": ""
+  },
+  {
+    "name": "safariDotShadow",
+    "value": "0 1px 3px rgba(0,0,0,.2)",
     "doc": ""
   },
   {

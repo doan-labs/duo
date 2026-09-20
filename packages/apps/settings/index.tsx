@@ -115,7 +115,7 @@ function Root({ os, host }: { os: Os; host: SettingsHost }) {
           title="Apps"
           icon={<Glyph name="grid" bg={colors.indigo} />}
           label="Apps"
-          page={() => <AppsPage os={os} host={host} />}
+          page={() => <AppsPage os={os} />}
         />
       </Section>
     </>
