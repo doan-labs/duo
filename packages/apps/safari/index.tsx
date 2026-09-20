@@ -54,7 +54,7 @@ export const Safari = ({ os }: { os: Os }) => {
   const rail = os.display === 'cover'
   const Btn = ({ name, ...p }: { name: SymProps['name']; disabled?: boolean; onClick?: () => void }) => (
     <button type="button" {...stylex.props(styles.barBtn, rail && styles.railBtn)} {...p}>
-      <Sym name={name} size={rail ? 17 : 22} />
+      <Sym name={name} size={rail ? 16 : 22} />
     </button>
   )
   return (

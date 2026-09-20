@@ -63,7 +63,7 @@ export const StatusBar = ({
 }) => {
   const t = useToggles()
   return (
-    <div {...stylex.props(styles.status, light && styles.statusLight)}>
+    <div {...stylex.props(styles.status, !wide && styles.statusNarrow, light && styles.statusLight)}>
       {/* No punch-hole on the inner display: the Duo's inner camera is under-display. */}
       {!wide && <div {...stylex.props(styles.hole, covered && shared.hide)} />}
       {cc ? (
@@ -113,6 +113,8 @@ const styles = stylex.create({
     letterSpacing: tracking.caption1,
     fontWeight: weight.semibold
   },
+  // The cover's camera sits 5.5 mm from the free edge: the ring's centre lands on 28 px.
+  statusNarrow: { right: 11 },
   statusLight: { color: colors.black },
   hole: { width: 23, height: 23, borderRadius: radius.circle, backgroundColor: colors.black, marginBottom: 2 },
   read: { fontSize: typeScale.caption1, marginTop: -4 },

@@ -69,8 +69,8 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    width: 82,
-    paddingTop: 138,
+    width: 56,
+    paddingTop: 141,
     paddingBottom: 16,
     backgroundColor: app.elevated,
     color: colors.black,
@@ -81,7 +81,7 @@ export const styles = stylex.create({
   railPill: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 6,
+    gap: 8,
     padding: 3,
     borderRadius: radius.pill,
     boxShadow: '0 0 0 .5px rgba(0,0,0,.06)'
@@ -92,7 +92,11 @@ export const styles = stylex.create({
     padding: 0,
     borderRadius: radius.circle,
     backgroundColor: 'rgba(255,255,255,.7)',
-    boxShadow: `0 1px 2px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.08), ${shadow.rim}`
+    boxShadow: `0 1px 2px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.08), ${shadow.rim}`,
+    transform: { default: 'scale(1)', ':active': 'scale(.9)' },
+    transitionProperty: 'transform, opacity',
+    transitionDuration: { default: '.22s', '@media (prefers-reduced-motion: reduce)': '0s' },
+    transitionTimingFunction: 'cubic-bezier(.2,.8,.2,1)'
   },
   railGap: { flexGrow: 1 },
   barBtn: {
