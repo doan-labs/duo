@@ -9,6 +9,9 @@ Built for the Astra challenge.
 A folding iPhone simulator for the browser and desktop. Explore the device, move between
 its displays, and build apps that respond to the fold.
 
+> An unofficial, experimental project by Doan Labs. Not an Apple product and not affiliated
+> with Apple. iPhone is a trademark of Apple Inc.
+
 ![iPhone Duo unfolded, showing its lock screen beneath the introduction to the simulator.](public/readme/hero.png)
 
 ## A device you can explore

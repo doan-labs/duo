@@ -88,7 +88,9 @@ export function Footer() {
           <DoanMark />
           An experiment by Doan Labs
         </a>
-        <p {...stylex.props(styles.fine)}>Built in the open. Not affiliated with Apple.</p>
+        <p {...stylex.props(styles.fine)}>
+          An unofficial experiment, not affiliated with Apple. iPhone is a trademark of Apple Inc.
+        </p>
       </div>
     </footer>
   )
