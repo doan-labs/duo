@@ -13,9 +13,14 @@ Rationale for a rule lives in [decisions](docs/decisions.md); this page is the r
 ## 1. Design for the cover first
 
 The cover display is 387 points wide, the inner display 790: a little more than
-two covers. Lay out in boxes and let width decide, measured with a
-`ResizeObserver` on your own box, never from the display: a split half of the
-inner display is as narrow as the cover.
+two covers. Lay out in boxes and let width decide, measured on your own box,
+never from the display: a split half of the inner display is as narrow as the
+cover.
+
+`useSplit(ref)` from the kit is that measurement: a `ResizeObserver` on the ref
+you pass, true past 600 px. Use it rather than writing the observer again, and
+keep what you store a boolean — an app holding the observed width in state
+re-renders on every pixel of the fold.
 
 A cover layout has room to breathe unfolded. The reverse never works. Never hide
 a feature on the cover; the person may never unfold the phone for it.

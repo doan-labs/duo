@@ -47,7 +47,7 @@ export const api: ApiEntry[] = [
     "file": "packages/sdk/legacy.ts",
     "line": 10,
     "doc": "",
-    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
+    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /** The glass this instance draws on: the folded cover or the open inner display. */\n  display?: 'inner' | 'cover'\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
     "members": [
       {
         "name": "store",
@@ -80,6 +80,12 @@ export const api: ApiEntry[] = [
         "doc": ""
       },
       {
+        "name": "display",
+        "type": "'inner' | 'cover'",
+        "optional": true,
+        "doc": "The glass this instance draws on: the folded cover or the open inner display."
+      },
+      {
         "name": "mirror",
         "type": "boolean",
         "optional": true,
@@ -98,7 +104,7 @@ export const api: ApiEntry[] = [
     "name": "SettingsHost",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 52,
+    "line": 54,
     "doc": "What the shell hands the Settings app. Baked apps never import the shell, so\nthe switches, the eraser and the link opener arrive as a prop from apps.ts,\nthe way the Store gets `openExternal`.",
     "signature": "type SettingsHost = {\n  /** The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`. */\n  switches: Readonly<Switches>\n  subscribe: (cb: () => void) => () => void\n  revision: () => number\n  flip: (key: keyof Switches, value?: boolean) => void\n  /** The Wi-Fi network and the charge the status stack reports. */\n  network: string\n  battery: number\n  /** Erase All Content and Settings: clears device storage and reloads the shell. */\n  erase: () => Promise<void>\n  openExternal: (url: string) => void\n  /** Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press. */\n  claimSide: (claim: () => boolean) => () => void\n}",
     "members": [
@@ -163,7 +169,7 @@ export const api: ApiEntry[] = [
     "name": "Switches",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 34,
+    "line": 36,
     "doc": "The device switches Control Center and Settings both flip. One definition, so\nthe shell's store (springboard/toggles.ts) and the baked Settings app cannot\ndrift apart.",
     "signature": "type Switches = {\n  airplane: boolean\n  cell: boolean\n  wifi: boolean\n  bt: boolean\n  drop: boolean\n  hotspot: boolean\n  rotate: boolean\n  mirror: boolean\n  focus: boolean\n  torch: boolean\n}",
     "members": [
@@ -568,7 +574,7 @@ export const api: ApiEntry[] = [
     "file": "packages/uikit/app.ts",
     "line": 6,
     "doc": "",
-    "signature": "type App = {\n  id?: string\n  icon?: string\n  name: string\n  light?: boolean\n  /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */\n  edge?: boolean\n  view: ComponentType<{ os: Os }>\n  /** Invented data behind a static screen: the tile shows a dot and the app a 'Mockup' pill. */\n  mock?: boolean\n  /** Names of the apps inside, when this tile is a folder rather than an app. */\n  folder?: string[]\n}",
+    "signature": "type App = {\n  id?: string\n  icon?: string\n  name: string\n  light?: boolean\n  /** Draws under the status stack, edge to edge, and pads its own top; the shell adds no band. */\n  edge?: boolean\n  /** On the cover, keeps the right column free for the status stack, which stays whole; the shell adds no band. */\n  rail?: boolean\n  view: ComponentType<{ os: Os }>\n  /** Invented data behind a static screen: the tile shows a dot and the app a 'Mockup' pill. */\n  mock?: boolean\n  /** Names of the apps inside, when this tile is a folder rather than an app. */\n  folder?: string[]\n}",
     "members": [
       {
         "name": "id",
@@ -599,6 +605,12 @@ export const api: ApiEntry[] = [
         "type": "boolean",
         "optional": true,
         "doc": "Draws under the status stack, edge to edge, and pads its own top; the shell adds no band."
+      },
+      {
+        "name": "rail",
+        "type": "boolean",
+        "optional": true,
+        "doc": "On the cover, keeps the right column free for the status stack, which stays whole; the shell adds no band."
       },
       {
         "name": "view",
@@ -993,6 +1005,27 @@ export const api: ApiEntry[] = [
     "line": 6,
     "doc": "Inset rounded group of rows, retaining the original grouped-list geometry.",
     "signature": "type SectionProps<T extends ElementType = 'div'> = PrimitiveProps<T>"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "SPLIT",
+    "kind": "value",
+    "file": "packages/uikit/split.ts",
+    "line": 4,
+    "doc": "The width two columns start at. The cover display stays under it; so does a split half.",
+    "signature": "SPLIT = 600"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "useSplit",
+    "kind": "hook",
+    "file": "packages/uikit/split.ts",
+    "line": 14,
+    "doc": "True once the box is wide enough for two columns, measured with a\n`ResizeObserver` on the app's own root rather than read off the display: a\nsplit half of the inner display is as narrow as the cover and gets the cover's\nlayout. A boolean is the whole result on purpose. An app that keeps the\nobserved width in state re-renders on every pixel of the fold; this one\nre-renders when the layout actually changes.",
+    "signature": "function useSplit(ref: RefObject<HTMLElement | null>, at: number = SPLIT)",
+    "extends": [
+      "RefObject<HTMLElement | null>"
+    ]
   },
   {
     "pkg": "@doan-labs/duo-uikit",

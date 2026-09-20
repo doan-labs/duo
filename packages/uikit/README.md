@@ -39,6 +39,12 @@ Use `Row as="button"` for actions. Name icon-only buttons and every Toggle.
 cross axis. Both take `gap`, `align`, `justify` and `wrap`, so a one-off
 `stylex.create` is no longer the way to put two things side by side.
 
+`useSplit(ref)` is true once that box passes `SPLIT` (600 px), the width two
+columns start at. It measures the app's own root with a `ResizeObserver` rather
+than reading the display, because a split half of the inner display is as narrow
+as the cover, and it returns a boolean so the app re-renders when the layout
+changes rather than on every pixel of the fold.
+
 `Text`'s `size` names a step of Dynamic Type at the Large size (`largeTitle`
 34/41, `title1` 28/34, `title2` 22/28, `title3` 20/25, `headline` 17/22
 semibold, `body` 17/22, `callout` 16/21, `subheadline` 15/20, `footnote` 13/18,

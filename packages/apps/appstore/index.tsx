@@ -7,12 +7,12 @@
 import type { Os } from '@doan-labs/duo-sdk'
 import { PREVIEW_FEATURES } from '@doan-labs/duo-sdk/preview-features.ts'
 import type { Store, StoreRow } from '@doan-labs/duo-sdk/store.ts'
-import { LargeTitle, Placeholder, Screen, Section } from '@doan-labs/duo-uikit'
+import { LargeTitle, Placeholder, Screen, Section, useSplit } from '@doan-labs/duo-uikit'
 import { Nav, useNav } from '@doan-labs/duo-uikit/nav.tsx'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react'
 import { AppPage, Head } from './app-page.tsx'
 import { Action, type External, Icon, Item, kicker, type Open, size, tagline } from './rows.tsx'
 import { styles } from './styles.ts'
@@ -35,14 +35,9 @@ type Lane = { key: string; label: string; glyph: SymProps['name']; n?: number }
 function Shelf({ store, open, openExternal }: { store: Store; open: Open; openExternal: External }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   // The box decides, not the display: a split half is as narrow as the cover, and
-  // a sidebar in 380 px is a sidebar and no page. Measured as Maps and Camera do.
+  // a sidebar in 380 px is a sidebar and no page.
   const box = useRef<HTMLDivElement>(null)
-  const [wide, setWide] = useState(false)
-  useEffect(() => {
-    const ro = new ResizeObserver(([e]) => setWide(e!.contentRect.width > 600))
-    ro.observe(box.current!)
-    return () => ro.disconnect()
-  }, [])
+  const wide = useSplit(box)
   const [section, setSection] = useState('discover')
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()

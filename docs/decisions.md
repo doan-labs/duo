@@ -1084,3 +1084,24 @@ the sidebar stands beside a list scrolling down, which never passes behind it, s
 column and shows the page's tone rather than moving content. The catalog at its foot became a
 control instead of two grey discs around a label, matching the search field at the panel's
 other end.
+
+## 78. The width two columns start at is one hook, and it returns a boolean
+
+2026-09-20. The Store, Notes and Photos each carried the same six lines: a `ResizeObserver` on
+the app's own root setting `wide` past 600 px. Settings on main carries a fourth copy, with the
+600 named. It is `useSplit(ref)` in the kit now, with `SPLIT` beside it; Settings joins when
+this branch merges. The rule it enforces is [DESIGN.md](../DESIGN.md)'s first: a split half of
+the inner display is as narrow as the cover, so the layout comes off the box and never off the
+display.
+
+The hook returns a boolean, not the rect, and that is the decision rather than an omission.
+Maps, Camera, Books and Freeform observe their box too and want live dimensions, so a general
+`useBox` looks like the better extraction until you count renders: an app keeping the observed
+width in state re-renders through every frame of the fold, where a boolean re-renders when the
+layout actually changes. Two hooks for eight call sites is an abstraction for its own sake; one
+boolean hook for the four identical ones is the whole win. Nothing else came with it. The
+Store's sidebar and the Settings sidebar share a `nav` and an `aria-current` and disagree about
+every row inside them; the search field has two callers wearing different chrome; `Head`, `Item`
+and the Today card are shaped by `StoreRow` and have no second caller. `shared.glass` already
+holds decision 18's recipe and is not a drop-in here, since `glass.tint` is sized for chrome
+over a wallpaper and the Store's panels sit over a white page.

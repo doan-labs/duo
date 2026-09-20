@@ -34,6 +34,9 @@ a `// <app>` line and only that app may read them.
 
 `Button variant="plain"` now presses. `Row`'s chevron is `app.label3`.
 
+Added `useSplit(ref)` and the `SPLIT` const (600), the width two columns start
+at. The Store, Notes and Photos each carried the same `ResizeObserver` effect.
+
 No SDK protocol or host compatibility requirement changes.
 
 # 0.2.0
