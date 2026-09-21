@@ -1,20 +1,18 @@
 import { os } from '@doan-labs/duo-sdk'
-import { useKV } from '@doan-labs/duo-sdk/react.ts'
+import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
 import type { Folder, Note } from './data.ts'
-
-const parse = <T>(raw: string | null): T[] => (raw ? JSON.parse(raw) : [])
 
 /** The list itself, newest first, as one JSON key so both displays agree on it. */
 export function useNotes() {
-  const index = useKV(os.storage, 'index')
-  const notes = parse<Note>(index.value)
+  const index = useJSON<Note[]>(os.storage, 'index', [])
+  const notes = index.value
   const add = (folder?: string) => {
     const note: Note = { id: Date.now().toString(36), when: new Date().toISOString(), folder }
-    index.set(JSON.stringify([note, ...notes]))
+    index.set([note, ...notes])
     return note
   }
   const remove = (note: Note) => {
-    index.set(JSON.stringify(notes.filter((n) => n.id !== note.id)))
+    index.set(notes.filter((n) => n.id !== note.id))
     void os.storage.del(`note:${note.id}`)
   }
   return { notes, add, remove, hydrating: index.status === 'hydrating' }
@@ -22,11 +20,11 @@ export function useNotes() {
 
 /** User folders under iCloud; the built-in "Notes" folder is `undefined` on a note. */
 export function useFolders() {
-  const list = useKV(os.storage, 'folders')
-  const folders = parse<Folder>(list.value)
+  const list = useJSON<Folder[]>(os.storage, 'folders', [])
+  const folders = list.value
   const add = (name: string) => {
     const folder: Folder = { id: Date.now().toString(36), name }
-    list.set(JSON.stringify([...folders, folder]))
+    list.set([...folders, folder])
     return folder
   }
   return { folders, add }

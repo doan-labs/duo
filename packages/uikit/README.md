@@ -1,6 +1,6 @@
 # UI kit
 
-Version **1.0.0**, private local preview. React 19 and compiled StyleX 0.19.
+Version **1.1.0**, private local preview. React 19 and compiled StyleX 0.19.
 Apps bundle their selected kit; its version does not change host compatibility.
 SDK runtime requirements remain separate. Existing Nav/Page/Sym/Num and style
 subpaths continue to work. See [CHANGELOG](CHANGELOG.md).
@@ -31,13 +31,19 @@ Components accept native attributes, `as` where appropriate, `animate` for
 CSS-only presets and `xstyle` for compiled StyleX extensions. They intentionally
 exclude raw `style` and `className`. Defaults preserve the original app geometry;
 use semantic elements (`Title as="h1"`, `Row as="li"` inside `List`) for new UI.
-Use `Row as="button"` for actions. Name icon-only buttons and every Toggle.
+Use `Row as="button"` for actions. Name icon-only buttons and every Toggle or Checkbox. `Checkbox` is the tinted square from macOS Calendar; `Toggle` is the iOS switch.
 
 ## Layout and type
 
 `VStack` fills its flex parent and `HStack` is a horizontal row centred on the
 cross axis. Both take `gap`, `align`, `justify` and `wrap`, so a one-off
 `stylex.create` is no longer the way to put two things side by side.
+
+`useWide(at = 600)` returns `[ref, wide]`: attach the ref to the element the
+layout lives in and branch on `wide` for a two-column arrangement. Use it rather
+than `useDisplay()` for layout, because the box decides and the display does not.
+A split half of the inner panel is as narrow as the cover, and an app that reads
+`display === 'inner'` there lays out two columns in a space that holds one.
 
 `Text`'s `size` names a step of Dynamic Type at the Large size (`largeTitle`
 34/41, `title1` 28/34, `title2` 22/28, `title3` 20/25, `headline` 17/22

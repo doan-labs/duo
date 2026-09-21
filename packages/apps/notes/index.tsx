@@ -1,11 +1,11 @@
 import { type Os, os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Push, Text, Title, VStack } from '@doan-labs/duo-uikit'
+import { Push, Text, Title, useWide, VStack } from '@doan-labs/duo-uikit'
 import { Page } from '@doan-labs/duo-uikit/nav.tsx'
 import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Note } from './data.ts'
 import { NotePane, NoteSheet } from './editor.tsx'
 import { Folders } from './folders.tsx'
@@ -23,8 +23,9 @@ type Model = {
 }
 
 export const Notes = (_: { os: Os }) => {
-  const root = useRef<HTMLDivElement>(null)
-  const [wide, setWide] = useState(false)
+  // The box decides, not the display: a split half of the inner panel is as
+  // narrow as the cover, and gets the same one-column Notes.
+  const [root, wide] = useWide()
   const selected = useKV(os.session, 'selected')
   const pushed = useKV(os.session, 'pushed')
   const { notes: all, add, remove } = useNotes()
@@ -48,13 +49,6 @@ export const Notes = (_: { os: Os }) => {
       pushed.set('false')
     }
   }
-  // The box decides, not the display: a split half of the inner panel is as
-  // narrow as the cover, and gets the same one-column Notes.
-  useEffect(() => {
-    const ro = new ResizeObserver(([e]) => setWide(e!.contentRect.width > 600))
-    ro.observe(root.current!)
-    return () => ro.disconnect()
-  }, [])
   return (
     <VStack ref={root} xstyle={[dark]}>
       {wide ? (

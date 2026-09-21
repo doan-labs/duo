@@ -9,12 +9,12 @@
 // once for both, so a row is never described twice.
 
 import type { Os, SettingsHost, Switches } from '@doan-labs/duo-sdk'
-import { Nav, Page, Toggle } from '@doan-labs/duo-uikit'
+import { Nav, Page, Toggle, useWide } from '@doan-labs/duo-uikit'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { Fragment, type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, type ReactNode, useState, useSyncExternalStore } from 'react'
 import { AppsPage } from './apps.tsx'
 import { GeneralPage, SOFTWARE } from './general.tsx'
 import {
@@ -34,17 +34,9 @@ import {
 import { Sidebar } from './sidebar.tsx'
 import { styles } from './styles.ts'
 
-/** The width iPadOS shows two columns at; the cover display stays under it. */
-const SPLIT = 600
-
 export function Settings({ os, host }: { os: Os; host: SettingsHost }) {
-  const root = useRef<HTMLDivElement>(null)
-  const [wide, setWide] = useState(false)
-  useEffect(() => {
-    const ro = new ResizeObserver(([entry]) => setWide(entry!.contentRect.width > SPLIT))
-    ro.observe(root.current!)
-    return () => ro.disconnect()
-  }, [])
+  // The kit's default is the width iPadOS shows two columns at; the cover stays under it.
+  const [root, wide] = useWide()
   const [picked, setPicked] = useState('general')
   const groups = rootList(os, host, useSwitches(host))
   const current = groups.flatMap((group) => group.rows).find((row) => row.id === picked)

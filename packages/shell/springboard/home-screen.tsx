@@ -17,7 +17,7 @@
 // another cell stacks the two into a folder, a tap on a folder opens it, and a
 // press held on the paper itself brings up the wallpaper sheet.
 
-import { CalendarWidget } from '@doan-labs/duo-app-calendar/index.tsx'
+import { CalendarWidget } from '@doan-labs/duo-app-calendar/widget.tsx'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { chrome, colors, easing, layout, motion, radius } from '@doan-labs/duo-uikit/tokens.stylex.ts'

@@ -1,3 +1,19 @@
+# 1.1.0
+
+Added the desktop-style controls Calendar's tablet layout needed, so no app has
+to draw them again: `Checkbox` (the tinted square, hollow at rest and filled
+with a white tick), `IconButton` (a symbol-only toolbar button in `plain`,
+`tinted` and `round` variants), `Segmented` (a radio group of views or filters),
+`TextField` and `Select` (native fields over `fill`, any input type, `multiline`
+for a textarea) and `Sheet` (a modal card on a native `<dialog>`). `Toggle`
+stays the iOS switch. `Checkbox` animates the way macOS draws it: the fill fades
+in, the tick springs up from half size, and the box squashes while pressed.
+
+`useWide(at = 600)` returns `[ref, wide]` and measures the ref's own box, which
+five apps had each written out as a `ResizeObserver` against the same 600 px.
+The threshold now has one home, and the reason it is a box measurement rather
+than `useDisplay()` is stated once in the kit rather than in five app comments.
+
 # 1.0.0
 
 The design system is Apple's. Every value in `tokens.stylex.ts` now traces to

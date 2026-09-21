@@ -357,6 +357,14 @@ export const appAppearance = stylex.defineConsts({
   calculatorKeyLight: '#a5a5a5',
   // calendar
   calendarPaper: 'rgba(255,255,255,.78)',
+  calendarSidebar: '#1b1b1d',
+  calendarPane: '#1f1f21',
+  calendarHover: 'rgba(255,255,255,.06)',
+  /** The sheet's rules. A calendar is almost all lines, so they sit far under the UIKit separator. */
+  calendarGrid: 'rgba(255,255,255,.07)',
+  /** Saturday and Sunday, shaded the way Apple shades them in the month and the week. */
+  calendarWeekend: 'rgba(255,255,255,.024)',
+  calendarHourLines: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px)',
   // camera
   cameraGrid:
     'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))',

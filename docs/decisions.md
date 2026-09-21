@@ -1051,3 +1051,103 @@ the row hairline is inset to where the label starts instead of running edge to
 edge. All three live in `styles.ts` and reach every pane through the `Row` and
 `Section` wrappers in `parts.tsx`, so no call site states them. Cost: Settings
 and the other grouped lists in the shell no longer match row for row.
+
+## 78. Calendar's month is a sheet ruled by the week, and it opens with a life in it
+
+2026-09-20. The first month view drew a full grid: a rule on every cell edge, a wash
+on the weekend columns, and the date set at body size in the top right. On a fresh
+install it also drew nothing else, because `useEvents` fell back to an empty list.
+Both together read as a spreadsheet someone had forgotten to fill in, which is not
+what the app is.
+
+Apple's month view is a sheet ruled only by the week. There are no column rules, and
+that is not decoration: a multi-day event is one bar running across the days it
+covers, and a vertical rule every 80 px would cut it into pieces. So the week is now
+a grid of seven columns and a few 15 px lanes, and `lanes.ts` packs each event into
+the first lane free for its whole run. Day and Week use the same packer for their
+all-day row, which is why `Cupertino trip` is one bar there too instead of the same
+title repeated in four columns. A week that runs out of lanes counts what it dropped
+and opens the day, so nothing is hidden silently. Day numbers are the footnote step,
+centred, and today and the picked day are discs rather than pills, which is why the
+disc drops the `1 Sep` month label: the label would stretch it.
+
+The cover gets dots. At 387 points a title is four letters and an ellipsis, so the
+narrow month draws up to four dots under each number and a tap opens the day, which
+is what iPhone does and what rule 1 asks for. Nothing is cover-only or inner-only;
+the same events are reachable from both.
+
+A fresh install seeds a working month around today (`seed.ts`), the keynote the
+home-screen widget draws included, so the tile and the app agree. The first edit
+writes the whole list to storage and it is the person's calendar from then on. Work
+is orange, not red: the only red on the sheet should be today.
+
+## 79. Calendar is two sheets, not one, and the rule weight is the whole argument
+
+Decision 78 dropped the column rules from the month, reasoning that a vertical line
+every 80 px would cut a multi-day bar into pieces. Held against the real thing, that
+was wrong: macOS Calendar rules its month both ways and still runs a bar straight
+over the rules, because the rule is a seventh of the weight of a separator. The
+mistake was not drawing the line, it was drawing it at `app.separator`, which is
+sized for one hairline between two rows, not for seven crossing every week. So
+`appAppearance.calendarGrid` exists and every rule in the app is on it, and
+`calendarWeekend` shades Saturday and Sunday the way both sheets do.
+
+The month is now two sheets from one component. Inside, it is the Mac's: ruled both
+ways, weekend shaded, the number hung on the right of its day, the picked day lifted
+whole. On the cover it is the phone's: no rules, no shading, the number centred over
+its dots. Rule 1 says design for the cover first, and the cover is not a small Mac.
+
+The month also stopped ruling an empty sixth week. `weeks()` returns the weeks a
+month actually spans, so a five-week month gives its rows the height it has, and the
+lanes are `1fr` rather than a fixed 16 px, which is what kept the third lane on the
+sheet in a six-week month instead of off the bottom of it. The thumbnail in the
+sidebar and the twelve in Year pad back to six, because a grid that changes height
+every month jumps.
+
+Day and Week hang their hours on their own lines rather than near them, and draw now
+the way Calendar does: pale across the week, solid with a dot on today, the time
+itself in a pill in the gutter. The head is one grid with the body, and the scroller
+has no scrollbar, because a gutter on one and not the other is what knocked the two
+out of line.
+
+The sidebar's calendars are the kit's `Checkbox`, which was written as macOS
+Calendar's tinted square and had drifted out of use. A dot plus a trailing checkmark
+was iOS's pattern wearing a Mac layout.
+
+`Sheet` now leaves the way it arrives. It popped in and vanished, because a native
+`<dialog>` closes the moment `close()` is called. `usePresence` holds the close back
+200 ms so `popOut` and the backdrop's fade can play, and `onCancel` is intercepted so
+Escape goes through React rather than closing the dialog out from under the
+animation. Every popover in the repo is this component, so they all gained the exit.
+
+## 80. The fold rule and the JSON encoding each get one home
+
+2026-09-20. Calendar's layout branch was the fourth copy of the same eleven lines:
+a `ResizeObserver` on the app's own root, a comparison against 600, a `wide`
+boolean. App Store, Notes and Photos had written it out too, each with its own
+version of the comment explaining why it measures a box instead of reading
+`useDisplay()`. The rule is a design decision, not app code: a split half of the
+inner panel is as narrow as the cover, so the room an app has is the only thing
+that can choose its columns. It is now `useWide(at = 600)` in the kit, returning
+`[ref, wide]`, and in every one of those apps the ref existed for nothing else, so
+each lost six lines and the threshold stopped being a number per app.
+
+Decision 77 wrote the fifth copy while this was in flight, which is the argument
+rather than an objection to it: Settings had reached the same 600 independently
+and named it `SPLIT`. It reads the kit's default now. Five apps arriving at one
+number by hand is how a design decision turns into folklore.
+
+The same argument settled the second copy. `useKV` is strings-only by contract and
+that is right, but every app storing a list had wrapped it in the same three lines:
+parse or fall back, stringify on write. Calendar and Notes each kept a private
+`parse` helper and Reminders inlined it. `useJSON(space, key, fallback)` in the SDK
+is that wrapper, next to `useKV` rather than in the kit, because it is storage and
+not presentation. `fallback` is the useful half: nothing written yet is a fresh
+install rather than an empty list, so Calendar seeds its month there and Reminders
+ships its five tasks there instead of at the call site.
+
+Neither is a new capability and neither is a component. The bar for moving
+something into the kit is a second consumer that already exists, which is why the
+calendar's date helpers, its lane packer and its sidebar chrome stayed in the app:
+one caller each, and a sidebar whose width, ground and border differ per app is
+four lines of flex pretending to be a component.

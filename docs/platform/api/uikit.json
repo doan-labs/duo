@@ -1,12 +1,48 @@
 {
   "package": "@doan-labs/duo-uikit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "components": [
     {
       "name": "Button",
       "description": "Native button: tinted capsule by default, filled with the link colour, or plain text. Icon-only buttons need aria-label.",
       "props": "type ButtonProps = PrimitiveProps<'button'> & { variant?: 'filled' | 'tinted' | 'plain' }",
       "source": "packages/uikit/button.tsx"
+    },
+    {
+      "name": "Checkbox",
+      "description": "Native checkbox drawn as macOS Calendar's tinted square: hollow at rest, filled\nwith a white tick when checked. `tint` is any CSS colour. Supply a visible\nlabel or aria-label.",
+      "props": "type CheckboxProps = Omit<PrimitiveProps<'input'>, 'type' | 'as'> & { tint?: string }",
+      "source": "packages/uikit/checkbox.tsx"
+    },
+    {
+      "name": "IconButton",
+      "description": "A toolbar button that is only a symbol: the plus, the chevrons, the sidebar\ntoggle. `plain` sits on the bar, `tinted` is a rounded square over `fill`,\n`round` is the small circle a stepper uses. The label is required because the\nglyph is decorative.",
+      "props": "type IconButtonProps = Omit<PrimitiveProps<'button'>, 'as' | 'children'> & {\n  name: SymProps['name']\n  size?: number\n  variant?: 'plain' | 'tinted' | 'round'\n  'aria-label': string\n}",
+      "source": "packages/uikit/icon-button.tsx"
+    },
+    {
+      "name": "Segmented",
+      "description": "Segmented control: one of a few views or filters, the selected segment raised\non `control`. A radio group to assistive tech; `onChange` gets the option.",
+      "props": "type SegmentedProps<T extends string> = Omit<PrimitiveProps<'div'>, 'as' | 'onChange' | 'children'> & {\n  options: readonly T[]\n  value: T\n  onChange: (value: T) => void\n}",
+      "source": "packages/uikit/segmented.tsx"
+    },
+    {
+      "name": "Select",
+      "description": "Native select drawn like `TextField`, so a form's pop-up and its fields line up. Children are `<option>`s.",
+      "props": "type SelectProps = Omit<PrimitiveProps<'select'>, 'as'>",
+      "source": "packages/uikit/select.tsx"
+    },
+    {
+      "name": "Sheet",
+      "description": "The backdrop's own fade. StyleX resolves keyframes per file, so it cannot come from styles.ts.",
+      "props": "type SheetProps = Omit<PrimitiveProps<'dialog'>, 'as' | 'open' | 'onClose'> & {\n  open: boolean\n  onClose: () => void\n}",
+      "source": "packages/uikit/sheet.tsx"
+    },
+    {
+      "name": "TextField",
+      "description": "Native text input over `fill`, the field in a form or a sheet. Any `type`\nworks, including `date`, `time` and `datetime-local`; `multiline` swaps in a\ntextarea. Supply a visible label or aria-label.",
+      "props": "type TextFieldProps = Omit<PrimitiveProps<'input'>, 'as'> & { multiline?: boolean }",
+      "source": "packages/uikit/text-field.tsx"
     },
     {
       "name": "HStack",

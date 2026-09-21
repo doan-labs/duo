@@ -1018,6 +1018,36 @@ export const appAppearance: Token[] = [
     "doc": "calendar"
   },
   {
+    "name": "calendarSidebar",
+    "value": "#1b1b1d",
+    "doc": ""
+  },
+  {
+    "name": "calendarPane",
+    "value": "#1f1f21",
+    "doc": ""
+  },
+  {
+    "name": "calendarHover",
+    "value": "rgba(255,255,255,.06)",
+    "doc": ""
+  },
+  {
+    "name": "calendarGrid",
+    "value": "rgba(255,255,255,.07)",
+    "doc": "The sheet's rules. A calendar is almost all lines, so they sit far under the UIKit separator."
+  },
+  {
+    "name": "calendarWeekend",
+    "value": "rgba(255,255,255,.024)",
+    "doc": "Saturday and Sunday, shaded the way Apple shades them in the month and the week."
+  },
+  {
+    "name": "calendarHourLines",
+    "value": "linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px)",
+    "doc": ""
+  },
+  {
     "name": "cameraGrid",
     "value": "linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))",
     "doc": "camera"

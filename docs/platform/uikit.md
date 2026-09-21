@@ -1,6 +1,6 @@
 # UI kit
 
-Private `@doan-labs/duo-uikit` 1.0.0 provides presentation components for baked apps
+Private `@doan-labs/duo-uikit` 1.1.0 provides presentation components for baked apps
 and isolated documents. The SDK separately owns host API, bridge, manifest and runtime
 compatibility. The kit's version never gates host compatibility.
 
@@ -15,7 +15,8 @@ The kit is Apple's design system for the device (decision 75): iOS 26 system hue
 dynamic colours as the per-app `app` theme, Dynamic Type at the Large size with the HIG's
 leading and SF Pro tracking, and `space`, `radius`, `shadow`, `glass` and `motion` scales.
 Typed `as` and StyleX `xstyle` support app composition; legacy Nav/Page/Sym/Num and style
-subpaths remain. `appAppearance` holds only an app's own colours, prefixed by its folder
+subpaths remain. `Checkbox`, `IconButton`, `Segmented`, `TextField`, `Select` and `Sheet`
+are the desktop controls a tablet layout needs, drawn on native elements. `appAppearance` holds only an app's own colours, prefixed by its folder
 name. The AST token gate (`scripts/check-app-tokens.ts`) fails any literal size, weight,
 radius, shadow, tracking, leading, font, timing or colour in `packages/apps` and
 `packages/shell`, and any cross-app `appAppearance` read; it runs locally/in CI alongside
@@ -23,7 +24,9 @@ Biome, not as a new Biome plugin.
 
 `Screen` and `useDisplay` subscribe without opening a bridge, calling ready or owning
 network/audio work. Apps own connection, readiness and effects. Layout follows the view's
-box, including cover and split widths. Navigation handles cleanup and reduced motion.
+box, including cover and split widths. `useWide` is that rule as a hook: it observes an
+element's own box against a 600 px default, so an app branches on the room it has rather
+than on which display it is. Navigation handles cleanup and reduced motion.
 Widget rendering consumes bounded snapshots; it does not fetch or wake app sessions.
 
 Each sandbox bundles its own React, kit, assets and compiled styles. It cannot inherit
