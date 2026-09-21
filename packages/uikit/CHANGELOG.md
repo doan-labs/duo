@@ -10,9 +10,9 @@ stays the iOS switch. `Checkbox` animates the way macOS draws it: the fill fades
 in, the tick springs up from half size, and the box squashes while pressed.
 
 `useWide(at = 600)` returns `[ref, wide]` and measures the ref's own box, which
-four apps had each written out as a `ResizeObserver` against the same 600 px.
+five apps had each written out as a `ResizeObserver` against the same 600 px.
 The threshold now has one home, and the reason it is a box measurement rather
-than `useDisplay()` is stated once in the kit rather than in four app comments.
+than `useDisplay()` is stated once in the kit rather than in five app comments.
 
 # 1.0.0
 

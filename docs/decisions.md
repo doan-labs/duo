@@ -1081,9 +1081,9 @@ home-screen widget draws included, so the tile and the app agree. The first edit
 writes the whole list to storage and it is the person's calendar from then on. Work
 is orange, not red: the only red on the sheet should be today.
 
-## 78. Calendar is two sheets, not one, and the rule weight is the whole argument
+## 79. Calendar is two sheets, not one, and the rule weight is the whole argument
 
-Decision 77 dropped the column rules from the month, reasoning that a vertical line
+Decision 78 dropped the column rules from the month, reasoning that a vertical line
 every 80 px would cut a multi-day bar into pieces. Held against the real thing, that
 was wrong: macOS Calendar rules its month both ways and still runs a bar straight
 over the rules, because the rule is a seventh of the weight of a separator. The
@@ -1120,7 +1120,7 @@ was iOS's pattern wearing a Mac layout.
 Escape goes through React rather than closing the dialog out from under the
 animation. Every popover in the repo is this component, so they all gained the exit.
 
-## 79. The fold rule and the JSON encoding each get one home
+## 80. The fold rule and the JSON encoding each get one home
 
 2026-09-20. Calendar's layout branch was the fourth copy of the same eleven lines:
 a `ResizeObserver` on the app's own root, a comparison against 600, a `wide`
@@ -1129,8 +1129,13 @@ version of the comment explaining why it measures a box instead of reading
 `useDisplay()`. The rule is a design decision, not app code: a split half of the
 inner panel is as narrow as the cover, so the room an app has is the only thing
 that can choose its columns. It is now `useWide(at = 600)` in the kit, returning
-`[ref, wide]`, and in all four apps the ref existed for nothing else, so each lost
-six lines and the threshold stopped being four separate numbers.
+`[ref, wide]`, and in every one of those apps the ref existed for nothing else, so
+each lost six lines and the threshold stopped being a number per app.
+
+Decision 77 wrote the fifth copy while this was in flight, which is the argument
+rather than an objection to it: Settings had reached the same 600 independently
+and named it `SPLIT`. It reads the kit's default now. Five apps arriving at one
+number by hand is how a design decision turns into folklore.
 
 The same argument settled the second copy. `useKV` is strings-only by contract and
 that is right, but every app storing a list had wrapped it in the same three lines:
