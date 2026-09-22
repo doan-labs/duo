@@ -71,6 +71,14 @@ const newFolder = '/icons/sym/folder-badge-plus.webp'
 const folder = '/icons/sym/folder-fill.webp'
 const gear = '/icons/sym/gear.webp'
 const privacy = '/icons/sym/hand-raised-fill.webp'
+const bookmark = '/icons/sym/bookmark.webp'
+const textSmaller = '/icons/sym/textformat-size-smaller.webp'
+const textLarger = '/icons/sym/textformat-size-larger.webp'
+const findOnPage = '/icons/sym/doc-text-magnifyingglass.webp'
+const eyeSlash = '/icons/sym/eye-slash.webp'
+const translate = '/icons/sym/translate.webp'
+const extension = '/icons/sym/puzzlepiece-extension.webp'
+const pageMenu = '/icons/sym/text-below-rectangle.webp'
 const iphone = '/icons/sym/iphone.webp'
 const live = '/icons/sym/livephoto.webp'
 const location = '/icons/sym/location-fill.webp'
@@ -329,6 +337,14 @@ export const SYM = {
   moon,
   iphone,
   privacy,
+  bookmark,
+  textSmaller,
+  textLarger,
+  findOnPage,
+  eyeSlash,
+  translate,
+  extension,
+  pageMenu,
   lock,
   back,
   forward,

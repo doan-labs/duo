@@ -1179,3 +1179,79 @@ for one of the three and in the way of the other two. Cost: a new menu has to
 decide for itself what dismisses it, and Maps and Weather changed appearance
 slightly: both gained the exit they never had, and Weather's typed `✓` is now
 the same `app.link` tick Maps was already drawing.
+
+## 82. The menu draws iOS 26, row for row
+
+2026-09-22. Safari's two menus were a guess at Apple's: a glyph on the trailing
+edge, no rules between groups, and a list of whatever the shell could do. Held
+against screenshots of iOS 26, Apple's more menu is Share, Add to Bookmarks, Add
+Bookmark to…, a rule, New Tab, New Private Tab, and a footer of two glyph-over-
+caption buttons, Bookmarks and All Tabs; the page menu is Hide Distracting Items,
+Translate, a rule, Manage Extensions, and a footer of Find on Page and the two
+text-size buttons. Every glyph sits on the leading edge.
+
+`Menu` now draws that: `icon` leads, `items` takes `'separator'`, and `footer` is
+the closing row. Maps and Weather inherit the leading glyph, which is the iOS 26
+shape they were meant to have. Safari fills both menus with Apple's rows and greys
+the ones a cross-origin frame forbids, Hide Distracting Items, Translate, Manage
+Extensions and Find on Page, rather than dropping or faking them. Text size is
+real: Safari's Page Zoom is the frame laid out at 100/z and scaled by z, in
+Apple's eleven steps from 50% to 300%, remembered per host for the session. Seven
+SF Symbols join the set for the new rows. Cost: a private tab is a plain new tab,
+since the shell keeps no history or storage for any tab, and the •••
+sub-menu inside the page menu (Request Desktop Website, Page Actions, Website
+Settings) is not drawn yet.
+
+## 83. The address bar is iOS 26's dark glass, with nothing under it
+
+2026-09-23. Held against the phone, Safari's bar was wrong three ways: a white
+glass with a second white field inside it, three drawn lines where Apple has a
+glyph, and a toolbar row of back, forward, share, bookmarks and tabs under a
+layout that has none. On iOS 26 the pill, the back button and the more button
+are one dark glass, rgb 73 over a white page, that lets the page's type show
+through, and the leading glyph is `text.below.rectangle`, a symbol only Apple's
+own apps get. `scripts/symbols.swift` now falls back to CoreGlyphsPrivate, where
+it loads by name through `Bundle.image(forResource:)`.
+
+The bar wears the kit's `dark` theme, so its type, glyphs and placeholder read
+from `app` like any dark screen. The address sits straight on the glass at 17 px,
+and at 13 px on the cover, whose camera column leaves the host about 80 px. The
+toolbar row is gone from the inner display: share, bookmarks and all tabs were
+already in the more menu, and bookmarks takes the round close button an iOS 26
+sheet carries.
+
+The compact bar is measured off the phone rather than guessed: the full pill at
+72%, sunk 10 px to sit just above the home indicator, as wide as the host plus
+18 pt either side, which a canvas measures because an input never sizes to its
+text. The scale springs and the width does not, since a width that overshoots
+narrows the pill past the name it is shrinking around. A tap on the compact pill
+only brings the bar back; the next one edits the address. Cost: forward has no
+button on the inner display, as on the phone, where it is a swipe the shell
+cannot take from a cross-origin frame. The glass is always dark, where Apple's
+lightens over a light page in light mode; the shell cannot read a frame's pixels
+to choose.
+
+## 84. Safari's buttons give under the finger, and All Tabs is iOS 26's overview
+
+2026-09-23
+
+The more and back buttons had no press state, and the page menu and reload
+glyphs had one on the bar's .45 s transition, so a click lifted before they
+moved. Every Safari button now takes the kit's `motion.press` in
+`motion.pressDuration` and lets go on `easing.spring`, the durations switching
+on `:active` so the way in is fast and the way out springs. The round glass
+buttons also light, to `safariBarPress`, as iOS 26's glass does, and a bookmark
+row greys at once and fades instead of shrinking, as an iOS list row does.
+
+All Tabs was light cards with a close dot top-left over a white page. It is now
+the phone's overview: the cards on dark ground under the kit's `dark` theme, a
+glass close dot top-right, and in place of the address bar a new tab button,
+the Private and Tabs segments on one glass track, and a blue Done. Private tabs
+are a list of their own: New Private Tab and the overview's + on Private add to
+it, it may run empty and then shows its own page, and Done goes back to the open
+tab if it is in the list on show, else that list's last tab, else a new one. The
+open tab is held by id, since closing a tab before it would shift an index.
+Cost: a private tab is private only in name, as before, since the shell keeps no
+history or storage for any tab. The status bar stays dark-on-light over the dark
+overview: the shell draws it from the manifest's fixed `light` flag, and no app
+can change that while it runs.

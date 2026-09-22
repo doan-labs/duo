@@ -32,7 +32,9 @@ xcrun swift scripts/symbols.swift "$out/sym" 128 \
   shared.with.you hand.draw paintbrush.pointed doc.text square.and.arrow.down.on.square minus \
   line.3.horizontal.decrease ellipsis info.circle checkmark.circle.fill chevron.down \
   mappin figure.walk bus.fill tram.fill fork.knife cup.and.saucer.fill \
-  cart.fill cross.fill leaf.fill building.columns.fill film.fill star checkmark globe.americas.fill
+  cart.fill cross.fill leaf.fill building.columns.fill film.fill star checkmark globe.americas.fill \
+  bookmark textformat.size.smaller textformat.size.larger doc.text.magnifyingglass eye.slash translate puzzlepiece.extension \
+  text.below.rectangle
 
 # PNG straight off the icon services is ~50 KB each; webp holds up at a fifth of that.
 find "$out" -name '*.png' | while read -r f; do

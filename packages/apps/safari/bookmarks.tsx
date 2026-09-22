@@ -3,7 +3,8 @@ import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { styles } from './styles.ts'
 
-type Props = { onNavigate: (url: string) => void }
+// The cover closes bookmarks from its rail; the inner display passes onClose.
+type Props = { onNavigate: (url: string) => void; onClose?: () => void }
 type Section = 'bookmarks' | 'reading-list' | 'history'
 type Folder = 'recently-saved' | 'favorites' | 'tab-group-favorites'
 
@@ -20,15 +21,16 @@ const favorites = [
   ['Bun', 'https://bun.sh/docs', 'bun.sh/docs']
 ] as const
 
-const recent = [
+// Recently Saved is the one list Add to Bookmarks writes to; it lives for the session.
+export const recent: [string, string, string][] = [
   ['Duo', 'https://duo.doan-labs.com', 'duo.doan-labs.com'],
   ['Wikipedia', 'https://en.m.wikipedia.org', 'en.m.wikipedia.org']
-] as const
+]
 
 const iconFor = (label: string): 'star' | 'globe' | 'bookOutline' =>
   label === 'Apple' ? 'star' : label === 'Wikipedia' ? 'globe' : 'bookOutline'
 
-export const Bookmarks = ({ onNavigate }: Props) => {
+export const Bookmarks = ({ onNavigate, onClose }: Props) => {
   const [section, setSection] = useState<Section>('bookmarks')
   const [folder, setFolder] = useState<Folder | null>(null)
 
@@ -64,6 +66,11 @@ export const Bookmarks = ({ onNavigate }: Props) => {
           <span>{title}</span>
           {!showBack && <Sym name="forward" size={15} />}
         </button>
+        {onClose && (
+          <button type="button" {...stylex.props(styles.bookmarkClose)} aria-label="Close bookmarks" onClick={onClose}>
+            <Sym name="close" size={13} />
+          </button>
+        )}
       </div>
       <div {...stylex.props(styles.bookmarkSegments)} role="tablist" aria-label="Bookmarks sections">
         {sections.map(([id, label, icon]) => (

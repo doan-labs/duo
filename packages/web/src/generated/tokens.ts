@@ -1385,7 +1385,7 @@ export const appAppearance: Token[] = [
   {
     "name": "safariGlass",
     "value": "rgba(255,255,255,.7)",
-    "doc": "The cover rail's glass: circle fill, its hairline and drop, the pill's hairline, the tab card's close dot and its drop."
+    "doc": "The cover rail's glass: circle fill, its hairline and drop, the pill's hairline."
   },
   {
     "name": "safariGlassEdge",
@@ -1398,13 +1398,28 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "safariDot",
-    "value": "rgba(255,255,255,.85)",
+    "name": "safariBar",
+    "value": "rgba(40,40,42,.8)",
+    "doc": "The floating address bar and its round buttons: iOS 26's dark glass, which\nreads rgb 73 over a white page on the phone, and a blur thin enough that\nthe page's type still shows through it."
+  },
+  {
+    "name": "safariBarPress",
+    "value": "rgba(84,84,88,.8)",
+    "doc": "The same glass lit by a finger on a round button."
+  },
+  {
+    "name": "safariBarBlur",
+    "value": "blur(6px) saturate(180%)",
     "doc": ""
   },
   {
-    "name": "safariDotShadow",
-    "value": "0 1px 3px rgba(0,0,0,.2)",
+    "name": "safariMenu",
+    "value": "rgba(255,255,255,.8)",
+    "doc": "The sheet a menu lands on, and the tile behind a saved link's glyph."
+  },
+  {
+    "name": "safariMarkTile",
+    "value": "#d7f0ff",
     "doc": ""
   },
   {

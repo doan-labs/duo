@@ -97,8 +97,10 @@ is the nav transition with the open state kept by the caller. Reduced-motion use
 receive no preset animation.
 
 `Menu` is the pop-up menu those parts add up to: pass `open`, `onClose` and
-`items`, and it floats out of the control that opened it, ticks a `checked` row,
-goes dead to the pointer while it sinks, and unmounts. It carries no coordinates,
+`items`, and it floats out of the control that opened it, draws a row's glyph on
+the leading edge as iOS 26 does, rules a line at each `'separator'`, ticks a
+`checked` row, ends in an optional `footer` of glyph-over-caption buttons, goes
+dead to the pointer while it sinks, and unmounts. It carries no coordinates,
 so `xstyle` both places and tints the sheet and `itemStyle` sets a row's type
 step. It draws no scrim: a menu over a cross-origin frame or a canvas needs the
 app's own catcher for a tap outside, and one whose surface already reports a

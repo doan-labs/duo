@@ -95,11 +95,15 @@ For scripted React range changes, use the native input value setter before dispa
 input; direct assignment can update React's tracker without notifying its handler.
 For layout checks, finish only finite shell animations, never infinite app animations.
 Safari's URL pill is covered by a real embedded-page scroll check: select the visible Safari app,
-scroll inside `iframe[title="Page"]` down to assert the compact gray pill, then up to assert
-the expanded translucent pill. The Duo site sends the direction through its
-`duo-safari-scroll` parent message because the iframe is cross-origin. Test a second external
-site only for navigation and interaction; without the bridge, its private scroll cannot drive
-Safari chrome.
+scroll inside `iframe[title="Page"]` down to assert the compact pill (`scale(.72)`, a px
+`max-width` hugging the host), then up to assert the expanded pill (`max-width: 100%`). The Duo
+site sends the direction through its `duo-safari-scroll` parent message because the iframe is
+cross-origin. A mouse wheel over the device orbits the camera rather than scrolling the page;
+to drive the pill from the top page, dispatch that message yourself as a `MessageEvent` whose
+`source` is the frame's `contentWindow` and whose `origin` is the frame's. To inspect the
+motion, pause the row's `document.getAnimations()` and step `currentTime` between captures.
+Test a second external site only for navigation and interaction; without the bridge, its
+private scroll cannot drive Safari chrome.
 Control Center child paths, when needed: + `[1,0,0,0,0]`, power `[1,0,0,0,1]`, rail
 `[1,0,1,i]`, grid `[1,0,0,1,0,0,0,n]` (tile child 0, minus child 1), radio
 `[1,0,0,1,0,0,0,0,0,j]`; recheck against current DOM before relying on them.

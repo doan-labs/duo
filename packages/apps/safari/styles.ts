@@ -3,8 +3,8 @@ import {
   appAppearance,
   colors,
   easing,
-  glass,
   leading,
+  motion,
   radius,
   shadow,
   tracking,
@@ -15,6 +15,18 @@ import * as stylex from '@stylexjs/stylex'
 
 const bookmarkRise = stylex.keyframes({ from: { transform: 'translateY(100%)', opacity: 0 } })
 const bookmarkSink = stylex.keyframes({ to: { transform: 'translateY(100%)', opacity: 0 } })
+
+// A press lands in the kit's .15 s and lets go on a spring. Eased at the
+// release's pace both ways, a quick click lifts before the button has moved.
+const PRESS = {
+  transform: { default: 'scale(1)', ':active': motion.press },
+  transitionDuration: {
+    default: '.45s',
+    ':active': motion.pressDuration,
+    '@media (prefers-reduced-motion: reduce)': '0s'
+  },
+  transitionTimingFunction: { default: easing.spring, ':active': easing.out }
+} as const
 
 export const styles = stylex.create({
   body: { display: 'flex', flexDirection: 'column', paddingBottom: 0 },
@@ -40,7 +52,16 @@ export const styles = stylex.create({
     color: colors.black
   },
   favs: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 12 },
-  fav: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 0, color: colors.black },
+  fav: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 6,
+    padding: 0,
+    color: colors.black,
+    ...PRESS,
+    transitionProperty: 'transform'
+  },
   favIcon: {
     display: 'grid',
     placeItems: 'center',
@@ -66,7 +87,8 @@ export const styles = stylex.create({
     placeItems: 'center',
     height: '100%',
     fontSize: typeScale.caption1,
-    color: app.label2
+    // The card stays white under the overview's dark theme, so not app.label2.
+    color: colors.grey
   },
   bookmarkLayer: {
     position: 'absolute',
@@ -132,9 +154,23 @@ export const styles = stylex.create({
     paddingBottom: 4,
     paddingLeft: 4,
     color: app.link,
-    transform: { default: 'scale(1)', ':active': 'scale(.9)' },
-    transitionProperty: 'transform',
-    transitionDuration: '.2s'
+    ...PRESS,
+    transitionProperty: 'transform'
+  },
+  // The inner display has no toolbar to close bookmarks from, so the page takes
+  // the round close button an iOS 26 sheet carries at its top right.
+  bookmarkClose: {
+    display: 'grid',
+    placeItems: 'center',
+    width: 30,
+    height: 30,
+    marginLeft: 'auto',
+    padding: 0,
+    borderRadius: radius.circle,
+    backgroundColor: app.fill,
+    color: app.label2,
+    ...PRESS,
+    transitionProperty: 'transform'
   },
   bookmarkSegments: {
     display: 'grid',
@@ -192,7 +228,12 @@ export const styles = stylex.create({
     fontSize: typeScale.body,
     lineHeight: leading.body,
     letterSpacing: tracking.body,
-    color: colors.black
+    color: colors.black,
+    // A list row does not shrink under the finger: iOS greys it at once and
+    // lets the grey fade when the finger lifts.
+    backgroundColor: { default: 'transparent', ':active': app.fill },
+    transitionProperty: 'background-color',
+    transitionDuration: { default: '.3s', ':active': '0s' }
   },
   bookmarkIcon: {
     display: 'grid',
@@ -238,12 +279,8 @@ export const styles = stylex.create({
     minWidth: 150,
     backgroundColor: appAppearance.safariMenu
   },
-  moreItem: {
-    borderBottomWidth: { default: 1, ':last-child': 0 },
-    borderBottomStyle: 'solid',
-    borderBottomColor: app.separator,
-    color: colors.black
-  },
+  // No hairline per row: iOS 26 rules only between groups, and the menu draws that.
+  moreItem: { color: colors.black },
   bookmarkEmpty: {
     display: 'flex',
     flexDirection: 'column',
@@ -256,105 +293,148 @@ export const styles = stylex.create({
     lineHeight: leading.body
   },
   // The URL bar floats over the page, so the web content keeps its full height.
-  foot: { position: 'absolute', right: 0, bottom: 0, left: 0, zIndex: 3, pointerEvents: 'none' },
+  // iOS 26 runs no toolbar under it on either display, so the row clears the
+  // home indicator itself.
+  foot: { position: 'absolute', right: 0, bottom: 0, left: 0, zIndex: 3, paddingBottom: 16, pointerEvents: 'none' },
   // The page menu rises from the address bar, so it lives in the foot with it.
   // A transparent scrim over the page takes the tap that dismisses it — the page
   // is a cross-origin frame and never reports a click of its own.
   pageScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3 },
   pageMenu: { marginRight: 12, marginBottom: 6, marginLeft: 12, backgroundColor: appAppearance.safariMenu },
-  // No toolbar under it on the cover, so the pill clears the home indicator itself.
-  footRail: { paddingBottom: 16 },
+  // The more menu rises out of its round button at the right, as wide as its rows.
+  menuRight: { width: 'fit-content', minWidth: 240, marginLeft: 'auto' },
+  // Page Zoom: the frame is laid out at 100/z and drawn at z, which is what
+  // WebKit's zoom does to a page: bigger type, same visible width, reflowed.
+  zoom: (z: number) => ({
+    width: `${100 / z}%`,
+    height: `${100 / z}%`,
+    transform: `scale(${z})`,
+    transformOrigin: 'top left'
+  }),
+  // Apple's row: a round back button, the address pill, a round more button.
+  footRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 12,
+    paddingBottom: 8,
+    paddingLeft: 12
+  },
+  // The row wears the kit's dark theme, so the glyphs, the type and the
+  // placeholder on the glass all read from `app` as they would in a dark app.
+  footBtn: {
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+    width: 44,
+    height: 44,
+    padding: 0,
+    borderRadius: radius.circle,
+    // The glass lights under the finger as well as giving, as iOS 26's does.
+    backgroundColor: { default: appAppearance.safariBar, ':active': appAppearance.safariBarPress },
+    boxShadow: `${shadow.card}, ${shadow.rim}`,
+    backdropFilter: appAppearance.safariBarBlur,
+    WebkitBackdropFilter: appAppearance.safariBarBlur,
+    // A dead back button keeps its glass and greys only the chevron, as iOS does.
+    color: { default: app.fg, ':disabled': app.label3 },
+    pointerEvents: 'auto',
+    opacity: 1,
+    ...PRESS,
+    transitionProperty: 'opacity, transform, background-color'
+  },
+  footBtnOff: { opacity: 0, transform: 'scale(.4)', pointerEvents: 'none' },
   url: {
     display: 'flex',
     alignItems: 'center',
+    flexGrow: 1,
     gap: 6,
     minHeight: 44,
-    marginRight: 12,
-    marginBottom: 8,
-    marginLeft: 12,
     paddingTop: 5,
     paddingRight: 8,
     paddingBottom: 5,
     paddingLeft: 8,
     borderRadius: radius.pill,
     backgroundColor: appAppearance.safariBar,
-    boxShadow: `${shadow.float}, ${appAppearance.safariBarSheen}`,
-    backdropFilter: glass.blur,
-    WebkitBackdropFilter: glass.blur,
-    color: colors.blue,
+    boxShadow: `${shadow.card}, ${shadow.rim}`,
+    backdropFilter: appAppearance.safariBarBlur,
+    WebkitBackdropFilter: appAppearance.safariBarBlur,
+    color: app.fg,
     pointerEvents: 'auto',
-    // Compacting by width/height would relayout and re-blur the glass every
-    // frame. A scale about the bottom edge lands on the same 72%-wide, 32-tall
-    // pill on the compositor instead, so the transition never touches layout.
+    // The type and the height come down on the compositor, through a scale about
+    // the bottom edge. The width cannot: a scale that took the pill down to a
+    // host name would take the name with it. So the box narrows too, and the
+    // buttons inside it collapse, which is the one thing here that relayouts.
+    maxWidth: '100%',
+    overflow: 'hidden',
     transformOrigin: 'bottom center',
-    transform: 'scale(1)',
+    transform: 'translateY(0) scale(1)',
     willChange: 'transform',
-    transitionProperty: 'transform, background-color, box-shadow',
-    transitionDuration: { default: '.3s', '@media (prefers-reduced-motion: reduce)': '0s' },
-    transitionTimingFunction: easing.pop
+    transitionProperty: 'transform, max-width',
+    transitionDuration: { default: '.45s', '@media (prefers-reduced-motion: reduce)': '0s' },
+    // The scale may spring past its mark; the width may not, or the pill dips
+    // narrower than the name it is shrinking around and the type hits the edge.
+    transitionTimingFunction: `${easing.spring}, ${easing.push}`
   },
-  urlCompact: {
-    backgroundColor: appAppearance.safariBarCompact,
-    boxShadow: shadow.card,
-    transform: 'scale(.72)'
-  },
-  // Safari's compact bar carries the domain alone. The buttons fade rather than
-  // unmount so they keep their box, and the name stays centred without a reflow.
-  urlSideOff: { opacity: 0, pointerEvents: 'none' },
-  inputCompact: { backgroundColor: 'transparent' },
-  urlMenu: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: 3,
-    width: 26,
-    height: 28,
-    paddingTop: 5,
-    paddingRight: 5,
-    paddingBottom: 5,
-    paddingLeft: 5,
-    color: colors.black,
-    opacity: { default: 1, ':focus-visible': 0.55 },
-    transform: { default: 'scale(1)', ':active': 'scale(.9)' },
-    transitionProperty: 'opacity, transform',
-    transitionDuration: '.2s'
-  },
-  menuLine: { display: 'block', width: 16, height: 2, borderRadius: radius.pill, backgroundColor: 'currentColor' },
-  urlReload: {
+  // Safari's compact bar is the host and nothing else. On the phone it is the
+  // full pill at 72%, 32 pt tall with 13 pt type, sunk to sit just above the
+  // home indicator, and only as wide as the name plus 18 pt either side.
+  urlCompact: (width: number) => ({ transform: 'translateY(10px) scale(.72)', maxWidth: width }),
+  // The buttons give up their box as well as their ink, so the pill closes over
+  // the gap instead of holding two empty squares either side of the name.
+  urlSideOff: { width: 0, paddingRight: 0, paddingLeft: 0, opacity: 0, transform: 'scale(.4)', pointerEvents: 'none' },
+  // The page menu's glyph at the leading end, the reload arrow at the trailing.
+  urlSide: {
     display: 'grid',
     placeItems: 'center',
+    flexShrink: 0,
     width: 28,
     height: 28,
     paddingTop: 3,
     paddingRight: 3,
     paddingBottom: 3,
     paddingLeft: 3,
-    color: colors.black,
-    transform: { default: 'scale(1)', ':active': 'scale(.9)' },
-    transitionProperty: 'opacity, transform',
-    transitionDuration: '.2s'
+    opacity: { default: 1, ':focus-visible': 0.55 },
+    ...PRESS,
+    transitionProperty: 'opacity, transform, width, padding',
+    // Only the glyph's scale springs; the box keeps push, or its width overshoots
+    // and shoves the address sideways as the pill opens.
+    transitionTimingFunction: {
+      default: `${easing.push}, ${easing.spring}, ${easing.push}`,
+      ':active': easing.out
+    }
   },
+  // No field inside the pill: the address sits straight on the glass.
   input: {
     flexGrow: 1,
     minWidth: 0,
     borderWidth: 0,
-    borderRadius: radius.lg,
-    paddingTop: 7,
+    paddingTop: 0,
     paddingRight: 8,
-    paddingBottom: 7,
+    paddingBottom: 0,
     paddingLeft: 8,
-    backgroundColor: appAppearance.safariBarField,
+    backgroundColor: 'transparent',
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    textAlign: 'center',
+    textOverflow: 'ellipsis',
+    color: app.fg,
+    outline: 0,
+    '::placeholder': { color: app.label2 }
+  },
+  // The cover's pill shares its width with the camera column, which leaves the
+  // host about 80 px: 17 px type truncates even localhost:3001 there.
+  inputRail: {
+    paddingRight: 0,
+    paddingLeft: 0,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
-    letterSpacing: tracking.footnote,
-    textAlign: 'center',
-    color: colors.black,
-    outline: 0,
-    transitionProperty: 'background-color, color',
-    transitionDuration: '.2s'
+    letterSpacing: tracking.footnote
   },
-  // The tab switcher: Safari's grid of live page cards over the page, two across,
-  // the open one ringed, a close dot top-left of each.
+  // The tab overview, iOS 26's: live page cards on dark ground under the kit's
+  // dark theme, a glass close dot top-right of each, the open one ringed when
+  // there is more than one to tell it from.
   grid: {
     position: 'absolute',
     inset: 0,
@@ -371,7 +451,7 @@ export const styles = stylex.create({
     paddingBottom: 72,
     paddingLeft: 12,
     overflowY: 'auto',
-    backgroundColor: app.elevated
+    backgroundColor: app.surface
   },
   card: { position: 'relative', display: 'flex', flexDirection: 'column', minWidth: 0 },
   cardPick: {
@@ -381,10 +461,9 @@ export const styles = stylex.create({
     borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: colors.white,
-    boxShadow: { default: shadow.card, ':active': `0 0 0 2px ${colors.blue}` },
-    transitionProperty: 'transform, box-shadow',
-    transitionDuration: '.2s',
-    transform: { default: 'scale(1)', ':active': 'scale(.97)' }
+    boxShadow: shadow.card,
+    ...PRESS,
+    transitionProperty: 'transform'
   },
   cardOn: { boxShadow: `0 0 0 2px ${colors.blue}` },
   // The card's page at a third: wide as three cards, drawn back to one, untouchable.
@@ -399,40 +478,84 @@ export const styles = stylex.create({
   cardClose: {
     position: 'absolute',
     top: 6,
-    left: 6,
+    right: 6,
     display: 'grid',
     placeItems: 'center',
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     padding: 0,
     borderRadius: radius.circle,
-    backgroundColor: appAppearance.safariDot,
-    color: colors.black,
-    boxShadow: appAppearance.safariDotShadow
+    backgroundColor: appAppearance.safariBar,
+    backdropFilter: appAppearance.safariBarBlur,
+    WebkitBackdropFilter: appAppearance.safariBarBlur,
+    color: app.fg,
+    ...PRESS,
+    transitionProperty: 'transform'
   },
   cardName: {
     paddingTop: 6,
     textAlign: 'center',
-    fontSize: typeScale.caption1,
-    lineHeight: leading.caption1,
-    letterSpacing: tracking.caption1,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    color: colors.black
+    color: app.fg
   },
-  bar: {
+  // An empty private list is a page of its own, as on the phone.
+  privateEmpty: {
+    position: 'absolute',
+    inset: 0,
+    display: 'grid',
+    placeContent: 'center',
+    gap: 6,
+    paddingInline: 32,
+    textAlign: 'center',
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    color: app.label2
+  },
+  privateTitle: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.semibold,
+    color: app.fg
+  },
+  // In the overview the address bar's row holds a new tab button, the Private
+  // and Tabs segments on one glass track, and a blue Done. The track's auto
+  // margins hold the two buttons out at the ends.
+  tabSegs: {
     display: 'flex',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingInline: 20,
-    // The home indicator owns the bottom 22 px of the display; the buttons clear it.
-    paddingBottom: 24,
-    backgroundColor: app.elevated,
-    flexShrink: 0,
-    color: colors.blue
+    marginRight: 'auto',
+    marginLeft: 'auto',
+    padding: 3,
+    borderRadius: radius.pill,
+    backgroundColor: appAppearance.safariBar,
+    boxShadow: `${shadow.card}, ${shadow.rim}`,
+    backdropFilter: appAppearance.safariBarBlur,
+    WebkitBackdropFilter: appAppearance.safariBarBlur,
+    pointerEvents: 'auto'
   },
+  tabSeg: {
+    height: 38,
+    // 12 either side keeps 17 px type inside the cover's row up to 99 tabs.
+    paddingInline: 12,
+    borderRadius: radius.pill,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    fontWeight: weight.semibold,
+    whiteSpace: 'nowrap',
+    color: app.label2,
+    ...PRESS,
+    transitionProperty: 'transform, background-color, color'
+  },
+  tabSegOn: { backgroundColor: app.fill, color: app.fg },
+  done: { backgroundColor: colors.blue, color: colors.white },
   // The camera column, 82 wide so its centre lands under the punch-hole (right
   // 24 + half the 34 ring). The stack above is 18 + hole 25 + time 21 + ring 45.
   rail: {
@@ -463,10 +586,8 @@ export const styles = stylex.create({
     borderRadius: radius.circle,
     backgroundColor: appAppearance.safariGlass,
     boxShadow: `${appAppearance.safariGlassEdge}, ${shadow.rim}`,
-    transform: { default: 'scale(1)', ':active': 'scale(.9)' },
-    transitionProperty: 'transform, opacity',
-    transitionDuration: { default: '.22s', '@media (prefers-reduced-motion: reduce)': '0s' },
-    transitionTimingFunction: easing.pop
+    ...PRESS,
+    transitionProperty: 'transform, opacity'
   },
   railGap: { flexGrow: 1 },
   barBtn: {
