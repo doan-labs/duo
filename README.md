@@ -29,6 +29,10 @@ without rebuilding the simulator.
 
 https://github.com/user-attachments/assets/2460d57e-335e-4c2f-bda9-b00b6561417d
 
+## Try it for yourself
+
+https://duo.doan-labs.com/simulator
+
 ## Run locally
 
 You'll need Bun and Python. For the desktop app, you'll also need Rust and the
