@@ -1,3 +1,17 @@
+# 1.2.0
+
+Added `Menu`, the iOS pop-up menu: a sheet of actions that floats out of the
+control which opened it and sinks back once one is chosen. Four apps had built
+it by hand — Safari twice, Maps and Weather once each — and only Safari's had an
+exit animation or a tick on a checked row. `MenuItem` is `label`, optional
+`icon`, `checked`, `disabled`, `name` (the spoken one) and `onSelect`; the
+component owns `role="menu"`, the radio rows, mounting through the exit and
+going dead to the pointer while it sinks. `xstyle` places and tints the sheet
+and `itemStyle` carries the app's type step, since a menu over a map and one
+over a night sky are the same control in different clothes.
+
+No SDK protocol or host compatibility requirement changes.
+
 # 1.1.0
 
 Added the desktop-style controls Calendar's tablet layout needed, so no app has

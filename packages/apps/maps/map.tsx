@@ -1,3 +1,4 @@
+import { Menu } from '@doan-labs/duo-uikit'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent, useEffect, useRef, useState } from 'react'
@@ -174,31 +175,24 @@ export function MapCanvas({ view, onView, kind, onKind, sel, onSelect, padX, pad
           </div>
         </div>
 
-        {menu && (
-          <div role="menu" {...stylex.props(styles.menu)} onPointerDown={stop}>
-            {(['explore', 'satellite'] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="menuitemradio"
-                aria-checked={kind === k}
-                onClick={() => {
-                  onKind(k)
-                  setMenu(false)
-                }}
-                {...stylex.props(styles.menuItem)}
-              >
+        <Menu
+          open={menu}
+          onClose={() => setMenu(false)}
+          onPointerDown={stop}
+          size={12}
+          xstyle={styles.menu}
+          itemStyle={styles.menuItem}
+          items={(['explore', 'satellite'] as const).map((k) => ({
+            label: (
+              <>
                 <Sym name={k === 'explore' ? 'map' : 'globe'} size={14} />
                 {k === 'explore' ? 'Explore' : 'Satellite'}
-                {kind === k && (
-                  <i {...stylex.props(styles.check)}>
-                    <Sym name="tick" size={12} />
-                  </i>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+              </>
+            ),
+            checked: kind === k,
+            onSelect: () => onKind(k)
+          }))}
+        />
 
         <div {...stylex.props(styles.legal)}>{dark ? 'Imagery © Esri' : '© OpenStreetMap contributors'}</div>
       </div>

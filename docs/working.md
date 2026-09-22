@@ -136,6 +136,17 @@ ramp at 11. `getBoundingClientRect()` is screen space; use `spot()`'s offset cha
 panel coordinates, including home-page transforms. Chromium can lose rounded image clips
 inside CSS3D; existing widgets use text/gradients.
 
+## Safari maintenance
+
+`packages/apps/safari/index.tsx` owns tab history, the floating URL pill and the cover rail;
+`bookmarks.tsx` owns the local Recently Saved, folders and bookmark sections; shared Safari
+layout and material rules stay in `styles.ts`. Real web pages scroll in their own iframe
+viewport. The Duo website mounts `packages/web/src/safari-scroll-bridge.tsx`, which sends only
+scroll direction and position to the parent because cross-origin document scroll events cannot
+reach the Safari DOM. The URL pill compacts into the small gray pill on downward intent and
+expands on upward intent. A page that does not install the bridge remains functional, but its
+URL pill cannot mirror its private scroll position.
+
 The grid order and the wallpaper persist in localStorage (`os.home`, `os.wallpaper`); clear
 them for a factory home. `screen.ts` bakes from the same `grid()` snapshot the live home
 renders, so a change to either must keep the two reading the same data.

@@ -165,6 +165,8 @@ export const styles = stylex.create({
   },
   divider: { height: 1, backgroundColor: appAppearance.mapsHairline },
   on: { color: colors.blue },
+  // Where the kit's `Menu` sits over the map, and the card it is cut from; the
+  // sheet, the tick and the float in and out are the kit's.
   menu: {
     position: 'absolute',
     top: 44,
@@ -173,29 +175,17 @@ export const styles = stylex.create({
     paddingTop: 4,
     paddingBottom: 4,
     borderRadius: radius.md,
-    backgroundColor: appAppearance.mapsCard,
-    backdropFilter: glass.blur,
-    WebkitBackdropFilter: glass.blur,
-    boxShadow: shadow.float,
-    pointerEvents: 'auto',
-    zIndex: 3
+    backgroundColor: appAppearance.mapsCard
   },
   menuItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    width: '100%',
     paddingInline: 10,
     paddingBlock: 6,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
     color: colors.black,
-    textAlign: 'left',
-    cursor: 'pointer',
     backgroundColor: { default: 'transparent', ':hover': appAppearance.mapsHover }
   },
-  check: { marginLeft: 'auto', color: colors.blue },
 
   scale: {
     position: 'absolute',

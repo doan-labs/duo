@@ -810,6 +810,107 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
+    "name": "Menu",
+    "kind": "component",
+    "file": "packages/uikit/menu.tsx",
+    "line": 41,
+    "doc": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.",
+    "signature": "function Menu({ open, onClose, items, size = 16, itemStyle, xstyle, animate, ...props }: MenuProps)",
+    "members": [
+      {
+        "name": "open",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "onClose",
+        "type": "() => void",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "items",
+        "type": "MenuItem[]",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "size",
+        "type": "number",
+        "optional": true,
+        "doc": "Row glyph size; a menu set in a smaller type step wants a smaller one.",
+        "default": "16"
+      },
+      {
+        "name": "itemStyle",
+        "type": "KitStyle",
+        "optional": true,
+        "doc": ""
+      }
+    ],
+    "extends": [
+      "Omit<PrimitiveProps<'div'>, 'children' | 'as'>"
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "MenuItem",
+    "kind": "type",
+    "file": "packages/uikit/menu.tsx",
+    "line": 33,
+    "doc": "One action. `checked` present makes the row a radio and puts a tick on the\ntrailing edge in place of `icon`; `name` is what a screen reader says when the\nvisible label is not enough on its own.",
+    "signature": "type MenuItem = {\n  label: ReactNode\n  icon?: SymProps['name']\n  checked?: boolean\n  disabled?: boolean\n  name?: string\n  onSelect: () => void\n}",
+    "members": [
+      {
+        "name": "label",
+        "type": "ReactNode",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "icon",
+        "type": "SymProps['name']",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "checked",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "disabled",
+        "type": "boolean",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "onSelect",
+        "type": "() => void",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
+    "name": "MenuProps",
+    "kind": "type",
+    "file": "packages/uikit/menu.tsx",
+    "line": 19,
+    "doc": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.",
+    "signature": "type MenuProps = Omit<PrimitiveProps<'div'>, 'children' | 'as'> & {\n  open: boolean\n  onClose: () => void\n  items: MenuItem[]\n  /** Row glyph size; a menu set in a smaller type step wants a smaller one. */\n  size?: number\n  itemStyle?: KitStyle\n}"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
     "name": "Nav",
     "kind": "component",
     "file": "packages/uikit/nav.tsx",
@@ -1522,8 +1623,8 @@ export const versions: Record<string, { name: string; version: string; changelog
   },
   "uikit": {
     "name": "@doan-labs/duo-uikit",
-    "version": "1.1.0",
-    "changelog": "# 1.1.0\n\nAdded the desktop-style controls Calendar's tablet layout needed, so no app has\nto draw them again: `Checkbox` (the tinted square, hollow at rest and filled\nwith a white tick), `IconButton` (a symbol-only toolbar button in `plain`,\n`tinted` and `round` variants), `Segmented` (a radio group of views or filters),\n`TextField` and `Select` (native fields over `fill`, any input type, `multiline`\nfor a textarea) and `Sheet` (a modal card on a native `<dialog>`). `Toggle`\nstays the iOS switch. `Checkbox` animates the way macOS draws it: the fill fades\nin, the tick springs up from half size, and the box squashes while pressed.\n\n# 1.0.0\n\nThe design system is Apple's. Every value in `tokens.stylex.ts` now traces to\nthe HIG or to UIKit, and every size, weight, radius, shadow, font and timing an\napp uses comes from a scale. Removals, hence the major.\n\nColours: `colors` is the iOS 26 system palette (`blue` is `#0088ff`, `red`\n`#ff383c`, and so on) with a `*Dark` sibling per hue, `mint` and `brown` added,\nand `grey`..`grey6` plus `grey2Dark`..`grey6Dark`. Removed `blueBright`,\n`blueDark`'s old value, `greenBright`, `redBright`, `settingsPink`,\n`settingsIndigo`, `separator`, `groupedLight`, `barLight`, `trackLight`,\n`trackDark`, `darkElevated`, `darkElevated2`, `separatorDark`, `fill`,\n`fillThin`, `fillThick`, `fillDark`, `controlDark` and the `weather*` hues.\n\nSurfaces: `app` is the UIKit dynamic colour set. Added `label3`, `link`, `fill2`,\n`fill3`; removed `track` (use `fill2`). `light` and `dark` carry UIKit's light\nand dark values. `Text` gained `color=\"tertiary\"`.\n\nType: `typeScale` is Dynamic Type at Large (body 17, not 15), joined by\n`leading`, `tracking` and `weight` consts and four `display` sizes. `typography`\nsteps carry all four. `Text` `weight` is `regular | medium | semibold | bold`;\n`size=\"footnote\"` and `size=\"title\"` as colour-setting legacy names are gone\n(`footnote` is now the ramp step). `fonts` gained `rounded`, `serif`, `mono`.\n\nScales: added `space`, `radius`, `shadow`, `glass`, `motion`; `easing` gained\n`linear`, `out`, `inOut`. Added `chrome` and `wallpaper` consts for the shell's\nglass scrims and wallpaper palettes. `shared.glass` lost its radial sheen (decision 18).\n`shared.press`, `pill`, `fab` and `widget` all press to `motion.press`.\n\n`appAppearance`: every `*FontSize*`, `*FontWeight*`, `*Radius*`, `*Shadow*`,\n`*TimingFunction*` and `*FontFamily*` key is removed; colour keys are renamed by\nrole (`photosSidebarBackgroundColor` is `photosSidebar`). Keys are grouped under\na `// <app>` line and only that app may read them.\n\n`Button variant=\"plain\"` now presses. `Row`'s chevron is `app.label3`.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.2.0\n\nRemoved three components that were verbatim renames of something already\nexported: `Hero` (`LargeTitle`), `Symbol` (`Sym`) and `NavigationStack` (`Nav`).\n`Sym` now carries the `SymProps` type and the TSDoc that `Symbol` existed to\nhold. `NavigationLink` stays; unlike the other three it manages destination and\nreturn focus, which `Nav` and `Page` do not.\n\nAdded `HStack`, and `gap` / `align` / `justify` / `wrap` on both stacks. The kit\nhad no horizontal primitive, so the apps carried roughly 530 hand-written flex\ndeclarations.\n\nAdded the type ramp. `Text`'s `size` names a step (`largeTitle`,\n`title1`..`title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`,\n`caption1`, `caption2`), each with size, leading and weight together; `typeScale`\nholds the raw px and `typography` the same steps as whole blocks. `caption`,\n`footnote` and `title` still render exactly as before and are now documented as\nthe original names to migrate off.\n\nAdded the per-app surface. `app` gained `surface`, `elevated`, `label2`,\n`separator`, `fill` and `track`, and `shared` reads from them instead of\nhardcoding light values, so a dark app can theme `Row`, `Section`, `Toggle` and\nsecondary labels rather than avoiding them. `light` and `dark` ship as themes;\nthe `app` defaults are the values the kit used to hardcode, so applying `light`\nchanges nothing.\n\n`Row` gained `subtitle`, the second line most iOS rows have, and `chevron` now\nrenders the SF chevron through `Sym` instead of a typed `›`.\n\nMoved invented data and feedback out of the kit into `@doan-labs/duo-fixtures`:\n`hue`, `art`, `walk`, `poly`, `mmss`, `beep` and the sample tracks. `Bars` in\n`rings.tsx` takes the values to plot instead of generating them from a seed, so\nthe kit no longer depends on fixture data to draw a chart.\n\nRemoved four `shared` blocks with no consumer anywhere in the repo (`grid`,\n`gridImg`, `viewer`, `viewerImg`), and 35 `appAppearance` constants: 19 that\nwere never referenced and 16 that were exact duplicates of a palette colour\n(`notesColor10` was `colors.darkElevated`, `healthColor3` was `colors.indigo`,\nand so on). The remaining 224 are still per-app values in a shared module and\nstill want moving into the app that owns them.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
+    "version": "1.2.0",
+    "changelog": "# 1.2.0\n\nAdded `Menu`, the iOS pop-up menu: a sheet of actions that floats out of the\ncontrol which opened it and sinks back once one is chosen. Four apps had built\nit by hand — Safari twice, Maps and Weather once each — and only Safari's had an\nexit animation or a tick on a checked row. `MenuItem` is `label`, optional\n`icon`, `checked`, `disabled`, `name` (the spoken one) and `onSelect`; the\ncomponent owns `role=\"menu\"`, the radio rows, mounting through the exit and\ngoing dead to the pointer while it sinks. `xstyle` places and tints the sheet\nand `itemStyle` carries the app's type step, since a menu over a map and one\nover a night sky are the same control in different clothes.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 1.1.0\n\nAdded the desktop-style controls Calendar's tablet layout needed, so no app has\nto draw them again: `Checkbox` (the tinted square, hollow at rest and filled\nwith a white tick), `IconButton` (a symbol-only toolbar button in `plain`,\n`tinted` and `round` variants), `Segmented` (a radio group of views or filters),\n`TextField` and `Select` (native fields over `fill`, any input type, `multiline`\nfor a textarea) and `Sheet` (a modal card on a native `<dialog>`). `Toggle`\nstays the iOS switch. `Checkbox` animates the way macOS draws it: the fill fades\nin, the tick springs up from half size, and the box squashes while pressed.\n\n`useWide(at = 600)` returns `[ref, wide]` and measures the ref's own box, which\nfive apps had each written out as a `ResizeObserver` against the same 600 px.\nThe threshold now has one home, and the reason it is a box measurement rather\nthan `useDisplay()` is stated once in the kit rather than in five app comments.\n\n# 1.0.0\n\nThe design system is Apple's. Every value in `tokens.stylex.ts` now traces to\nthe HIG or to UIKit, and every size, weight, radius, shadow, font and timing an\napp uses comes from a scale. Removals, hence the major.\n\nColours: `colors` is the iOS 26 system palette (`blue` is `#0088ff`, `red`\n`#ff383c`, and so on) with a `*Dark` sibling per hue, `mint` and `brown` added,\nand `grey`..`grey6` plus `grey2Dark`..`grey6Dark`. Removed `blueBright`,\n`blueDark`'s old value, `greenBright`, `redBright`, `settingsPink`,\n`settingsIndigo`, `separator`, `groupedLight`, `barLight`, `trackLight`,\n`trackDark`, `darkElevated`, `darkElevated2`, `separatorDark`, `fill`,\n`fillThin`, `fillThick`, `fillDark`, `controlDark` and the `weather*` hues.\n\nSurfaces: `app` is the UIKit dynamic colour set. Added `label3`, `link`, `fill2`,\n`fill3`; removed `track` (use `fill2`). `light` and `dark` carry UIKit's light\nand dark values. `Text` gained `color=\"tertiary\"`.\n\nType: `typeScale` is Dynamic Type at Large (body 17, not 15), joined by\n`leading`, `tracking` and `weight` consts and four `display` sizes. `typography`\nsteps carry all four. `Text` `weight` is `regular | medium | semibold | bold`;\n`size=\"footnote\"` and `size=\"title\"` as colour-setting legacy names are gone\n(`footnote` is now the ramp step). `fonts` gained `rounded`, `serif`, `mono`.\n\nScales: added `space`, `radius`, `shadow`, `glass`, `motion`; `easing` gained\n`linear`, `out`, `inOut`. Added `chrome` and `wallpaper` consts for the shell's\nglass scrims and wallpaper palettes. `shared.glass` lost its radial sheen (decision 18).\n`shared.press`, `pill`, `fab` and `widget` all press to `motion.press`.\n\n`appAppearance`: every `*FontSize*`, `*FontWeight*`, `*Radius*`, `*Shadow*`,\n`*TimingFunction*` and `*FontFamily*` key is removed; colour keys are renamed by\nrole (`photosSidebarBackgroundColor` is `photosSidebar`). Keys are grouped under\na `// <app>` line and only that app may read them.\n\n`Button variant=\"plain\"` now presses. `Row`'s chevron is `app.label3`.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.2.0\n\nRemoved three components that were verbatim renames of something already\nexported: `Hero` (`LargeTitle`), `Symbol` (`Sym`) and `NavigationStack` (`Nav`).\n`Sym` now carries the `SymProps` type and the TSDoc that `Symbol` existed to\nhold. `NavigationLink` stays; unlike the other three it manages destination and\nreturn focus, which `Nav` and `Page` do not.\n\nAdded `HStack`, and `gap` / `align` / `justify` / `wrap` on both stacks. The kit\nhad no horizontal primitive, so the apps carried roughly 530 hand-written flex\ndeclarations.\n\nAdded the type ramp. `Text`'s `size` names a step (`largeTitle`,\n`title1`..`title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`,\n`caption1`, `caption2`), each with size, leading and weight together; `typeScale`\nholds the raw px and `typography` the same steps as whole blocks. `caption`,\n`footnote` and `title` still render exactly as before and are now documented as\nthe original names to migrate off.\n\nAdded the per-app surface. `app` gained `surface`, `elevated`, `label2`,\n`separator`, `fill` and `track`, and `shared` reads from them instead of\nhardcoding light values, so a dark app can theme `Row`, `Section`, `Toggle` and\nsecondary labels rather than avoiding them. `light` and `dark` ship as themes;\nthe `app` defaults are the values the kit used to hardcode, so applying `light`\nchanges nothing.\n\n`Row` gained `subtitle`, the second line most iOS rows have, and `chevron` now\nrenders the SF chevron through `Sym` instead of a typed `›`.\n\nMoved invented data and feedback out of the kit into `@doan-labs/duo-fixtures`:\n`hue`, `art`, `walk`, `poly`, `mmss`, `beep` and the sample tracks. `Bars` in\n`rings.tsx` takes the values to plot instead of generating them from a seed, so\nthe kit no longer depends on fixture data to draw a chart.\n\nRemoved four `shared` blocks with no consumer anywhere in the repo (`grid`,\n`gridImg`, `viewer`, `viewerImg`), and 35 `appAppearance` constants: 19 that\nwere never referenced and 16 that were exact duplicates of a palette colour\n(`notesColor10` was `colors.darkElevated`, `healthColor3` was `colors.indigo`,\nand so on). The remaining 224 are still per-app values in a shared module and\nstill want moving into the app that owns them.\n\nNo SDK protocol or host compatibility requirement changes.\n\n# 0.1.0\n\nAdd harvested screen, stack, title, list, row, text, button, toggle, symbol,\nnavigation and passive widget-label components; display subscription and\nreduced-motion CSS animation presets. Existing Nav/Page/Sym/Num and style\nsubpaths remain supported. Apps bundle their selected kit version. This minor\nrelease changes no SDK protocol or host compatibility requirement.\n"
   },
   "shell": {
     "name": "@doan-labs/duo-shell",

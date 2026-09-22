@@ -4,9 +4,13 @@ import AppKit
 
 let outDir = CommandLine.arguments[1]
 let S = CGFloat(Double(CommandLine.arguments[2])!)
+// Apple's own apps draw some glyphs the public set leaves out, Safari's page
+// menu among them; they ship in this bundle and load by name through Bundle.
+let privateGlyphs = Bundle(path: "/System/Library/CoreServices/CoreGlyphsPrivate.bundle")
 
 for name in CommandLine.arguments.dropFirst(3) {
-  guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil),
+  guard let base = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+          ?? privateGlyphs?.image(forResource: name),
         let img = base.withSymbolConfiguration(.init(pointSize: S * 0.82, weight: .semibold))
   else { print("MISS \(name)"); continue }
   let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(S), pixelsHigh: Int(S),

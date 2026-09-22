@@ -174,8 +174,11 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
   }
   const openFrom: Open = (a, el) => open(a, at(el))
 
-  /** What the frame's Siri, Wallet and Camera buttons do, and what `?app=` does. */
-  const launch = (name: string) => {
+  /**
+   * What the frame's Siri, Wallet and Camera buttons do, and what `?app=` does.
+   * `arg` is the deep link: the status stack opens Settings straight at Wi-Fi.
+   */
+  const launch = (name: string, arg?: string) => {
     if (device.asleep) device.wake()
     const a = byName(name)
     const on = onStage()
@@ -183,8 +186,8 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     // Into the free half if there is one; otherwise in place of the app under
     // the status stack, the one iOS would call frontmost.
     const victim = on.find((e) => !e.side) ?? (on.length === 2 ? on.find((e) => e.side === 'right') : undefined)
-    if (victim) swap(victim.id, name)
-    else open(a)
+    if (victim) swap(victim.id, name, arg)
+    else open(a, undefined, arg)
   }
   const stage = (): Stage => onStage().map((e) => ({ name: e.a.id ?? e.a.name, side: e.side }))
   /**

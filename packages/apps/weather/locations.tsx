@@ -1,3 +1,4 @@
+import { Menu } from '@doan-labs/duo-uikit'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useEffect, useState } from 'react'
@@ -93,42 +94,31 @@ export function Locations({ onClose, temp }: Props) {
           >
             <Sym name="more" size={20} />
           </button>
-          {menu && (
-            <div role="menu" {...stylex.props(styles.menu)}>
-              {units.map(([unit, name, sign]) => (
-                <button
-                  key={unit}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={preferences.unit === unit}
-                  aria-label={`Switch to degrees ${name}`}
-                  onClick={() => {
-                    update({ unit })
-                    setMenu(false)
-                  }}
-                  {...stylex.props(styles.menuItem)}
-                >
+          <Menu
+            open={menu}
+            onClose={() => setMenu(false)}
+            size={14}
+            xstyle={styles.menu}
+            itemStyle={styles.menuItem}
+            items={[
+              ...units.map(([unit, name, sign]) => ({
+                label: (
                   <span>
                     {name} <span {...stylex.props(styles.muted)}>{sign}</span>
                   </span>
-                  {preferences.unit === unit && '✓'}
-                </button>
-              ))}
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenu(false)
-                  locate()
-                }}
-                disabled={locationState === 'Finding your location…'}
-                {...stylex.props(styles.menuItem)}
-              >
-                <span>Use Current Location</span>
-                <Sym name="location" size={14} />
-              </button>
-            </div>
-          )}
+                ),
+                name: `Switch to degrees ${name}`,
+                checked: preferences.unit === unit,
+                onSelect: () => update({ unit })
+              })),
+              {
+                label: <span>Use Current Location</span>,
+                icon: 'location' as const,
+                disabled: locationState === 'Finding your location…',
+                onSelect: locate
+              }
+            ]}
+          />
         </div>
       </div>
       <div {...stylex.props(styles.searchBox)}>
