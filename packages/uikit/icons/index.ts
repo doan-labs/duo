@@ -168,6 +168,13 @@ const ellipsis = '/icons/sym/ellipsis.webp'
 const info = '/icons/sym/info-circle.webp'
 const check = '/icons/sym/checkmark-circle-fill.webp'
 const down = '/icons/sym/chevron-down.webp'
+// Phone's tab bar and call key.
+const starFill = '/icons/sym/star-fill.webp'
+const clockFill = '/icons/sym/clock-fill.webp'
+const personFill = '/icons/sym/person-crop-circle-fill.webp'
+const keypad = '/icons/sym/circle-grid-3x3-fill.webp'
+const voicemail = '/icons/sym/recordingtape.webp'
+const call = '/icons/sym/phone-fill.webp'
 
 /** Apple's icon outline is a superellipse, not a rounded rect. */
 function squircle(size: number, n = 5) {
@@ -422,7 +429,13 @@ export const SYM = {
   film,
   star,
   tick,
-  globe
+  globe,
+  starFill,
+  clockFill,
+  personFill,
+  keypad,
+  voicemail,
+  call
 }
 
 /** The wallpaper rides along under this key: screen.ts needs it decoded too. */

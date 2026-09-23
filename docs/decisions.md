@@ -1256,7 +1256,25 @@ history or storage for any tab. The status bar stays dark-on-light over the dark
 overview: the shell draws it from the manifest's fixed `light` flag, and no app
 can change that while it runs.
 
-## 85. The Store wears the App Store's sidebar, and the app page opens inside the pane
+## 85. Phone is iOS 26's five tabs, and its keypad fits the glass
+
+2026-09-23. Phone had two tabs, Recents and Keypad, on a flat strip, and its keypad
+was a fixed 521 px that both displays are too short for, so the number you typed
+went off the top (issue 23). Held against a screenshot of iOS 26, Phone is five tabs,
+Favorites, Recents, Contacts, Keypad and Voicemail, on a floating capsule with the
+selected tab on a lighter pill, and dark keys under a hairline with a handset on a
+deep green call key.
+
+Phone now draws that. The bar stops 22 px up, clear of the home indicator. The keys
+and call key are one `min(76px, (100cqh - 141px) / 5)` disc, the Calculator fix,
+and the digit is 45% of it, so the keypad shrinks as a whole and the number always
+shows. Every row on the new tabs calls, as Recents always did; tapping a voicemail
+calls back and clears its dot. Six SF Symbols join the set, the handset among them,
+so the call key drops its emoji. Cost: letters under the digits keep the ramp's
+tracking rather than iOS's wide spacing, favourites are a fixed four, there is no
+voicemail audio, and a contact has no detail page in Phone.
+
+## 86. The Store wears the App Store's sidebar, and the app page opens inside the pane
 
 2026-09-20. Decision 71 gave the Store the App Store's list shapes but kept a settings-app
 skeleton around them: one long root page, a filter line of chips, and a detail page that
@@ -1315,3 +1333,18 @@ the sidebar stands beside a list scrolling down, which never passes behind it, s
 column and shows the page's tone rather than moving content. The catalog at its foot became a
 control instead of two grey discs around a label, matching the search field at the panel's
 other end.
+
+Then the corners. The bezel went from 2.2 mm to 1.2 mm (architecture.md), which moved the
+inner display's corner to 47.5 px, and the sidebar now takes the radius concentric with it,
+39.5 px at 8 px in, instead of the kit's 22 px. What sits in its corners had to follow: a 34 px
+field cannot take the 31.5 px corner that would be concentric, so the search field and the
+catalog became capsules, each dropped just far enough that its end rides a circle concentric
+with the panel's, 8 px clear all round (24 px from the top for the field, 12 px from the bottom
+for the 56 px catalog). The rectangular field had its corner up against the curve. The glass
+then got something to carry: the pane runs the full width, under the sidebar, and pads its
+scroller and a pushed app page clear, so the copy stays beside the panel while Discover's wash
+(the day's release blown up and blurred across the top of the page) and a page sliding in pass
+under it. That reverses the column above: a column suits a list, but it left the glass over
+plain paper, where it read as a white slab. The catalog is now a white card, where a Mac puts
+the account: the Duo mark in a disc concentric with the capsule's end, Doan Labs over Duo
+catalog, Refresh beside it.
