@@ -5,13 +5,12 @@
 
 import type { Os } from '@doan-labs/duo-sdk'
 import type { Store, StoreRow } from '@doan-labs/duo-sdk/store.ts'
-import { Row, Section } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState, useSyncExternalStore } from 'react'
-import { Glyph, Head, Hero, Link, Note, PERM_GLYPH, size, version } from './parts.tsx'
+import { Glyph, Head, Hero, Link, Note, PERM_GLYPH, Row, Section, size, version } from './parts.tsx'
 import { styles } from './styles.ts'
 
 const LANE: Record<string, string> = {
@@ -86,7 +85,7 @@ function Detail({ id, os, store }: { id: string; os: Os; store: Store }) {
   const remove = () => void store.remove(row.id)
   return (
     <>
-      <div {...stylex.props(shared.grp, styles.hero)}>
+      <div {...stylex.props(shared.grp, styles.card, styles.hero)}>
         <Icon row={row} big />
         <div {...stylex.props(typography.title1)}>{row.name}</div>
         <div {...stylex.props(typography.body, styles.heroText)}>{row.author}</div>
@@ -114,7 +113,7 @@ function Detail({ id, os, store }: { id: string; os: Os; store: Store }) {
       <Section>
         <button
           type="button"
-          {...stylex.props(shared.row, styles.action)}
+          {...stylex.props(shared.row, styles.row, styles.action)}
           onClick={() => os.open(row.name)}
           disabled={working}
         >
@@ -123,7 +122,7 @@ function Detail({ id, os, store }: { id: string; os: Os; store: Store }) {
         {row.recovery && (
           <button
             type="button"
-            {...stylex.props(shared.row, styles.action, working && styles.busy)}
+            {...stylex.props(shared.row, styles.row, styles.action, working && styles.busy)}
             onClick={() => void store.restore(row.id)}
             disabled={working}
           >
@@ -138,7 +137,7 @@ function Detail({ id, os, store }: { id: string; os: Os; store: Store }) {
           <Section>
             <button
               type="button"
-              {...stylex.props(shared.row, styles.destructive, working && styles.busy)}
+              {...stylex.props(shared.row, styles.row, styles.destructive, working && styles.busy)}
               onClick={remove}
               disabled={working}
             >
@@ -146,7 +145,7 @@ function Detail({ id, os, store }: { id: string; os: Os; store: Store }) {
             </button>
             <button
               type="button"
-              {...stylex.props(shared.row, styles.action, styles.centred)}
+              {...stylex.props(shared.row, styles.row, styles.action, styles.centred)}
               onClick={() => setConfirming(false)}
             >
               Cancel
@@ -158,7 +157,7 @@ function Detail({ id, os, store }: { id: string; os: Os; store: Store }) {
         <Section>
           <button
             type="button"
-            {...stylex.props(shared.row, styles.destructive, working && styles.busy)}
+            {...stylex.props(shared.row, styles.row, styles.destructive, working && styles.busy)}
             onClick={() => setConfirming(true)}
             disabled={working}
           >

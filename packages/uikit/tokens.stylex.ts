@@ -356,6 +356,14 @@ export const appAppearance = stylex.defineConsts({
   calculatorKeyLight: '#a5a5a5',
   // calendar
   calendarPaper: 'rgba(255,255,255,.78)',
+  calendarSidebar: '#1b1b1d',
+  calendarPane: '#1f1f21',
+  calendarHover: 'rgba(255,255,255,.06)',
+  /** The sheet's rules. A calendar is almost all lines, so they sit far under the UIKit separator. */
+  calendarGrid: 'rgba(255,255,255,.07)',
+  /** Saturday and Sunday, shaded the way Apple shades them in the month and the week. */
+  calendarWeekend: 'rgba(255,255,255,.024)',
+  calendarHourLines: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px)',
   // camera
   cameraGrid:
     'linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))',
@@ -453,12 +461,22 @@ export const appAppearance = stylex.defineConsts({
   previewFill: 'rgba(60,60,67,.08)',
   // reminders
   // safari
-  /** The cover rail's glass: circle fill, its hairline and drop, the pill's hairline, the tab card's close dot and its drop. */
+  /** The cover rail's glass: circle fill, its hairline and drop, the pill's hairline. */
   safariGlass: 'rgba(255,255,255,.7)',
   safariGlassEdge: '0 1px 2px rgba(0,0,0,.08), 0 0 0 .5px rgba(0,0,0,.08)',
   safariPillEdge: '0 0 0 .5px rgba(0,0,0,.06)',
-  safariDot: 'rgba(255,255,255,.85)',
-  safariDotShadow: '0 1px 3px rgba(0,0,0,.2)',
+  /**
+   * The floating address bar and its round buttons: iOS 26's dark glass, which
+   * reads rgb 73 over a white page on the phone, and a blur thin enough that
+   * the page's type still shows through it.
+   */
+  safariBar: 'rgba(40,40,42,.8)',
+  /** The same glass lit by a finger on a round button. */
+  safariBarPress: 'rgba(84,84,88,.8)',
+  safariBarBlur: 'blur(6px) saturate(180%)',
+  /** The sheet a menu lands on, and the tile behind a saved link's glyph. */
+  safariMenu: 'rgba(255,255,255,.8)',
+  safariMarkTile: '#d7f0ff',
   // shortcuts
   /** The scrim that dims a shortcut tile while it runs. */
   shortcutsScrim: 'rgba(0,0,0,.45)',

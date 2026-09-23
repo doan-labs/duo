@@ -6,6 +6,7 @@ import { Footer } from '../footer'
 import { Button, Eyebrow } from '../layout'
 import { CURVE } from '../motion'
 import { Nav } from '../nav'
+import { SafariScrollBridge } from '../safari-scroll-bridge'
 import { SmoothScroll } from '../smooth-scroll'
 import { BOOT } from '../theme'
 import { color, font } from '../tokens.stylex'
@@ -74,6 +75,7 @@ function Root() {
   })
   return (
     <Document>
+      <SafariScrollBridge />
       {workspace ? (
         <>
           <Nav />

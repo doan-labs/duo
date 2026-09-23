@@ -17,8 +17,8 @@ two covers. Lay out in boxes and let width decide, measured on your own box,
 never from the display: a split half of the inner display is as narrow as the
 cover.
 
-`useSplit(ref)` from the kit is that measurement: a `ResizeObserver` on the ref
-you pass, true past 600 px. Use it rather than writing the observer again, and
+`useWide()` from the kit is that measurement: a `ResizeObserver` on the ref it
+returns, true past 600 px. Use it rather than writing the observer again, and
 keep what you store a boolean — an app holding the observed width in state
 re-renders on every pixel of the fold.
 

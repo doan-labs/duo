@@ -1,18 +1,17 @@
 // Settings › General, and the panes under it: About, Software Update, Duo
-// Storage and the reset. Nothing here is a placeholder — the numbers come from
+// Storage and the reset. Nothing here is a placeholder: the numbers come from
 // the store and from `navigator.storage.estimate()`, and Erase All Content and
 // Settings really does empty the device and reboot it.
 
 import type { Os, SettingsHost } from '@doan-labs/duo-sdk'
 import { HOST_SDK } from '@doan-labs/duo-sdk/compat.ts'
 import type { Store } from '@doan-labs/duo-sdk/store.ts'
-import { Row, Section } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { emptyStore, Glyph, Head, Hero, Link, Note, noStore, size } from './parts.tsx'
+import { emptyStore, Glyph, Head, Hero, Link, Note, noStore, Row, Section, size } from './parts.tsx'
 import { styles } from './styles.ts'
 
 export const SOFTWARE = 'iOS 27.0'
@@ -26,8 +25,8 @@ export function GeneralPage({ os, host }: { os: Os; host: SettingsHost }) {
   return (
     <>
       <Hero name="gear" bg={colors.grey} title="General">
-        Manage this Duo’s overall setup: what it is running, how much room it has left, and what it takes to put it back
-        the way it shipped.
+        Manage your overall setup and preferences for this Duo, such as what it is running, how much room it has left,
+        and what it takes to put it back the way it shipped.
       </Hero>
       <Section>
         <Link
@@ -92,11 +91,19 @@ function AboutPage({ os, host }: { os: Os; host: SettingsHost }) {
       </Note>
       <Head>Made by</Head>
       <Section>
-        <button type="button" {...stylex.props(shared.row, styles.action)} onClick={() => host.openExternal(STUDIO)}>
+        <button
+          type="button"
+          {...stylex.props(shared.row, styles.row, styles.action)}
+          onClick={() => host.openExternal(STUDIO)}
+        >
           <Sym name="globe" size={15} />
           Doan Labs
         </button>
-        <button type="button" {...stylex.props(shared.row, styles.action)} onClick={() => host.openExternal(SOURCE)}>
+        <button
+          type="button"
+          {...stylex.props(shared.row, styles.row, styles.action)}
+          onClick={() => host.openExternal(SOURCE)}
+        >
           <Sym name="document" size={15} />
           Source on GitHub
         </button>
@@ -140,7 +147,7 @@ function StoragePage({ store }: { store?: Store }) {
   const other = used - apps
   return (
     <>
-      <div {...stylex.props(shared.grp, styles.measure)}>
+      <div {...stylex.props(shared.grp, styles.card, styles.measure)}>
         <div {...stylex.props(typography.title1)}>{estimate ? size(estimate.usage) : '—'}</div>
         <div {...stylex.props(typography.body, styles.heroText)}>
           used of {estimate ? size(estimate.quota) : '—'} this browser allows
@@ -196,7 +203,7 @@ function ResetPage({ host }: { host: SettingsHost }) {
       <Section>
         <button
           type="button"
-          {...stylex.props(shared.row, styles.destructive, erasing && styles.busy)}
+          {...stylex.props(shared.row, styles.row, styles.destructive, erasing && styles.busy)}
           onClick={() => setConfirming(true)}
           disabled={erasing || confirming}
         >
@@ -214,7 +221,7 @@ function ResetPage({ host }: { host: SettingsHost }) {
           <Section>
             <button
               type="button"
-              {...stylex.props(shared.row, styles.destructive, erasing && styles.busy)}
+              {...stylex.props(shared.row, styles.row, styles.destructive, erasing && styles.busy)}
               disabled={erasing}
               onClick={() => {
                 setErasing(true)
@@ -229,7 +236,7 @@ function ResetPage({ host }: { host: SettingsHost }) {
             </button>
             <button
               type="button"
-              {...stylex.props(shared.row, styles.action, styles.centred)}
+              {...stylex.props(shared.row, styles.row, styles.action, styles.centred)}
               disabled={erasing}
               onClick={() => setConfirming(false)}
             >

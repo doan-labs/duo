@@ -62,7 +62,7 @@ const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books'
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
   { name: 'FaceTime', mock: true, view: FaceTime },
-  { name: 'Calendar', id: 'labs.doan.ipduo.calendar', light: true, ...RELEASE },
+  { name: 'Calendar', id: 'labs.doan.ipduo.calendar', ...RELEASE },
   { name: 'Photos', id: 'labs.doan.ipduo.photos', light: true, ...RELEASE },
   { name: 'Camera', view: Camera },
   { name: 'Mail', mock: true, light: true, view: Mail },
@@ -74,7 +74,13 @@ export const LEFT: App[] = [
   { name: 'Health', mock: true, light: true, view: Health },
   { name: 'Wallet', mock: true, view: Wallet },
   { name: 'Siri', mock: true, view: Siri },
-  { name: 'Settings', light: true, view: (props) => createElement(Settings, { ...props, host: SETTINGS_HOST }) }
+  // `edge`: the sidebar's material runs to the top corner, so each column pads its own status band.
+  {
+    name: 'Settings',
+    light: true,
+    edge: true,
+    view: (props) => createElement(Settings, { ...props, host: SETTINGS_HOST })
+  }
 ]
 
 /** Right half — only on the inner display, rows 1 to 6. */

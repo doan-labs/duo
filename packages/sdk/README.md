@@ -17,6 +17,12 @@ writes, and exposes hydrating/ready/saving/error states. A timeout does not
 prove a write failed: the client retries a mutation once using the same
 request ID, then the app must read back before starting a new operation.
 
+`useJSON(space, key, fallback)` is `useKV` for a key holding JSON: it parses on
+read, stringifies on write and keeps every other field, so the state is still
+there. `fallback` stands in until something is written, which is what a fresh
+install looks like, so an app seeds itself in one place rather than at each
+call site. Storage stays strings-only; this is the encoding, not a new type.
+
 `transition(fn)` runs `fn` inside a same-document view transition, so the
 screen cross-fades to whatever it changes; it is a plain call where the API
 is missing or motion is reduced. `useKV` already applies it to changes that

@@ -1,6 +1,6 @@
 # UI kit
 
-Version **1.0.0**, private local preview. React 19 and compiled StyleX 0.19.
+Version **1.2.0**, private local preview. React 19 and compiled StyleX 0.19.
 Apps bundle their selected kit; its version does not change host compatibility.
 SDK runtime requirements remain separate. Existing Nav/Page/Sym/Num and style
 subpaths continue to work. See [CHANGELOG](CHANGELOG.md).
@@ -31,7 +31,7 @@ Components accept native attributes, `as` where appropriate, `animate` for
 CSS-only presets and `xstyle` for compiled StyleX extensions. They intentionally
 exclude raw `style` and `className`. Defaults preserve the original app geometry;
 use semantic elements (`Title as="h1"`, `Row as="li"` inside `List`) for new UI.
-Use `Row as="button"` for actions. Name icon-only buttons and every Toggle.
+Use `Row as="button"` for actions. Name icon-only buttons and every Toggle or Checkbox. `Checkbox` is the tinted square from macOS Calendar; `Toggle` is the iOS switch.
 
 ## Layout and type
 
@@ -39,11 +39,11 @@ Use `Row as="button"` for actions. Name icon-only buttons and every Toggle.
 cross axis. Both take `gap`, `align`, `justify` and `wrap`, so a one-off
 `stylex.create` is no longer the way to put two things side by side.
 
-`useSplit(ref)` is true once that box passes `SPLIT` (600 px), the width two
-columns start at. It measures the app's own root with a `ResizeObserver` rather
-than reading the display, because a split half of the inner display is as narrow
-as the cover, and it returns a boolean so the app re-renders when the layout
-changes rather than on every pixel of the fold.
+`useWide(at = 600)` returns `[ref, wide]`: attach the ref to the element the
+layout lives in and branch on `wide` for a two-column arrangement. Use it rather
+than `useDisplay()` for layout, because the box decides and the display does not.
+A split half of the inner panel is as narrow as the cover, and an app that reads
+`display === 'inner'` there lays out two columns in a space that holds one.
 
 `Text`'s `size` names a step of Dynamic Type at the Large size (`largeTitle`
 34/41, `title1` 28/34, `title2` 22/28, `title3` 20/25, `headline` 17/22
@@ -94,7 +94,17 @@ sliding over another. `shared.press` (tappable), `shared.select` (selectable
 row) and `shared.swap` (content replaced in place) are the matching transitions.
 `usePresence(open)` keeps a thing mounted through its exit animation; `Push`
 is the nav transition with the open state kept by the caller. Reduced-motion users
-receive no preset animation. `Widget` only renders the existing declarative
+receive no preset animation.
+
+`Menu` is the pop-up menu those parts add up to: pass `open`, `onClose` and
+`items`, and it floats out of the control that opened it, draws a row's glyph on
+the leading edge as iOS 26 does, rules a line at each `'separator'`, ticks a
+`checked` row, ends in an optional `footer` of glyph-over-caption buttons, goes
+dead to the pointer while it sinks, and unmounts. It carries no coordinates,
+so `xstyle` both places and tints the sheet and `itemStyle` sets a row's type
+step. It draws no scrim: a menu over a cross-origin frame or a canvas needs the
+app's own catcher for a tap outside, and one whose surface already reports a
+click does not. `Widget` only renders the existing declarative
 snapshot; `WidgetLabel` is passive typography. Neither refreshes data.
 
 Invented data and feedback are not part of the kit. Generated artwork, the

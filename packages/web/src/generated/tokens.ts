@@ -1008,6 +1008,36 @@ export const appAppearance: Token[] = [
     "doc": "calendar"
   },
   {
+    "name": "calendarSidebar",
+    "value": "#1b1b1d",
+    "doc": ""
+  },
+  {
+    "name": "calendarPane",
+    "value": "#1f1f21",
+    "doc": ""
+  },
+  {
+    "name": "calendarHover",
+    "value": "rgba(255,255,255,.06)",
+    "doc": ""
+  },
+  {
+    "name": "calendarGrid",
+    "value": "rgba(255,255,255,.07)",
+    "doc": "The sheet's rules. A calendar is almost all lines, so they sit far under the UIKit separator."
+  },
+  {
+    "name": "calendarWeekend",
+    "value": "rgba(255,255,255,.024)",
+    "doc": "Saturday and Sunday, shaded the way Apple shades them in the month and the week."
+  },
+  {
+    "name": "calendarHourLines",
+    "value": "linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px)",
+    "doc": ""
+  },
+  {
     "name": "cameraGrid",
     "value": "linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% - .5px), rgba(255,255,255,.55) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% - .5px), rgba(255,255,255,.55) calc(66.66% + .5px), transparent calc(66.66% + .5px))",
     "doc": "camera"
@@ -1345,7 +1375,7 @@ export const appAppearance: Token[] = [
   {
     "name": "safariGlass",
     "value": "rgba(255,255,255,.7)",
-    "doc": "The cover rail's glass: circle fill, its hairline and drop, the pill's hairline, the tab card's close dot and its drop."
+    "doc": "The cover rail's glass: circle fill, its hairline and drop, the pill's hairline."
   },
   {
     "name": "safariGlassEdge",
@@ -1358,13 +1388,28 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "safariDot",
-    "value": "rgba(255,255,255,.85)",
+    "name": "safariBar",
+    "value": "rgba(40,40,42,.8)",
+    "doc": "The floating address bar and its round buttons: iOS 26's dark glass, which\nreads rgb 73 over a white page on the phone, and a blur thin enough that\nthe page's type still shows through it."
+  },
+  {
+    "name": "safariBarPress",
+    "value": "rgba(84,84,88,.8)",
+    "doc": "The same glass lit by a finger on a round button."
+  },
+  {
+    "name": "safariBarBlur",
+    "value": "blur(6px) saturate(180%)",
     "doc": ""
   },
   {
-    "name": "safariDotShadow",
-    "value": "0 1px 3px rgba(0,0,0,.2)",
+    "name": "safariMenu",
+    "value": "rgba(255,255,255,.8)",
+    "doc": "The sheet a menu lands on, and the tile behind a saved link's glyph."
+  },
+  {
+    "name": "safariMarkTile",
+    "value": "#d7f0ff",
     "doc": ""
   },
   {

@@ -1025,7 +1025,238 @@ the two and aborts hydration for the whole tree. Props stay present, `tabIndex` 
 stated, and only values are gated. Note that `?? false` does not fix this, because
 the divergence is server-`null` against client-`true`.
 
-## 77. The Store wears the App Store's sidebar, and the app page opens inside the pane
+## 77. Settings splits on the unfolded display
+
+2026-09-20. Decision 72 made Settings a `Nav` stack, which is the right shape for
+the cover and wrong for 790 px of inner glass: one column of rows with half the
+width empty. It is now iPadOS's split view above 600 px of measured width, the
+threshold Photos and Weather already switch at. The root list is written once, as
+`rootList()` in `index.tsx` returning `Group[]`; `sidebar.tsx` draws it as
+destinations and `Folded` draws it as pushing rows, so a row cannot exist in one
+layout and not the other. Selecting a destination is a keyed `Nav`, which drops
+whatever the last pane had pushed and replays `shared.swap` on the fresh mount.
+The sidebar's field filters the same list rather than opening a search pane.
+
+Settings gains `edge` in apps.ts so the sidebar's material reaches the top corner
+the way Apple's footage shows it, and each column pads its own 40 px. The pad goes
+on the flex parent of `Nav`, never inside it: `Nav`'s pages are absolutely
+positioned at `inset: 0`, which resolves against the padding box and would cover
+the band. Nothing behind a row changed, and decision 72's rule stands: the panes
+Apple has that this device does not are still absent rather than drawn.
+
+Three geometry values are the app's own rather than the kit's, because the kit's
+row is a phone list and this is iPadOS: cards take `radius.xl`, rows are 44 px
+whatever they carry (the kit's 11 px padding makes 52 with a glyph in it), and
+the row hairline is inset to where the label starts instead of running edge to
+edge. All three live in `styles.ts` and reach every pane through the `Row` and
+`Section` wrappers in `parts.tsx`, so no call site states them. Cost: Settings
+and the other grouped lists in the shell no longer match row for row.
+
+## 78. Calendar's month is a sheet ruled by the week, and it opens with a life in it
+
+2026-09-20. The first month view drew a full grid: a rule on every cell edge, a wash
+on the weekend columns, and the date set at body size in the top right. On a fresh
+install it also drew nothing else, because `useEvents` fell back to an empty list.
+Both together read as a spreadsheet someone had forgotten to fill in, which is not
+what the app is.
+
+Apple's month view is a sheet ruled only by the week. There are no column rules, and
+that is not decoration: a multi-day event is one bar running across the days it
+covers, and a vertical rule every 80 px would cut it into pieces. So the week is now
+a grid of seven columns and a few 15 px lanes, and `lanes.ts` packs each event into
+the first lane free for its whole run. Day and Week use the same packer for their
+all-day row, which is why `Cupertino trip` is one bar there too instead of the same
+title repeated in four columns. A week that runs out of lanes counts what it dropped
+and opens the day, so nothing is hidden silently. Day numbers are the footnote step,
+centred, and today and the picked day are discs rather than pills, which is why the
+disc drops the `1 Sep` month label: the label would stretch it.
+
+The cover gets dots. At 387 points a title is four letters and an ellipsis, so the
+narrow month draws up to four dots under each number and a tap opens the day, which
+is what iPhone does and what rule 1 asks for. Nothing is cover-only or inner-only;
+the same events are reachable from both.
+
+A fresh install seeds a working month around today (`seed.ts`), the keynote the
+home-screen widget draws included, so the tile and the app agree. The first edit
+writes the whole list to storage and it is the person's calendar from then on. Work
+is orange, not red: the only red on the sheet should be today.
+
+## 79. Calendar is two sheets, not one, and the rule weight is the whole argument
+
+Decision 78 dropped the column rules from the month, reasoning that a vertical line
+every 80 px would cut a multi-day bar into pieces. Held against the real thing, that
+was wrong: macOS Calendar rules its month both ways and still runs a bar straight
+over the rules, because the rule is a seventh of the weight of a separator. The
+mistake was not drawing the line, it was drawing it at `app.separator`, which is
+sized for one hairline between two rows, not for seven crossing every week. So
+`appAppearance.calendarGrid` exists and every rule in the app is on it, and
+`calendarWeekend` shades Saturday and Sunday the way both sheets do.
+
+The month is now two sheets from one component. Inside, it is the Mac's: ruled both
+ways, weekend shaded, the number hung on the right of its day, the picked day lifted
+whole. On the cover it is the phone's: no rules, no shading, the number centred over
+its dots. Rule 1 says design for the cover first, and the cover is not a small Mac.
+
+The month also stopped ruling an empty sixth week. `weeks()` returns the weeks a
+month actually spans, so a five-week month gives its rows the height it has, and the
+lanes are `1fr` rather than a fixed 16 px, which is what kept the third lane on the
+sheet in a six-week month instead of off the bottom of it. The thumbnail in the
+sidebar and the twelve in Year pad back to six, because a grid that changes height
+every month jumps.
+
+Day and Week hang their hours on their own lines rather than near them, and draw now
+the way Calendar does: pale across the week, solid with a dot on today, the time
+itself in a pill in the gutter. The head is one grid with the body, and the scroller
+has no scrollbar, because a gutter on one and not the other is what knocked the two
+out of line.
+
+The sidebar's calendars are the kit's `Checkbox`, which was written as macOS
+Calendar's tinted square and had drifted out of use. A dot plus a trailing checkmark
+was iOS's pattern wearing a Mac layout.
+
+`Sheet` now leaves the way it arrives. It popped in and vanished, because a native
+`<dialog>` closes the moment `close()` is called. `usePresence` holds the close back
+200 ms so `popOut` and the backdrop's fade can play, and `onCancel` is intercepted so
+Escape goes through React rather than closing the dialog out from under the
+animation. Every popover in the repo is this component, so they all gained the exit.
+
+## 80. The fold rule and the JSON encoding each get one home
+
+2026-09-20. Calendar's layout branch was the fourth copy of the same eleven lines:
+a `ResizeObserver` on the app's own root, a comparison against 600, a `wide`
+boolean. App Store, Notes and Photos had written it out too, each with its own
+version of the comment explaining why it measures a box instead of reading
+`useDisplay()`. The rule is a design decision, not app code: a split half of the
+inner panel is as narrow as the cover, so the room an app has is the only thing
+that can choose its columns. It is now `useWide(at = 600)` in the kit, returning
+`[ref, wide]`, and in every one of those apps the ref existed for nothing else, so
+each lost six lines and the threshold stopped being a number per app.
+
+Decision 77 wrote the fifth copy while this was in flight, which is the argument
+rather than an objection to it: Settings had reached the same 600 independently
+and named it `SPLIT`. It reads the kit's default now. Five apps arriving at one
+number by hand is how a design decision turns into folklore.
+
+The same argument settled the second copy. `useKV` is strings-only by contract and
+that is right, but every app storing a list had wrapped it in the same three lines:
+parse or fall back, stringify on write. Calendar and Notes each kept a private
+`parse` helper and Reminders inlined it. `useJSON(space, key, fallback)` in the SDK
+is that wrapper, next to `useKV` rather than in the kit, because it is storage and
+not presentation. `fallback` is the useful half: nothing written yet is a fresh
+install rather than an empty list, so Calendar seeds its month there and Reminders
+ships its five tasks there instead of at the call site.
+
+Neither is a new capability and neither is a component. The bar for moving
+something into the kit is a second consumer that already exists, which is why the
+calendar's date helpers, its lane packer and its sidebar chrome stayed in the app:
+one caller each, and a sidebar whose width, ground and border differ per app is
+four lines of flex pretending to be a component.
+
+## 81. The pop-up menu is the kit's, not each app's
+
+2026-09-20. Four menus had been written by hand — Safari's page actions and its
+bookmarks overflow, Maps' map type, Weather's units — and each was the same
+sheet: absolutely placed glass, `shadow.float`, a column of rows with a glyph on
+the trailing edge. Only Safari's knew how to leave. `Menu` in the kit is now the
+control: it owns `role="menu"`, the radio row and its tick, staying mounted
+through `floatOut` and going dead to the pointer while it sinks. `MenuItem` is
+`label`, `icon`, `checked`, `disabled`, `name` and `onSelect`; nothing about
+where the sheet is.
+
+Placement and tint stay with the app, through `xstyle` on the sheet and
+`itemStyle` on a row, because a menu over a map wants a near-opaque white at a
+corner of the map's chrome and one over a night sky wants dark glass under a
+title. That is the same split the kit already uses for `Button` and `Toggle`:
+the kit carries the control, the app carries where it sits. The alternative, an
+`anchor` prop enumerating corners, would have had to grow a case for Safari's,
+which is not anchored to anything — it stacks above the address bar in the
+floating toolbar's own flow.
+
+The sheet draws no scrim. Safari needs one because its page is a cross-origin
+frame that never reports a click, Maps closes on the map's own pointer handler,
+and Weather's list closes on its rows; a scrim in the kit would have been right
+for one of the three and in the way of the other two. Cost: a new menu has to
+decide for itself what dismisses it, and Maps and Weather changed appearance
+slightly: both gained the exit they never had, and Weather's typed `✓` is now
+the same `app.link` tick Maps was already drawing.
+
+## 82. The menu draws iOS 26, row for row
+
+2026-09-22. Safari's two menus were a guess at Apple's: a glyph on the trailing
+edge, no rules between groups, and a list of whatever the shell could do. Held
+against screenshots of iOS 26, Apple's more menu is Share, Add to Bookmarks, Add
+Bookmark to…, a rule, New Tab, New Private Tab, and a footer of two glyph-over-
+caption buttons, Bookmarks and All Tabs; the page menu is Hide Distracting Items,
+Translate, a rule, Manage Extensions, and a footer of Find on Page and the two
+text-size buttons. Every glyph sits on the leading edge.
+
+`Menu` now draws that: `icon` leads, `items` takes `'separator'`, and `footer` is
+the closing row. Maps and Weather inherit the leading glyph, which is the iOS 26
+shape they were meant to have. Safari fills both menus with Apple's rows and greys
+the ones a cross-origin frame forbids, Hide Distracting Items, Translate, Manage
+Extensions and Find on Page, rather than dropping or faking them. Text size is
+real: Safari's Page Zoom is the frame laid out at 100/z and scaled by z, in
+Apple's eleven steps from 50% to 300%, remembered per host for the session. Seven
+SF Symbols join the set for the new rows. Cost: a private tab is a plain new tab,
+since the shell keeps no history or storage for any tab, and the •••
+sub-menu inside the page menu (Request Desktop Website, Page Actions, Website
+Settings) is not drawn yet.
+
+## 83. The address bar is iOS 26's dark glass, with nothing under it
+
+2026-09-23. Held against the phone, Safari's bar was wrong three ways: a white
+glass with a second white field inside it, three drawn lines where Apple has a
+glyph, and a toolbar row of back, forward, share, bookmarks and tabs under a
+layout that has none. On iOS 26 the pill, the back button and the more button
+are one dark glass, rgb 73 over a white page, that lets the page's type show
+through, and the leading glyph is `text.below.rectangle`, a symbol only Apple's
+own apps get. `scripts/symbols.swift` now falls back to CoreGlyphsPrivate, where
+it loads by name through `Bundle.image(forResource:)`.
+
+The bar wears the kit's `dark` theme, so its type, glyphs and placeholder read
+from `app` like any dark screen. The address sits straight on the glass at 17 px,
+and at 13 px on the cover, whose camera column leaves the host about 80 px. The
+toolbar row is gone from the inner display: share, bookmarks and all tabs were
+already in the more menu, and bookmarks takes the round close button an iOS 26
+sheet carries.
+
+The compact bar is measured off the phone rather than guessed: the full pill at
+72%, sunk 10 px to sit just above the home indicator, as wide as the host plus
+18 pt either side, which a canvas measures because an input never sizes to its
+text. The scale springs and the width does not, since a width that overshoots
+narrows the pill past the name it is shrinking around. A tap on the compact pill
+only brings the bar back; the next one edits the address. Cost: forward has no
+button on the inner display, as on the phone, where it is a swipe the shell
+cannot take from a cross-origin frame. The glass is always dark, where Apple's
+lightens over a light page in light mode; the shell cannot read a frame's pixels
+to choose.
+
+## 84. Safari's buttons give under the finger, and All Tabs is iOS 26's overview
+
+2026-09-23
+
+The more and back buttons had no press state, and the page menu and reload
+glyphs had one on the bar's .45 s transition, so a click lifted before they
+moved. Every Safari button now takes the kit's `motion.press` in
+`motion.pressDuration` and lets go on `easing.spring`, the durations switching
+on `:active` so the way in is fast and the way out springs. The round glass
+buttons also light, to `safariBarPress`, as iOS 26's glass does, and a bookmark
+row greys at once and fades instead of shrinking, as an iOS list row does.
+
+All Tabs was light cards with a close dot top-left over a white page. It is now
+the phone's overview: the cards on dark ground under the kit's `dark` theme, a
+glass close dot top-right, and in place of the address bar a new tab button,
+the Private and Tabs segments on one glass track, and a blue Done. Private tabs
+are a list of their own: New Private Tab and the overview's + on Private add to
+it, it may run empty and then shows its own page, and Done goes back to the open
+tab if it is in the list on show, else that list's last tab, else a new one. The
+open tab is held by id, since closing a tab before it would shift an index.
+Cost: a private tab is private only in name, as before, since the shell keeps no
+history or storage for any tab. The status bar stays dark-on-light over the dark
+overview: the shell draws it from the manifest's fixed `light` flag, and no app
+can change that while it runs.
+
+## 85. The Store wears the App Store's sidebar, and the app page opens inside the pane
 
 2026-09-20. Decision 71 gave the Store the App Store's list shapes but kept a settings-app
 skeleton around them: one long root page, a filter line of chips, and a detail page that
@@ -1084,24 +1315,3 @@ the sidebar stands beside a list scrolling down, which never passes behind it, s
 column and shows the page's tone rather than moving content. The catalog at its foot became a
 control instead of two grey discs around a label, matching the search field at the panel's
 other end.
-
-## 78. The width two columns start at is one hook, and it returns a boolean
-
-2026-09-20. The Store, Notes and Photos each carried the same six lines: a `ResizeObserver` on
-the app's own root setting `wide` past 600 px. Settings on main carries a fourth copy, with the
-600 named. It is `useSplit(ref)` in the kit now, with `SPLIT` beside it; Settings joins when
-this branch merges. The rule it enforces is [DESIGN.md](../DESIGN.md)'s first: a split half of
-the inner display is as narrow as the cover, so the layout comes off the box and never off the
-display.
-
-The hook returns a boolean, not the rect, and that is the decision rather than an omission.
-Maps, Camera, Books and Freeform observe their box too and want live dimensions, so a general
-`useBox` looks like the better extraction until you count renders: an app keeping the observed
-width in state re-renders through every frame of the fold, where a boolean re-renders when the
-layout actually changes. Two hooks for eight call sites is an abstraction for its own sake; one
-boolean hook for the four identical ones is the whole win. Nothing else came with it. The
-Store's sidebar and the Settings sidebar share a `nav` and an `aria-current` and disagree about
-every row inside them; the search field has two callers wearing different chrome; `Head`, `Item`
-and the Today card are shaped by `StoreRow` and have no second caller. `shared.glass` already
-holds decision 18's recipe and is not a drop-in here, since `glass.tint` is sized for chrome
-over a wallpaper and the Store's panels sit over a white page.

@@ -1,9 +1,9 @@
 // The macOS Photos window: a sidebar of albums, a toolbar with the zoom pill,
 // the Years / Months / All Photos switch and the item actions, and a grid of
 // aspect-fit thumbnails. Folded, the sidebar becomes a panel over the grid.
-import { useSplit } from '@doan-labs/duo-uikit/split.ts'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { useWide } from '@doan-labs/duo-uikit/wide.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -27,10 +27,8 @@ import { styles } from './styles.ts'
 const ZOOM = [56, 76, 96, 130, 190]
 
 export const Photos = () => {
-  const root = useRef<HTMLDivElement>(null)
-  // The box decides, not the display: a split half of the inner display is as
-  // narrow as the cover and gets the cover's one-column Photos.
-  const wide = useSplit(root)
+  // The box decides, not the display: a split half is as narrow as the cover.
+  const [root, wide] = useWide()
   // Unfolded the sidebar is open until hidden; folded it starts closed and slides over the grid.
   const [side, setSide] = useState<boolean | null>(null)
   const [zoom, setZoom] = useState(2)

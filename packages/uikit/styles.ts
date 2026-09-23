@@ -34,6 +34,7 @@ export const fade = stylex.keyframes({ from: { opacity: 0 } })
 export const drop = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(-8px) scale(.98)' } })
 export const lift = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(24px) scale(.96)' } })
 export const sink = stylex.keyframes({ to: { opacity: 0, transform: 'translateY(24px) scale(.96)' } })
+export const shrink = stylex.keyframes({ to: { transform: 'scale(.94) translateY(8px)', opacity: 0 } })
 export const slideIn = stylex.keyframes({ from: { transform: 'translateX(100%)' } })
 export const slideOut = stylex.keyframes({ to: { transform: 'translateX(100%)' } })
 
@@ -54,6 +55,13 @@ export const animations = stylex.create({
     animationName: { default: pop, '@media (prefers-reduced-motion: reduce)': 'none' },
     animationDuration: '.4s',
     animationTimingFunction: easing.pop
+  },
+  /** How a popped card leaves. `Sheet` pairs it with `pop` through `usePresence`. */
+  popOut: {
+    animationName: { default: shrink, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.2s',
+    animationTimingFunction: easing.out,
+    animationFillMode: 'forwards'
   },
   fade: {
     animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },

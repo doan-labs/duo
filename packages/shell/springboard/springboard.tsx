@@ -262,7 +262,13 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
           asleep && styles.dispAsleep
         )}
       >
-        <StatusBar wide={wide} light={lit && !cc} covered={!!topRight && !railed} cc={cc} />
+        <StatusBar
+          wide={wide}
+          light={lit && !cc}
+          covered={!!topRight && !railed}
+          cc={cc}
+          open={locked || asleep ? undefined : launch}
+        />
 
         <HomeScreen
           ref={shell}

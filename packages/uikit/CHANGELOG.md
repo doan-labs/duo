@@ -1,3 +1,33 @@
+# 1.2.0
+
+Added `Menu`, the iOS pop-up menu: a sheet of actions that floats out of the
+control which opened it and sinks back once one is chosen. Four apps had built
+it by hand — Safari twice, Maps and Weather once each — and only Safari's had an
+exit animation or a tick on a checked row. `MenuItem` is `label`, optional
+`icon`, `checked`, `disabled`, `name` (the spoken one) and `onSelect`; the
+component owns `role="menu"`, the radio rows, mounting through the exit and
+going dead to the pointer while it sinks. `xstyle` places and tints the sheet
+and `itemStyle` carries the app's type step, since a menu over a map and one
+over a night sky are the same control in different clothes.
+
+No SDK protocol or host compatibility requirement changes.
+
+# 1.1.0
+
+Added the desktop-style controls Calendar's tablet layout needed, so no app has
+to draw them again: `Checkbox` (the tinted square, hollow at rest and filled
+with a white tick), `IconButton` (a symbol-only toolbar button in `plain`,
+`tinted` and `round` variants), `Segmented` (a radio group of views or filters),
+`TextField` and `Select` (native fields over `fill`, any input type, `multiline`
+for a textarea) and `Sheet` (a modal card on a native `<dialog>`). `Toggle`
+stays the iOS switch. `Checkbox` animates the way macOS draws it: the fill fades
+in, the tick springs up from half size, and the box squashes while pressed.
+
+`useWide(at = 600)` returns `[ref, wide]` and measures the ref's own box, which
+five apps had each written out as a `ResizeObserver` against the same 600 px.
+The threshold now has one home, and the reason it is a box measurement rather
+than `useDisplay()` is stated once in the kit rather than in five app comments.
+
 # 1.0.0
 
 The design system is Apple's. Every value in `tokens.stylex.ts` now traces to
@@ -33,9 +63,6 @@ role (`photosSidebarBackgroundColor` is `photosSidebar`). Keys are grouped under
 a `// <app>` line and only that app may read them.
 
 `Button variant="plain"` now presses. `Row`'s chevron is `app.label3`.
-
-Added `useSplit(ref)` and the `SPLIT` const (600), the width two columns start
-at. The Store, Notes and Photos each carried the same `ResizeObserver` effect.
 
 No SDK protocol or host compatibility requirement changes.
 

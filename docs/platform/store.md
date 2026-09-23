@@ -10,7 +10,7 @@ curated shelves remain [roadmap](roadmap.md); there is no catalog polling, Updat
 A baked `light` app in three files: `packages/apps/appstore/index.tsx` for the shell and the
 sections, `app-page.tsx` for one app, `rows.tsx` for the icon, the capsule and the catalog row
 they share. It is laid out like the App Store, and which of its two layouts you get depends on
-the box, measured with the kit's `useSplit`, not on the display: a split half of the inner
+the box, measured with the kit's `useWide`, not on the display: a split half of the inner
 display is as narrow as the cover.
 
 Wider than 600 px, a **sidebar** holds the search field, the sections and, at its foot, the
