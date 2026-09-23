@@ -447,6 +447,16 @@ export const appAppearance = stylex.defineConsts({
   phoneKeyDark: '#5a5a5e',
   phoneKeyRim: 'rgba(255,255,255,.45)',
   phoneKeyFaint: 'rgba(255,255,255,.16)',
+  /** iOS 26's keypad key and floating tab bar at rest, and the hairline round both, off the phone. */
+  phoneGlass: '#141414',
+  phoneGlassEdge: 'inset 0 0 0 1px #242424',
+  /** The selected tab's capsule. */
+  phoneTabOn: '#353535',
+  /** The call key: a deep green under a lighter green rim, off the phone. */
+  phoneCall: '#127a2d',
+  phoneCallEdge: 'inset 0 0 0 1.5px #3fb163',
+  /** A contact with no photo: iOS's grey monogram. */
+  phoneMono: 'linear-gradient(#a5aab6,#858a95)',
   // photos
   photosSidebar: '#ececec',
   photosSidebarBorder: 'rgba(0,0,0,.1)',
