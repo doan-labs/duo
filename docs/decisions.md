@@ -1255,3 +1255,21 @@ Cost: a private tab is private only in name, as before, since the shell keeps no
 history or storage for any tab. The status bar stays dark-on-light over the dark
 overview: the shell draws it from the manifest's fixed `light` flag, and no app
 can change that while it runs.
+
+## 85. Phone is iOS 26's five tabs, and its keypad fits the glass
+
+2026-09-23. Phone had two tabs, Recents and Keypad, on a flat strip, and its keypad
+was a fixed 521 px that both displays are too short for, so the number you typed
+went off the top (issue 23). Held against a screenshot of iOS 26, Phone is five tabs,
+Favorites, Recents, Contacts, Keypad and Voicemail, on a floating capsule with the
+selected tab on a lighter pill, and dark keys under a hairline with a handset on a
+deep green call key.
+
+Phone now draws that. The bar stops 22 px up, clear of the home indicator. The keys
+and call key are one `min(76px, (100cqh - 141px) / 5)` disc, the Calculator fix,
+and the digit is 45% of it, so the keypad shrinks as a whole and the number always
+shows. Every row on the new tabs calls, as Recents always did; tapping a voicemail
+calls back and clears its dot. Six SF Symbols join the set, the handset among them,
+so the call key drops its emoji. Cost: letters under the digits keep the ramp's
+tracking rather than iOS's wide spacing, favourites are a fixed four, there is no
+voicemail audio, and a contact has no detail page in Phone.

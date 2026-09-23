@@ -136,6 +136,11 @@ ramp at 11. `getBoundingClientRect()` is screen space; use `spot()`'s offset cha
 panel coordinates, including home-page transforms. Chromium can lose rounded image clips
 inside CSS3D; existing widgets use text/gradients.
 
+A bottom-anchored column (`justifyContent: 'flex-end'`) that outgrows its panel overflows
+off the top, where no scroll reaches it. Both displays are shorter than a phone keypad, so
+Calculator and Phone make the column a `containerType: 'size'` container and size their
+keys `min(<full>, (100cqh - <fixed>) / <rows>)`; change `<fixed>` with any height around them.
+
 ## Safari maintenance
 
 `packages/apps/safari/index.tsx` owns tab history, the floating URL pill and the cover rail;
