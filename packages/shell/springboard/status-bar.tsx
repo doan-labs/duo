@@ -134,8 +134,8 @@ const styles = stylex.create({
     letterSpacing: tracking.caption1,
     fontWeight: weight.semibold
   },
-  // The cover's camera sits 5.5 mm from the free edge: the ring's centre lands on 28 px.
-  statusNarrow: { right: 11 },
+  // The cover's camera sits 5.5 mm from the free edge: the ring's centre lands on 33 px.
+  statusNarrow: { right: 16 },
   statusLight: { color: colors.black },
   hole: { width: 23, height: 23, borderRadius: radius.circle, backgroundColor: colors.black, marginBottom: 2 },
   read: { fontSize: typeScale.caption1, marginTop: -4 },

@@ -88,7 +88,7 @@ constants in both paths or the display jumps at transition. Measured geometry:
 | Value | Source |
 | --- | --- |
 | Glass radii: inner 10.7 mm; cover free edge 11.4 mm, hinge edge 1.3 mm | Model meshes; `os.tsx` |
-| Bezel 2.2 mm; concentric active-area radii | `screen.ts` |
+| Bezel 1.2 mm; concentric active-area radii | `screen.ts` |
 | Home grid/widget/dock scale 768/1072 | HIG renders; `springboard/home-screen.tsx` |
 | Display rectangles | Mesh bounds; `main.ts` |
 

@@ -1273,3 +1273,78 @@ calls back and clears its dot. Six SF Symbols join the set, the handset among th
 so the call key drops its emoji. Cost: letters under the digits keep the ramp's
 tracking rather than iOS's wide spacing, favourites are a fixed four, there is no
 voicemail audio, and a contact has no detail page in Phone.
+
+## 86. The Store wears the App Store's sidebar, and the app page opens inside the pane
+
+2026-09-20. Decision 71 gave the Store the App Store's list shapes but kept a settings-app
+skeleton around them: one long root page, a filter line of chips, and a detail page that
+pushed over the whole app. Beside a real App Store window the difference was structural, not
+cosmetic.
+
+The root is now a sidebar of sections, as the Mac App Store has: search at the top, Discover,
+Apps, the three lanes, Updates and Develop with their counts, and the catalog everything came
+from at the foot with Refresh beside it, where the account row sits on a Mac. The lane chips,
+the Apps/Updates segment and the header's Refresh are gone; the sections carry that. On the
+cover a sidebar would be a sidebar and no page, so the same list becomes a tab bar and the
+search field moves up beside the large title. The lanes have no room in four tabs, so Apps
+shows every lane there. The box decides, as it did before, not the display.
+
+Both float, inset and rounded on `app.surface` with decision 18's recipe and `shadow.float`,
+rather than a full-height slab behind a hairline and a strip pinned to the bottom edge; the
+pane pads itself clear of whichever is showing. A flat slab beside flat content is what iOS 26
+stopped doing, and the first pass had shipped exactly that. The tint stays on the theme's own
+surface rather than a fixed translucency, because `appAppearance` is a const table with no
+light and dark siblings and a white wash would only be right in one of them. A Today card's
+bar dropped its blur in the same pass: the artwork behind it is already blurred, and a
+filtered child escapes its parent's rounded clip, which was squaring off the card's bottom
+corners.
+
+`Nav` now wraps the pane rather than the app, so pushing an app page leaves the sidebar and the
+tab bar in place, as the Mac does; the pane is keyed on the section, so picking another one
+drops the page that was over it instead of stranding it. The page itself gained the parts the
+App Store has and the catalog can answer honestly: the compatibility line, the description
+beside the developer's links, an App Privacy card naming the device access the release asked
+for or stating there is none, and You Might Also Like from the rest of the lane. Ratings,
+charts, age ratings and screenshots have no data behind them and were left out rather than
+invented.
+
+Discover keeps the blurred-icon artwork from decision 71 for the cards and drops it for the
+lead, which sits on a plain surface with its icon beside the copy, as the App Store's own lead
+card does. Every card carries `data-store-app` and a capsule, so a section that shows an app
+exposes the same hooks a row does and the store checks reach them from wherever they land.
+Every button label, `data-store-app` and `data-store-submit` hook and notice is unchanged.
+
+Three follow-ups from looking at it on the glass. The sidebar runs up under the status stack
+and stops 8 px from the top, because the shell's 40 px reserve left a band of bare background
+across the whole width and the panel stranded below it; the clock sits on the far right of the
+inner display, so nothing collides, and the pane keeps its own clearance. The group that opens
+a pane drops its hairline and heads straight into its rows: the pane's large title has already
+named the section, and a second heading under it cost a fifth of the display before the first
+app. Rows lost their lane chip, since every group is one lane and its heading says which; DEV
+and the permission chips stay, and the chip line is only drawn when it holds something. The
+Store also moved from the right page into the dock, where its traffic belongs.
+
+The panels then stopped being paper. `app.surface` is opaque white, so the blur on them had
+been decoration: nothing showed through. They sit on `appstorePanel` now, a translucent white,
+which is safe to fix because the Store is a baked light app and has no dark sibling to be
+wrong in. Where the glass earns it differs by axis: the tab bar crosses the scroll, so its
+clearance moved out of the pane and into the scroller and the list genuinely passes under it;
+the sidebar stands beside a list scrolling down, which never passes behind it, so it keeps its
+column and shows the page's tone rather than moving content. The catalog at its foot became a
+control instead of two grey discs around a label, matching the search field at the panel's
+other end.
+
+Then the corners. The bezel went from 2.2 mm to 1.2 mm (architecture.md), which moved the
+inner display's corner to 47.5 px, and the sidebar now takes the radius concentric with it,
+39.5 px at 8 px in, instead of the kit's 22 px. What sits in its corners had to follow: a 34 px
+field cannot take the 31.5 px corner that would be concentric, so the search field and the
+catalog became capsules, each dropped just far enough that its end rides a circle concentric
+with the panel's, 8 px clear all round (24 px from the top for the field, 12 px from the bottom
+for the 56 px catalog). The rectangular field had its corner up against the curve. The glass
+then got something to carry: the pane runs the full width, under the sidebar, and pads its
+scroller and a pushed app page clear, so the copy stays beside the panel while Discover's wash
+(the day's release blown up and blurred across the top of the page) and a page sliding in pass
+under it. That reverses the column above: a column suits a list, but it left the glass over
+plain paper, where it read as a white slab. The catalog is now a white card, where a Mac puts
+the account: the Duo mark in a disc concentric with the capsule's end, Doan Labs over Duo
+catalog, Refresh beside it.

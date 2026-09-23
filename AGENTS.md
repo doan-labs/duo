@@ -2,6 +2,11 @@
 
 A folding iPhone Duo rendered with Three.js, shipping as a web page and as a native desktop window.
 
+> **Read [DESIGN.md](DESIGN.md) before touching anything with pixels in it.** Every UI change,
+> in any package, starts there. Its rules are hard rules, not preferences: cover-first layout,
+> the running second copy, tokens only, and decision 18's glass recipe. Do not design from a
+> screenshot or from memory of how iOS looks.
+
 ## Stack
 
 | Layer | Choice |
@@ -37,6 +42,7 @@ then read the pages relevant to the task before changing anything non-trivial:
 
 | Task | Read |
 | --- | --- |
+| Anything visual, in any package | [DESIGN.md](DESIGN.md) first, always, then the rows below |
 | Scene, fold, displays, SpringBoard or native shell | [Architecture](docs/architecture.md), [working guide](docs/working.md) |
 | SDK, sandbox, app sessions, storage or lifecycle | [Platform overview](docs/platform/README.md), [accepted contract and amendments](docs/platform/contract.md), [runtime](docs/platform/runtime.md), [security](docs/platform/security.md); [manifest](docs/platform/manifest.md) or [updates](docs/platform/updates.md) as relevant |
 | App authoring, CLI, UI kit or Store | [Development](docs/platform/dev.md), the relevant package README, [UI kit](docs/platform/uikit.md) or [Store](docs/platform/store.md); distinguish trusted baked apps from sandboxed apps |
@@ -82,7 +88,7 @@ verified; Chromium results do not establish native WebKit parity.
 - One responsibility per file, named after it. New feature the web can call: a file in `packages/shell/desktop/commands/`. New OS-specific code: behind the `Platform` trait in `packages/shell/desktop/platform/`. Never inline either in `main.rs`.
 - `packages/shell/native.ts` owns every Tauri check. The rest of the web code never touches `window.__TAURI__`.
 - Shaders are TS modules exporting a string, not `.glsl` files - the bundler treats those as assets.
-- UI is React function components styled with StyleX: `stylex.create` at the bottom of the file, longhand properties only, pseudo-classes and media queries as nested values, no descendant selectors, never `className` or `style` next to `stylex.props`. Colours and easings come from `packages/uikit/tokens.stylex.ts`. The only plain CSS is the `@layer reset` block in `packages/shell/index.html`.
+- UI is React function components styled with StyleX: `stylex.create` at the bottom of the file, longhand properties only, pseudo-classes and media queries as nested values, no descendant selectors, never `className` or `style` next to `stylex.props`. Colours and easings come from `packages/uikit/tokens.stylex.ts`; [DESIGN.md](DESIGN.md) governs what you build out of them. The only plain CSS is the `@layer reset` block in `packages/shell/index.html`.
 - Assets belong in `public/`, imported by URL. Apple's model is not redistributable, so it stays out of git.
 - Units are centimetres. The camera is fixed at z=40 and the screen shader projects from that eye; moving it breaks the projection.
 - Biome owns formatting and lint: single quotes, no semicolons, 2-space indent, 120 columns. Matching edits are formatted by the PostToolUse hook in `.codex/hooks.json`, and staged files again on pre-commit. Codex hooks require user trust before running; see docs/working.md. Use `apply_patch` for Codex edits so the hook runs; shell-written files do not trigger this matcher. Never hand-format or run `biome check --write` or `bun run format` yourself. If the hook is inactive, report it rather than assuming formatting ran. Lint errors are handed back to fix.

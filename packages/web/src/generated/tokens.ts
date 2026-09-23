@@ -680,7 +680,7 @@ export const layout: Token[] = [
   {
     "name": "glassInner",
     "value": "53.5px",
-    "doc": "The physical glass corners, not design radii: docs/architecture.md gives\ninner 10.7 mm, cover free edge 11.4 mm, cover hinge edge 1.3 mm, here at\n5 px/mm. The active area sits 11 px inside the glass, concentric with it."
+    "doc": "The physical glass corners, not design radii: docs/architecture.md gives\ninner 10.7 mm, cover free edge 11.4 mm, cover hinge edge 1.3 mm, here at\n5 px/mm. The active area sits 6 px inside the glass, concentric with it."
   },
   {
     "name": "glassCoverFree",
@@ -694,18 +694,23 @@ export const layout: Token[] = [
   },
   {
     "name": "screenInner",
-    "value": "42.5px",
+    "value": "47.5px",
     "doc": ""
   },
   {
     "name": "screenCoverFree",
-    "value": "46px",
+    "value": "51px",
     "doc": ""
   },
   {
     "name": "screenCoverHinge",
     "value": "2.5px",
     "doc": ""
+  },
+  {
+    "name": "screenInnerPanel",
+    "value": "39.5px",
+    "doc": "A panel floating 8 px inside the inner screen's corner, concentric with it."
   }
 ]
 
@@ -953,16 +958,6 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "appstoreInk",
-    "value": "#3c3c43",
-    "doc": ""
-  },
-  {
-    "name": "appstoreBorder",
-    "value": "rgba(0,136,255,.22)",
-    "doc": ""
-  },
-  {
     "name": "appstoreHeroBar",
     "value": "rgba(0,0,0,.26)",
     "doc": ""
@@ -973,14 +968,19 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "appstoreOfficial",
-    "value": "rgba(52,199,89,.14)",
-    "doc": ""
+    "name": "appstorePanel",
+    "value": "rgba(255,255,255,.6)",
+    "doc": "The sidebar and the tab bar: glass the page shows through, not paper. The Store is baked light, so one value is the value."
   },
   {
     "name": "appstorePillLight",
     "value": "rgba(255,255,255,.25)",
     "doc": ""
+  },
+  {
+    "name": "appstoreWash",
+    "value": "linear-gradient(180deg,transparent 0%,#000 24%,#000 40%,transparent 100%)",
+    "doc": "Discover's wash: faded in under the status stack, full through the title and the lead card, gone by the shelf."
   },
   {
     "name": "booksPaperInk",
@@ -1336,6 +1336,36 @@ export const appAppearance: Token[] = [
     "name": "phoneKeyFaint",
     "value": "rgba(255,255,255,.16)",
     "doc": ""
+  },
+  {
+    "name": "phoneGlass",
+    "value": "#141414",
+    "doc": "iOS 26's keypad key and floating tab bar at rest, and the hairline round both, off the phone."
+  },
+  {
+    "name": "phoneGlassEdge",
+    "value": "inset 0 0 0 1px #242424",
+    "doc": ""
+  },
+  {
+    "name": "phoneTabOn",
+    "value": "#353535",
+    "doc": "The selected tab's capsule."
+  },
+  {
+    "name": "phoneCall",
+    "value": "#127a2d",
+    "doc": "The call key: a deep green under a lighter green rim, off the phone."
+  },
+  {
+    "name": "phoneCallEdge",
+    "value": "inset 0 0 0 1.5px #3fb163",
+    "doc": ""
+  },
+  {
+    "name": "phoneMono",
+    "value": "linear-gradient(#a5aab6,#858a95)",
+    "doc": "A contact with no photo: iOS's grey monogram."
   },
   {
     "name": "photosSidebar",

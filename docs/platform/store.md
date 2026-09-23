@@ -7,25 +7,58 @@ curated shelves remain [roadmap](roadmap.md); there is no catalog polling, Updat
 
 ## The screen
 
-`packages/apps/appstore/index.tsx`, a baked `light` app inside a kit `Nav`, laid out like the
-App Store. The root page has the large title with the search field and Refresh on one line
-(the field wraps under the title in a narrow box; Refresh turns orange on a developer
-catalog, whose host also shows in a banner), then the Apps/Updates segment behind
-`stageUpdates` beside the lane chips **All**, **Official**, **Community** and, with a developer
-catalog loaded, **Local previews**, each with its count. A Today card features one compatible
-official release per day, rotating: the release's own icon, blown up and blurred, is the
-artwork, with the icon floating over it when the box is wider than 600 px. Then one group per
-lane, **From Doan Labs**, **Community** and **Local previews**, its rows in two columns in a wide box
-and one in a narrow one. A row is a
-60 px icon, name, `author · version`, a lane tag (a green tick for Official) and permission tags
-with glyphs, and the GET / OPEN /
-UPDATE / Retry update capsule or a download ring. Notices (errors as `role="alert"`, "Updates
-when … closes") sit under the row. Tapping an icon or name pushes
-a detail page: version, size, lane, licence and access facts, a Privacy list of the granted
-permissions, View source (the manifest repo, through the native bridge), **Restore previous
-version** when a previous release is kept, and **Remove App**. Rows carry `data-store-app`; the checks drive those buttons by their text. The runtime gives
-each row `icon` (a catalog file, or an object URL for a locally installed release), `repo`,
-`bytes` and the optional release `note`.
+A baked `light` app in three files: `packages/apps/appstore/index.tsx` for the shell and the
+sections, `app-page.tsx` for one app, `rows.tsx` for the icon, the capsule and the catalog row
+they share. It is laid out like the App Store, and which of its two layouts you get depends on
+the box, measured with the kit's `useWide`, not on the display: a split half of the inner
+display is as narrow as the cover.
+
+Wider than 600 px, a **sidebar** holds the search field, the sections and, at its foot, the
+catalog everything came from with Refresh beside it: a white card with the Doan Labs mark,
+`Doan Labs` over `Duo catalog`, where a Mac puts the account (orange, with the developer's host,
+on a developer catalog, which also shows in a banner). Narrower, the sidebar becomes a **tab bar** and the search
+field moves beside the large title. Both float over the pane rather than taking a column or a
+strip out of it: inset from the edges, rounded concentric with the glass (`layout.screenInnerPanel`; the tab bar at `radius.xxl`), on a translucent
+`appstorePanel` under [decision 18](../decisions.md)'s glass recipe and `shadow.float`. The
+sidebar runs up under the status stack and stops 8 px from the top, clear of the clock on the
+inner display's far right. The pane runs the full width under it and pads its scroller, and a
+pushed app page, clear: the copy stays beside the glass while Discover's wash and a page sliding
+in pass under it. Over plain paper the glass had nothing to carry and read as a white slab. The
+tab bar crosses the scroll, so its
+clearance is in the scroller and the list runs under the glass to the last row, above the home
+bar's bottom 22 px.
+
+The sections are **Discover**, **Apps**, **Official**, **Community**, **Previews** with a
+developer catalog loaded, **Updates** behind `stageUpdates`, and **Develop**, each but Discover
+and Develop with its count; the three lane sections have no room in the tab bar, so Apps shows
+every lane there. Typing in the search field replaces the pane with **Results** whatever the
+section.
+
+**Discover** is Today cards: one compatible official release per day leads, rotating, on a
+plain surface with its icon beside the copy, over a wash of that icon blown up and blurred
+across the top of the page, edge to edge, faded in under the status stack and out by the shelf, and every other release gets a card whose artwork
+is its own icon, blown up and blurred. A card is a kicker (what most needs saying about that
+release, falling back to its lane), the name, what it reaches for, and a bar with the icon,
+`author · size` and the capsule. **Apps** and the lane sections are groups of rows, two columns
+across in a wide box and one in a narrow one: a 60 px icon, name, `author · version` and, where
+there is one to draw, a DEV tag or permission tags with glyphs, then the GET / OPEN / UPDATE /
+Retry update capsule or a download ring, with the size or version beside it. There is no lane
+tag: every group is one lane and its heading says which. Notices (errors as `role="alert"`,
+"Updates when … closes") sit under the row. The group that opens a pane drops its hairline, so
+the pane title is not followed by a second heading saying the same thing.
+
+Tapping a card or a row pushes the app page **inside the pane**, so the sidebar and the tab bar
+stay put; picking another section drops it. The page is the icon, name, author and capsule over
+a strip of version, size, lane, licence and access facts, the compatibility line, the
+description beside the developer's links, an **App Privacy** card naming the device access the
+release asked for (or that it asked for none), **You Might Also Like** with the rest of its
+lane, **Restore previous version** when a previous release is kept, and **Remove App**. View
+source opens the manifest repo through the native bridge, from the share button in the header
+and from the links.
+
+Every card and row carries `data-store-app`; the checks drive those buttons by their text. The
+runtime gives each row `icon` (a catalog file, or an object URL for a locally installed
+release), `repo`, `bytes` and the optional release `note`.
 
 ## Default and developer catalogs
 

@@ -236,14 +236,16 @@ export const layout = stylex.defineConsts({
   /**
    * The physical glass corners, not design radii: docs/architecture.md gives
    * inner 10.7 mm, cover free edge 11.4 mm, cover hinge edge 1.3 mm, here at
-   * 5 px/mm. The active area sits 11 px inside the glass, concentric with it.
+   * 5 px/mm. The active area sits 6 px inside the glass, concentric with it.
    */
   glassInner: '53.5px',
   glassCoverFree: '57px',
   glassCoverHinge: '6.6px',
-  screenInner: '42.5px',
-  screenCoverFree: '46px',
-  screenCoverHinge: '2.5px'
+  screenInner: '47.5px',
+  screenCoverFree: '51px',
+  screenCoverHinge: '2.5px',
+  /** A panel floating 8 px inside the inner screen's corner, concentric with it. */
+  screenInnerPanel: '39.5px'
 })
 
 /**
@@ -341,12 +343,13 @@ export const appAppearance = stylex.defineConsts({
   // appstore
   appstoreBanner: 'rgba(255,141,40,.16)',
   appstoreBannerDev: 'rgba(0,136,255,.1)',
-  appstoreInk: '#3c3c43',
-  appstoreBorder: 'rgba(0,136,255,.22)',
   appstoreHeroBar: 'rgba(0,0,0,.26)',
   appstoreHeroShade: 'linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,.1) 45%,rgba(0,0,0,.5) 100%)',
-  appstoreOfficial: 'rgba(52,199,89,.14)',
+  /** The sidebar and the tab bar: glass the page shows through, not paper. The Store is baked light, so one value is the value. */
+  appstorePanel: 'rgba(255,255,255,.6)',
   appstorePillLight: 'rgba(255,255,255,.25)',
+  /** Discover's wash: faded in under the status stack, full through the title and the lead card, gone by the shelf. */
+  appstoreWash: 'linear-gradient(180deg,transparent 0%,#000 24%,#000 40%,transparent 100%)',
   // books
   booksPaperInk: '#fff9f0',
   booksPaper: '#f6f1e6',
