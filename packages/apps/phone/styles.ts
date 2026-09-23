@@ -19,6 +19,11 @@ const pop = stylex.keyframes({ from: { transform: 'scale(.55) translateY(12px)',
 
 const rip = stylex.keyframes({ to: { transform: 'scale(2.3)', opacity: 0 } })
 
+// 76px discs when they fit, else what is left of the keypad's height after the
+// 61px number, the grid's padding and three gaps, and the call button's margin,
+// shared by four key rows and the call button.
+const disc = 'min(76px, (100cqh - 141px) / 5)'
+
 export const styles = stylex.create({
   // Phone is a dark app: the root carries the dark theme's own background so
   // every `app.*` colour below it reads against it.
@@ -35,7 +40,15 @@ export const styles = stylex.create({
   dark: { backgroundColor: app.surface, borderBottomColor: app.separator, cursor: 'pointer' },
   name: { fontWeight: weight.semibold, color: app.fg },
   missed: { color: colors.redDark },
-  keypad: { display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' },
+  // The discs read their size off the keypad's height, so the number is never
+  // pushed off the top: both displays are shorter than a full-size keypad.
+  keypad: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    height: '100%',
+    containerType: 'size'
+  },
   dial: {
     textAlign: 'center',
     fontSize: typeScale.largeTitle,
@@ -50,7 +63,7 @@ export const styles = stylex.create({
   // the panel and the call button lands as a 76x36 ellipse.
   keys: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3,76px)',
+    gridTemplateColumns: `repeat(3, ${disc})`,
     justifyContent: 'center',
     gap: 14,
     paddingTop: 4,
@@ -58,8 +71,7 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   key: {
-    width: 76,
-    height: 76,
+    aspectRatio: 1,
     borderRadius: radius.circle,
     backgroundColor: { default: app.fill3, ':active': appAppearance.phoneKey },
     display: 'grid',
@@ -95,7 +107,7 @@ export const styles = stylex.create({
     transform: { default: null, ':active': motion.press }
   },
   red: { backgroundColor: colors.redDark },
-  dialBtn: { marginBottom: 20, fontSize: typeScale.title1 },
+  dialBtn: { width: disc, height: disc, marginBottom: 20, fontSize: typeScale.title1 },
   hangUp: { marginTop: 26 },
   bar: {
     display: 'flex',
