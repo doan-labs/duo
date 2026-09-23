@@ -398,7 +398,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
 const styles = stylex.create({
   disp: {
     position: 'absolute',
-    inset: 11,
+    inset: 6,
     overflow: 'hidden',
     backgroundColor: colors.black,
     backgroundSize: 'cover, cover',

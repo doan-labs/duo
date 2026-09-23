@@ -236,14 +236,16 @@ export const layout = stylex.defineConsts({
   /**
    * The physical glass corners, not design radii: docs/architecture.md gives
    * inner 10.7 mm, cover free edge 11.4 mm, cover hinge edge 1.3 mm, here at
-   * 5 px/mm. The active area sits 11 px inside the glass, concentric with it.
+   * 5 px/mm. The active area sits 6 px inside the glass, concentric with it.
    */
   glassInner: '53.5px',
   glassCoverFree: '57px',
   glassCoverHinge: '6.6px',
-  screenInner: '42.5px',
-  screenCoverFree: '46px',
-  screenCoverHinge: '2.5px'
+  screenInner: '47.5px',
+  screenCoverFree: '51px',
+  screenCoverHinge: '2.5px',
+  /** A panel floating 8 px inside the inner screen's corner, concentric with it. */
+  screenInnerPanel: '39.5px'
 })
 
 /**

@@ -9,11 +9,11 @@ import { grid, isFolder, type Slot } from './springboard/grid.ts'
 const PX = 12
 const M = 1000 * PX
 const mm = (v: number) => v * PX
-const BEZEL = mm(2.2)
+const BEZEL = mm(1.2)
 // Active-area corners: the glass radius (10.7 mm inner, 11.4 mm outer, 1.3 mm on
 // the outer's hinge edge) minus the bezel, so the bezel reads as an even ring.
-const RADIUS = mm(8.5)
-const OUTER_RADII = [mm(0.5), mm(9.2), mm(9.2), mm(0.5)]
+const RADIUS = mm(9.5)
+const OUTER_RADII = [mm(0.5), mm(10.2), mm(10.2), mm(0.5)]
 
 // This layer shows while the hinge moves, when the live DOM panel cannot bend,
 // so every number below is os.ts's — in the same CSS px, scaled by the ratio of
@@ -370,8 +370,8 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
 
   // Status stack, top right: camera, time, radios. The inner camera is
   // under-display, so only the cover half draws the punch-hole.
-  // The cover's camera is 5.5 mm from the free edge, so its stack sits 11 px in; the inner keeps 24.
-  const sx = X + W - u(wide ? 24 : 11) - u(17)
+  // The cover's camera is 5.5 mm from the free edge, so its stack sits 16 px in; the inner keeps 24.
+  const sx = X + W - u(wide ? 24 : 16) - u(17)
   let sy = Y + u(18)
   if (!wide) {
     ctx.beginPath()
