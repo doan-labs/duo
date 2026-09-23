@@ -14,14 +14,17 @@ the box, measured with the kit's `useWide`, not on the display: a split half of 
 display is as narrow as the cover.
 
 Wider than 600 px, a **sidebar** holds the search field, the sections and, at its foot, the
-catalog everything came from with Refresh beside it (both turn orange on a developer catalog,
-whose host also shows in a banner). Narrower, the sidebar becomes a **tab bar** and the search
+catalog everything came from with Refresh beside it: a white card with the Doan Labs mark,
+`Doan Labs` over `Duo catalog`, where a Mac puts the account (orange, with the developer's host,
+on a developer catalog, which also shows in a banner). Narrower, the sidebar becomes a **tab bar** and the search
 field moves beside the large title. Both float over the pane rather than taking a column or a
-strip out of it: inset from the edges, rounded at `radius.xxl`, on a translucent
+strip out of it: inset from the edges, rounded concentric with the glass (`layout.screenInnerPanel`; the tab bar at `radius.xxl`), on a translucent
 `appstorePanel` under [decision 18](../decisions.md)'s glass recipe and `shadow.float`. The
 sidebar runs up under the status stack and stops 8 px from the top, clear of the clock on the
-inner display's far right, and takes its column out of the layout, since a list scrolling down
-never passes behind a panel standing beside it. The tab bar crosses the scroll, so its
+inner display's far right. The pane runs the full width under it and pads its scroller, and a
+pushed app page, clear: the copy stays beside the glass while Discover's wash and a page sliding
+in pass under it. Over plain paper the glass had nothing to carry and read as a white slab. The
+tab bar crosses the scroll, so its
 clearance is in the scroller and the list runs under the glass to the last row, above the home
 bar's bottom 22 px.
 
@@ -32,7 +35,8 @@ every lane there. Typing in the search field replaces the pane with **Results** 
 section.
 
 **Discover** is Today cards: one compatible official release per day leads, rotating, on a
-plain surface with its icon beside the copy, and every other release gets a card whose artwork
+plain surface with its icon beside the copy, over a wash of that icon blown up and blurred
+across the top of the page, edge to edge, faded in under the status stack and out by the shelf, and every other release gets a card whose artwork
 is its own icon, blown up and blurred. A card is a kicker (what most needs saying about that
 release, falling back to its lane), the name, what it reaches for, and a bar with the icon,
 `author · size` and the capsule. **Apps** and the lane sections are groups of rows, two columns

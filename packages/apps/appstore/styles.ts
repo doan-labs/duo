@@ -5,6 +5,7 @@ import {
   easing,
   fonts,
   glass,
+  layout,
   leading,
   motion,
   radius,
@@ -26,13 +27,50 @@ export const styles = stylex.create({
   shellWide: { flexDirection: 'row' },
   pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
   /**
-   * Room for the panel that floats over this edge. The sidebar takes its column
-   * out of the layout, since a list scrolling down never passes behind a panel
-   * standing beside it. The tab bar crosses the scroll, so its clearance goes in
-   * the scroller instead and the list runs under the glass to the last row.
+   * Room for the panel that floats over this edge. The pane runs the full width,
+   * under the sidebar too, and the scroller pads itself clear: the copy stays
+   * beside the glass while anything drawn to the edge, Discover's wash or a page
+   * sliding in, passes under it. The tab bar crosses the scroll, so the list runs
+   * under the glass to the last row.
    */
   paneSide: { paddingLeft: 202 },
   paneScroll: { paddingBottom: 78 },
+  /** Its own stacking context, so the wash can sit at z -1 under the title without dropping behind the page. */
+  paneRoot: { isolation: 'isolate' },
+  /** A pushed app page, padded clear of the sidebar the same way. */
+  pushed: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
+  /**
+   * The day's release, blown up and blurred across the top of Discover, edge to
+   * edge: what the sidebar's glass has to carry. On plain paper the panel read
+   * as a white slab. Faded in at the top, so it never cuts a line where the
+   * sidebar runs up past the scroller under the status stack.
+   */
+  wash: {
+    position: 'absolute',
+    zIndex: -1,
+    top: 0,
+    right: 0,
+    left: 0,
+    height: 620,
+    overflow: 'hidden',
+    maskImage: appAppearance.appstoreWash,
+    WebkitMaskImage: appAppearance.appstoreWash,
+    pointerEvents: 'none'
+  },
+  washArt: {
+    position: 'absolute',
+    top: '-8%',
+    right: '-10%',
+    bottom: '-42%',
+    left: '-10%',
+    width: '120%',
+    height: '150%',
+    borderRadius: 0,
+    boxShadow: null,
+    objectFit: 'cover',
+    filter: 'blur(64px) saturate(160%)',
+    opacity: 0.5
+  },
 
   /** Sidebar: search, the sections, and the catalog they all came from. */
   side: {
@@ -48,15 +86,20 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
-    paddingTop: 8,
+    // The search field and the catalog are capsules sitting in the panel's
+    // 39.5 px corners, 8 px in from the sides. A capsule is as round as its
+    // height lets it be, so each clears its corner by moving in from the end:
+    // 24 px for the 34 px field and 12 px for the 56 px catalog put their ends
+    // on circles concentric with the panel's, 8 px clear all round.
+    paddingTop: 24,
     paddingRight: 8,
-    paddingBottom: 8,
+    paddingBottom: 12,
     paddingLeft: 8,
-    borderRadius: radius.xxl,
+    borderRadius: layout.screenInnerPanel,
     backgroundColor: appAppearance.appstorePanel,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: shadow.float
+    boxShadow: `${shadow.rim},${shadow.float}`
   },
   sideList: { display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, overflowY: 'auto' },
   sideRow: {
@@ -88,33 +131,50 @@ export const styles = stylex.create({
     color: app.label2,
     fontVariantNumeric: 'tabular-nums'
   },
+  /** A card lifted off the glass, its mark 8 px inside the capsule's end and concentric with it. */
   sideFoot: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexShrink: 0,
-    paddingTop: 7,
-    paddingRight: 9,
-    paddingBottom: 7,
-    paddingLeft: 10,
-    borderRadius: radius.md,
-    backgroundColor: app.fill
+    paddingTop: 8,
+    paddingRight: 12,
+    paddingBottom: 8,
+    paddingLeft: 8,
+    borderRadius: radius.pill,
+    backgroundColor: app.surface,
+    boxShadow: shadow.card
   },
-  sideFootDev: { backgroundColor: appAppearance.appstoreBanner },
-  sideFootIc: { display: 'flex', flexShrink: 0, color: app.label2 },
+  sideFootDev: { backgroundColor: appAppearance.appstoreBanner, boxShadow: null },
+  sideMark: { width: 40, height: 40, flexShrink: 0, borderRadius: radius.circle, boxShadow: shadow.card },
+  sideMarkDev: {
+    display: 'grid',
+    placeItems: 'center',
+    color: colors.orange,
+    backgroundColor: appAppearance.appstoreBanner,
+    boxShadow: null
+  },
   sideFootDevIc: { color: colors.orange },
   sideFootGo: { display: 'flex', flexShrink: 0, color: colors.blue, cursor: 'pointer' },
-  sideFootText: {
-    flexGrow: 1,
-    minWidth: 0,
+  sideFootText: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
+  sideFootName: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    fontSize: typeScale.footnote,
-    lineHeight: leading.footnote,
-    letterSpacing: tracking.footnote,
-    fontWeight: weight.medium,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
     color: app.fg
+  },
+  sideFootSub: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    color: app.label2
   },
 
   /** The cover's tab bar, floating clear of the home bar's bottom 22 px. */
@@ -162,7 +222,7 @@ export const styles = stylex.create({
     paddingRight: 10,
     paddingBottom: 7,
     paddingLeft: 10,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: app.fill,
     color: app.label2
   },

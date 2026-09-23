@@ -19,6 +19,8 @@ import { styles } from './styles.ts'
 
 /** Where app authors go to publish; opened outside the device, so the shell hands us the opener. */
 const SUBMIT_URL = 'https://duo.doan-labs.com/publish'
+/** Doan Labs' mark: the repo's own icon, `public/icon.svg`. */
+const LOGO = '/icon.svg'
 /** Sections the cover cannot offer: its tab bar has no room, so Apps shows every lane there. */
 const LANES = new Set(['official', 'community', 'development'])
 
@@ -75,7 +77,7 @@ function Shelf({ store, open, openExternal }: { store: Store; open: Open; openEx
           developer={state.developer}
         />
       )}
-      <div {...stylex.props(styles.pane, wide && styles.paneSide)}>
+      <div {...stylex.props(styles.pane)}>
         {/* Keyed on the section: picking another one in the sidebar drops the app page that was over it. */}
         <Nav key={view}>
           <Pane
@@ -138,12 +140,19 @@ function Sidebar({
           </button>
         ))}
       </div>
-      {/* The catalog reads as a control, like the search field at the other end of the panel. */}
+      {/* The catalog everything came from, where a Mac puts the account: Doan Labs, or a developer's host. */}
       <div {...stylex.props(styles.sideFoot, developer && styles.sideFootDev)}>
-        <span {...stylex.props(styles.sideFootIc, developer && styles.sideFootDevIc)}>
-          <Sym name="tabs" size={14} />
+        {developer ? (
+          <span {...stylex.props(styles.sideMark, styles.sideMarkDev)}>
+            <Sym name="tabs" size={18} />
+          </span>
+        ) : (
+          <img src={LOGO} alt="" {...stylex.props(styles.sideMark)} />
+        )}
+        <span {...stylex.props(styles.sideFootText)}>
+          <span {...stylex.props(styles.sideFootName)}>{developer ? new URL(source).host : 'Doan Labs'}</span>
+          <span {...stylex.props(styles.sideFootSub)}>{developer ? 'Developer catalog' : 'Duo catalog'}</span>
         </span>
-        <span {...stylex.props(styles.sideFootText)}>{developer ? new URL(source).host : 'Duo catalog'}</span>
         <button
           type="button"
           aria-label="Refresh catalog"
@@ -289,7 +298,7 @@ function Pane({
   else if (view === 'development') body = groups([lanes[2]!])
   else body = found ? groups(lanes) : <Placeholder xstyle={styles.center}>No apps found.</Placeholder>
   return (
-    <Screen xstyle={!wide && styles.paneScroll}>
+    <Screen xstyle={[styles.paneRoot, wide ? styles.paneSide : styles.paneScroll]}>
       <div {...stylex.props(styles.top)}>
         <LargeTitle as="h1" xstyle={styles.title}>
           {title}
@@ -334,19 +343,24 @@ function Discover({
   const lead = pool.length ? pool[day % pool.length] : rows[0]
   if (!lead) return <Placeholder xstyle={styles.center}>Nothing to discover yet.</Placeholder>
   return (
-    <div {...stylex.props(styles.cards, wide && styles.cardsWide)}>
-      {[lead, ...rows.filter((row) => row !== lead)].map((row) => (
-        <Card
-          key={row.id}
-          row={row}
-          lead={row === lead}
-          wide={wide}
-          store={store}
-          open={open}
-          onShow={() => onShow(row)}
-        />
-      ))}
-    </div>
+    <>
+      <div aria-hidden="true" {...stylex.props(styles.wash)}>
+        <Icon row={lead} xstyle={styles.washArt} />
+      </div>
+      <div {...stylex.props(styles.cards, wide && styles.cardsWide)}>
+        {[lead, ...rows.filter((row) => row !== lead)].map((row) => (
+          <Card
+            key={row.id}
+            row={row}
+            lead={row === lead}
+            wide={wide}
+            store={store}
+            open={open}
+            onShow={() => onShow(row)}
+          />
+        ))}
+      </div>
+    </>
   )
 }
 

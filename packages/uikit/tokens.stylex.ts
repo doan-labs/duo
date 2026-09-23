@@ -348,6 +348,8 @@ export const appAppearance = stylex.defineConsts({
   /** The sidebar and the tab bar: glass the page shows through, not paper. The Store is baked light, so one value is the value. */
   appstorePanel: 'rgba(255,255,255,.6)',
   appstorePillLight: 'rgba(255,255,255,.25)',
+  /** Discover's wash: faded in under the status stack, full through the title and the lead card, gone by the shelf. */
+  appstoreWash: 'linear-gradient(180deg,transparent 0%,#000 24%,#000 40%,transparent 100%)',
   // books
   booksPaperInk: '#fff9f0',
   booksPaper: '#f6f1e6',

@@ -13,21 +13,25 @@ import { type ReactNode, useSyncExternalStore } from 'react'
 import { Action, type External, Icon, Item, Notices, type Open, PERM_GLYPH, size, tagline, version } from './rows.tsx'
 import { styles } from './styles.ts'
 
-export function AppPage({
-  id,
-  store,
-  open,
-  openExternal,
-  wide,
-  back
-}: {
+type PageArgs = {
   id: string
   store: Store
   open: Open
   openExternal: External
   wide?: boolean
   back: () => void
-}) {
+}
+
+/** The pane runs under the sidebar, so a pushed page pads itself clear of it, as the root's scroller does. */
+export function AppPage(props: PageArgs) {
+  return (
+    <div {...stylex.props(styles.pushed, props.wide && styles.paneSide)}>
+      <Body {...props} />
+    </div>
+  )
+}
+
+function Body({ id, store, open, openExternal, wide, back }: PageArgs) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const { push } = useNav()
   const row = state.rows.find((r) => r.id === id)
