@@ -1,143 +1,146 @@
-import { art } from '@doan-labs/duo-fixtures'
+// Contacts. The iPadOS shape: a Lists page with the A-Z directory pushed over
+// it, and the card beside it when the box is wide, pushed over it when it is
+// not. The book and every selection live in the SDK's storage and session,
+// so both displays agree on them.
+
 import type { Os } from '@doan-labs/duo-sdk'
-import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/duo-uikit'
-import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { Push, useWide } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
+import type { Contact } from './data.ts'
+import { Blank, Detail } from './detail.tsx'
+import { ContactForm, ListPicker, NewList } from './form.tsx'
+import { ALL, Directory, inList, Lists, listTitle } from './list.tsx'
+import { blank, useBook, useShared } from './store.ts'
 import { styles } from './styles.ts'
 
-const PEOPLE: [string, string][] = [
-  ['Jony', '+1 (408) 555‑0134'],
-  ['Ada Lovelace', '+44 20 7946 0812'],
-  ['Mum', '+1 (415) 555‑0177'],
-  ['Kim Minh', '+84 90 555 214'],
-  ['Blender Foundation', '+31 20 555 9011'],
-  ['Alan Turing', '+44 161 555 0918'],
-  ['Apple Park Reception', '+1 (408) 555‑0100'],
-  ['Grace Hopper', '+1 (202) 555‑0146'],
-  ['Hideo Kojima', '+81 3 5555 2049'],
-  ['Katherine Johnson', '+1 (757) 555‑0163'],
-  ['Nguyễn Thanh', '+84 28 555 771'],
-  ['Radia Perlman', '+1 (617) 555‑0129'],
-  ['Susan Kare', '+1 (415) 555‑0188'],
-  ['Tim', '+1 (408) 555‑0111'],
-  ['Vera Rubin', '+1 (520) 555‑0154']
-]
+export const Contacts = ({ os }: { os: Os }) => {
+  const [root, wide] = useWide()
+  const { book, contacts, me, save, remove, toggle, addList, removeList } = useBook()
+  const [list, setList] = useShared('list')
+  const [lists, setLists] = useShared('lists')
+  const [selected, setSelected] = useShared('selected')
+  const [pushed, setPushed] = useShared('pushed')
+  const [query, setQuery] = useShared('q')
+  const [draft, setDraft] = useState<Contact | null>(null)
+  const [isNew, setIsNew] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [naming, setNaming] = useState(false)
 
-const initials = (n: string) =>
-  n
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  const shown = contacts.filter((c) => c.id !== me?.id && inList(c, list))
+  const sel = contacts.find((c) => c.id === selected)
+  const pick = (c: Contact) => {
+    setSelected(c.id)
+    setPushed('true')
+  }
+  const edit = (c: Contact, fresh: boolean) => {
+    setIsNew(fresh)
+    setDraft(c)
+  }
+  const onSave = (c: Contact) => {
+    save(c)
+    setDraft(null)
+    pick(c)
+  }
+  const onDelete = (c: Contact) => {
+    remove(c.id)
+    setSelected('')
+    setPushed('')
+  }
+  const chooseList = (id: string) => {
+    setList(id)
+    setLists('')
+    setQuery('')
+  }
+  // The rows of another list may not hold the card that was open; the pane clears rather than keeping a stranger.
+  useEffect(() => {
+    if (sel && !inList(sel, list) && sel.id !== me?.id) setSelected('')
+  }, [list, sel, me?.id, setSelected])
 
-/** Monogram disc: the contact's initials over artwork derived from their name. */
-const Mono = ({ name, size, font }: { name: string; size: number; font: number }) => (
-  <div {...stylex.props(styles.mono, styles.monoSize(size, font, art(name)))}>{initials(name)}</div>
-)
-
-/** The circle shrinks while the whole button is held, so the press is tracked here and not with `:active`. */
-const Act = ({ label, glyph, onClick }: { label: string; glyph: string; onClick: () => void }) => {
-  const [down, setDown] = useState(false)
-  const up = () => setDown(false)
+  const directory = (
+    <Directory
+      title={listTitle(list, book.lists)}
+      contacts={shown}
+      me={list === ALL ? me : undefined}
+      sel={sel?.id}
+      query={query}
+      onQuery={setQuery}
+      onPick={pick}
+      onAdd={() => edit(blank(), true)}
+      onBack={() => setLists('true')}
+      wide={wide}
+    />
+  )
+  const page = (
+    <Lists
+      contacts={contacts}
+      lists={book.lists}
+      current={list}
+      onPick={chooseList}
+      onAdd={() => setNaming(true)}
+      onRemove={(id) => {
+        removeList(id)
+        if (list === id) chooseList(ALL)
+      }}
+      wide={wide}
+    />
+  )
+  const column = (
+    <Push open={lists !== 'true'} sheet={directory}>
+      {page}
+    </Push>
+  )
+  const card = (c: Contact) => (
+    <Detail
+      contact={c}
+      lists={book.lists}
+      isMe={c.id === me?.id}
+      wide={wide}
+      onBack={() => setPushed('')}
+      onEdit={() => edit(c, false)}
+      onToggle={(key) => toggle(c.id, key)}
+      onLists={() => setPicking(true)}
+      onDelete={() => onDelete(c)}
+      open={os.open}
+    />
+  )
   return (
-    <button
-      type="button"
-      {...stylex.props(styles.act)}
-      onClick={onClick}
-      onPointerDown={() => setDown(true)}
-      onPointerUp={up}
-      onPointerLeave={up}
-      onPointerCancel={up}
-    >
-      <b {...stylex.props(styles.actGlyph, down && styles.actDown)}>{glyph}</b>
-      {label}
-    </button>
+    <div ref={root} {...stylex.props(styles.root)}>
+      {wide ? (
+        <div {...stylex.props(styles.split)}>
+          <div {...stylex.props(styles.side)}>{column}</div>
+          <div {...stylex.props(styles.pane, styles.paneWide)}>{sel ? card(sel) : <Blank />}</div>
+        </div>
+      ) : (
+        <Phone open={pushed === 'true' && !!sel} sel={sel} card={card}>
+          {column}
+        </Phone>
+      )}
+      <ContactForm draft={draft} isNew={isNew} onSave={onSave} onClose={() => setDraft(null)} />
+      <ListPicker
+        contact={picking && sel ? sel : null}
+        lists={book.lists}
+        onChange={save}
+        onAdd={(name) => addList(name, sel?.id)}
+        onClose={() => setPicking(false)}
+      />
+      <NewList open={naming} onAdd={(name) => chooseList(addList(name).id)} onClose={() => setNaming(false)} />
+    </div>
   )
 }
 
-const Detail = ({ name, tel, back, os }: { name: string; tel: string; back: () => void; os: Os }) => (
-  <VStack>
-    <Title xstyle={[styles.hdr17]}>
-      <button type="button" {...stylex.props(shared.bk)} onClick={back}>
-        <Sym name="back" size={20} />
-        Contacts
-      </button>
-    </Title>
-    <Screen>
-      <div {...stylex.props(styles.head)}>
-        <Mono name={name} size={88} font={30} />
-        <div {...stylex.props(styles.name)}>{name}</div>
-      </div>
-      <div {...stylex.props(styles.acts)}>
-        <Act label="call" glyph="📞" onClick={() => os.open('Phone')} />
-        <Act label="message" glyph="💬" onClick={() => os.open('Messages')} />
-        <Act label="video" glyph="🎥" onClick={() => os.open('FaceTime')} />
-        <Act label="mail" glyph="✉️" onClick={() => os.open('Mail')} />
-      </div>
-      <Section xstyle={[styles.white]}>
-        <Row>
-          <div>
-            <Text as="div" size="caption">
-              mobile
-            </Text>
-            <div {...stylex.props(styles.blue)}>{tel}</div>
-          </div>
-        </Row>
-        <Row>
-          <div>
-            <Text as="div" size="caption">
-              email
-            </Text>
-            <div {...stylex.props(styles.blue)}>{`${name.split(' ')[0]!.toLowerCase()}@icloud.com`}</div>
-          </div>
-        </Row>
-      </Section>
-      <Section xstyle={[styles.white]}>
-        <Row>
-          Send Message
-          <span {...stylex.props(shared.rowR)}>›</span>
-        </Row>
-        <Row>
-          Share Contact
-          <span {...stylex.props(shared.rowR)}>›</span>
-        </Row>
-        <Row xstyle={[styles.red]}>Block this Caller</Row>
-      </Section>
-    </Screen>
-  </VStack>
-)
+// ---------- folded: the card pushed over the list like a nav stack ----------
 
-const List = ({ os }: { os: Os }) => {
-  const { push } = useNav()
-  const sorted = [...PEOPLE].sort((a, b) => a[0].localeCompare(b[0]))
-  const rows: ReactNode[] = []
-  let letter = ''
-  for (const [name, tel] of sorted) {
-    if (name[0]! !== letter) {
-      letter = name[0]!
-      rows.push(
-        <div key={`#${letter}`} {...stylex.props(styles.sec)}>
-          {letter}
-        </div>
-      )
-    }
-    rows.push(
-      <Row key={name} onClick={() => push((b) => <Detail name={name} tel={tel} back={b} os={os} />)}>
-        <Mono name={name} size={34} font={13} />
-        <span {...stylex.props(styles.rowName)}>{name}</span>
-        <span {...stylex.props(shared.rowR)}>›</span>
-      </Row>
-    )
-  }
-  return <Page title="Contacts">{rows}</Page>
+type PhoneProps = { open: boolean; sel?: Contact; card: (c: Contact) => ReactNode; children: ReactNode }
+const Phone = ({ open, sel, card, children }: PhoneProps) => {
+  // The sheet keeps the card it was opened with so it can slide out after the selection clears.
+  const [held, setHeld] = useState<Contact | undefined>(sel)
+  useEffect(() => {
+    if (sel) setHeld(sel)
+  }, [sel])
+  return (
+    <Push open={open} sheet={held && <div {...stylex.props(styles.pane)}>{card(held)}</div>}>
+      {children}
+    </Push>
+  )
 }
-
-export const Contacts = ({ os }: { os: Os }) => (
-  <Nav>
-    <List os={os} />
-  </Nav>
-)
