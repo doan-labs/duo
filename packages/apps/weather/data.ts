@@ -197,13 +197,17 @@ type Fix = { latitude: number; longitude: number }
 /** The browser prompt's answer, or null when it is refused, missing or times out. */
 function geolocate(): Promise<Fix | null> {
   if (!('geolocation' in navigator)) return Promise.resolve(null)
-  return new Promise((resolve) =>
+  // The API's own timeout cannot fire while a permission decision pends, so an
+  // unanswered bubble (or a prompt the hidden view cannot show) parks the
+  // request forever; the fallback rides on our clock, not theirs.
+  const fix = new Promise<Fix | null>((resolve) =>
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
       () => resolve(null),
       { timeout: 10000, maximumAge: 300000 }
     )
   )
+  return Promise.race([fix, new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000))])
 }
 /** 'denied' means skip the prompt entirely and go straight to the IP answer. */
 async function geoState(): Promise<PermissionState | null> {
@@ -230,7 +234,7 @@ async function named(fix: Fix, signal: AbortSignal): Promise<Place> {
         longitude: String(fix.longitude),
         localityLanguage: 'en'
       })}`,
-      { credentials: 'omit', signal }
+      { credentials: 'omit', signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]) }
     )
     if (response.ok) {
       const data = await response.json()
@@ -249,7 +253,10 @@ async function named(fix: Fix, signal: AbortSignal): Promise<Place> {
 /** Where the public IP puts the device, when a GPS fix never comes. */
 async function ipLocate(signal: AbortSignal): Promise<Place | null> {
   try {
-    const response = await fetch('https://ipwho.is/', { credentials: 'omit', signal })
+    const response = await fetch('https://ipwho.is/', {
+      credentials: 'omit',
+      signal: AbortSignal.any([signal, AbortSignal.timeout(12000)])
+    })
     if (!response.ok) return null
     const data = await response.json()
     if (data.success !== true || !Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) return null
@@ -280,9 +287,15 @@ async function locateHere(signal: AbortSignal): Promise<Place | null> {
 export async function locate(): Promise<Place | null> {
   if (!os.owner) {
     const request = crypto.randomUUID()
-    await os.commands.send('locate', request)
-    const value = await os.session.get(`locate:${request}`)
-    await os.session.del(`locate:${request}`)
+    // The owner's clock bounds its own work; this cap covers an owner that dies
+    // mid-answer, since commands.send itself waits forever.
+    const ask = (async () => {
+      await os.commands.send('locate', request)
+      const value = await os.session.get(`locate:${request}`)
+      await os.session.del(`locate:${request}`)
+      return value
+    })()
+    const value = await Promise.race([ask, new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000))])
     try {
       const place = JSON.parse(value ?? 'null')
       return place && typeof place.id === 'string' ? (place as Place) : null
