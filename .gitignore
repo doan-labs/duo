@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .cache/
+.venv/
 .DS_Store
 
 # Claude Code worktrees: full checkouts that live inside the repo
