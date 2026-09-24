@@ -74,7 +74,24 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   const ccOn = useRef(false)
   const ccScrim = useRef<HTMLDivElement>(null)
   const ccPanel = useRef<HTMLDivElement>(null)
-  const [bright, setBright] = useState(0.7)
+  // Brightness is a preference: `os.bright` keeps it for the next visit. Each
+  // display holds its own copy of the state, as it always has.
+  const [bright, setBright] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem('os.bright'))
+      return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 0.7
+    } catch {
+      return 0.7
+    }
+  })
+  const setBrightness = (v: number) => {
+    setBright(v)
+    try {
+      localStorage.setItem('os.bright', String(v))
+    } catch {
+      // Private mode or quota: the level holds until the page reloads.
+    }
+  }
   const { vol, show: hud, setLevel } = useVolumeHud()
   const { flash, thumbs, screenshot } = useScreenshot(disp)
 
@@ -330,7 +347,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
             volume={device.level}
             onVolume={setLevel}
             bright={bright}
-            onBright={setBright}
+            onBright={setBrightness}
             open={(name) => {
               ccClose()
               launch(name)

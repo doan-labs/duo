@@ -1412,3 +1412,28 @@ The saved `dock` key means the finger arranged it, even when it saved an empty
 column; only a missing key falls back to the factory five. That asymmetry is what
 makes "dock down to zero" stick across reloads while a pre-change `os.home` still
 yields the factory dock untouched.
+
+## 89. The view, the switches and the levels are remembered
+
+A reload forgot everything but the grid and the wallpaper: the phone came back
+open, level, front-facing at the reference size, auto-rotate off, radios and
+torch at their defaults, ringer at ten sixteenths, brightness at 70%. Every one
+of those is a preference the finger can set, so all of them persist now.
+
+`view.ts` keeps `os.view` - hinge angle, yaw, camera orbit (azimuth, polar,
+distance) and auto-rotate - restored once at load with `?deg=`, `?yaw=` and
+`?spin=` still winning, since a deep link or an embedding page poses the phone
+on purpose. Writes happen on gestures only: the slider, the fold/flip/reset
+buttons, the orbit 'end' event (drag and wheel alike) and the auto-rotate
+checkbox. A postMessage pose never saves, so a page posing the phone for a
+section cannot overwrite what the user left. The camera restore happens before
+the model lands and clamps polar and distance to the controls' limits, so a
+saved pose can never strand the phone out of reach.
+
+`toggles.ts`, `device.ts` and `springboard.tsx` keep the rest: `os.toggles` for
+the Control Center switches (saved keys resolve against the defaults, so a
+switch added or removed since still lands right), `os.level` for the ringer,
+`os.bright` for brightness. All `os.` keys, so Erase All Content and Settings
+forgets them with the rest of the phone, and none of it reaches the website's
+own hyphenated keys. The sleep, lock and power states stay transient - what is
+asleep should wake to the lock screen, not to sleep.

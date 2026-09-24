@@ -56,7 +56,7 @@ export function useVolumeHud() {
   }
 
   const setLevel = (n: number) => {
-    device.level = n
+    device.setLevel(n)
     setVol((v) => ({ ...v, level: n }))
   }
 
