@@ -262,6 +262,9 @@ const styles = stylex.create({
     borderWidth: 2,
     borderStyle: 'solid',
     borderColor: colors.yellow,
+    // Hidden at rest; the eat animation reveals then re-hides it. Without a base
+    // opacity, reduced-motion (which skips the animation) leaves it painted forever.
+    opacity: 0,
     animationName: { default: eatRing, [reduced]: 'none' },
     animationDuration: '.5s',
     animationTimingFunction: easing.out,
@@ -272,6 +275,7 @@ const styles = stylex.create({
     left: '50%',
     top: 0,
     color: colors.yellow,
+    opacity: 0,
     fontSize: typeScale.caption1,
     fontWeight: weight.bold,
     textShadow: shadow.text,
@@ -285,6 +289,9 @@ const styles = stylex.create({
     inset: 0,
     pointerEvents: 'none',
     backgroundColor: colors.redDark,
+    // Hidden at rest for the same reason as the burst: reduced-motion never runs
+    // deathFlash, so this element would otherwise sit as a solid red block.
+    opacity: 0,
     animationName: { default: deathFlash, [reduced]: 'none' },
     animationDuration: '.45s',
     animationTimingFunction: easing.out,
