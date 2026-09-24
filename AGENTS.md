@@ -85,6 +85,9 @@ verified; Chromium results do not establish native WebKit parity.
 
 - Hard rule: em dashes (U+2014) are banned throughout the repository. Use only the normal ASCII dash (`-`, U+002D) instead.
 
+- Git worktrees always go inside the repo: `git worktree add .claude/worktree/<name>`. The folder is gitignored; never create one beside the checkout.
+- Proof of work always includes screenshots: capture the rendered result of a user-visible change (agent-browser for the site, the visible Tauri app for anything native) and attach it to the PR or the reply. PRs follow `.github/pull_request_template.md`: summary, proof, test plan.
+
 - One responsibility per file, named after it. New feature the web can call: a file in `packages/shell/desktop/commands/`. New OS-specific code: behind the `Platform` trait in `packages/shell/desktop/platform/`. Never inline either in `main.rs`.
 - `packages/shell/native.ts` owns every Tauri check. The rest of the web code never touches `window.__TAURI__`.
 - Shaders are TS modules exporting a string, not `.glsl` files - the bundler treats those as assets.
