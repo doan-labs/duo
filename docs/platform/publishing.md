@@ -83,5 +83,10 @@ The website build runs `packages/web/scripts/catalog.ts`: it unpacks `origin/cat
 `public/catalog/` when reachable and merges the nine bundled official releases from
 `dist/cdn` with the same publisher, so the hosted Store lists official and community apps
 from one origin. The Store loads `/catalog/index.json`, then `/cdn`, then `/preinstalled`.
+Site Created/Updated dates are the release `build.at` for community apps but the first
+and last package commit for official apps: their `dist/cdn` release is rebuilt on every
+site build, so its timestamp is only the deploy minute. For the same reason the script
+completes shallow checkouts (`git fetch --unshallow`) before reading commit history -
+a single-commit checkout would date every package to the deploy commit.
 Catalog hashes are integrity checks, not signatures; publisher identity and signing remain
 release decisions, as does any public telemetry statement.
