@@ -194,7 +194,9 @@ const styles = stylex.create({
     touchAction: 'none'
   },
   tileDock: {
+    // No label: the empty text line must not add height, or the slot pitch drifts from 50.
     fontSize: 0,
+    lineHeight: 0,
     gap: 0,
     // Dock tiles slide to make room; lift writes transform inline, which wins.
     transitionProperty: 'transform',

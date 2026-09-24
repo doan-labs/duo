@@ -1362,7 +1362,12 @@ and caps at 8, the most that clears the status stack and the search button at th
 
 The make-room is transforms only, the same reason the grid's is: the other icons slide
 on `translateY` and the glass animates an explicit height, so a finger that changes
-its mind mid-drag retargets smoothly and nothing in the DOM moves. The let-go gets
+its mind mid-drag retargets smoothly and nothing in the DOM moves. The column's
+centre rides in `top`, not a `translateY(-50%)`: `spot()` and `lift()` read the
+offset chain, which a transform hides, and a carried tile needs that chain honest -
+the dock re-centres while a tile is on the finger, so `lift()` drives its transform
+per animation frame and folds the drift of the tile's own layout origin into it.
+The let-go gets
 the same treatment a tap got from `zoom`: the grid updates first, then the freshly
 mounted tile flies from where the finger left it (lift reports the carried box and
 the display's 3D scale; the FLIP kills the tile's landing stagger so the two

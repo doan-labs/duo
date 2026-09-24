@@ -429,8 +429,9 @@ const styles = stylex.create({
     right: layout.dockRight,
     // Centred on the content, not measured: the column grows with DOCK and the
     // baked one in screen.ts derives the same centre from its own height.
-    top: '52.5%',
-    transform: 'translateY(-50%)',
+    // Centring rides in `top`, not a transform: `spot()` and `lift()` read the
+    // offset chain, which a transform hides, so a carried dock tile must see
+    // where it actually sits while the column re-centres under it.
     width: layout.dock,
     display: 'flex',
     flexDirection: 'column',
@@ -441,13 +442,17 @@ const styles = stylex.create({
     overflow: 'visible',
     borderRadius: radius.xxl,
     // The glass grows and shrinks with the slot that opens or closes under a
-    // carried tile; translateY(-50%) keeps it centred as the height animates.
-    transitionProperty: 'height',
+    // carried tile; `top` animates with the height so the centre stays at 52.5%.
+    transitionProperty: 'height, top',
     transitionDuration: '.25s',
     transitionTimingFunction: easing.push
   },
-  // 8 px top and bottom, one 41 px slot per app plus its 9 px gap.
-  dockHeight: (n: number) => ({ height: 8 + n * 41 + Math.max(0, n - 1) * 9 + 8 }),
+  // 8 px top and bottom, one 41 px slot per app plus its 9 px gap; the centre
+  // is derived from the same number the bake uses, so live and baked agree.
+  dockHeight: (n: number) => ({
+    height: 8 + n * 41 + Math.max(0, n - 1) * 9 + 8,
+    top: `calc(52.5% - ${(8 + n * 41 + Math.max(0, n - 1) * 9 + 8) / 2}px)`
+  }),
   srch: {
     position: 'absolute',
     right: 16,
