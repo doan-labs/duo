@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3
+
+- Rebuilt the UI: on wide boxes the arrow pad sits in a control deck on the right of the board; on the cover the pad is right-aligned with New run on the left and extra edge insets keep it clear of the screen's corner mask.
+- Added a food ripple ring, an eat burst with a floating +1, a death shake with a red flash, a tapered snake tail, ready-state pulses, and a pressed-arrow flash; all gated behind reduced-motion.
+- Restyled on the UI kit token scales: radius, shadow, easing, motion press, type scale, tracking, leading, and space.
+
 ## 1.2.2
 
 - Fixed the food dot rendering at the board's corner instead of its cell: the pulse animation overrode the translate used for placement, so the point could never be reached.
