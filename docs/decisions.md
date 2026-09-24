@@ -1348,3 +1348,37 @@ under it. That reverses the column above: a column suits a list, but it left the
 plain paper, where it read as a white slab. The catalog is now a white card, where a Mac puts
 the account: the Duo mark in a disc concentric with the capsule's end, Doan Labs over Duo
 catalog, Refresh beside it.
+
+## 87. Music wears Apple Music's chrome, and its accent is the app's own
+
+2026-09-24. Music had been a list of five tracks and a play button, closer to a demo of the
+deck than to the app the Dock names. It now takes Apple Music's shape, as the Store took the
+App Store's in decision 86: a floating sidebar of sections on the wide box, and on the cover
+the same list as a floating tab bar - Home, New, Radio, Library - with Search split off into
+its own circle beside it, as iOS 26 draws them. `Nav` wraps the pane for the same reason it
+does in the Store: an album, artist or mix page pushes over the section and the chrome stays.
+
+The chrome has the parts the catalog can answer honestly. Home is shelves of the real
+releases: Top Picks and New Releases by year, Recently Played from the deck's own history,
+and the mixes. New leads with the newest release over Latest Albums and New Songs. Radio is
+stations - Duo Radio over the whole library, one per artist, one per broad genre - where a
+tap plays the collection shuffled under the station's name, since a fake live stream would be
+invented data. Library is the five lists iOS names plus a Recently Added shelf; Search shows
+browse categories until there is text, then top result, songs, albums and artists. The mini
+player floats over whichever section is up once something has started, and the Now Playing
+sheet slides up over everything with artwork, scrubber, shuffle and repeat, volume, Up Next,
+and the credits card - which is where the licences live, with the `P` line that was already
+on the album page footers.
+
+The queue model moved with it. The deck now holds a list plus `order`, a permutation of
+indices, so shuffle is a reshuffled order, repeat-all is a wrap, repeat-one is staying put,
+and Up Next reads `upcoming` back out; skipping back inside the first three seconds goes to
+the previous track and after that rewinds, as iOS does. Stations and Shuffle deal the rest of
+the order at random under their own context name, which is what the sheet's "Playing From"
+line reports. `nowPlaying` and `useNowPlaying` keep their old contract, so Control Center and
+the launch cues drive the same deck untouched.
+
+The accent is `musicAccent` (#fc3c44) plus its soft fill, under `appAppearance` as the app's
+own identity colour rather than `app.link`: the selected tab, the Play and Shuffle pills and
+the sheet's on-state marks all read Music, not the system blue. Category tiles take their
+colour from `art()` rather than an invented palette, and artwork backs every card it can.
