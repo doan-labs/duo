@@ -2,6 +2,7 @@
 // collection with its gradient square and tip count. Selection is a rounded
 // row, the iPadOS pattern Settings uses.
 
+import { LargeTitle } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
@@ -12,6 +13,9 @@ export function Sidebar({ current, pick }: { current: string; pick: (id: string)
   return (
     <nav aria-label="Tips" {...stylex.props(styles.side)}>
       <div {...stylex.props(styles.sideScroll)}>
+        <LargeTitle as="h1" xstyle={styles.sideTitle}>
+          Tips
+        </LargeTitle>
         <button
           type="button"
           aria-current={current === 'saved' || undefined}

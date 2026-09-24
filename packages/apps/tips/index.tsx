@@ -2,7 +2,7 @@
 // a two-column grid of collections, and whatever you bookmarked, pushing
 // collection and tip pages. Unfolded, the collections are a sidebar and the
 // picked one fills the pane, as iPadOS splits it; folded, the same destinations
-// push. Saved ids live in storage because both displays' copies must agree.
+// push. Saved ids live in a module store both displays' copies share (store.ts).
 
 import type { Os } from '@doan-labs/duo-sdk'
 import { IconButton, LargeTitle, Nav, Screen, Sym, useNav, useWide } from '@doan-labs/duo-uikit'
@@ -32,6 +32,9 @@ export function Tips(_: { os: Os }) {
           // Keyed: picking another destination drops whatever the last one pushed.
           <Nav key={picked}>
             <div {...stylex.props(shared.column)}>
+              <div {...stylex.props(styles.homeHdr)}>
+                <LargeTitle as="h1">{picked === 'saved' ? 'Saved Tips' : collection.title}</LargeTitle>
+              </div>
               <Screen xstyle={[shared.swap]}>
                 {picked === 'saved' ? (
                   <SavedBody saved={saved} />

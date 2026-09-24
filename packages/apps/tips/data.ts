@@ -46,7 +46,7 @@ export const COLLECTIONS: Collection[] = [
           'Drag the fold slider under the phone, or drag the hinge itself.',
           'Watch the active display change at 40°.'
         ],
-        glyph: 'flip'
+        glyph: 'expand'
       },
       {
         id: 'home',
@@ -125,7 +125,7 @@ export const COLLECTIONS: Collection[] = [
           'The cover display shows the left half of the inner display. Close the Duo with two apps open and the left one carries on at cover width.',
           'Open it again and the split comes back exactly as you left it.'
         ],
-        glyph: 'flip'
+        glyph: 'iphone'
       }
     ]
   },

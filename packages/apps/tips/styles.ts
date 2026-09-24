@@ -6,6 +6,8 @@ export const styles = stylex.create({
   split: { display: 'flex', flexDirection: 'row', flexGrow: 1, minHeight: 0, backgroundColor: app.bg },
   detail: { display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
 
+  /** The large title heads the sidebar scroll, padded to sit on the destinations' axis. */
+  sideTitle: { paddingLeft: space.sm },
   /** The sidebar's material: one step darker than the grouped background it sits against. */
   side: {
     display: 'flex',
