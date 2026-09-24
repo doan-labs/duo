@@ -94,7 +94,7 @@ export function GameBoard({
         )}
         <div
           key={`${game.round}-${game.food.x}-${game.food.y}-${game.eatTick}`}
-          {...stylex.props(styles.food, styles.segmentSize(metrics), styles.segmentPosition(metrics, game.food))}
+          {...stylex.props(styles.food, styles.segmentSize(metrics), styles.foodPosition(metrics, game.food))}
         >
           <span {...stylex.props(styles.foodCore)} />
         </div>
@@ -172,6 +172,11 @@ const styles = stylex.create({
     animationTimingFunction: 'ease-in-out',
     animationIterationCount: 'infinite'
   },
+  // The pulse keyframes animate transform, so the dot positions with left/top rather than translate.
+  foodPosition: (metrics, point) => ({
+    left: `${metrics.padding - metrics.gap * 0.5 + point.x * (metrics.cell + metrics.gap)}px`,
+    top: `${metrics.padding - metrics.gap * 0.5 + point.y * (metrics.cell + metrics.gap)}px`
+  }),
   foodCore: {
     width: '32%',
     height: '32%',

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+
+- Fixed the food dot rendering at the board's corner instead of its cell: the pulse animation overrode the translate used for placement, so the point could never be reached.
+- Fixed instant self-collision from quick turns: steering input now queues one turn per tick instead of applying a reversal mid-tick.
+
 ## 1.2.1
 
 - Built against UI kit 1.0.0 token names.

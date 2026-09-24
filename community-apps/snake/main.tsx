@@ -24,18 +24,24 @@ function Game() {
   const [game, setGame] = useState(newGame)
   const [best, setBest] = useState(0)
   const direction = useRef<Direction>('right')
+  const steering = useRef<Direction[]>([])
   const cover = view.display === 'cover'
   const fit = fitLayout(view, 50)
 
   const reset = () => {
     direction.current = 'right'
+    steering.current = []
     setGame((current) => newGame(current.round + 1))
   }
 
   const steer = useCallback((next: Direction) => {
     const opposites: Record<Direction, Direction> = { up: 'down', down: 'up', left: 'right', right: 'left' }
-    if (opposites[direction.current] === next) return
-    direction.current = next
+    const last = steering.current[steering.current.length - 1] ?? direction.current
+    // Pending turns apply one per tick, so quick input can no longer queue a reversal into the body.
+    if (next !== last && opposites[last] !== next) {
+      if (steering.current.length === 2) steering.current.shift()
+      steering.current.push(next)
+    }
     setGame((current) => (current.status === 'ready' ? { ...current, status: 'playing' } : current))
   }, [])
 
@@ -43,6 +49,8 @@ function Game() {
     if (game.status !== 'playing') return
     const timer = window.setInterval(() => {
       setGame((current) => {
+        const turn = steering.current.shift()
+        if (turn) direction.current = turn
         const next = nextGame(current, direction.current)
         setBest((currentBest) => Math.max(currentBest, next.score))
         return next
