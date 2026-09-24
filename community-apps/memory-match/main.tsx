@@ -8,11 +8,15 @@ import { adoptDeck, type Card, createDeck, fitBoard, SYMBOLS, serializeDeck } fr
 import { BOARD_GAP, BOARD_PAD, faceStyle, styles } from './styles.ts'
 
 // Why a writer id: both displays share one session key whose store is
-// last-writer-wins, so a value not written by this copy is always the newer
-// settled board - adopting it unconditionally is what converges the two
-// displays, including the race where both seed an empty session at once.
+// last-writer-wins, so a value not written by this copy is usually the newer
+// settled board - adopting it is what converges the two displays, including
+// the race where both seed an empty session at once.
 const ME = crypto.randomUUID()
-type SavedGame = { by: string; deck: string[]; flipped: number[]; matched: number[]; moves: number }
+// `at` orders writes: an occluded display's timers can be throttled long
+// enough to republish after the other display already moved on, and the
+// shared store is last-writer-wins, so the wire value needs a clock.
+// Both app copies run in the shell page, so they share one Date.now().
+type SavedGame = { by: string; at: number; deck: string[]; flipped: number[]; matched: number[]; moves: number }
 
 function Game() {
   const view = useDisplay()
@@ -28,6 +32,7 @@ function Game() {
   const [newBest, setNewBest] = useState(false)
   const seeded = useRef(false)
   const lastSeen = useRef<string | null>(null)
+  const lastWriteAt = useRef(0)
   const fit = fitBoard(view, wide)
   const cell = Math.max(1, Math.floor((fit.width - BOARD_PAD * 2 - BOARD_GAP * 3) / 4))
   const finished = matched.length === deck.length
@@ -38,7 +43,9 @@ function Game() {
 
   const publish = useCallback(
     (cards: Card[], open: number[], done: number[], count: number) => {
-      const game: SavedGame = { by: ME, deck: serializeDeck(cards), flipped: open, matched: done, moves: count }
+      const at = Date.now()
+      lastWriteAt.current = at
+      const game: SavedGame = { by: ME, at, deck: serializeDeck(cards), flipped: open, matched: done, moves: count }
       saved.set(JSON.stringify(game))
     },
     [saved]
@@ -63,11 +70,15 @@ function Game() {
     }
     const next = JSON.parse(raw) as SavedGame
     if (next.by === ME) return
+    // A write older than the newest local write is a throttled replay of a
+    // settled board; adopting it would resurrect flipped/matched/moves the
+    // player already moved past.
+    if (next.at < lastWriteAt.current) return
+    lastWriteAt.current = next.at
     setDeck(adoptDeck(next.deck))
     setFlipped(next.flipped)
     setMatched(next.matched)
     setMoves(next.moves)
-    setNewBest(false)
   }, [saved.value, saved.status, publish])
 
   // The reveal window is part of the shared state, so an adopting copy that
@@ -182,7 +193,7 @@ function Game() {
             <Sym name="reload" size={13} />
             New game
           </button>
-          {newBest && <span {...stylex.props(styles.bestTag)}>NEW BEST</span>}
+          {finished && newBest && <span {...stylex.props(styles.bestTag)}>NEW BEST</span>}
           {wide && <p {...stylex.props(styles.hint)}>{hint}</p>}
         </aside>
       </section>
