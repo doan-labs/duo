@@ -233,7 +233,7 @@ nothing is published, no host is chosen, no CI deploys it.
 
 | # | Section | What is on screen | How it is made |
 | --- | --- | --- | --- |
-| 0 | Hero | "A phone Apple hasn't shipped, that you can build apps for." Try Duo, Build an app, the real shell full width | `home/hero.tsx`; `Simulator eager tall`; under 734 px the Remotion loop `public/hero.*` |
+| 0 | Hero | "A phone Apple hasn't shipped, that you can build apps for." Try Duo, Build an app, the real shell full width | `home/hero.tsx`; `Simulator eager tall`; under 734 px the pre-rendered loop `public/hero.*` |
 | 1 | Not a mockup | "It looks like a concept. It behaves like a device." A device that folds, turns and opens as the page scrolls; four captions take turns | `home/works.tsx`; `useScroll` on a 320 vh track driving a sticky `Simulator` by pose; reduced motion gets a still device and the captions as a list |
 | 2 | Real hardware | "Your imaginary phone can use your real camera." The shell running Camera; "The apps are fake. The capabilities aren't." | `home/camera.tsx`, near-black palette via the `dark` theme class; the page asks for the webcam when the scene is on screen, then mounts `Simulator app="Camera" mount`, `allow="camera"` |
 | 3 | The twist | "And then we gave it an App Store." The shell on the App Store, six steps from Get to launch | `home/store.tsx`; a mono note says the runtime and store are real (stages 2–5) and the frame's store lists the bundled Notes and Weather until a developer catalog URL is pasted |

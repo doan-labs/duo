@@ -295,8 +295,8 @@ bun run api            # only the TSDoc reference
   copies `/model`, `/icons`, `/cdn` and `/preinstalled` to the site root: the
   shell loads all four by absolute path, and the runtime seeds Notes and
   Weather from the last one.
-- Under 734 px the hero swaps the WebGL shell for `public/hero.{webm,mp4}`,
-  rendered from `packages/web/video` (Remotion, its own `bun install`).
+- Under 734 px the hero swaps the WebGL shell for the pre-rendered loop
+  `public/hero.{webm,mp4}`.
 - The page scrolls through Lenis (`src/smooth-scroll.tsx`, `ReactLenis root`
   around everything in `__root.tsx`; off under reduced motion). A region that
   scrolls on its own needs `data-lenis-prevent`, and anything reading

@@ -116,7 +116,6 @@ packages/
     src/motion.ts   the shared easing curve, springs and press scale
     src/smooth-scroll.tsx  Lenis on the window, off under reduced motion
     scripts/        API generation, simulator/catalog copy, browser compiler assets and website checks
-    video/          Remotion project for the hero loop (own bun.lock), renders to public/hero.*
     vite-stylex.ts  StyleX for Vite, same Babel plugin as the root
   apps/             one private workspace per existing app
 community-apps/     submitted apps for the curated catalog, one independent project per folder
