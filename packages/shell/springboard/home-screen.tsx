@@ -113,17 +113,19 @@ export function HomeScreen({
     const c = el?.closest<HTMLElement>('[data-cell]')?.dataset.cell?.split(':')
     return c ? (grid()[c[0] as Half][Number(c[1])] ?? null) : null
   }
-  /** The dock index `app` would drop into for a finger over the dock at `at`, or null when it has no room. */
+  // The dock index `app` would drop into for a finger over the dock at `at`,
+  // or null when it has no room. Measured off the glass's own centre, which is
+  // stationary - the other tiles are mid-transition while they slide, so their
+  // rects would flicker the index as a centre crosses the finger.
   const dockAtOf = (d: Element, app: string, at: PointerEvent) => {
     const now = grid()
     if (!now.dock.includes(app) && now.dock.length >= DOCK_MAX) return null
-    let n = 0
-    for (const t of d.querySelectorAll<HTMLElement>('[data-dock-slot]')) {
-      if (t.dataset.app === app) continue
-      const r = t.getBoundingClientRect()
-      if (r.top + r.height / 2 < at.clientY) n++
-    }
-    return n
+    const r = d.getBoundingClientRect()
+    const s = d.clientWidth / r.width // screen px -> layout px
+    const n = now.dock.filter((x) => x !== app).length // the tiles besides the carried one
+    const h = 8 + (n + 1) * 41 + n * 9 + 8 // the glass with the gap open
+    const y = (at.clientY - (r.top + r.height / 2)) * s + h / 2
+    return Math.min(n, Math.max(0, Math.floor((y - 8 + 4.5) / 50)))
   }
   // The let-go into a new cell: the grid updates, then the freshly mounted tile
   // flies from where the finger left it. Its landing stagger is cancelled or the
@@ -262,7 +264,6 @@ export function HomeScreen({
   // animated height, so a retarget mid-drag slides rather than jumps. Slot
   // pitch is the 41 px icon plus the 9 px gap.
   const gap = carry?.dockAt != null
-  const out = !!carry && carry.from === 'dock' && carry.dockAt === null
   const shiftOf = (n: string, k: number) => {
     if (!carry || carry.app === n) return undefined
     let vis = cells.dock.filter((x) => x !== carry.app).indexOf(n)
@@ -270,7 +271,9 @@ export function HomeScreen({
     const shift = (vis - k) * 50
     return shift === 0 ? undefined : shift
   }
-  const dockN = cells.dock.length + (gap ? 1 : 0) - (out ? 1 : 0)
+  // A dock-origin tile occupies no slot while carried, so it never counts;
+  // only a gap opened by the finger adds one.
+  const dockN = cells.dock.length + (gap ? 1 : 0) - (carry?.from === 'dock' ? 1 : 0)
 
   return (
     <div
@@ -283,7 +286,7 @@ export function HomeScreen({
       )}
     >
       <div
-        {...stylex.props(styles.homewrap)}
+        {...stylex.props(styles.homewrap, carry?.from === 'grid' && styles.homewrapCarry)}
         onPointerDown={(e) => {
           x0.current = e.clientX
           y0.current = e.clientY
@@ -375,6 +378,11 @@ const styles = stylex.create({
   shellRight: { left: '50%' },
   shellAway: { transform: 'scale(1.1)', opacity: 0, pointerEvents: 'none' },
   homewrap: { position: 'absolute', inset: 0, overflow: 'hidden' },
+  // A carried grid tile sits inside homewrap's stacking context, which the
+  // dock's glass paints above; lift the wrap over it while a grid tile rides.
+  // pointer-events stays on the halves so hit-testing still reaches the dock
+  // through the transparent wrap, and the React handlers still bubble up.
+  homewrapCarry: { zIndex: 2, pointerEvents: 'none' },
   pages: {
     display: 'flex',
     height: '100%',
@@ -396,6 +404,7 @@ const styles = stylex.create({
   pageWide: { paddingLeft: 48 },
   pageNarrow: { paddingLeft: 7 },
   half: {
+    pointerEvents: 'auto',
     display: 'grid',
     gridTemplateColumns: `repeat(4,${layout.cell})`,
     gridAutoRows: layout.row,

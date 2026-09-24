@@ -123,7 +123,6 @@ export function Tile({
       data-tile
       data-app={a.id ?? a.name}
       data-cell={cell}
-      data-dock-slot={dock || undefined}
       {...stylex.props(
         styles.tile,
         dock && styles.tileDock,
