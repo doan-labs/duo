@@ -185,10 +185,32 @@ function Pane({
   const d = useNowPlaying()
   const { push } = useNav()
   const open: Open = {
-    album: (a) => push((back) => <AlbumPage a={a} back={back} open={open} />),
-    artist: (n) => push((back) => <ArtistPage name={n} back={back} open={open} />),
-    mix: (c) => push((back) => <PlaylistPage c={c} back={back} open={open} />),
-    list: (k) => push((back) => <ListPage k={k} back={back} open={open} />)
+    // A pushed page's own chrome pads clear of the floating sidebar so its
+    // Back stays tappable; the slide-under itself is decision 86's.
+    album: (a) =>
+      push((back) => (
+        <div {...stylex.props(styles.pgPush, wide && styles.pgPushSide)}>
+          <AlbumPage a={a} back={back} open={open} />
+        </div>
+      )),
+    artist: (n) =>
+      push((back) => (
+        <div {...stylex.props(styles.pgPush, wide && styles.pgPushSide)}>
+          <ArtistPage name={n} back={back} open={open} />
+        </div>
+      )),
+    mix: (c) =>
+      push((back) => (
+        <div {...stylex.props(styles.pgPush, wide && styles.pgPushSide)}>
+          <PlaylistPage c={c} back={back} open={open} />
+        </div>
+      )),
+    list: (k) =>
+      push((back) => (
+        <div {...stylex.props(styles.pgPush, wide && styles.pgPushSide)}>
+          <ListPage k={k} back={back} open={open} />
+        </div>
+      ))
   }
   /** Stations deal themselves shuffled under their own name; tiles just name them. */
   const playStation = (c: Collection) =>

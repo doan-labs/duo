@@ -50,6 +50,14 @@ export const styles = stylex.create({
   paneScrollMini: { paddingBottom: 146 },
   /** Its own stacking context, so a pushed page slides over the shelves but under the floating chrome. */
   paneRoot: { isolation: 'isolate' },
+  /**
+   * A pushed page fills the pane and slides under the floating sidebar, so its
+   * header's left controls would land under the glass. On the wide box the
+   * page's body pads past the sidebar — the pane's own clearance — while the
+   * artwork still runs the full width behind it.
+   */
+  pgPush: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
+  pgPushSide: { paddingLeft: 202 },
   top: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -820,10 +828,16 @@ export const styles = stylex.create({
   npRight: { display: 'flex', flexDirection: 'column', gap: 10, flexGrow: 1, minWidth: 0 },
   /** The artwork shrinks a step while paused, as the sheet's own does. */
   npArt: {
-    height: 'min(52%,240px)',
+    height: 'min(48%,240px)',
     aspectRatio: 1,
     width: 'auto',
     maxWidth: 'min(56%,250px)',
+    /**
+     * Shrinks rather than overflowing the column: a short sheet (the cover's)
+     * still has to clear the controls and footer below the art.
+     */
+    flexShrink: 1,
+    minHeight: 128,
     marginTop: 2,
     marginRight: 'auto',
     marginBottom: 2,
@@ -836,8 +850,7 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     transitionProperty: 'transform, opacity',
     transitionDuration: '.3s',
-    transitionTimingFunction: easing.push,
-    flexShrink: 0
+    transitionTimingFunction: easing.push
   },
   npArtWide: { height: 'min(64%,240px)', marginRight: 0, marginLeft: 0 },
   npArtRest: { transform: 'scale(.92)', opacity: 0.85 },

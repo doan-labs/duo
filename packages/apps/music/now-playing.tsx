@@ -8,7 +8,7 @@ import { usePresence } from '@doan-labs/duo-uikit'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { albumOf } from './data.ts'
 import { useNowPlaying } from './deck.ts'
 import { Glyph } from './glyphs.tsx'
@@ -22,6 +22,10 @@ export function NowPlaying({ open, onClose, wide }: { open: boolean; onClose: ()
   // Playing does; on the cover it stacks.
   // What the middle of the sheet shows while it is up.
   const [mode, setMode] = useState<'art' | 'queue' | 'credits'>('art')
+  // The sheet's face is what opens next time; the queue and credits are detours.
+  useEffect(() => {
+    if (!open) setMode('art')
+  }, [open])
   if (!mounted || !d.started) return null
   const t = d.now
   const album = albumOf(t)
