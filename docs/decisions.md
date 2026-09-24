@@ -1382,3 +1382,33 @@ The accent is `musicAccent` (#fc3c44) plus its soft fill, under `appAppearance` 
 own identity colour rather than `app.link`: the selected tab, the Play and Shuffle pills and
 the sheet's on-state marks all read Music, not the system blue. Category tiles take their
 colour from `art()` rather than an invented palette, and artwork backs every card it can.
+
+## 88. The dock is arranged by the finger, like the pages
+
+The dock stops being a static list from apps.ts and joins the arranged grid: `os.home`
+now saves a `dock` key next to `left` and `right`, resolve() cleans it against the
+registry the same way, and the baked canvas draws exactly what the live column shows.
+A dock icon held 0.5 s lifts like any tile; carried up or down the column it reorders,
+carried onto the paper it lands loose on that half, carried onto an icon it folds.
+A grid icon carried onto the dock lands at the slot under the finger. The dock holds
+apps only - a folder there would answer to a tap the column has no room to explain -
+and caps at 8, the most that clears the status stack and the search button at the
+52.5% centre.
+
+The make-room is transforms only, the same reason the grid's is: the other icons slide
+on `translateY` and the glass animates an explicit height, so a finger that changes
+its mind mid-drag retargets smoothly and nothing in the DOM moves. The column's
+centre rides in `top`, not a `translateY(-50%)`: `spot()` and `lift()` read the
+offset chain, which a transform hides, and a carried tile needs that chain honest -
+the dock re-centres while a tile is on the finger, so `lift()` drives its transform
+per animation frame and folds the drift of the tile's own layout origin into it.
+The let-go gets
+the same treatment a tap got from `zoom`: the grid updates first, then the freshly
+mounted tile flies from where the finger left it (lift reports the carried box and
+the display's 3D scale; the FLIP kills the tile's landing stagger so the two
+transforms do not compose).
+
+The saved `dock` key means the finger arranged it, even when it saved an empty
+column; only a missing key falls back to the factory five. That asymmetry is what
+makes "dock down to zero" stick across reloads while a pre-change `os.home` still
+yields the factory dock untouched.

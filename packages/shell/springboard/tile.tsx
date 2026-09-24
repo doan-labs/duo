@@ -88,6 +88,7 @@ export function Tile({
   cell,
   hot,
   shake,
+  shift,
   onOpen,
   onHold
 }: {
@@ -97,6 +98,8 @@ export function Tile({
   cell?: string
   hot?: boolean
   shake?: boolean
+  /** How far the tile slides to make room in the dock, in px. */
+  shift?: number
   onOpen: Open
   onHold?: Hold
 }) {
@@ -118,8 +121,14 @@ export function Tile({
     <div
       ref={tile}
       data-tile
+      data-app={a.id ?? a.name}
       data-cell={cell}
-      {...stylex.props(styles.tile, dock && styles.tileDock, i !== undefined && [styles.land, delay.ms(i * 17)])}
+      {...stylex.props(
+        styles.tile,
+        dock && styles.tileDock,
+        i !== undefined && [styles.land, delay.ms(i * 17)],
+        shift !== undefined && styles.shift(shift)
+      )}
       onClick={() => !held.current && onOpen(a, icon.current!)}
       onPointerDown={(e) => {
         setPressed(true)
@@ -183,7 +192,16 @@ const styles = stylex.create({
     // A held tile is carried by pointer events; the page must not scroll under a finger instead.
     touchAction: 'none'
   },
-  tileDock: { fontSize: 0, gap: 0 },
+  tileDock: {
+    // No label: the empty text line must not add height, or the slot pitch drifts from 50.
+    fontSize: 0,
+    lineHeight: 0,
+    gap: 0,
+    // Dock tiles slide to make room; lift writes transform inline, which wins.
+    transitionProperty: 'transform',
+    transitionDuration: '.25s',
+    transitionTimingFunction: easing.push
+  },
   icon: {
     width: layout.icon,
     height: layout.icon,
@@ -228,6 +246,7 @@ const styles = stylex.create({
     borderColor: colors.white
   },
   iconDock: { width: 41, height: 41 },
+  shift: (px: number) => ({ transform: `translateY(${px}px)` }),
   iconPressed: { transform: 'scale(.88)' },
   // Folder tile: a blurred well showing the grid it holds.
   fold: {

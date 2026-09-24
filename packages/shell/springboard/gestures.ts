@@ -86,16 +86,23 @@ export const zone = (side: Side | undefined, W: number, H: number, split = 0.5):
  * with a transform, which offsetLeft does not see.
  */
 export function spot(el: HTMLElement, disp: HTMLElement, page: number): Box {
-  let x = el.offsetLeft
-  let y = el.offsetTop
-  for (let n = el.offsetParent as HTMLElement | null; n && n !== disp; n = n.offsetParent as HTMLElement | null) {
-    x += n.offsetLeft
-    y += n.offsetTop
-  }
+  const { x: ox, y } = origin(el, disp)
+  let x = ox
   // A page is as wide as the strip holding it: the whole display, or the half the home is squeezed into.
   const strip = el.closest('[data-pages]')?.parentElement
   if (strip) x -= page * strip.clientWidth
   return { x, y, w: el.offsetWidth, h: el.offsetHeight }
+}
+
+/** `el`'s layout origin inside `root`, summed through the offsetParent chain; transforms do not enter into it. */
+const origin = (el: HTMLElement, root: HTMLElement) => {
+  let x = el.offsetLeft
+  let y = el.offsetTop
+  for (let n = el.offsetParent as HTMLElement | null; n && n !== root; n = n.offsetParent as HTMLElement | null) {
+    x += n.offsetLeft
+    y += n.offsetTop
+  }
+  return { x, y }
 }
 
 /**
@@ -134,20 +141,29 @@ export function zoom(el: HTMLElement, from: Box, out: boolean, z: Box, start?: K
 
 /**
  * Picks a tile up under the finger that pressed it at `down` and carries it
- * until release, reporting what is under the pointer as that changes; the tile
- * itself is deaf to hit-testing while carried, so what it covers is what is
- * found. `drop` gets the last thing under the finger and says whether it took
- * the tile. If not, the tile springs back to its cell.
+ * until release, reporting what is under the pointer on every move (the caller
+ * dedupes); the tile itself is deaf to hit-testing while carried, so what it
+ * covers is what is found. The transform is driven per animation frame, not
+ * per pointer event, and compensates for the tile's own layout origin moving -
+ * the dock re-centres itself as it makes room, and the tile must stay under
+ * the finger through that. `drop` gets the last thing under the finger and the
+ * box and scale the tile showed while carried, so the caller can fly it from
+ * where the finger left it into its new cell rather than popping it there; it
+ * says whether it took the tile. If not, the tile springs back to its cell.
  */
+export type Carried = { box: DOMRect; s: number }
 export function lift(
   down: PointerEvent,
   el: HTMLElement,
-  over: (under: Element | null) => void,
-  drop: (under: Element | null) => boolean
+  over: (under: Element | null, at: PointerEvent) => void,
+  drop: (under: Element | null, was: Carried) => boolean
 ) {
   // Pointer deltas are screen px; the panel is scaled in 3D. The display root gives the ratio.
   const box = el.closest<HTMLElement>('[data-os]') ?? el
   const s = box.clientWidth / box.getBoundingClientRect().width
+  const o0 = origin(el, box)
+  let px = down.clientX
+  let py = down.clientY
   let under: Element | null = null
   let at = 'scale(1.12)'
   el.style.zIndex = '5'
@@ -155,23 +171,34 @@ export function lift(
   // A short ease, so the tile trails the hand rather than snapping to each pointer event.
   el.style.transition = 'transform .15s ease-out'
   el.style.transform = at
-  const move = (m: PointerEvent) => {
-    at = `translate(${(m.clientX - down.clientX) * s}px,${(m.clientY - down.clientY) * s}px) scale(1.12)`
+  let raf = 0
+  const frame = () => {
+    // The slot may itself be moving (the dock re-centring): keep the tile under
+    // the finger by folding the drift of its layout origin into the translate.
+    const o = origin(el, box)
+    at = `translate(${(px - down.clientX) * s + o0.x - o.x}px,${(py - down.clientY) * s + o0.y - o.y}px) scale(1.12)`
     el.style.transform = at
+    raf = requestAnimationFrame(frame)
+  }
+  raf = requestAnimationFrame(frame)
+  const move = (m: PointerEvent) => {
+    px = m.clientX
+    py = m.clientY
     const now = document.elementFromPoint(m.clientX, m.clientY)
-    if (now === under) return
     under = now
-    over(now)
+    over(now, m)
   }
   const up = () => {
+    cancelAnimationFrame(raf)
     removeEventListener('pointermove', move)
     removeEventListener('pointerup', up)
     removeEventListener('pointercancel', up)
+    const was = { box: el.getBoundingClientRect(), s }
     el.style.zIndex = ''
     el.style.pointerEvents = ''
     el.style.transition = ''
     el.style.transform = ''
-    if (drop(under)) return
+    if (drop(under, was)) return
     const back = el.animate([{ transform: at }, { transform: 'none' }], {
       duration: 260,
       easing: 'cubic-bezier(.2,.9,.3,1)'

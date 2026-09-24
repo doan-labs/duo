@@ -1,7 +1,7 @@
 import { WALL_KEY } from '@doan-labs/duo-uikit/icons/index.ts'
 import * as THREE from 'three'
 import { widgetAge } from '../uikit/widget.tsx'
-import { byName, DOCK } from './apps.ts'
+import { byName } from './apps.ts'
 import { widgetSnapshot } from './runtime/widgets.tsx'
 import { grid, isFolder, type Slot } from './springboard/grid.ts'
 
@@ -463,12 +463,14 @@ export function screen(width: number, height: number, wide: boolean, imgs: Icons
     }
   }
 
-  // Dock: vertical, clear glass, hugging the hinge-free edge.
-  const dockh = u(8 + DOCK.length * 41 + (DOCK.length - 1) * 9 + 8)
+  // Dock: vertical, clear glass, hugging the hinge-free edge. The same arranged
+  // dock the live one draws, so a fold mid-arrangement keeps the finger's order.
+  const dockApps = cells.dock.map(named)
+  const dockh = u(8 + dockApps.length * 41 + Math.max(0, dockApps.length - 1) * 9 + 8)
   const docky = Y + H * 0.525 - dockh / 2
   glass(ctx, blur, dockx, docky, u(DOCKW), dockh, u(21))
-  DOCK.forEach((a, i) => {
-    const img = imgs[a.name]
+  dockApps.forEach((n, i) => {
+    const img = imgs[n]
     if (img?.width) ctx.drawImage(img, dockx + u((DOCKW - 41) / 2), docky + u(8 + i * 50), u(41), u(41))
   })
 
