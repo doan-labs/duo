@@ -22,7 +22,6 @@ export function Tips(_: { os: Os }) {
   // narrow as the cover and gets the same one-column Tips.
   const [root, wide] = useWide()
   const [picked, setPicked] = useState(COLLECTIONS[0]!.id)
-  const saved = useSaved()
   const collection = COLLECTIONS.find((c) => c.id === picked) ?? COLLECTIONS[0]!
   return (
     <div ref={root} {...stylex.props(styles.split)}>
@@ -36,17 +35,13 @@ export function Tips(_: { os: Os }) {
                 <LargeTitle as="h1">{picked === 'saved' ? 'Saved Tips' : collection.title}</LargeTitle>
               </div>
               <Screen xstyle={[shared.swap]}>
-                {picked === 'saved' ? (
-                  <SavedBody saved={saved} />
-                ) : (
-                  <CollectionBody collection={collection} saved={saved} />
-                )}
+                {picked === 'saved' ? <SavedBody /> : <CollectionBody collection={collection} />}
               </Screen>
             </div>
           </Nav>
         ) : (
           <Nav>
-            <Home saved={saved} />
+            <Home />
           </Nav>
         )}
       </div>
@@ -55,8 +50,9 @@ export function Tips(_: { os: Os }) {
 }
 
 /** The cover's root: large title, tip of the day, collections grid, saved rows. */
-function Home({ saved }: { saved: ReturnType<typeof useSaved> }) {
+function Home() {
   const { push } = useNav()
+  const saved = useSaved()
   const day = tipOfTheDay()
   return (
     <div {...stylex.props(shared.column)}>
@@ -67,7 +63,7 @@ function Home({ saved }: { saved: ReturnType<typeof useSaved> }) {
           size={19}
           aria-label="Saved Tips"
           xstyle={styles.hdrBtn}
-          onClick={() => push((back) => <SavedPage saved={saved} back={back} />)}
+          onClick={() => push((back) => <SavedPage back={back} />)}
         />
       </div>
       <Screen>
@@ -78,12 +74,7 @@ function Home({ saved }: { saved: ReturnType<typeof useSaved> }) {
             {...stylex.props(styles.hero, styles.art(day.collection.art), shared.press)}
             onClick={() =>
               push((back) => (
-                <TipPage
-                  collection={day.collection}
-                  index={day.collection.tips.indexOf(day.tip)}
-                  saved={saved}
-                  back={back}
-                />
+                <TipPage collection={day.collection} index={day.collection.tips.indexOf(day.tip)} back={back} />
               ))
             }
           >
@@ -102,7 +93,7 @@ function Home({ saved }: { saved: ReturnType<typeof useSaved> }) {
                 key={collection.id}
                 type="button"
                 {...stylex.props(styles.card, shared.press)}
-                onClick={() => push((back) => <CollectionPage collection={collection} saved={saved} back={back} />)}
+                onClick={() => push((back) => <CollectionPage collection={collection} back={back} />)}
               >
                 <span {...stylex.props(styles.cardArt, styles.art(collection.art))}>
                   <Sym name={collection.glyph} size={44} />
@@ -116,7 +107,7 @@ function Home({ saved }: { saved: ReturnType<typeof useSaved> }) {
           </div>
           <div {...stylex.props(typography.footnote, styles.label)}>Saved</div>
           {saved.ids.length ? (
-            <SavedBody saved={saved} />
+            <SavedBody />
           ) : (
             <p {...stylex.props(typography.footnote, styles.savedHint)}>Tap the bookmark on a tip to keep it here.</p>
           )}

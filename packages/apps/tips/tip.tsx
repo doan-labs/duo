@@ -7,23 +7,14 @@ import { typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { Collection } from './data.ts'
-import type { Saved } from './store.ts'
+import { useSaved } from './store.ts'
 import { styles } from './styles.ts'
 
-export function TipPage({
-  collection,
-  index,
-  saved,
-  back
-}: {
-  collection: Collection
-  index: number
-  saved: Saved
-  back?: () => void
-}) {
+export function TipPage({ collection, index, back }: { collection: Collection; index: number; back?: () => void }) {
   // The position moves within this page: pushing a fresh page per tip would
   // fill the stack with siblings the back button should not have to unwind.
   const [at, setAt] = useState(index)
+  const saved = useSaved()
   const tip = collection.tips[at]!
   const on = saved.on(tip.id)
   return (

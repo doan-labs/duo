@@ -6,11 +6,10 @@ import { Page, Sym, useNav } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { Collection } from './data.ts'
-import type { Saved } from './store.ts'
 import { styles } from './styles.ts'
 import { TipPage } from './tip.tsx'
 
-export function CollectionBody({ collection, saved }: { collection: Collection; saved: Saved }) {
+export function CollectionBody({ collection }: { collection: Collection }) {
   const { push } = useNav()
   return (
     <>
@@ -24,7 +23,7 @@ export function CollectionBody({ collection, saved }: { collection: Collection; 
             key={tip.id}
             type="button"
             {...stylex.props(styles.tip, shared.press)}
-            onClick={() => push((back) => <TipPage collection={collection} index={i} saved={saved} back={back} />)}
+            onClick={() => push((back) => <TipPage collection={collection} index={i} back={back} />)}
           >
             <span {...stylex.props(styles.tipBand, styles.art(collection.art))}>
               <Sym name={tip.glyph} size={36} />
@@ -40,18 +39,10 @@ export function CollectionBody({ collection, saved }: { collection: Collection; 
   )
 }
 
-export function CollectionPage({
-  collection,
-  saved,
-  back
-}: {
-  collection: Collection
-  saved: Saved
-  back?: () => void
-}) {
+export function CollectionPage({ collection, back }: { collection: Collection; back?: () => void }) {
   return (
     <Page title={collection.title} back={back}>
-      <CollectionBody collection={collection} saved={saved} />
+      <CollectionBody collection={collection} />
     </Page>
   )
 }

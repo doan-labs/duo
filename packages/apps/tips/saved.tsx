@@ -7,12 +7,13 @@ import { Page, Row, Section, Sym, useNav } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { ALL_TIPS } from './data.ts'
-import type { Saved } from './store.ts'
+import { useSaved } from './store.ts'
 import { styles } from './styles.ts'
 import { TipPage } from './tip.tsx'
 
-export function SavedBody({ saved }: { saved: Saved }) {
+export function SavedBody() {
   const { push } = useNav()
+  const saved = useSaved()
   const items = ALL_TIPS.filter(({ tip }) => saved.ids.includes(tip.id))
   if (!items.length)
     return (
@@ -40,9 +41,7 @@ export function SavedBody({ saved }: { saved: Saved }) {
           chevron
           xstyle={styles.rowBtn}
           onClick={() =>
-            push((back) => (
-              <TipPage collection={collection} index={collection.tips.indexOf(tip)} saved={saved} back={back} />
-            ))
+            push((back) => <TipPage collection={collection} index={collection.tips.indexOf(tip)} back={back} />)
           }
         />
       ))}
@@ -50,10 +49,10 @@ export function SavedBody({ saved }: { saved: Saved }) {
   )
 }
 
-export function SavedPage({ saved, back }: { saved: Saved; back?: () => void }) {
+export function SavedPage({ back }: { back?: () => void }) {
   return (
     <Page title="Saved Tips" back={back}>
-      <SavedBody saved={saved} />
+      <SavedBody />
     </Page>
   )
 }
