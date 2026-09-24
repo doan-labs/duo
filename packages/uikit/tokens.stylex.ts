@@ -375,6 +375,21 @@ export const appAppearance = stylex.defineConsts({
   cameraChip: 'rgba(255,255,255,.14)',
   cameraScrimStrong: 'rgba(0,0,0,.45)',
   // clock
+  /** The selected tab's capsule in the floating bar, and a sidebar row under the finger. */
+  clockTabOn: 'rgba(255,255,255,.14)',
+  /** Start / Stop / Lap discs: a tinted well under a same-hue label, the way iOS draws them. */
+  clockStartFill: 'rgba(48,209,88,.22)',
+  clockStopFill: 'rgba(255,66,69,.22)',
+  clockLapFill: 'rgba(120,120,128,.28)',
+  /** The timer ring's unlit track. */
+  clockRingTrack: 'rgba(255,255,255,.12)',
+  /** A wheel picker's rows fading toward its top and bottom edge. */
+  clockWheelMask: 'linear-gradient(transparent,#000 28%,#000 72%,transparent)',
+  /** The analog stopwatch face: minute ticks and the numerals around them. */
+  clockTick: 'rgba(255,255,255,.55)',
+  clockTickMinor: 'rgba(255,255,255,.28)',
+  /** The full-screen ring sheet behind a firing alarm or an ended timer. */
+  clockRingingScrim: 'rgba(0,0,0,.72)',
   // contacts
   contactsSelection: 'rgba(0,136,255,.12)',
   // facetime
@@ -434,6 +449,12 @@ export const appAppearance = stylex.defineConsts({
   musicFillStrong: 'rgba(255,255,255,.85)',
   musicFillFaint: 'rgba(255,255,255,.06)',
   musicHairline: 'rgba(255,255,255,.08)',
+  /** The Music brand: the selected tab, tappable text and the Play/Shuffle pills' ink. */
+  musicAccent: '#fc3c44',
+  /** The accent's rest fill: pill buttons, the live chip, a selected badge's back. */
+  musicAccentSoft: 'rgba(252,60,68,.16)',
+  /** Keeps card text readable over artwork at the bottom edge of hero tiles. */
+  musicShade: 'linear-gradient(180deg,rgba(0,0,0,0) 34%,rgba(0,0,0,.62) 100%)',
   // news
   newsHairline: 'rgba(60,60,67,.12)',
   // notes

@@ -99,7 +99,7 @@ export const RIGHT: App[] = [
   { name: 'Contacts', mock: true, light: true, view: Contacts },
   { name: 'iTunes Store', mock: true, light: true, view: Itunes },
   { name: 'Freeform', id: 'labs.doan.ipduo.freeform', light: true, ...RELEASE },
-  { name: 'Tips', mock: true, light: true, view: Tips }
+  { name: 'Tips', light: true, view: Tips }
 ]
 
 /** The vertical dock on the hinge-free edge. A dock app is not also on a page. */

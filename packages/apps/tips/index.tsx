@@ -1,69 +1,118 @@
-import { LargeTitle, Screen, Text } from '@doan-labs/duo-uikit'
-import { delay, shared } from '@doan-labs/duo-uikit/styles.ts'
-import { appAppearance } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+// Tips. Apple's own shape on the Duo: the tip of the day under a large title,
+// a two-column grid of collections, and whatever you bookmarked, pushing
+// collection and tip pages. Unfolded, the collections are a sidebar and the
+// picked one fills the pane, as iPadOS splits it; folded, the same destinations
+// push. Saved ids live in a module store both displays' copies share (store.ts).
+
+import type { Os } from '@doan-labs/duo-sdk'
+import { IconButton, LargeTitle, Nav, Screen, Sym, useNav, useWide } from '@doan-labs/duo-uikit'
+import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
+import { CollectionBody, CollectionPage } from './collection.tsx'
+import { COLLECTIONS, tipOfTheDay } from './data.ts'
+import { SavedBody, SavedPage } from './saved.tsx'
+import { Sidebar } from './sidebar.tsx'
+import { useSaved } from './store.ts'
 import { styles } from './styles.ts'
+import { TipPage } from './tip.tsx'
 
-const TIPS: [string, string, string, string][] = [
-  [
-    'Two screens, one gesture',
-    '📖',
-    appAppearance.tipsWarm,
-    'Open the Duo and whatever you were reading widens into the inner display. Fold it and the same view snaps back to the cover, keeping your place.'
-  ],
-  [
-    'Drag across the fold',
-    '🫳',
-    appAppearance.tipsCool,
-    'Pick a photo up on the left half and drop it into a message on the right. Apps either side of the hinge share one drag session.'
-  ],
-  [
-    'Half-fold the camera',
-    '📸',
-    appAppearance.tipsGreen,
-    'Stand the Duo at 90° and the viewfinder moves to the top half, controls to the bottom. No tripod needed for a long exposure.'
-  ],
-  [
-    'Cover-screen widgets',
-    '🧩',
-    appAppearance.tipsPink,
-    'Widgets you place on the left four columns stay put when you fold, because the cover display shows exactly that half.'
-  ],
-  [
-    'Battery across halves',
-    '🔋',
-    appAppearance.tipsYellow,
-    'Closing the Duo parks the inner display entirely. Reading on the cover alone roughly doubles what a charge is worth.'
-  ]
-]
-
-const Tip = ({ title, emoji, bg, body, i }: { title: string; emoji: string; bg: string; body: string; i: number }) => {
-  const [open, setOpen] = useState(false)
+export function Tips(_: { os: Os }) {
+  // The box decides, not the display: a split half of the inner panel is as
+  // narrow as the cover and gets the same one-column Tips.
+  const [root, wide] = useWide()
+  const [picked, setPicked] = useState(COLLECTIONS[0]!.id)
+  const collection = COLLECTIONS.find((c) => c.id === picked) ?? COLLECTIONS[0]!
   return (
-    <div {...stylex.props(styles.tip, shared.rise, delay.ms(i * 60))} onClick={() => setOpen(!open)}>
-      <div {...stylex.props(styles.im, styles.bg(bg))}>{emoji}</div>
-      <div {...stylex.props(styles.tx)}>
-        <div {...stylex.props(styles.title)}>{title}</div>
-        <Text as="div" size="caption" xstyle={[styles.hint]}>
-          Tap to read
-        </Text>
-        <p {...stylex.props(styles.more, open && styles.moreOpen)}>{body}</p>
+    <div ref={root} {...stylex.props(styles.split)}>
+      {wide && <Sidebar current={picked} pick={setPicked} />}
+      <div {...stylex.props(styles.detail)}>
+        {wide ? (
+          // Keyed: picking another destination drops whatever the last one pushed.
+          <Nav key={picked}>
+            <div {...stylex.props(shared.column)}>
+              <div {...stylex.props(styles.homeHdr)}>
+                <LargeTitle as="h1">{picked === 'saved' ? 'Saved Tips' : collection.title}</LargeTitle>
+              </div>
+              <Screen xstyle={[shared.swap]}>
+                {picked === 'saved' ? <SavedBody /> : <CollectionBody collection={collection} />}
+              </Screen>
+            </div>
+          </Nav>
+        ) : (
+          <Nav>
+            <Home />
+          </Nav>
+        )}
       </div>
     </div>
   )
 }
 
-export const Tips = () => (
-  <Screen>
-    <LargeTitle>Tips</LargeTitle>
-    <Text as="div" size="caption" xstyle={[styles.lede]}>
-      Getting the most out of iPhone Duo
-    </Text>
-    <div {...stylex.props(styles.cols)}>
-      {TIPS.map(([title, emoji, bg, body], i) => (
-        <Tip key={title} title={title} emoji={emoji} bg={bg} body={body} i={i} />
-      ))}
+/** The cover's root: large title, tip of the day, collections grid, saved rows. */
+function Home() {
+  const { push } = useNav()
+  const saved = useSaved()
+  const day = tipOfTheDay()
+  return (
+    <div {...stylex.props(shared.column)}>
+      <div {...stylex.props(styles.homeHdr)}>
+        <LargeTitle as="h1">Tips</LargeTitle>
+        <IconButton
+          name="bookmark"
+          size={19}
+          aria-label="Saved Tips"
+          xstyle={styles.hdrBtn}
+          onClick={() => push((back) => <SavedPage back={back} />)}
+        />
+      </div>
+      <Screen>
+        <div {...stylex.props(styles.inset)}>
+          <div {...stylex.props(typography.footnote, styles.label)}>Tip of the Day</div>
+          <button
+            type="button"
+            {...stylex.props(styles.hero, styles.art(day.collection.art), shared.press)}
+            onClick={() =>
+              push((back) => (
+                <TipPage collection={day.collection} index={day.collection.tips.indexOf(day.tip)} back={back} />
+              ))
+            }
+          >
+            <span {...stylex.props(styles.heroGlyph)}>
+              <Sym name={day.tip.glyph} size={56} />
+            </span>
+            <span {...stylex.props(styles.heroText)}>
+              <span {...stylex.props(typography.title2)}>{day.tip.title}</span>
+              <span {...stylex.props(typography.footnote, styles.heroSub)}>{day.tip.summary}</span>
+            </span>
+          </button>
+          <div {...stylex.props(typography.footnote, styles.label)}>Collections</div>
+          <div {...stylex.props(styles.grid)}>
+            {COLLECTIONS.map((collection) => (
+              <button
+                key={collection.id}
+                type="button"
+                {...stylex.props(styles.card, shared.press)}
+                onClick={() => push((back) => <CollectionPage collection={collection} back={back} />)}
+              >
+                <span {...stylex.props(styles.cardArt, styles.art(collection.art))}>
+                  <Sym name={collection.glyph} size={44} />
+                </span>
+                <span {...stylex.props(styles.cardText)}>
+                  <span {...stylex.props(typography.headline)}>{collection.title}</span>
+                  <span {...stylex.props(typography.footnote, styles.savedHint)}>{collection.tips.length} tips</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div {...stylex.props(typography.footnote, styles.label)}>Saved</div>
+          {saved.ids.length ? (
+            <SavedBody />
+          ) : (
+            <p {...stylex.props(typography.footnote, styles.savedHint)}>Tap the bookmark on a tip to keep it here.</p>
+          )}
+        </div>
+      </Screen>
     </div>
-  </Screen>
-)
+  )
+}

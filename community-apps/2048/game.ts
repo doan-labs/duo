@@ -52,6 +52,21 @@ export function newGame() {
   return spawnTile(spawnTile([]))
 }
 
+export type SavedTile = { id: number; value: number; row: number; column: number }
+
+// Why serialize without animation fields: session storage holds the settled
+// board both displays share, so the fold hands the same game over. Transient
+// glide/merge flags belong to the display that is playing, never to the wire.
+export function serializeTiles(tiles: Tile[]): SavedTile[] {
+  return tiles.map((tile) => ({ id: tile.id, value: tile.nextValue ?? tile.value, row: tile.row, column: tile.column }))
+}
+
+export function adoptTiles(saved: SavedTile[]): Tile[] {
+  const top = saved.reduce((max, tile) => Math.max(max, tile.id), 0)
+  if (nextTileId <= top) nextTileId = top + 1
+  return saved.map((tile) => ({ ...tile, fresh: false, merged: false }))
+}
+
 function lineCells(lineIndex: number, direction: Direction) {
   return direction === 'left'
     ? Array.from({ length: SIZE }, (_, offset) => ({ row: lineIndex, column: offset }))
@@ -100,7 +115,12 @@ export function move(tiles: Tile[], direction: Direction) {
       const cell = cells[offset]!
       if (entry.absorbed) {
         moved = true
-        absorbed.push({ ...entry.absorbed, fresh: false, merged: false, target: { row: cell.row, column: cell.column } })
+        absorbed.push({
+          ...entry.absorbed,
+          fresh: false,
+          merged: false,
+          target: { row: cell.row, column: cell.column }
+        })
         next.push({
           ...entry.tile,
           row: cell.row,
@@ -111,7 +131,14 @@ export function move(tiles: Tile[], direction: Direction) {
         })
       } else {
         if (entry.tile.row !== cell.row || entry.tile.column !== cell.column) moved = true
-        next.push({ ...entry.tile, value: entry.value, row: cell.row, column: cell.column, fresh: false, merged: false })
+        next.push({
+          ...entry.tile,
+          value: entry.value,
+          row: cell.row,
+          column: cell.column,
+          fresh: false,
+          merged: false
+        })
       }
     })
   }
@@ -122,7 +149,8 @@ export function move(tiles: Tile[], direction: Direction) {
 
 function boardValues(tiles: Tile[]) {
   const board = Array.from({ length: CELL_COUNT }, () => 0)
-  for (const tile of tiles) board[tile.row * SIZE + tile.column] = Math.max(board[tile.row * SIZE + tile.column]!, tile.value)
+  for (const tile of tiles)
+    board[tile.row * SIZE + tile.column] = Math.max(board[tile.row * SIZE + tile.column]!, tile.value)
   return board
 }
 
