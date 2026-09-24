@@ -23,11 +23,12 @@ import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { chrome, colors, easing, layout, motion, radius } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type Ref, type RefObject, useEffect, useRef, useState } from 'react'
-import { byName, DOCK } from '../apps.ts'
+import { flushSync } from 'react-dom'
+import { byName } from '../apps.ts'
 import { WeatherSnapshot } from '../runtime/widgets.tsx'
 import { FolderView } from './folder.tsx'
-import { lift, type Side } from './gestures.ts'
-import { eject, grid, type Half, isFolder, rename, type Slot, stack, useGrid } from './grid.ts'
+import { type Carried, lift, type Side } from './gestures.ts'
+import { DOCK_MAX, dock, eject, grid, type Half, isFolder, place, rename, type Slot, stack, useGrid } from './grid.ts'
 import { Magnifier } from './spotlight.tsx'
 import { HOLD, type Open, Tile, WidgetTile } from './tile.tsx'
 import { WallpaperSheet } from './wallpaper-sheet.tsx'
@@ -83,9 +84,14 @@ export function HomeScreen({
   const opened = at && cells[at.half][at.i]
   const folder = opened && isFolder(opened) ? opened : null
   const [papers, setPapers] = useState(false)
-  // The tile on a finger and the cell under it. `lifting` says the same to the
-  // pointer-up below, which must not read the carry as a swipe between pages.
-  const [carry, setCarry] = useState<{ app: string; hot: Slot | null } | null>(null)
+  // The tile on a finger, where it came from and what is under it: a grid cell
+  // it could stack on, or the dock index it would drop into. `lifting` says the
+  // same to the pointer-up below, which must not read the carry as a swipe
+  // between pages; `last` mirrors the state so pointer handlers do not
+  // re-render per frame and the drop can read the final dock index.
+  type Carry = { app: string; from: 'dock' | 'grid'; hot: Slot | null; dockAt: number | null }
+  const [carry, setCarry] = useState<Carry | null>(null)
+  const last = useRef<Carry | null>(null)
   const lifting = useRef(false)
 
   // Swipe between pages; a short drag still counts as a tap on an icon.
@@ -107,21 +113,82 @@ export function HomeScreen({
     const c = el?.closest<HTMLElement>('[data-cell]')?.dataset.cell?.split(':')
     return c ? (grid()[c[0] as Half][Number(c[1])] ?? null) : null
   }
-  /** A tile held on the grid: carried until let go, on another cell (they stack) or anywhere else (it springs back). */
-  const carryOff = (app: string, down: PointerEvent, el: HTMLElement) => {
+  /** The dock index `app` would drop into for a finger over the dock at `at`, or null when it has no room. */
+  const dockAtOf = (d: Element, app: string, at: PointerEvent) => {
+    const now = grid()
+    if (!now.dock.includes(app) && now.dock.length >= DOCK_MAX) return null
+    let n = 0
+    for (const t of d.querySelectorAll<HTMLElement>('[data-dock-slot]')) {
+      if (t.dataset.app === app) continue
+      const r = t.getBoundingClientRect()
+      if (r.top + r.height / 2 < at.clientY) n++
+    }
+    return n
+  }
+  // The let-go into a new cell: the grid updates, then the freshly mounted tile
+  // flies from where the finger left it. Its landing stagger is cancelled or the
+  // two transforms compose.
+  const landTile = (app: string, was: Carried, el: HTMLElement, move: () => boolean) => {
+    let ok = false
+    flushSync(() => {
+      ok = move()
+    })
+    if (!ok) return false
+    const root = el.closest('[data-os]') ?? document
+    const to = root.querySelector<HTMLElement>(`[data-tile][data-app="${CSS.escape(app)}"]`)
+    if (!to) return true
+    for (const x of to.getAnimations()) x.cancel()
+    const now = to.getBoundingClientRect()
+    const dx = (was.box.left + was.box.width / 2 - now.left - now.width / 2) * was.s
+    const dy = (was.box.top + was.box.height / 2 - now.top - now.height / 2) * was.s
+    // lift carried the tile at 1.12; dock icons are 41 px, grid icons 51.
+    const k = was.box.width / 1.12 / now.width
+    const a = to.animate([{ transform: `translate(${dx}px,${dy}px) scale(${k * 1.12})` }, { transform: 'none' }], {
+      duration: 300,
+      easing: 'cubic-bezier(.2,.9,.3,1)'
+    })
+    a.finished.then(
+      () => a.cancel(),
+      () => {}
+    )
+    return true
+  }
+  /** A tile held on the grid or in the dock: carried until let go, onto another cell (they stack), into the dock, or onto the paper of a half (it lands there loose); anywhere else it springs back. */
+  const carryOff = (app: string, from: 'dock' | 'grid', down: PointerEvent, el: HTMLElement) => {
     lifting.current = true
-    setCarry({ app, hot: null })
+    last.current = { app, from, hot: null, dockAt: null }
+    setCarry(last.current)
     lift(
       down,
       el,
-      (under) => setCarry({ app, hot: cellAt(under) }),
-      (under) => {
+      (under, at) => {
+        const d = under?.closest('[data-dock]')
+        const dockAt = d ? dockAtOf(d, app, at) : null
+        const hot = dockAt === null ? cellAt(under) : null
+        const prev = last.current
+        if (prev && prev.hot === hot && prev.dockAt === dockAt) return
+        last.current = { app, from, hot, dockAt }
+        setCarry(last.current)
+      },
+      (under, was) => {
         lifting.current = false
+        const c = last.current
+        last.current = null
         setCarry(null)
+        if (under?.closest('[data-dock]')) {
+          const i = c?.dockAt
+          if (i == null) return false
+          return landTile(app, was, el, () => dock(app, i))
+        }
         const target = cellAt(under)
-        if (!target || target === app) return false
-        stack(app, target)
-        return true
+        if (target) {
+          if (target === app) return false
+          stack(app, target)
+          return true
+        }
+        const half = under?.closest<HTMLElement>('[data-half]')?.dataset.half as Half | undefined
+        if (half) return landTile(app, was, el, () => place(app, half))
+        return false
       }
     )
   }
@@ -155,13 +222,13 @@ export function HomeScreen({
           hot={!!carry && carry.hot === s}
           shake={!!carry && carry.app !== s}
           onOpen={app ? onOpen : () => setAt({ half, i })}
-          onHold={app ? (down, el) => carryOff(app, down, el) : undefined}
+          onHold={app ? (down, el) => carryOff(app, 'grid', down, el) : undefined}
         />
       )
     })
 
   const left = (
-    <div key="left" {...stylex.props(styles.half)}>
+    <div key="left" data-half="left" {...stylex.props(styles.half)}>
       <WidgetTile i={0} name="Weather">
         <WeatherSnapshot
           onOpen={(el) => {
@@ -177,7 +244,7 @@ export function HomeScreen({
     </div>
   )
   const right = (
-    <div key="right" {...stylex.props(styles.half)}>
+    <div key="right" data-half="right" {...stylex.props(styles.half)}>
       {tiles('right', 0)}
     </div>
   )
@@ -189,6 +256,21 @@ export function HomeScreen({
         { id: 'left', halves: [left] },
         { id: 'right', halves: [right] }
       ]
+
+  // The dock makes room: a finger over it opens a slot at `dockAt`, and a dock
+  // tile carried away closes its slot behind it. Both are transforms and an
+  // animated height, so a retarget mid-drag slides rather than jumps. Slot
+  // pitch is the 41 px icon plus the 9 px gap.
+  const gap = carry?.dockAt != null
+  const out = !!carry && carry.from === 'dock' && carry.dockAt === null
+  const shiftOf = (n: string, k: number) => {
+    if (!carry || carry.app === n) return undefined
+    let vis = cells.dock.filter((x) => x !== carry.app).indexOf(n)
+    if (gap && vis >= carry.dockAt!) vis += 1
+    const shift = (vis - k) * 50
+    return shift === 0 ? undefined : shift
+  }
+  const dockN = cells.dock.length + (gap ? 1 : 0) - (out ? 1 : 0)
 
   return (
     <div
@@ -237,10 +319,23 @@ export function HomeScreen({
           ))}
         </div>
       )}
-      <div {...stylex.props(shared.glass, styles.dock)}>
-        {DOCK.map((a) => (
-          <Tile key={a.name} a={a} dock onOpen={onOpen} />
-        ))}
+      <div data-dock {...stylex.props(shared.glass, styles.dock, styles.dockHeight(dockN))}>
+        {cells.dock.map((n, k) => {
+          const a = byName(n)
+          return (
+            a && (
+              <Tile
+                key={n}
+                a={a}
+                dock
+                onOpen={onOpen}
+                onHold={(down, el) => carryOff(n, 'dock', down, el)}
+                shake={!!carry && carry.app !== n}
+                shift={shiftOf(n, k)}
+              />
+            )
+          )
+        })}
       </div>
       <div ref={searchRef} {...stylex.props(shared.glass, styles.srch)} onClick={onSearch}>
         <Magnifier />
@@ -340,11 +435,19 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'flex-start',
     gap: 9,
     paddingTop: 8,
-    paddingBottom: 8,
-    borderRadius: radius.xxl
+    overflow: 'visible',
+    borderRadius: radius.xxl,
+    // The glass grows and shrinks with the slot that opens or closes under a
+    // carried tile; translateY(-50%) keeps it centred as the height animates.
+    transitionProperty: 'height',
+    transitionDuration: '.25s',
+    transitionTimingFunction: easing.push
   },
+  // 8 px top and bottom, one 41 px slot per app plus its 9 px gap.
+  dockHeight: (n: number) => ({ height: 8 + n * 41 + Math.max(0, n - 1) * 9 + 8 }),
   srch: {
     position: 'absolute',
     right: 16,

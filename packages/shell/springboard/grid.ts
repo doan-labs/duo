@@ -8,14 +8,17 @@
 
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { useSyncExternalStore } from 'react'
-import { byName, LEFT, RIGHT } from '../apps.ts'
+import { byName, DOCK, LEFT, RIGHT } from '../apps.ts'
 import { registryRevision, subscribeRegistry } from '../runtime/registry.ts'
 
 export type Folder = { name: string; apps: string[] }
 /** An app, by the key `byName` resolves, or a folder of them. */
 export type Slot = string | Folder
 export type Half = 'left' | 'right'
-export type Grid = Record<Half, Slot[]>
+/** The two halves plus the dock, which holds apps only, never folders. */
+export type Grid = Record<Half, Slot[]> & { dock: string[] }
+/** The most icons the dock takes: more would reach the status stack and the search button. */
+export const DOCK_MAX = 8
 
 export const isFolder = (s: Slot): s is Folder => typeof s !== 'string'
 
@@ -35,10 +38,23 @@ const slotsOf = (x: unknown): Slot[] =>
       )
     : []
 
-let saved: Grid | null = (() => {
+/** `x` as a list of app keys: strings only, anything else skipped. */
+const stringsOf = (x: unknown): string[] =>
+  Array.isArray(x) ? x.filter((n): n is string => typeof n === 'string') : []
+
+/** What the finger left: a saved `dock` key, even an empty one, is an arrangement; a missing key is the factory dock. */
+type Saved = { left: Slot[]; right: Slot[]; dock?: string[] }
+
+let saved: Saved | null = (() => {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null')
-    return raw ? { left: slotsOf(raw.left), right: slotsOf(raw.right) } : null
+    return raw
+      ? {
+          left: slotsOf(raw.left),
+          right: slotsOf(raw.right),
+          ...(raw.dock === undefined ? {} : { dock: stringsOf(raw.dock) })
+        }
+      : null
   } catch {
     return null
   }
@@ -66,12 +82,19 @@ function resolve(): Grid {
       const apps = s.apps.flatMap(take)
       return apps.length > 1 ? [{ name: s.name, apps }] : apps
     })
-  const out: Grid = { left: clean(saved?.left ?? []), right: clean(saved?.right ?? []) }
+  const out: Grid = {
+    left: clean(saved?.left ?? []),
+    right: clean(saved?.right ?? []),
+    // The saved dock goes through `take` before the factory halves do, so an app
+    // the finger moved from the dock onto a page does not reappear in the dock.
+    dock: saved?.dock === undefined ? [] : saved.dock.flatMap(take)
+  }
   for (const h of HALVES)
     for (const a of FACTORY[h]) {
       const apps = a.folder ? a.folder.flatMap(take) : take(key(a))
       out[h].push(...(a.folder && apps.length > 1 ? [{ name: a.name, apps }] : apps))
     }
+  for (const a of DOCK) out.dock.push(...take(key(a)))
   return out
 }
 
@@ -99,7 +122,7 @@ export const subscribeGrid = (f: () => void) => {
 /** Re-renders the caller when the grid changes. */
 export const useGrid = () => useSyncExternalStore(subscribeGrid, grid)
 
-function save(next: Grid) {
+function save(next: Saved) {
   saved = next
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
@@ -119,7 +142,7 @@ const without = (slots: Slot[], app: string): Slot[] =>
 /** Drops `app` on `target`: a folder takes it in; an app becomes a folder holding both. */
 export function stack(app: string, target: Slot) {
   const cur = grid()
-  const next = { ...cur }
+  const next = { ...cur, dock: cur.dock.filter((n) => n !== app) }
   for (const h of HALVES)
     next[h] = without(cur[h], app).map((s) =>
       s !== target ? s : isFolder(s) ? { ...s, apps: [...s.apps, app] } : { name: 'Folder', apps: [s, app] }
@@ -143,7 +166,27 @@ export function eject(app: string) {
 /** Names a folder. */
 export function rename(folder: Folder, name: string) {
   const swap = (slots: Slot[]) => slots.map((s) => (s === folder ? { ...s, name } : s))
-  save({ left: swap(grid().left), right: swap(grid().right) })
+  save({ left: swap(grid().left), right: swap(grid().right), dock: grid().dock })
+}
+
+/** Puts `app` into the dock at index `i`, from wherever it was. False when the dock is full and `app` is not in it. */
+export function dock(app: string, i: number) {
+  const cur = grid()
+  if (!cur.dock.includes(app) && cur.dock.length >= DOCK_MAX) return false
+  const next = { left: without(cur.left, app), right: without(cur.right, app), dock: cur.dock.filter((n) => n !== app) }
+  next.dock.splice(Math.min(Math.max(0, i), next.dock.length), 0, app)
+  save(next)
+  return true
+}
+
+/** Puts `app` loose at the end of `half`, from wherever it was. False when it already sits there, so it springs back. */
+export function place(app: string, half: Half) {
+  const cur = grid()
+  if (cur[half].includes(app)) return false
+  const next = { left: without(cur.left, app), right: without(cur.right, app), dock: cur.dock.filter((n) => n !== app) }
+  next[half].push(app)
+  save(next)
+  return true
 }
 
 /** Back to the factory layout: nothing saved resolves to apps.ts's own order. */

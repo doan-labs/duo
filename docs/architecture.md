@@ -17,7 +17,7 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 | `springboard/springboard.tsx` | Layer stack and state that outlives individual layers |
 | `springboard/scenes.ts` | Per-display apps, split placement and mirrored scenes |
 | `springboard/gestures.ts`, `home-bar.tsx` | WAAPI scrubbing/zoom geometry, the hold-to-switch/split gesture and the lift that carries a held tile |
-| `springboard/grid.ts`, `wallpaper.ts` | Device-wide, persisted home order (apps and folders) and wallpaper; both displays and the bake read them |
+| `springboard/grid.ts`, `wallpaper.ts` | Device-wide, persisted home order (apps, folders and the dock) and wallpaper; both displays and the bake read them |
 | `springboard/folder.tsx`, `wallpaper-sheet.tsx` | The open-folder layer and the wallpaper picker, mounted by the home screen |
 | `springboard/switcher.tsx` | App switcher: parked and on-glass scenes as scrollable live cards |
 | `springboard/control-center.tsx`, `toggles.ts`, `clock.ts` | Control UI, device-wide switches and minute clock |

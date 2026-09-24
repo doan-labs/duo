@@ -134,16 +134,19 @@ export function zoom(el: HTMLElement, from: Box, out: boolean, z: Box, start?: K
 
 /**
  * Picks a tile up under the finger that pressed it at `down` and carries it
- * until release, reporting what is under the pointer as that changes; the tile
- * itself is deaf to hit-testing while carried, so what it covers is what is
- * found. `drop` gets the last thing under the finger and says whether it took
- * the tile. If not, the tile springs back to its cell.
+ * until release, reporting what is under the pointer on every move (the caller
+ * dedupes); the tile itself is deaf to hit-testing while carried, so what it
+ * covers is what is found. `drop` gets the last thing under the finger and the
+ * box and scale the tile showed while carried, so the caller can fly it from
+ * where the finger left it into its new cell rather than popping it there; it
+ * says whether it took the tile. If not, the tile springs back to its cell.
  */
+export type Carried = { box: DOMRect; s: number }
 export function lift(
   down: PointerEvent,
   el: HTMLElement,
-  over: (under: Element | null) => void,
-  drop: (under: Element | null) => boolean
+  over: (under: Element | null, at: PointerEvent) => void,
+  drop: (under: Element | null, was: Carried) => boolean
 ) {
   // Pointer deltas are screen px; the panel is scaled in 3D. The display root gives the ratio.
   const box = el.closest<HTMLElement>('[data-os]') ?? el
@@ -159,19 +162,19 @@ export function lift(
     at = `translate(${(m.clientX - down.clientX) * s}px,${(m.clientY - down.clientY) * s}px) scale(1.12)`
     el.style.transform = at
     const now = document.elementFromPoint(m.clientX, m.clientY)
-    if (now === under) return
     under = now
-    over(now)
+    over(now, m)
   }
   const up = () => {
     removeEventListener('pointermove', move)
     removeEventListener('pointerup', up)
     removeEventListener('pointercancel', up)
+    const was = { box: el.getBoundingClientRect(), s }
     el.style.zIndex = ''
     el.style.pointerEvents = ''
     el.style.transition = ''
     el.style.transform = ''
-    if (drop(under)) return
+    if (drop(under, was)) return
     const back = el.animate([{ transform: at }, { transform: 'none' }], {
       duration: 260,
       easing: 'cubic-bezier(.2,.9,.3,1)'
