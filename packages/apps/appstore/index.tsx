@@ -12,7 +12,7 @@ import { Nav, useNav } from '@doan-labs/duo-uikit/nav.tsx'
 import { animations, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useState, useSyncExternalStore } from 'react'
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { AppPage, Head } from './app-page.tsx'
 import { Action, type External, Icon, Item, kicker, type Open, size, tagline } from './rows.tsx'
 import { styles } from './styles.ts'
@@ -26,7 +26,7 @@ const LANES = new Set(['official', 'community', 'development'])
 
 export function AppStore({ os, openExternal }: { os: Os; openExternal: External }) {
   return os.store ? (
-    <Shelf store={os.store} open={os.open} openExternal={openExternal} />
+    <Shelf store={os.store} open={os.open} openExternal={openExternal} arg={os.arg} />
   ) : (
     <Placeholder>Store unavailable</Placeholder>
   )
@@ -34,13 +34,23 @@ export function AppStore({ os, openExternal }: { os: Os; openExternal: External 
 
 type Lane = { key: string; label: string; glyph: SymProps['name']; n?: number }
 
-function Shelf({ store, open, openExternal }: { store: Store; open: Open; openExternal: External }) {
+function Shelf({ store, open, openExternal, arg }: { store: Store; open: Open; openExternal: External; arg?: string }) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   // The box decides, not the display: a split half is as narrow as the cover, and
   // a sidebar in 380 px is a sidebar and no page.
   const [box, wide] = useWide()
   const [section, setSection] = useState('discover')
   const [query, setQuery] = useState('')
+  // The `os.arg` deep link is spent once; it lives here because a section change remounts the pane below.
+  const linked = useRef(false)
+  // `wide` reads false until the box is first measured, and a pushed page keeps the `wide` it was
+  // built with, so the link waits for the measurement or the page lands in the narrow layout.
+  const [measured, setMeasured] = useState(false)
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setMeasured(true))
+    ro.observe(box.current!)
+    return () => ro.disconnect()
+  }, [box])
   const q = query.trim().toLowerCase()
   const rows = state.rows.filter((row) => row.name.toLowerCase().includes(q) || row.author.toLowerCase().includes(q))
   const lane = (key: string) => rows.filter((r) => r.lane === key)
@@ -90,6 +100,8 @@ function Shelf({ store, open, openExternal }: { store: Store; open: Open; openEx
             store={store}
             open={open}
             openExternal={openExternal}
+            arg={measured ? arg : undefined}
+            linked={linked}
             official={official}
             community={community}
             development={development}
@@ -222,6 +234,8 @@ function Pane({
   store,
   open,
   openExternal,
+  arg,
+  linked,
   official,
   community,
   development,
@@ -236,6 +250,10 @@ function Pane({
   store: Store
   open: Open
   openExternal: External
+  /** `os.arg` from a `?arg=` link: the catalog id whose page opens once its row is in. */
+  arg?: string
+  /** Held by Shelf: a section change remounts this pane, and the link must not push twice. */
+  linked: { current: boolean }
   official: StoreRow[]
   community: StoreRow[]
   development: StoreRow[]
@@ -246,6 +264,15 @@ function Pane({
     push((back) => (
       <AppPage id={row.id} store={store} open={open} openExternal={openExternal} wide={wide} back={back} />
     ))
+  // `/apps` names a catalog app the home screen does not carry: the Store opens straight on its page.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `show` is rebuilt each render; `linked` is the once-guard.
+  useEffect(() => {
+    if (linked.current || state.loading || !arg) return
+    const row = state.rows.find((r) => r.id === arg)
+    if (!row) return
+    linked.current = true
+    show(row)
+  }, [state, arg, linked])
   // The pane's title already announces the section, so the group that opens it
   // drops the hairline and the space a second heading would otherwise cost.
   const groups = (list: [string, string, StoreRow[]][]) =>

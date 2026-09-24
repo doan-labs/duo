@@ -48,7 +48,10 @@ tag: every group is one lane and its heading says which. Notices (errors as `rol
 the pane title is not followed by a second heading saying the same thing.
 
 Tapping a card or a row pushes the app page **inside the pane**, so the sidebar and the tab bar
-stay put; picking another section drops it. The page is the icon, name, author and capsule over
+stay put; picking another section drops it. A launch that carries `os.arg` equal to a catalog
+id opens that release's page the same way once the rows have loaded - this is how the website's
+`/apps` links land (`/simulator?app=App%20Store&arg=<id>`), for apps the home screen does not
+carry. The page is the icon, name, author and capsule over
 a strip of version, size, lane, licence and access facts, the compatibility line, the
 description beside the developer's links, an **App Privacy** card naming the device access the
 release asked for (or that it asked for none), **You Might Also Like** with the rest of its

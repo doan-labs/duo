@@ -14,9 +14,10 @@ const SUGGESTIONS = ['Make me a timer app', 'Build a simple notes app', 'Make a 
 
 /**
  * `upcoming` shows the workspace with the phone live and the chat side switched off.
- * `app` is the home screen name the phone opens on, from the /apps deep links.
+ * `app` is the home screen name the phone opens on, `arg` the deep link it opens with,
+ * from the /apps deep links (a catalog id opens that page in the Store).
  */
-export function Workspace({ upcoming = false, app }: { upcoming?: boolean; app?: string }) {
+export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; app?: string; arg?: string }) {
   const [project, setProject] = useState<Project>()
   const [projects, setProjects] = useState<Project[]>([])
   const [connection, setConnection] = useState<Connection>({
@@ -687,7 +688,14 @@ export function Workspace({ upcoming = false, app }: { upcoming?: boolean; app?:
         >
           <div inert={sourceOpen} {...stylex.props(styles.phone)}>
             {token && (
-              <Simulator eager fill app={app} builder={upcoming ? undefined : token} onBuilderReady={frameReady} />
+              <Simulator
+                eager
+                fill
+                app={app}
+                arg={arg}
+                builder={upcoming ? undefined : token}
+                onBuilderReady={frameReady}
+              />
             )}
           </div>
           {sourceOpen && (
