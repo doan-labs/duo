@@ -467,7 +467,7 @@
     },
     "packages/uikit": {
       "name": "@doan-labs/duo-uikit",
-      "version": "0.2.0",
+      "version": "1.2.0",
       "dependencies": {
         "@doan-labs/duo-sdk": "workspace:*",
         "@sfinterface/numbers": "^0.3.4",

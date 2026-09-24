@@ -1,0 +1,32 @@
+# Orca project config. scripts.setup runs at the root of a fresh worktree when
+# worktree creation runs hooks; scripts.archive runs just before a worktree is
+# deleted. worktree.sharedDirectories links gitignored directories from the
+# main checkout into each new worktree.
+
+setupAgentStartupPolicy: wait-for-setup
+
+worktree:
+  sharedDirectories:
+    # Apple's model is fetched once per clone and gitignored; worktrees link
+    # the main checkout's copy instead of downloading it again.
+    - public/model
+
+scripts:
+  setup: |
+    set -e
+    bun install
+    # Normally linked in by worktree.sharedDirectories; fetch only when the
+    # link is absent, e.g. the main checkout has no model yet.
+    if [ ! -f public/model/iPhone_Duo_Render.usdc ]; then
+      if command -v uv >/dev/null 2>&1; then
+        uv run --with usd-core python scripts/prepare-model.py
+      else
+        python3 -m venv .venv
+        .venv/bin/pip install usd-core
+        .venv/bin/python scripts/prepare-model.py
+      fi
+    fi
+  archive: |
+    # Nothing outside the checkout needs releasing; this only marks that the
+    # hook ran in Orca's hook output.
+    echo "archive: nothing to clean for $PWD"
