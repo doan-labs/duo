@@ -540,10 +540,16 @@ controls.addEventListener('start', () => {
   hud.hideHint()
   homing = false
 })
-// Orbit or zoom done, drag or wheel alike: keep the camera where it landed.
-controls.addEventListener('end', () =>
-  saveView({ az: controls.getAzimuthalAngle(), pol: controls.getPolarAngle(), dist: controls.getDistance() })
-)
+// Orbit or zoom settled, drag or wheel alike: damping keeps the camera moving
+// past 'end', so the write trails 'change' until the pose actually rests.
+let orbitSave = 0
+controls.addEventListener('change', () => {
+  clearTimeout(orbitSave)
+  orbitSave = setTimeout(
+    () => saveView({ az: controls.getAzimuthalAngle(), pol: controls.getPolarAngle(), dist: controls.getDistance() }),
+    300
+  )
+})
 
 let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
 let angle = targetAngle
