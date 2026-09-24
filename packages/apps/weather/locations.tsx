@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import {
   clock,
   condition,
+  locate,
   type Place,
   refresh,
   remove,
@@ -17,10 +18,11 @@ import {
 } from './data.ts'
 import { styles } from './styles.ts'
 
-type Props = { onClose: () => void; temp: (value: number | undefined) => ReactNode }
+type Props = { onClose?: () => void; temp: (value: number | undefined) => ReactNode; wide?: boolean }
 
-/** The saved-cities list: large title, unit menu, search, one sky card per city. */
-export function Locations({ onClose, temp }: Props) {
+/** The saved-cities list: large title, unit menu, search, one sky card per city. On the
+ *  inner display it becomes the iPad sidebar: search and the menu share the top row. */
+export function Locations({ onClose, temp, wide }: Props) {
   const preferences = usePreferences()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Place[]>([])
@@ -50,90 +52,83 @@ export function Locations({ onClose, temp }: Props) {
   }, [query])
   function choose(p: Place) {
     select(p)
-    onClose()
+    if (wide) setQuery('')
+    else onClose?.()
   }
-  function locate() {
-    if (!navigator.geolocation) {
-      setLocationState('Location is unavailable in this browser. Search for a city instead.')
-      return
-    }
+  async function askLocation() {
     setLocationState('Finding your location…')
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-        const p = {
-          id: `local:${latitude.toFixed(4)},${longitude.toFixed(4)}`,
-          name: 'My Location',
-          region: `${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°`,
-          latitude,
-          longitude
-        }
-        select(p)
-        void refresh(p, true)
-        onClose()
-      },
-      () => setLocationState('Location access failed. Allow location in your browser, or search for a city.'),
-      { timeout: 10000, maximumAge: 300000 }
-    )
+    try {
+      const place = await locate()
+      if (!place) {
+        setLocationState('Location access failed. Allow location in your browser, or search for a city.')
+        return
+      }
+      select(place)
+      void refresh(place, true)
+      if (!wide) onClose?.()
+    } catch {
+      setLocationState('Location access failed. Allow location in your browser, or search for a city.')
+    }
   }
   const units = [
     ['C', 'Celsius', '°C'],
     ['F', 'Fahrenheit', '°F']
   ] as const
-  return (
-    <div {...stylex.props(styles.scroll, styles.scrollbar)}>
-      <div {...stylex.props(styles.listHead)}>
-        <h1 {...stylex.props(styles.listTitle)}>Weather</h1>
-        <div {...stylex.props(styles.menuWrap)}>
-          <button
-            type="button"
-            aria-label="More options"
-            aria-expanded={menu}
-            onClick={() => setMenu(!menu)}
-            {...stylex.props(styles.control)}
-          >
-            <Sym name="more" size={20} />
-          </button>
-          <Menu
-            open={menu}
-            onClose={() => setMenu(false)}
-            size={14}
-            xstyle={styles.menu}
-            itemStyle={styles.menuItem}
-            items={[
-              ...units.map(([unit, name, sign]) => ({
-                label: (
-                  <span>
-                    {name} <span {...stylex.props(styles.muted)}>{sign}</span>
-                  </span>
-                ),
-                name: `Switch to degrees ${name}`,
-                checked: preferences.unit === unit,
-                onSelect: () => update({ unit })
-              })),
-              {
-                label: <span>Use Current Location</span>,
-                icon: 'location' as const,
-                disabled: locationState === 'Finding your location…',
-                onSelect: locate
-              }
-            ]}
-          />
-        </div>
-      </div>
-      <div {...stylex.props(styles.searchBox)}>
-        <span aria-hidden="true" {...stylex.props(styles.searchIcon)}>
-          <Sym name="search" size={15} />
-        </span>
-        <input
-          type="search"
-          aria-label="Search cities"
-          placeholder="Search for a city or airport"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          {...stylex.props(styles.search)}
-        />
-      </div>
+  const more = (
+    <div {...stylex.props(styles.menuWrap)}>
+      <button
+        type="button"
+        aria-label="More options"
+        aria-expanded={menu}
+        onClick={() => setMenu(!menu)}
+        {...stylex.props(styles.control)}
+      >
+        <Sym name="more" size={20} />
+      </button>
+      <Menu
+        open={menu}
+        onClose={() => setMenu(false)}
+        size={14}
+        xstyle={styles.menu}
+        itemStyle={styles.menuItem}
+        items={[
+          ...units.map(([unit, name, sign]) => ({
+            label: (
+              <span>
+                {name} <span {...stylex.props(styles.muted)}>{sign}</span>
+              </span>
+            ),
+            name: `Switch to degrees ${name}`,
+            checked: preferences.unit === unit,
+            onSelect: () => update({ unit })
+          })),
+          {
+            label: <span>Use Current Location</span>,
+            icon: 'location' as const,
+            disabled: locationState === 'Finding your location…',
+            onSelect: () => void askLocation()
+          }
+        ]}
+      />
+    </div>
+  )
+  const searchField = (
+    <div {...stylex.props(styles.searchBox, wide && styles.searchGrow)}>
+      <span aria-hidden="true" {...stylex.props(styles.searchIcon)}>
+        <Sym name="search" size={15} />
+      </span>
+      <input
+        type="search"
+        aria-label="Search cities"
+        placeholder="Search for a city or airport"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        {...stylex.props(styles.search)}
+      />
+    </div>
+  )
+  const body = (
+    <>
       {(locationState || searchState) && (
         <p role="status" {...stylex.props(styles.message)}>
           {locationState || searchState}
@@ -155,10 +150,31 @@ export function Locations({ onClose, temp }: Props) {
               place={p}
               selected={p.id === preferences.selected}
               onChoose={() => choose(p)}
-              canRemove={preferences.places.length > 1}
+              canRemove={preferences.places.length > 1 && !p.id.startsWith('local:')}
               temp={temp}
             />
           ))}
+    </>
+  )
+  if (wide)
+    return (
+      <div {...stylex.props(styles.sideFrame)}>
+        <div {...stylex.props(styles.sideHead)}>
+          {searchField}
+          {more}
+        </div>
+        <div {...stylex.props(styles.sideList, styles.scrollbar)}>{body}</div>
+        <p {...stylex.props(styles.footnote, styles.sideFoot)}>Locations and units are shared across both displays.</p>
+      </div>
+    )
+  return (
+    <div {...stylex.props(styles.scroll, styles.scrollbar)}>
+      <div {...stylex.props(styles.listHead)}>
+        <h1 {...stylex.props(styles.listTitle)}>Weather</h1>
+        {more}
+      </div>
+      {searchField}
+      {body}
       <p {...stylex.props(styles.footnote)}>Locations and units are shared across both displays.</p>
     </div>
   )

@@ -589,6 +589,8 @@ export const appAppearance = stylex.defineConsts({
   weatherAqiSpectrum: 'linear-gradient(90deg,#3fbf5f,#f7d539,#f5a623,#e94b3c,#a55ad6,#7e0023)',
   weatherDot: 'rgba(255,255,255,.45)',
   weatherBottomBar: 'rgba(15,35,65,.55)',
+  /** The iPad sidebar's glass: deeper than a card, lighter than the sheet. */
+  weatherSide: 'rgba(14,30,55,.55)',
   weatherMenu: 'rgba(30,50,80,.92)',
   // youtube
   youtubeMuted: '#aaa'

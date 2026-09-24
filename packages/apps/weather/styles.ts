@@ -161,7 +161,9 @@ export const styles = stylex.create({
   },
   topLeft: { display: 'flex', justifyContent: 'flex-start' },
   topRight: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
-  wideOnly: { display: { default: 'none', [wide]: 'flex' } },
+  /** The detail column beside the floating sidebar; the pane pads clear of it. */
+  pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
+  paneSide: { paddingLeft: 310 },
   bottom: {
     position: 'relative',
     zIndex: 1,
@@ -570,6 +572,48 @@ export const styles = stylex.create({
     paddingLeft: 14,
     paddingRight: 8
   },
+
+  // The iPad sidebar: a floating glass panel that runs from under the status
+  // stack to 8 px off the glass, the same idiom the store's panel uses. The
+  // shell reserves the top 40 px for the clock, which sits on the far right,
+  // so the panel's 8 px gap collides with nothing.
+  side: {
+    position: 'absolute',
+    zIndex: 2,
+    top: 8,
+    bottom: 8,
+    left: 8,
+    width: 292,
+    display: 'flex',
+    flexDirection: 'column',
+    borderRadius: radius.xxl,
+    backgroundColor: appAppearance.weatherSide,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    boxShadow: `${appAppearance.weatherCardRim},${shadow.float}`,
+    overflow: 'hidden'
+  },
+  sideFrame: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
+  /** Search and the menu share the sidebar's top row, as on iPad. */
+  sideHead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 10,
+    paddingInline: 10,
+    paddingBottom: 8,
+    flexShrink: 0
+  },
+  searchGrow: { flexGrow: 1, minWidth: 0, marginBottom: 0 },
+  sideList: {
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingInline: 10,
+    scrollbarGutter: 'stable'
+  },
+  sideFoot: { flexShrink: 0, marginBlock: 10, paddingInline: 14 },
 
   // Locations list.
   listHead: {
