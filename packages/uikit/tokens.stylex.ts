@@ -449,6 +449,12 @@ export const appAppearance = stylex.defineConsts({
   musicFillStrong: 'rgba(255,255,255,.85)',
   musicFillFaint: 'rgba(255,255,255,.06)',
   musicHairline: 'rgba(255,255,255,.08)',
+  /** The Music brand: the selected tab, tappable text and the Play/Shuffle pills' ink. */
+  musicAccent: '#fc3c44',
+  /** The accent's rest fill: pill buttons, the live chip, a selected badge's back. */
+  musicAccentSoft: 'rgba(252,60,68,.16)',
+  /** Keeps card text readable over artwork at the bottom edge of hero tiles. */
+  musicShade: 'linear-gradient(180deg,rgba(0,0,0,0) 34%,rgba(0,0,0,.62) 100%)',
   // news
   newsHairline: 'rgba(60,60,67,.12)',
   // notes
