@@ -1412,3 +1412,31 @@ The saved `dock` key means the finger arranged it, even when it saved an empty
 column; only a missing key falls back to the factory five. That asymmetry is what
 makes "dock down to zero" stick across reloads while a pre-change `os.home` still
 yields the factory dock untouched.
+
+## 89. Health and Fitness share one book and wear iPadOS's chrome
+
+2026-09-24. Health and Fitness shipped as mock pills: invented rings on invented
+cards, with no data behind them and none of the gestures that make the pair feel
+like one system on the real phones.
+
+Both now read `packages/fixtures/health.ts`, a single persisted book: the
+profile and goals, the pinned metrics Health's Summary shows, per-day accruals
+and measurements over a deterministic 90-day seed, and the workout log. The
+book's mutations (`log`, `measure`, `logWorkout`, `removeWorkout`, `setGoals`,
+`setPin`, `setProfile`) are the only way values change, so a workout logged in
+Fitness is already on Health's charts and a weigh-in in Health is already in
+Fitness's activity history - there is no sync to configure, which is exactly
+what Health's Sharing page now says. `health.test.ts` pins the book's
+guarantees: same date, same seed; logged amounts sit on top of the seed and
+reverse on delete; series span the asked range.
+
+The chrome is iPadOS's, per the rules already in this document: the floating
+glass sidebar with search, the tab bar on the cover, ~380 ms pushes, the glass
+recipe from decision 18. Health keeps `light: true` in the registry; Fitness is
+the same recipe on `tintDark`. Ring colours live in the kit (`RING_TINTS`) so
+Health's mini rings, Fitness's hero and Watch's glance can never drift apart -
+the token gate would have rejected a cross-app `appAppearance` read.
+
+Both drop `mock`. The screens are no longer invented data: every rendered
+number is the book's, every button writes back to it, and the two displays'
+copies stay in lockstep through the same module cells decision 59 set.
