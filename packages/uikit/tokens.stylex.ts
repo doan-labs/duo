@@ -375,6 +375,21 @@ export const appAppearance = stylex.defineConsts({
   cameraChip: 'rgba(255,255,255,.14)',
   cameraScrimStrong: 'rgba(0,0,0,.45)',
   // clock
+  /** The selected tab's capsule in the floating bar, and a sidebar row under the finger. */
+  clockTabOn: 'rgba(255,255,255,.14)',
+  /** Start / Stop / Lap discs: a tinted well under a same-hue label, the way iOS draws them. */
+  clockStartFill: 'rgba(48,209,88,.22)',
+  clockStopFill: 'rgba(255,66,69,.22)',
+  clockLapFill: 'rgba(120,120,128,.28)',
+  /** The timer ring's unlit track. */
+  clockRingTrack: 'rgba(255,255,255,.12)',
+  /** A wheel picker's rows fading toward its top and bottom edge. */
+  clockWheelMask: 'linear-gradient(transparent,#000 28%,#000 72%,transparent)',
+  /** The analog stopwatch face: minute ticks and the numerals around them. */
+  clockTick: 'rgba(255,255,255,.55)',
+  clockTickMinor: 'rgba(255,255,255,.28)',
+  /** The full-screen ring sheet behind a firing alarm or an ended timer. */
+  clockRingingScrim: 'rgba(0,0,0,.72)',
   // contacts
   contactsSelection: 'rgba(0,136,255,.12)',
   // facetime
