@@ -3,7 +3,7 @@
 // releases the root build wrote to dist/cdn, merged by the same publisher CI uses.
 // Without the branch (a fresh fork, offline) the bundled releases alone are served.
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { publish } from '../../../scripts/publish-catalog.ts'
 import { type Catalog, type Release, releaseId } from '../../sdk/manifest.ts'
@@ -32,6 +32,26 @@ console.log(
   `catalog: ${result.published.length} bundled releases added, ${result.reused.length} reused → public/catalog/`
 )
 
+// Hosted builds can check out a single commit; with no history behind it HEAD is the
+// root commit and counts as touching every path, so every package would date to the
+// deploy commit. Complete the history before git log dates any package below.
+if (
+  spawnSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: root, encoding: 'utf8' }).stdout.trim() === 'true'
+)
+  spawnSync('git', ['fetch', '--unshallow', 'origin'], { cwd: root, stdio: 'ignore' })
+
+/** First and last commit that touched the package: the site's Created and Updated. */
+const dates = (dir: string) => {
+  const log = spawnSync('git', ['log', '--format=%aI', '--', `packages/apps/${dir}`], { cwd: root, encoding: 'utf8' })
+  const all = log.stdout.split('\n').filter(Boolean)
+  return { created: all.at(-1), updated: all[0] }
+}
+/** packages/apps/<dir> for an in-repo app id like labs.doan.ipduo.<dir>, else undefined. */
+const repoDir = (id: string) => {
+  const dir = id.split('.').at(-1)!
+  return existsSync(`${root}packages/apps/${dir}`) ? dir : undefined
+}
+
 // The shelf on / and /apps reads the same index the Store installs from, so the site
 // never lists an app that is not actually published.
 const index: Catalog = JSON.parse(readFileSync(`${target}/index.json`, 'utf8'))
@@ -40,7 +60,11 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
     ({ release }): Release => JSON.parse(readFileSync(`${target}/apps/${id}/${release}/release.json`, 'utf8'))
   )
   const newest = releases[0]!
-  const dates = releases.map((r) => r.build.at).sort()
+  const released = releases.map((r) => r.build.at).sort()
+  // In-repo officials rebuild into dist/cdn on every site build, so their build.at is
+  // the deploy minute, not a date. The package history carries the real dates.
+  const dir = app.lane === 'official' ? repoDir(id) : undefined
+  const committed = dir ? dates(dir) : undefined
   return {
     id,
     name: app.name,
@@ -49,8 +73,8 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
     repo: app.repo,
     version: newest.manifest.version,
     releases: releases.length,
-    created: dates[0]!,
-    updated: dates.at(-1)!,
+    created: committed?.created ?? released[0]!,
+    updated: committed?.updated ?? released.at(-1)!,
     permissions: (app.permissions ?? []).map((name) => ({ name, label: PERMISSIONS[name].label })),
     icon: `/catalog/apps/${id}/${releaseId(newest)}/icon-1024.png`
   }
@@ -65,12 +89,6 @@ for (const [, names = '', dir = ''] of shellSource.matchAll(
   /import \{([^}]+)\} from '@doan-labs\/duo-app-([a-z-]+)\//g
 ))
   for (const name of names.split(',')) dirs.set(name.trim(), dir)
-/** First and last commit that touched the package: the site's Created and Updated. */
-const dates = (dir: string) => {
-  const log = spawnSync('git', ['log', '--format=%aI', '--', `packages/apps/${dir}`], { cwd: root, encoding: 'utf8' })
-  const all = log.stdout.split('\n').filter(Boolean)
-  return { created: all.at(-1), updated: all[0] }
-}
 const seen = new Set<string>()
 const shell = [...shellSource.matchAll(/\{ name: '([^']+)'(.*)$/gm)]
   .map(([, name = '', rest = '']) => {

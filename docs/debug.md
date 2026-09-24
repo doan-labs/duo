@@ -272,6 +272,13 @@ commit on `main`. Verify that commit and then inspect `/catalog/index.json` and 
 the release ID. If the branch is current but the site is stale, the failure is in the web
 deployment trigger or hosting propagation, not submission validation.
 
+When every app on `/apps` reads Created/Updated as the deploy day, the build checkout had
+no usable history or release metadata: shell dates come from `git log` per package (a
+single-commit checkout dates them all to HEAD) and official `build.at` is the deploy
+minute because `dist/cdn` is rebuilt each build. `catalog.ts` unshallows before dating;
+if the symptom returns, check the checkout, not the publisher. Community dates live in
+the catalog branch and are unaffected.
+
 The shared docs/UI-kit sidebar uses `data-lenis-prevent` so wheel and touch
 input scroll its overflow instead of the page's Lenis controller. At desktop
 width, wheel over the component links and verify the aside's `scrollTop`
