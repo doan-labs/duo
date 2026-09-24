@@ -1,184 +1,194 @@
 import { os } from '@doan-labs/duo-sdk'
-import { useDisplay } from '@doan-labs/duo-uikit'
-import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
+import { Num, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { adoptDeck, type Card, createDeck, fitBoard, SYMBOLS, serializeDeck } from './game.ts'
+import { BOARD_GAP, BOARD_PAD, faceStyle, styles } from './styles.ts'
 
-const SYMBOLS = ['🍎', '🌙', '⭐', '🌈', '🎵', '🚀']
-type Card = { id: number; symbol: string }
-const motion = '@media (prefers-reduced-motion: reduce)'
-const cardReveal = stylex.keyframes({
-  from: { opacity: 0.7, transform: 'scale(.92) rotateY(-8deg)' },
-  '70%': { opacity: 1, transform: 'scale(1.03) rotateY(2deg)' },
-  to: { opacity: 1, transform: 'scale(1) rotateY(0)' }
-})
-
-function createDeck() {
-  const cards = [...SYMBOLS, ...SYMBOLS].map((symbol, index) => ({ id: index, symbol }))
-  for (let index = cards.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(Math.random() * (index + 1))
-    const current = cards[index]!
-    cards[index] = cards[swap]!
-    cards[swap] = current
-  }
-  return cards
-}
+// Why a writer id: both displays share one session key whose store is
+// last-writer-wins, so a value not written by this copy is always the newer
+// settled board - adopting it unconditionally is what converges the two
+// displays, including the race where both seed an empty session at once.
+const ME = crypto.randomUUID()
+type SavedGame = { by: string; deck: string[]; flipped: number[]; matched: number[]; moves: number }
 
 function Game() {
   const view = useDisplay()
-  const cover = view.display === 'cover'
-  const [deck, setDeck] = useState(createDeck)
+  const [rootRef, wide] = useWide<HTMLElement>()
+  // Why a ref-held seed deck: the session may hydrate with a board the other
+  // display dealt; this copy's shuffle is only ever the fallback it publishes.
+  const initial = useRef<Card[] | null>(null)
+  if (!initial.current) initial.current = createDeck()
+  const [deck, setDeck] = useState<Card[]>(initial.current)
   const [flipped, setFlipped] = useState<number[]>([])
   const [matched, setMatched] = useState<number[]>([])
   const [moves, setMoves] = useState(0)
-  const fitWidth = Math.max(
-    0,
-    Math.floor(
-      Math.min((view.width || 740) - (cover ? 20 : 36), (((view.height || 480) - (cover ? 154 : 144)) * 4) / 3)
-    )
-  )
-  const fitHeight = Math.floor((fitWidth * 3) / 4)
+  const [newBest, setNewBest] = useState(false)
+  const seeded = useRef(false)
+  const lastSeen = useRef<string | null>(null)
+  const fit = fitBoard(view, wide)
+  const cell = Math.max(1, Math.floor((fit.width - BOARD_PAD * 2 - BOARD_GAP * 3) / 4))
   const finished = matched.length === deck.length
+  const miss = flipped.length === 2 && deck[flipped[0]!]!.symbol !== deck[flipped[1]!]!.symbol
 
+  const saved = useKV(os.session, 'board')
+  const best = useJSON<number | null>(os.storage, 'best', null)
+
+  const publish = useCallback(
+    (cards: Card[], open: number[], done: number[], count: number) => {
+      const game: SavedGame = { by: ME, deck: serializeDeck(cards), flipped: open, matched: done, moves: count }
+      saved.set(JSON.stringify(game))
+    },
+    [saved]
+  )
+
+  // Why adopt on the session key: the fold carries the running game to the
+  // other display. A write this copy did not make is the new board; own
+  // writes are already on screen and are ignored. The raw string is the
+  // guard: the effect must not re-fire on every render of a remote value
+  // already on screen, or the setDeck below loops forever.
+  useEffect(() => {
+    if (saved.status === 'hydrating' || saved.status === 'saving') return
+    const raw = saved.value
+    if (raw !== null && raw === lastSeen.current) return
+    lastSeen.current = raw
+    if (!raw) {
+      if (!seeded.current) {
+        seeded.current = true
+        publish(initial.current!, [], [], 0)
+      }
+      return
+    }
+    const next = JSON.parse(raw) as SavedGame
+    if (next.by === ME) return
+    setDeck(adoptDeck(next.deck))
+    setFlipped(next.flipped)
+    setMatched(next.matched)
+    setMoves(next.moves)
+    setNewBest(false)
+  }, [saved.value, saved.status, publish])
+
+  // The reveal window is part of the shared state, so an adopting copy that
+  // lands mid-pair resolves it the same way and the boards stay identical.
   useEffect(() => {
     if (flipped.length !== 2) return
     const timer = window.setTimeout(() => {
       const first = deck[flipped[0]!]!
       const second = deck[flipped[1]!]!
-      if (first.symbol === second.symbol) setMatched((current) => [...current, flipped[0]!, flipped[1]!])
+      const nextMatched = first.symbol === second.symbol ? [...matched, flipped[0]!, flipped[1]!] : matched
       setFlipped([])
+      setMatched(nextMatched)
+      if (nextMatched.length === deck.length && (best.value === null || moves < best.value)) {
+        best.set(moves)
+        setNewBest(true)
+      }
+      publish(deck, [], nextMatched, moves)
     }, 650)
     return () => window.clearTimeout(timer)
-  }, [deck, flipped])
+  }, [deck, flipped, matched, moves, best, publish])
+
+  const flip = (index: number) => {
+    if (flipped.length >= 2 || flipped.includes(index) || matched.includes(index)) return
+    const next = [...flipped, index]
+    const count = next.length === 2 ? moves + 1 : moves
+    setFlipped(next)
+    setMoves(count)
+    publish(deck, next, matched, count)
+  }
+
+  const reset = () => {
+    const fresh = createDeck()
+    setDeck(fresh)
+    setFlipped([])
+    setMatched([])
+    setMoves(0)
+    setNewBest(false)
+    publish(fresh, [], [], 0)
+  }
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
 
-  const flip = (index: number) => {
-    if (flipped.length >= 2 || flipped.includes(index) || matched.includes(index)) return
-    const next = [...flipped, index]
-    setFlipped(next)
-    if (next.length === 2) setMoves((current) => current + 1)
-  }
-
-  const reset = () => {
-    setDeck(createDeck())
-    setFlipped([])
-    setMatched([])
-    setMoves(0)
-  }
+  const hint = finished ? `Cleared in ${moves} moves` : 'Find the matching pairs'
 
   return (
-    <main data-display={view.display} {...stylex.props(styles.root, cover && styles.cover)}>
+    <main ref={rootRef} data-display={view.display} {...stylex.props(styles.root, !wide && styles.rootCover)}>
       <header {...stylex.props(styles.header)}>
-        <div>
+        <div {...stylex.props(styles.brand)}>
           <span {...stylex.props(styles.kicker)}>DUO ARCADE</span>
-          <h1 {...stylex.props(styles.title)}>Memory Match</h1>
+          <h1 {...stylex.props(styles.logo, !wide && styles.logoCover)}>
+            Memory
+            <span {...stylex.props(styles.logoTile)}>Match</span>
+          </h1>
         </div>
-        <span {...stylex.props(styles.moves)}>MOVES {moves}</span>
+        <div {...stylex.props(styles.scores)}>
+          <div {...stylex.props(styles.chip)}>
+            <span {...stylex.props(styles.chipLabel)}>BEST</span>
+            <strong {...stylex.props(styles.chipValue)}>
+              <Num value={best.value ?? undefined} />
+            </strong>
+          </div>
+        </div>
       </header>
-      <p {...stylex.props(styles.hint)}>{finished ? 'Board cleared' : 'Find the matching pairs'}</p>
-      <div role="grid" aria-label="Memory cards" {...stylex.props(styles.board, styles.fitBoard(fitWidth, fitHeight))}>
-        {deck.map((card, index) => {
-          const open = flipped.includes(index) || matched.includes(index)
-          return (
-            <button
-              type="button"
-              aria-label={open ? card.symbol : 'Hidden card'}
-              key={card.id}
-              onClick={() => flip(index)}
-              {...stylex.props(styles.card, open && styles.cardOpen, matched.includes(index) && styles.cardMatched)}
-            >
-              {open ? card.symbol : '?'}
-            </button>
-          )
-        })}
-      </div>
-      <button type="button" onClick={reset} {...stylex.props(styles.reset)}>
-        New game
-      </button>
+      {!wide && <p {...stylex.props(styles.hint)}>{hint}</p>}
+      <section {...stylex.props(styles.stage, !wide && styles.stageCover)}>
+        <div {...stylex.props(styles.board, styles.fitBoard(fit.width, fit.height), finished && styles.boardWin)}>
+          {deck.map((card, index) => {
+            const open = flipped.includes(index) || matched.includes(index)
+            const done = matched.includes(index)
+            return (
+              <button
+                type="button"
+                aria-label={open ? card.symbol : 'Hidden card'}
+                key={card.id}
+                onClick={() => flip(index)}
+                {...stylex.props(
+                  styles.card,
+                  styles.cardFont(Math.round(cell * 0.42)),
+                  open && !done && styles.cardOpen,
+                  done && styles.cardMatched,
+                  done && faceStyle(card.symbol),
+                  miss && flipped.includes(index) && styles.cardMiss,
+                  finished && styles.cardCelebrate,
+                  finished && styles.stagger(index)
+                )}
+              >
+                {open ? card.symbol : '◆'}
+              </button>
+            )
+          })}
+        </div>
+        <aside {...stylex.props(styles.rail, !wide && styles.railCover)}>
+          <div {...stylex.props(styles.railStats, !wide && styles.railStatsCover)}>
+            <div {...stylex.props(styles.stat)}>
+              <span {...stylex.props(styles.statLabel)}>MOVES</span>
+              <strong {...stylex.props(styles.statValue)}>
+                <Num value={moves} />
+              </strong>
+            </div>
+            <div {...stylex.props(styles.stat)}>
+              <span {...stylex.props(styles.statLabel)}>PAIRS</span>
+              <div {...stylex.props(styles.pips)}>
+                {SYMBOLS.map((symbol, pip) => (
+                  <span key={symbol} {...stylex.props(styles.pip, pip < matched.length / 2 && styles.pipOn)} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <button type="button" onClick={reset} {...stylex.props(styles.newGame)}>
+            <Sym name="reload" size={13} />
+            New game
+          </button>
+          {newBest && <span {...stylex.props(styles.bestTag)}>NEW BEST</span>}
+          {wide && <p {...stylex.props(styles.hint)}>{hint}</p>}
+        </aside>
+      </section>
     </main>
   )
 }
-
-const styles = stylex.create({
-  root: {
-    position: 'absolute',
-    inset: 0,
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 9,
-    paddingBlock: 16,
-    paddingInline: 18,
-    color: colors.white,
-    backgroundColor: colors.grey6Dark,
-    fontFamily: fonts.system
-  },
-  cover: { gap: 5, paddingBlock: 9, paddingInline: 10 },
-  header: {
-    width: '100%',
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 10,
-    flexShrink: 0
-  },
-  kicker: { color: colors.purple, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
-  title: { marginBlock: 0, fontSize: 32, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
-  moves: { color: colors.grey3, fontSize: 10, fontWeight: 700, letterSpacing: 1 },
-  hint: { marginBlock: 0, color: colors.grey3, fontSize: 12, flexShrink: 0 },
-  board: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-    gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
-    gap: 6,
-    flexShrink: 0
-  },
-  fitBoard: (width: number, height: number) => ({ width: String(width) + 'px', height: String(height) + 'px' }),
-  card: {
-    display: 'grid',
-    placeItems: 'center',
-    minWidth: 0,
-    minHeight: 0,
-    borderWidth: 0,
-    borderRadius: 10,
-    color: colors.white,
-    backgroundColor: app.fill,
-    fontSize: 26,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color, color',
-    transitionDuration: '.16s, .2s, .2s',
-    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    transform: { default: 'scale(1)', ':active': 'scale(.95)' }
-  },
-  cardOpen: {
-    backgroundColor: app.fill3,
-    animationName: { default: cardReveal, [motion]: 'none' },
-    animationDuration: '.24s',
-    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    animationFillMode: 'both'
-  },
-  cardMatched: { color: colors.greenDark, backgroundColor: colors.grey5Dark },
-  reset: {
-    borderWidth: 0,
-    borderRadius: 999,
-    paddingBlock: 9,
-    paddingInline: 18,
-    color: colors.grey6Dark,
-    backgroundColor: colors.purple,
-    fontWeight: 800,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.14s, .18s',
-    transform: { default: 'scale(1)', ':active': 'scale(.96)' },
-    flexShrink: 0
-  }
-})
 
 await os.connect()
 createRoot(document.body).render(<Game />)
