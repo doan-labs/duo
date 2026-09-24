@@ -1,7 +1,15 @@
 export type Point = { x: number; y: number }
 export type Direction = 'up' | 'down' | 'left' | 'right'
 export type Status = 'ready' | 'playing' | 'over'
-export type Game = { snake: Point[]; food: Point; score: number; status: Status; round: number; eatTick: number }
+export type Game = {
+  snake: Point[]
+  food: Point
+  score: number
+  status: Status
+  round: number
+  eatTick: number
+  lastMeal: Point
+}
 export type ViewDimensions = { display: 'inner' | 'cover'; width: number; height: number }
 export type BoardMetrics = { padding: number; gap: number; cell: number }
 
@@ -34,7 +42,8 @@ export function newGame(round = 0): Game {
     score: 0,
     status: 'ready',
     round,
-    eatTick: 0
+    eatTick: 0,
+    lastMeal: { x: 10, y: 7 }
   }
 }
 
@@ -56,21 +65,36 @@ export function nextGame(game: Game, direction: Direction): Game {
     score: game.score + (ate ? 1 : 0),
     status: 'playing',
     round: game.round,
-    eatTick: game.eatTick + (ate ? 1 : 0)
+    eatTick: game.eatTick + (ate ? 1 : 0),
+    // Where the last meal was eaten, for the burst effect; the food itself already moved on.
+    lastMeal: ate ? game.food : game.lastMeal
   }
 }
 
-export function fitLayout(view: ViewDimensions, headerHeight: number) {
+export function fitLayout(view: ViewDimensions, headerHeight: number, wide: boolean) {
   const cover = view.display === 'cover'
   const padding = cover ? 10 : 14
   const gap = cover ? 6 : 8
   const control = cover ? 32 : 36
-  const fixedHeight = padding * 2 + headerHeight + 24 + control * 2 + 6 + 38 + gap * 4
+  const hint = 18
   const width = view.width || 740
   const height = view.height || 480
+  // Wide boxes put the control deck on a rail beside the board, so it costs width not height.
+  if (wide) {
+    const rail = control * 3 + 6 * 2 + 24
+    const fixedHeight = padding * 2 + headerHeight + hint + gap * 2
+    return {
+      board: Math.max(0, Math.floor(Math.min(width - padding * 2 - rail - gap, height - fixedHeight))),
+      control,
+      rail
+    }
+  }
+  const strip = control * 2 + 6
+  const fixedHeight = padding * 2 + headerHeight + hint + strip + gap * 5
   return {
     board: Math.max(0, Math.floor(Math.min(width - padding * 2, height - fixedHeight))),
-    control
+    control,
+    rail: 0
   }
 }
 
