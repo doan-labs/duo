@@ -1,7 +1,7 @@
 {
   "id": "labs.doan.fold-compass",
   "name": "Fold Compass",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "lane": "community",
   "entry": "./main.tsx",
   "icon": "./icon.png",
