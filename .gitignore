@@ -17,3 +17,6 @@ design/blender/*.blend1
 
 # Tauri regenerates these on every build
 packages/shell/desktop/gen/
+
+# The Duo films (HyperFrames) and their app captures stay on the machine that made them
+/video/
