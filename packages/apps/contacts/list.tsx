@@ -224,12 +224,18 @@ const Rail = ({ letters, onJump }: { letters: string[]; onJump: (l: string) => v
   const [active, setActive] = useState<string | null>(null)
   const el = useRef<HTMLDivElement>(null)
   const at = (e: PointerEvent) => {
-    const box = el.current!.getBoundingClientRect()
-    const k = Math.min(
-      letters.length - 1,
-      Math.max(0, Math.floor(((e.clientY - box.top) / box.height) * letters.length))
-    )
-    const letter = letters[k]!
+    // The glyphs sit centred in a taller strip, so the pointer maps to the nearest glyph, not the strip.
+    const spans = Array.from(el.current!.querySelectorAll<HTMLElement>('[data-rail]'))
+    let letter = letters[0]!
+    let best = Number.POSITIVE_INFINITY
+    for (const s of spans) {
+      const r = s.getBoundingClientRect()
+      const d = Math.abs(e.clientY - (r.top + r.height / 2))
+      if (d < best) {
+        best = d
+        letter = s.dataset.rail!
+      }
+    }
     if (letter !== active) {
       setActive(letter)
       onJump(letter)
@@ -248,7 +254,7 @@ const Rail = ({ letters, onJump }: { letters: string[]; onJump: (l: string) => v
       onPointerCancel={() => setActive(null)}
     >
       {letters.map((l) => (
-        <span key={l} {...stylex.props(styles.railLetter, active === l && styles.railOn)}>
+        <span key={l} data-rail={l} {...stylex.props(styles.railLetter, active === l && styles.railOn)}>
           {l}
         </span>
       ))}

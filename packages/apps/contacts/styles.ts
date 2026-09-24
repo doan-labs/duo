@@ -43,7 +43,14 @@ export const styles = stylex.create({
     borderRightStyle: 'solid',
     borderRightColor: app.separator
   },
-  pane: { flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', backgroundColor: app.surface },
+  pane: {
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: app.surface
+  },
   paneWide: { backgroundColor: app.bg },
   column: {
     display: 'flex',

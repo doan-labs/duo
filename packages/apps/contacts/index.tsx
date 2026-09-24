@@ -27,7 +27,7 @@ export const Contacts = ({ os }: { os: Os }) => {
   const [picking, setPicking] = useState(false)
   const [naming, setNaming] = useState(false)
 
-  const shown = contacts.filter((c) => inList(c, list) || c.id === me?.id)
+  const shown = contacts.filter((c) => c.id !== me?.id && inList(c, list))
   const sel = contacts.find((c) => c.id === selected)
   const pick = (c: Contact) => {
     setSelected(c.id)
