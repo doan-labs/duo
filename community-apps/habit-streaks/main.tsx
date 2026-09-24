@@ -1,197 +1,159 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { useDisplay } from '@doan-labs/duo-uikit'
-import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { useWide } from '@doan-labs/duo-uikit'
+import { dark } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
+import {
+  dateKey,
+  type Habit,
+  parseHabits,
+  parseMirror,
+  serializeHabits,
+  serializeMirror,
+  streak,
+  toggleHabit
+} from './habits.ts'
+import { styles } from './styles.ts'
 
-type Habit = { id: string; name: string; detail: string; dates: string[] }
-const motion = '@media (prefers-reduced-motion: reduce)'
-const checkPop = stylex.keyframes({
-  from: { opacity: 0, transform: 'scale(.72)' },
-  '70%': { opacity: 1, transform: 'scale(1.08)' },
-  to: { opacity: 1, transform: 'scale(1)' }
-})
-
-const DEFAULT_HABITS: Habit[] = [
-  { id: 'move', name: 'Move 10 minutes', detail: 'A short walk or stretch', dates: [] },
-  { id: 'read', name: 'Read a page', detail: 'Keep the story going', dates: [] },
-  { id: 'water', name: 'Drink water', detail: 'Refill your glass', dates: [] }
-]
-
-function dateKey(date = new Date()) {
-  return (
-    date.getFullYear() +
-    '-' +
-    String(date.getMonth() + 1).padStart(2, '0') +
-    '-' +
-    String(date.getDate()).padStart(2, '0')
-  )
-}
-
-function shiftDate(value: string, amount: number) {
-  const date = new Date(value + 'T12:00:00')
-  date.setDate(date.getDate() + amount)
-  return dateKey(date)
-}
-
-function parseHabits(value: string | null) {
-  if (!value) return DEFAULT_HABITS
-  try {
-    const parsed = JSON.parse(value) as Habit[]
-    if (!Array.isArray(parsed)) return DEFAULT_HABITS
-    return DEFAULT_HABITS.map((habit) => {
-      const saved = parsed.find((item) => item.id === habit.id)
-      return saved
-        ? { ...habit, dates: Array.isArray(saved.dates) ? saved.dates.filter((date) => typeof date === 'string') : [] }
-        : habit
-    })
-  } catch {
-    return DEFAULT_HABITS
-  }
-}
-
-function streak(habit: Habit, today: string) {
-  if (!habit.dates.includes(today)) return 0
-  let count = 0
-  let cursor = today
-  while (habit.dates.includes(cursor)) {
-    count += 1
-    cursor = shiftDate(cursor, -1)
-  }
-  return count
-}
+// Why a writer id: both displays share one session key whose store is
+// last-writer-wins, so a value not written by this copy is always the newer
+// settled list - adopting it unconditionally is what converges the two
+// displays, including the race where both seed an empty session at once.
+const ME = crypto.randomUUID()
 
 function Habits() {
-  const view = useDisplay()
-  const cover = view.display === 'cover'
+  const [rootRef, wide] = useWide<HTMLElement>()
   const stored = useKV(os.storage, 'habits')
+  const mirror = useKV(os.session, 'habits')
   const today = dateKey()
   const habits = parseHabits(stored.value)
+  const lastSeen = useRef<string | null>(null)
+  const seeded = useRef(false)
+
+  const publish = useCallback(
+    (next: Habit[]) => {
+      void stored.set(serializeHabits(next))
+      mirror.set(serializeMirror(ME, next, today))
+    },
+    [stored, mirror, today]
+  )
+
+  // Why adopt on the session key: the fold carries the day's checkmarks to the
+  // other display. A write this copy did not make is the new settled list; own
+  // writes are already on screen and are ignored. Storage stays the source of
+  // truth - an adopted mirror lands as one storage write, so the two stores
+  // never fight. The raw string is the guard: the effect body must not re-fire
+  // on every render of a remote value already on screen.
+  useEffect(() => {
+    if (mirror.status === 'hydrating' || mirror.status === 'saving') return
+    const raw = mirror.value
+    if (raw !== null && raw === lastSeen.current) return
+    lastSeen.current = raw
+    if (!raw) {
+      if (!seeded.current && stored.status === 'ready' && stored.value !== null) {
+        seeded.current = true
+        mirror.set(serializeMirror(ME, habits, today))
+      }
+      return
+    }
+    const next = parseMirror(raw)
+    if (!next || next.by === ME || next.today !== today) return
+    if (next.habits !== stored.value) void stored.set(next.habits)
+  }, [mirror.value, mirror.status, stored.value, stored.status, mirror, stored.set, habits, today])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
 
-  const toggle = (id: string) => {
-    const next = habits.map((habit) => {
-      if (habit.id !== id) return habit
-      const dates = habit.dates.includes(today) ? habit.dates.filter((date) => date !== today) : [...habit.dates, today]
-      return { ...habit, dates }
-    })
-    void stored.set(JSON.stringify(next))
-  }
-
   const completed = habits.filter((habit) => habit.dates.includes(today)).length
+  const allDone = completed === habits.length
+
+  const counter = (
+    <div {...stylex.props(styles.counterChip, !wide && styles.counterChipCover, allDone && styles.counterDone)}>
+      <span {...stylex.props(styles.counterLabel)}>TODAY</span>
+      <strong {...stylex.props(styles.counterValue)}>
+        {completed}/{habits.length}
+      </strong>
+    </div>
+  )
+
+  const list = (
+    <section role="list" aria-label="Today's habits" {...stylex.props(styles.list, !wide && styles.listCover)}>
+      {habits.map((habit, index) => {
+        const done = habit.dates.includes(today)
+        const currentStreak = streak(habit, today)
+        const delay = [styles.rowDelay1, styles.rowDelay2, styles.rowDelay3][index] ?? styles.rowDelay3
+        return (
+          <button
+            type="button"
+            aria-pressed={done}
+            key={habit.id}
+            onClick={() => publish(toggleHabit(habits, habit.id, today))}
+            {...stylex.props(styles.habit, done && styles.habitDone, delay)}
+          >
+            <span {...stylex.props(styles.check, done && styles.checkDone)}>{done ? '✓' : ''}</span>
+            <span {...stylex.props(styles.habitCopy)}>
+              <strong {...stylex.props(styles.habitName, !wide && styles.habitNameCover)}>{habit.name}</strong>
+              <small {...stylex.props(styles.habitDetail, !wide && styles.habitDetailCover)}>{habit.detail}</small>
+            </span>
+            <span {...stylex.props(styles.streak)}>
+              <span key={currentStreak} {...stylex.props(styles.streakBump)}>
+                {currentStreak}d
+              </span>
+            </span>
+          </button>
+        )
+      })}
+    </section>
+  )
+
+  const status = (
+    <small role="status" {...stylex.props(styles.saved)}>
+      {stored.status === 'saving' ? 'Saving...' : 'Synced across both displays'}
+    </small>
+  )
 
   return (
-    <main data-display={view.display} {...stylex.props(styles.root, cover && styles.cover)}>
-      <header {...stylex.props(styles.header)}>
-        <div>
-          <span {...stylex.props(styles.kicker)}>DUO DAILY</span>
-          <h1 {...stylex.props(styles.title)}>Habit Streaks</h1>
-        </div>
-        <strong {...stylex.props(styles.counter)}>{completed}/3</strong>
-      </header>
-      <p {...stylex.props(styles.hint)}>{completed === 3 ? 'All done for today' : 'Small actions, steady momentum'}</p>
-      <section role="list" aria-label="Today's habits" {...stylex.props(styles.list)}>
-        {habits.map((habit) => {
-          const done = habit.dates.includes(today)
-          const currentStreak = streak(habit, today)
-          return (
-            <button
-              type="button"
-              aria-pressed={done}
-              key={habit.id}
-              onClick={() => toggle(habit.id)}
-              {...stylex.props(styles.habit, done && styles.habitDone)}
-            >
-              <span {...stylex.props(styles.check, done && styles.checkDone)}>{done ? '✓' : ''}</span>
-              <span {...stylex.props(styles.habitCopy)}>
-                <strong>{habit.name}</strong>
-                <small>{habit.detail}</small>
-              </span>
-              <span {...stylex.props(styles.streak)}>{currentStreak}d</span>
-            </button>
-          )
-        })}
-      </section>
-      <small role="status" {...stylex.props(styles.saved)}>
-        {stored.status === 'saving' ? 'Saving...' : 'Saved in this app only'}
-      </small>
+    <main ref={rootRef} {...stylex.props(dark, styles.root, !wide && styles.rootCover)}>
+      {wide ? (
+        <section {...stylex.props(styles.stage)}>
+          <div {...stylex.props(styles.rail)}>
+            <header {...stylex.props(styles.brand)}>
+              <span {...stylex.props(styles.kicker)}>Duo Daily</span>
+              <h1 {...stylex.props(styles.title)}>Habit Streaks</h1>
+            </header>
+            {counter}
+            {allDone ? (
+              <strong {...stylex.props(styles.doneBanner)}>All done for today</strong>
+            ) : (
+              <p {...stylex.props(styles.hint)}>Small actions, steady momentum</p>
+            )}
+          </div>
+          {list}
+        </section>
+      ) : (
+        <>
+          <header {...stylex.props(styles.railCover)}>
+            <div {...stylex.props(styles.brand)}>
+              <span {...stylex.props(styles.kicker)}>Duo Daily</span>
+              <h1 {...stylex.props(styles.title, styles.titleCover)}>Habit Streaks</h1>
+            </div>
+            {counter}
+          </header>
+          {allDone ? (
+            <strong {...stylex.props(styles.doneBanner)}>All done for today</strong>
+          ) : (
+            <p {...stylex.props(styles.hint, styles.hintCover)}>Small actions, steady momentum</p>
+          )}
+          {list}
+        </>
+      )}
+      {status}
     </main>
   )
 }
-
-const styles = stylex.create({
-  root: {
-    position: 'absolute',
-    inset: 0,
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    paddingBlock: 16,
-    paddingInline: 18,
-    color: colors.white,
-    backgroundColor: colors.grey6Dark,
-    fontFamily: fonts.system
-  },
-  cover: { gap: 6, paddingBlock: 10, paddingInline: 10 },
-  header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, flexShrink: 0 },
-  kicker: { color: colors.greenDark, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
-  title: { marginBlock: 0, fontSize: 32, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
-  counter: { color: colors.greenDark, fontSize: 16 },
-  hint: { marginBlock: 0, color: colors.grey3, fontSize: 12, flexShrink: 0 },
-  list: { display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minHeight: 0, justifyContent: 'center' },
-  habit: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-    borderWidth: 0,
-    borderRadius: 14,
-    paddingBlock: 13,
-    paddingInline: 12,
-    color: colors.white,
-    backgroundColor: app.fill3,
-    textAlign: 'start',
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.16s, .2s',
-    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    transform: { default: 'scale(1)', ':active': 'scale(.985)' }
-  },
-  habitDone: { backgroundColor: colors.grey5Dark },
-  check: {
-    display: 'grid',
-    placeItems: 'center',
-    width: 28,
-    height: 28,
-    flexShrink: 0,
-    borderWidth: 2,
-    borderStyle: 'solid',
-    borderColor: colors.grey,
-    borderRadius: 999,
-    color: colors.black,
-    fontWeight: 900,
-    transitionProperty: 'background-color, border-color, transform',
-    transitionDuration: '.18s, .18s, .16s'
-  },
-  checkDone: {
-    borderColor: colors.greenDark,
-    backgroundColor: colors.greenDark,
-    animationName: { default: checkPop, [motion]: 'none' },
-    animationDuration: '.22s',
-    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    animationFillMode: 'both'
-  },
-  habitCopy: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 },
-  streak: { color: colors.greenDark, fontSize: 13, fontWeight: 800 },
-  saved: { alignSelf: 'center', color: colors.grey3, fontSize: 10, flexShrink: 0 }
-})
 
 await os.connect()
 createRoot(document.body).render(<Habits />)
