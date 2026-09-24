@@ -1,0 +1,11 @@
+{
+  "id": "com.mnismt.duo.snake",
+  "name": "Snake",
+  "version": "1.2.3",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "mnismt",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
+  "license": "MIT"
+}
