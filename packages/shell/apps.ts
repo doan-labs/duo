@@ -96,7 +96,7 @@ export const RIGHT: App[] = [
   { name: 'Preview', mock: true, light: true, view: Preview },
   // A folder opens on the home screen, never as a scene; springboard/grid.ts reads what it holds.
   { name: 'Utilities', folder: UTILITIES, view: () => null },
-  { name: 'Contacts', mock: true, light: true, view: Contacts },
+  { name: 'Contacts', light: true, view: Contacts },
   { name: 'iTunes Store', mock: true, light: true, view: Itunes },
   { name: 'Freeform', id: 'labs.doan.ipduo.freeform', light: true, ...RELEASE },
   { name: 'Tips', mock: true, light: true, view: Tips }
