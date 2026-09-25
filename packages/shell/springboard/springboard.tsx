@@ -78,7 +78,10 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   // display holds its own copy of the state, as it always has.
   const [bright, setBright] = useState(() => {
     try {
-      const v = Number(localStorage.getItem('os.bright'))
+      const raw = localStorage.getItem('os.bright')
+      // A miss is null, and Number(null) is 0: that would paint the veil black.
+      if (raw === null) return 0.7
+      const v = Number(raw)
       return Number.isFinite(v) && v >= 0 && v <= 1 ? v : 0.7
     } catch {
       return 0.7

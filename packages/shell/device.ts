@@ -74,7 +74,10 @@ export function follow(wide: boolean) {
 const LEVEL_KEY = 'os.level'
 const savedLevel = () => {
   try {
-    const v = Number(localStorage.getItem(LEVEL_KEY))
+    const raw = localStorage.getItem(LEVEL_KEY)
+    // `getItem` is null, never the string "null", on a miss: Number(null) is 0.
+    if (raw === null) return null
+    const v = Number(raw)
     return Number.isFinite(v) ? Math.min(16, Math.max(0, v)) : null
   } catch {
     return null

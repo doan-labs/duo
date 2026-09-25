@@ -68,7 +68,7 @@ export function mountHud(events: HudEvents, spun = false) {
   // `?spin=1` or the checkbox's saved pick: start turning as soon as the scene
   // draws (the hero). A stated preference for less motion wins; the checkbox
   // still turns it on by hand.
-  const spin = (q.get('spin') === '1' || spun) && !matchMedia('(prefers-reduced-motion: reduce)').matches
+  const spin = (q.has('spin') ? q.get('spin') === '1' : spun) && !matchMedia('(prefers-reduced-motion: reduce)').matches
   const store = createStore({ target: 180, yaw: 0, hint: true, spin, away: false })
   const live: Live = { deg: 180, degEl: null }
   const web = document.documentElement.classList.contains('web')
