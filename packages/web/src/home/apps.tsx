@@ -725,6 +725,7 @@ const styles = stylex.create({
     fontFamily: font.sans,
     textAlign: 'left',
     color: color.text,
+    textDecorationLine: 'none',
     cursor: 'pointer',
     // The card lifts under the pointer rather than only changing colour on contact.
     transform: { default: 'translateY(0)', ':hover': 'translateY(-2px)' },
@@ -841,6 +842,7 @@ const styles = stylex.create({
     fontFamily: font.sans,
     textAlign: 'left',
     color: color.text,
+    textDecorationLine: 'none',
     cursor: 'pointer',
     borderRadius: radius.sm,
     outlineColor: { default: 'transparent', ':focus-visible': color.ring },
