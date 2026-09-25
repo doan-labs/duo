@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import { Browser } from '../home/apps'
 import { Block, Cap, Headline, Lede } from '../home/parts'
 import { Button } from '../layout'
@@ -12,21 +12,25 @@ export const Route = createFileRoute('/apps')({
 
 function Page() {
   return (
-    <Block labelledBy="apps-title">
-      <Cap>Apps</Cap>
-      <Headline as="h1" id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
-      <Lede>
-        Official apps ship in the simulator and publish to the Duo catalog; community apps arrive as pull requests,
-        reviewed and published the same way. Everything is MIT licensed and installs through the Store.{' '}
-        <Link to="/publish" {...stylex.props(styles.link)}>
-          How to add yours.
-        </Link>
-      </Lede>
-      <div {...stylex.props(styles.action)}>
-        <Button to="/publish">Submit your app</Button>
-      </div>
-      <Browser />
-    </Block>
+    <>
+      <Block labelledBy="apps-title">
+        <Cap>Apps</Cap>
+        <Headline as="h1" id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
+        <Lede>
+          Official apps ship in the simulator and publish to the Duo catalog; community apps arrive as pull requests,
+          reviewed and published the same way. Everything is MIT licensed and installs through the Store.{' '}
+          <Link to="/publish" {...stylex.props(styles.link)}>
+            How to add yours.
+          </Link>
+        </Lede>
+        <div {...stylex.props(styles.action)}>
+          <Button to="/publish">Submit your app</Button>
+        </div>
+        <Browser />
+      </Block>
+      {/* /apps/<slug> sheets an app over the catalog without unmounting it. */}
+      <Outlet />
+    </>
   )
 }
 

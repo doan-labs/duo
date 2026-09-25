@@ -5,8 +5,8 @@
 // a search field, expandable lanes, and every app opening in a sheet with its facts,
 // version notes and a way into the simulator.
 import * as stylex from '@stylexjs/stylex'
-import { Link } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { known } from '../docs'
 import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
 import { type Block as MdBlock, parse, render } from '../markdown'
@@ -23,6 +23,8 @@ type Layout = 'grid' | 'list'
 type Perm = { name: string; label: string }
 type Entry = {
   key: string
+  /** Last segment of the app id, lowercase and dashed; unique across the catalog, so it is the /apps/<slug> address. */
+  slug: string
   name: string
   icon: string
   author: string
@@ -61,11 +63,20 @@ const USES: Record<string, Perm[]> = {
   YouTube: [{ name: 'network', label: 'Network' }]
 }
 
+const slugOf = (key: string) =>
+  key
+    .split('.')
+    .at(-1)!
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+
 const OFFICIAL: Entry[] = [
   ...SHELL.map((s): Entry => {
     const release = CATALOG.find((c) => c.lane === 'official' && c.name === s.name)
+    const key = release?.id ?? s.name
     return {
-      key: release?.id ?? s.name,
+      key,
+      slug: slugOf(key),
       name: s.name,
       icon: release?.icon ?? s.icon,
       author: release?.author ?? 'Doan Labs',
@@ -89,6 +100,7 @@ const COMMUNITY: Entry[] = CATALOG.filter((c) => c.lane === 'community')
 function fromRelease(c: CatalogApp): Entry {
   return {
     key: c.id,
+    slug: slugOf(c.id),
     name: c.name,
     icon: c.icon,
     author: c.author,
@@ -101,6 +113,9 @@ function fromRelease(c: CatalogApp): Entry {
     changelog: c.changelog
   }
 }
+
+const BY_SLUG = new Map([...OFFICIAL, ...COMMUNITY].map((e) => [e.slug, e]))
+export const appForSlug = (slug: string) => BY_SLUG.get(slug)
 
 type LaneInfo = { key: Lane; label: string; text: string; apps: Entry[] }
 const LANES: LaneInfo[] = [
@@ -275,24 +290,18 @@ function Group({ status, apps }: { status: Status; apps: Entry[] }) {
   )
 }
 
-/** A shelf of apps; each card or row opens the app's sheet, which this shelf owns. */
+/** A shelf of apps; each card or row links to the app's /apps/<slug> sheet. */
 export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout }) {
-  const [app, setApp] = useState<Entry | null>(null)
-  return (
-    <>
-      {layout === 'list' ? <List apps={apps} onOpen={setApp} /> : <Grid apps={apps} onOpen={setApp} />}
-      {app && <Sheet entry={app} onClose={() => setApp(null)} />}
-    </>
-  )
+  return layout === 'list' ? <List apps={apps} /> : <Grid apps={apps} />
 }
 
-function Grid({ apps, onOpen }: { apps: readonly Entry[]; onOpen: (app: Entry) => void }) {
+function Grid({ apps }: { apps: readonly Entry[] }) {
   return (
     <ul {...stylex.props(styles.grid)}>
       {apps.map((a, i) => (
         <li key={a.key} {...stylex.props(styles.item)}>
           <Reveal delay={(i % 3) * 0.06}>
-            <button type="button" onClick={() => onOpen(a)} aria-haspopup="dialog" {...stylex.props(styles.card)}>
+            <Link to="/apps/$slug" params={{ slug: a.slug }} resetScroll={false} {...stylex.props(styles.card)}>
               <img src={a.icon} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
               <span {...stylex.props(styles.cardBody)}>
                 <span {...stylex.props(styles.name)}>
@@ -307,7 +316,7 @@ function Grid({ apps, onOpen }: { apps: readonly Entry[]; onOpen: (app: Entry) =
                 </span>
                 <StatusChip status={a.status} />
               </span>
-            </button>
+            </Link>
           </Reveal>
         </li>
       ))}
@@ -315,7 +324,7 @@ function Grid({ apps, onOpen }: { apps: readonly Entry[]; onOpen: (app: Entry) =
   )
 }
 
-function List({ apps, onOpen }: { apps: readonly Entry[]; onOpen: (app: Entry) => void }) {
+function List({ apps }: { apps: readonly Entry[] }) {
   return (
     <table {...stylex.props(styles.table)}>
       <thead>
@@ -332,7 +341,7 @@ function List({ apps, onOpen }: { apps: readonly Entry[]; onOpen: (app: Entry) =
         {apps.map((a) => (
           <tr key={a.key} {...stylex.props(styles.tr)}>
             <td {...stylex.props(styles.td)}>
-              <button type="button" onClick={() => onOpen(a)} aria-haspopup="dialog" {...stylex.props(styles.rowApp)}>
+              <Link to="/apps/$slug" params={{ slug: a.slug }} resetScroll={false} {...stylex.props(styles.rowApp)}>
                 <img src={a.icon} alt="" width={1024} height={1024} {...stylex.props(styles.iconSm)} />
                 <span>
                   <span {...stylex.props(styles.rowName)}>
@@ -341,7 +350,7 @@ function List({ apps, onOpen }: { apps: readonly Entry[]; onOpen: (app: Entry) =
                   </span>
                   <span {...stylex.props(styles.rowMeta)}>{a.author}</span>
                 </span>
-              </button>
+              </Link>
             </td>
             <td {...stylex.props(styles.td)}>
               <StatusChip status={a.status} />
@@ -438,13 +447,7 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
           <section aria-label="Version history" {...stylex.props(styles.logs)}>
             <h4 {...stylex.props(styles.sheetTitle)}>Version history</h4>
             {log.map((v, i) => (
-              <div key={v.version} {...stylex.props(styles.release)}>
-                <p {...stylex.props(styles.releaseHead)}>
-                  <span {...stylex.props(styles.releaseVersion)}>{v.version}</span>
-                  {i === 0 && <span {...stylex.props(styles.latest)}>Latest</span>}
-                </p>
-                {render(v.blocks, LOG_CTX)}
-              </div>
+              <Release key={v.version} version={v.version} blocks={v.blocks} latest={i === 0} />
             ))}
           </section>
         )}
@@ -477,6 +480,34 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
       </div>
     </dialog>
   )
+}
+
+/** One changelog entry, folded so the sheet stays short; the latest release starts open. */
+function Release({ version, blocks, latest }: { version: string; blocks: MdBlock[]; latest: boolean }) {
+  const [open, setOpen] = useState(latest)
+  return (
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} {...stylex.props(styles.release)}>
+      <summary {...stylex.props(styles.releaseHead)}>
+        <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>
+          <Glyph name="chevron" />
+        </span>
+        <span {...stylex.props(styles.releaseVersion)}>{version}</span>
+        {latest && <span {...stylex.props(styles.latest)}>Latest</span>}
+      </summary>
+      <div {...stylex.props(styles.releaseBody)}>{render(blocks, LOG_CTX)}</div>
+    </details>
+  )
+}
+
+/** The sheet behind /apps/<slug>: the route names the app, the dialog closes by navigating back to the catalog. */
+export function AppSheet({ slug }: { slug: string }) {
+  const navigate = useNavigate()
+  const entry = appForSlug(slug)
+  const close = useCallback(() => navigate({ to: '/apps', resetScroll: false }), [navigate])
+  useEffect(() => {
+    if (!entry) navigate({ to: '/apps', replace: true })
+  }, [entry, navigate])
+  return entry ? <Sheet entry={entry} onClose={close} /> : null
 }
 
 function StatusChip({ status }: { status: Status }) {
@@ -949,7 +980,21 @@ const styles = stylex.create({
     borderTopStyle: 'solid',
     borderTopColor: color.border
   },
-  releaseHead: { margin: 0, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px' },
+  releaseHead: {
+    margin: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    listStyleType: 'none',
+    '::-webkit-details-marker': { display: 'none' },
+    borderRadius: radius.sm,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
+  },
+  releaseBody: { marginTop: '6px', paddingLeft: '24px' },
   releaseVersion: { fontFamily: font.mono, fontSize: '13px', fontWeight: 600, color: color.text },
   latest: {
     paddingTop: '2px',
