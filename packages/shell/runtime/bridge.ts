@@ -192,10 +192,11 @@ export function launchFrame(
   })
   // A hidden display's root is display:none, so its document never paints and an app
   // that reports ready from a frame callback cannot. The deadline runs only while visible.
+  // The budget has to clear boot + first paint on slow machines, not just healthy ones.
   function armReady() {
     clearTimeout(readyTimer)
     if (launch.state === 'connected' && view.info.visible)
-      readyTimer = setTimeout(() => fail('App did not become ready'), 10000)
+      readyTimer = setTimeout(() => fail('App did not become ready'), 30000)
   }
   function receive(data: unknown) {
     if (launch.state === 'revoked') return
@@ -313,7 +314,7 @@ export function launchFrame(
   function start() {
     clearInterval(waiting)
     state('bootstrapping')
-    helloTimer = setTimeout(() => fail('App did not connect'), 10000)
+    helloTimer = setTimeout(() => fail('App did not connect'), 30000)
     if (src) frame.src = src
     else frame.srcdoc = session.bundle.html
     container.append(frame)

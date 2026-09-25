@@ -32,6 +32,12 @@
         }
         /* In a browser the page is the backdrop; on the desktop the wallpaper is. */
         html.web body { background: #f6f6f3; }
+      }
+    </style>
+    <style>
+      /* Scene-only: these style the WebGL canvas and live in a second block because
+         app bundles embed the first block's reset as their own (scripts/build-app.ts). */
+      @layer reset {
         /* The model takes a few seconds to arrive; the scene fades in on its
            first frame rather than popping (main.ts writes `data-ready`). */
         canvas { position: fixed; inset: 0; cursor: grab; opacity: 0; transition: opacity 0.45s ease; }
