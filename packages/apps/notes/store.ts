@@ -5,26 +5,48 @@
 
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { type Doc, type Folder, type Note, parse, type Sort, serialize, tagsOf, titleOf, uid } from './data.ts'
+
+/**
+ * Collection keys are read-modify-write: a value computed before the first
+ * hydrate lands (or while a failed save leaves the key in 'error') still
+ * reflects stale storage, and writing it back would replace every stored row.
+ * Writers therefore hand over a transform that runs against fresh state; while
+ * the key has no real read yet the transform waits in a queue and the effect
+ * replays it once the key is ready.
+ */
+function useCollection<T>(key: string, fallback: T[]) {
+  const kv = useJSON<T[]>(os.storage, key, fallback)
+  const ready = kv.status === 'ready' || kv.status === 'saving'
+  const pending = useRef<((current: T[]) => T[])[]>([])
+  useEffect(() => {
+    if (!ready || !pending.current.length) return
+    const fns = pending.current.splice(0)
+    for (const fn of fns) kv.set(fn(kv.value))
+  }, [ready, kv])
+  const write = (fn: (current: T[]) => T[]) => {
+    if (ready) kv.set(fn(kv.value))
+    else pending.current.push(fn)
+  }
+  return { list: kv.value, write, status: kv.status }
+}
 
 /** The list itself as one JSON key, like v1, so both displays agree on it. */
 export function useNotes() {
-  const index = useJSON<Note[]>(os.storage, 'index', [])
-  const notes = index.value
-  const write = (v: Note[]) => index.set(v)
+  const { list: notes, write, status } = useCollection<Note>('index', [])
   const add = (folder?: string) => {
     const note: Note = { id: uid(), when: new Date().toISOString(), edited: new Date().toISOString(), folder }
-    write([note, ...notes])
+    write((current) => [note, ...current])
     return note
   }
-  const put = (note: Note) => write(notes.map((n) => (n.id === note.id ? note : n)))
+  const put = (note: Note) => write((current) => current.map((n) => (n.id === note.id ? note : n)))
   /** For good: index entry plus every key the doc owned. */
   const remove = (note: Note) => {
-    write(notes.filter((n) => n.id !== note.id))
+    write((current) => current.filter((n) => n.id !== note.id))
     void delMedia(note.id)
   }
-  return { notes, add, put, remove, hydrating: index.status === 'hydrating' }
+  return { notes, add, put, remove, hydrating: status === 'hydrating' }
 }
 
 /** Deletes a note's doc, markup and image keys. Storage pages keys at 256. */
@@ -56,17 +78,17 @@ export function usePurge() {
 
 /** User folders under iCloud; the built-in "Notes" folder is `undefined` on a note. */
 export function useFolders() {
-  const list = useJSON<Folder[]>(os.storage, 'folders', [])
-  const folders = list.value
+  const { list: folders, write } = useCollection<Folder>('folders', [])
   return {
     folders,
     add: (name: string) => {
       const folder: Folder = { id: uid(), name }
-      list.set([...folders, folder])
+      write((current) => [...current, folder])
       return folder
     },
-    rename: (folder: Folder, name: string) => list.set(folders.map((f) => (f.id === folder.id ? { ...f, name } : f))),
-    remove: (folder: Folder) => list.set(folders.filter((f) => f.id !== folder.id))
+    rename: (folder: Folder, name: string) =>
+      write((current) => current.map((f) => (f.id === folder.id ? { ...f, name } : f))),
+    remove: (folder: Folder) => write((current) => current.filter((f) => f.id !== folder.id))
   }
 }
 

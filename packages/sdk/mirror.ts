@@ -4,7 +4,7 @@ import type { Change, ErrCode, KV } from './protocol.ts'
 export type KeyState = { value: string | null; status: 'hydrating' | 'ready' | 'saving' | 'error'; error?: ErrCode }
 const empty: KeyState = { value: null, status: 'hydrating' }
 
-/** Optimistic state is independent of hydration and remains visible after a failed save. */
+/** Optimistic state is independent of hydration until the next hydrate re-reads storage. */
 export class KVMirror {
   private states = new Map<string, KeyState>()
   private listeners = new Set<() => void>()
@@ -63,9 +63,10 @@ export class KVMirror {
         for (const [k, v] of page.entries) values.set(k, v)
         cursor = page.cursor
       } while (cursor)
+      // In-flight writes keep their optimistic state; settled 'error' entries get
+      // overwritten so a transient failure cannot wedge a key away from storage.
       for (const k of new Set([...this.states.keys(), ...values.keys()])) {
-        if (!this.local.has(k) && this.states.get(k)?.status !== 'error')
-          this.states.set(k, { value: values.get(k) ?? null, status: 'ready' })
+        if (!this.local.has(k)) this.states.set(k, { value: values.get(k) ?? null, status: 'ready' })
       }
       this.rev = revision ?? 0
       this.readyEmpty = { value: null, status: 'ready' }
