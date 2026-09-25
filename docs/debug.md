@@ -43,7 +43,9 @@ use deviceScaleFactor 2 for detail and crop rather than shrink. Baselines use
 `?debug&app=Notes&deg=180` and `deg=0`; use 120 for clipping. Live fold tests must omit the
 pinned `deg` parameter and drive the hinge control: the blur/bake fold look only exists
 while the hinge is moving and ~250 ms after (decisions.md 95), so capture mid-transition;
-a pinned `deg` renders the settled, live state.
+a pinned `deg` renders the settled state: past ~15° of bend the live inner panel is
+clipped at the hinge and the folded half is the crisp bake, so taps there are expected
+to do nothing (decisions.md 96).
 
 ### The state probe
 

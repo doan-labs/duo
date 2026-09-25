@@ -1569,3 +1569,29 @@ control); the silhouette sliver keeps the shell's projected bake, so with an
 app up it still blacks out past the clip; and the eased angle's tail below
 SETTLE still counts as motion, so the real hand-off is ~SETTLE_DEBOUNCE after
 the last visible turn.
+
+## 96. A settled live panel is clipped at the hinge
+
+2026-09-25. Amends 95. The first settle fix clipped the flat inner panel only
+where `foldClip()` cuts it, so at a held fold the whole unfurled picture stayed
+on flat glass while the device surface bent away behind it - a straight
+billboard over a curve, with a projected-bake sliver leaking where the camera
+clip and the shader's fixed eye disagree. Wrong read: it made the fold look
+like a rendering bug instead of a bent display.
+
+At rest the panel is now clipped at the hinge once the bend is past a shallow
+~15 deg (`Math.PI / 12`): the half still facing the camera stays live DOM, and
+the half the fold took shows the projected bake - the same picture wrapped
+around the curve. The hinge seam is where bake and panel hold the same
+content, so the display reads as one screen bent around the fold. During
+motion nothing changes: `foldClip()` still bounds the ramped panel. Near flat
+the bend is too shallow to lift the surface out from under the panel, so the
+whole display stays live; deep folds already clip past the hinge on their
+own, so the settled clip is `max(foldClip(), hingeClip)` and glides in over
+the same ~300 ms `foldMotion` fade.
+
+Costs: the folded-away half is a crisp but dead bake at rest - taps on it do
+nothing, which matches hardware whose surface faces away; `viewInfo.clip`
+reports 0.5 there, so a `left`-placed scene correctly reads as hidden; and a
+settled bend just under the threshold keeps a fully live, essentially flat
+panel.

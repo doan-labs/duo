@@ -812,9 +812,14 @@ renderer.setAnimationLoop((now) => {
   outerLive.visible = facing(outerLive) && (angle < 1 || (angle < FLAT && (app || !folding)))
   outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
   coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) * foldMotion.value : 0)
-  // The clip is what keeps the inner panel inside the half that is still
-  // facing you, so it holds all the way to closed.
-  const clip = foldClip()
+  // The clip keeps the inner panel inside glass that is still flat. While the
+  // hinge moves the fold only takes `foldClip` of it, but a settled panel laid
+  // flat across the fold would hide the bent surface under a straight edge -
+  // so past a shallow bend it is clipped at the hinge, and the half the fold
+  // took shows the bake: the same picture, wrapped around the curve. Near
+  // flat the fold is too shallow to lift the surface out from under the
+  // panel, which keeps the whole display live (decisions.md 96).
+  const clip = Math.max(foldClip(), bend.value > Math.PI / 12 ? 0.5 * (1 - foldMotion.value) : 0)
   innerLive.visible = facing(innerLive) && (angle > FLAT || app || (!folding && clip < 1))
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
   updateDisplays(

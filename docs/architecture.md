@@ -76,7 +76,7 @@ direction, not zoom distance; close zoom can still crop. See [model checks](debu
 | Surface | Behavior |
 | --- | --- |
 | Baked canvas | Shell-only texture projected from the fixed eye, blurred/darkened while the hinge moves; inner bake is black when a bending app uses live DOM |
-| Live DOM | Inner panel at flat ≥179°, under an open app's fold, or wherever `foldClip()` leaves it once the hinge rests ~250 ms; cover when closed, under its app, or resting mid-fold and facing the camera |
+| Live DOM | Inner panel at flat ≥179°, under an open app's fold, or the half still facing the camera once the hinge rests ~250 ms (clipped at the hinge past a ~15° bend); cover when closed, under its app, or resting mid-fold and facing the camera |
 
 `foldClip()` projects the moving edge back onto the inner glass using the camera position.
 `ramp()` matches shader shading with one gradient and six clipped blur layers at z-index 11;
