@@ -141,7 +141,8 @@ function NoteBody({
   }
   const pin = () => putNote({ ...note, pinned: !note.pinned })
   const lock = () => {
-    if (note.locked) unlocked.del()
+    // Either direction retires the unlock pass: the other display may hold it.
+    unlocked.del()
     putNote({ ...note, locked: !note.locked })
   }
   const copy = () => {
@@ -383,7 +384,7 @@ function NoteBody({
       <div role="status" aria-live="polite" {...stylex.props(styles.save)}>
         {status === 'error' ? 'Not saved' : longStamp(note)}
       </div>
-      {!wide && !isDeleted && !isLocked && tools}
+      {!wide && !isLocked && tools}
       <Menu
         open={aa}
         onClose={() => setAa(false)}

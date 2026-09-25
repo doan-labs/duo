@@ -2,7 +2,7 @@
 // display; a Folders page pushes a list pushes a note on the cover. One path
 // cell in os.session drives both, so they never disagree about where you are.
 
-import type { Os } from '@doan-labs/duo-sdk'
+import { type Os, os } from '@doan-labs/duo-sdk'
 import { Menu, type MenuEntry, Push, Title, useWide, VStack } from '@doan-labs/duo-uikit'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
@@ -51,7 +51,10 @@ export function Notes(_: { os: Os }) {
   /** A live note drops into Recently Deleted; a binned one goes for good. */
   const trash = (n: Note) => {
     if (n.deleted) remove(n)
-    else put({ ...n, deleted: new Date().toISOString() })
+    else {
+      if (n.locked) void os.session.del(`unl:${n.id}`)
+      put({ ...n, deleted: new Date().toISOString() })
+    }
     if (sel?.id === n.id) back()
   }
 

@@ -5,7 +5,7 @@
 
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { type Doc, type Folder, type Note, parse, type Sort, serialize, tagsOf, titleOf, uid } from './data.ts'
 
 /**
@@ -13,21 +13,37 @@ import { type Doc, type Folder, type Note, parse, type Sort, serialize, tagsOf, 
  * hydrate lands (or while a failed save leaves the key in 'error') still
  * reflects stale storage, and writing it back would replace every stored row.
  * Writers therefore hand over a transform that runs against fresh state; while
- * the key has no real read yet the transform waits in a queue and the effect
- * replays it once the key is ready.
+ * the key has no real read yet the transform waits in a queue shared by every
+ * mounted reader, and a flush folds the whole queue over one accumulator and
+ * writes once, so queued changes can never overwrite each other.
  */
+const queues = new Map<string, ((current: unknown) => unknown)[]>()
+
+/** Fold the queued transforms for a key over its latest value, once. */
+function drain<T>(key: string, current: T[]) {
+  const fns = queues.get(key)
+  if (!fns?.length) return current
+  queues.delete(key)
+  let acc = current
+  for (const fn of fns) acc = (fn as (c: T[]) => T[])(acc)
+  return acc
+}
+
 function useCollection<T>(key: string, fallback: T[]) {
   const kv = useJSON<T[]>(os.storage, key, fallback)
   const ready = kv.status === 'ready' || kv.status === 'saving'
-  const pending = useRef<((current: T[]) => T[])[]>([])
   useEffect(() => {
-    if (!ready || !pending.current.length) return
-    const fns = pending.current.splice(0)
-    for (const fn of fns) kv.set(fn(kv.value))
-  }, [ready, kv])
+    if (!ready) return
+    const acc = drain(key, kv.value)
+    if (acc !== kv.value) kv.set(acc)
+  }, [ready, key, kv])
   const write = (fn: (current: T[]) => T[]) => {
-    if (ready) kv.set(fn(kv.value))
-    else pending.current.push(fn)
+    if (ready) kv.set(fn(drain(key, kv.value)))
+    else {
+      const fns = queues.get(key) ?? []
+      fns.push(fn as (current: unknown) => unknown)
+      queues.set(key, fns)
+    }
   }
   return { list: kv.value, write, status: kv.status }
 }
@@ -49,17 +65,23 @@ export function useNotes() {
   return { notes, add, put, remove, hydrating: status === 'hydrating' }
 }
 
-/** Deletes a note's doc, markup and image keys. Storage pages keys at 256. */
+/**
+ * Deletes a note's doc, markup and image keys. Storage pages keys at 256 and a
+ * cursor dies with the revision it was taken on, so a delete mid-enumeration
+ * would strand later pages: collect every matching key first, then delete.
+ */
 async function delMedia(id: string) {
   try {
+    const keys: string[] = []
     let cursor: string | undefined
     do {
       const page: { keys: string[]; cursor?: string } = await os.storage.keys(cursor)
       for (const k of page.keys) {
-        if (k === `note:${id}` || k === `markup:${id}` || k.startsWith(`img:${id}:`)) void os.storage.del(k)
+        if (k === `note:${id}` || k === `markup:${id}` || k.startsWith(`img:${id}:`)) keys.push(k)
       }
       cursor = page.cursor
     } while (cursor)
+    for (const k of keys) await os.storage.del(k)
   } catch {
     // A sweep that fails leaves orphan keys; the next purge tries again.
   }

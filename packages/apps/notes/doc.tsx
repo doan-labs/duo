@@ -69,6 +69,52 @@ const TEXT_STYLES = new Set([
 const LISTY = new Set(['bullet', 'dash', 'number', 'check'])
 const INDENTABLE = new Set(['bullet', 'dash', 'number', 'check', 'quote'])
 const INLINE_TAGS = new Set(['B', 'I', 'U', 'S', 'A', 'BR'])
+const RENAME: Record<string, string> = { STRONG: 'b', EM: 'i', DEL: 's', STRIKE: 's' }
+const SAFE_HREF = /^(https?:|mailto:)/i
+
+/**
+ * Sanitize inline markup in place: spans restyle onto the four inline tags,
+ * anything else unwraps back to text, and every attribute goes except a safe
+ * href on a link - stored HTML can come from a paste or an older writer, so
+ * event handlers and javascript: URLs never reach innerHTML again.
+ */
+const clean = (root: HTMLElement) => {
+  for (const n of [...root.childNodes]) {
+    if (n.nodeType !== 1) continue
+    let el = n as HTMLElement
+    if (el.dataset.mk) continue
+    const rename =
+      RENAME[el.tagName] ??
+      (el.tagName === 'SPAN'
+        ? el.style.fontWeight === 'bold' || Number(el.style.fontWeight) >= 600
+          ? 'b'
+          : el.style.fontStyle === 'italic'
+            ? 'i'
+            : /underline/.test(el.style.textDecorationLine)
+              ? 'u'
+              : /line-through/.test(el.style.textDecorationLine)
+                ? 's'
+                : undefined
+        : undefined)
+    if (rename) {
+      const to = document.createElement(rename)
+      while (el.firstChild) to.append(el.firstChild)
+      el.replaceWith(to)
+      el = to
+    }
+    if (!INLINE_TAGS.has(el.tagName)) {
+      while (el.firstChild) el.before(el.firstChild)
+      el.remove()
+    } else {
+      for (const a of [...el.attributes]) {
+        if (el.tagName === 'A' && a.name === 'href' && SAFE_HREF.test(a.value)) continue
+        el.removeAttribute(a.name)
+      }
+      el.className = TAG_CLS[el.tagName] ?? ''
+      clean(el)
+    }
+  }
+}
 
 /** Paint a block element for its data-s/data-ind state. */
 const restyle = (el: HTMLElement) => {
@@ -101,6 +147,7 @@ const render = (b: Block): HTMLElement => {
         const td = document.createElement('td')
         td.className = CLS.td
         td.innerHTML = cell || '<br>'
+        clean(td)
         tr.append(td)
       }
       tbody.append(tr)
@@ -130,8 +177,8 @@ const render = (b: Block): HTMLElement => {
   }
   const wrap = document.createElement('div')
   wrap.innerHTML = b.t
+  clean(wrap)
   for (const n of [...wrap.childNodes]) div.append(n)
-  for (const el of [...div.querySelectorAll('a,b,i,u,s')] as HTMLElement[]) el.className = TAG_CLS[el.tagName] ?? ''
   if (!div.textContent) div.append(document.createElement('br'))
   restyle(div)
   return div
@@ -140,13 +187,25 @@ const render = (b: Block): HTMLElement => {
 /** Trailing caret-bridging <br>s are chrome, not content. */
 const strip = (html: string) => html.replace(/(\s|<br\s*\/?>)*$/s, '').trim()
 
+/** Checklist markers drop out of serialized content; find-marks unwrap back to text. */
+const unmark = (root: HTMLElement) => {
+  for (const junk of [...root.querySelectorAll('[data-mk],mark')]) {
+    if (junk.tagName === 'MARK') while (junk.firstChild) junk.before(junk.firstChild)
+    junk.remove()
+  }
+}
+
 /** The block shapes DOM children read back as; returns the doc the DOM holds. */
 const readDom = (ce: HTMLElement): Doc => {
   const blocks: Block[] = []
   for (const el of [...ce.children] as HTMLElement[]) {
     if (el.tagName === 'TABLE') {
       const rows = [...el.querySelectorAll('tr')].map((tr) =>
-        [...tr.children].map((td) => strip((td as HTMLElement).innerHTML))
+        [...tr.children].map((td) => {
+          const cell = td.cloneNode(true) as HTMLElement
+          unmark(cell)
+          return strip(cell.innerHTML)
+        })
       )
       blocks.push({ id: el.dataset.b ?? uid(), s: 'table', rows })
       continue
@@ -158,11 +217,7 @@ const readDom = (ce: HTMLElement): Doc => {
     }
     const s = (TEXT_STYLES.has(el.dataset.s as TextStyle) ? el.dataset.s : 'body') as TextStyle
     const body = el.cloneNode(true) as HTMLElement
-    for (const junk of [...body.querySelectorAll('[data-mk],mark')]) {
-      // markers drop; find-marks unwrap back to text
-      if (junk.tagName === 'MARK') while (junk.firstChild) junk.before(junk.firstChild)
-      junk.remove()
-    }
+    unmark(body)
     blocks.push({
       id: el.dataset.b ?? uid(),
       s,
@@ -194,19 +249,16 @@ const caretOffset = (block: HTMLElement, node: Node, off: number) => {
   range.selectNodeContents(block)
   range.setEnd(node, off)
   const frag = range.cloneContents()
-  for (const mk of [...frag.querySelectorAll('[data-mk],mark')]) {
-    if (mk.tagName === 'MARK') while (mk.firstChild) mk.before(mk.firstChild)
-    mk.remove()
+  for (const junk of [...frag.querySelectorAll('[data-mk],mark')]) {
+    if (junk.tagName === 'MARK') while (junk.firstChild) junk.before(junk.firstChild)
+    junk.remove()
   }
   return frag.textContent?.length ?? 0
 }
 
 const textLength = (el: HTMLElement) => {
   const clone = el.cloneNode(true) as HTMLElement
-  for (const mk of [...clone.querySelectorAll('[data-mk],mark')]) {
-    if (mk.tagName === 'MARK') while (mk.firstChild) mk.before(mk.firstChild)
-    mk.remove()
-  }
+  unmark(clone)
   return clone.textContent?.length ?? 0
 }
 
@@ -320,7 +372,9 @@ export function Editor({
         continue
       }
       const ind = Number(el.dataset.ind ?? 0)
-      run = { [ind]: (run[ind] ?? 0) + 1 }
+      // Outdenting continues the outer count; only deeper levels reset.
+      for (const level of Object.keys(run)) if (Number(level) > ind) delete run[Number(level)]
+      run[ind] = (run[ind] ?? 0) + 1
       const want = `${run[ind]}.`
       if (el.dataset.num !== want) el.dataset.num = want
     }
@@ -415,44 +469,6 @@ export function Editor({
         ceEl.insertBefore(div, list)
       }
       list.remove()
-    }
-    // Sanitize inline markup inside text blocks and cells; find-marks and stray
-    // wrappers unwrap back to text.
-    const RENAME: Record<string, string> = { STRONG: 'b', EM: 'i', DEL: 's', STRIKE: 's' }
-    const clean = (root: HTMLElement) => {
-      for (const n of [...root.childNodes]) {
-        if (n.nodeType !== 1) continue
-        let el = n as HTMLElement
-        if (el.dataset.mk) continue
-        const rename =
-          RENAME[el.tagName] ??
-          (el.tagName === 'SPAN'
-            ? el.style.fontWeight === 'bold' || Number(el.style.fontWeight) >= 600
-              ? 'b'
-              : el.style.fontStyle === 'italic'
-                ? 'i'
-                : /underline/.test(el.style.textDecorationLine)
-                  ? 'u'
-                  : /line-through/.test(el.style.textDecorationLine)
-                    ? 's'
-                    : undefined
-            : undefined)
-        if (rename) {
-          const to = document.createElement(rename)
-          while (el.firstChild) to.append(el.firstChild)
-          el.replaceWith(to)
-          el = to
-        }
-        if (!INLINE_TAGS.has(el.tagName)) {
-          while (el.firstChild) el.before(el.firstChild)
-          el.remove()
-        } else {
-          if (el.tagName === 'A')
-            for (const a of [...el.attributes]) if (a.name !== 'href' && a.name !== 'class') el.removeAttribute(a.name)
-          el.className = TAG_CLS[el.tagName] ?? ''
-          clean(el)
-        }
-      }
     }
     for (const el of [...ceEl.children] as HTMLElement[]) {
       if (el.tagName === 'DIV') {

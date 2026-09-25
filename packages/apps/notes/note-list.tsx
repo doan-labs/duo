@@ -128,7 +128,11 @@ function useNoteMenu(note: Note) {
         {
           label: note.locked ? 'Remove Lock' : 'Lock Note',
           icon: 'lock',
-          onSelect: () => put({ ...note, locked: !note.locked })
+          onSelect: () => {
+            // Reapplying a lock retires this session's unlock pass too.
+            if (!note.locked) void os.session.del(`unl:${note.id}`)
+            put({ ...note, locked: !note.locked })
+          }
         },
         'separator',
         { label: 'Move to…', icon: 'folder', onSelect: () => setMoving(true) },
@@ -136,7 +140,10 @@ function useNoteMenu(note: Note) {
         {
           label: 'Move to Recently Deleted',
           icon: 'trash',
-          onSelect: () => put({ ...note, deleted: new Date().toISOString() })
+          onSelect: () => {
+            if (note.locked) void os.session.del(`unl:${note.id}`)
+            put({ ...note, deleted: new Date().toISOString() })
+          }
         }
       ]
   const sheet = (
