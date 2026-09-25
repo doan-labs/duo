@@ -1639,3 +1639,28 @@ reference demo shows one export plainly and a scene composes several. Cost: the
 scenes mount on the client as they scroll in, so the prerendered page carries
 their captions only; and the scenes are hand-composed, so a new export does not
 appear in the grid until someone builds a tile for it.
+
+## 98. Maps searches, geocodes and routes live
+
+2026-09-25, accepted; supersedes the "nothing routes or geocodes" half of 60. The
+tile drawing and furniture from 60 stand; what changed is that the controls
+behind them now answer for real, all on keyless CORS-open services so no secret
+lives in the bundle. Photon (`photon.komoot.io`) geocodes the search field and
+reverse-geocodes dropped pins and the blue dot; Nominatim lost the geocoder seat
+because it sends no `Access-Control-Allow-Origin`. Routes come from FOSSGIS's
+OSRM mirrors (`routing.openstreetmap.de`), one host per engine -
+`routed-car`, `routed-bike`, `routed-foot` - because the public demo at
+router.project-osrm.org silently aliases every profile to driving.
+
+New files split the live half out of `data.ts`: `live.ts` (the clients, the
+Photon/OSRM mappers, the formatters), `camera.ts` (the fly plan - a zoom dip on
+long hauls, cubic easing - and its rAF driver), `directions.tsx` (modes, the
+ways there, the steps), `glyphs.tsx` (car, bike and the turn arrows SYM lacks).
+Zoom is fractional now: tiles render at the nearest integer level scaled by
+`2 ** (z - tileZ)`, so wheel and fly zoom without a reload between levels, and
+a released drag coasts on its last velocity. A tap on a grey alternative picks
+it; a hold drops a pin that reverse-geocodes into its address. The mirror copy
+still starts nothing: every fetch gates on `!os.mirror`. Cost: recents are now
+real history from the session (seeded by the same sample as before), and the
+backends are best-effort free services - Photon and FOSSGIS can throttle, in
+which case the search note and the directions note say so rather than hang.
