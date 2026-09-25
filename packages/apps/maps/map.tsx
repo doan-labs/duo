@@ -109,23 +109,25 @@ export function MapCanvas({
       e.stopPropagation()
       onInterrupt()
       const r = el.getBoundingClientRect()
+      const k = box.w / r.width
       onView(
         zoomAt(
           view,
           -e.deltaY * 0.004,
-          e.clientX - r.left,
-          e.clientY - r.top,
-          r.width,
-          r.height,
+          (e.clientX - r.left) * k,
+          (e.clientY - r.top) * k,
+          box.w,
+          box.h,
           padX,
-          padYFrac * r.height
+          padYFrac * box.h
         )
       )
     }
     const dbl = (e: MouseEvent) => {
       e.preventDefault()
       const r = el.getBoundingClientRect()
-      flyTo(zoomAt(view, 1, e.clientX - r.left, e.clientY - r.top, r.width, r.height, padX, padYFrac * r.height))
+      const k = box.w / r.width
+      flyTo(zoomAt(view, 1, (e.clientX - r.left) * k, (e.clientY - r.top) * k, box.w, box.h, padX, padYFrac * box.h))
     }
     el.addEventListener('wheel', wheel, { passive: false })
     el.addEventListener('dblclick', dbl)
@@ -221,9 +223,12 @@ export function MapCanvas({
         setDrag(true)
         setMenu(false)
         // Held still long enough, a press drops a pin rather than grabs the map.
+        // Client px are the CSS3D display's scaled px; the world maths wants the
+        // surface's own layout px, so every coordinate crosses `k` first.
         hold.current = window.setTimeout(() => {
           const r = surface.current!.getBoundingClientRect()
-          const p = unproject(left + e.clientX - r.left, top + e.clientY - r.top, view.z)
+          const k = box.w / r.width
+          const p = unproject(left + (e.clientX - r.left) * k, top + (e.clientY - r.top) * k, view.z)
           onDropPin(p.lat, p.lon)
         }, 600)
       }}
@@ -235,7 +240,8 @@ export function MapCanvas({
           hold.current = null
         }
         trail.current = [...trail.current.slice(-6), { t: e.timeStamp, x: e.clientX, y: e.clientY }]
-        onView({ ...view, ...unproject(f.x - (e.clientX - f.px), f.y - (e.clientY - f.py), view.z) })
+        const k = box.w / surface.current!.getBoundingClientRect().width
+        onView({ ...view, ...unproject(f.x - (e.clientX - f.px) * k, f.y - (e.clientY - f.py) * k, view.z) })
       }}
       onPointerUp={(e) => {
         from.current = null
@@ -248,8 +254,9 @@ export function MapCanvas({
         // A tap near a grey line picks that way there instead, like Apple Maps.
         if (routes && tr.length && Math.hypot(e.clientX - tr[0]!.x, e.clientY - tr[0]!.y) < 5) {
           const r = surface.current!.getBoundingClientRect()
-          const px = e.clientX - r.left
-          const py = e.clientY - r.top
+          const k = box.w / r.width
+          const px = (e.clientX - r.left) * k
+          const py = (e.clientY - r.top) * k
           for (let i = 0; i < routes.length; i++) {
             if (i !== active && near(px, py, routes[i]!)) {
               onRoute(i)
@@ -260,8 +267,12 @@ export function MapCanvas({
         }
         if (tr.length > 2) {
           const dt = tr[tr.length - 1]!.t - tr[0]!.t
+          const k = box.w / surface.current!.getBoundingClientRect().width
           if (dt > 0 && dt < 150)
-            onCoast(((tr[tr.length - 1]!.x - tr[0]!.x) / dt) * 1000, ((tr[tr.length - 1]!.y - tr[0]!.y) / dt) * 1000)
+            onCoast(
+              ((tr[tr.length - 1]!.x - tr[0]!.x) / dt) * 1000 * k,
+              ((tr[tr.length - 1]!.y - tr[0]!.y) / dt) * 1000 * k
+            )
         }
         trail.current = []
       }}
