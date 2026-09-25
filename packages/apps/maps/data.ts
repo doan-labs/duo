@@ -1,5 +1,5 @@
 // Real OpenStreetMap raster tiles under Apple Maps furniture. PLACES are the
-// curated pins the map opens on — District 1 and 3 of Ho Chi Minh City, then
+// curated pins the map opens on - District 1 and 3 of Ho Chi Minh City, then
 // San Francisco and a few cities further out; live.ts covers what is real-time
 // (search, routes), this file is the static half: the catalogue, the Web
 // Mercator maths and the tile URLs.

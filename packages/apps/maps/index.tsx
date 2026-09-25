@@ -10,7 +10,7 @@ import type { Os } from '@doan-labs/duo-sdk'
 import { useWide } from '@doan-labs/duo-uikit'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fly, run } from './camera.ts'
 import { fit, localMatches, type Place, project, RECENT, unproject, type View } from './data.ts'
 import { Directions } from './directions.tsx'
@@ -53,10 +53,13 @@ export const Maps = ({ os }: { os: Os }) => {
   // A live query narrows the pins to what matches it, locally and on Photon.
   const local = localMatches(q.toLowerCase())
   const marks = q ? [...local, ...results.filter((r) => !local.some((l) => l.name === r.name))] : null
-  const want = dir ? `${dir.mode}|${me.lat.toFixed(4)},${me.lon.toFixed(4)}|${dir.to.id}` : ''
+  // Route keys and route requests normalize the origin the same way, so a GPS
+  // fix inside an ~11m bucket neither refetches nor lies about where it started.
+  const from = useMemo(() => ({ lat: +me.lat.toFixed(4), lon: +me.lon.toFixed(4) }), [me.lat, me.lon])
+  const want = dir ? `${dir.mode}|${from.lat},${from.lon}|${dir.to.id}` : ''
   const routeList = rec.key === want ? rec.list : null
   const routeError = rec.key === want && rec.failed
-  const estKey = sel ? `drive|${me.lat.toFixed(4)},${me.lon.toFixed(4)}|${sel.id}` : ''
+  const estKey = sel ? `drive|${from.lat},${from.lon}|${sel.id}` : ''
   const estimate = estKey && s.estimate?.key === estKey ? s.estimate : null
 
   // Whatever rAF is moving the camera - flight or the pan's leftover speed - lives here.
@@ -139,13 +142,16 @@ export const Maps = ({ os }: { os: Os }) => {
     }
   }, [q, live, found])
 
+  // Leaving the app mid-flight would let a stray rAF keep writing the store.
+  useEffect(() => () => motion.current?.(), [])
+
   // A place card asks for its drive time up front; the same answer warms the
   // routes record, so Directions opens loaded.
   useEffect(() => {
     if (!sel || dir || !live) return
     if (share.get().estimate?.key === estKey) return
     const ctl = new AbortController()
-    routes('drive', me, sel, ctl.signal)
+    routes('drive', from, sel, ctl.signal)
       .then((list) => {
         if (!list[0]) return
         share.set({
@@ -155,7 +161,7 @@ export const Maps = ({ os }: { os: Os }) => {
       })
       .catch(() => {})
     return () => ctl.abort()
-  }, [sel, dir, me, live, estKey])
+  }, [sel, dir, from, live, estKey])
 
   // Fetch the routes whenever the directions panel wants them. The record lands
   // keyed by the request, so failure or an empty answer ends it - no refire.
@@ -164,7 +170,7 @@ export const Maps = ({ os }: { os: Os }) => {
     fetching.current = want
     let dead = false
     const ctl = new AbortController()
-    routes(dir.mode, me, dir.to, ctl.signal)
+    routes(dir.mode, from, dir.to, ctl.signal)
       .then((list) => {
         if (!dead) share.set({ routes: { key: want, list, failed: false } })
       })
@@ -179,7 +185,7 @@ export const Maps = ({ os }: { os: Os }) => {
       ctl.abort()
       if (fetching.current === want) fetching.current = ''
     }
-  }, [dir, live, want, me, rec])
+  }, [dir, live, want, from, rec])
 
   // The live copy flies the shared camera to a route once the record lands;
   // the mirror draws the same view without scheduling a frame of its own.
@@ -232,7 +238,8 @@ export const Maps = ({ os }: { os: Os }) => {
         if (!p) return
         const cur = share.get()
         if (cur.sel?.id !== id) return
-        const namedP = { ...p, id, name: p.address[0] ?? p.name }
+        // The pin stays where it was dropped; only its name comes from Photon.
+        const namedP = { ...p, id, lat: sel.lat, lon: sel.lon, name: p.address[0] ?? p.name }
         share.set({ sel: namedP, dir: cur.dir?.to.id === id ? { ...cur.dir, to: namedP } : cur.dir })
         remember(namedP)
       })
@@ -337,6 +344,7 @@ export const Maps = ({ os }: { os: Os }) => {
         onSelect={pick}
         results={marks}
         me={me}
+        pulse={live}
         routes={routeList}
         active={dir?.active ?? 0}
         onRoute={(i) => dir && share.set({ dir: { ...dir, active: i } })}

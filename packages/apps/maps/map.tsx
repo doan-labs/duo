@@ -34,6 +34,8 @@ type Props = {
   results: Place[] | null
   /** The blue dot - the device's real position when granted, else the seed point. */
   me: { lat: number; lon: number }
+  /** The dot's pulse ring is an animation, so it follows the mirror's no-timer rule. */
+  pulse: boolean
   /** Routes on the canvas, selected one on top; tapping a grey one picks it. */
   routes: Route[] | null
   active: number
@@ -64,6 +66,7 @@ export function MapCanvas({
   onSelect,
   results,
   me,
+  pulse,
   routes,
   active,
   onRoute,
@@ -167,7 +170,8 @@ export function MapCanvas({
     }
     return false
   }
-  const zoom = (by: number) => flyTo({ ...view, z: clamp(Math.round(view.z) + by) })
+  // Steps stay fractional like the wheel's, so a plus from 15.7 lands on 16.7.
+  const zoom = (by: number) => flyTo({ ...view, z: clamp(view.z + by) })
   const stop = (e: PointerEvent) => e.stopPropagation()
   const dot = place(me.lat, me.lon)
   const ruler = scale(view.lat, view.z)
@@ -314,7 +318,7 @@ export function MapCanvas({
       {marks.map((p) => pin(p))}
       {pinless && sel && pin(sel)}
 
-      <span {...stylex.props(styles.mePulse, styles.at(dot.x, dot.y))} />
+      {pulse && <span {...stylex.props(styles.mePulse, styles.at(dot.x, dot.y))} />}
       <span {...stylex.props(styles.me, styles.at(dot.x, dot.y))} />
 
       <div {...stylex.props(styles.chrome, styles.pad(padX, padY))}>
