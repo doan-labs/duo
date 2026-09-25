@@ -1412,3 +1412,26 @@ The saved `dock` key means the finger arranged it, even when it saved an empty
 column; only a missing key falls back to the factory five. That asymmetry is what
 makes "dock down to zero" stick across reloads while a pre-change `os.home` still
 yields the factory dock untouched.
+
+## 89. Stocks quotes the market instead of inventing one
+
+2026-09-25. The Stocks app was the last fake feed on the phone: a seeded `walk()`
+that produced plausible numbers for every ticker, hardcoded rows, dead range pills
+and a Mockup pill to say so.
+
+Both copies now read a module-level store backed by three free public feeds, all
+CORS-open so no proxy or key exists: CNBC's quote service batches the watchlist
+plus the viewed symbol every 25s (price, delta, company name, market state and
+the extended-hours print, OHLCV and fundamentals into the stats grid), CNBC's
+Business RSS feeds the headline section every 15 minutes, stockanalysis.com
+serves the daily history that drives the chart and the row sparklines plus the
+symbol search that Follow works from, and Coinbase candles give crypto the true
+intraday series no free equity feed offers.
+
+Honesty over completeness, the same rule as decision 7: indexes quote and stat
+but say "Historical data is not available for index symbols." rather than draw a
+line, and equities carry no 1D range because no keyless intraday source exists.
+The watchlist and the viewed symbol persist in localStorage, `viewing` is
+decoupled from the list so a searched or unfollowed symbol still has a detail,
+and every fetch and timer is gated on `!os.mirror` so the second copy draws
+everything and starts nothing.
