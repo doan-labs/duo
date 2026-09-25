@@ -23,6 +23,8 @@ export type Cue = {
   /** Hold the paper, pick the next swatch along, put the sheet away. */
   wallpaper?: boolean
   screenshot?: boolean
+  /** Down from the top edge: Control Center, where the switches are. */
+  control?: boolean
   /** Fade the deck in from the middle of the song, muted only where the browser refuses sound without a gesture; a later cue without it fades the song out. */
   play?: boolean
 }
@@ -70,6 +72,7 @@ export function cue(c: Cue) {
   if (c.switcher) void switcher(my)
   if (c.folder) void folder(my)
   if (c.wallpaper) void wallpaper(my)
+  if (c.control) void control(my)
 }
 
 const ok = (my: number) => my === run
@@ -191,6 +194,17 @@ async function switcher(my: number) {
   f.down()
   await f.glide(0, -130 * p.s, 450, my)
   await wait(600)
+  if (ok(my)) release?.()
+}
+
+/** Down from the strip along the top of the inner display until the panel is out, then let go. */
+async function control(my: number) {
+  const p = await panel(my)
+  const pull = p?.os.querySelector('[data-cc-pull]')
+  if (!p || !pull) return
+  const f = finger(pull)
+  f.down()
+  await f.glide(0, p.os.clientHeight * 0.4 * p.s, 450, my)
   if (ok(my)) release?.()
 }
 

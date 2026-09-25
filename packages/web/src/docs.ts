@@ -25,7 +25,7 @@ export const groups = ['Start', 'Build', 'Ship'] as const
 
 const ORDER: Record<Doc['group'], string[]> = {
   Start: ['introduction', 'getting-started', 'your-first-app'],
-  Build: ['manifest', 'lifecycle', 'displays', 'storage', 'permissions'],
+  Build: ['manifest', 'lifecycle', 'displays', 'hardware', 'storage', 'permissions'],
   Ship: ['cli', 'catalogs', 'publishing']
 }
 

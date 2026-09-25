@@ -3,11 +3,11 @@
 // up, and a readout shows what `useDisplay()` hands the app in that state.
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { Line } from '../highlight'
+import { Field, LiveCode, Readout } from '../live-code'
 import { Segmented } from '../segmented'
 import { Simulator } from '../simulator'
-import { color, font } from '../tokens.stylex'
-import { Block, Cap, Columns, Headline, Lede } from './parts'
+import { color } from '../tokens.stylex'
+import { Block, Cap, Columns, Headline, Lede, TextLink } from './parts'
 
 const SMALL = '@media (max-width: 734px)'
 
@@ -55,29 +55,17 @@ export function Fold() {
               options={STATES.map((st) => ({ value: st.deg, label: st.name }))}
             />
 
-            <div {...stylex.props(styles.code)}>
-              <div {...stylex.props(styles.codeTitle)}>app.tsx</div>
-              <pre {...stylex.props(styles.pre)}>
-                {CODE.map((line, i) => (
-                  <div key={line || `blank-${i}`} {...stylex.props(styles.line, i === s.runs && styles.lineOn)}>
-                    <span {...stylex.props(styles.gutter)}>{i + 1}</span>
-                    <code {...stylex.props(styles.text)}>
-                      <Line code={line} />
-                    </code>
-                  </div>
-                ))}
-              </pre>
-            </div>
+            <LiveCode title="app.tsx" lines={CODE} on={s.runs} />
 
-            <dl {...stylex.props(styles.readout)} aria-live="polite">
+            <Readout>
               <Field k="display" v={`"${s.display}"`} />
               <Field k="angle" v={String(s.deg)} />
               <Field k="placement" v={'"full"'} />
               <Field k="width × height" v={s.size} />
-            </dl>
+            </Readout>
             <p {...stylex.props(styles.list)}>
               Apps hear about the display in use, their placement on it, its size and the hinge angle, every time one
-              changes. Nothing else; the fold is the API.
+              changes. The buttons and sensors are events too: <TextLink to="/sdk">press them live</TextLink>.
             </p>
           </div>
           <div {...stylex.props(styles.device)}>
@@ -89,99 +77,8 @@ export function Fold() {
   )
 }
 
-function Field({ k, v }: { k: string; v: string }) {
-  return (
-    <div {...stylex.props(styles.field)}>
-      <dt {...stylex.props(styles.key)}>{k}</dt>
-      <dd {...stylex.props(styles.val)}>{v}</dd>
-    </div>
-  )
-}
-
 const styles = stylex.create({
   scene: { marginTop: { default: '72px', [SMALL]: '48px' } },
-  code: {
-    marginTop: '24px',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: color.border,
-    borderRadius: '14px',
-    backgroundColor: color.surface,
-    overflow: 'hidden'
-  },
-  codeTitle: {
-    paddingTop: '10px',
-    paddingBottom: '10px',
-    paddingLeft: '18px',
-    paddingRight: '18px',
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: color.border,
-    fontFamily: font.mono,
-    fontSize: '11.5px',
-    letterSpacing: '0.04em',
-    color: color.text3
-  },
-  pre: {
-    margin: 0,
-    paddingTop: '14px',
-    paddingBottom: '14px',
-    fontFamily: font.mono,
-    fontSize: '13.5px',
-    lineHeight: 1.7,
-    color: color.text,
-    overflowX: 'auto'
-  },
-  line: {
-    display: 'flex',
-    gap: '16px',
-    paddingLeft: '14px',
-    paddingRight: '18px',
-    borderLeftWidth: '2px',
-    borderLeftStyle: 'solid',
-    borderLeftColor: 'transparent',
-    transitionProperty: 'background-color, border-color',
-    transitionDuration: '0.35s'
-  },
-  lineOn: { backgroundColor: color.accentSoft, borderLeftColor: color.accent },
-  gutter: {
-    flexShrink: 0,
-    width: '1.5ch',
-    textAlign: 'right',
-    color: color.text3,
-    userSelect: 'none'
-  },
-  text: { whiteSpace: 'pre', fontFamily: 'inherit' },
-  readout: {
-    margin: 0,
-    marginTop: '16px',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: '1px',
-    backgroundColor: color.border,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: color.border,
-    borderRadius: '14px',
-    overflow: 'hidden'
-  },
-  field: {
-    backgroundColor: color.bg,
-    paddingTop: '14px',
-    paddingBottom: '14px',
-    paddingLeft: '18px',
-    paddingRight: '18px'
-  },
-  key: { fontFamily: font.mono, fontSize: '11px', letterSpacing: '0.06em', color: color.text3 },
-  val: {
-    margin: 0,
-    marginTop: '6px',
-    fontFamily: font.mono,
-    fontSize: '15px',
-    color: color.text,
-    transitionProperty: 'color',
-    transitionDuration: '0.35s'
-  },
   list: {
     marginTop: '28px',
     marginBottom: 0,

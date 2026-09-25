@@ -1,9 +1,20 @@
 import { HOST_SDK } from './compat.ts'
-import { envelope, keyValid, mutating, PlatformError, valueValid, viewValid } from './guards.ts'
+import {
+  deviceEventName,
+  deviceEventValid,
+  envelope,
+  keyValid,
+  mutating,
+  PlatformError,
+  valueValid,
+  viewValid
+} from './guards.ts'
 import { record } from './manifest.ts'
 import type { Photo } from './permissions.ts'
 import {
   type Change,
+  type DeviceEvent,
+  type DeviceEvents,
   type Evt,
   type KV,
   LIMITS,
@@ -24,6 +35,9 @@ type Pending = {
   retries: number
 }
 type Command = { type: string; payload: string }
+type Listener = (e: unknown) => void
+/** Device events that are a state, not a moment: a new listener hears the current value first. */
+const STATES: DeviceEvent[] = ['orientation', 'switches']
 
 /** One client per app document; importing host-only types has no side effects. */
 export function createClient() {
@@ -41,6 +55,8 @@ export function createClient() {
   const watches = { storage: new Set<(c: Change) => void>(), session: new Set<(c: Change) => void>() }
   const commands = new Set<(c: Command) => Promise<void> | void>()
   const commandWaiters = new Map<string, { resolve: () => void; reject: (e: Error) => void }>()
+  const devices = new Map<DeviceEvent, Set<Listener>>()
+  const latest = new Map<DeviceEvent, unknown>()
   const executing = new Set<string>()
   const completed = new Set<string>()
   const subscribe = <T>(set: Set<T>, cb: T) => {
@@ -107,6 +123,28 @@ export function createClient() {
         }
       }
     }
+  }
+  function hear(type: DeviceEvent, data: unknown) {
+    const listeners = devices.get(type)
+    if (!listeners) return
+    if (STATES.includes(type)) latest.set(type, data)
+    for (const cb of listeners) cb(data)
+  }
+  /** Starts a device event on the host; a state's reply is its current value. */
+  function watch(type: DeviceEvent) {
+    const listeners = new Set<Listener>()
+    devices.set(type, listeners)
+    void client
+      .connect()
+      .then(() => request<unknown>('device.watch', { type }))
+      .then((now) => {
+        // An event that beat the reply is newer than the value the reply carries.
+        if (now === undefined || devices.get(type) !== listeners || latest.has(type)) return
+        if (!deviceEventValid(type, now)) return stop('E_PROTOCOL')
+        hear(type, now)
+      })
+      .catch(() => {})
+    return listeners
   }
   async function command(p: Extract<Evt, { ev: 'cmd' }>['p']) {
     const epoch = client.owner?.epoch
@@ -177,6 +215,11 @@ export function createClient() {
         )
           return stop('E_PROTOCOL')
         for (const cb of watches[event.p.space]) cb(event.p)
+        break
+      case 'device':
+        if (!record(event.p) || !deviceEventName(event.p.type) || !deviceEventValid(event.p.type, event.p.data))
+          return stop('E_PROTOCOL')
+        hear(event.p.type, event.p.data)
         break
       case 'command-result':
         if (!record(event.p) || typeof event.p.cmdId !== 'string') return stop('E_PROTOCOL')
@@ -307,6 +350,29 @@ export function createClient() {
       claim: () => request<void>('side.claim'),
       release: () => request<void>('side.release'),
       onDouble: (cb: () => void) => subscribe(sides, cb)
+    },
+    device: {
+      /**
+       * Hears the phone's hardware: `os.device.on('volume', (e) => …)`. Returns
+       * the unsubscribe. The first listener of a type starts it on the host and
+       * the last one to leave stops it, so a button is only taken from the
+       * system while something is listening for it.
+       */
+      on<K extends DeviceEvent>(type: K, cb: (e: DeviceEvents[K]) => void): () => void {
+        const listener = cb as Listener
+        const listeners = devices.get(type) ?? watch(type)
+        if (latest.has(type))
+          queueMicrotask(() => {
+            if (listeners.has(listener) && latest.has(type)) listener(latest.get(type))
+          })
+        listeners.add(listener)
+        return () => {
+          if (!listeners.delete(listener) || listeners.size || devices.get(type) !== listeners) return
+          devices.delete(type)
+          latest.delete(type)
+          void request('device.unwatch', { type }).catch(() => {})
+        }
+      }
     },
     photos: {
       list: () => request<Photo[]>('photos.list'),

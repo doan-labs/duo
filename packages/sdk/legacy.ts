@@ -1,4 +1,6 @@
 // Transitional host types for baked apps. Not the future sandbox bridge contract.
+import type { Switches } from './protocol.ts'
+
 /** What the Camera app publishes for Camera Control and the volume buttons. */
 export type CameraHooks = {
   shoot: () => void
@@ -26,26 +28,6 @@ export type Os = {
   mirror?: boolean
   /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */
   camera: { current: CameraHooks | null }
-}
-
-/**
- * The device switches Control Center and Settings both flip. One definition, so
- * the shell's store (springboard/toggles.ts) and the baked Settings app cannot
- * drift apart.
- */
-export type Switches = {
-  airplane: boolean
-  cell: boolean
-  wifi: boolean
-  bt: boolean
-  drop: boolean
-  hotspot: boolean
-  rotate: boolean
-  mirror: boolean
-  focus: boolean
-  torch: boolean
-  /** Dark Mode: light apps wear the kit's dark theme; always-dark apps are untouched. */
-  darkMode: boolean
 }
 
 /**

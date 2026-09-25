@@ -21,6 +21,7 @@ const sdk = api.filter((e) => e.pkg === '@doan-labs/duo-sdk' && !e.file.endsWith
 const GUIDES = [
   ['Lifecycle', 'Connect, render, ready. Requests, errors and limits.', 'lifecycle'],
   ['Displays and the fold', 'The view, two running copies, one owner, commands and widgets.', 'displays'],
+  ['Buttons and sensors', 'Volume, Camera Control, the side button, the pose and the switches, as events.', 'hardware'],
   ['Storage', 'Two revisioned key-value spaces and the React hook over them.', 'storage'],
   ['Permissions', 'The permission table, network origins and what the sandbox denies.', 'permissions'],
   ['Manifest', 'Every field, and what a built release adds.', 'manifest']
@@ -55,6 +56,7 @@ os.owner                                 // { epoch } in the view that runs effe
 os.commands.send('refresh', '')          // resolves when the owner acknowledged
 os.widget.set('small', { lines })        // owner only
 os.open('labs.doan.ipduo.maps', 'q=1')
+os.device.on('volume', (e) => ...)     // the frame's buttons, pose and switches
 
 import { useKV } from '@doan-labs/duo-sdk/react'
 const note = useKV(os.storage, 'note')   // { value, status, set, del }`}</Pre>

@@ -2,7 +2,7 @@
 
 The non-website platform is implemented and locally verified: independent apps install
 without rebuilding the simulator, run in opaque sandboxes, and respond visibly to the
-fold/display SDK. CLI authoring, isolated previews, explicit app updates and the UI-kit
+fold/display SDK and its device events. CLI authoring, isolated previews, explicit app updates and the UI-kit
 harvest are also implemented. SDK/CLI 0.0.0 and kit 0.1.0 are private local previews.
 
 Start with [the local review guide](review.md) to build and install an external app.
