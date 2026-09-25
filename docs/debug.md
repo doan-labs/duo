@@ -55,6 +55,7 @@ StyleX classes are unstable; use shell data attributes:
 | Split | data-drop=left/right/none |
 | Home grid | data-tile; data-cell=left:i/right:i; data-folder, data-folder-well while a folder is open; data-wallpapers, data-paper, data-on for the sheet; `localStorage['os.home']`, `['os.wallpaper']` |
 | Sandbox | data-view/session/generation/state/owner; select frames by data-view, never frame-list order |
+| Notifications | data-banner while a banner is up; data-notice=<id> on every card; data-notices on the lock-screen list |
 
 ```js
 const st = () => page.evaluate(() => ({

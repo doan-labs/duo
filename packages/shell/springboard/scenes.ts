@@ -14,6 +14,7 @@ import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
 import { device, type Stage } from '../device.ts'
 import { store } from '../runtime/catalog.ts'
+import { deliverArg } from '../runtime/sessions.ts'
 import { type Box, type Side, settle, spot, zone, zoom } from './gestures.ts'
 import type { Open } from './tile.tsx'
 import { flip } from './toggles.ts'
@@ -98,7 +99,11 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (on.some((e) => e.side === side)) return
     // Already parked: the app comes back as it was, not as a second copy.
     const kept = live.current.find((e) => e.parked && !e.leaving && same(e, a))
-    if (kept) return unpark(kept.id, side)
+    if (kept) {
+      // A deep link into a parked app (a notification tap) still reaches it.
+      if (a.id && arg !== undefined) void deliverArg(a.id, arg)
+      return unpark(kept.id, side)
+    }
     const z = box(side)
     from ??= { x: z.x + z.w / 2 - 30, y: z.y + z.h / 2 - 30, w: 60, h: 60 }
     const id = ++seq
@@ -186,7 +191,12 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (device.asleep) device.wake()
     const a = byName(name)
     const on = onStage()
-    if (!a || on.some((e) => same(e, a))) return
+    if (!a) return
+    if (on.some((e) => same(e, a))) {
+      // Already on stage: the deep link still reaches it, the scene stays put.
+      if (a.id && arg !== undefined) void deliverArg(a.id, arg)
+      return
+    }
     // Into the free half if there is one; otherwise in place of the app under
     // the status stack, the one iOS would call frontmost.
     const victim = on.find((e) => !e.side) ?? (on.length === 2 ? on.find((e) => e.side === 'right') : undefined)
