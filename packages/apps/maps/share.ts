@@ -10,11 +10,13 @@ import type { Route, TravelMode } from './live.ts'
 
 export type Dir = { to: Place; mode: TravelMode; active: number }
 
-/** The last route answer, keyed by the request that asked for it: `${mode}|${origin}|${to}`. */
-export type RoutesRec = { key: string; list: Route[] | null; failed: boolean }
+/** The last route answer, keyed by the request that asked for it: `${mode}|${origin}|${to}`.
+ * `tries` bounds retries: a transient failure asks again once, then stops. */
+export type RoutesRec = { key: string; list: Route[] | null; failed: boolean; tries: number }
 
-/** The last search answer, keyed by the query that asked for it. */
-export type ResultsRec = { q: string; list: Place[]; failed: boolean }
+/** The last search answer, keyed by the query plus a coarse camera bucket -
+ * Photon's bias follows the map at city scale, and so does the refresh. */
+export type ResultsRec = { key: string; q: string; list: Place[]; failed: boolean; tries: number }
 
 /** The card's drive-time answer for one selection, keyed like a route request. */
 export type EstRec = { key: string; duration: number; distance: number }
@@ -33,6 +35,8 @@ export type MapState = {
   // animate applies the writes flat.
   view: View
   kind: MapKind
+  // The directions scroll offset, so the folded copy opens on the same turn.
+  scroll: number
 }
 
 let state: MapState = {
@@ -40,12 +44,13 @@ let state: MapState = {
   results: null,
   sel: null,
   dir: null,
-  routes: { key: '', list: null, failed: false },
+  routes: { key: '', list: null, failed: false, tries: 0 },
   estimate: null,
   me: ME,
   recents: null,
   view: HOME,
-  kind: 'explore'
+  kind: 'explore',
+  scroll: 0
 }
 const subs = new Set<() => void>()
 

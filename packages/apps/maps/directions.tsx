@@ -1,5 +1,6 @@
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
+import { useEffect, useRef } from 'react'
 import type { Place } from './data.ts'
 import { Glyph, type GlyphName } from './glyphs.tsx'
 import { arrival, formatLength, formatMin, MODE_LABEL, type Route, type TravelMode } from './live.ts'
@@ -19,11 +20,53 @@ type Props = {
   /** Fetch failed or the engine found no road there. */
   error: boolean
   onEnd: () => void
+  /** Only the copy on the visible display writes the shared offset. */
+  track: boolean
+  scroll: number
+  onScrolled: (n: number) => void
 }
 
 /** The directions panel: modes, the ways there with times, and the turns of the chosen one. */
-export function Directions({ to, origin, mode, onMode, routes, active, onPick, error, onEnd }: Props) {
+export function Directions({
+  to,
+  origin,
+  mode,
+  onMode,
+  routes,
+  active,
+  onPick,
+  error,
+  onEnd,
+  track,
+  scroll,
+  onScrolled
+}: Props) {
   const chosen = routes?.[active]
+  const list = useRef<HTMLDivElement>(null)
+  const deb = useRef<number | null>(null)
+  const at = useRef(scroll)
+  at.current = scroll
+
+  // Becoming the live display lands the steps where the shared offset says;
+  // a new destination, mode or route remounts the scroller at the top instead.
+  useEffect(() => {
+    if (track && list.current) list.current.scrollTop = at.current
+  }, [track])
+
+  useEffect(
+    () => () => {
+      if (deb.current !== null) window.clearTimeout(deb.current)
+    },
+    []
+  )
+
+  const scrolled = () => {
+    if (!track || !list.current) return
+    const el = list.current
+    if (deb.current !== null) window.clearTimeout(deb.current)
+    deb.current = window.setTimeout(() => onScrolled(el.scrollTop), 140)
+  }
+
   return (
     <>
       <div {...stylex.props(styles.dirTop)}>
@@ -50,7 +93,7 @@ export function Directions({ to, origin, mode, onMode, routes, active, onPick, e
         ))}
       </div>
 
-      <div {...stylex.props(styles.scroll)}>
+      <div key={`${to.id}:${mode}:${active}`} ref={list} onScroll={scrolled} {...stylex.props(styles.scroll)}>
         <div {...stylex.props(styles.ends)}>
           <div {...stylex.props(styles.endRow)}>
             <span {...stylex.props(styles.endDot)} />
