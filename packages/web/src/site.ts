@@ -11,7 +11,7 @@ export const CATALOG = 'https://duo.doan-labs.com/catalog/index.json'
 /**
  * The global bar. `Try Duo` is the call to action and lives in the bar's right
  * group. `icon` is a 16 × 16 stroke path in the manner of SF Symbols: a grid of
- * apps, stacked components, a page, a phone.
+ * apps, stacked components, a chip, a page, a phone.
  */
 export const NAV = [
   {
@@ -20,6 +20,11 @@ export const NAV = [
     icon: 'M2.5 2.5h4.25v4.25H2.5zM9.25 2.5h4.25v4.25H9.25zM2.5 9.25h4.25v4.25H2.5zM9.25 9.25h4.25v4.25H9.25z'
   },
   { to: '/kit', label: 'UI kit', icon: 'M2.5 2.5h8v8h-8zM5.5 5.5h8v8h-8' },
+  {
+    to: '/sdk',
+    label: 'SDK',
+    icon: 'M4 4h8v8H4zM6.25 1.75V4M9.75 1.75V4M6.25 12v2.25M9.75 12v2.25M1.75 6.25H4M1.75 9.75H4M12 6.25h2.25M12 9.75h2.25'
+  },
   { to: '/docs', label: 'Docs', icon: 'M4 1.75h5.5L13 5.25v9H4zM9.5 1.75v3.5H13M6.25 8.5h3.5M6.25 11h3.5' },
   {
     to: '/simulator',

@@ -304,10 +304,16 @@ bun run api            # only the TSDoc reference
   `split` drags it onto the left half by synthetic pointer events and opens the
   named app beside it, `switcher` holds the home bar and lets go, `folder` resets
   the grid and carries Find My onto Stocks, `wallpaper` holds the paper and taps
-  the next swatch, `screenshot`, `play` starts the deck muted). The shell
+  the next swatch, `screenshot`, `play` starts the deck muted, `control` pulls
+  Control Center down on the inner display). `hear: [...types]` asks to be told
+  the device events an app would hear (`packages/shell/embed-device.ts`), each
+  posted back to the asking origin as `{ device: { type, data } }`; the page
+  listens as a visible, active view, so while it hears volume or Camera Control
+  those presses are its, and `hear: []` stops. The shell
   also accepts a localhost parent on another port, so `vite dev` on 3001 can
   drive the root dev server on 3000; anything else must be the same origin. `src/simulator.tsx` posts the body colour and
-  its `deg`, `yaw`, `app` and `cue` props, and never puts a live pose in the
+  its `deg`, `yaw`, `app`, `cue` and `hear` props (re-sent on every load, so a
+  message lost to the frame's blank first document is not lost for good), and never puts a live pose in the
   frame URL: a `src` change reloads the whole scene. After changing
   the bridge, rebuild the copy with `bun scripts/simulator.ts`. That script also
   copies `/model`, `/icons`, `/cdn` and `/preinstalled` to the site root: the

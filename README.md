@@ -110,7 +110,9 @@ packages/
     src/kit/        the /kit hero: every demo drifting past live, over the counts in data.ts
     src/kit-demos/  one live demo per UI kit component, rendered on /kit and shown as source on /kit/docs/<name>
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
-    src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
+    src/hardware/   the /sdk page: each device event beside one live phone, and the pose dial
+    src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge, and told its device events
+    src/live-code.tsx  a code sample whose running line lights up, and its readout
     src/segmented.tsx  the sliding-thumb group button, shared by every filter and tab strip
     src/side-nav.tsx  the docs sidebar: sliding hover and active indicators, a disclosure when narrow
     src/motion.ts   the shared easing curve, springs and press scale

@@ -1582,3 +1582,25 @@ privacy one: a released SDK closes its connection on an event type it does
 not know, so a type the host sends unasked would break every app built
 before it. Haptics and battery were left out. The simulator has nothing to
 vibrate, and its charge is a constant.
+
+## 96. The /sdk page hears the real shell, as an app would
+
+`/sdk` stops forwarding to `/docs/sdk` and becomes the showcase for decision
+95, with an SDK item in the global bar. Each device event type is one chapter
+beside one sticky phone: the sample code, the sample's own variables and the
+last payloads. The chapter in the middle of the screen poses the phone so its
+buttons face the reader.
+
+Every number on the page comes from the shell. The embed bridge gained
+`{ hear: [...types] }`, answered with `{ device: { type, data } }` to the
+origin that asked, and `packages/shell/embed-device.ts` builds it from the same
+`deviceEvents` a sandboxed view uses, as a view that is always visible and
+active. So the page takes volume and Camera Control presses exactly as a
+listening app would, and the side button still sleeps the phone. A page-side
+simulation was rejected: it would show what we meant the events to be, not
+what the shell sends. A `control` cue pulls Control Center down, because the
+switches are read-only and the reader has to flip them in the phone.
+
+Only one frame renders, for the WebGL budget decision 76 set, and the page
+never hears anything until it asks, as with apps.
+

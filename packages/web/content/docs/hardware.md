@@ -13,6 +13,8 @@ const stop = os.device.on('volume', (e) => {
 stop()
 ```
 
+[Press them live](/sdk): the phone on that page is the real shell, and every readout is what it told a listening app.
+
 No manifest entry is needed. Nothing crosses the bridge until something listens, and the shell stops sending a type once its last listener has stopped.
 
 ## Events

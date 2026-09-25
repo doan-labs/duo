@@ -8,7 +8,10 @@ import { type Heard, listen, orientation, watchOrientation } from '../device.ts'
 import { subscribeToggles, toggles } from '../springboard/toggles.ts'
 import type { SessionView } from './sessions.ts'
 
-export function deviceEvents(view: SessionView) {
+/** A view's side of it, or the embedding page's in packages/shell/main.ts, which hears as an always-active view. */
+type Hearer = { readonly info: Pick<SessionView['info'], 'visible' | 'active'>; send: SessionView['send'] }
+
+export function deviceEvents(view: Hearer) {
   const live = new Map<DeviceEvent, () => void>()
   const send = <K extends DeviceEvent>(type: K, data: DeviceEvents[K]) =>
     view.send({ ev: 'device', p: { type, data } } as Evt)

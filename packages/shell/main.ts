@@ -8,6 +8,7 @@ import { buttons } from './buttons.ts'
 import { type Cue, cancel, cue } from './cues.ts'
 import { booted, busy, device, follow, goHome, lockState, setPose, unlockAll } from './device.ts'
 import { press } from './device-buttons.ts'
+import { hear } from './embed-device.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
 import { os } from './os.tsx'
@@ -46,7 +47,8 @@ document.documentElement.classList.toggle('web', !isDesktop)
 startBuilderPreview()
 
 // An embedding page drives the backdrop, the pose and what the phone is doing: `?bg=` at
-// load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage (cues in cues.ts).
+// load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage (cues in cues.ts),
+// and `{ hear }` to be told the hardware events an app would hear (embed-device.ts).
 // Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
 type Pose = {
@@ -58,6 +60,7 @@ type Pose = {
   arg?: string
   cue?: Cue
   hello?: boolean
+  hear?: unknown[]
 }
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
@@ -78,13 +81,19 @@ const local = (o: string) => location.hostname === 'localhost' && new URL(o).hos
 let shown = false
 addEventListener('message', (e: MessageEvent<Pose>) => {
   if (e.source !== parent || typeof e.data !== 'object' || !e.data) return
-  if (e.origin !== location.origin && !local(e.origin)) return
+  if (e.origin !== location.origin && !local(e.origin)) {
+    console.warn(
+      `[duo] embed message from ${e.origin} ignored: only ${location.origin} or a localhost page may drive the shell`
+    )
+    return
+  }
   // `hello` is the page saying it is listening now. Both announcements below can
   // land before an embedding page has hydrated, which would leave the frame
   // hidden for good, so the state is repeated on request.
   if (e.data.hello) announce(shown ? { ready: true } : { live: true })
   if (typeof e.data.bg === 'string') paint(e.data.bg)
   if (typeof e.data.paused === 'boolean') paused = e.data.paused
+  if (Array.isArray(e.data.hear)) hear(e.data.hear, e.origin)
   if (pose) pose(e.data)
   else queued = { ...queued, ...e.data }
 })

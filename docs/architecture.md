@@ -15,6 +15,7 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 | `view.ts` | The persisted view preference (`os.view`): hinge angle, yaw, camera orbit/zoom and auto-rotate, restored at load and written on gestures only |
 | `buttons.ts` → `device-buttons.ts` → `device.ts` | Hardware hit boxes/springs/keys → press interpretation → device actions, display registry, app button listeners and the pose; device.ts has no React/StyleX |
 | `runtime/device-events.ts` | One sandboxed view's watched device events: button listeners, pose and switch subscriptions |
+| `embed-device.ts` | The embedding page's device events: the same `deviceEvents` as an always-active view, posted to the page that asked (the site's `/sdk`) |
 | `os.tsx` | Create each display root and mount SpringBoard |
 | `springboard/springboard.tsx` | Layer stack and state that outlives individual layers |
 | `springboard/scenes.ts` | Per-display apps, split placement and mirrored scenes |
