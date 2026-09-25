@@ -11,10 +11,30 @@ export const RINGS: [string, string, number, number, string][] = [
 ]
 
 /**
+ * The ring hues, one per ring id. They live here rather than in each app so
+ * Health's Activity card and Fitness's hero can never drift apart.
+ */
+export const RING_TINTS = {
+  move: appAppearance.fitnessMove,
+  exercise: appAppearance.fitnessExercise,
+  stand: appAppearance.fitnessStand
+}
+
+/**
  * The three activity rings. They mount empty and fill on the next two frames —
  * a ring drawn straight at its value reads as a diagram, not as today's total.
+ * `values` is `[label, colour, done, goal, unit][]` — omit it for the kit's
+ * own sample so a caller that draws real totals (Health, Fitness) can.
  */
-export function Rings({ size = 160, stroke = 15 }: { size?: number; stroke?: number }) {
+export function Rings({
+  size = 160,
+  stroke = 15,
+  values = RINGS
+}: {
+  size?: number
+  stroke?: number
+  values?: [string, string, number, number, string][]
+}) {
   const [filled, setFilled] = useState(false)
   useEffect(() => {
     let raf = requestAnimationFrame(() => {
@@ -25,7 +45,7 @@ export function Rings({ size = 160, stroke = 15 }: { size?: number; stroke?: num
   return (
     <div {...stylex.props(styles.rings)}>
       <svg viewBox={`0 0 ${size} ${size}`} aria-hidden="true" {...stylex.props(styles.svg, styles.square(size))}>
-        {RINGS.map(([label, c, done, goal], i) => {
+        {values.map(([label, c, done, goal], i) => {
           const r = size / 2 - stroke / 2 - i * (stroke + 2)
           const C = 2 * Math.PI * r
           const to = C * Math.max(0, 1 - done / goal)

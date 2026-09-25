@@ -34,7 +34,7 @@
     },
     {
       "name": "Sheet",
-      "description": "The backdrop's own fade. StyleX resolves keyframes per file, so it cannot come from styles.ts.",
+      "description": "The scrim's own fade. StyleX resolves keyframes per file, so it cannot come from styles.ts.",
       "props": "type SheetProps = Omit<PrimitiveProps<'dialog'>, 'as' | 'open' | 'onClose'> & {\n  open: boolean\n  onClose: () => void\n}",
       "source": "packages/uikit/sheet.tsx"
     },

@@ -77,6 +77,13 @@ const RotateLock = () => (
     <path d="M10.4 11V9.6a1.6 1.6 0 0 1 3.2 0V11" strokeWidth={1.5} />
   </svg>
 )
+// circle.lefthalf.filled: the left half lit, the right dark.
+const DarkMode = () => (
+  <svg viewBox="0 0 24 24" width={26} height={26} {...stroke} strokeWidth={1.9}>
+    <path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="8.5" />
+  </svg>
+)
 const Flashlight = ({ on }: { on: boolean }) => (
   <svg viewBox="0 0 24 24" width={24} height={24} {...stroke} strokeWidth={1.8} fill={on ? 'currentColor' : 'none'}>
     <path d="M8 2.5h8v3.2L13.8 9.4V21a1.8 1.8 0 0 1-3.6 0V9.4L8 5.7z" />
@@ -415,6 +422,14 @@ export function ControlCenter({
       el: (
         <div {...stylex.props(styles.tile, t.mirror && styles.lit)} onClick={() => flip('mirror')}>
           <Sym name="tabs" size={24} />
+        </div>
+      )
+    },
+    {
+      id: 'dark',
+      el: (
+        <div {...stylex.props(styles.tile, t.darkMode && styles.lit)} onClick={() => flip('darkMode')}>
+          <DarkMode />
         </div>
       )
     },
