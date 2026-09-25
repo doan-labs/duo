@@ -181,6 +181,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tic-tac-toe",
       "releases": [
         {
+          "release": "1.1.0+82bf1ef2",
+          "sdk": "0.0.0",
+          "bytes": 514127,
+          "sha256": "7a879557bc850cd878a6af7c5bfbd01306c811c53010ae9ef2be444f87ee793e"
+        },
+        {
           "release": "1.0.1+a83a158a",
           "sdk": "0.0.0",
           "bytes": 258634,
