@@ -1,12 +1,13 @@
 {
   "id": "labs.doan.ipduo.reminders",
   "name": "Reminders",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "lane": "official",
   "entry": "./main.tsx",
   "icon": "./icon.png",
   "light": true,
   "author": "Doan Labs",
   "repo": "https://github.com/doan-labs/duo",
-  "license": "MIT"
+  "license": "MIT",
+  "permissions": ["clipboard-write"]
 }

@@ -57,6 +57,15 @@ export function DestPage({ dest, wide }: { dest: string; wide: boolean }) {
     }
   ]
 
+  // The system share sheet cannot reach a backend from here, so the list goes
+  // as text: its name over one line per reminder, open items then done.
+  const share = () => {
+    const open = groups.flatMap((g) => g.items.filter((r) => !r.done).map((r) => `- ${r.t}`))
+    const done = groups.flatMap((g) => g.items.filter((r) => r.done).map((r) => `- ${r.t} (done)`))
+    const text = [name, '', ...open, ...done].join('\n')
+    void (navigator.share?.({ title: name, text }) ?? navigator.clipboard?.writeText(text))
+  }
+
   return (
     <>
       <div {...stylex.props(styles.head)}>
@@ -76,7 +85,7 @@ export function DestPage({ dest, wide }: { dest: string; wide: boolean }) {
           </button>
         )}
         <span {...stylex.props(styles.headSide)}>
-          <button type="button" aria-label="Share list" {...stylex.props(styles.headBtn, shared.press)}>
+          <button type="button" aria-label="Share list" onClick={share} {...stylex.props(styles.headBtn, shared.press)}>
             <Sym name="share" size={19} />
           </button>
           <span {...stylex.props(styles.toolWrap)}>

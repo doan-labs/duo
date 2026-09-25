@@ -81,11 +81,29 @@ export function Nav({ children }: { children: ReactNode }) {
  */
 export function Push({ open, sheet, children }: { open: boolean; sheet: ReactNode; children: ReactNode }) {
   const { mounted, closing } = usePresence(open, 380)
+  // Born with the sheet already up, the way a fold mounts the cover's copy of an
+  // app mid-path (decisions.md 24): the slide-in has nothing to add to a mount
+  // that restores state, and a keyframe suspended mid-flight on a display the
+  // eye cannot see leaves the sheet stuck over the edge as a blurred sliver.
+  // It rests there until the path drops it; the next push slides as usual.
+  const cold = useRef(open)
+  useEffect(() => {
+    if (!mounted) cold.current = false
+  }, [mounted])
   return (
     <div {...stylex.props(styles.nav)}>
       <div {...stylex.props(styles.pg, open && styles.under)}>{children}</div>
       {mounted && (
-        <div {...stylex.props(styles.pg, styles.shadow, animations.sheet, closing && animations.sheetOut)}>{sheet}</div>
+        <div
+          {...stylex.props(
+            styles.pg,
+            styles.shadow,
+            !cold.current && animations.sheet,
+            closing && !cold.current && animations.sheetOut
+          )}
+        >
+          {sheet}
+        </div>
       )}
     </div>
   )
