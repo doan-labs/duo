@@ -195,7 +195,8 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
    * `want` with no zoom in or out, since nothing is being launched or closed
    * here — the fold is showing the same session on another piece of glass.
    */
-  const mirror = (want: Stage) => {
+  const mirror = (want: Stage, ratio?: number) => {
+    if (ratio !== undefined && ratio !== splitRef.current) setRatio(ratio)
     const on = onStage()
     if (
       on.length === want.length &&
@@ -256,6 +257,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     launch,
     stage,
     mirror,
+    ratio: () => splitRef.current,
     cam
   }
 }

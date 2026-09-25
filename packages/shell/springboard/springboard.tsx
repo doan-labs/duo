@@ -44,9 +44,17 @@ import { Flash, Thumbs, TorchHud, useScreenshot, useVolumeHud, Veil, VolumeHud }
 import { useToggles } from './toggles.ts'
 import { useWallpaper } from './wallpaper.ts'
 
-export type SpringBoardProps = { w: number; hgt: number; boot?: string | null; arg?: string | null; shots: string[] }
+export type SpringBoardProps = {
+  w: number
+  hgt: number
+  boot?: string | null
+  arg?: string | null
+  shots: string[]
+  /** The inner display's folded-half copy (device.ts `Display.fold`). */
+  fold?: boolean
+}
 
-export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
+export function SpringBoard({ w, hgt, boot, arg, shots, fold }: SpringBoardProps) {
   // Folded, the cover display shows the left half of both the grid and the
   // wallpaper, so the picture does not jump when the hinge closes.
   const wide = w > 600
@@ -256,10 +264,12 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   useEffect(() => {
     const d: Display = {
       wide,
+      fold,
       dark: setAsleep,
       launch,
       stage: ctl.stage,
       mirror: ctl.mirror,
+      split: ctl.ratio,
       covered: ctl.covered,
       cam: ctl.cam,
       hud,

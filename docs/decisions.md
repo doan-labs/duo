@@ -1595,3 +1595,27 @@ nothing, which matches hardware whose surface faces away; `viewInfo.clip`
 reports 0.5 there, so a `left`-placed scene correctly reads as hidden; and a
 settled bend just under the threshold keeps a fully live, essentially flat
 panel.
+
+## 97. The folded half is a live copy of the inner display
+
+2026-09-25. Amends 96. The settled hinge clip left the folded half to the projected
+bake, which drew the wrong picture twice over: the fixed-eye projection windows the flat
+image instead of wrapping it, so the half nearer the camera outgrew it and showed black
+wedges, and with an app up the bake is black altogether. The folded half read as a dead
+panel, not the same screen bent round the fold.
+
+A DOM panel cannot bend, so the folded half gets its own. `main.ts` builds a third OS
+root (`os(..., fold)`, `data-os=fold`) as a CSS3D panel on the hinge group, where the
+cover rides, clipped to its left half plus a pixel. The hinge axis is 0.26 mm behind the
+glass, so it meets the original's hinge clip within a few px at any angle. It shows only
+where decision 96 clips the original at the hinge - resting, past ~15 deg, facing the
+camera - and fades in with the same `foldMotion`. `Display.fold` keeps it out of the lead
+and the frame buttons; `follow()` mirrors the inner display's stage and split onto it
+every frame, lock and sleep reach it like any display, and the root is `inert`. While the
+hinge moves nothing changes: 95's bake and ramps still carry the fold.
+
+Costs: a third React root is always mounted and every open app runs a third view - a
+sandboxed iframe loads again and `os.mirror` keeps it silent; scroll, the home page,
+Control Center, the switcher and Spotlight are local to the original, so the folded half
+can disagree with the live one after they change; the folded half still takes no input;
+probes must scope to `[data-os="wide"]`.

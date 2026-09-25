@@ -393,10 +393,10 @@ const px = (cm: number) => Math.round(cm / PXCM)
 // A deep link into an app lands past the lock screen; `?arg=` reaches the app as `os.arg`.
 const deep = new URLSearchParams(location.search)
 lockState.locked = !deep.get('app')
-function live(w: number, h: number) {
+function live(w: number, h: number, fold = false) {
   // Pre-attach hidden roots to the renderer's camera layer: moving a live iframe reloads its document.
   const container = css.domElement.firstElementChild!.firstElementChild as HTMLElement
-  const o = new CSS3DObject(os(w, h, container, deep.get('app'), deep.get('arg')))
+  const o = new CSS3DObject(os(w, h, container, fold ? null : deep.get('app'), deep.get('arg'), fold))
   o.scale.setScalar(PXCM)
   return o
 }
@@ -411,6 +411,16 @@ const outerLive = live(px(7.73936), px(11.2513))
 outerLive.position.set(-0.23396 - 7.73936 / 2, 0.27173 - 5.8974 + 11.2513 / 2, OUTER_Z - HINGE_Z - 0.005)
 outerLive.rotation.y = Math.PI
 hinge.add(outerLive)
+// A DOM panel cannot bend, so a resting fold gets a second inner panel riding
+// the moving half: an inert copy of the inner display (device.ts `Display.fold`),
+// clipped to the half that folded while the original keeps the half that did
+// not. The hinge axis is 0.26 mm behind the glass, so the two meet within a
+// few px at any angle (decisions.md 97).
+const foldLive = live(px(INNER.z), px(INNER.w), true)
+foldLive.position.set(INNER.x + INNER.z / 2, INNER.y + INNER.w / 2, INNER_Z - HINGE_Z + 0.005)
+// A pixel past the hinge: two clip edges that meet exactly leave a hairline of the bake between them.
+foldLive.element.style.clipPath = 'inset(0 calc(50% - 1px) 0 0)'
+hinge.add(foldLive)
 
 // The bands around the phone, in pixels: it hangs centred in what they leave.
 // Everything outside it is transparent desktop the window blocks for nothing, so
@@ -815,13 +825,17 @@ renderer.setAnimationLoop((now) => {
   // The clip keeps the inner panel inside glass that is still flat. While the
   // hinge moves the fold only takes `foldClip` of it, but a settled panel laid
   // flat across the fold would hide the bent surface under a straight edge -
-  // so past a shallow bend it is clipped at the hinge, and the half the fold
-  // took shows the bake: the same picture, wrapped around the curve. Near
+  // so past a shallow bend it is clipped at the hinge, and `foldLive` takes the
+  // half the fold took: the same picture on the moving half's glass. Near
   // flat the fold is too shallow to lift the surface out from under the
   // panel, which keeps the whole display live (decisions.md 96).
-  const clip = Math.max(foldClip(), bend.value > Math.PI / 12 ? 0.5 * (1 - foldMotion.value) : 0)
+  const bent = bend.value > Math.PI / 12
+  const clip = Math.max(foldClip(), bent ? 0.5 * (1 - foldMotion.value) : 0)
   innerLive.visible = facing(innerLive) && (angle > FLAT || app || (!folding && clip < 1))
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
+  // The folded half, live, in step with the clip that hands it over.
+  foldLive.visible = innerLive.visible && bent && foldMotion.value < 1 && facing(foldLive)
+  foldLive.element.style.opacity = (1 - foldMotion.value).toFixed(3)
   updateDisplays(
     { visible: innerLive.visible && !device.asleep, active: angle > 40, angle, clip },
     {
