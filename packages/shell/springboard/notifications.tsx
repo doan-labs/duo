@@ -22,7 +22,7 @@ import {
   weight
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { byName } from '../apps.ts'
 import {
   clearAllNotices,
@@ -54,7 +54,7 @@ const ago = (at: number, now: number) => {
   return `${Math.floor(h / 24)}d ago`
 }
 
-/** One glass card: app, title, body — the unit a banner and the list share. */
+/** One glass card: app, title, body - the unit a banner and the list share. */
 export function NoticeCard({ notice: n, onOpen, now }: { notice: Posted; onOpen: Open; now: number }) {
   const src = icon(n)
   return (
@@ -90,8 +90,11 @@ export function NoticeBanner({ onOpen }: { onOpen: Open }) {
   const latest = list[0]
   const [live, setLive] = useState<Posted | null>(null)
   const [leaving, setLeaving] = useState(false)
+  // A notice banners once: clearing the newest must not re-drop the one under it.
+  const shown = useRef(new Set<string>())
   useEffect(() => {
-    if (!latest || Date.now() - latest.at > SHOW) return
+    if (!latest || shown.current.has(latest.id) || Date.now() - latest.at > SHOW) return
+    shown.current.add(latest.id)
     setLive(latest)
     setLeaving(false)
     const away = setTimeout(() => setLeaving(true), SHOW)

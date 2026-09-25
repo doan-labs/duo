@@ -178,7 +178,8 @@ export function launchFrame(
     // invokes it, and an E_STALE would silently drop a notice the user caused.
     if (req.m === 'notify.post') return { value: postNotice(session.app.id, session.bundle.release.manifest.name, p) }
     if (req.m === 'notify.clear') {
-      clearNotices(session.app.id, typeof p.id === 'string' ? p.id : undefined)
+      if (p.id !== undefined && typeof p.id !== 'string') throw new PlatformError('E_ARGS')
+      clearNotices(session.app.id, p.id as string | undefined)
       return {}
     }
     throw new PlatformError('E_ARGS')
