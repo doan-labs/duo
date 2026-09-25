@@ -18,6 +18,3 @@ export function useMedia(query: string): boolean {
     () => false
   )
 }
-
-/** Under 734 px: the kit strip drops its second run and becomes a scroller the visitor pushes. */
-export const useNarrow = () => useMedia('(max-width: 734px)')
