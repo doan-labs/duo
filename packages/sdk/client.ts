@@ -82,12 +82,15 @@ export function createClient() {
     const req: Req = { id: ++seq, m, p, epoch: client.owner?.epoch }
     if (!envelope(req) || pending.size >= LIMITS.inflight) return Promise.reject(new PlatformError('E_ARGS'))
     return new Promise<T>((resolve, reject) => {
+      // Reads go through the shell's serialized IDB queue and can sit behind slow
+      // writes; mutating calls repost once early instead of waiting that whole window.
+      const first = mutating(m) ? 5000 : 15000
       const timeout = () => {
         const entry = pending.get(req.id)
         if (!entry) return
         if (mutating(m) && entry.retries++ === 0) {
           port?.postMessage(req)
-          entry.timer = setTimeout(timeout, 5000)
+          entry.timer = setTimeout(timeout, 10000)
         } else {
           pending.delete(req.id)
           reject(new PlatformError('E_TIMEOUT', 'Timed out; read back before retrying with a new request.'))
@@ -98,7 +101,7 @@ export function createClient() {
         resolve: (v) => resolve(v as T),
         reject,
         retries: 0,
-        timer: setTimeout(timeout, 5000)
+        timer: setTimeout(timeout, first)
       })
       port!.postMessage(req)
     })

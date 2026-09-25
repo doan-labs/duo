@@ -44,11 +44,19 @@ async function freshLeases(tx: IDBTransaction, id: string) {
   return leases.some(([, value]) => value.views > 0 && Date.now() - value.heartbeat < 30000)
 }
 let timer: ReturnType<typeof setInterval> | undefined
+let reconciling = false
 export function startLifecycle() {
   if (timer) return
   timer = setInterval(() => {
     for (const [id, value] of sessions) void lease(id, value.generation, value.views).catch(() => broadcast({ id }))
-    void reconcile().catch(() => {})
+    // A cycle slower than the interval would pile appLock waiters up unboundedly.
+    if (reconciling) return
+    reconciling = true
+    void reconcile()
+      .catch(() => {})
+      .finally(() => {
+        reconciling = false
+      })
   }, 10000)
   addEventListener('pagehide', () => {
     for (const id of sessions.keys())

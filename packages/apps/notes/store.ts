@@ -1,44 +1,217 @@
+// App state, the sandboxed way: notes, folders and documents live in
+// `os.storage`, the chrome (path, search, sort, view) in `os.session` so both
+// displays draw the same page. Written values carry the derived bits - title
+// and tags on the index entry - so nothing else has to open a doc.
+
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
-import type { Folder, Note } from './data.ts'
+import { useEffect, useMemo } from 'react'
+import { type Doc, type Folder, type Note, parse, type Sort, serialize, tagsOf, titleOf, uid } from './data.ts'
 
-/** The list itself, newest first, as one JSON key so both displays agree on it. */
+/**
+ * Collection keys are read-modify-write: a value computed before the first
+ * hydrate lands (or while a failed save leaves the key in 'error') still
+ * reflects stale storage, and writing it back would replace every stored row.
+ * Writers therefore hand over a transform that runs against fresh state; while
+ * the key has no real read yet the transform waits in a queue shared by every
+ * mounted reader, and a flush folds the whole queue over one accumulator and
+ * writes once, so queued changes can never overwrite each other.
+ */
+const queues = new Map<string, ((current: unknown) => unknown)[]>()
+
+/** Fold the queued transforms for a key over its latest value, once. */
+function drain<T>(key: string, current: T[]) {
+  const fns = queues.get(key)
+  if (!fns?.length) return current
+  queues.delete(key)
+  let acc = current
+  for (const fn of fns) acc = (fn as (c: T[]) => T[])(acc)
+  return acc
+}
+
+function useCollection<T>(key: string, fallback: T[]) {
+  const kv = useJSON<T[]>(os.storage, key, fallback)
+  const ready = kv.status === 'ready' || kv.status === 'saving'
+  useEffect(() => {
+    if (!ready) return
+    const acc = drain(key, kv.value)
+    if (acc !== kv.value) kv.set(acc)
+  }, [ready, key, kv])
+  const write = (fn: (current: T[]) => T[]) => {
+    if (ready) kv.set(fn(drain(key, kv.value)))
+    else {
+      const fns = queues.get(key) ?? []
+      fns.push(fn as (current: unknown) => unknown)
+      queues.set(key, fns)
+    }
+  }
+  return { list: kv.value, write, status: kv.status }
+}
+
+/** The list itself as one JSON key, like v1, so both displays agree on it. */
 export function useNotes() {
-  const index = useJSON<Note[]>(os.storage, 'index', [])
-  const notes = index.value
+  const { list: notes, write, status } = useCollection<Note>('index', [])
   const add = (folder?: string) => {
-    const note: Note = { id: Date.now().toString(36), when: new Date().toISOString(), folder }
-    index.set([note, ...notes])
+    const note: Note = { id: uid(), when: new Date().toISOString(), edited: new Date().toISOString(), folder }
+    write((current) => [note, ...current])
     return note
   }
+  const put = (note: Note) => write((current) => current.map((n) => (n.id === note.id ? note : n)))
+  /** For good: index entry plus every key the doc owned. */
   const remove = (note: Note) => {
-    index.set(notes.filter((n) => n.id !== note.id))
-    void os.storage.del(`note:${note.id}`)
+    write((current) => current.filter((n) => n.id !== note.id))
+    void delMedia(note.id)
   }
-  return { notes, add, remove, hydrating: index.status === 'hydrating' }
+  return { notes, add, put, remove, hydrating: status === 'hydrating' }
+}
+
+/**
+ * Deletes a note's doc, markup and image keys. Storage pages keys at 256 and a
+ * cursor dies with the revision it was taken on, so a delete mid-enumeration
+ * would strand later pages: collect every matching key first, then delete.
+ */
+async function delMedia(id: string) {
+  try {
+    const keys: string[] = []
+    let cursor: string | undefined
+    do {
+      const page: { keys: string[]; cursor?: string } = await os.storage.keys(cursor)
+      for (const k of page.keys) {
+        if (k === `note:${id}` || k === `markup:${id}` || k.startsWith(`img:${id}:`)) keys.push(k)
+      }
+      cursor = page.cursor
+    } while (cursor)
+    for (const k of keys) await os.storage.del(k)
+  } catch {
+    // A sweep that fails leaves orphan keys; the next purge tries again.
+  }
+}
+
+/** Drops notes that have sat in Recently Deleted for 30 days, once per mount. */
+export function usePurge() {
+  const { notes, remove, hydrating } = useNotes()
+  useEffect(() => {
+    if (hydrating) return
+    for (const n of notes) {
+      if (n.deleted && Date.now() - new Date(n.deleted).getTime() > 30 * 864e5) remove(n)
+    }
+  }, [hydrating, notes, remove])
 }
 
 /** User folders under iCloud; the built-in "Notes" folder is `undefined` on a note. */
 export function useFolders() {
-  const list = useJSON<Folder[]>(os.storage, 'folders', [])
-  const folders = list.value
-  const add = (name: string) => {
-    const folder: Folder = { id: Date.now().toString(36), name }
-    list.set([...folders, folder])
-    return folder
+  const { list: folders, write } = useCollection<Folder>('folders', [])
+  return {
+    folders,
+    add: (name: string) => {
+      const folder: Folder = { id: uid(), name }
+      write((current) => [...current, folder])
+      return folder
+    },
+    rename: (folder: Folder, name: string) =>
+      write((current) => current.map((f) => (f.id === folder.id ? { ...f, name } : f))),
+    remove: (folder: Folder) => write((current) => current.filter((f) => f.id !== folder.id))
   }
-  return { folders, add }
 }
 
-/** Which folder each display shows; both share it so a pick on one side follows on the other. */
-export function useFolder() {
-  const kv = useKV(os.session, 'folder')
-  return [kv.value ?? undefined, (id?: string) => (id ? kv.set(id) : kv.del())] as const
+// ---------- navigation: one path cell drives both displays ----------
+
+const ROOT = ['folders']
+export type Dest = { kind: 'notes' | 'folder' | 'deleted' | 'tag'; id?: string }
+
+/** The list destination a path names: the Notes folder, a user folder, the bin, or a tag. */
+export const destOf = (path: string[]): Dest => {
+  const top = path.filter((p) => p !== 'folders' && !p.startsWith('note:')).at(-1)
+  if (top === 'deleted') return { kind: 'deleted' }
+  if (top?.startsWith('tag:')) return { kind: 'tag', id: top.slice(4) }
+  if (top?.startsWith('fold:')) return { kind: 'folder', id: top.slice(5) }
+  return { kind: 'notes' }
 }
 
-/** Both displays and every row read the same persisted text; no editor keeps a stale copy. */
-export function useNoteText(note: Note) {
-  const state = useKV(os.storage, `note:${note.id}`)
-  const put = (body: string) => (body === '' ? state.del() : state.set(body))
-  return [state.value ?? '', put, state.del, state] as const
+/** The open note's id, when the path ends in one. */
+export const noteOf = (path: string[]) => {
+  const top = path.at(-1)
+  return top?.startsWith('note:') ? top.slice(5) : undefined
+}
+
+export const usePath = () => useJSON<string[]>(os.session, 'path', ROOT).value
+
+export function useGo() {
+  const kv = useJSON<string[]>(os.session, 'path', ROOT)
+  const path = kv.value
+  return {
+    path,
+    root: () => kv.set(ROOT),
+    /** A sidebar or cover pick replaces whatever was open. */
+    open: (d: string) => kv.set(['folders', d]),
+    note: (id: string) => kv.set([...(noteOf(path) ? path.slice(0, -1) : path), `note:${id}`]),
+    back: () => kv.set(path.length > 1 ? path.slice(0, -1) : path)
+  }
+}
+
+// ---------- chrome prefs ----------
+
+/** The search field; results swap the list on both displays. */
+export function useSearch() {
+  const kv = useKV(os.session, 'q')
+  return [kv.value ?? '', (v: string) => (v ? kv.set(v) : kv.del())] as const
+}
+
+/** List order: Date Edited, Date Created or Title, like the real list's ellipsis menu. */
+export function useSort() {
+  const kv = useKV(os.session, 'sort')
+  return [(kv.value as Sort) ?? 'edited', (v: Sort) => (v === 'edited' ? kv.del() : kv.set(v))] as const
+}
+
+/** Rows or the gallery grid. */
+export function useView() {
+  const kv = useKV(os.session, 'view')
+  return [
+    kv.value === 'gallery' ? 'gallery' : 'list',
+    (v: 'list' | 'gallery') => (v === 'list' ? kv.del() : kv.set(v))
+  ] as const
+}
+
+// ---------- the document itself ----------
+
+/**
+ * Both displays and every row read the same stored doc; the editor serializes
+ * on input. `put` also stamps the index entry: edited time, title, tags.
+ * Loading a doc written before the index carried those fields backfills them,
+ * which is what migrates a v1 install just by opening its list.
+ */
+export function useDoc(note: Note) {
+  const kv = useKV(os.storage, `note:${note.id}`)
+  const doc = useMemo(() => parse(kv.value ?? undefined), [kv.value])
+  const { notes, put: putNote } = useNotes()
+  useEffect(() => {
+    const current = notes.find((n) => n.id === note.id)
+    if (!current || kv.status === 'hydrating' || (current.title !== undefined && current.tags !== undefined)) return
+    putNote({ ...current, title: titleOf(doc), tags: tagsOf(doc) })
+  }, [doc, note.id, kv.status, notes, putNote])
+  const put = (next: Doc, touch = true) => {
+    kv.set(serialize(next))
+    if (!touch) return
+    const current = notes.find((n) => n.id === note.id)
+    if (current) putNote({ ...current, edited: new Date().toISOString(), title: titleOf(next), tags: tagsOf(next) })
+  }
+  return { doc, put, raw: kv.value ?? '', status: kv.status }
+}
+
+/** The tags every index entry advertises, for the sidebar strip. */
+export function useTags() {
+  const { notes } = useNotes()
+  const all = new Set<string>()
+  for (const n of notes) {
+    if (n.deleted) continue
+    for (const t of n.tags ?? []) all.add(t)
+  }
+  return [...all].sort()
+}
+
+export type Stroke = { c: string; w: number; pts: number[] }
+/** Markup scribbles over a note: vector strokes under `markup:<id>`. */
+export function useMarkup(note: Note) {
+  const kv = useJSON<Stroke[]>(os.storage, `markup:${note.id}`, [])
+  return { strokes: kv.value, put: kv.set }
 }

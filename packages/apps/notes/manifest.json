@@ -1,11 +1,12 @@
 {
   "id": "labs.doan.ipduo.notes",
   "name": "Notes",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "lane": "official",
   "entry": "./main.tsx",
   "icon": "./icon.png",
   "author": "Doan Labs",
   "repo": "https://github.com/doan-labs/duo",
-  "license": "MIT"
+  "license": "MIT",
+  "permissions": ["photos", "clipboard-write"]
 }

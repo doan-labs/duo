@@ -1640,7 +1640,31 @@ scenes mount on the client as they scroll in, so the prerendered page carries
 their captions only; and the scenes are hand-composed, so a new export does not
 appear in the grid until someone builds a tile for it.
 
-## 98. Maps searches, geocodes and routes live
+## 98. Safari's history and bookmarks are a real book, not staged rows
+
+2026-09-25. The bookmarks sheet was drawn around data nobody could reach:
+Favorites counted four fixed rows, Recently Saved was a session array the more
+menu pushed into, History showed two of the favourites, and a private tab was
+private only in name because nothing anywhere was kept. `store.ts` now holds
+the book - favourites, bookmarks, the reading list and history - a module
+store both displays read, persisted under `duo.safari.v1` so Erase All Content
+and Settings wipes it with the rest of the phone.
+
+Every address-bar go and every back or forward step writes a visit; a private
+tab's never reach the store, which is the whole promise of one now. A frame's
+own title only crosses the boundary when the page is same-origin, and on load
+in a normal tab the visit and any marks of that address are retitled to it.
+The lists are editable the way iOS edits them: Edit puts the red minus dot on
+each row, and History's Clear offers the last hour, today, today and
+yesterday, or all time.
+"Add to Bookmarks" files under Bookmarks, and "Add Bookmark to…" asks
+Favorites, Bookmarks or Reading List. The start page reads the same book: the
+Favorites grid is the favourites list, and a Frequently Visited section ranks
+hosts by visit count. Cost: the Tab Group Favorites folder and the seeded
+iPhone User Guide row are gone - both were invented, and a bookmark whose page
+refuses to frame would open to a blank screen anyway.
+
+## 99. Maps searches, geocodes and routes live
 
 2026-09-25, accepted; supersedes the "nothing routes or geocodes" half of 60. The
 tile drawing and furniture from 60 stand; what changed is that the controls
@@ -1655,7 +1679,8 @@ router.project-osrm.org silently aliases every profile to driving.
 New files split the live half out of `data.ts`: `live.ts` (the clients, the
 Photon/OSRM mappers, the formatters), `camera.ts` (the fly plan - a zoom dip on
 long hauls, cubic easing - and its rAF driver), `directions.tsx` (modes, the
-ways there, the steps), `glyphs.tsx` (car, bike and the turn arrows SYM lacks).
+ways there, the steps), `glyphs.tsx` (car, bike and the turn arrows SYM lacks),
+`share.ts` (the module store both displays draw, so the fold keeps the map).
 Zoom is fractional now: tiles render at the nearest integer level scaled by
 `2 ** (z - tileZ)`, so wheel and fly zoom without a reload between levels, and
 a released drag coasts on its last velocity. A tap on a grey alternative picks
