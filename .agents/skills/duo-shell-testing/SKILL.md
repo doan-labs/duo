@@ -64,3 +64,9 @@ Both displays run the same app session as separate views on one set of iframes. 
 - `?app=<id>` auto-launches the app only on the inner display. At `deg=0` the cover shows the lock/wallpaper screen - tap the display once to wake/unlock and reveal the running app.
 - `device.wake()` is bound to `pointerdown` on the top document; `agent-browser click @eN` does NOT fire it (no top-doc pointerdown). Real-mouse clicks do.
 - `os.open('Safari', url)` from an app launches the real sim Safari app on that display's slot (full URL bar + live external page). The host remounts the slot's iframe - a JS expando on the old element is lost, which is how an app-switch remount differs from an in-place reload.
+
+## App-bundle and navigation gotchas
+
+- App bundles embed `packages/shell/index.html`'s FIRST `<style>` block as their own reset (scripts/build-app.ts extracts only the first block). Scene-only rules - e.g. the `canvas { opacity: 0; }` fade-in for the WebGL model - must live in a SECOND `<style>` block, or they leak into every sandboxed app bundle and invisibly hide app canvases (markup strokes draw but never appear).
+- `press Escape` / `agent-browser key Escape` maps to the device's Home button - it sends the running app back to SpringBoard. Never use it to dismiss an in-app menu or sheet; click the scrim/outside region instead.
+- The `?app=<id>` autolaunch leaves a `div.sandbox__styles.sheet` "Connecting..." scrim over the display while the app's session comes up. `agent-browser click` refuses clicks through it - wait for the app iframe to mount instead of clicking the scrim away.
