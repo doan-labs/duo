@@ -363,7 +363,7 @@ function NoteBody({
       <div {...stylex.props(styles.docBox)}>
         {isLocked ? (
           <LockView onOpen={() => unlocked.set('1')} />
-        ) : status === 'ready' ? (
+        ) : status !== 'hydrating' ? (
           <Editor
             doc={doc}
             onDoc={(next) => put(next)}
