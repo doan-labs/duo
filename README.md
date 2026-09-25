@@ -107,8 +107,8 @@ packages/
     src/routes/     one file per page, TanStack file routes
     src/builder/    provider chat, browser compiler, projects and live preview client
     src/home/       the launch page, one section per file, plus parts.tsx (blocks, headlines, code)
-    src/kit/        the /kit hero: every demo drifting past live, over the counts in data.ts
-    src/kit-demos/  one live demo per UI kit component, rendered on /kit and shown as source on /kit/docs/<name>
+    src/kit/        the /kit hero and showcase grid: scenes/ holds one small live app per tile
+    src/kit-demos/  one live demo per UI kit component, rendered and shown as source on /kit/docs/<name>
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
     src/hardware/   the /sdk page: each device event beside one live phone, drawn as keys, viewfinder, dial, tiles, and the tour that rings each cap
     src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge, and told its device events

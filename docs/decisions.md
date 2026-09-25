@@ -750,7 +750,7 @@ card while `bg` is in flight. Cost: two more message shapes on the bridge, and a
 ignores `hello` still gets the announcements.
 
 ## 64. `/kit` is a showcase, the reference moves under `/kit/docs`
-2026-09-18, accepted. The UI kit's landing page was the reference itself: a lead paragraph,
+2026-09-18, accepted; the drifting strip is superseded by 97. The UI kit's landing page was the reference itself: a lead paragraph,
 one code block and a list of 47 export names. It answered "what is the signature of Row"
 and nothing else, so a visitor who had never seen the kit left without seeing a single
 component. `/kit` is now one hero in the launch page's own language: a headline whose count
@@ -1622,7 +1622,25 @@ Closed, the tour leaves a "Show the tour" bubble in the stage's top right,
 breathing a ring so a reader who closed it by accident finds the way back; it
 reopens on the chapter in view.
 
-## 97. Stocks quotes the market instead of inventing one
+## 97. `/kit` shows a grid of composed scenes, not a strip of reference demos
+
+2026-09-25, accepted; supersedes the showcase half of 64. The drifting strip
+showed the reference demos one after another at the same size, so the page read
+as the reference on a conveyor belt rather than the best the kit can build. `/kit`
+now keeps the hero and puts a bento grid under it: ten tiles, each a small app
+composed from the kit (a Notes screen whose frame moves between 387 and 790
+points while `useWide()` switches its layout, the Activity rings, a Settings
+stack with a push, controls, a menu, a form with a sheet, widgets over the
+real wallpaper, the type ramp, the symbols, the hues). The strip's rejection of
+"a browsing page underneath the hero" in 64 stands for search and per-export
+browsing, which stay under `/kit/docs`; this is a showcase, not an index.
+Scenes live in `src/kit/scenes/`, separate from `src/kit-demos/`, because a
+reference demo shows one export plainly and a scene composes several. Cost: the
+scenes mount on the client as they scroll in, so the prerendered page carries
+their captions only; and the scenes are hand-composed, so a new export does not
+appear in the grid until someone builds a tile for it.
+
+## 98. Stocks quotes the market instead of inventing one
 
 2026-09-25. The Stocks app was the last fake feed on the phone: a seeded `walk()`
 that produced plausible numbers for every ticker, hardcoded rows, dead range pills
@@ -1645,7 +1663,7 @@ decoupled from the list so a searched or unfollowed symbol still has a detail,
 and every fetch and timer is gated on `!os.mirror` so the second copy draws
 everything and starts nothing.
 
-## 98. The Stocks detail chart is LiveLine, not a drawn SVG
+## 99. The Stocks detail chart is LiveLine, not a drawn SVG
 
 2026-09-25. The detail chart now renders through `liveline` (LiveLine) instead of
 the app's hand-drawn SVG: a 60fps canvas line with a live dot, value badge,

@@ -1,22 +1,17 @@
-// The kit's only viewport: what it is, one line to install it, and every
-// component drifting past as the real thing. Nothing on the page says the strip
-// can be held still and pressed; hovering does it, and the card lifting under
-// the pointer is the whole of the instruction.
+// The kit's page: what it is, one line to install it, and under that the
+// showcase grid, every tile a small app composed from the real package.
 import * as stylex from '@stylexjs/stylex'
-import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
 import { versions } from '../generated/api'
-import { KitFrame } from '../kit-preview'
 import { Button } from '../layout'
-import { useNarrow } from '../media'
 import { CURVE, TAP } from '../motion'
 import { color, ease, font, radius } from '../tokens.stylex'
-import { counts, kit, live, summary } from './data'
+import { counts, kit } from './data'
+import { Showcase } from './showcase'
 
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
-const REDUCE = '@media (prefers-reduced-motion: reduce)'
 
 const INSTALL = 'bun add @doan-labs/duo-uikit'
 
@@ -36,7 +31,6 @@ const STATS = [
 
 export function KitHero() {
   const still = useReducedMotion() ?? false
-  const narrow = useNarrow()
   const rise = (i: number) => ({
     initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
@@ -65,19 +59,9 @@ export function KitHero() {
           <Install />
         </motion.div>
       </div>
-      <motion.div
-        {...stylex.props(styles.strip)}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={still ? NONE : { duration: 1, delay: 0.45, ease: CURVE }}
-      >
-        {/* Two identical runs: the track slides exactly one run, then repeats.
-            Narrow screens scroll the strip by hand, so one run is the whole of it. */}
-        <div {...stylex.props(styles.track)}>
-          <Run />
-          {!narrow && <Run copy />}
-        </div>
-      </motion.div>
+      <div {...stylex.props(styles.inner, styles.showcase)}>
+        <Showcase />
+      </div>
       <div {...stylex.props(styles.inner)}>
         <ul {...stylex.props(styles.stats)}>
           {STATS.map((s, i) => (
@@ -94,29 +78,6 @@ export function KitHero() {
         </ul>
       </div>
     </section>
-  )
-}
-
-/** One pass over every live component. The second pass is scenery: hide it from assistive tech. */
-function Run({ copy = false }: { copy?: boolean }) {
-  return (
-    <ul {...stylex.props(styles.run)} aria-hidden={copy || undefined} inert={copy}>
-      {live.map((e) => (
-        <li key={e.name} {...stylex.props(styles.card)}>
-          <header {...stylex.props(styles.head)}>
-            {copy ? (
-              <span {...stylex.props(styles.name)}>{e.name}</span>
-            ) : (
-              <Link to="/kit/docs/$name" params={{ name: e.name }} {...stylex.props(styles.name)}>
-                {e.name}
-              </Link>
-            )}
-            <p {...stylex.props(styles.doc)}>{summary(e)}</p>
-          </header>
-          <KitFrame name={e.name} height={270} />
-        </li>
-      ))}
-    </ul>
   )
 }
 
@@ -157,9 +118,6 @@ function Install() {
     </motion.button>
   )
 }
-
-// One run of cards wide, so the loop is seamless wherever it restarts.
-const drift = stylex.keyframes({ from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } })
 
 const styles = stylex.create({
   hero: {
@@ -249,81 +207,7 @@ const styles = stylex.create({
     transitionTimingFunction: ease.out
   },
   copyTagDone: { backgroundColor: color.greenBg, color: color.green },
-  // Full bleed: the strip runs off both edges of the page and fades out there.
-  // Where the drift is off there is nothing to hover, so the strip becomes a
-  // plain scroller the visitor pushes themselves.
-  strip: {
-    marginTop: { default: '62px', [SMALL]: '38px' },
-    // Room for the lift and the shadow a hovered card grows. It is not
-    // decoration: `overflow-x: auto` below takes `overflow-y` off `visible` by
-    // the spec's own rule, and a card flush with that edge had its top three
-    // pixels cut off the moment the pointer picked it up, with no scrollbar to
-    // say so. The margin above is shortened by the same amount.
-    paddingTop: '10px',
-    paddingBottom: '10px',
-    overflowX: { default: 'visible', [SMALL]: 'auto', [REDUCE]: 'auto' },
-    // Where the strip is pushed by hand, the push stops at its own ends rather
-    // than becoming the browser's back gesture.
-    overscrollBehaviorX: 'contain',
-    // Three stops rather than two: a straight ramp reads as a grey wash over the
-    // cards, and the cards should look like they are leaving, not fading.
-    maskImage: {
-      default:
-        'linear-gradient(to right, transparent 0, rgba(0,0,0,0.35) 44px, #000 156px, #000 calc(100% - 156px), rgba(0,0,0,0.35) calc(100% - 44px), transparent 100%)',
-      [SMALL]: 'none'
-    }
-  },
-  track: {
-    display: 'flex',
-    width: 'max-content',
-    animationName: { default: drift, [SMALL]: 'none', [REDUCE]: 'none' },
-    animationDuration: '160s',
-    animationTimingFunction: 'linear',
-    animationIterationCount: 'infinite',
-    // Stopping is how the visitor presses something: the strip holds while the
-    // pointer is over it, and while anything inside has focus.
-    animationPlayState: { default: 'running', ':hover': 'paused', ':focus-within': 'paused' }
-  },
-  run: { listStyleType: 'none', display: 'flex', gap: '20px', margin: 0, padding: 0, paddingRight: '20px' },
-  card: {
-    flexShrink: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-    padding: '18px',
-    borderRadius: radius.lg,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: { default: color.border, ':hover': color.borderStrong },
-    backgroundColor: color.surface,
-    // The strip is already still under the pointer; the card under it lifts so
-    // the one that will answer a press is obvious before the press.
-    transform: { default: 'translateY(0)', ':hover': 'translateY(-3px)' },
-    boxShadow: { default: 'none', ':hover': color.shadow },
-    transitionProperty: 'border-color, box-shadow, transform',
-    transitionDuration: { default: '0.24s', [REDUCE]: '0s' },
-    transitionTimingFunction: ease.out
-  },
-  head: { maxWidth: '387px' },
-  name: {
-    fontFamily: font.display,
-    fontSize: '19px',
-    fontWeight: 600,
-    letterSpacing: '-0.02em',
-    color: { default: color.text, ':hover': color.accent },
-    textDecoration: 'none'
-  },
-  doc: {
-    margin: 0,
-    marginTop: '6px',
-    fontSize: '14px',
-    lineHeight: 1.5,
-    color: color.text2,
-    display: '-webkit-box',
-    WebkitBoxOrient: 'vertical',
-    WebkitLineClamp: 1,
-    overflow: 'hidden'
-  },
+  showcase: { marginTop: { default: '72px', [SMALL]: '48px' } },
   stats: {
     listStyleType: 'none',
     display: 'flex',
