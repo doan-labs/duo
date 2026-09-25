@@ -256,6 +256,8 @@ export const styles = stylex.create({
   modeOn: { color: colors.yellow, backgroundColor: appAppearance.cameraChip },
 
   zoomRow: { display: 'flex', gap: 6, touchAction: 'none' },
+  // Stood up in the landscape rail, the way the iPad camera's strip runs.
+  zoomRowLand: { flexDirection: 'column' },
   zl: {
     width: 34,
     height: 34,

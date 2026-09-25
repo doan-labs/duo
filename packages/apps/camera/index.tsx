@@ -481,19 +481,21 @@ export const Camera = ({ os }: { os: Os }) => {
 
   // The zoom chips: tap picks a preset, a drag across the row scrubs
   // continuously like sliding along Camera Control.
-  const zoomDrag = useRef<{ x: number; z: number; moved: boolean } | null>(null)
+  const zoomDrag = useRef<{ pos: number; z: number; moved: boolean } | null>(null)
   const [scrub, setScrub] = useState(false)
   const zoomDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    zoomDrag.current = { x: e.clientX, z: zRef.current, moved: false }
+    zoomDrag.current = { pos: land ? e.clientY : e.clientX, z: zRef.current, moved: false }
     e.currentTarget.setPointerCapture(e.pointerId)
     setScrub(true)
   }
   const zoomMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const g = zoomDrag.current
     if (!g) return
-    if (Math.abs(e.clientX - g.x) < 6) return
+    // A scrub reads along the strip's axis: right on the row, up on the column.
+    const d = land ? g.pos - e.clientY : e.clientX - g.pos
+    if (Math.abs(d) < 6) return
     g.moved = true
-    zoom(clamp(g.z * 2 ** ((e.clientX - g.x) / 110), 0.5, 5))
+    zoom(clamp(g.z * 2 ** (d / 110), 0.5, 5))
   }
   const zoomUp = () => {
     setScrub(false)
@@ -642,7 +644,7 @@ export const Camera = ({ os }: { os: Os }) => {
   const zoomRow = (
     <div
       data-zoom
-      {...stylex.props(styles.zoomRow)}
+      {...stylex.props(styles.zoomRow, land && styles.zoomRowLand)}
       onPointerDown={zoomDown}
       onPointerMove={zoomMove}
       onPointerUp={zoomUp}
@@ -880,8 +882,8 @@ export const Camera = ({ os }: { os: Os }) => {
             {exposureBtn}
             <div {...stylex.props(styles.railMid)}>
               {zoomRow}
-              {shutterBtn}
               {dial}
+              {shutterBtn}
             </div>
             {aspectBtn}
           </div>
