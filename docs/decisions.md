@@ -1440,3 +1440,28 @@ the token gate would have rejected a cross-app `appAppearance` read.
 Both drop `mock`. The screens are no longer invented data: every rendered
 number is the book's, every button writes back to it, and the two displays'
 copies stay in lockstep through the same module cells decision 59 set.
+
+## 90. Dark Mode is a switch, and the apps it does not draw stay dark
+
+2026-09-25. Apps baked light stayed light forever: `apps.ts`'s `light` flag was
+the whole appearance story. There was no Dark Mode.
+
+`Switches` gains `darkMode`, flipped from Control Center's new tile (the
+half-lit circle, next to the brightness slider where iOS puts it) or Settings >
+Display & Brightness. The SpringBoard theme pick becomes
+`app.light && !darkMode ? light : dark`, so every light app - Health, Settings,
+the sandboxed releases - wears the kit's dark theme when it is on, and the
+status stack follows the app under it as before. Apps declared dark in the
+registry (Fitness, and Apple's Fitness really is always dark) do not read the
+switch, which is the point of the flag surviving: `light` means "follows the
+system", its absence means "always dark".
+
+An app's own glass chrome could not ride the theme before: `glass.tint` is a
+const. The `app` var set gains `glass` - light glass in the light theme,
+`tintDark` in the dark one - so a themed app's sidebar, tab bar and menus
+(including the kit's `Menu`) retint without a prop. Chrome that is not the
+app's, like `shared.glass` on the dock and widgets, keeps `glass.tint`:
+Dark Mode does not repaint the system the way it repaints apps.
+
+The switch is device-wide through `toggles.ts`, so both displays flip together.
+Like the rest of that object it is session state, not persisted.

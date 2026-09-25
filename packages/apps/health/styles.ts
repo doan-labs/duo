@@ -57,7 +57,7 @@ export const styles = stylex.create({
     paddingBottom: 12,
     paddingLeft: 8,
     borderRadius: layout.screenInnerPanel,
-    backgroundColor: glass.tint,
+    backgroundColor: app.glass,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim},${shadow.float}`
@@ -120,7 +120,7 @@ export const styles = stylex.create({
     textAlign: 'left',
     cursor: 'pointer'
   },
-  sideRowOn: { backgroundColor: app.fill, color: colors.blue, fontWeight: weight.semibold },
+  sideRowOn: { backgroundColor: app.fill, color: app.link, fontWeight: weight.semibold },
   sideLabel: { flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   sideTint: { display: 'grid', placeItems: 'center', width: 20, flexShrink: 0 },
   /** The profile chip where a Mac puts the account. */
@@ -146,7 +146,7 @@ export const styles = stylex.create({
     width: size,
     height: size,
     borderRadius: radius.circle,
-    backgroundColor: colors.blue,
+    backgroundColor: app.link,
     color: colors.white,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
@@ -168,7 +168,7 @@ export const styles = stylex.create({
     paddingTop: 6,
     paddingBottom: 6,
     borderRadius: radius.xxl,
-    backgroundColor: glass.tint,
+    backgroundColor: app.glass,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim},${shadow.float}`
@@ -190,7 +190,7 @@ export const styles = stylex.create({
     fontWeight: weight.medium,
     cursor: 'pointer'
   },
-  tabOn: { color: colors.blue },
+  tabOn: { color: app.link },
 
   /** Cover push navigation, the kit's slide geometry driven by the path cell. */
   nav: { position: 'relative', flexGrow: 1, minHeight: 0, overflow: 'hidden' },

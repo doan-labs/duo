@@ -128,7 +128,7 @@ const styles = stylex.create({
     overflow: 'hidden',
     zIndex: 3,
     borderRadius: radius.lg,
-    backgroundColor: glass.tint,
+    backgroundColor: app.glass,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: shadow.float,

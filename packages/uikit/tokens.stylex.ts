@@ -100,7 +100,9 @@ export const app = stylex.defineVars({
   /** tertiarySystemFill: an input field, a search bar. */
   fill3: 'rgba(118,118,128,.12)',
   /** The raised segment of a segmented control. */
-  control: '#fff'
+  control: '#fff',
+  /** The app's own glass chrome (sidebar, tab bar, menu): `glass.tint` on a light app, `glass.tintDark` on a dark one. */
+  glass: 'rgba(255,255,255,.18)'
 })
 
 /**

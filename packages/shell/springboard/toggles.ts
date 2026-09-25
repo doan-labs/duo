@@ -27,7 +27,8 @@ const state: Toggles = {
   rotate: false,
   mirror: false,
   focus: false,
-  torch: false
+  torch: false,
+  darkMode: false
 }
 
 /** The same object, for code with no render to hook: main.ts reads `torch` every frame to light the LED. */
