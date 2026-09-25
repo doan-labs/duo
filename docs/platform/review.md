@@ -124,6 +124,33 @@ in step 3.
 
 ## Verification scope and limits
 
+### Device events (2026-09-25)
+
+`bun test packages/sdk packages/shell/device-buttons.test.ts` covers the guards (known
+types, every payload shape) and the press routing: a listened volume press leaves the
+ringer level alone and hears its release, a declining listener leaves the press to the
+system, and a Camera Control press keeps its slide and release with the listener that
+took it, even after that listener stops. In headless Chromium, a dev preview probe
+(CLI `create` from local archives, `dev --simulator`) received volume, Camera Control and
+side events through `__duo.press` with the ringer level unchanged. The side+volume chord
+still took the screenshot and did not sleep the phone. A real mouse click on the side cap
+still slept and woke it. A posed `yaw -0.6 rad, deg 150` arrived as `-34.4°, 150°`, and
+Control Center Wi-Fi and torch flips arrived live. Not verified: the Tauri WKWebView,
+a split inner display with two listening halves, and hidden-view throttling of
+orientation events.
+
+The site's `/sdk` page was checked in headless Chromium against `vite dev` and the root
+dev server, with real mouse input on the model. Volume caps: down, up, down gave the
+score -1, the running line lit, and no volume HUD came down. A drag along Camera Control
+logged press, three slides and a release, zoom read 4.97× and Camera stayed shut. The
+side cap was heard as press and release and still slept the phone. The Turn and Hinge
+controls streamed the ease to -70.0°, 110.0°, lit the `tent` line and turned the dial.
+Arriving at the switches chapter pulled Control Center down, and tapping Wi-Fi and the
+torch logged `wifi: false` and `torch: true`. At 390 px the phone rides sticky above the
+chapters. The frame's first `hear` was lost to its blank first document until the
+Simulator re-sent it on every load. Not verified: the production static build under
+`/device/`, Safari, and touch input on the small caps.
+
 ### Browser builder (2026-09-18)
 
 The `/build` workspace was verified against the production static build in Chromium 153

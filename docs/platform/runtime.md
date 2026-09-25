@@ -28,7 +28,8 @@ and the kit but never share the shell's JavaScript, stylesheet or import map.
 revisioned KV; `releases.ts` downloads and verifies artifacts; `lifecycle.ts` owns
 installation, generations, leases, activation, migration, restore and removal.
 `sessions.ts` owns sessions, sticky effect ownership and commands. `bridge.ts` owns
-launch records and nonce/MessagePort authority. `display.ts` derives view information;
+launch records and nonce/MessagePort authority. `device-events.ts` routes the frame's
+buttons, the pose and the switches to the views that watch them. `display.ts` derives view information;
 `sandbox.tsx` renders loading/failure states. `registry.ts` combines installed apps with
 the shell registry and seeds bundled releases once. `development.ts` owns preview bytes
 and namespaces; `catalog.ts` owns explicit catalog operations.
@@ -65,6 +66,11 @@ not frame parents or document URLs. The renderer keeps open panels live, clipped
 and darkened; the bake draws the shell. `os.view` provides display, placement, box size,
 visibility, activity, focus and angle. Layout should follow the box; a split half is as
 narrow as the cover. Visibility derives from render-loop state and sleep, not angle alone.
+
+`os.device.on(type, cb)` hears volume, Camera Control and the side button, the phone's
+pose and the read-only switches. A button press goes to the first watching view that is
+visible and active. Volume and Camera Control are then taken from the system; the side
+button and the side+volume chord never are. See contract §3.8.
 
 ## Persistence and lifecycle
 

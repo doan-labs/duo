@@ -84,6 +84,13 @@ coordinates, so zoom affects gesture distances. See [architecture](architecture.
 Camera publishes `shoot`, `record`, `zoom` via legacy `os.camera` in an effect and clears
 it on unmount. `scenes.ts` and `device.ts` route these hooks to the frame buttons.
 
+A sandboxed app listening through `os.device.on('volume' | 'camera-control')` takes
+those presses before any row above runs; `device-buttons.ts` offers each press to
+`device.ts` listeners first and remembers the taker, so the slide and release follow it.
+Keep the side button and the chord checks ahead of any offer: apps hear `side`, they never
+take it. A new device event type must go only to views that watched it, because a released
+SDK revokes itself on an event type it does not know.
+
 ## Adding things
 
 ### Trusted baked app
@@ -294,17 +301,28 @@ bun run api            # only the TSDoc reference
   element that carries only `style`.
 - The embedded shell is driven over the bridge in `packages/shell/main.ts`:
   `?bg=` at load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage from
-  the same origin: `paused` parks the render loop while the frame is off screen,
+  the same origin: a `yaw` that differs from the current one also eases the
+  camera home, since a page poses the phone as its reader sees it and an orbit
+  drag would otherwise leave it showing its back; `paused` parks the render loop while the frame is off screen,
   `app` clears the stage and launches an app by home screen name (empty string
   is Home; `arg` reaches it as `os.arg`, so `app: 'App Store'` plus a catalog id
   opens that app's page in the Store), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
   `split` drags it onto the left half by synthetic pointer events and opens the
   named app beside it, `switcher` holds the home bar and lets go, `folder` resets
   the grid and carries Find My onto Stocks, `wallpaper` holds the paper and taps
-  the next swatch, `screenshot`, `play` starts the deck muted). The shell
+  the next swatch, `screenshot`, `play` starts the deck muted, `control` pulls
+  Control Center down on the inner display). `hear: [...types]` asks to be told
+  the device events an app would hear (`packages/shell/embed-device.ts`), each
+  posted back to the asking origin as `{ device: { type, data } }`; the page
+  listens as a visible, active view, so while it hears volume or Camera Control
+  those presses are its, and `hear: []` stops. `spots: true` asks where the
+  four caps are, answered as `{ spots: { side, camera, up, down } }` in frame
+  pixels after every rendered frame that moved one, so a page can point at a
+  button while the phone eases into a pose; `spots: false` stops. The shell
   also accepts a localhost parent on another port, so `vite dev` on 3001 can
   drive the root dev server on 3000; anything else must be the same origin. `src/simulator.tsx` posts the body colour and
-  its `deg`, `yaw`, `app` and `cue` props, and never puts a live pose in the
+  its `deg`, `yaw`, `app`, `cue` and `hear` props (re-sent on every load, so a
+  message lost to the frame's blank first document is not lost for good), and never puts a live pose in the
   frame URL: a `src` change reloads the whole scene. After changing
   the bridge, rebuild the copy with `bun scripts/simulator.ts`. That script also
   copies `/model`, `/icons`, `/cdn` and `/preinstalled` to the site root: the

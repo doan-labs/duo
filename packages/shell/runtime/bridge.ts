@@ -1,10 +1,11 @@
 import { REQUIRES_PLATFORM, supports } from '../../sdk/compat.ts'
-import { envelope, PlatformError, requestValid, widgetValid } from '../../sdk/guards.ts'
+import { deviceEventName, envelope, PlatformError, requestValid, widgetValid } from '../../sdk/guards.ts'
 import { record } from '../../sdk/manifest.ts'
 import { frameAllow, mutatingService, servicePermission } from '../../sdk/permissions.ts'
 import { type Change, LIMITS, PROTOCOL, type Req, type Res, type ViewInfo } from '../../sdk/protocol.ts'
 import { claimSide } from '../device.ts'
 import { authority, broadcast, put, transaction } from './database.ts'
+import { deviceEvents } from './device-events.ts'
 import { photoService } from './photos.ts'
 import type { Session, SessionView } from './sessions.ts'
 import { snapshot, storage } from './storage.ts'
@@ -60,6 +61,7 @@ export function launchFrame(
     revoke(reason) {
       if (launch.state === 'revoked') return
       releaseSide?.()
+      hardware.close()
       state('revoked', reason === 'closed' ? undefined : reason)
       launch.generation++
       clearTimeout(helloTimer)
@@ -72,6 +74,7 @@ export function launchFrame(
       session.remove(view)
     }
   }
+  const hardware = deviceEvents(view)
   const fail = (error: string, e: 'E_PROTOCOL' | 'E_INCOMPATIBLE' = 'E_PROTOCOL') => {
     const ownerFailed = session.owner === view && !view.ready
     frame.contentWindow?.postMessage({ t: 'refused', e, msg: error }, '*')
@@ -164,6 +167,11 @@ export function launchFrame(
       releaseSide?.()
       releaseSide = undefined
       return {}
+    }
+    if (req.m === 'device.watch' || req.m === 'device.unwatch') {
+      if (!deviceEventName(p.type)) throw new PlatformError('E_ARGS')
+      if (req.m === 'device.unwatch') return { value: hardware.unwatch(p.type) }
+      return { value: hardware.watch(p.type) }
     }
     throw new PlatformError('E_ARGS')
   }

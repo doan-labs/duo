@@ -134,6 +134,15 @@ await page.evaluate(() => document.querySelector('canvas').style.cursor) // 'poi
 await page.mouse.down(); await wait(120); await page.mouse.up()
 ```
 
+Device events: run a dev preview app that renders what `os.device.on` hears, then press
+through `__duo.press` as above. A listened volume press leaves `__duo.device.level`
+unchanged. The side button sleeps the phone, which closes apps, so check `side` delivery
+through the chord instead: hold `down`, tap `side`. The app counts both, the screenshot
+thumbnail still appears and `__duo.device.asleep` stays false. Pose the phone from the top
+document with `window.postMessage({ yaw: -0.6, deg: 150 }, '*')` (the embed bridge accepts
+its own window) and expect `yaw -34.4, hinge 150`. Control Center tiles answer
+`document.elementFromPoint(x, y).click()` when coordinate taps miss.
+
 Do not capture between mouse-down and mouse-up: a 0.3–6 s screenshot turns a click into
 a hold. Recompute projected coordinates after orbit, fit-band or hit-box changes. At default
 818×664/yaw 0 only: side (720,237), Camera Control (718,396), volume up/down (621,75)/(570,75).

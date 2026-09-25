@@ -98,7 +98,7 @@ packages/
   shell/            scene, HUD, hardware buttons, shaders, native.ts, index.html
     springboard/    display layers, scenes, gestures and device controls
     apps.ts         remaining baked apps and home grid
-    runtime/        isolated app bridge, storage, lifecycle, catalog and registry
+    runtime/        isolated app bridge, device events, storage, lifecycle, catalog and registry
     desktop/        Tauri crate, commands/ and platform/
   uikit/            harvested typed components, tokens, icons and shared helpers
   sdk/              host types, sandbox contract/client and async React adapter
@@ -110,7 +110,9 @@ packages/
     src/kit/        the /kit hero and showcase grid: scenes/ holds one small live app per tile
     src/kit-demos/  one live demo per UI kit component, rendered and shown as source on /kit/docs/<name>
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
-    src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge
+    src/hardware/   the /sdk page: each device event beside one live phone, drawn as keys, viewfinder, dial, tiles, and the tour that rings each cap
+    src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge, and told its device events
+    src/live-code.tsx  a code sample whose running line lights up, and its readout
     src/segmented.tsx  the sliding-thumb group button, shared by every filter and tab strip
     src/side-nav.tsx  the docs sidebar: sliding hover and active indicators, a disclosure when narrow
     src/motion.ts   the shared easing curve, springs and press scale
