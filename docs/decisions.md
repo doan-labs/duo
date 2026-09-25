@@ -1435,3 +1435,25 @@ The watchlist and the viewed symbol persist in localStorage, `viewing` is
 decoupled from the list so a searched or unfollowed symbol still has a detail,
 and every fetch and timer is gated on `!os.mirror` so the second copy draws
 everything and starts nothing.
+
+## 90. The Stocks detail chart is LiveLine, not a drawn SVG
+
+2026-09-25. The detail chart now renders through `liveline` (LiveLine) instead of
+the app's hand-drawn SVG: a 60fps canvas line with a live dot, value badge,
+scrub crosshair and a morph between ranges, so the chart feels live rather than
+replaced. The small SVG remains the row sparkline and the mirror copy's chart.
+
+Three integration gotchas, all handled at the boundary in `chart.tsx`. LiveLine
+wants unix seconds while the store keeps points in ms, so `Live` divides at the
+edge. Its `window` prop defaults to a 30s streaming window and clips anything
+before `now - window`, so it is computed as `now - first.time` to cover the full
+fetched range. And StyleX tokens resolve to `var(--x)` strings that a DOM can
+read but a canvas `strokeStyle` silently ignores, so the line colour passes
+through `canvasColor`, which reads the resolved custom property off
+`:root`. The shell reset also had to stop claiming every canvas: the scene
+canvas rule in `index.html` is scoped to `body > canvas` or it hijacks
+LiveLine's absolutely positioned canvas.
+
+The chart still scrubs like Apple's: `onHover` feeds the big price and swaps
+the delta line to the hovered point's date, and the previous close draws as a
+dashed reference only when it sits inside the visible range.

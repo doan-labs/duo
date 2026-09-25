@@ -12,10 +12,11 @@ import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
-import { Chart, Spark } from './chart.tsx'
+import { Chart, Live, Spark, tickFmt } from './chart.tsx'
 import {
   follow,
   type Item,
+  type Point,
   type Quote,
   RANGES,
   type StatKey,
@@ -52,11 +53,11 @@ export function Stocks({ os }: { os: Os }) {
       <div {...stylex.props(styles.detail)}>
         {wide ? (
           <div {...stylex.props(styles.detailScroll)}>
-            <Detail key={viewing.sym} item={viewing} showNews />
+            <Detail key={viewing.sym} item={viewing} showNews live={!os.mirror} />
           </div>
         ) : (
           <Nav>
-            <Home />
+            <Home live={!os.mirror} />
           </Nav>
         )}
       </div>
@@ -93,14 +94,14 @@ function Side() {
 
 // -- the cover's list page --------------------------------------------------------
 
-function Home() {
+function Home({ live }: { live?: boolean }) {
   const { push } = useNav()
   const { items } = useStore()
   const [query, setQuery] = useState('')
   const searching = query.trim().length > 0
   const open = (v: Item) => {
     select(v)
-    push((back) => <DetailPage item={v} back={back} />)
+    push((back) => <DetailPage item={v} back={back} live={live} />)
   }
   return (
     <Page
@@ -128,11 +129,11 @@ function Home() {
   )
 }
 
-function DetailPage({ item, back }: { item: Item; back: () => void }) {
+function DetailPage({ item, back, live }: { item: Item; back: () => void; live?: boolean }) {
   return (
     <Page title={item.sym} back={back}>
       <div {...stylex.props(styles.detailPad)}>
-        <Detail item={item} />
+        <Detail item={item} live={live} />
       </div>
     </Page>
   )
@@ -277,7 +278,7 @@ function SymbolRow({
 const extTone = (v: number) => (v < 0 ? styles.deltaDn : styles.delta)
 
 /** The quote block, range pills, chart, stats grid and follow toggle. */
-function Detail({ item, showNews }: { item: Item; showNews?: boolean }) {
+function Detail({ item, showNews, live }: { item: Item; showNews?: boolean; live?: boolean }) {
   const { items } = useStore()
   const inList = items.some((v) => v.sym === item.sym)
   const quote = useQuote(item.sym)
@@ -286,6 +287,10 @@ function Detail({ item, showNews }: { item: Item; showNews?: boolean }) {
   const { entry, pts } = useHistory(item, range)
   const q = quote.data
   const dn = (q?.chgPct ?? 0) < 0
+  // Scrubbing the live chart borrows Apple's gesture: the big price and the
+  // line under it show the hovered point's close and time instead.
+  const [hover, setHover] = useState<Point | null>(null)
+  const fmt = tickFmt(pts)
   return (
     <>
       <div {...stylex.props(styles.quoteTop)}>
@@ -306,10 +311,12 @@ function Detail({ item, showNews }: { item: Item; showNews?: boolean }) {
         </Button>
       </div>
       <div {...stylex.props(styles.bigPrice)}>
-        <Num value={q?.px} format={two} />
+        <Num value={hover?.c ?? q?.px} format={two} />
       </div>
       <div {...stylex.props(typography.subheadline, styles.delta, dn && styles.deltaDn)}>
-        {q ? (
+        {hover ? (
+          <span {...stylex.props(styles.hoverDate)}>{fmt(hover.t)}</span>
+        ) : q ? (
           <>
             <Num value={q.chg} format={signed} /> (<Num value={q.chgPct} format={two} suffix="%" />)
           </>
@@ -324,7 +331,10 @@ function Detail({ item, showNews }: { item: Item; showNews?: boolean }) {
             <button
               key={r}
               type="button"
-              onClick={() => setRange(r)}
+              onClick={() => {
+                setRange(r)
+                setHover(null)
+              }}
               {...stylex.props(styles.rangePill, typography.footnote, r === range && styles.pillOn)}
             >
               {r}
@@ -334,7 +344,11 @@ function Detail({ item, showNews }: { item: Item; showNews?: boolean }) {
       )}
       {ranges.length > 0 && (
         <div {...stylex.props(styles.chartWrap)}>
-          <Chart pts={pts} />
+          {live ? (
+            <Live pts={pts} px={q?.px} prev={q?.stats.prev} loading={entry.loading} onHover={setHover} />
+          ) : (
+            <Chart pts={pts} />
+          )}
         </div>
       )}
       {ranges.length > 0 && (

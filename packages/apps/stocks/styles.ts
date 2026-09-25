@@ -179,6 +179,8 @@ export const styles = stylex.create({
   },
   delta: { color: colors.greenDark, fontWeight: weight.semibold, fontVariantNumeric: 'tabular-nums' },
   deltaDn: { color: colors.redDark },
+  /** Scrubbing the chart swaps the delta for the hovered point's date. */
+  hoverDate: { color: app.label2, fontWeight: weight.regular },
   mktLine: { marginTop: space.xxs, color: app.label2 },
 
   /** The range pills under the chart. */
@@ -200,7 +202,14 @@ export const styles = stylex.create({
   },
   pillOn: { backgroundColor: app.fill, color: app.fg },
 
-  chartWrap: { height: 220, paddingTop: space.xs, paddingBottom: space.xs },
+  /** LiveLine absolutely positions its canvas and badge; contain them here. */
+  chartWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+    height: 220,
+    paddingTop: space.xs,
+    paddingBottom: space.xs
+  },
   chartSvg: { display: 'block', width: '100%', height: '100%' },
   chartFoot: { color: app.label3, paddingBottom: space.md },
 
