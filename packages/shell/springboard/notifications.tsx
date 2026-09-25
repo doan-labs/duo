@@ -17,6 +17,7 @@ import {
   motion,
   radius,
   shadow,
+  space,
   tracking,
   typeScale,
   weight
@@ -155,10 +156,10 @@ const dropIn = stylex.keyframes({
 const styles = stylex.create({
   card: {
     borderRadius: radius.xxl,
-    paddingTop: 11,
-    paddingRight: 13,
-    paddingBottom: 12,
-    paddingLeft: 13,
+    paddingTop: space.md,
+    paddingRight: space.lg,
+    paddingBottom: space.md,
+    paddingLeft: space.lg,
     cursor: 'pointer',
     textAlign: 'left',
     boxShadow: shadow.float,
@@ -169,8 +170,8 @@ const styles = stylex.create({
   head: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 3
+    gap: space.sm,
+    marginBottom: space.xs
   },
   icon: {
     width: 20,
@@ -229,9 +230,9 @@ const styles = stylex.create({
   // Deaf to the pointer until the card: what is around it stays clickable.
   bannerWrap: {
     position: 'absolute',
-    top: 12,
-    left: 8,
-    right: 8,
+    top: space.md,
+    left: space.sm,
+    right: space.sm,
     display: 'flex',
     justifyContent: 'center',
     zIndex: 8,
@@ -255,11 +256,11 @@ const styles = stylex.create({
   // both displays; the button row tops out at ~128 px on wide, ~90 on narrow.
   list: {
     position: 'absolute',
-    left: 8,
-    right: 8,
+    left: space.sm,
+    right: space.sm,
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: space.sm,
     overflowY: 'auto',
     touchAction: 'pan-y',
     // Hide the bar but keep the scroll.
@@ -267,7 +268,13 @@ const styles = stylex.create({
   },
   listWide: { top: 176, bottom: 134 },
   listNarrow: { top: 178, bottom: 100 },
-  listHead: { display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 6, paddingRight: 2 },
+  listHead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingLeft: space.xs,
+    paddingRight: space.xxs
+  },
   listTitle: {
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
