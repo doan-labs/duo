@@ -71,6 +71,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/habit-streaks",
       "releases": [
         {
+          "release": "1.1.0+71a61bff",
+          "sdk": "0.0.0",
+          "bytes": 268397,
+          "sha256": "0f1cd46b9dfdad6b7d43f4996d3a3fbf57614ad4ec742eda1c9d692c39b9d694"
+        },
+        {
           "release": "1.0.1+2dd374bf",
           "sdk": "0.0.0",
           "bytes": 255697,
