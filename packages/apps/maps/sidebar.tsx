@@ -1,6 +1,6 @@
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { byId, GLYPH, PLACES, type Place, type Recent, SUGGESTED } from './data.ts'
+import { byId, GLYPH, localMatches, type Place, type Recent, SUGGESTED } from './data.ts'
 import { styles } from './styles.ts'
 
 type Props = {
@@ -34,7 +34,7 @@ export function Sidebar({
   onCollapse
 }: Props) {
   const q = query.trim().toLowerCase()
-  const local = q ? PLACES.filter((p) => `${p.name} ${p.kind} ${p.address.join(' ')}`.toLowerCase().includes(q)) : []
+  const local = q ? localMatches(q) : []
   const found = [...local, ...results.filter((r) => !local.some((l) => l.name === r.name))]
   const suggestion = byId(SUGGESTED)
   const row = (p: Place, note: string) => (

@@ -12,7 +12,7 @@ import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fly, run } from './camera.ts'
-import { fit, HOME, type MapKind, type Place, project, RECENT, unproject, type View } from './data.ts'
+import { fit, localMatches, type Place, project, RECENT, unproject, type View } from './data.ts'
 import { Directions } from './directions.tsx'
 import { reverse, routes, search } from './live.ts'
 import { MapCanvas } from './map.tsx'
@@ -36,14 +36,12 @@ export const Maps = ({ os }: { os: Os }) => {
   // The folded-away copy draws but starts nothing - no search, no routes, no GPS.
   const live = !os.mirror
   const box = useRef({ w: 0, h: 0 })
-  const [view, setView] = useState<View>(HOME)
-  const viewRef = useRef(view)
-  viewRef.current = view
-  const [kind, setKind] = useState<MapKind>('explore')
   const [aside, setAside] = useState(true)
 
   const s = useShared()
-  const { query, sel, dir, me } = s
+  const { query, sel, dir, me, view, kind } = s
+  const viewRef = useRef(view)
+  viewRef.current = view
   const found = s.results
   const rec = s.routes
   const recents = s.recents ?? RECENT
@@ -52,6 +50,9 @@ export const Maps = ({ os }: { os: Os }) => {
   const results = found?.q === q ? found.list : []
   const searching = q !== '' && found?.q !== q
   const searchFailed = found?.q === q && found.failed
+  // A live query narrows the pins to what matches it, locally and on Photon.
+  const local = localMatches(q.toLowerCase())
+  const marks = q ? [...local, ...results.filter((r) => !local.some((l) => l.name === r.name))] : null
   const want = dir ? `${dir.mode}|${me.lat.toFixed(4)},${me.lon.toFixed(4)}|${dir.to.id}` : ''
   const routeList = rec.key === want ? rec.list : null
   const routeError = rec.key === want && rec.failed
@@ -63,7 +64,6 @@ export const Maps = ({ os }: { os: Os }) => {
   // The request in flight and the route already fitted, so effects never ask twice.
   const fetching = useRef('')
   const fitted = useRef('')
-  const named = useRef(new Set<string>())
 
   useEffect(() => {
     const ro = new ResizeObserver(([e]) => (box.current = { w: e!.contentRect.width, h: e!.contentRect.height }))
@@ -71,16 +71,29 @@ export const Maps = ({ os }: { os: Os }) => {
     return () => ro.disconnect()
   }, [root])
 
-  const flyTo = useCallback((to: View) => {
-    motion.current?.()
-    motion.current = run(fly(viewRef.current, to), setView, () => (motion.current = null))
-  }, [])
+  const setView = useCallback((to: View) => share.set({ view: to }), [])
+
+  // Only the live copy animates: its frames land in the store and the mirror
+  // draws them flat, so no timer ever runs on the folded-away display.
+  const flyTo = useCallback(
+    (to: View) => {
+      motion.current?.()
+      if (!live) {
+        setView(to)
+        motion.current = null
+        return
+      }
+      motion.current = run(fly(viewRef.current, to), setView, () => (motion.current = null))
+    },
+    [live, setView]
+  )
   const interrupt = () => {
     motion.current?.()
     motion.current = null
   }
   const coast = (vx: number, vy: number) => {
     interrupt()
+    if (!live) return
     let v = { x: vx, y: vy }
     let last = performance.now()
     let raf = 0
@@ -168,16 +181,28 @@ export const Maps = ({ os }: { os: Os }) => {
     }
   }, [dir, live, want, me, rec])
 
-  // Every copy flies its own camera to a route once the record lands.
+  // The live copy flies the shared camera to a route once the record lands;
+  // the mirror draws the same view without scheduling a frame of its own.
   useEffect(() => {
     if (!dir) {
       fitted.current = ''
       return
     }
-    if (rec.key !== want || !rec.list?.length || fitted.current === want) return
+    if (!live || rec.key !== want || !rec.list?.length || fitted.current === want) return
     fitted.current = want
     fitRoute(rec.list[0]!)
-  }, [dir, want, rec, fitRoute])
+  }, [dir, live, want, rec, fitRoute])
+
+  // The real position gets a quiet chance at being the origin, before "My
+  // Location" means it; denied, the demo city's point stands in like before.
+  useEffect(() => {
+    if (!live || !('geolocation' in navigator)) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => share.set({ me: { lat: pos.coords.latitude, lon: pos.coords.longitude } }),
+      () => {},
+      { timeout: 9000, maximumAge: 60000 }
+    )
+  }, [live])
 
   // The blue dot's street name, once the geocoder answers; runs wherever `me` lands.
   useEffect(() => {
@@ -194,12 +219,12 @@ export const Maps = ({ os }: { os: Os }) => {
   }, [live, me])
 
   // A dropped pin starts unnamed; the live copy asks Photon what is there, so a
-  // pin laid from the folded display gets named too.
+  // pin laid from the folded display gets named too. The label is the dedupe:
+  // still "Dropped Pin" and the lookup can retry.
   useEffect(() => {
-    if (!live || !sel?.id.startsWith('pin-') || named.current.has(sel.id)) return
+    if (!live || sel?.name !== 'Dropped Pin' || !sel.id.startsWith('pin-')) return
     const m = /^pin-(-?\d+\.\d+):(-?\d+\.\d+)$/.exec(sel.id)
     if (!m) return
-    named.current.add(sel.id)
     const id = sel.id
     const ctl = new AbortController()
     reverse(Number(m[1]), Number(m[2]), ctl.signal)
@@ -307,10 +332,10 @@ export const Maps = ({ os }: { os: Os }) => {
         onView={setView}
         flyTo={flyTo}
         kind={kind}
-        onKind={setKind}
+        onKind={(kind) => share.set({ kind })}
         sel={sel}
         onSelect={pick}
-        results={results}
+        results={marks}
         me={me}
         routes={routeList}
         active={dir?.active ?? 0}

@@ -441,6 +441,10 @@ export const PLACES: Place[] = [
 
 export const byId = (id: string) => PLACES.find((p) => p.id === id)
 
+/** Catalogue rows a trimmed-lowercased query hits - the sidebar and the map agree through this. */
+export const localMatches = (q: string) =>
+  PLACES.filter((p) => `${p.name} ${p.kind} ${p.address.join(' ')}`.toLowerCase().includes(q))
+
 /** What the sidebar opens with: Siri's guess first, then the last few lookups. */
 export const SUGGESTED = 'eye-stop'
 
@@ -521,16 +525,14 @@ export const zoomAt = (
 export const fit = (pts: [number, number][], w: number, h: number, padX: number, padY: number): View => {
   const sx = Math.max(1, w - padX)
   const sy = Math.max(1, h - padY)
-  let z = MAX_Z
-  let lo = { x: 0, y: 0 }
-  let hi = { x: 0, y: 0 }
-  for (; z > MIN_Z; z--) {
+  for (let z = MAX_Z; ; z--) {
     const ps = pts.map(([lat, lon]) => project(lat, lon, z))
-    lo = { x: Math.min(...ps.map((p) => p.x)), y: Math.min(...ps.map((p) => p.y)) }
-    hi = { x: Math.max(...ps.map((p) => p.x)), y: Math.max(...ps.map((p) => p.y)) }
-    if (hi.x - lo.x <= sx * 0.82 && hi.y - lo.y <= sy * 0.82) break
+    const lo = { x: Math.min(...ps.map((p) => p.x)), y: Math.min(...ps.map((p) => p.y)) }
+    const hi = { x: Math.max(...ps.map((p) => p.x)), y: Math.max(...ps.map((p) => p.y)) }
+    // Bounds and unproject share a zoom: a route bigger than MIN_Z still centres on itself.
+    if ((hi.x - lo.x <= sx * 0.82 && hi.y - lo.y <= sy * 0.82) || z === MIN_Z)
+      return { ...unproject((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, z), z }
   }
-  return { ...unproject((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, z), z }
 }
 
 /** Ground metres one pixel covers, which is what the scale bar measures. */

@@ -5,7 +5,7 @@
 // folded copy never starts anything, it only draws what lands.
 
 import { useSyncExternalStore } from 'react'
-import { ME, type Place, type Recent } from './data.ts'
+import { HOME, type MapKind, ME, type Place, type Recent, type View } from './data.ts'
 import type { Route, TravelMode } from './live.ts'
 
 export type Dir = { to: Place; mode: TravelMode; active: number }
@@ -28,6 +28,11 @@ export type MapState = {
   estimate: EstRec | null
   me: { lat: number; lon: number; label?: string }
   recents: Recent[] | null
+  // The camera and the layer go through too, so a fold hands over the same map,
+  // not a reset one. Whoever is interacted with writes; the copy that may not
+  // animate applies the writes flat.
+  view: View
+  kind: MapKind
 }
 
 let state: MapState = {
@@ -38,7 +43,9 @@ let state: MapState = {
   routes: { key: '', list: null, failed: false },
   estimate: null,
   me: ME,
-  recents: null
+  recents: null,
+  view: HOME,
+  kind: 'explore'
 }
 const subs = new Set<() => void>()
 

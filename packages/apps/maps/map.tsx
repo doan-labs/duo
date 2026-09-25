@@ -30,8 +30,8 @@ type Props = {
   onKind: (k: MapKind) => void
   sel: Place | null
   onSelect: (p: Place) => void
-  /** Live search hits, pinned while the query lasts; they stand in for PLACES. */
-  results: Place[]
+  /** Pins while a query is up (local + Photon, already matched); null means no query and the catalogue stands in. */
+  results: Place[] | null
   /** The blue dot - the device's real position when granted, else the seed point. */
   me: { lat: number; lon: number }
   /** Routes on the canvas, selected one on top; tapping a grey one picks it. */
@@ -173,7 +173,7 @@ export function MapCanvas({
   const ruler = scale(view.lat, view.z)
 
   // A route covers the canvas; while it is up the loose pins bow out.
-  const marks = pinless ? [] : results.length ? results : PLACES
+  const marks = pinless ? [] : (results ?? PLACES)
   const pin = (p: Place) => {
     const at = place(p.lat, p.lon)
     if (at.x < -60 || at.y < -60 || at.x > box.w + 60 || at.y > box.h + 60) return null
