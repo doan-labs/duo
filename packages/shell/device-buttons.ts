@@ -8,10 +8,14 @@
 //   camera     click: Camera, or the shutter once it is open. Hold: record.
 //              Slide along the cap: zoom.
 //
+// An app listening to volume or Camera Control takes the press instead, and one
+// listening to the side button hears it while it still does all of the above
+// (docs/platform/contract.md 3.8). The side+volume chord is always the system's.
+//
 // The hardware that produces the presses is packages/shell/buttons.ts.
 
 import type { Button, Press } from './buttons.ts'
-import { device } from './device.ts'
+import { device, type Heard, type Listener, offer } from './device.ts'
 
 const HOLD = 500
 const DOUBLE = 300
@@ -31,6 +35,22 @@ let camHold = 0
 let camSlid = false
 let recording = false
 let zoom0 = 1
+
+/** Who took each button's press, so its slide and release reach the same listener. */
+const taken = new Map<Button, Listener>()
+/** Offers a press to the apps; true when one took it. */
+function give<K extends keyof Heard>(button: Button, kind: K, press: Heard[K]) {
+  const listener = offer(kind, press)
+  if (listener) taken.set(button, listener as Listener)
+  return !!listener
+}
+/** Hands a taken press its next event; true when there was one to hand it to. */
+function tell(button: Button, e: Heard[keyof Heard], last = false) {
+  const listener = taken.get(button)
+  if (last) taken.delete(button)
+  listener?.(e)
+  return !!listener
+}
 
 const chordStart = () => {
   clearTimeout(sideHold)
@@ -55,6 +75,7 @@ const chordEnd = () => {
 
 function side(down: boolean) {
   if (down) {
+    give('side', 'side', { action: 'press' })
     sideSpent = false
     if (held.has('up') || held.has('down')) return chordStart()
     sideHold = setTimeout(() => {
@@ -65,6 +86,7 @@ function side(down: boolean) {
     }, HOLD)
     return
   }
+  tell('side', { action: 'release' }, true)
   clearTimeout(sideHold)
   sideHold = 0
   if (chord || chordSpent) return chordEnd()
@@ -81,14 +103,16 @@ function side(down: boolean) {
   }, DOUBLE)
 }
 
-function volume(b: Button, down: boolean) {
+function volume(b: 'up' | 'down', down: boolean) {
   if (!down) {
     clearTimeout(repeat)
     repeat = 0
     if (chord || chordSpent) chordEnd()
+    tell(b, { action: 'release', button: b }, true)
     return
   }
   if (held.has('side')) return chordStart()
+  if (give(b, 'volume', { action: 'press', button: b })) return
   if (device.cameraOpen()) return device.shoot()
   const step = () => {
     device.volume(b === 'up' ? 1 : -1)
@@ -99,6 +123,7 @@ function volume(b: Button, down: boolean) {
 
 function cameraControl(down: boolean) {
   if (down) {
+    if (give('camera', 'camera-control', { action: 'press' })) return
     camSlid = false
     zoom0 = device.zoom()
     camHold = setTimeout(() => {
@@ -109,6 +134,7 @@ function cameraControl(down: boolean) {
     }, RECORD)
     return
   }
+  if (tell('camera', { action: 'release' }, true)) return
   if (camHold) {
     clearTimeout(camHold)
     camHold = 0
@@ -123,6 +149,7 @@ function cameraControl(down: boolean) {
 
 /** One centimetre along the cap doubles the zoom, like sliding Camera Control. */
 function slide(cm: number) {
+  if (held.has('camera') && tell('camera', { action: 'slide', offset: cm })) return
   if (!held.has('camera') || !device.cameraOpen()) return
   if (!camSlid && Math.abs(cm) < 0.04) return
   camSlid = true

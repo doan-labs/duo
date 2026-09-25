@@ -1546,3 +1546,39 @@ dotted, and the hypnogram as one continuous wave that changes colour at each
 stage instead of disjoint blocks. Fitness's WeekBars moves to the same
 vocabulary. Cost: the wave hypnogram no longer shows per-segment time labels
 directly on the blocks; the stage legend under it carries the totals.
+
+## 95. Apps hear the frame's buttons and sensors as device events
+
+2026-09-25. The SDK exposed the hinge (`view.angle`) and the side button's
+double-click claim, and contract 3.8 said single clicks, long press and the
+volume buttons are never forwarded. Apps asked for the rest of the hardware
+the simulator already models: volume, Camera Control, the side button, the
+phone's pose and the Control Center switches.
+
+`os.device.on(type, cb)` is now the one pattern for all of it, returning the
+unsubscribe. On the wire, `device.watch { type }` / `device.unwatch { type }`
+and a single `{ ev: 'device', p: { type, data } }` event. The first listener
+of a type watches, the last one to leave unwatches, so the host routes only
+what something listens to. This supersedes the contract 3.8 sentence above;
+the double-click claim (`os.sideButton`) stays as it was.
+
+- Volume and Camera Control are *taken*: while a view listens and is visible
+  and active, the press goes to it instead of the ringer, the HUD or Camera.
+  Choosing the view follows the double-click claim: first in listen order.
+  The view that took a press keeps its slides and release, so it never sees
+  a stuck button, even if it stopped listening mid-press.
+- The side button is *heard*, never taken. An app must not be able to stop
+  the person locking or powering off the phone. The side and volume chord
+  (screenshot, power-off) stays the system's for the same reason.
+- `orientation` (`{ yaw, hinge }` in degrees) and `switches` are states:
+  the watch reply is the current value, then each change. The SDK replays
+  the latest value to a late listener. The pose is rounded to 0.1°, so an
+  ease that has almost landed stops sending events instead of trickling on.
+- The switches are read-only. Letting any app turn on airplane mode or the
+  torch is a permission question, not an event, and stays unanswered.
+
+The events are opt-in per type for a compatibility reason as much as a
+privacy one: a released SDK closes its connection on an event type it does
+not know, so a type the host sends unasked would break every app built
+before it. Haptics and battery were left out. The simulator has nothing to
+vibrate, and its charge is a constant.

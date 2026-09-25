@@ -7,7 +7,7 @@ export const api: ApiEntry[] = [
     "name": "PlatformError",
     "kind": "class",
     "file": "packages/sdk/guards.ts",
-    "line": 5,
+    "line": 15,
     "doc": "",
     "signature": "class PlatformError extends Error"
   },
@@ -16,7 +16,7 @@ export const api: ApiEntry[] = [
     "name": "CameraHooks",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 3,
+    "line": 5,
     "doc": "What the Camera app publishes for Camera Control and the volume buttons.",
     "signature": "type CameraHooks = {\n  shoot: () => void\n  record: (on: boolean) => void\n  /** Sets the zoom factor when given one; returns the current one. */\n  zoom: (z?: number) => number\n}",
     "members": [
@@ -45,7 +45,7 @@ export const api: ApiEntry[] = [
     "name": "Os",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 10,
+    "line": 12,
     "doc": "",
     "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /** The glass this instance draws on: the folded cover or the open inner display. */\n  display?: 'inner' | 'cover'\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
     "members": [
@@ -104,7 +104,7 @@ export const api: ApiEntry[] = [
     "name": "SettingsHost",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 54,
+    "line": 38,
     "doc": "What the shell hands the Settings app. Baked apps never import the shell, so\nthe switches, the eraser and the link opener arrive as a prop from apps.ts,\nthe way the Store gets `openExternal`.",
     "signature": "type SettingsHost = {\n  /** The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`. */\n  switches: Readonly<Switches>\n  subscribe: (cb: () => void) => () => void\n  revision: () => number\n  flip: (key: keyof Switches, value?: boolean) => void\n  /** The Wi-Fi network and the charge the status stack reports. */\n  network: string\n  battery: number\n  /** Erase All Content and Settings: clears device storage and reloads the shell. */\n  erase: () => Promise<void>\n  openExternal: (url: string) => void\n  /** Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press. */\n  claimSide: (claim: () => boolean) => () => void\n}",
     "members": [
@@ -161,77 +161,6 @@ export const api: ApiEntry[] = [
         "type": "(claim: () => boolean) => () => void",
         "optional": false,
         "doc": "Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press."
-      }
-    ]
-  },
-  {
-    "pkg": "@doan-labs/duo-sdk",
-    "name": "Switches",
-    "kind": "type",
-    "file": "packages/sdk/legacy.ts",
-    "line": 36,
-    "doc": "The device switches Control Center and Settings both flip. One definition, so\nthe shell's store (springboard/toggles.ts) and the baked Settings app cannot\ndrift apart.",
-    "signature": "type Switches = {\n  airplane: boolean\n  cell: boolean\n  wifi: boolean\n  bt: boolean\n  drop: boolean\n  hotspot: boolean\n  rotate: boolean\n  mirror: boolean\n  focus: boolean\n  torch: boolean\n}",
-    "members": [
-      {
-        "name": "airplane",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "cell",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "wifi",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "bt",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "drop",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "hotspot",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "rotate",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "mirror",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "focus",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
-      },
-      {
-        "name": "torch",
-        "type": "boolean",
-        "optional": false,
-        "doc": ""
       }
     ]
   },
@@ -414,10 +343,54 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-sdk",
+    "name": "DeviceEvent",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 58,
+    "doc": "",
+    "signature": "type DeviceEvent = keyof DeviceEvents"
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "DeviceEvents",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 38,
+    "doc": "What `os.device.on(type, cb)` hands `cb`, by type. Button events reach one\nview: the first listener whose view is visible and active when the button\ngoes down, and that view also hears the slide and the release of that press.",
+    "signature": "type DeviceEvents = {\n  /** Volume up or down. While a view hears it, the ringer level does not move. */\n  volume: { action: 'press' | 'release'; button: 'up' | 'down' }\n  /**\n   * Camera Control. While a view hears it, the Camera app neither opens nor shoots.\n   * `offset` is how far the finger has slid along the cap since the press, in\n   * centimetres, positive toward the top of the phone.\n   */\n  'camera-control': { action: 'press' | 'release' } | { action: 'slide'; offset: number }\n  /** The side button. Heard, not taken: it still sleeps, wakes and calls Siri. */\n  side: { action: 'press' | 'release' }\n  /**\n   * The phone's pose, in degrees. `yaw` turns about its long axis, 0 facing you,\n   * positive as the right edge swings away, in [-180, 180). `hinge` is `view.angle`.\n   * Heard first as the current pose, then on each change, at most once a frame.\n   */\n  orientation: { yaw: number; hinge: number }\n  /** Read-only. Heard first as the current switches, then on each flip. */\n  switches: Switches\n}",
+    "members": [
+      {
+        "name": "volume",
+        "type": "{ action: 'press' | 'release'; button: 'up' | 'down' }",
+        "optional": false,
+        "doc": "Volume up or down. While a view hears it, the ringer level does not move."
+      },
+      {
+        "name": "side",
+        "type": "{ action: 'press' | 'release' }",
+        "optional": false,
+        "doc": "The side button. Heard, not taken: it still sleeps, wakes and calls Siri."
+      },
+      {
+        "name": "orientation",
+        "type": "{ yaw: number; hinge: number }",
+        "optional": false,
+        "doc": "The phone's pose, in degrees. `yaw` turns about its long axis, 0 facing you,\npositive as the right edge swings away, in [-180, 180). `hinge` is `view.angle`.\nHeard first as the current pose, then on each change, at most once a frame."
+      },
+      {
+        "name": "switches",
+        "type": "Switches",
+        "optional": false,
+        "doc": "Read-only. Heard first as the current switches, then on each flip."
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
     "name": "ErrCode",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 35,
+    "line": 87,
     "doc": "",
     "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'"
   },
@@ -426,7 +399,7 @@ export const api: ApiEntry[] = [
     "name": "KV",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 83,
+    "line": 138,
     "doc": "",
     "signature": "type KV = {\n  get(k: string): Promise<string | null>\n  set(k: string, v: string): Promise<{ rev: number }>\n  del(k: string): Promise<{ rev: number }>\n  keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>\n  snapshot(cursor?: string): Promise<Snapshot>\n  watch(since: number, cb: (e: Change) => void): () => void\n}",
     "members": []
@@ -436,9 +409,86 @@ export const api: ApiEntry[] = [
     "name": "Limits",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 19,
+    "line": 71,
     "doc": "",
     "signature": "type Limits = typeof LIMITS"
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "Switches",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 19,
+    "doc": "The device switches Control Center and Settings both flip. One definition, so\nthe shell's store (springboard/toggles.ts), the baked Settings app and the\n`switches` device event cannot drift apart. Apps only read them.",
+    "signature": "type Switches = {\n  airplane: boolean\n  cell: boolean\n  wifi: boolean\n  bt: boolean\n  drop: boolean\n  hotspot: boolean\n  rotate: boolean\n  mirror: boolean\n  focus: boolean\n  torch: boolean\n  /** Dark Mode: light apps wear the kit's dark theme; always-dark apps are untouched. */\n  darkMode: boolean\n}",
+    "members": [
+      {
+        "name": "airplane",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "cell",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "wifi",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "bt",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "drop",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "hotspot",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "rotate",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "mirror",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "focus",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "torch",
+        "type": "boolean",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "darkMode",
+        "type": "boolean",
+        "optional": false,
+        "doc": "Dark Mode: light apps wear the kit's dark theme; always-dark apps are untouched."
+      }
+    ]
   },
   {
     "pkg": "@doan-labs/duo-sdk",
@@ -504,7 +554,7 @@ export const api: ApiEntry[] = [
     "name": "WidgetSnapshot",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 14,
+    "line": 66,
     "doc": "",
     "signature": "type WidgetSnapshot = {\n  arg?: string\n  lines: { text: string; role: 'label' | 'value' | 'caption' }[]\n  tint?: 'glass' | 'dark'\n}",
     "members": [
@@ -545,7 +595,7 @@ export const api: ApiEntry[] = [
     "name": "os",
     "kind": "value",
     "file": "packages/sdk/index.ts",
-    "line": 9,
+    "line": 18,
     "doc": "",
     "signature": "os = createClient()"
   },
@@ -813,9 +863,9 @@ export const api: ApiEntry[] = [
     "name": "Menu",
     "kind": "component",
     "file": "packages/uikit/menu.tsx",
-    "line": 41,
-    "doc": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.",
-    "signature": "function Menu({ open, onClose, items, size = 16, itemStyle, xstyle, animate, ...props }: MenuProps)",
+    "line": 48,
+    "doc": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.\n\n`items` is the column of rows, with `'separator'` where iOS rules a line\nbetween groups. `footer` is the row of glyph-over-caption buttons some menus\nend in, Safari's Bookmarks and All Tabs.",
+    "signature": "function Menu({ open, onClose, items, footer, size = 16, itemStyle, xstyle, animate, ...props }: MenuProps)",
     "members": [
       {
         "name": "open",
@@ -831,8 +881,14 @@ export const api: ApiEntry[] = [
       },
       {
         "name": "items",
-        "type": "MenuItem[]",
+        "type": "MenuEntry[]",
         "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "footer",
+        "type": "MenuItem[]",
+        "optional": true,
         "doc": ""
       },
       {
@@ -855,11 +911,20 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-uikit",
+    "name": "MenuEntry",
+    "kind": "type",
+    "file": "packages/uikit/menu.tsx",
+    "line": 46,
+    "doc": "",
+    "signature": "type MenuEntry = MenuItem | 'separator'"
+  },
+  {
+    "pkg": "@doan-labs/duo-uikit",
     "name": "MenuItem",
     "kind": "type",
     "file": "packages/uikit/menu.tsx",
-    "line": 33,
-    "doc": "One action. `checked` present makes the row a radio and puts a tick on the\ntrailing edge in place of `icon`; `name` is what a screen reader says when the\nvisible label is not enough on its own.",
+    "line": 38,
+    "doc": "One action. The glyph sits on the leading edge, as iOS 26 draws it; `checked`\npresent makes the row a radio and puts a tick on the trailing edge. `name` is\nwhat a screen reader says when the visible label is not enough on its own.",
     "signature": "type MenuItem = {\n  label: ReactNode\n  icon?: SymProps['name']\n  checked?: boolean\n  disabled?: boolean\n  name?: string\n  onSelect: () => void\n}",
     "members": [
       {
@@ -905,9 +970,9 @@ export const api: ApiEntry[] = [
     "name": "MenuProps",
     "kind": "type",
     "file": "packages/uikit/menu.tsx",
-    "line": 19,
-    "doc": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.",
-    "signature": "type MenuProps = Omit<PrimitiveProps<'div'>, 'children' | 'as'> & {\n  open: boolean\n  onClose: () => void\n  items: MenuItem[]\n  /** Row glyph size; a menu set in a smaller type step wants a smaller one. */\n  size?: number\n  itemStyle?: KitStyle\n}"
+    "line": 23,
+    "doc": "The iOS pop-up menu: a sheet of actions that floats out of the control which\nopened it and sinks back once one is chosen. The caller keeps `open` and puts\n`aria-expanded` on that control; `onClose` runs after the chosen action.\n\nThe sheet carries no coordinates of its own, so `xstyle` both places it —\npinned to a corner, or stacked above a toolbar — and tints it: a menu over a\nmap wants a near-opaque white, one over a night sky wants the dark glass.\n`itemStyle` is the app's type step and padding for a row.\n\n`items` is the column of rows, with `'separator'` where iOS rules a line\nbetween groups. `footer` is the row of glyph-over-caption buttons some menus\nend in, Safari's Bookmarks and All Tabs.",
+    "signature": "type MenuProps = Omit<PrimitiveProps<'div'>, 'children' | 'as'> & {\n  open: boolean\n  onClose: () => void\n  items: MenuEntry[]\n  footer?: MenuItem[]\n  /** Row glyph size; a menu set in a smaller type step wants a smaller one. */\n  size?: number\n  itemStyle?: KitStyle\n}"
   },
   {
     "pkg": "@doan-labs/duo-uikit",
@@ -1247,8 +1312,8 @@ export const api: ApiEntry[] = [
     "name": "Sheet",
     "kind": "component",
     "file": "packages/uikit/sheet.tsx",
-    "line": 23,
-    "doc": "A modal card over the app: a native `<dialog>`, so focus, Escape and the\nbackdrop come from the platform. `open` drives `showModal`; `onClose` fires\nfor Escape and a click outside the card as well as your own buttons. Closing\nis held back until the card has shrunk away, so it leaves the way it came.",
+    "line": 26,
+    "doc": "A modal card over the app. It is a non-modal `<dialog>` on purpose:\n`showModal` would lift the card into the top layer, and Chromium hit-tests\ntop-layer content at its untransformed position - inside the scene's\npreserve-3d transform every point lands behind the card, dead to the finger.\nThe `open` attribute keeps it in the transformed tree where hit-testing is\nhonest, and the scrim, Escape and closing are drawn by hand. Closing is held\nback until the card has shrunk away, so it leaves the way it came.",
     "signature": "function Sheet({ open, onClose, xstyle, animate, ...props }: SheetProps)",
     "members": [
       {
@@ -1273,8 +1338,8 @@ export const api: ApiEntry[] = [
     "name": "SheetProps",
     "kind": "type",
     "file": "packages/uikit/sheet.tsx",
-    "line": 19,
-    "doc": "A modal card over the app: a native `<dialog>`, so focus, Escape and the\nbackdrop come from the platform. `open` drives `showModal`; `onClose` fires\nfor Escape and a click outside the card as well as your own buttons. Closing\nis held back until the card has shrunk away, so it leaves the way it came.",
+    "line": 22,
+    "doc": "A modal card over the app. It is a non-modal `<dialog>` on purpose:\n`showModal` would lift the card into the top layer, and Chromium hit-tests\ntop-layer content at its untransformed position - inside the scene's\npreserve-3d transform every point lands behind the card, dead to the finger.\nThe `open` attribute keeps it in the transformed tree where hit-testing is\nhonest, and the scrim, Escape and closing are drawn by hand. Closing is held\nback until the card has shrunk away, so it leaves the way it came.",
     "signature": "type SheetProps = Omit<PrimitiveProps<'dialog'>, 'as' | 'open' | 'onClose'> & {\n  open: boolean\n  onClose: () => void\n}"
   },
   {

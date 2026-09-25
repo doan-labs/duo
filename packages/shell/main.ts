@@ -6,7 +6,7 @@ import { USDLoader } from 'three/addons/loaders/USDLoader.js'
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js'
 import { buttons } from './buttons.ts'
 import { type Cue, cancel, cue } from './cues.ts'
-import { booted, busy, device, follow, goHome, lockState, unlockAll } from './device.ts'
+import { booted, busy, device, follow, goHome, lockState, setPose, unlockAll } from './device.ts'
 import { press } from './device-buttons.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
@@ -756,6 +756,7 @@ renderer.setAnimationLoop((now) => {
   bend.value = ((180 - angle) / 180) * Math.PI
   hinge.rotation.y = bend.value
   phone.rotation.y = yaw
+  setPose(yaw, angle)
   hardware.tick(dt / 1000)
   const torch = toggles.torch && !device.off
   for (const m of led) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = torch ? 6 : 0

@@ -3,7 +3,7 @@
 // shell on purpose, so packages/shell/device-buttons.ts and packages/shell/main.ts can reach the hardware
 // side of iOS without importing the UI.
 
-import type { CameraHooks } from '@doan-labs/duo-sdk'
+import type { CameraHooks, DeviceEvents } from '@doan-labs/duo-sdk'
 
 // The home bar is a 5 px pill on a panel you may be looking at edge-on, and
 // there is no swipe-up gesture here, so the page keeps a Home button.
@@ -179,5 +179,49 @@ export const claimSide = (claim: () => boolean) => {
   sideClaims.add(claim)
   return () => {
     sideClaims.delete(claim)
+  }
+}
+
+/** The frame buttons an app can listen to, in the words it hears them. */
+export type Heard = Pick<DeviceEvents, 'volume' | 'camera-control' | 'side'>
+/** Answers a press with whether it took it; a listener that did also hears that press's slide and release. */
+export type Listener<K extends keyof Heard = keyof Heard> = (e: Heard[K]) => boolean
+const listeners: { [K in keyof Heard]: Set<Listener<K>> } = {
+  volume: new Set(),
+  'camera-control': new Set(),
+  side: new Set()
+}
+/** An app listening to a frame button, from packages/shell/runtime/device-events.ts. Returns the stop. */
+export function listen<K extends keyof Heard>(button: K, listener: Listener<K>) {
+  listeners[button].add(listener)
+  return () => {
+    listeners[button].delete(listener)
+  }
+}
+/** The first listener, in listening order, that takes the press; none leaves it to the system. */
+export function offer<K extends keyof Heard>(button: K, press: Heard[K]): Listener<K> | undefined {
+  for (const listener of listeners[button]) if (listener(press)) return listener
+}
+
+/**
+ * The phone's pose in degrees, as main.ts last drew it. Rounded to a tenth, so
+ * an ease that has all but landed stops talking instead of trickling forever.
+ */
+const pose = { yaw: 0, hinge: 180 }
+const poseWatchers = new Set<() => void>()
+const tenth = (n: number) => Math.round(n * 10) / 10
+export function setPose(yaw: number, hinge: number) {
+  // Radians that pile up turn after turn, into [-180, 180) degrees.
+  const deg = (((((yaw * 180) / Math.PI) % 360) + 540) % 360) - 180
+  const next = { yaw: tenth(deg) === 180 ? -180 : tenth(deg), hinge: tenth(hinge) }
+  if (next.yaw === pose.yaw && next.hinge === pose.hinge) return
+  Object.assign(pose, next)
+  for (const f of poseWatchers) f()
+}
+export const orientation = () => ({ ...pose })
+export const watchOrientation = (f: () => void) => {
+  poseWatchers.add(f)
+  return () => {
+    poseWatchers.delete(f)
   }
 }

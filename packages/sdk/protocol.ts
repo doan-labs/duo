@@ -11,6 +11,58 @@ export type ViewInfo = {
   focused: boolean
   angle: number
 }
+/**
+ * The device switches Control Center and Settings both flip. One definition, so
+ * the shell's store (springboard/toggles.ts), the baked Settings app and the
+ * `switches` device event cannot drift apart. Apps only read them.
+ */
+export type Switches = {
+  airplane: boolean
+  cell: boolean
+  wifi: boolean
+  bt: boolean
+  drop: boolean
+  hotspot: boolean
+  rotate: boolean
+  mirror: boolean
+  focus: boolean
+  torch: boolean
+  /** Dark Mode: light apps wear the kit's dark theme; always-dark apps are untouched. */
+  darkMode: boolean
+}
+/**
+ * What `os.device.on(type, cb)` hands `cb`, by type. Button events reach one
+ * view: the first listener whose view is visible and active when the button
+ * goes down, and that view also hears the slide and the release of that press.
+ */
+export type DeviceEvents = {
+  /** Volume up or down. While a view hears it, the ringer level does not move. */
+  volume: { action: 'press' | 'release'; button: 'up' | 'down' }
+  /**
+   * Camera Control. While a view hears it, the Camera app neither opens nor shoots.
+   * `offset` is how far the finger has slid along the cap since the press, in
+   * centimetres, positive toward the top of the phone.
+   */
+  'camera-control': { action: 'press' | 'release' } | { action: 'slide'; offset: number }
+  /** The side button. Heard, not taken: it still sleeps, wakes and calls Siri. */
+  side: { action: 'press' | 'release' }
+  /**
+   * The phone's pose, in degrees. `yaw` turns about its long axis, 0 facing you,
+   * positive as the right edge swings away, in [-180, 180). `hinge` is `view.angle`.
+   * Heard first as the current pose, then on each change, at most once a frame.
+   */
+  orientation: { yaw: number; hinge: number }
+  /** Read-only. Heard first as the current switches, then on each flip. */
+  switches: Switches
+}
+export type DeviceEvent = keyof DeviceEvents
+export const DEVICE_EVENTS = [
+  'volume',
+  'camera-control',
+  'side',
+  'orientation',
+  'switches'
+] as const satisfies readonly DeviceEvent[]
 export type WidgetSnapshot = {
   arg?: string
   lines: { text: string; role: 'label' | 'value' | 'caption' }[]
@@ -52,6 +104,8 @@ export type Method =
   | 'home'
   | 'side.claim'
   | 'side.release'
+  | 'device.watch'
+  | 'device.unwatch'
   | ServiceMethod
 export type Hello = { t: 'hello'; protocol: number; sdk: string; nonce: string }
 export type Welcome = {
@@ -71,6 +125,7 @@ export type Evt =
   | { ev: 'arg'; p: { arg: string; argSeq: number } }
   | { ev: 'owner'; p: { epoch: number } | null }
   | { ev: 'side'; p: { action: 'double' } }
+  | { [K in DeviceEvent]: { ev: 'device'; p: { type: K; data: DeviceEvents[K] } } }[DeviceEvent]
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
   | { ev: 'command-result'; p: { cmdId: string } }
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }

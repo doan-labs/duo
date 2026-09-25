@@ -98,7 +98,7 @@ packages/
   shell/            scene, HUD, hardware buttons, shaders, native.ts, index.html
     springboard/    display layers, scenes, gestures and device controls
     apps.ts         remaining baked apps and home grid
-    runtime/        isolated app bridge, storage, lifecycle, catalog and registry
+    runtime/        isolated app bridge, device events, storage, lifecycle, catalog and registry
     desktop/        Tauri crate, commands/ and platform/
   uikit/            harvested typed components, tokens, icons and shared helpers
   sdk/              host types, sandbox contract/client and async React adapter

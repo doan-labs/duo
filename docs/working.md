@@ -84,6 +84,13 @@ coordinates, so zoom affects gesture distances. See [architecture](architecture.
 Camera publishes `shoot`, `record`, `zoom` via legacy `os.camera` in an effect and clears
 it on unmount. `scenes.ts` and `device.ts` route these hooks to the frame buttons.
 
+A sandboxed app listening through `os.device.on('volume' | 'camera-control')` takes
+those presses before any row above runs; `device-buttons.ts` offers each press to
+`device.ts` listeners first and remembers the taker, so the slide and release follow it.
+Keep the side button and the chord checks ahead of any offer: apps hear `side`, they never
+take it. A new device event type must go only to views that watched it, because a released
+SDK revokes itself on an event type it does not know.
+
 ## Adding things
 
 ### Trusted baked app

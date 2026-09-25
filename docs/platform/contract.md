@@ -16,6 +16,8 @@ and updates and completed the kit/audit. [The roadmap](roadmap.md) owns remainin
 Current amendments: development src executes verified Blob bytes; app code calls ready
 (the kit is passive); external catalogs and previews accept no device permissions;
 camera/microphone are always refused. Updates bind to the installed catalog origin.
+Device events (§3.8, decision 95) forward volume, Camera Control and side button presses,
+the phone's pose and the read-only switches, only to a view that asked for each type.
 No periodic catalog polling or automatic native updater is enabled. These scope limits
 preserve the sandbox, generation, session, transaction and lifecycle safeguards below.
 
@@ -292,6 +294,7 @@ export type Evt =
   | { ev: 'arg'; p: { arg: string; argSeq: number } }
   | { ev: 'owner'; p: { epoch: number } | null }
   | { ev: 'side'; p: { action: 'double' } }                 // only to a view that claimed it, §3.8
+  | { ev: 'device'; p: { type: DeviceEvent; data: DeviceEvents[DeviceEvent] } }  // only watched types, §3.8
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
   | { ev: 'command-result'; p: { cmdId: string } }
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }
@@ -307,6 +310,7 @@ export type Method =
   | 'widget.set'
   | 'open' | 'home'
   | 'side.claim' | 'side.release'
+  | 'device.watch' | 'device.unwatch'                   // { type: DeviceEvent }, §3.8
   | ServiceMethod                                       // §6, gated by the manifest's permissions
 
 export type ErrCode =
@@ -357,7 +361,7 @@ the last 256 completed ids with their results per view; a repeated id returns
 the recorded result without re-executing. The SDK's timeout (5 s) retries a
 mutating request once with the same id, then surfaces `E_TIMEOUT`; the app
 then reads back (`get`) to reconcile, because a timeout does not prove the
-write failed. `open`, `home`, `side.claim` and `side.release` are never retried.
+write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch` and `device.unwatch` are never retried.
 
 | Limit | Value | Error |
 | --- | --- | --- |
@@ -477,6 +481,8 @@ export const os: {
   home(): Promise<void>
   /** The frame's side button (§3.8). While claimed and this view is visible and active, a double-click reaches onDouble instead of opening Wallet. */
   sideButton: { claim(): Promise<void>; release(): Promise<void>; onDouble(cb: () => void): () => void }
+  /** The phone's hardware (§3.8). The first listener of a type watches it on the host, the last one to leave unwatches it. */
+  device: { on<K extends DeviceEvent>(type: K, cb: (e: DeviceEvents[K]) => void): () => void }
   /** Host services (§6). Present on the object; each call is E_DENIED unless declared. */
   photos: { list(): Promise<Photo[]>; get(id: string): Promise<Blob>; add(blob: Blob): Promise<Photo> }
 }
@@ -713,9 +719,35 @@ The frame's side button double-click opens Wallet. A view may claim it with
 payment sheet. On the next double-click the shell asks each claiming view in
 claim order; the first whose `ViewInfo` is visible and active receives
 `{ev:'side', p:{action:'double'}}` and Wallet does not open. If no claiming view
-qualifies, Wallet opens as before. Single clicks, long press and the volume
-buttons are never forwarded. `side.release` drops the claim; revocation drops
+qualifies, Wallet opens as before. `side.release` drops the claim; revocation drops
 it too, so a closed or crashed app cannot keep the button.
+
+Amended (decision 95, superseding "single clicks, long press and the volume buttons
+are never forwarded"): the frame's buttons and sensors reach a view through
+`device.watch { type }`, and only the types it watches. The SDK's `os.device.on(type, cb)`
+watches on the first listener and unwatches on the last. Types (`DeviceEvents` in
+`packages/sdk/protocol.ts` owns the payloads):
+
+| Type | Payload | The system's own action |
+| --- | --- | --- |
+| `volume` | `press`/`release` of `up` or `down` | Taken: no ringer step, HUD or Camera shutter |
+| `camera-control` | `press`/`release`, `slide` with `offset` cm since the press | Taken: Camera neither opens, shoots, records nor zooms |
+| `side` | `press`/`release` | Kept: sleep, wake, Wallet, Siri and power still run |
+| `orientation` | `{ yaw, hinge }` degrees, current value first | None; the simulated pose, rounded to 0.1° |
+| `switches` | the Control Center `Switches`, current value first | None; read-only, no method writes them |
+
+A press goes to the first watching view, in watch order, whose `ViewInfo` is visible
+and active when the button goes down, exactly as the double-click claim chooses; no
+qualifying view leaves the press to the system. The view that took a press also receives
+that press's slides and its release, even if it stopped watching or stopped being
+visible in between, so it never sees a stuck button. The side and volume chord is always
+the system's (screenshot, power-off), and the side button is never taken: an app hears
+it but cannot keep the person from locking the phone. The reply to `device.watch` for
+`orientation` and `switches` is the current value; each change follows as an event,
+orientation at most once per rendered frame. An SDK treats an event type it does not know
+as a protocol error, so the host sends a type only to a view that watched it, and a new
+type is safe to add without breaking released apps. `device.unwatch` and revocation stop
+delivery and drop every button the view listened to.
 
 ## 4. Storage and release lifecycle
 
