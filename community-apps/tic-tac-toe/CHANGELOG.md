@@ -10,6 +10,10 @@
 - Added a mark pop, a board-in entrance, a win-line reveal, and a reset
   transition; every animation is one-shot, composited, and gated behind
   reduced-motion.
+- Added synth sound cues: a woodblock tick on each placement, a rising win
+  jingle, and a soft two-note motif on a draw. A win also pops sparkles off
+  the line and makes the board rumble, with `navigator.vibrate` where the
+  hardware has it.
 - Live game state (board, turn, scores) now syncs through session storage,
   so folding the phone hands the same in-progress match to the other
   display. The win tally stays persisted across launches.

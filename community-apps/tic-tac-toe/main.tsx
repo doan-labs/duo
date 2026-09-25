@@ -4,6 +4,7 @@ import { Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { cue } from './audio.ts'
 import {
   adoptBoard,
   type Board,
@@ -59,6 +60,9 @@ function lineGeometry(line: WinLine, board: number) {
   }
 }
 
+// Pops along the win bar, alternately thrown to each side.
+const SPARKS = [0.07, 0.19, 0.31, 0.43, 0.55, 0.67, 0.79, 0.91]
+
 function Game() {
   const view = useDisplay()
   const [rootRef, wide] = useWide<HTMLElement>()
@@ -69,6 +73,7 @@ function Game() {
   const [round, setRound] = useState(0)
   const seeded = useRef(false)
   const lastSeen = useRef<string | null>(null)
+  const celebrated = useRef(-1)
   const fit = fitLayout(view, wide)
 
   const line = winLine(board)
@@ -122,6 +127,16 @@ function Game() {
     }
   }, [saved.value, saved.status, publish, stored.status, stored.value, stored.set, scores])
 
+  // Celebrate once per round: only the glass the player is looking at plays
+  // the jingle, so the two views never double it. The rumble pattern is the
+  // hardware half of the same beat; the board's own jitter is the visible half.
+  useEffect(() => {
+    if (!finished || celebrated.current === round) return
+    celebrated.current = round
+    if (view.active) cue(result ? 'win' : 'draw')
+    if (result) navigator.vibrate?.([50, 40, 80])
+  }, [finished, result, round, view.active])
+
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
@@ -137,6 +152,7 @@ function Game() {
     setBoard(next)
     setTurn(nextTurn)
     if (nextLine) void stored.set(JSON.stringify(nextScores))
+    cue('place')
     publish(next, nextTurn, nextScores, round)
   }
 
@@ -183,7 +199,12 @@ function Game() {
           key={round}
           role="grid"
           aria-label="Tic-Tac-Toe board"
-          {...stylex.props(styles.board, styles.fitBoard(fit.board))}
+          {...stylex.props(
+            styles.board,
+            styles.fitBoard(fit.board),
+            line && styles.celebrate,
+            !line && draw && styles.celebrateDraw
+          )}
         >
           {board.map((mark, index) => (
             <button
@@ -212,6 +233,23 @@ function Game() {
               )}
             />
           )}
+          {beam &&
+            SPARKS.map((f, i) => {
+              const rad = (beam.deg * Math.PI) / 180
+              const x = beam.x + Math.cos(rad) * beam.width * f - 3.5
+              const y = beam.y + Math.sin(rad) * beam.width * f - 3.5
+              return (
+                <span
+                  key={f}
+                  aria-hidden="true"
+                  {...stylex.props(
+                    styles.spark,
+                    result === 'X' ? styles.sparkX : styles.sparkO,
+                    styles.fitSpark(x, y, beam.deg + (i % 2 === 0 ? 90 : -90), 0.3 + i * 0.05)
+                  )}
+                />
+              )
+            })}
         </div>
         <aside {...stylex.props(styles.rail, !wide && styles.railCover)}>
           <div role="group" aria-label="Game controls" {...stylex.props(styles.controls, wide && styles.controlsWide)}>

@@ -42,6 +42,26 @@ const cardIn = stylex.keyframes({
   '0%': { opacity: 0, translate: '0 14px', scale: '.92' },
   '100%': { opacity: 1, translate: '0 0', scale: '1' }
 })
+// Round-end celebration: a pump-and-jitter so the board reads as rumbling,
+// then sparkles that burst off the win bar. Every sparkle is rotated onto the
+// line's axis, so the same keyframe throws them perpendicular either way.
+const winPulse = stylex.keyframes({
+  '0%': { scale: '1', translate: '0 0' },
+  '30%': { scale: '1.05', translate: '-3px 0' },
+  '55%': { scale: '.99', translate: '3px 1px' },
+  '75%': { scale: '1.02', translate: '-1px 0' },
+  '100%': { scale: '1', translate: '0 0' }
+})
+const drawPulse = stylex.keyframes({
+  '0%': { scale: '1' },
+  '45%': { scale: '1.02' },
+  '100%': { scale: '1' }
+})
+const spark = stylex.keyframes({
+  '0%': { opacity: 0, scale: '.4', translate: '0 0' },
+  '35%': { opacity: 1, scale: '1.15' },
+  '100%': { opacity: 0, scale: '.9', translate: '0 -30px' }
+})
 
 export const styles = stylex.create({
   root: {
@@ -217,6 +237,40 @@ export const styles = stylex.create({
   },
   lineX: { backgroundColor: colors.cyanDark, boxShadow: '0 0 16px rgba(60,211,254,.6)' },
   lineO: { backgroundColor: colors.orangeDark, boxShadow: '0 0 16px rgba(255,147,48,.6)' },
+  // Finish animations replace the board-in entrance on the same element; by
+  // then it has already played, so the swap is invisible.
+  celebrate: {
+    animationName: { default: winPulse, [reduce]: 'none' },
+    animationDuration: '.55s',
+    animationTimingFunction: easing.spring,
+    animationFillMode: 'both'
+  },
+  celebrateDraw: {
+    animationName: { default: drawPulse, [reduce]: 'none' },
+    animationDuration: '.4s',
+    animationTimingFunction: easing.spring,
+    animationFillMode: 'both'
+  },
+  spark: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: radius.pill,
+    pointerEvents: 'none',
+    animationName: { default: spark, [reduce]: 'none' },
+    animationDuration: '.62s',
+    animationTimingFunction: easing.spring,
+    animationFillMode: 'both'
+  },
+  sparkX: { backgroundColor: colors.cyan, boxShadow: '0 0 10px rgba(60,211,254,.8)' },
+  sparkO: { backgroundColor: colors.orange, boxShadow: '0 0 10px rgba(255,147,48,.8)' },
+  // rotate aims the burst off the bar's axis; delay staggers the pop.
+  fitSpark: (x: number, y: number, deg: number, delay: number) => ({
+    left: `${x}px`,
+    top: `${y}px`,
+    rotate: `${deg}deg`,
+    animationDelay: `${delay}s`
+  }),
   fitLine: (width: number, height: number, x: number, y: number, deg: number) => ({
     width: `${width}px`,
     height: `${height}px`,
