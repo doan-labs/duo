@@ -1547,7 +1547,82 @@ stage instead of disjoint blocks. Fitness's WeekBars moves to the same
 vocabulary. Cost: the wave hypnogram no longer shows per-segment time labels
 directly on the blocks; the stage legend under it carries the totals.
 
-## 95. Stocks quotes the market instead of inventing one
+## 95. Apps hear the frame's buttons and sensors as device events
+
+2026-09-25. The SDK exposed the hinge (`view.angle`) and the side button's
+double-click claim, and contract 3.8 said single clicks, long press and the
+volume buttons are never forwarded. Apps asked for the rest of the hardware
+the simulator already models: volume, Camera Control, the side button, the
+phone's pose and the Control Center switches.
+
+`os.device.on(type, cb)` is now the one pattern for all of it, returning the
+unsubscribe. On the wire, `device.watch { type }` / `device.unwatch { type }`
+and a single `{ ev: 'device', p: { type, data } }` event. The first listener
+of a type watches, the last one to leave unwatches, so the host routes only
+what something listens to. This supersedes the contract 3.8 sentence above;
+the double-click claim (`os.sideButton`) stays as it was.
+
+- Volume and Camera Control are *taken*: while a view listens and is visible
+  and active, the press goes to it instead of the ringer, the HUD or Camera.
+  Choosing the view follows the double-click claim: first in listen order.
+  The view that took a press keeps its slides and release, so it never sees
+  a stuck button, even if it stopped listening mid-press.
+- The side button is *heard*, never taken. An app must not be able to stop
+  the person locking or powering off the phone. The side and volume chord
+  (screenshot, power-off) stays the system's for the same reason.
+- `orientation` (`{ yaw, hinge }` in degrees) and `switches` are states:
+  the watch reply is the current value, then each change. The SDK replays
+  the latest value to a late listener. The pose is rounded to 0.1°, so an
+  ease that has almost landed stops sending events instead of trickling on.
+- The switches are read-only. Letting any app turn on airplane mode or the
+  torch is a permission question, not an event, and stays unanswered.
+
+The events are opt-in per type for a compatibility reason as much as a
+privacy one: a released SDK closes its connection on an event type it does
+not know, so a type the host sends unasked would break every app built
+before it. Haptics and battery were left out. The simulator has nothing to
+vibrate, and its charge is a constant.
+
+## 96. The /sdk page hears the real shell, as an app would
+
+`/sdk` stops forwarding to `/docs/sdk` and becomes the showcase for decision
+95, with an SDK item in the global bar. Each device event type is one chapter
+beside one sticky phone: the sample code, the sample's own variables and the
+last payloads. The chapter in the middle of the screen poses the phone so its
+buttons face the reader.
+
+Every number on the page comes from the shell. The embed bridge gained
+`{ hear: [...types] }`, answered with `{ device: { type, data } }` to the
+origin that asked, and `packages/shell/embed-device.ts` builds it from the same
+`deviceEvents` a sandboxed view uses, as a view that is always visible and
+active. So the page takes volume and Camera Control presses exactly as a
+listening app would, and the side button still sleeps the phone. A page-side
+simulation was rejected: it would show what we meant the events to be, not
+what the shell sends. A `control` cue pulls Control Center down, because the
+switches are read-only and the reader has to flip them in the phone.
+
+Only one frame renders, for the WebGL budget decision 76 set, and the page
+never hears anything until it asks, as with apps.
+
+`yaw` is measured from the eye, not the world: it is the phone's own turn less
+the camera's orbit azimuth. Dragging the phone orbits the camera, and to the
+person that is turning the phone, so an app hears it. Only the azimuth counts;
+tilting the camera up or down is not a turn about the long axis.
+
+The page opens on a tour: a ring pulses on the cap the chapter is about and a
+card beside it says what to do, with Back and Next walking the chapters. The
+page cannot see into the frame, so the shell reports where the caps are
+(`{ spots }` on the bridge, projected from the same hit boxes a pointer
+presses) after each frame that moved one, and the ring rides the pose ease
+instead of landing where the phone used to be. A ring goes once its chapter
+is tried: a press for the buttons, a turn away from the page's pose for the
+orientation, a flip for the switches, since those two arrive as state on
+their own.
+Closed, the tour leaves a "Show the tour" bubble in the stage's top right,
+breathing a ring so a reader who closed it by accident finds the way back; it
+reopens on the chapter in view.
+
+## 97. Stocks quotes the market instead of inventing one
 
 2026-09-25. The Stocks app was the last fake feed on the phone: a seeded `walk()`
 that produced plausible numbers for every ticker, hardcoded rows, dead range pills
@@ -1570,7 +1645,7 @@ decoupled from the list so a searched or unfollowed symbol still has a detail,
 and every fetch and timer is gated on `!os.mirror` so the second copy draws
 everything and starts nothing.
 
-## 96. The Stocks detail chart is LiveLine, not a drawn SVG
+## 98. The Stocks detail chart is LiveLine, not a drawn SVG
 
 2026-09-25. The detail chart now renders through `liveline` (LiveLine) instead of
 the app's hand-drawn SVG: a 60fps canvas line with a live dot, value badge,

@@ -3,6 +3,7 @@ import { app, fonts, leading, typeScale } from '@doan-labs/duo-uikit/tokens.styl
 import * as stylex from '@stylexjs/stylex'
 import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
+import { initializeNews } from './data.ts'
 import { News } from './index.tsx'
 
 function Screen() {
@@ -11,18 +12,7 @@ function Screen() {
   }, [])
   return (
     <div {...stylex.props(styles.root)}>
-      <News
-        os={{
-          shots: [],
-          home: () => {
-            void os.home()
-          },
-          open: (id, arg) => {
-            void os.open(id, arg)
-          },
-          camera: { current: null }
-        }}
-      />
+      <News />
     </div>
   )
 }
@@ -40,4 +30,5 @@ const styles = stylex.create({
   }
 })
 await os.connect()
+await initializeNews()
 createRoot(document.body).render(<Screen />)

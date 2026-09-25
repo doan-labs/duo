@@ -43,6 +43,11 @@ Commands resolve after the owner callback acknowledges. Internally the ordered
 request acknowledges admission first, then a separate command-result event
 settles the SDK promise; this allows owner callbacks to await storage safely.
 
+`os.device.on(type, cb)` hears the hardware and returns the unsubscribe: `volume`
+and `camera-control` (taken from the system while a visible, active view listens),
+`side` (heard, never taken), and the states `orientation` (`{ yaw, hinge }`) and read-only
+`switches`, which deliver their current value first. Only watched types cross the bridge.
+
 Camera/microphone declarations are rejected and frame policy always denies
 them. Other permission adapters remain, but external developer catalogs accept
 no device permissions at the MVP gate. This is not a claim of full browser or

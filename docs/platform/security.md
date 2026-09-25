@@ -61,6 +61,14 @@ Locks serialize lifecycle work; leases coordinate tabs; BroadcastChannel is only
 invalidation signal. Request/storage quotas, rate limits and retries are specified in
 [the contract](contract.md). Never disable reconciliation merely to hide an optional UI.
 
+## Device events
+
+A view hears only the device event types it watched, and a button only while it is
+visible and active. It can take volume and Camera Control presses from the system, never
+the side button or the side+volume chord, so no app can keep the person from locking or
+powering off the phone. The switches are read-only and the pose is the simulated model's,
+not the host machine's sensors. Revocation drops every listener. See contract §3.8.
+
 ## Enabled permissions
 
 Camera/microphone are rejected globally pending a separate host-mediated media design.

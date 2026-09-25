@@ -6,8 +6,9 @@ import { USDLoader } from 'three/addons/loaders/USDLoader.js'
 import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js'
 import { buttons } from './buttons.ts'
 import { type Cue, cancel, cue } from './cues.ts'
-import { booted, busy, device, follow, goHome, lockState, unlockAll } from './device.ts'
+import { booted, busy, device, follow, goHome, lockState, setPose, unlockAll } from './device.ts'
 import { press } from './device-buttons.ts'
+import { hear } from './embed-device.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
 import { os } from './os.tsx'
@@ -46,7 +47,9 @@ document.documentElement.classList.toggle('web', !isDesktop)
 startBuilderPreview()
 
 // An embedding page drives the backdrop, the pose and what the phone is doing: `?bg=` at
-// load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage (cues in cues.ts).
+// load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage (cues in cues.ts),
+// and `{ hear }` to be told the hardware events an app would hear (embed-device.ts),
+// `{ spots }` to be told where the buttons are on screen, every frame they move.
 // Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
 type Pose = {
@@ -58,9 +61,14 @@ type Pose = {
   arg?: string
   cue?: Cue
   hello?: boolean
+  hear?: unknown[]
+  spots?: boolean
 }
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
+/** The page that asked where the buttons are, and what it was last told. */
+let spotsTo: string | null = null
+let spotsSent = ''
 const paint = (bg: string | null) => {
   if (bg) document.body.style.background = bg
 }
@@ -78,13 +86,23 @@ const local = (o: string) => location.hostname === 'localhost' && new URL(o).hos
 let shown = false
 addEventListener('message', (e: MessageEvent<Pose>) => {
   if (e.source !== parent || typeof e.data !== 'object' || !e.data) return
-  if (e.origin !== location.origin && !local(e.origin)) return
+  if (e.origin !== location.origin && !local(e.origin)) {
+    console.warn(
+      `[duo] embed message from ${e.origin} ignored: only ${location.origin} or a localhost page may drive the shell`
+    )
+    return
+  }
   // `hello` is the page saying it is listening now. Both announcements below can
   // land before an embedding page has hydrated, which would leave the frame
   // hidden for good, so the state is repeated on request.
   if (e.data.hello) announce(shown ? { ready: true } : { live: true })
   if (typeof e.data.bg === 'string') paint(e.data.bg)
   if (typeof e.data.paused === 'boolean') paused = e.data.paused
+  if (Array.isArray(e.data.hear)) hear(e.data.hear, e.origin)
+  if (typeof e.data.spots === 'boolean') {
+    spotsTo = e.data.spots ? e.origin : null
+    spotsSent = ''
+  }
   if (pose) pose(e.data)
   else queued = { ...queued, ...e.data }
 })
@@ -590,6 +608,8 @@ const lead = () => follow(targetAngle > HANDOVER)
 pose = (m) => {
   if (typeof m.deg === 'number') setAngle(m.deg)
   if (typeof m.yaw === 'number') {
+    // A page turns the phone to face its reader, which only holds from the front: a new yaw brings the camera home.
+    homing ||= m.yaw !== targetYaw
     targetYaw = m.yaw
     hud.yaw(targetYaw)
   }
@@ -756,6 +776,8 @@ renderer.setAnimationLoop((now) => {
   bend.value = ((180 - angle) / 180) * Math.PI
   hinge.rotation.y = bend.value
   phone.rotation.y = yaw
+  // Facing you means facing the eye: a drag orbits the camera, not the phone, and still turns it as you see it.
+  setPose(yaw - controls.getAzimuthalAngle(), angle)
   hardware.tick(dt / 1000)
   const torch = toggles.torch && !device.off
   for (const m of led) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = torch ? 6 : 0
@@ -781,6 +803,12 @@ renderer.setAnimationLoop((now) => {
   frame()
   hud.orbit(controls.getAzimuthalAngle(), controls.getPolarAngle(), controls.getDistance(), yaw)
   renderer.render(scene, camera)
+  if (spotsTo) {
+    const spots = hardware.spots()
+    const now = JSON.stringify(spots)
+    if (now !== spotsSent) parent.postMessage({ spots }, spotsTo)
+    spotsSent = now
+  }
   // A DOM panel has no depth test and can't bend, so a panel stands in for the
   // bake only where the bake cannot draw what is up: the inner one flat, or
   // holding an app through the fold; the cover closed, or holding the app at

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { compatible, semver, supports } from './compat.ts'
-import { bytes, keyValid, requestValid, widgetValid } from './guards.ts'
+import { bytes, deviceEventName, deviceEventValid, keyValid, requestValid, widgetValid } from './guards.ts'
 import { networkOrigin } from './manifest.ts'
 import { frameAllow, permissionsValid, servicePermission } from './permissions.ts'
 
@@ -60,4 +60,19 @@ test('UTF-8 bounds and request/widget guards', () => {
   assert.equal(requestValid({ id: 1, m: 'native.exec' }), false)
   assert.equal(widgetValid({ lines: [{ text: 'hello', role: 'value' }] }), true)
   assert.equal(widgetValid({ lines: [{ text: 'a'.repeat(65), role: 'value' }] }), false)
+})
+test('device events: known types only, and every payload checked', () => {
+  assert.equal(requestValid({ id: 1, m: 'device.watch', p: { type: 'volume' } }), true)
+  assert.equal(deviceEventName('camera-control'), true)
+  assert.equal(deviceEventName('accelerometer'), false)
+  assert.equal(deviceEventValid('volume', { action: 'press', button: 'up' }), true)
+  assert.equal(deviceEventValid('volume', { action: 'press', button: 'mute' }), false)
+  assert.equal(deviceEventValid('camera-control', { action: 'slide', offset: -0.3 }), true)
+  assert.equal(deviceEventValid('camera-control', { action: 'slide', offset: Number.NaN }), false)
+  assert.equal(deviceEventValid('orientation', { yaw: -180, hinge: 90 }), true)
+  assert.equal(deviceEventValid('orientation', { yaw: 180, hinge: 90 }), false)
+  const switches = { airplane: false, cell: true, wifi: true, bt: true, drop: true, hotspot: false }
+  const rest = { rotate: false, mirror: false, focus: false, torch: false, darkMode: false }
+  assert.equal(deviceEventValid('switches', { ...switches, ...rest }), true)
+  assert.equal(deviceEventValid('switches', switches), false)
 })

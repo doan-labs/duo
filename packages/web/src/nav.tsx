@@ -36,7 +36,7 @@ const KEEP = 0
 const SKIP = -1
 
 /**
- * One quiet bar: the wordmark, four links, GitHub, the theme toggle and the
+ * One quiet bar: the wordmark, five links, GitHub, the theme toggle and the
  * call to action. It gains a hairline and deeper blur once the page leaves the
  * top, so the bar only asserts itself when there is content behind it.
  */
