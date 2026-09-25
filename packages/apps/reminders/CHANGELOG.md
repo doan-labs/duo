@@ -1,3 +1,11 @@
+# 1.1.1
+
+The cover no longer shows a blurred sliver of a pushed page over the Lists
+edge: the kit's Push draws a sheet that mounts already-open at rest instead of
+replaying its slide on the copy the fold brings up. The destination header's
+Share button works, writing the list's name and its reminders to the clipboard
+where no system share sheet can reach.
+
 # 1.1.0
 
 A full Reminders rebuild after the iPad app: a glass sidebar of Today,
