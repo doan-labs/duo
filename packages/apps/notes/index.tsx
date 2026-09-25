@@ -1,153 +1,248 @@
+// Apple Notes on the Duo: sidebar, list and editor spread across the inner
+// display; a Folders page pushes a list pushes a note on the cover. One path
+// cell in os.session drives both, so they never disagree about where you are.
+
 import { type Os, os } from '@doan-labs/duo-sdk'
-import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Push, Text, Title, useWide, VStack } from '@doan-labs/duo-uikit'
-import { Page } from '@doan-labs/duo-uikit/nav.tsx'
-import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
+import { Menu, type MenuEntry, Push, Title, useWide, VStack } from '@doan-labs/duo-uikit'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
-import type { Note } from './data.ts'
+import { useRef, useState } from 'react'
+import { type Note, SORTS } from './data.ts'
 import { NotePane, NoteSheet } from './editor.tsx'
-import { Folders } from './folders.tsx'
+import { FoldersPage, Sidebar } from './folders.tsx'
 import { NoteList } from './note-list.tsx'
-import { useFolder, useFolders, useNotes } from './store.ts'
+import {
+  type Dest,
+  destOf,
+  noteOf,
+  useFolders,
+  useGo,
+  useNotes,
+  usePath,
+  usePurge,
+  useSearch,
+  useSort,
+  useView
+} from './store.ts'
 import { styles } from './styles.ts'
 
-type Model = {
-  notes: Note[]
-  title: string
-  sel?: Note
-  pick: (n: Note) => void
-  compose: () => void
-  trash: (n: Note) => void
-}
-
-export const Notes = (_: { os: Os }) => {
-  // The box decides, not the display: a split half of the inner panel is as
-  // narrow as the cover, and gets the same one-column Notes.
+export function Notes(_: { os: Os }) {
   const [root, wide] = useWide()
-  const selected = useKV(os.session, 'selected')
-  const pushed = useKV(os.session, 'pushed')
-  const { notes: all, add, remove } = useNotes()
+  usePurge()
+  const path = usePath()
+  const { back, note } = useGo()
+  const { notes, add, put, remove } = useNotes()
   const { folders } = useFolders()
-  const [folder] = useFolder()
-  const notes = all.filter((n) => n.folder === folder)
-  const sel = notes.find((n) => n.id === selected.value)
-  const pick = (n: Note) => {
-    selected.set(n.id)
-    pushed.set('true')
-  }
-  const model: Model = {
-    notes,
-    title: folders.find((f) => f.id === folder)?.name ?? 'Notes',
-    sel,
-    pick,
-    compose: () => pick(add(folder)),
-    trash: (n) => {
-      remove(n)
-      selected.del()
-      pushed.set('false')
+  const dest = destOf(path)
+  const sel = notes.find((n) => n.id === noteOf(path))
+
+  const title =
+    dest.kind === 'folder'
+      ? (folders.find((f) => f.id === dest.id)?.name ?? 'Notes')
+      : dest.kind === 'deleted'
+        ? 'Recently Deleted'
+        : dest.kind === 'tag'
+          ? `#${dest.id}`
+          : 'Notes'
+
+  const pick = (n: Note) => note(n.id)
+  const compose = () => note(add(dest.kind === 'folder' ? dest.id : undefined).id)
+  /** A live note drops into Recently Deleted; a binned one goes for good. */
+  const trash = (n: Note) => {
+    if (n.deleted) remove(n)
+    else {
+      if (n.locked) void os.session.del(`unl:${n.id}`)
+      put({ ...n, deleted: new Date().toISOString() })
     }
+    if (sel?.id === n.id) back()
   }
+
   return (
-    <VStack ref={root} xstyle={[dark]}>
+    <VStack ref={root}>
       {wide ? (
-        <Columns m={model} />
+        <Columns dest={dest} title={title} sel={sel} pick={pick} compose={compose} trash={trash} />
       ) : (
-        <Phone m={model} open={pushed.value === 'true' && !!sel} back={() => pushed.set('false')} />
+        <Cover
+          dest={dest}
+          title={title}
+          sel={sel}
+          pick={pick}
+          compose={compose}
+          trash={trash}
+          back={back}
+          deep={path.length > 1}
+        />
       )}
     </VStack>
   )
 }
 
-// ---------- folded: list, with the note pushed over it like a nav stack ----------
-
-const Phone = ({ m, open, back }: { m: Model; open: boolean; back: () => void }) => {
-  // The sheet keeps the note it was opened with so it can slide out after the selection clears.
-  const [held, setHeld] = useState<Note | undefined>(m.sel)
-  useEffect(() => {
-    if (m.sel) setHeld(m.sel)
-  }, [m.sel])
+/** The ⋯ at the head of a list: sort order and the list/gallery view swap. */
+function ListMenu() {
+  const [open, setOpen] = useState(false)
+  const [sort, setSort] = useSort()
+  const [view, setView] = useView()
+  const items: MenuEntry[] = [
+    ...SORTS.map(([s, label]) => ({ label: `Sort by ${label}`, checked: sort === s, onSelect: () => setSort(s) })),
+    'separator',
+    {
+      label: view === 'gallery' ? 'View as List' : 'View as Gallery',
+      icon: view === 'gallery' ? 'list' : 'grid',
+      onSelect: () => setView(view === 'gallery' ? 'list' : 'gallery')
+    }
+  ]
   return (
-    <Push
-      open={open}
-      sheet={held && <NoteSheet note={held} back={back} compose={m.compose} trash={() => m.trash(held)} />}
-    >
-      <Stack m={m} />
-    </Push>
+    <span {...stylex.props(styles.menuWrap)}>
+      <button
+        type="button"
+        {...stylex.props(styles.round, shared.press)}
+        onClick={() => setOpen(!open)}
+        aria-label="List options"
+        aria-expanded={open}
+      >
+        <Sym name="ellipsis" size={15} />
+      </button>
+      <Menu open={open} onClose={() => setOpen(false)} items={items} size={14} xstyle={[styles.listMenu]} />
+    </span>
   )
 }
 
-/** Rows whose text contains the query; every row already subscribes to its text, so this is free. */
-const useSearch = () => {
-  const q = useKV(os.session, 'q')
-  return [q.value ?? '', (v: string) => (v ? q.set(v) : q.del())] as const
+/** The search capsule both displays share; the query is a session cell. */
+const Find = () => {
+  const [q, setQ] = useSearch()
+  return (
+    <label {...stylex.props(styles.search)}>
+      <Sym name="search" size={13} />
+      <input {...stylex.props(styles.searchIn)} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+      {!!q && (
+        <button type="button" {...stylex.props(styles.searchX)} onClick={() => setQ('')} aria-label="Clear search">
+          <Sym name="close" size={11} />
+        </button>
+      )}
+    </label>
+  )
 }
 
 // ---------- unfolded: folders | list | note ----------
 
-const Columns = ({ m }: { m: Model }) => {
-  const [ink, setInk] = useState(0)
-  const [q, setQ] = useSearch()
+function Columns({
+  dest,
+  title,
+  sel,
+  pick,
+  compose,
+  trash
+}: {
+  dest: Dest
+  title: string
+  sel?: Note
+  pick: (n: Note) => void
+  compose: () => void
+  trash: (n: Note) => void
+}) {
+  const [q] = useSearch()
+  const { notes } = useNotes()
+  const count = scopedCount(notes, dest)
   return (
     <div {...stylex.props(styles.cols)}>
-      <Folders />
+      <Sidebar />
       <div {...stylex.props(styles.list)}>
         <div {...stylex.props(styles.listHdr)}>
-          <div>
-            <div {...stylex.props(styles.listTitle)}>{m.title}</div>
-            <Text as="div" size="caption" xstyle={[styles.listCount]}>
-              {m.notes.length} {m.notes.length === 1 ? 'Note' : 'Notes'}
-            </Text>
-          </div>
-          <button
-            type="button"
-            {...stylex.props(styles.round, styles.push, shared.press)}
-            onClick={m.compose}
-            aria-label="New note"
-          >
+          <div {...stylex.props(styles.listTitle)}>{title}</div>
+          <span {...stylex.props(styles.push)}>
+            <ListMenu />
+          </span>
+          <button type="button" {...stylex.props(styles.round, shared.press)} onClick={compose} aria-label="New note">
             <Sym name="compose" size={15} />
           </button>
         </div>
-        <label {...stylex.props(styles.search)}>
-          <Sym name="search" size={13} />
-          <input
-            {...stylex.props(styles.searchIn)}
-            placeholder="Search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
+        <div {...stylex.props(styles.searchBox)}>
+          <Find />
+        </div>
         <div {...stylex.props(styles.scroll)}>
-          <NoteList notes={m.notes} q={q} sel={m.sel?.id} onPick={m.pick} />
+          <NoteList dest={dest} q={q} sel={sel?.id} onPick={pick} />
+        </div>
+        <div {...stylex.props(styles.listFoot)}>
+          {count} {count === 1 ? 'Note' : 'Notes'}
         </div>
       </div>
-      <NotePane
-        key={m.sel?.id}
-        note={m.sel}
-        ink={ink}
-        onInk={setInk}
-        compose={m.compose}
-        trash={() => m.sel && m.trash(m.sel)}
-      />
+      <NotePane key={sel?.id ?? 'none'} note={sel} compose={compose} trash={trash} />
     </div>
   )
 }
 
-const Stack = ({ m }: { m: Model }) => (
-  <Page
-    title={
-      <>
-        {m.title}
-        <Title as="span" variant="accessory" xstyle={[styles.gold]}>
-          <Sym name="more" size={19} />
-          <button type="button" {...stylex.props(styles.gold, styles.flat)} onClick={m.compose} aria-label="New note">
-            <Sym name="compose" size={19} />
-          </button>
-        </Title>
-      </>
-    }
-  >
-    <NoteList notes={m.notes} onPick={m.pick} />
-  </Page>
-)
+// ---------- folded: Folders > list > note, each pushed over the last ----------
+
+function Cover({
+  dest,
+  title,
+  sel,
+  pick,
+  compose,
+  trash,
+  back,
+  deep
+}: {
+  dest: Dest
+  title: string
+  sel?: Note
+  pick: (n: Note) => void
+  compose: () => void
+  trash: (n: Note) => void
+  back: () => void
+  deep: boolean
+}) {
+  const [q] = useSearch()
+  // The note page keeps the note it was opened with so it can slide out after
+  // the selection clears (a delete sends it away mid-animation).
+  const held = useRef<Note | undefined>(sel)
+  if (sel) held.current = sel
+  return (
+    <Push
+      open={deep}
+      sheet={
+        <Push
+          open={!!sel}
+          sheet={held.current && <NoteSheet note={held.current} back={back} compose={compose} trash={trash} />}
+        >
+          <div {...stylex.props(shared.column)}>
+            <Title xstyle={[styles.coverTitle]}>
+              {title}
+              <Title as="span" variant="accessory" xstyle={[styles.gold]}>
+                <ListMenu />
+                <button
+                  type="button"
+                  {...stylex.props(styles.gold, styles.flat)}
+                  onClick={compose}
+                  aria-label="New note"
+                >
+                  <Sym name="compose" size={19} />
+                </button>
+              </Title>
+            </Title>
+            <div {...stylex.props(styles.coverFind)}>
+              <Find />
+            </div>
+            <div {...stylex.props(styles.scroll)}>
+              <NoteList dest={dest} q={q} sel={sel?.id} onPick={pick} />
+            </div>
+          </div>
+        </Push>
+      }
+    >
+      <FoldersPage />
+    </Push>
+  )
+}
+
+const scopedCount = (notes: Note[], dest: Dest) =>
+  notes.filter((n) =>
+    dest.kind === 'deleted'
+      ? n.deleted
+      : dest.kind === 'folder'
+        ? !n.deleted && n.folder === dest.id
+        : dest.kind === 'tag'
+          ? !n.deleted && (n.tags ?? []).includes(dest.id ?? '')
+          : !n.deleted && !n.folder
+  ).length
