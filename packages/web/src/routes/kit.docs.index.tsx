@@ -55,7 +55,7 @@ function App() {
         <Link to="/kit" {...stylex.props(styles.link)}>
           showcase
         </Link>{' '}
-        runs every component live, and the{' '}
+        composes the kit into small live apps, and the{' '}
         <a href={blob('examples/developer/main.tsx')} {...stylex.props(styles.link)}>
           Developer gallery
         </a>{' '}

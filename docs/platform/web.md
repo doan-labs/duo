@@ -318,7 +318,7 @@ published, no host is chosen, no CI deploys it.
 | Home | `/` | Apple-style hero, the live simulator, the three fold rules, tiles to every section, download notes | Installers marked not built; browser marked works |
 | Get started | `/get-started` | Clone, model fetch, `bun run dev`, `?app=`/`?deg=` poses, how a baked app is added; the CLI and `?dev=` path as a plan | First half works today; SDK path marked not built |
 | Docs | `/docs`, `/docs/<path>` | Every file under `docs/` rendered from source with a badge and a source link; sidebar grouped Platform plan, Progress, Repository | Planning document, Proposed, or Works today per file |
-| UI kit | `/kit`, `/kit/docs`, `/kit/docs/<export>` | `/kit` is one hero: the export counts and every demo drifting past live, pausing on hover. Under it the reference is generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today |
+| UI kit | `/kit`, `/kit/docs`, `/kit/docs/<export>` | `/kit` is the hero with the export counts and install line over a showcase grid of live scenes composed from the kit. Under it the reference is generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today |
 | SDK | `/sdk` | Generated legacy types marked Transitional; the runtime contract summarised and linked by section, marked Proposed | Two badges, never mixed |
 | Publish | `/publish` | `publishing.md` rendered; PR template marked not built | Planning document |
 | Guidelines | `/guidelines` | The three fold rules and the iOS rules that still hold, with Notes on the cover to fold | Works today (describes current shell behaviour) |
