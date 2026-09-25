@@ -344,7 +344,11 @@ export function statusOf(p: Position, seen: Record<string, number> = {}): GameSt
   return { state: 'playing' }
 }
 
-export const positionKey = (p: Position) => `${toFEN(p).split(' ').slice(0, 4).join(' ')}`
+export const positionKey = (p: Position) => {
+  const [placement, turn, castling] = toFEN(p).split(' ')
+  const ep = p.ep !== null && legalMoves(p).some((m) => m.ep) ? squareName(p.ep) : '-'
+  return `${placement} ${turn} ${castling} ${ep}`
+}
 
 const PIECE_LETTER: Record<string, string> = { n: 'N', b: 'B', r: 'R', q: 'Q', k: 'K' }
 

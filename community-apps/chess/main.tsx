@@ -140,7 +140,11 @@ function Game() {
     const raw = saved.value
     if (raw !== null && raw === lastSeen.current) return
     lastSeen.current = raw
-    if (!raw) {
+    let parsed: unknown = null
+    try {
+      if (raw) parsed = JSON.parse(raw)
+    } catch {}
+    if (!parsed) {
       // Seed only after the tally hydrates: a fresh copy publishing before it
       // would otherwise let a peer repair its real record away.
       if (!seeded.current && stored.status !== 'hydrating') {
@@ -149,7 +153,7 @@ function Game() {
       }
       return
     }
-    const next = adoptGame(JSON.parse(raw), ME)
+    const next = adoptGame(parsed, ME)
     if (next.by === ME) return
     setSelected(null)
     setPending(null)
@@ -169,9 +173,9 @@ function Game() {
   // writes the tally, so the two views never double either. The record's
   // lastGame dedupe covers the fold-during-mate race.
   useEffect(() => {
-    if (!finished || !game || celebrated.current === game.id) return
+    if (!finished || !game || !view.active || celebrated.current === game.id) return
+    if (stored.status !== 'ready' && stored.status !== 'saving') return
     celebrated.current = game.id
-    if (!view.active) return
     const copy = resultCopy(status, game.you)
     cue(copy.tone)
     if (copy.tone !== 'draw') navigator.vibrate?.([50, 40, 80])
@@ -500,7 +504,12 @@ function Game() {
     if (n === 0) n = Math.min(2, game.moves.length)
     setSelected(null)
     setPending(null)
-    publish({ ...game, by: ME, moves: game.moves.slice(0, game.moves.length - n) })
+    publish({
+      ...game,
+      id: finished ? crypto.randomUUID() : game.id,
+      by: ME,
+      moves: game.moves.slice(0, game.moves.length - n)
+    })
   }
 }
 

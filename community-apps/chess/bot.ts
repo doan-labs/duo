@@ -137,7 +137,7 @@ class Search {
       if (stand > alpha) alpha = stand
     }
     const all = legalMoves(p)
-    if (checked && all.length === 0) return -MATE + ply
+    if (all.length === 0) return checked ? -MATE + ply : 0
     const moves = checked ? all : all.filter((m) => m.ep || m.promo || p.board[m.to])
     for (const { m } of orderMoves(p, moves, [], 0, this.history)) {
       const score = -this.quiesce(apply(p, m), -beta, -alpha, ply + 1)
