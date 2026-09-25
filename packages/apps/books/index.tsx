@@ -1,124 +1,97 @@
-import { Text, Title } from '@doan-labs/duo-uikit'
+// Books: the app's own iPadOS chrome - a glass sidebar when the Duo is open
+// and a floating tab bar on the cover - over panes for Home, Library, the
+// Book Store, Audiobooks and Search, with a book page pushed on top and the
+// reader above everything. Both displays share the module stores, so the fold
+// keeps the same page, the same shelf and the same spot in the book.
 
-// Books: a shelf of covers, and a reader that pages through the text.
-
-import { art } from '@doan-labs/duo-fixtures'
-import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import { Push } from '@doan-labs/duo-uikit/nav.tsx'
+import { Sheet } from '@doan-labs/duo-uikit/sheet.tsx'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
-import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
+import { TextField } from '@doan-labs/duo-uikit/text-field.tsx'
+import { useWide } from '@doan-labs/duo-uikit/wide.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { GAP, styles } from './styles.ts'
+import { useRef, useState } from 'react'
+import { Audio, NowPlaying } from './audio.tsx'
+import { Sidebar, Tabs } from './chrome.tsx'
+import { Detail } from './detail.tsx'
+import { Home } from './home.tsx'
+import { Library } from './library.tsx'
+import { Reader } from './reader.tsx'
+import { Search } from './search.tsx'
+import { Shop } from './shop.tsx'
+import { addShelf } from './store.ts'
+import { styles } from './styles.ts'
+import { closeBook, openCard, useUi } from './ui.ts'
 
-const LIB: [string, string, string[]][] = [
-  [
-    'Moby-Dick',
-    'Herman Melville',
-    [
-      'Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world.',
-      'It is a way I have of driving off the spleen and regulating the circulation. Whenever I find myself growing grim about the mouth; whenever it is a damp, drizzly November in my soul; whenever I find myself involuntarily pausing before coffin warehouses, and bringing up the rear of every funeral I meet.',
-      'Then, I account it high time to get to sea as soon as I can. This is my substitute for pistol and ball. With a philosophical flourish Cato throws himself upon his sword; I quietly take to the ship.',
-      'There is nothing surprising in this. If they but knew it, almost all men in their degree, some time or other, cherish very nearly the same feelings towards the ocean with me.',
-      'There now is your insular city of the Manhattoes, belted round by wharves as Indian isles by coral reefs—commerce surrounds it with her surf. Right and left, the streets take you waterward.',
-      'Its extreme downtown is the battery, where that noble mole is washed by waves, and cooled by breezes, which a few hours previous were out of sight of land. Look at the crowds of water-gazers there.'
-    ]
-  ],
-  [
-    'Alice in Wonderland',
-    'Lewis Carroll',
-    [
-      'Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it.',
-      '"And what is the use of a book," thought Alice, "without pictures or conversations?" So she was considering in her own mind, as well as she could, for the hot day made her feel very sleepy and stupid.',
-      'Whether the pleasure of making a daisy-chain would be worth the trouble of getting up and picking the daisies, when suddenly a White Rabbit with pink eyes ran close by her.',
-      'There was nothing so very remarkable in that; nor did Alice think it so very much out of the way to hear the Rabbit say to itself, "Oh dear! Oh dear! I shall be late!"',
-      'But when the Rabbit actually took a watch out of its waistcoat-pocket, and looked at it, and then hurried on, Alice started to her feet, for it flashed across her mind that she had never before seen a rabbit with either a waistcoat-pocket, or a watch to take out of it.',
-      'Burning with curiosity, she ran across the field after it, and fortunately was just in time to see it pop down a large rabbit-hole under the hedge.'
-    ]
-  ],
-  [
-    'Frankenstein',
-    'Mary Shelley',
-    [
-      'You will rejoice to hear that no disaster has accompanied the commencement of an enterprise which you have regarded with such evil forebodings.',
-      'I arrived here yesterday, and my first task is to assure my dear sister of my welfare and increasing confidence in the success of my undertaking.',
-      'I am already far north of London, and as I walk in the streets of Petersburgh, I feel a cold northern breeze play upon my cheeks, which braces my nerves and fills me with delight.',
-      'Do you understand this feeling? This breeze, which has travelled from the regions towards which I am advancing, gives me a foretaste of those icy climes.',
-      'Inspirited by this wind of promise, my daydreams become more fervent and vivid. I try in vain to be persuaded that the pole is the seat of frost and desolation.',
-      'It ever presents itself to my imagination as the region of beauty and delight. There, Margaret, the sun is for ever visible.'
-    ]
-  ]
-]
+const Pane = ({ tab }: { tab: string }) => {
+  if (tab === 'library' || tab.startsWith('shelf:')) return <Library shelf={tab === 'library' ? undefined : tab} />
+  if (tab === 'store') return <Shop />
+  if (tab === 'audio') return <Audio />
+  if (tab === 'search') return <Search />
+  return <Home />
+}
 
-const Shelf = () => {
-  const { push } = useNav()
+/** The last-opened book keeps rendering while its sheet slides out. */
+const DetailSheet = () => {
+  const ui = useUi()
+  const last = useRef(ui.detail)
+  if (ui.detail) last.current = ui.detail
+  return last.current ? <Detail id={last.current} back={closeBook} /> : null
+}
+
+const ReaderSheet = () => {
+  const ui = useUi()
+  const last = useRef(ui.reading)
+  if (ui.reading) last.current = ui.reading
+  return last.current ? <Reader id={last.current} /> : null
+}
+
+/** The New Collection card, shared by the sidebar's + and the book menu. */
+const NewShelf = () => {
+  const ui = useUi()
+  const [name, setName] = useState('')
+  const make = () => {
+    const n = name.trim()
+    if (n) addShelf(n)
+    setName('')
+    openCard(undefined)
+  }
   return (
-    <div {...stylex.props(styles.shelf)}>
-      {LIB.map(([t, who], i) => (
-        <div key={t} onClick={() => push((back) => <Reader i={i} back={back} />)}>
-          <div {...stylex.props(styles.cov, styles.bg(art(t, 40)))}>{t}</div>
-          <div {...stylex.props(styles.title)}>{t}</div>
-          <Text as="div" size="caption" xstyle={[styles.who]}>
-            {who}
-          </Text>
+    <Sheet open={ui.card === 'shelf'} onClose={() => openCard(undefined)} xstyle={[styles.newShelf]}>
+      <div {...stylex.props(styles.newShelfBody)}>
+        <h2 {...stylex.props(styles.newShelfTitle)}>New Collection</h2>
+        <TextField
+          aria-label="Collection name"
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && make()}
+        />
+        <button type="button" {...stylex.props(styles.btn, shared.press)} onClick={make}>
+          Create
+        </button>
+      </div>
+    </Sheet>
+  )
+}
+
+export const Books = () => {
+  const [ref, wide] = useWide<HTMLDivElement>()
+  const ui = useUi()
+  return (
+    <div ref={ref} {...stylex.props(styles.root)}>
+      <Push open={!!ui.reading} sheet={<ReaderSheet />}>
+        <div {...stylex.props(styles.fill)}>
+          <Push open={!!ui.detail} sheet={<DetailSheet />}>
+            <div {...stylex.props(styles.scroll, wide && styles.paneSide, !wide && styles.paneScroll)}>
+              <Pane tab={ui.tab} />
+            </div>
+          </Push>
+          {ui.detail || ui.reading ? null : wide ? <Sidebar /> : <Tabs />}
+          {ui.reading ? null : <NowPlaying />}
+          <NewShelf />
         </div>
-      ))}
+      </Push>
     </div>
   )
 }
-
-const Reader = ({ i, back }: { i: number; back: () => void }) => {
-  const [title, , paras] = LIB[i]!
-  const col = useRef<HTMLDivElement>(null)
-  const [w, setW] = useState(0)
-  const [pages, setPages] = useState(1)
-  const [at, setAt] = useState(0)
-  // CSS columns do the pagination: one column per page width, then translate by
-  // whole pages. No measuring text, and it reflows if the panel unfolds.
-  useEffect(() => {
-    const el = col.current!
-    const ro = new ResizeObserver(() => setW(el.clientWidth))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  // scrollWidth only means anything once the column width is on the element,
-  // so the page count waits for the render that applies `w`.
-  useLayoutEffect(() => {
-    if (!w) return
-    const n = Math.max(1, Math.round(col.current!.scrollWidth / (w + GAP)))
-    setPages(n)
-    setAt((a) => Math.min(n - 1, a))
-  }, [w])
-  const go = (d: number) => setAt((a) => Math.min(pages - 1, Math.max(0, a + d)))
-  return (
-    <>
-      <Title xstyle={[styles.readHdr]}>
-        <button type="button" {...stylex.props(shared.bk)} onClick={back}>
-          <Sym name="back" size={18} />
-          Library
-        </button>
-      </Title>
-      <div {...stylex.props(styles.read)}>
-        <div ref={col} {...stylex.props(styles.col, w > 0 && styles.colW(w), styles.shift(-at * (w + GAP)))}>
-          {paras.map((p) => (
-            <p key={p} {...stylex.props(styles.p)}>
-              {p}
-            </p>
-          ))}
-        </div>
-        <div {...stylex.props(styles.pgn)}>
-          {title} · {at + 1} of {pages}
-        </div>
-        <div {...stylex.props(styles.tap, styles.tapL)} onClick={() => go(-1)} />
-        <div {...stylex.props(styles.tap, styles.tapR)} onClick={() => go(1)} />
-      </div>
-    </>
-  )
-}
-
-export const Books = () => (
-  <Nav>
-    <Page title="Library">
-      <Shelf />
-    </Page>
-  </Nav>
-)

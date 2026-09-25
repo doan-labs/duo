@@ -121,7 +121,7 @@ export const APPS: App[] = [
   { name: 'Voice Memos', view: Memos },
   { name: 'Shortcuts', mock: true, light: true, view: Shortcuts },
   { name: 'Podcasts', mock: true, light: true, view: Podcasts },
-  { name: 'Books', mock: true, light: true, view: Books },
+  { name: 'Books', light: true, view: Books },
   { name: 'YouTube', mock: true, light: true, view: YouTube }
 ]
 

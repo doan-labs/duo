@@ -159,6 +159,35 @@ export const tracking = stylex.defineConsts({
   caption2: '0.07px'
 })
 
+/**
+ * The Books reader's font menu: Apple's list, mapped to what a browser can
+ * resolve. `fonts.serif` is the "Original" entry and stays in `fonts`; these
+ * are the alternates, each with a graceful fallback.
+ */
+export const booksFonts = stylex.defineConsts({
+  athelas: 'Athelas,"Charis SIL","Iowan Old Style",Georgia,serif',
+  charter: 'Charter,"Bitstream Charter",Cambria,serif',
+  georgia: 'Georgia,"Times New Roman",serif',
+  iowan: '"Iowan Old Style","Palatino Linotype",Palatino,serif',
+  palatino: 'Palatino,"Palatino Linotype","Book Antiqua",serif',
+  seravek: 'Seravek,"Gill Sans","Avenir Next",system-ui,sans-serif',
+  times: '"Times New Roman",Times,serif'
+})
+
+/**
+ * Book leading: looser than the UI ramp's ~1.3, the way long prose is set.
+ * Keyed by the same `typeScale` step names the reader's size slider uses.
+ */
+export const booksLeading = stylex.defineConsts({
+  caption2: '17px',
+  footnote: '20px',
+  subheadline: '23px',
+  callout: '25px',
+  body: '27px',
+  title3: '30px',
+  title2: '33px'
+})
+
 /** The weight ladder. Nothing lighter than regular except `weight.thin` for oversized numerals. */
 export const weight = stylex.defineConsts({
   thin: 200,
@@ -357,6 +386,37 @@ export const appAppearance = stylex.defineConsts({
   booksPaper: '#f6f1e6',
   booksInk: '#241f18',
   booksInkMuted: '#8a7f6d',
+  /** The icon's orange, as the app's own tint: selected rows, progress, tinted actions. */
+  booksAccent: '#ff8d28',
+  booksAccentSoft: 'rgba(255,141,40,.18)',
+  /** Sidebar and tab bar: glass the shelves show through, not paper. */
+  booksPanel: 'rgba(255,255,255,.62)',
+  /** A cover's spine shading, inner frame hairline and fore-edge drop. */
+  booksSpine: 'inset 9px 0 14px -8px rgba(30,20,10,.38)',
+  booksCoverFrame: 'inset 0 0 0 1px rgba(255,255,255,.16)',
+  booksAudioBadge: 'rgba(0,0,0,.55)',
+  /** The store hero's bottom scrim over its generated wash. */
+  booksShade: 'linear-gradient(180deg,transparent 30%,rgba(0,0,0,.45) 100%)',
+  /**
+   * The reader's six themes, Apple's own names and palettes: Original is the
+   * white page, Quiet a warm grey, Paper the sepia above, Bold the white page
+   * under heavier type, Calm a low-contrast dark, Focus the black one.
+   */
+  booksOriginalBg: '#fffefb',
+  booksOriginalInk: '#1d1c19',
+  booksOriginalMute: 'rgba(29,28,25,.45)',
+  booksQuietBg: '#efede6',
+  booksQuietInk: '#3f3c34',
+  booksQuietMute: 'rgba(63,60,52,.48)',
+  booksBoldMute: 'rgba(0,0,0,.52)',
+  booksCalmBg: '#262019',
+  booksCalmInk: '#b5a98f',
+  booksCalmMute: 'rgba(181,169,143,.5)',
+  booksFocusBg: '#0b0b0c',
+  booksFocusInk: '#f1efe9',
+  booksFocusMute: 'rgba(241,239,233,.48)',
+  /** The end-of-book card's ink over any theme. */
+  booksEndInk: '#fff9f0',
   // calculator
   calculatorKey: '#333',
   calculatorKeyLight: '#a5a5a5',
