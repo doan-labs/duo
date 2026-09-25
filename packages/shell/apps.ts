@@ -86,7 +86,7 @@ export const LEFT: App[] = [
 /** Right half — only on the inner display, rows 1 to 6. */
 export const RIGHT: App[] = [
   { name: 'Weather', id: 'labs.doan.ipduo.weather', edge: true, ...RELEASE },
-  { name: 'Stocks', mock: true, view: Stocks },
+  { name: 'Stocks', view: Stocks },
   { name: 'Find My', mock: true, light: true, view: FindMy },
   { name: 'Home', mock: true, view: Home },
   { name: 'Fitness', mock: true, view: Fitness },
