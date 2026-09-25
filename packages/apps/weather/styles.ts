@@ -226,7 +226,7 @@ export const styles = stylex.create({
     },
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: appAppearance.weatherCardRim,
+    boxShadow: shadow.rim,
     outlineWidth: { default: 0, ':focus-visible': 2 },
     outlineStyle: 'solid',
     outlineColor: appAppearance.weatherOutline,
@@ -323,7 +323,7 @@ export const styles = stylex.create({
     backgroundColor: appAppearance.weatherCard,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: appAppearance.weatherCardRim
+    boxShadow: shadow.rim
   },
   summary: {
     fontSize: typeScale.subheadline,
@@ -590,7 +590,7 @@ export const styles = stylex.create({
     backgroundColor: appAppearance.weatherSide,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: `${appAppearance.weatherCardRim},${shadow.float}`,
+    boxShadow: `${shadow.rim},${shadow.float}`,
     overflow: 'hidden'
   },
   sideFrame: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
@@ -640,8 +640,8 @@ export const styles = stylex.create({
     minWidth: 190,
     padding: 6,
     borderRadius: radius.xl,
-    backgroundColor: appAppearance.weatherMenu,
-    boxShadow: `${appAppearance.weatherCardRim},${shadow.float}`
+    backgroundColor: glass.tintDark,
+    boxShadow: `${shadow.rim},${shadow.float}`
   },
   menuItem: {
     gap: 12,
@@ -712,7 +712,7 @@ export const styles = stylex.create({
     backgroundColor: { default: appAppearance.weatherCard, ':hover': appAppearance.weatherControlHover },
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: appAppearance.weatherCardRim,
+    boxShadow: shadow.rim,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',
     transitionDuration: pressed,
@@ -744,21 +744,16 @@ export const styles = stylex.create({
     overflow: 'hidden',
     backgroundColor: appAppearance.weatherNight,
     boxShadow: {
-      default: `${appAppearance.weatherCardRim},${shadow.card}`,
+      default: `${shadow.rim},${shadow.card}`,
       ':hover': `${shadow.rim},${shadow.float}`
     },
     transitionProperty: 'transform, box-shadow',
     transitionDuration: '.2s',
     transform: { default: null, ':active': motion.press }
   },
-  // Selection is a ring, so it is an outline; the card keeps its glass rim.
-  locationSelected: {
-    boxShadow: `${shadow.rim},${shadow.float}`,
-    outlineWidth: 2,
-    outlineStyle: 'solid',
-    outlineColor: appAppearance.weatherOutline,
-    outlineOffset: -2
-  },
+  // Selection lifts the card, it does not ring it: the only edge glass may wear
+  // is the hairline rim.
+  locationSelected: { boxShadow: `${shadow.rim},${shadow.float}` },
   locationMain: {
     position: 'relative',
     display: 'grid',
