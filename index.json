@@ -209,6 +209,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/fold-compass",
       "releases": [
         {
+          "release": "1.1.0+112a7cfe",
+          "sdk": "0.0.0",
+          "bytes": 263770,
+          "sha256": "662b74fe6e8ed56034066766e88b6944edf617d47a00c44eb0a949417f747670"
+        },
+        {
           "release": "1.0.1+425fab54",
           "sdk": "0.0.0",
           "bytes": 233670,

@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "labs.doan.fold-compass",
+    "name": "Fold Compass",
+    "version": "1.1.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "Doan Labs",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/fold-compass",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-09-25T02:00:26.649Z",
+    "commit": "6ad3c335ff258a7bf617d12c9824fc811fc130e3",
+    "hash": "112a7cfe"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 263770,
+      "sha256": "359dc8578c0f1e1069d774f768e2f4337f21559a3f6a54dca35ecdd8d7e0637e"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 15498,
+      "sha256": "ec139547b3513f21e09feb1705b7a741acdcd6df8c697cd668681983b7882a33"
+    }
+  ]
+}
