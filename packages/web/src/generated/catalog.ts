@@ -35,13 +35,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "mnismt",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flappy-duo",
-    "version": "1.0.1",
-    "releases": 2,
+    "version": "1.0.2",
+    "releases": 3,
     "created": "2026-09-19T10:54:31.264Z",
-    "updated": "2026-09-19T15:45:19.344Z",
+    "updated": "2026-09-25T15:18:57.749Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.flappyduo/1.0.1+e0580af9/icon-1024.png",
-    "changelog": "# Changelog\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Initial release.\n- Canvas 2D game loop with the Duo as the player character; obstacles are numbered glass slabs.\n- Per-run fold counter; best score and money spent persisted via `os.storage`.\n- Difficulty keyed to game number and score: oscillating gaps, periodic blur, notification banners, slabs that snap shut, thrown accessories, speed increase; each game narrows the gap and adds speed.\n- Game-over dialog with score, best and medal tier; the only action is the purchase.\n- Payment sheet confirmed by a double-click of the frame side button, claimed through the SDK while the sheet is open. A glow marks the button position; confirmation runs processing, an animated check and a dismiss transition, then adds the price to the spent total and shows a notification with avatar from Tim Cook, John Ternus or Apple on the first three purchases only. The price rises 25% per game from $2,399.\n- Small home-screen widget via `os.widget.set`.\n- Synthesised flap, score, crash and payment cues via Web Audio.\n- Supports the inner and cover displays.\n"
+    "icon": "/catalog/apps/com.mnismt.duo.flappyduo/1.0.2+a6daf032/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.2\n\n- The purchase receipt posts through `os.notify.post` as a real OS notification (banner over the display, then a card in Notification Center) instead of the in-app mockup. The painted avatar header goes with it.\n- The in-canvas notification flood stays a gameplay hazard; it never claimed to be the OS.\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Initial release.\n- Canvas 2D game loop with the Duo as the player character; obstacles are numbered glass slabs.\n- Per-run fold counter; best score and money spent persisted via `os.storage`.\n- Difficulty keyed to game number and score: oscillating gaps, periodic blur, notification banners, slabs that snap shut, thrown accessories, speed increase; each game narrows the gap and adds speed.\n- Game-over dialog with score, best and medal tier; the only action is the purchase.\n- Payment sheet confirmed by a double-click of the frame side button, claimed through the SDK while the sheet is open. A glow marks the button position; confirmation runs processing, an animated check and a dismiss transition, then adds the price to the spent total and shows a notification with avatar from Tim Cook, John Ternus or Apple on the first three purchases only. The price rises 25% per game from $2,399.\n- Small home-screen widget via `os.widget.set`.\n- Synthesised flap, score, crash and payment cues via Web Audio.\n- Supports the inner and cover displays.\n"
   },
   {
     "id": "com.mnismt.duo.habitstreaks",
@@ -148,11 +148,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.0.1",
-    "releases": 1,
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.0.1+5192a9fd/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.0.1+288d703d/icon-1024.png",
     "changelog": "# 1.0.1\n\nThe keypad shrinks to the display height, so the readout is no longer clipped at the top.\n\n# 1.0.0\n\nThe iOS calculator: one pending operator, immediate evaluation on the next.\n"
   },
   {
@@ -162,11 +162,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 1,
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-21T21:34:57+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+b7f0c171/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+01f69dbf/icon-1024.png",
     "changelog": "# 1.1.0\n\nThe tablet layout: sidebar with calendars and a mini month, Day, Week, Month and\nYear views, events that are created, edited, deleted and searched, and stored in\napp storage.\n\nMonth draws the sheet each display asks for. Inside, it is the Mac's: ruled both\nways in a hairline well under the UIKit separator, the weekend shaded, numbers\nhung on the right of their day, the picked day lifted whole. On the cover it is\nthe phone's: no rules, no shading, the number centred over its dots. Events pack\ninto lanes either way, so a multi-day event is a single bar across the days it\ncovers, and a week only draws the rows the month has instead of ruling an empty\nsixth. A day that runs out of lanes counts the rest and opens on Day.\n\nDay and Week are ruled to match, with the weekend shaded, the hours hung on\ntheir own lines, and now drawn the way Calendar draws it: pale across the week,\nsolid with a dot on today, and the time itself in the gutter. The sidebar lists\ncalendars as tinted checkboxes and its mini month follows the pane instead of\nstranding September under a February sheet. Paging slides the sheet the way the\narrow points; arriving at a view raises it.\n\nA fresh install opens on a working month around today, the keynote the\nhome-screen widget shows included.\n\n# 1.0.0\n\nMonth view with today marked, as an isolated release.\n"
   },
   {
@@ -176,11 +176,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 1,
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-24T21:30:20+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+8b3355db/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+75a0ba61/icon-1024.png",
     "changelog": "# 1.1.0\n\nThe Clock app rebuilt end to end as the iPadOS Clock: a sidebar on the wide\ndisplay, a floating tab bar on the cover, and four working tabs. World Clock\nlists cities with relative-day offsets and an add-city sheet with search.\nAlarms add, edit, toggle and delete, with an iOS wheel picker for the time,\nrepeat days, sounds, snooze, and a full-screen snooze/stop alert that only the\nowning display sounds. Stopwatch runs a digital and an analog face off one\nshared timer with laps, best and worst highlights. Timers pick hours, minutes\nand seconds on wheels, run as orange-ring cards that pause, resume and cancel,\nand remember recents. All state lives in app storage, so the two display\ncopies agree while only the owner fires sounds.\n\n# 1.0.0\n\nWorld clock: local time large, six cities below, ticking once a second.\n"
   },
   {
@@ -194,7 +194,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+bcfa5e67/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+7d7d0406/icon-1024.png",
     "changelog": "# 1.0.0\n\nFreehand ink on a canvas with a palette of inks.\n"
   },
   {
@@ -204,11 +204,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 1,
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-25T12:38:04+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.news/1.1.0+83163c94/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.news/1.1.0+80333929/icon-1024.png",
     "changelog": "# 1.1.0\n\nRebuilt as Apple News for the Duo: a floating glass sidebar (channels, followed topics, Saved Stories, History) on the inner display and a tab bar on the cover. Today opens with a Top Story hero over a Latest wire, articles push over the whole app in a serif column with the live discussion underneath, and every list animates in staggered. Feeds cache through storage so the mirror copy paints the same stories without fetching.\n\n# 1.0.0\n\nHacker News front page dressed as Apple News, opening stories in Safari.\n"
   },
   {
@@ -217,13 +217,22 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.0.0",
-    "releases": 1,
+    "version": "1.1.0",
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-21T21:34:57+07:00",
-    "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.0.0+dfafc635/icon-1024.png",
-    "changelog": "# 1.0.0\n\nRun Notes in an isolated document with persistent text, shared session navigation\nand explicit saving and failure states.\n"
+    "updated": "2026-09-25T20:29:05+07:00",
+    "permissions": [
+      {
+        "name": "photos",
+        "label": "Photos"
+      },
+      {
+        "name": "clipboard-write",
+        "label": "Write clipboard"
+      }
+    ],
+    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.1.0+3297e7b9/icon-1024.png",
+    "changelog": "# 1.1.0\n\nRebuild Notes to match Apple's: a rich-text document model behind a block\neditor (Title, Heading, Subheading, Body, Monostyled, Block Quote, bold,\nitalic, underline, strikethrough, bulleted, dashed and numbered lists with\nindent, tappable checklists, tables with growing rows and columns, inline\nphotos and auto-linked URLs), custom undo and redo, find-in-note with live\nhighlights, and a Markup canvas with inks, widths, eraser and undo kept beside\nthe document. Notes pin, lock behind the side button's double-press, move\nbetween folders and drop into Recently Deleted with a 30-day clock, a recover\npath and media cleanup on final delete. The folders rail gains iCloud,\nuser folders with rename and delete, the bin and a #tag strip mined from the\ndocuments; the list gains a Pinned section, date groups, a gallery view,\nsort orders, search and per-note menus; and the folded phone walks\nFolders, list, note.\n\n# 1.0.0\n\nRun Notes in an isolated document with persistent text, shared session navigation\nand explicit saving and failure states.\n"
   },
   {
     "id": "labs.doan.ipduo.photos",
@@ -241,7 +250,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Photos"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+bc72c121/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+184fc696/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe photos taken in Camera, read through the Photos service, with a full-bleed viewer.\n"
   },
   {
@@ -251,11 +260,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 1,
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-25T12:37:54+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.0+9c8dfe5d/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.0+ebb68b78/icon-1024.png",
     "changelog": "# 1.1.0\n\nA full Reminders rebuild after the iPad app: a glass sidebar of Today,\nScheduled, All, Flagged and Completed tiles with My Lists and tags on the inner\ndisplay, push navigation on the cover, round tinted checkboxes, inline editing,\na details sheet with dates, flags, priorities, tags and subtasks, list editing,\nsearch and a legacy tasks migration - all in the app storage, shared by both\ndisplays.\n\n# 1.0.0\n\nA checklist kept in the app storage, shared by both displays.\n"
   },
   {
@@ -265,7 +274,7 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 1,
+    "releases": 2,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-25T10:02:40+07:00",
     "permissions": [
@@ -274,7 +283,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Location"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+457d0df0/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+67df7e45/icon-1024.png",
     "changelog": "# 1.1.0\n\nLaunch now asks for the device's place on its own: the geolocation prompt runs first\nand the public IP answers when the prompt is refused, unnamed or times out, named\nthrough a free reverse geocoder. My Location files itself first in the list, cannot\nbe removed, and refreshes quietly on later launches while permission holds.\n\nThe inner display becomes the iPad layout: a floating glass sidebar carries the\nsearch field, the units and location menu, and sky-tinted location cards beside the\ndetail pane, with a sidebar toggle in the top bar. The cover display keeps the\niPhone list and bottom bar.\n\n# 1.0.0\n\nIsolated Weather with owner-only forecast requests, shared persistent preferences,\nrefresh commands, delegated geolocation and declarative widget snapshots.\n\nRedesigned after the iOS Weather app: large hero temperature, condition-driven sky\nbackgrounds with moon, stars, clouds, rain, snow and fog layers, frosted glass cards,\nSF Symbol condition glyphs, an hourly strip with sunrise and sunset, ten-day rows with\ntemperature range bars and a today marker, visual detail tiles (UV, sunrise/sunset arc,\nwind compass, feels like, 24-hour precipitation bars, humidity, visibility, pressure\ngauge, air quality from Open-Meteo), sky-card locations list, and a page-dot toolbar\nwith a bottom bar on the outer display.\n"
   }
 ]
@@ -315,7 +324,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-25T22:18:27+07:00"
   },
   {
     "name": "Mail",
@@ -495,7 +504,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-23T00:24:19+07:00"
+    "updated": "2026-09-25T21:35:13+07:00"
   },
   {
     "name": "Messages",
