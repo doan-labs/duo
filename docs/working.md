@@ -362,6 +362,12 @@ bun run api            # only the TSDoc reference
   the reader clicks Allow; the page asks for the webcam itself first, then
   posts `app`. Never open the Camera app in a frame that mounts early: the
   browser prompts before the reader can see why.
+- A collapsible row is `Fold` (`src/fold.tsx`), not `<details>`: a closing
+  `<details>` hides its content at once, so it can only animate open. A
+  `<dialog>` has the same trap: `close()` is instant, so the app sheet plays
+  its exit and closes on `animationend`, and holds Escape through `cancel`.
+  Test the sheet's backdrop with real clicks: it measures the click point, and
+  a scripted `.click()` reports (0, 0), which reads as outside.
 - Inside a frame the shell's HUD hides its "iPhone Duo" heading and display
   line (`window.self !== window.top` in `packages/shell/hud.tsx`); the hint
   and the control bar stay.

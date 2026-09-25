@@ -135,6 +135,7 @@ bunfig.toml         development plugin registration
 tsconfig.json       shared strict TypeScript configuration
 .cargo/             shared Rust cache configuration and shell-check alias
 DESIGN.md           hard design rules for every visual change
+CHANGELOG.md        project-wide changes by version, rendered at /changelog
 docs/               maintainer guides and documentation index
   platform/         current platform references, roadmap, publication/website plans
     api/            generated UI-kit API data

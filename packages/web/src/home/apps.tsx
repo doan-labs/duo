@@ -8,6 +8,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { known } from '../docs'
+import { Fold } from '../fold'
 import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
 import { type Block as MdBlock, parse, render } from '../markdown'
 import { Segmented } from '../segmented'
@@ -116,6 +117,9 @@ function fromRelease(c: CatalogApp): Entry {
 
 const BY_SLUG = new Map([...OFFICIAL, ...COMMUNITY].map((e) => [e.slug, e]))
 export const appForSlug = (slug: string) => BY_SLUG.get(slug)
+const BY_NAME = new Map([...OFFICIAL, ...COMMUNITY].map((e) => [e.name, e]))
+/** The changelog names apps as people see them; this finds the entry behind the name. */
+export const appForName = (name: string) => BY_NAME.get(name)
 
 type LaneInfo = { key: Lane; label: string; text: string; apps: Entry[] }
 const LANES: LaneInfo[] = [
@@ -375,6 +379,9 @@ function List({ apps }: { apps: readonly Entry[] }) {
  *  browser owns the scroll lock and the focus return. */
 function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement | null>(null)
+  // `close()` removes a dialog at once, so every way out plays the exit first and
+  // closes on its `animationend`. Reduced motion shortens it to nothing in reset.css.
+  const [leaving, setLeaving] = useState(false)
   useEffect(() => {
     const d = ref.current
     if (!d) return
@@ -382,9 +389,16 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
     const root = document.documentElement.style
     const overflow = root.overflow
     root.overflow = 'hidden'
+    // Escape would close natively; hold it for the exit like the other two ways out.
+    const cancel = (e: Event) => {
+      e.preventDefault()
+      setLeaving(true)
+    }
+    d.addEventListener('cancel', cancel)
     d.addEventListener('close', onClose)
     return () => {
       root.overflow = overflow
+      d.removeEventListener('cancel', cancel)
       d.removeEventListener('close', onClose)
     }
   }, [onClose])
@@ -392,7 +406,10 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
     const d = ref.current
     if (!d) return
     const r = d.getBoundingClientRect()
-    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close()
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) setLeaving(true)
+  }
+  const done = (e: React.AnimationEvent<HTMLDialogElement>) => {
+    if (leaving && e.target === e.currentTarget && e.animationName === sheetOut) ref.current?.close()
   }
   // Every entry is either on the home screen or a catalog release.
   const search = entry.open ? { app: entry.open } : { app: 'App Store', arg: entry.release?.id }
@@ -414,9 +431,15 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
   ]
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a native dialog already closes on Escape; this handler only measures whether the click landed on the backdrop.
-    <dialog ref={ref} aria-labelledby="app-sheet-name" onClick={backdrop} {...stylex.props(styles.dialog)}>
+    <dialog
+      ref={ref}
+      aria-labelledby="app-sheet-name"
+      onClick={backdrop}
+      onAnimationEnd={done}
+      {...stylex.props(styles.dialog, leaving && styles.dialogOut)}
+    >
       <div {...stylex.props(styles.sheet)}>
-        <button type="button" aria-label="Close" onClick={() => ref.current?.close()} {...stylex.props(styles.close)}>
+        <button type="button" aria-label="Close" onClick={() => setLeaving(true)} {...stylex.props(styles.close)}>
           <Glyph name="x" />
         </button>
         <div {...stylex.props(styles.sheetHead)}>
@@ -484,18 +507,18 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
 
 /** One changelog entry, folded so the sheet stays short; the latest release starts open. */
 function Release({ version, blocks, latest }: { version: string; blocks: MdBlock[]; latest: boolean }) {
-  const [open, setOpen] = useState(latest)
   return (
-    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} {...stylex.props(styles.release)}>
-      <summary {...stylex.props(styles.releaseHead)}>
-        <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>
-          <Glyph name="chevron" />
-        </span>
-        <span {...stylex.props(styles.releaseVersion)}>{version}</span>
-        {latest && <span {...stylex.props(styles.latest)}>Latest</span>}
-      </summary>
-      <div {...stylex.props(styles.releaseBody)}>{render(blocks, LOG_CTX)}</div>
-    </details>
+    <Fold
+      open={latest}
+      head={
+        <>
+          <span {...stylex.props(styles.releaseVersion)}>{version}</span>
+          {latest && <span {...stylex.props(styles.latest)}>Latest</span>}
+        </>
+      }
+    >
+      {render(blocks, LOG_CTX)}
+    </Fold>
   )
 }
 
@@ -580,6 +603,12 @@ const sheetIn = stylex.keyframes({
   to: { opacity: 1, transform: 'translateY(0) scale(1)' }
 })
 const fadeIn = stylex.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } })
+/** The way in, reversed and quicker: leaving should never hold the page up. */
+const sheetOut = stylex.keyframes({
+  from: { opacity: 1, transform: 'translateY(0) scale(1)' },
+  to: { opacity: 0, transform: 'translateY(12px) scale(0.97)' }
+})
+const fadeOut = stylex.keyframes({ from: { opacity: 1 }, to: { opacity: 0 } })
 
 const styles = stylex.create({
   bar: {
@@ -877,6 +906,20 @@ const styles = stylex.create({
       animationTimingFunction: ease.out
     }
   },
+  // `forwards` holds the last frame until `close()` lands, so nothing flashes back in between.
+  dialogOut: {
+    animationName: sheetOut,
+    animationDuration: '0.2s',
+    animationTimingFunction: ease.inOut,
+    animationFillMode: 'forwards',
+    pointerEvents: 'none',
+    '::backdrop': {
+      animationName: fadeOut,
+      animationDuration: '0.2s',
+      animationTimingFunction: ease.inOut,
+      animationFillMode: 'forwards'
+    }
+  },
   sheet: {
     position: 'relative',
     paddingTop: '28px',
@@ -975,28 +1018,6 @@ const styles = stylex.create({
     color: color.text
   },
   logs: { marginTop: '4px' },
-  release: {
-    marginTop: '18px',
-    paddingTop: '14px',
-    borderTopWidth: '1px',
-    borderTopStyle: 'solid',
-    borderTopColor: color.border
-  },
-  releaseHead: {
-    margin: 0,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    cursor: 'pointer',
-    listStyleType: 'none',
-    '::-webkit-details-marker': { display: 'none' },
-    borderRadius: radius.sm,
-    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
-    outlineStyle: 'solid',
-    outlineWidth: '2px',
-    outlineOffset: '2px'
-  },
-  releaseBody: { marginTop: '6px', paddingLeft: '24px' },
   releaseVersion: { fontFamily: font.mono, fontSize: '13px', fontWeight: 600, color: color.text },
   latest: {
     paddingTop: '2px',

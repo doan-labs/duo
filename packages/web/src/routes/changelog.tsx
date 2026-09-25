@@ -1,156 +1,155 @@
 import * as stylex from '@stylexjs/stylex'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import log from '../../../../CHANGELOG.md?raw'
 import { known } from '../docs'
-import { versions } from '../generated/api'
+import { Fold } from '../fold'
+import { appForName } from '../home/apps'
 import { Section } from '../layout'
 import { type Block, parse, render } from '../markdown'
-import { PageTop, Reveal } from '../page-parts'
+import { PageTop } from '../page-parts'
 import { color, ease, font, radius } from '../tokens.stylex'
-
-// StyleX 0.19 cannot resolve an imported string as a media-query key, so the
-// shared breakpoint is declared here (see tokens.stylex.ts).
-const SMALL = '@media (max-width: 734px)'
 
 export const Route = createFileRoute('/changelog')({
   head: () => ({ meta: [{ title: 'Changelog · Duo' }] }),
   component: Page
 })
 
-const ORDER = ['sdk', 'uikit', 'shell', 'cli'] as const
-const LABEL: Record<(typeof ORDER)[number], string> = { sdk: 'SDK', uikit: 'UI kit', shell: 'Shell', cli: 'CLI' }
+const CTX = { from: 'CHANGELOG.md', known }
+
+type Part = { title: string; blocks: Block[] }
+type Version = { head: Block; intro: Block[]; parts: Part[] }
 
 /**
- * The package name is this page's `h2`, so a CHANGELOG's own `# 1.0.0` drops a
- * level rather than out-shouting the heading it sits under.
+ * One log for all of Duo. A `##` is a Duo version and stays a heading; each `###`
+ * under it (UI kit, SDK, Shell...) folds into an accordion. The file's own
+ * `# Changelog` is dropped: PageTop carries it.
  */
-const demote = (bs: Block[]): Block[] => bs.map((b) => (b.t === 'h' ? { ...b, level: Math.min(6, b.level + 1) } : b))
+const VERSIONS = parse(log).reduce<Version[]>((vs, b) => {
+  const v = vs.at(-1)
+  if (b.t === 'h' && b.level === 2) vs.push({ head: b, intro: [], parts: [] })
+  else if (!v || (b.t === 'h' && b.level === 1)) return vs
+  else if (b.t === 'h' && b.level === 3) v.parts.push({ title: b.text, blocks: [] })
+  else (v.parts.at(-1)?.blocks ?? v.intro).push(b)
+  return vs
+}, [])
+
+/** Settings is not on the home screen, so /apps has no entry for it: an icon, no page. */
+const SETTINGS = '/icons/settings.webp'
+const iconOf = (name: string) => appForName(name)?.icon ?? (name === 'Settings' ? SETTINGS : undefined)
+
+/**
+ * "Rebuilt after Apple's: Camera, Notes and the App Store." as a lead and app names,
+ * when every name is a real app; anything else stays prose.
+ */
+function appList(text: string) {
+  const at = text.indexOf(': ')
+  const names = text
+    .slice(at + 1)
+    .replace(/\.$/, '')
+    .split(/,\s+|\s+and\s+/)
+    .map((n) => n.trim().replace(/^the /, ''))
+  if (names.length < 2 || !names.every(iconOf)) return null
+  return { lead: at < 0 ? null : text.slice(0, at), names }
+}
 
 function Page() {
   return (
     <Section narrow>
-      <PageTop
-        eyebrow="Changelog"
-        title="Changelog"
-        lead="Every package on one page, read from its CHANGELOG.md at build time. Apps bundle the SDK and kit they compile against, so a new version here never breaks an installed app."
-      />
-      <Reveal>
-        <ul {...stylex.props(styles.cards)}>
-          {ORDER.map((k) => {
-            const v = versions[k]
-            if (!v) return null
-            // "Changelog below" was a promise the card could not keep; now it is the way there.
-            const body = (
-              <>
-                <p {...stylex.props(styles.pkg)}>{LABEL[k]}</p>
-                <p {...stylex.props(styles.version)}>{v.version}</p>
-                <p {...stylex.props(styles.name)}>{v.name}</p>
-                <p {...stylex.props(styles.note)}>{v.changelog ? 'Changelog below' : 'No changelog yet'}</p>
-              </>
-            )
-            return (
-              <li key={k}>
-                {v.changelog ? (
-                  <a href={`#${k}`} {...stylex.props(styles.card, styles.cardLink)}>
-                    {body}
-                  </a>
-                ) : (
-                  <div {...stylex.props(styles.card)}>{body}</div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      </Reveal>
-      {ORDER.map((k) => {
-        const v = versions[k]
-        if (!v?.changelog) return null
-        return (
-          <section key={k} id={k} {...stylex.props(styles.log)}>
-            <Reveal>
-              <h2 {...stylex.props(styles.h2)}>{LABEL[k]}</h2>
-            </Reveal>
-            {render(demote(parse(v.changelog)), { from: `packages/${k}/CHANGELOG.md`, known })}
-          </section>
-        )
-      })}
+      <PageTop eyebrow="Changelog" title="Changelog" lead="What changed in Duo, version by version." />
+      {VERSIONS.map((v) => (
+        <section key={v.head.t === 'h' ? v.head.id : ''}>
+          {render([v.head, ...v.intro], CTX)}
+          {v.parts.map((p) => (
+            <Accordion key={p.title} part={p} />
+          ))}
+        </section>
+      ))}
     </Section>
   )
 }
 
+/** One `###` part of a version; a line naming apps draws them as linked icons. */
+function Accordion({ part }: { part: Part }) {
+  return (
+    <Fold head={<span {...stylex.props(styles.title)}>{part.title}</span>}>
+      {part.blocks.map((b) => {
+        const items = b.t === 'list' ? b.items.map((it) => (it[0]?.t === 'p' ? appList(it[0].text) : null)) : []
+        if (b.t !== 'list' || !items.some(Boolean)) return render([b], CTX)
+        return b.items.map((it, i) => {
+          const apps = items[i]
+          const key = it[0]?.t === 'p' ? it[0].text : String(i)
+          if (!apps) return <div key={key}>{render(it, CTX)}</div>
+          return (
+            <div key={key} {...stylex.props(styles.apps)}>
+              {apps.lead && <p {...stylex.props(styles.lead)}>{apps.lead}</p>}
+              <ul {...stylex.props(styles.grid)}>
+                {apps.names.map((n) => {
+                  const slug = appForName(n)?.slug
+                  const face = (
+                    <>
+                      <img src={iconOf(n)} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
+                      {n}
+                    </>
+                  )
+                  return (
+                    <li key={n}>
+                      {slug ? (
+                        <Link to="/apps/$slug" params={{ slug }} {...stylex.props(styles.app, styles.appLink)}>
+                          {face}
+                        </Link>
+                      ) : (
+                        <span {...stylex.props(styles.app)}>{face}</span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )
+        })
+      })}
+    </Fold>
+  )
+}
+
 const styles = stylex.create({
-  cards: {
+  title: { fontFamily: font.sans, fontSize: '17px', fontWeight: 600 },
+  apps: { marginBottom: '20px' },
+  lead: { marginTop: 0, marginBottom: '12px', fontFamily: font.sans, fontSize: '15px', color: color.text2 },
+  grid: {
     listStyleType: 'none',
     margin: 0,
     padding: 0,
     display: 'grid',
-    gridTemplateColumns: { default: 'repeat(2, minmax(0, 1fr))', [SMALL]: 'minmax(0, 1fr)' },
+    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
     gap: '12px'
   },
-  card: {
-    display: 'block',
-    height: '100%',
-    backgroundColor: color.surface,
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: color.border,
-    borderRadius: radius.md,
-    paddingTop: '20px',
-    paddingBottom: '20px',
-    paddingLeft: '22px',
-    paddingRight: '22px'
+  app: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    minWidth: 0,
+    fontFamily: font.sans,
+    fontSize: '15px',
+    color: color.text,
+    // Every tile takes the hover pad, linked or not, so Settings lines up with its row.
+    marginLeft: '-6px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    borderRadius: radius.md
   },
-  cardLink: {
+  appLink: {
     textDecoration: 'none',
-    willChange: 'transform',
-    borderColor: { default: color.border, ':hover': color.borderStrong },
-    transitionProperty: 'border-color, transform, box-shadow, outline-color',
-    transitionDuration: '0.25s',
+    backgroundColor: { default: 'transparent', ':hover': color.well },
+    transitionProperty: 'background-color',
+    transitionDuration: '0.2s',
     transitionTimingFunction: ease.out,
-    transform: { default: 'translateY(0)', ':hover': 'translateY(-2px)' },
-    boxShadow: { default: 'none', ':hover': color.shadow },
     outlineColor: { default: 'transparent', ':focus-visible': color.ring },
     outlineStyle: 'solid',
     outlineWidth: '2px',
     outlineOffset: '2px'
   },
-  pkg: {
-    margin: 0,
-    fontFamily: font.mono,
-    fontSize: '11px',
-    fontWeight: 500,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-    color: color.text3
-  },
-  version: {
-    margin: 0,
-    marginTop: '10px',
-    fontFamily: font.display,
-    fontSize: '28px',
-    lineHeight: 1.1,
-    fontWeight: 600,
-    letterSpacing: '-0.02em',
-    color: color.text
-  },
-  name: {
-    margin: 0,
-    marginTop: '6px',
-    fontFamily: font.mono,
-    fontSize: '13px',
-    color: color.text2,
-    overflowWrap: 'anywhere'
-  },
-  note: { margin: 0, marginTop: '10px', fontFamily: font.sans, fontSize: '14px', color: color.text3 },
-  // The cards above link down here, and the nav sits over the top of the page.
-  log: { scrollMarginTop: '96px' },
-  h2: {
-    fontFamily: font.display,
-    fontSize: { default: '28px', [SMALL]: '24px' },
-    lineHeight: 1.15,
-    fontWeight: 600,
-    letterSpacing: '-0.02em',
-    marginTop: '48px',
-    marginBottom: '8px',
-    color: color.text
-  }
+  icon: { width: '32px', height: '32px', flexShrink: 0, borderRadius: '7px' }
 })
