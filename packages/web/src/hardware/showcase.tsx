@@ -3,6 +3,7 @@
 // embed-device.ts), so each readout is the payload itself, not a mock of it.
 // The chapter in the middle of the screen poses the phone to show its buttons.
 import type { DeviceEvent, DeviceEvents, Switches } from '@doan-labs/duo-sdk'
+import { Sym, type SymProps } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useEffect, useReducer, useRef, useState } from 'react'
 import { Block, Cap, Headline, Lede, TextLink } from '../home/parts'
@@ -198,18 +199,21 @@ const HINGES = [
   { value: 110, label: 'Tent' },
   { value: 0, label: 'Closed' }
 ]
-const SWITCHES: [keyof Switches, string][] = [
-  ['airplane', 'Airplane'],
-  ['cell', 'Cellular'],
-  ['wifi', 'Wi-Fi'],
-  ['bt', 'Bluetooth'],
-  ['drop', 'AirDrop'],
-  ['hotspot', 'Hotspot'],
-  ['rotate', 'Rotation lock'],
-  ['mirror', 'Mirroring'],
-  ['focus', 'Focus'],
-  ['torch', 'Torch'],
-  ['darkMode', 'Dark Mode']
+const sym = (name: SymProps['name']) => () => <Sym name={name} size={17} />
+// Control Center's own glyphs, so a tile here is the tile you tap in the phone. The kit's
+// `bluetooth` symbol is AirDrop's; the Bluetooth rune is drawn, as control-center.tsx does.
+const SWITCHES: [keyof Switches, string, (on: boolean) => ReactNode][] = [
+  ['airplane', 'Airplane Mode', sym('airplane')],
+  ['cell', 'Cellular', sym('antenna')],
+  ['wifi', 'Wi-Fi', sym('wifi')],
+  ['bt', 'Bluetooth', () => <Rune />],
+  ['drop', 'AirDrop', sym('bluetooth')],
+  ['hotspot', 'Personal Hotspot', sym('iphone')],
+  ['rotate', 'Rotation Lock', sym('lock')],
+  ['mirror', 'Screen Mirroring', sym('tabs')],
+  ['focus', 'Focus', sym('moon')],
+  ['torch', 'Torch', (on) => <Sym name={on ? 'torchOn' : 'torchOff'} size={17} />],
+  ['darkMode', 'Dark Mode', sym('moonStars')]
 ]
 
 export function Showcase() {
@@ -354,9 +358,15 @@ function Values({ type, live, onPull }: { type: DeviceEvent; live: Live; onPull:
         wide
         v={
           <span {...stylex.props(styles.pills)}>
-            {SWITCHES.map(([k, label]) => (
-              <span key={k} {...stylex.props(styles.pill, s?.[k] && styles.pillOn)}>
-                {label}
+            {SWITCHES.map(([k, label, glyph]) => (
+              <span
+                key={k}
+                role="img"
+                aria-label={`${label}: ${s?.[k] ? 'on' : 'off'}`}
+                title={label}
+                {...stylex.props(styles.pill, s?.[k] && styles.pillOn)}
+              >
+                {glyph(!!s?.[k])}
               </span>
             ))}
           </span>
@@ -405,6 +415,22 @@ function Meter({ value, label }: { value: number; label: string }) {
     </span>
   )
 }
+
+const Rune = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width={17}
+    height={17}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9" />
+  </svg>
+)
 
 function Kbd({ children }: { children: ReactNode }) {
   return <kbd {...stylex.props(styles.kbd)}>{children}</kbd>
@@ -513,14 +539,13 @@ const styles = stylex.create({
     borderRadius: radius.sm,
     color: color.text2
   },
-  pills: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+  pills: { display: 'flex', flexWrap: 'wrap', gap: '7px' },
   pill: {
-    fontFamily: font.sans,
-    fontSize: '12.5px',
-    paddingTop: '5px',
-    paddingBottom: '5px',
-    paddingLeft: '10px',
-    paddingRight: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '34px',
+    height: '34px',
     borderRadius: radius.pill,
     backgroundColor: color.well,
     color: color.text3,
@@ -528,7 +553,7 @@ const styles = stylex.create({
     transitionDuration: '0.3s',
     transitionTimingFunction: ease.out
   },
-  pillOn: { backgroundColor: color.accentSoft, color: color.accent },
+  pillOn: { backgroundColor: color.accent, color: color.onAccent },
   split: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' },
   button: {
     fontFamily: font.sans,
