@@ -6,6 +6,7 @@ import {
   type DeviceEvents,
   type ErrCode,
   LIMITS,
+  type Notice,
   type Req,
   type Switches,
   type ViewInfo,
@@ -53,7 +54,9 @@ export function requestValid(value: unknown): value is Req {
         'side.claim',
         'side.release',
         'device.watch',
-        'device.unwatch'
+        'device.unwatch',
+        'notify.post',
+        'notify.clear'
       ].includes(value.m) ||
       !!servicePermission(value.m)) &&
     (value.epoch === undefined || (Number.isSafeInteger(value.epoch) && Number(value.epoch) > 0)) &&
@@ -120,5 +123,21 @@ export function widgetValid(v: unknown): v is WidgetSnapshot {
     )
   )
 }
+// Chars, not bytes: a notice's title and body are what fits on the card.
+const chars = (s: string) => [...s].length
+export function noticeValid(v: unknown): v is Notice {
+  return (
+    record(v) &&
+    typeof v.title === 'string' &&
+    v.title.length > 0 &&
+    chars(v.title) <= LIMITS.noticeTitle &&
+    (v.body === undefined || (typeof v.body === 'string' && chars(v.body) <= LIMITS.noticeBody)) &&
+    (v.arg === undefined || (typeof v.arg === 'string' && v.arg.length <= LIMITS.noticeArg))
+  )
+}
 export const mutating = (method: string) =>
-  /\.(set|del)$/.test(method) || method === 'cmd.send' || method === 'cmd.ack' || mutatingService(method)
+  /\.(set|del)$/.test(method) ||
+  method === 'cmd.send' ||
+  method === 'cmd.ack' ||
+  method === 'notify.clear' ||
+  mutatingService(method)

@@ -8,6 +8,7 @@ export type {
   ErrCode,
   KV,
   Limits,
+  Notice,
   Switches,
   ViewInfo,
   WidgetSnapshot
