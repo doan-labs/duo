@@ -18,7 +18,7 @@ export const api: ApiEntry[] = [
     "file": "packages/sdk/legacy.ts",
     "line": 5,
     "doc": "What the Camera app publishes for Camera Control and the volume buttons.",
-    "signature": "type CameraHooks = {\n  shoot: () => void\n  record: (on: boolean) => void\n  /** Sets the zoom factor when given one; returns the current one. */\n  zoom: (z?: number) => number\n}",
+    "signature": "type CameraHooks = {\n  shoot: () => void\n  record: (on: boolean) => void\n  /** Sets the zoom factor when given one; returns the current one. */\n  zoom: (z?: number) => number\n  /** Volume Up held: a burst starts (`on` true) and ends (`on` false) around the shots it fires. */\n  burst?: (on: boolean) => void\n}",
     "members": [
       {
         "name": "shoot",
@@ -37,6 +37,12 @@ export const api: ApiEntry[] = [
         "type": "(z?: number) => number",
         "optional": false,
         "doc": "Sets the zoom factor when given one; returns the current one."
+      },
+      {
+        "name": "burst",
+        "type": "(on: boolean) => void",
+        "optional": true,
+        "doc": "Volume Up held: a burst starts (`on` true) and ends (`on` false) around the shots it fires."
       }
     ]
   },
@@ -45,9 +51,9 @@ export const api: ApiEntry[] = [
     "name": "Os",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 12,
+    "line": 14,
     "doc": "",
-    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /** The glass this instance draws on: the folded cover or the open inner display. */\n  display?: 'inner' | 'cover'\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n}",
+    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /** The glass this instance draws on: the folded cover or the open inner display. */\n  display?: 'inner' | 'cover'\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n  /**\n   * The LED beside the rear cameras, the same light Control Center's flashlight\n   * and the lock screen's torch flip: the Camera app drives it for rear flash\n   * and video torch.\n   */\n  led?: (on: boolean) => void\n}",
     "members": [
       {
         "name": "store",
@@ -96,6 +102,12 @@ export const api: ApiEntry[] = [
         "type": "{ current: CameraHooks | null }",
         "optional": false,
         "doc": "Set by the Camera app while it is open; the shell reads it for the frame buttons."
+      },
+      {
+        "name": "led",
+        "type": "(on: boolean) => void",
+        "optional": true,
+        "doc": "The LED beside the rear cameras, the same light Control Center's flashlight\nand the lock screen's torch flip: the Camera app drives it for rear flash\nand video torch."
       }
     ]
   },
@@ -104,7 +116,7 @@ export const api: ApiEntry[] = [
     "name": "SettingsHost",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 38,
+    "line": 46,
     "doc": "What the shell hands the Settings app. Baked apps never import the shell, so\nthe switches, the eraser and the link opener arrive as a prop from apps.ts,\nthe way the Store gets `openExternal`.",
     "signature": "type SettingsHost = {\n  /** The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`. */\n  switches: Readonly<Switches>\n  subscribe: (cb: () => void) => () => void\n  revision: () => number\n  flip: (key: keyof Switches, value?: boolean) => void\n  /** The Wi-Fi network and the charge the status stack reports. */\n  network: string\n  battery: number\n  /** Erase All Content and Settings: clears device storage and reloads the shell. */\n  erase: () => Promise<void>\n  openExternal: (url: string) => void\n  /** Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press. */\n  claimSide: (claim: () => boolean) => () => void\n}",
     "members": [

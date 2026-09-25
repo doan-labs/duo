@@ -29,7 +29,10 @@ revisioned KV; `releases.ts` downloads and verifies artifacts; `lifecycle.ts` ow
 installation, generations, leases, activation, migration, restore and removal.
 `sessions.ts` owns sessions, sticky effect ownership and commands. `bridge.ts` owns
 launch records and nonce/MessagePort authority. `device-events.ts` routes the frame's
-buttons, the pose and the switches to the views that watch them. `display.ts` derives view information;
+buttons, the pose and the switches to the views that watch them. `notifications.ts`
+owns the in-memory notice store `notify.post`/`notify.clear` dispatch into; every
+display's SpringBoard renders it as a banner and as the lock screen's Notification
+Center. `display.ts` derives view information;
 `sandbox.tsx` renders loading/failure states. `registry.ts` combines installed apps with
 the shell registry and seeds bundled releases once. `development.ts` owns preview bytes
 and namespaces; `catalog.ts` owns explicit catalog operations.

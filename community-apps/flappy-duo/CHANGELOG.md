@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2
+
+- The purchase receipt posts through `os.notify.post` as a real OS notification (banner over the display, then a card in Notification Center) instead of the in-app mockup. The painted avatar header goes with it.
+- The in-canvas notification flood stays a gameplay hazard; it never claimed to be the OS.
+
 ## 1.0.1
 
 - Built against UI kit 1.0.0 token names.

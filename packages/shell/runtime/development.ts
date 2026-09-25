@@ -1,5 +1,6 @@
 import { networkOrigin, releaseId, releaseValid } from '../../sdk/manifest.ts'
 import { appLock, broadcast, type Installed, put, range, read, type StoredRelease, transaction } from './database.ts'
+import { clearNotices } from './notifications.ts'
 import { boundedFetch, digest, download } from './releases.ts'
 
 export const development = new Map<string, { bundle: StoredRelease; src: string }>()
@@ -67,6 +68,7 @@ export async function removeDevelopment(id: string) {
     const previous = development.get(id)
     development.delete(id)
     if (previous) URL.revokeObjectURL(previous.src)
+    clearNotices(id)
   })
   broadcast({ id })
 }

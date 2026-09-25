@@ -105,8 +105,8 @@ export class Session {
   assertOwner(view: SessionView, epoch: unknown) {
     if (view !== this.owner || epoch !== this.epoch) throw new PlatformError('E_STALE')
   }
-  setArg(arg: string) {
-    if (this.arg === arg) return
+  setArg(arg: string, always = false) {
+    if (!always && this.arg === arg) return
     this.arg = arg
     this.argSeq++
     for (const view of this.views.values()) view.send({ ev: 'arg', p: { arg, argSeq: this.argSeq } })
@@ -168,6 +168,16 @@ export class Session {
   }
 }
 const sessions = new Map<string, Promise<Session>>()
+/**
+ * An arg for an app already running, parked or on stage: delivered like the
+ * launch arg, without opening a session that does not exist (a notification's
+ * deep link into a parked scene). Always emits: each tap is a user action, so a
+ * repeated arg still bumps argSeq and reaches the app.
+ */
+export async function deliverArg(id: string, arg: string) {
+  const current = await sessions.get(id)
+  current?.setArg(arg, true)
+}
 export async function closeSession(id: string) {
   const current = await sessions.get(id)
   if (current) {

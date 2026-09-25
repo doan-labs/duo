@@ -21,6 +21,7 @@ import {
   transaction,
   writeAuthority
 } from './database.ts'
+import { clearNotices } from './notifications.ts'
 import { download } from './releases.ts'
 import { emptyMeta } from './storage.ts'
 
@@ -277,6 +278,9 @@ export async function uninstall(id: string) {
     })
   )
   broadcast({ id })
+  // An uninstalled app's notices die with it: the cards can only unlock into
+  // nothing, and iOS drops them at removal too.
+  clearNotices(id)
   await finishRemoval(id)
 }
 async function finishRemoval(id: string) {

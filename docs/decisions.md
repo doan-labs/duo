@@ -1663,8 +1663,24 @@ Favorites grid is the favourites list, and a Frequently Visited section ranks
 hosts by visit count. Cost: the Tab Group Favorites folder and the seeded
 iPhone User Guide row are gone - both were invented, and a bookmark whose page
 refuses to frame would open to a blank screen anyway.
+## 99. Notifications are an ungated base method, not a permission
 
-## 99. Maps searches, geocodes and routes live
+2026-09-25, accepted. `os.notify.post({ title, body, arg })` stores a notice under
+the posting app's installed id; the shell shows it as a banner over whatever is
+on screen for about four seconds, then as a card in Notification Center - the
+list on the lock screen - and a tap unlocks and launches the app with `arg`,
+delivered to a running session like a launch arg. Posting needs no manifest
+permission: the curated gate accepts none (check-submissions refuses a nonempty
+`permissions`), so a service-method notification API would be dead for every
+community app. It needs no epoch either, for the same reason `open` and `home`
+carry none: the post is an intent, not an effect, and a notice the person
+caused on the non-owner display must not die on `E_STALE`. The store is
+in-memory and bounded (10 per app, 100 total); a reload clears the center. The
+lock screen is the center rather than a separate pull-down layer because Duo's
+lock lives on both displays and a Notification Center swipe would collide with
+the unlock swipe and the Control Center pull at the top edge.
+
+## 100. Maps searches, geocodes and routes live
 
 2026-09-25, accepted; supersedes the "nothing routes or geocodes" half of 60. The
 tile drawing and furniture from 60 stand; what changed is that the controls

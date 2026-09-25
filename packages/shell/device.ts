@@ -120,6 +120,7 @@ export const device = {
   cameraOpen: () => !!inUse().cam(),
   shoot: () => inUse().cam()?.shoot(),
   record: (on: boolean) => inUse().cam()?.record(on),
+  burst: (on: boolean) => inUse().cam()?.burst?.(on),
   zoom: (z?: number) => inUse().cam()?.zoom(z) ?? 1,
   /** Sets the ringer level and keeps it. Control Center's slider and the volume buttons share this. */
   setLevel(n: number) {

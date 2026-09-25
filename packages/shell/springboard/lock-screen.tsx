@@ -19,6 +19,7 @@ import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, type Ref, useRef } from 'react'
 import { clock, dateOf, useNow } from './clock.ts'
 import { HomeBar } from './home-bar.tsx'
+import { NoticeList, type Open } from './notifications.tsx'
 import { flip, useToggles } from './toggles.ts'
 
 // SF Symbols' flashlight.off.fill and camera.fill, as strokes.
@@ -71,12 +72,14 @@ export function LockScreen({
   hidden,
   onSwipe,
   onCamera,
+  onOpenNotice,
   ref
 }: {
   wide: boolean
   hidden: boolean
   onSwipe: (e: ReactPointerEvent<HTMLDivElement>) => void
   onCamera: (from: HTMLElement) => void
+  onOpenNotice: Open
   ref: Ref<HTMLDivElement>
 }) {
   // Device-wide: the same torch Control Center flips and the LED on the back shows.
@@ -99,6 +102,8 @@ export function LockScreen({
         <div {...stylex.props(styles.ldate, wide ? styles.ldateWide : styles.ldateNarrow)}>{dateOf(now)}</div>
         <div {...stylex.props(styles.ltime, wide ? styles.ltimeWide : styles.ltimeNarrow)}>{clock(now)}</div>
       </div>
+      {/* Notification Center: what arrived while the device was locked. */}
+      <NoticeList wide={wide} onOpen={onOpenNotice} />
       <div {...stylex.props(styles.lbtns, !wide && styles.lbtnsNarrow)}>
         <div
           data-torch

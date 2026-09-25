@@ -311,6 +311,7 @@ export type Method =
   | 'open' | 'home'
   | 'side.claim' | 'side.release'
   | 'device.watch' | 'device.unwatch'                   // { type: DeviceEvent }, §3.8
+  | 'notify.post' | 'notify.clear'                     // §3.9
   | ServiceMethod                                       // §6, gated by the manifest's permissions
 
 export type ErrCode =
@@ -361,7 +362,8 @@ the last 256 completed ids with their results per view; a repeated id returns
 the recorded result without re-executing. The SDK's timeout (5 s) retries a
 mutating request once with the same id, then surfaces `E_TIMEOUT`; the app
 then reads back (`get`) to reconcile, because a timeout does not prove the
-write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch` and `device.unwatch` are never retried.
+write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch`,
+`device.unwatch` and `notify.post` are never retried.
 
 | Limit | Value | Error |
 | --- | --- | --- |
@@ -373,6 +375,7 @@ write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch` and `
 | Session per session | 64 KiB total | `E_QUOTA` |
 | Widget snapshot | ≤ 8 lines of ≤ 64 chars, `arg` ≤ 256 | `E_ARGS` |
 | Command payload | ≤ 16 KiB; ≤ 32 unacknowledged per session | `E_ARGS` |
+| Notification | title ≤ 64 chars, body ≤ 240 chars, arg ≤ 4096; retained ≤ 10 per app, ≤ 100 total | `E_ARGS` |
 | In-flight requests per view | 64 | `E_ARGS` |
 | Request rate per view | 200 per second sustained, burst 400 (token bucket) | `E_RATE`, with `retryAfterMs` in `msg` |
 
@@ -483,9 +486,13 @@ export const os: {
   sideButton: { claim(): Promise<void>; release(): Promise<void>; onDouble(cb: () => void): () => void }
   /** The phone's hardware (§3.8). The first listener of a type watches it on the host, the last one to leave unwatches it. */
   device: { on<K extends DeviceEvent>(type: K, cb: (e: DeviceEvents[K]) => void): () => void }
+  /** OS notifications (§3.9). Any view may post; the card names the app and shows its icon. */
+  notify: { post(notice: Notice): Promise<{ id: string }>; clear(id?: string): Promise<void> }
   /** Host services (§6). Present on the object; each call is E_DENIED unless declared. */
   photos: { list(): Promise<Photo[]>; get(id: string): Promise<Blob>; add(blob: Blob): Promise<Photo> }
 }
+
+export type Notice = { title: string; body?: string; arg?: string }
 
 export type KV = {
   get(k: string): Promise<string | null>
@@ -748,6 +755,30 @@ orientation at most once per rendered frame. An SDK treats an event type it does
 as a protocol error, so the host sends a type only to a view that watched it, and a new
 type is safe to add without breaking released apps. `device.unwatch` and revocation stop
 delivery and drop every button the view listened to.
+
+### 3.9 Notifications
+
+Accepted: **any view may post; the OS owns the chrome.** `notify.post` stores
+`{ title, body?, arg? }` under the posting app's installed id and its manifest
+name at post time, and answers `{ id }`. `notify.clear` removes that app's own
+notices, one by `id` or all of them; an app cannot clear another's. Neither
+request carries an epoch: posting is an OS-level intent the way `open` and
+`home` are, not an effect - a notice the person caused on the non-owner display
+would otherwise be dropped on `E_STALE`. Ungated, too, because the curated gate
+accepts no permission declarations (§6.2), so a service-method notification
+would be unreachable for every community app.
+
+The shell shows a posted notice twice: a banner that drops over whatever is on
+screen for about four seconds, then a card in Notification Center, the list on
+the lock screen. Both displays render the one store - the shell is one document
+and both SpringBoards read it - so a post lands on cover and inner alike.
+Tapping a card or the banner unlocks the device and launches the app with
+`arg`; when the app is already running, parked or on stage, the session
+delivers it like a launch arg.
+
+The store is in-memory: a reload clears the center, and retention is bounded
+per app and in total (§2.5). Persistence, grouping, scheduled delivery,
+previews before unlock, and per-app notification settings are roadmap work.
 
 ## 4. Storage and release lifecycle
 
@@ -1080,8 +1111,10 @@ handlers and guards. The table is not authorization to expand the current permis
 
 `photos` is the retained host-service adapter because the data already exists: the
 shell keeps the stills the Camera app takes (`shots`). The host handler lists
-them, returns one as a Blob over the port, and appends one. Files, contacts
-and notifications have no enabled host-service contract; they remain roadmap work.
+them, returns one as a Blob over the port, and appends one. Notifications have
+an enabled contract but not through this table: `os.notify` is a base method
+(§3.9), an OS intent the way `open` is, not permission-gated data. Files and
+contacts have no enabled host-service contract; they remain roadmap work.
 
 ```ts
 export type Photo = { id: string; takenAt: number; width: number; height: number }

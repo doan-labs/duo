@@ -79,11 +79,21 @@ export const LIMITS = {
   session: 64 * 1024,
   command: 16 * 1024,
   commands: 32,
+  noticeTitle: 64,
+  noticeBody: 240,
+  noticeArg: 4096,
+  noticesApp: 10,
+  notices: 100,
   inflight: 64,
   rate: 200,
   burst: 400,
   dedupe: 256
 } as const
+/**
+ * What `os.notify.post` takes: the OS shows `name` and `title`, `body` under it,
+ * and hands `arg` back to the app when the notice is opened, like `os.open`'s arg.
+ */
+export type Notice = { title: string; body?: string; arg?: string }
 export type ErrCode =
   | 'E_ARGS'
   | 'E_QUOTA'
@@ -106,6 +116,8 @@ export type Method =
   | 'side.release'
   | 'device.watch'
   | 'device.unwatch'
+  | 'notify.post'
+  | 'notify.clear'
   | ServiceMethod
 export type Hello = { t: 'hello'; protocol: number; sdk: string; nonce: string }
 export type Welcome = {
