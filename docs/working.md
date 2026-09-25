@@ -46,6 +46,7 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | `?debug` | Expose `window.__duo`; [probe reference](debug.md#the-state-probe) |
 | `?deg=0..180&yaw=<radians>` | Pin pose; 0 closed, 180 flat, yaw −1.5708 faces the right edge |
 | `?app=Notes` | Open an app past the lock screen |
+| `?arg=<catalog id>` | Argument the `?app=` app gets as `os.arg`; `?app=App Store&arg=<id>` opens that app's page in the Store |
 | `?hud=0` | No slider, buttons, hint or minimap, fit centred on the phone; for a page that poses it by postMessage |
 | `Esc` / Home | Return home on both displays |
 | `L`, `C`, `↑`/`↓` | Side, Camera Control, volume buttons |
@@ -288,10 +289,11 @@ bun run api            # only the TSDoc reference
   through a StyleX function style (`at: (left) => ({ left })`) or a `motion.*`
   element that carries only `style`.
 - The embedded shell is driven over the bridge in `packages/shell/main.ts`:
-  `?bg=` at load, then `{ deg, yaw, bg, paused, app, cue }` by postMessage from
+  `?bg=` at load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage from
   the same origin: `paused` parks the render loop while the frame is off screen,
   `app` clears the stage and launches an app by home screen name (empty string
-  is Home), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
+  is Home; `arg` reaches it as `os.arg`, so `app: 'App Store'` plus a catalog id
+  opens that app's page in the Store), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
   `split` drags it onto the left half by synthetic pointer events and opens the
   named app beside it, `switcher` holds the home bar and lets go, `folder` resets
   the grid and carries Find My onto Stocks, `wallpaper` holds the paper and taps

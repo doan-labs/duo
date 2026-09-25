@@ -277,23 +277,21 @@ export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout
   )
 }
 
-/** The name opens the app on the phone; only a catalog app the shell does not carry points at its repo instead. */
+/** The name opens the app on the phone; an app the shell does not carry opens its page in the Store instead. */
 function Name({ entry, row = false }: { entry: Entry; row?: boolean }) {
   const style = row ? styles.rowName : styles.link
-  return entry.open ? (
-    <Link to="/simulator" search={{ app: entry.open }} {...stylex.props(style)}>
+  // Every entry is either on the home screen or a catalog release.
+  const search = entry.open ? { app: entry.open } : { app: 'App Store', arg: entry.release?.id }
+  return (
+    <Link to="/simulator" search={search} {...stylex.props(style)}>
       {entry.name}
     </Link>
-  ) : (
-    <a href={entry.release?.repo} {...stylex.props(style)}>
-      {entry.name}
-    </a>
   )
 }
 
-/** The repo, for an app whose name goes to the simulator. */
+/** The repo, for a released app. */
 function Source({ entry }: { entry: Entry }) {
-  if (!entry.open || !entry.release) return null
+  if (!entry.release) return null
   return (
     <>
       {' · '}

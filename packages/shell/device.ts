@@ -32,7 +32,7 @@ export const active = { wide: true }
 export type Display = {
   wide: boolean
   dark: (on: boolean) => void
-  launch: (name: string) => void
+  launch: (name: string, arg?: string) => void
   cam: () => CameraHooks | null
   hud: () => void
   screenshot: () => void
@@ -109,8 +109,8 @@ export const device = {
     if (device.asleep) device.wake()
     else device.sleep()
   },
-  /** An app by name on the display in use; the embed bridge in main.ts uses this. */
-  open: (name: string) => inUse().launch(name),
+  /** An app by name on the display in use; `arg` reaches it as `os.arg`. The embed bridge in main.ts uses this. */
+  open: (name: string, arg?: string) => inUse().launch(name, arg),
   siri: () => inUse().launch('Siri'),
   wallet: () => {
     for (const claim of sideClaims) if (claim()) return

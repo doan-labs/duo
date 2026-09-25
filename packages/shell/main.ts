@@ -46,10 +46,19 @@ document.documentElement.classList.toggle('web', !isDesktop)
 startBuilderPreview()
 
 // An embedding page drives the backdrop, the pose and what the phone is doing: `?bg=` at
-// load, then `{ deg, yaw, bg, paused, app, cue }` by postMessage (cues in cues.ts).
+// load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage (cues in cues.ts).
 // Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
-type Pose = { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue; hello?: boolean }
+type Pose = {
+  deg?: number
+  yaw?: number
+  bg?: string
+  paused?: boolean
+  app?: string
+  arg?: string
+  cue?: Cue
+  hello?: boolean
+}
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
 const paint = (bg: string | null) => {
@@ -377,12 +386,13 @@ css.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none;opaci
 document.body.appendChild(css.domElement)
 const PXCM = 0.02 // 1 CSS px = 0.2 mm, so the outer display is ~387 px wide like an iPhone
 const px = (cm: number) => Math.round(cm / PXCM)
-// A deep link into an app lands past the lock screen.
-lockState.locked = !new URLSearchParams(location.search).get('app')
+// A deep link into an app lands past the lock screen; `?arg=` reaches the app as `os.arg`.
+const deep = new URLSearchParams(location.search)
+lockState.locked = !deep.get('app')
 function live(w: number, h: number) {
   // Pre-attach hidden roots to the renderer's camera layer: moving a live iframe reloads its document.
   const container = css.domElement.firstElementChild!.firstElementChild as HTMLElement
-  const o = new CSS3DObject(os(w, h, container, new URLSearchParams(location.search).get('app')))
+  const o = new CSS3DObject(os(w, h, container, deep.get('app'), deep.get('arg')))
   o.scale.setScalar(PXCM)
   return o
 }
@@ -607,7 +617,7 @@ function stage(m: Pose) {
     if (m.app) {
       unlockAll()
       lead()
-      device.open(m.app)
+      device.open(m.app, typeof m.arg === 'string' ? m.arg : undefined)
     }
   }
   if (m.cue) cue(m.cue)

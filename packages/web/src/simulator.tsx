@@ -27,6 +27,7 @@ export function Simulator({
   deg = 180,
   yaw,
   app,
+  arg,
   cue,
   eager = false,
   spin = false,
@@ -44,6 +45,8 @@ export function Simulator({
   yaw?: number
   /** The app to show, by its home screen name; the empty string is Home. Changes after load go by postMessage. */
   app?: string
+  /** The deep link `app` opens with, arriving as its `os.arg`: a catalog id opens that page in the Store. */
+  arg?: string
   /** A gesture for the phone to play: the split drag toward `split`, the switcher, a folder, the wallpaper, a screenshot, a song. Replayed whenever the cue changes. */
   cue?: Cue
   /** Mount at once instead of waiting for the viewport (the hero). */
@@ -72,7 +75,7 @@ export function Simulator({
   // screen. Poses may go as soon as it loads (the shell queues them), but the
   // frame stays hidden behind the placeholder until it says it has a picture.
   const [painted, setPainted] = useState(false)
-  const shown = useRef(app)
+  const shown = useRef({ app, arg })
   const theme = useTheme()
 
   useEffect(() => {
@@ -149,10 +152,10 @@ export function Simulator({
     if (ready && yaw !== undefined) post(frame.current, { yaw })
   }, [ready, yaw])
   useEffect(() => {
-    if (!ready || app === shown.current) return
-    shown.current = app
-    post(frame.current, { app: app ?? '' })
-  }, [ready, app])
+    if (!ready || (app === shown.current.app && arg === shown.current.arg)) return
+    shown.current = { app, arg }
+    post(frame.current, { app: app ?? '', arg })
+  }, [ready, app, arg])
   const cueKey = JSON.stringify(cue ?? null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: `cueKey` stands for `cue`; an equal object is not a new cue.
   useEffect(() => {
@@ -167,6 +170,7 @@ export function Simulator({
     if (builder) q.set('builder', builder)
     if (yaw !== undefined) q.set('yaw', String(yaw))
     if (app) q.set('app', app)
+    if (arg) q.set('arg', arg)
     if (bare) q.set('hud', '0')
     return `${BASE}?${q}`
   })
@@ -206,7 +210,16 @@ export function Simulator({
 
 const post = (
   f: HTMLIFrameElement | null,
-  msg: { deg?: number; yaw?: number; bg?: string; paused?: boolean; app?: string; cue?: Cue; hello?: boolean }
+  msg: {
+    deg?: number
+    yaw?: number
+    bg?: string
+    paused?: boolean
+    app?: string
+    arg?: string
+    cue?: Cue
+    hello?: boolean
+  }
 ) => f?.contentWindow?.postMessage(msg, new URL(BASE, location.href).origin)
 // The box's own colour, not the body's: a frame inside a dark section takes the section's backdrop.
 const bg = (el: HTMLElement | null) => getComputedStyle(el ?? document.body).backgroundColor

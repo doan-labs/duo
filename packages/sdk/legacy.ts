@@ -44,6 +44,8 @@ export type Switches = {
   mirror: boolean
   focus: boolean
   torch: boolean
+  /** Dark Mode: light apps wear the kit's dark theme; always-dark apps are untouched. */
+  darkMode: boolean
 }
 
 /**

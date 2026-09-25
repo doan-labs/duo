@@ -31,7 +31,8 @@ const DEFAULT: Toggles = {
   rotate: false,
   mirror: false,
   focus: false,
-  torch: false
+  torch: false,
+  darkMode: false
 }
 
 const state: Toggles = (() => {

@@ -1,198 +1,164 @@
 import { os } from '@doan-labs/duo-sdk'
-import { useDisplay } from '@doan-labs/duo-uikit'
-import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { useKV } from '@doan-labs/duo-sdk/react.ts'
+import { useWide } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { styles } from './styles.ts'
+import {
+  adoptTimer,
+  DURATIONS,
+  formatTime,
+  freshTimer,
+  pauseTimer,
+  resetTimer,
+  rolloverTimer,
+  type SavedTimer,
+  secondsLeft,
+  serializeTimer,
+  skipTimer,
+  startTimer,
+  type TimerState
+} from './timer.ts'
 
-type Mode = 'focus' | 'break'
-const motion = '@media (prefers-reduced-motion: reduce)'
-const cardIn = stylex.keyframes({
-  from: { opacity: 0, transform: 'translateY(8px) scale(.98)' },
-  to: { opacity: 1, transform: 'translateY(0) scale(1)' }
-})
-const modeIn = stylex.keyframes({
-  from: { opacity: 0, transform: 'translateY(-4px)' },
-  to: { opacity: 1, transform: 'translateY(0)' }
-})
-
-const DURATIONS: Record<Mode, number> = { focus: 25 * 60, break: 5 * 60 }
-
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60)
-  const remainder = seconds % 60
-  return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0')
-}
+// Why a writer id: both displays share one session key whose store is
+// last-writer-wins, so a value not written by this copy is always the newer
+// settled timer - adopting it unconditionally is what converges the two
+// displays when the fold hands the countdown over.
+const ME = crypto.randomUUID()
 
 function Timer() {
-  const view = useDisplay()
-  const cover = view.display === 'cover'
-  const [mode, setMode] = useState<Mode>('focus')
-  const [seconds, setSeconds] = useState(DURATIONS.focus)
-  const [running, setRunning] = useState(false)
-  const total = DURATIONS[mode]
+  const [rootRef, wide] = useWide<HTMLElement>()
+  const [timer, setTimer] = useState<TimerState>(freshTimer)
+  const [now, setNow] = useState(() => Date.now())
+  const stateRef = useRef(timer)
+  stateRef.current = timer
+  const seeded = useRef(false)
+  const lastSeen = useRef<string | null>(null)
 
+  const saved = useKV(os.session, 'timer')
+
+  const publish = useCallback((next: TimerState) => saved.set(JSON.stringify(serializeTimer(ME, next))), [saved])
+
+  const apply = useCallback(
+    (next: TimerState) => {
+      setTimer(next)
+      publish(next)
+    },
+    [publish]
+  )
+
+  // Why adopt on the session key: the fold carries the running timer to the
+  // other display. A write this copy did not make is the new settled state;
+  // own writes are already on screen and are ignored. The raw string is the
+  // guard: the effect body must not re-fire on every render of a remote value
+  // already adopted, or the setTimer below loops forever.
   useEffect(() => {
-    if (!running) return
-    const timer = window.setInterval(() => {
-      setSeconds((current) => {
-        if (current > 1) return current - 1
-        setMode((currentMode) => (currentMode === 'focus' ? 'break' : 'focus'))
-        return DURATIONS[mode === 'focus' ? 'break' : 'focus']
-      })
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [mode, running])
+    if (saved.status === 'hydrating' || saved.status === 'saving') return
+    const raw = saved.value
+    if (raw !== null && raw === lastSeen.current) return
+    lastSeen.current = raw
+    if (!raw) {
+      if (!seeded.current) {
+        seeded.current = true
+        publish(stateRef.current)
+      }
+      return
+    }
+    const next = JSON.parse(raw) as SavedTimer
+    if (next.by === ME) return
+    const at = Date.now()
+    setNow(at)
+    setTimer(adoptTimer(next, at))
+  }, [saved.value, saved.status, publish])
+
+  const seconds = secondsLeft(timer, now)
+
+  // Why a derived rollover: `endAt` is the single source of truth, so the
+  // phase flip is one deterministic state transition computed in an effect
+  // instead of a `setMode` hidden inside a `setSeconds` updater, which read a
+  // stale mode and ran twice under StrictMode.
+  useEffect(() => {
+    if (!timer.running || seconds > 0) return
+    apply(rolloverTimer(timer, Date.now()))
+  }, [seconds, timer, apply])
+
+  // The interval only re-renders; it never owns the countdown. Both displays
+  // compute the same remaining seconds from the same `endAt`.
+  useEffect(() => {
+    if (!timer.running) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [timer.running])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
 
-  const reset = () => {
-    setRunning(false)
-    setSeconds(DURATIONS[mode])
+  const startPause = () => {
+    const at = Date.now()
+    setNow(at)
+    apply(timer.running ? pauseTimer(timer, at) : startTimer(timer, at))
   }
+  const reset = () => apply(resetTimer(timer))
+  const skip = () => apply(skipTimer(timer))
 
-  const skip = () => {
-    const nextMode = mode === 'focus' ? 'break' : 'focus'
-    setMode(nextMode)
-    setSeconds(DURATIONS[nextMode])
-    setRunning(false)
-  }
-
+  const total = DURATIONS[timer.mode]
   const progress = ((total - seconds) / total) * 100
+  const focus = timer.mode === 'focus'
+  const paused = !timer.running && seconds < total
 
   return (
-    <main data-display={view.display} {...stylex.props(styles.root, cover && styles.cover)}>
+    <main ref={rootRef} {...stylex.props(styles.root, !wide && styles.rootCover)}>
       <header {...stylex.props(styles.header)}>
         <div>
           <span {...stylex.props(styles.kicker)}>DUO FOCUS</span>
           <h1 {...stylex.props(styles.title)}>Pomodoro</h1>
         </div>
-        <span key={mode} {...stylex.props(styles.mode)}>
-          {mode === 'focus' ? 'FOCUS' : 'BREAK'}
+        <span key={timer.mode} {...stylex.props(styles.mode)}>
+          {focus ? 'FOCUS' : 'BREAK'}
         </span>
       </header>
-      <section {...stylex.props(styles.timerCard)}>
-        <span {...stylex.props(styles.phase)}>{mode === 'focus' ? 'Deep work' : 'Reset break'}</span>
-        <strong {...stylex.props(styles.time)}>{formatTime(seconds)}</strong>
-        <div
-          role="progressbar"
-          aria-label="Timer progress"
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={total - seconds}
-          {...stylex.props(styles.timeline)}
-        >
-          <div {...stylex.props(styles.timelineFill(progress))} />
+      <section {...stylex.props(styles.stage, wide && styles.stageWide)}>
+        <div {...stylex.props(styles.timerCard)}>
+          <span {...stylex.props(styles.phase)}>{focus ? 'Deep work' : 'Reset break'}</span>
+          <strong {...stylex.props(styles.time, wide && styles.timeWide)}>{formatTime(seconds)}</strong>
+          <div
+            role="progressbar"
+            aria-label="Timer progress"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={total - seconds}
+            {...stylex.props(styles.timeline)}
+          >
+            <div {...stylex.props(styles.timelineFill(progress))} />
+          </div>
+          <span {...stylex.props(styles.caption)}>
+            {timer.running ? 'Stay with the task' : paused ? 'Paused' : 'Ready when you are'}
+          </span>
         </div>
-        <span {...stylex.props(styles.caption)}>{running ? 'Stay with the task' : 'Ready when you are'}</span>
+        <aside {...stylex.props(styles.rail)}>
+          <div role="group" aria-label="Timer controls" {...stylex.props(styles.controls, wide && styles.controlsWide)}>
+            <button type="button" onClick={startPause} {...stylex.props(styles.primary)}>
+              {timer.running ? 'Pause' : 'Start'}
+            </button>
+            <div {...stylex.props(styles.actions)}>
+              <button type="button" onClick={reset} {...stylex.props(styles.secondary, wide && styles.actionWide)}>
+                Reset
+              </button>
+              <button type="button" onClick={skip} {...stylex.props(styles.secondary, wide && styles.actionWide)}>
+                Skip
+              </button>
+            </div>
+          </div>
+          <p {...stylex.props(styles.hint, !timer.running && !paused && styles.hintPulse)}>
+            {wide ? 'Fold mid-block, the countdown follows' : 'Fold to keep counting'}
+          </p>
+        </aside>
       </section>
-      <div role="group" aria-label="Timer controls" {...stylex.props(styles.controls)}>
-        <button type="button" onClick={() => setRunning((current) => !current)} {...stylex.props(styles.primary)}>
-          {running ? 'Pause' : 'Start'}
-        </button>
-        <button type="button" onClick={reset} {...stylex.props(styles.secondary)}>
-          Reset
-        </button>
-        <button type="button" onClick={skip} {...stylex.props(styles.secondary)}>
-          Skip
-        </button>
-      </div>
     </main>
   )
 }
-
-const styles = stylex.create({
-  root: {
-    position: 'absolute',
-    inset: 0,
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-    paddingBlock: 18,
-    paddingInline: 22,
-    color: colors.white,
-    backgroundColor: colors.grey6Dark,
-    fontFamily: fonts.system
-  },
-  cover: { gap: 7, paddingBlock: 10, paddingInline: 12 },
-  header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexShrink: 0 },
-  kicker: { color: colors.orange, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
-  title: { marginBlock: 0, fontSize: 34, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
-  mode: {
-    color: colors.grey3,
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: 1.2,
-    animationName: { default: modeIn, [motion]: 'none' },
-    animationDuration: '.18s',
-    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    animationFillMode: 'both'
-  },
-  timerCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    flex: 1,
-    minHeight: 0,
-    borderRadius: 20,
-    padding: 18,
-    backgroundColor: app.fill3,
-    animationName: { default: cardIn, [motion]: 'none' },
-    animationDuration: '.24s',
-    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    animationFillMode: 'both'
-  },
-  phase: { color: colors.orange, fontSize: 12, fontWeight: 700, letterSpacing: 1 },
-  time: { fontSize: 88, lineHeight: 0.95, fontVariantNumeric: 'tabular-nums', letterSpacing: -3 },
-  timeline: { width: '100%', height: 18, overflow: 'hidden', borderRadius: 999, backgroundColor: app.fill },
-  timelineFill: (progress: number) => ({
-    width: '100%',
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: colors.orange,
-    transformOrigin: 'left center',
-    transform: 'scaleX(' + String(progress / 100) + ')',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.35s, .2s',
-    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)'
-  }),
-  caption: { color: colors.grey3, fontSize: 12 },
-  controls: { display: 'flex', justifyContent: 'center', gap: 8, flexShrink: 0 },
-  primary: {
-    minWidth: 92,
-    borderWidth: 0,
-    borderRadius: 999,
-    paddingBlock: 10,
-    paddingInline: 18,
-    color: colors.grey6Dark,
-    backgroundColor: colors.orange,
-    fontWeight: 800,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.14s, .18s',
-    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
-  },
-  secondary: {
-    minWidth: 72,
-    borderWidth: 0,
-    borderRadius: 999,
-    paddingBlock: 10,
-    paddingInline: 14,
-    color: colors.white,
-    backgroundColor: app.fill,
-    fontWeight: 700,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.14s, .18s',
-    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
-  }
-})
 
 await os.connect()
 createRoot(document.body).render(<Timer />)
