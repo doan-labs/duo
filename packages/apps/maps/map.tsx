@@ -86,6 +86,10 @@ export function MapCanvas({
   // Last few pointer deltas, for the flick's take-off speed.
   const trail = useRef<{ t: number; x: number; y: number }[]>([])
   const hold = useRef<number | null>(null)
+  // The long-press fires 600ms later, after any flight may have moved the view;
+  // it unprojects against whatever the camera is then, not what it was at down.
+  const viewRef = useRef(view)
+  viewRef.current = view
 
   useEffect(() => {
     const ro = new ResizeObserver(([e]) => setBox({ w: e!.contentRect.width, h: e!.contentRect.height }))
@@ -226,9 +230,15 @@ export function MapCanvas({
         // Client px are the CSS3D display's scaled px; the world maths wants the
         // surface's own layout px, so every coordinate crosses `k` first.
         hold.current = window.setTimeout(() => {
+          const v = viewRef.current
+          const c = project(v.lat, v.lon, v.z)
           const r = surface.current!.getBoundingClientRect()
           const k = box.w / r.width
-          const p = unproject(left + (e.clientX - r.left) * k, top + (e.clientY - r.top) * k, view.z)
+          const p = unproject(
+            c.x - (box.w + padX) / 2 + (e.clientX - r.left) * k,
+            c.y - (box.h - padY) / 2 + (e.clientY - r.top) * k,
+            v.z
+          )
           onDropPin(p.lat, p.lon)
         }, 600)
       }}
