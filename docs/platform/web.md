@@ -259,7 +259,7 @@ nothing is published, no host is chosen, no CI deploys it.
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
 | 7 | The apps | The catalog (`/catalog/index.json`) and the shell's home-screen list, read at build time into `src/generated/catalog.ts` alongside each app's `CHANGELOG.md`. `/apps` is an App Store-style catalog: a search field over name, author and version, lane sections (Official, Community) that fold behind `<details>`, grid/list view, and a per-app sheet (native `<dialog>`) at the deep link `/apps/<slug>` - the slug is the app's last id segment, the sheet is the child route `routes/apps.$slug.tsx` rendered over the still-mounted catalog. Inside the sheet: the facts, each changelog version folded in its own `<details>` (latest open), the privacy card and an Open button - straight to `/simulator` for on-device apps, through the in-shell Store (`?app=App Store&arg=`) for catalog-only ones | `home/apps.tsx`, reused by `routes/apps.tsx`; changelogs emitted by `scripts/catalog.ts` |
 | 8 | Open | "The platform is open. So are the apps." Four facts, the Berlin sentence, fork → PR → review → Duo Store | `home/open.tsx` |
-| 9 | Go | "Build something strange for a phone that doesn't exist." Try Duo, Read the docs, View on GitHub | `home/cta.tsx` |
+| 9 | Go | "Build something strange for a phone that folds." Try Duo, Read the docs, View on GitHub, then "A product by Doan Labs" with the Doan mark from `footer.tsx` | `home/cta.tsx` |
 
 Nav: Duo · Apps · SDK · Docs · Build an app · GitHub · theme toggle · Try Duo.
 Footer: Duo · GitHub · Docs · Apps · License, then the Doan mark with "Made by

@@ -5,16 +5,18 @@
 import type { DeviceEvent, DeviceEvents, Switches } from '@doan-labs/duo-sdk'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useEffect, useReducer, useRef, useState } from 'react'
-import { Block, Cap, Headline, Lede, TextLink } from '../home/parts'
+import { Block, Cap, Headline, Lede } from '../home/parts'
 import { Field, LiveCode, Readout } from '../live-code'
 import { Segmented } from '../segmented'
 import { type Cue, type Heard, Simulator, type Spots } from '../simulator'
 import { color, ease, font, radius } from '../tokens.stylex'
+import { Finale } from './finale'
 import { PoseDial } from './pose-dial'
 import { SwitchTiles } from './switch-tiles'
 import { type Stop, Tour, TourBubble } from './tour'
 import { Viewfinder } from './viewfinder'
 import { Score, VolumeKeys } from './volume-keys'
+import { Wire } from './wire'
 
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
@@ -40,6 +42,8 @@ function network(s: Switches): [line: number, shows: string] {
 type Live = {
   last: { [K in DeviceEvent]?: DeviceEvents[K] }
   log: Record<DeviceEvent, { n: number; text: string }[]>
+  /** Every event heard per type; `log` keeps only the last few. */
+  heard: Record<DeviceEvent, number>
   /** Events heard so far; also the beat that flashes the running line. */
   n: number
   score: number
@@ -50,6 +54,7 @@ type Live = {
 const START: Live = {
   last: {},
   log: { volume: [], 'camera-control': [], side: [], orientation: [], switches: [] },
+  heard: { volume: 0, 'camera-control': 0, side: 0, orientation: 0, switches: 0 },
   n: 0,
   score: 0,
   zoom: 1,
@@ -75,6 +80,7 @@ function hear(s: Live, e: Heard): Live {
     const flipped = was && Object.entries(e.data).filter(([k, v]) => was[k as keyof Switches] !== v)
     text = flipped ? flipped.map(([k, v]) => `${k}: ${v}`).join(', ') : 'current state'
   }
+  next.heard = { ...s.heard, [e.type]: s.heard[e.type] + 1 }
   next.log = { ...s.log, [e.type]: [{ n: s.n, text }, ...s.log[e.type]].slice(0, 4) }
   return next
 }
@@ -264,6 +270,9 @@ export function Showcase() {
   const chapter = CHAPTERS[step]!
   const go = (i: number) => chapters.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   const pose = chapter.pose ?? { deg: hinge, yaw: turn * RAD }
+  const feed = TYPES.flatMap((type) => live.log[type].map((e) => ({ ...e, type })))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 6)
 
   // The pose and the switches arrive on their own as state, so for those, trying is a turn away from
   // where the page put the phone, or a flip. Once tried, a chapter stays tried.
@@ -279,77 +288,87 @@ export function Showcase() {
   }, [now, active])
 
   return (
-    <Block labelledBy="sdk-title">
-      <Cap>SDK · Buttons and sensors</Cap>
-      <Headline as="h1" id="sdk-title" lines={['Every button is an event.']} />
-      <Lede>
-        One call, <code {...stylex.props(styles.inline)}>os.device.on</code>. Press the phone; every number here is
-        live.
-      </Lede>
+    <>
+      <Block labelledBy="sdk-title">
+        <div {...stylex.props(styles.hero)}>
+          <div>
+            <Cap>SDK · Buttons and sensors</Cap>
+            <Headline as="h1" id="sdk-title" lines={['Every button', 'is an event.']} />
+            <Lede>
+              One call, <code {...stylex.props(styles.inline)}>os.device.on</code>. Press the phone; every number here
+              is live.
+            </Lede>
+          </div>
+          <Wire feed={feed} types={TYPES} heard={live.heard} onJump={go} />
+        </div>
 
-      <div {...stylex.props(styles.stage)}>
-        <div {...stylex.props(styles.device)}>
-          <Simulator
-            deg={pose.deg}
-            yaw={pose.yaw}
-            cue={cue}
-            hear={TYPES}
-            onDevice={dispatch}
-            onSpots={touring ? setSpots : undefined}
-            bare
-            fill
-          />
-          {!touring && <TourBubble onOpen={() => setTouring(true)} />}
-          {touring && (
-            <Tour
-              stop={chapter.tour}
-              step={step}
-              steps={CHAPTERS.length}
-              spots={spots}
-              done={tried.has(active)}
-              onStep={go}
-              onClose={() => setTouring(false)}
+        <div {...stylex.props(styles.stage)}>
+          <div {...stylex.props(styles.device)}>
+            <Simulator
+              deg={pose.deg}
+              yaw={pose.yaw}
+              cue={cue}
+              hear={TYPES}
+              onDevice={dispatch}
+              onSpots={touring ? setSpots : undefined}
+              bare
+              fill
             />
-          )}
+            {!touring && <TourBubble onOpen={() => setTouring(true)} />}
+            {touring && (
+              <Tour
+                stop={chapter.tour}
+                step={step}
+                steps={CHAPTERS.length}
+                spots={spots}
+                done={tried.has(active)}
+                onStep={go}
+                onClose={() => setTouring(false)}
+              />
+            )}
+          </div>
+          <div>
+            {CHAPTERS.map((c, i) => (
+              <section
+                key={c.type}
+                ref={(el) => {
+                  chapters.current[i] = el
+                }}
+                data-type={c.type}
+                aria-labelledby={`hw-${c.type}`}
+                {...stylex.props(styles.chapter, c.type === active && styles.chapterOn)}
+              >
+                <p {...stylex.props(styles.type)}>
+                  {String(i + 1).padStart(2, '0')} · '{c.type}'
+                </p>
+                <h2 id={`hw-${c.type}`} {...stylex.props(styles.title)}>
+                  {c.title}
+                </h2>
+                <p {...stylex.props(styles.text)}>{c.text}</p>
+                <LiveCode title="app.ts" lines={c.code} on={c.runs(live)} beat={live.log[c.type][0]?.n} />
+                {c.type === 'orientation' && (
+                  <div {...stylex.props(styles.controls)}>
+                    <Segmented id="hw-turn" label="Turn" value={turn} onChange={setTurn} options={TURNS} size="sm" />
+                    <Segmented
+                      id="hw-hinge"
+                      label="Hinge"
+                      value={hinge}
+                      onChange={setHinge}
+                      options={HINGES}
+                      size="sm"
+                    />
+                  </div>
+                )}
+                <Values type={c.type} live={live} onPull={pull} />
+                <Log entries={live.log[c.type]} />
+                <p {...stylex.props(styles.how)}>{c.how}</p>
+              </section>
+            ))}
+          </div>
         </div>
-        <div>
-          {CHAPTERS.map((c, i) => (
-            <section
-              key={c.type}
-              ref={(el) => {
-                chapters.current[i] = el
-              }}
-              data-type={c.type}
-              aria-labelledby={`hw-${c.type}`}
-              {...stylex.props(styles.chapter, c.type === active && styles.chapterOn)}
-            >
-              <p {...stylex.props(styles.type)}>
-                {String(i + 1).padStart(2, '0')} · '{c.type}'
-              </p>
-              <h2 id={`hw-${c.type}`} {...stylex.props(styles.title)}>
-                {c.title}
-              </h2>
-              <p {...stylex.props(styles.text)}>{c.text}</p>
-              <LiveCode title="app.ts" lines={c.code} on={c.runs(live)} beat={live.log[c.type][0]?.n} />
-              {c.type === 'orientation' && (
-                <div {...stylex.props(styles.controls)}>
-                  <Segmented id="hw-turn" label="Turn" value={turn} onChange={setTurn} options={TURNS} size="sm" />
-                  <Segmented id="hw-hinge" label="Hinge" value={hinge} onChange={setHinge} options={HINGES} size="sm" />
-                </div>
-              )}
-              <Values type={c.type} live={live} onPull={pull} />
-              <Log entries={live.log[c.type]} />
-              <p {...stylex.props(styles.how)}>{c.how}</p>
-            </section>
-          ))}
-          <p {...stylex.props(styles.end)}>
-            No manifest entry, and nothing crosses the bridge until something listens.{' '}
-            <TextLink to="/docs/hardware">Read the guide</TextLink> or the{' '}
-            <TextLink to="/docs/sdk">SDK reference</TextLink>.
-          </p>
-        </div>
-      </div>
-    </Block>
+      </Block>
+      <Finale types={TYPES} heard={live.heard} />
+    </>
   )
 }
 
@@ -453,6 +472,12 @@ const arrive = stylex.keyframes({
 })
 
 const styles = stylex.create({
+  hero: {
+    display: 'grid',
+    gridTemplateColumns: { default: 'minmax(0, 7fr) minmax(0, 5fr)', [MID]: 'minmax(0, 1fr)' },
+    alignItems: 'end',
+    gap: { default: '80px', [MID]: '40px' }
+  },
   inline: { fontFamily: font.mono, fontSize: '0.9em', color: color.text },
   stage: {
     marginTop: { default: '72px', [SMALL]: '48px' },
@@ -564,6 +589,5 @@ const styles = stylex.create({
     outlineStyle: 'solid',
     outlineWidth: '2px',
     outlineOffset: '2px'
-  },
-  end: { marginTop: '24px', marginBottom: 0, fontSize: '16px', lineHeight: 1.55, color: color.text2 }
+  }
 })

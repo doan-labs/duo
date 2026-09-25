@@ -11,8 +11,8 @@ import { color, ease, font, radius } from './tokens.stylex'
  * grid, one to a cell. Copied from doan-labs.com's handoff file
  * (public/doan-mark.svg); strokes are outlined so it fills in currentColor.
  */
-const DoanMark = () => (
-  <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" {...stylex.props(styles.markSvg)}>
+export const DoanMark = ({ size = 15 }: { size?: number }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" {...stylex.props(styles.markSvg)}>
     <path fill="currentColor" d="M5.6 3.4A4.1 4.1 0 0 1 5.6 11.6Z" />
     <path
       fill="currentColor"
