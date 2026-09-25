@@ -1068,6 +1068,51 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
+    "name": "clockTabOn",
+    "value": "rgba(255,255,255,.14)",
+    "doc": "The selected tab's capsule in the floating bar, and a sidebar row under the finger."
+  },
+  {
+    "name": "clockStartFill",
+    "value": "rgba(48,209,88,.22)",
+    "doc": "Start / Stop / Lap discs: a tinted well under a same-hue label, the way iOS draws them."
+  },
+  {
+    "name": "clockStopFill",
+    "value": "rgba(255,66,69,.22)",
+    "doc": ""
+  },
+  {
+    "name": "clockLapFill",
+    "value": "rgba(120,120,128,.28)",
+    "doc": ""
+  },
+  {
+    "name": "clockRingTrack",
+    "value": "rgba(255,255,255,.12)",
+    "doc": "The timer ring's unlit track."
+  },
+  {
+    "name": "clockWheelMask",
+    "value": "linear-gradient(transparent,#000 28%,#000 72%,transparent)",
+    "doc": "A wheel picker's rows fading toward its top and bottom edge."
+  },
+  {
+    "name": "clockTick",
+    "value": "rgba(255,255,255,.55)",
+    "doc": "The analog stopwatch face: minute ticks and the numerals around them."
+  },
+  {
+    "name": "clockTickMinor",
+    "value": "rgba(255,255,255,.28)",
+    "doc": ""
+  },
+  {
+    "name": "clockRingingScrim",
+    "value": "rgba(0,0,0,.72)",
+    "doc": "The full-screen ring sheet behind a firing alarm or an ended timer."
+  },
+  {
     "name": "contactsSelection",
     "value": "rgba(0,136,255,.12)",
     "doc": "contacts"
@@ -1271,6 +1316,21 @@ export const appAppearance: Token[] = [
     "name": "musicHairline",
     "value": "rgba(255,255,255,.08)",
     "doc": ""
+  },
+  {
+    "name": "musicAccent",
+    "value": "#fc3c44",
+    "doc": "The Music brand: the selected tab, tappable text and the Play/Shuffle pills' ink."
+  },
+  {
+    "name": "musicAccentSoft",
+    "value": "rgba(252,60,68,.16)",
+    "doc": "The accent's rest fill: pill buttons, the live chip, a selected badge's back."
+  },
+  {
+    "name": "musicShade",
+    "value": "linear-gradient(180deg,rgba(0,0,0,0) 34%,rgba(0,0,0,.62) 100%)",
+    "doc": "Keeps card text readable over artwork at the bottom edge of hero tiles."
   },
   {
     "name": "newsHairline",
@@ -1693,11 +1753,6 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "weatherCardRim",
-    "value": "inset 0 0 0 0.5px rgba(255,255,255,.24),inset 0 1px 0 rgba(255,255,255,.10)",
-    "doc": ""
-  },
-  {
     "name": "weatherHairline",
     "value": "rgba(255,255,255,.16)",
     "doc": ""
@@ -1743,9 +1798,9 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
-    "name": "weatherMenu",
-    "value": "rgba(30,50,80,.92)",
-    "doc": ""
+    "name": "weatherSide",
+    "value": "rgba(14,30,55,.55)",
+    "doc": "The iPad sidebar's glass: deeper than a card, lighter than the sheet."
   },
   {
     "name": "youtubeMuted",

@@ -1,3 +1,15 @@
+# 1.1.0
+
+Launch now asks for the device's place on its own: the geolocation prompt runs first
+and the public IP answers when the prompt is refused, unnamed or times out, named
+through a free reverse geocoder. My Location files itself first in the list, cannot
+be removed, and refreshes quietly on later launches while permission holds.
+
+The inner display becomes the iPad layout: a floating glass sidebar carries the
+search field, the units and location menu, and sky-tinted location cards beside the
+detail pane, with a sidebar toggle in the top bar. The cover display keeps the
+iPhone list and bottom bar.
+
 # 1.0.0
 
 Isolated Weather with owner-only forecast requests, shared persistent preferences,

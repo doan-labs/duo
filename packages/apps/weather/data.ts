@@ -3,7 +3,15 @@ import type { SYM } from '@doan-labs/duo-uikit/icons/index.ts'
 import { useEffect, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 
-export type Place = { id: string; name: string; region: string; latitude: number; longitude: number }
+export type Place = {
+  id: string
+  name: string
+  region: string
+  latitude: number
+  longitude: number
+  /** How a `local:` place was fixed: the GPS prompt, or the public IP's registry answer. */
+  via?: 'gps' | 'ip'
+}
 export const home: Place = {
   id: 'sf',
   name: 'San Francisco',
@@ -61,8 +69,9 @@ export function update(patch: Partial<Preferences>) {
 }
 export const usePreferences = () => useSyncExternalStore(subscribe, () => preferences)
 export function select(place: Place) {
+  // My Location leads the list, like on iOS; there is at most one of them.
   const places = place.id.startsWith('local:')
-    ? preferences.places.filter((p) => !p.id.startsWith('local:'))
+    ? [place, ...preferences.places.filter((p) => !p.id.startsWith('local:'))]
     : preferences.places
   update({ selected: place.id, places: places.some((p) => p.id === place.id) ? places : [...places, place] })
 }
@@ -183,6 +192,151 @@ export async function search(query: string, signal: AbortSignal): Promise<Place[
       longitude: p.longitude
     })
   )
+}
+type Fix = { latitude: number; longitude: number }
+/** The browser prompt's answer, or null when it is refused, missing or times out. */
+function geolocate(): Promise<Fix | null> {
+  if (!('geolocation' in navigator)) return Promise.resolve(null)
+  // The API's own timeout cannot fire while a permission decision pends, so an
+  // unanswered bubble (or a prompt the hidden view cannot show) parks the
+  // request forever; the fallback rides on our clock, not theirs.
+  const fix = new Promise<Fix | null>((resolve) =>
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      () => resolve(null),
+      { timeout: 10000, maximumAge: 300000 }
+    )
+  )
+  return Promise.race([fix, new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000))])
+}
+/** 'denied' means skip the prompt entirely and go straight to the IP answer. */
+async function geoState(): Promise<PermissionState | null> {
+  try {
+    return (await navigator.permissions.query({ name: 'geolocation' })).state
+  } catch {
+    return null
+  }
+}
+/** Name a GPS fix through the free reverse geocoder; the bare coordinates still work when it cannot. */
+async function named(fix: Fix, signal: AbortSignal): Promise<Place> {
+  const place: Place = {
+    id: `local:${fix.latitude.toFixed(4)},${fix.longitude.toFixed(4)}`,
+    name: 'My Location',
+    region: `${fix.latitude.toFixed(2)}\u00B0, ${fix.longitude.toFixed(2)}\u00B0`,
+    latitude: fix.latitude,
+    longitude: fix.longitude,
+    via: 'gps'
+  }
+  try {
+    const response = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?${new URLSearchParams({
+        latitude: String(fix.latitude),
+        longitude: String(fix.longitude),
+        localityLanguage: 'en'
+      })}`,
+      { credentials: 'omit', signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]) }
+    )
+    if (response.ok) {
+      const data = await response.json()
+      if (typeof data.city === 'string' && data.city) place.name = data.city
+      else if (typeof data.locality === 'string' && data.locality) place.name = data.locality
+      const region = [data.principalSubdivision, data.countryName]
+        .filter((part): part is string => typeof part === 'string' && part.length > 0)
+        .join(', ')
+      if (region) place.region = region
+    }
+  } catch {
+    /* An unnamed place still shows real weather. */
+  }
+  return place
+}
+/** Where the public IP puts the device, when a GPS fix never comes. */
+async function ipLocate(signal: AbortSignal): Promise<Place | null> {
+  try {
+    const response = await fetch('https://ipwho.is/', {
+      credentials: 'omit',
+      signal: AbortSignal.any([signal, AbortSignal.timeout(12000)])
+    })
+    if (!response.ok) return null
+    const data = await response.json()
+    if (data.success !== true || !Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) return null
+    const region = [data.region, data.country]
+      .filter((part): part is string => typeof part === 'string' && part.length > 0)
+      .join(', ')
+    return {
+      id: `local:${Number(data.latitude).toFixed(4)},${Number(data.longitude).toFixed(4)}`,
+      name: typeof data.city === 'string' && data.city ? data.city : 'My Location',
+      region: region || 'Approximate location',
+      latitude: data.latitude,
+      longitude: data.longitude,
+      via: 'ip'
+    }
+  } catch {
+    return null
+  }
+}
+/** GPS first, the public IP second; null when neither can place the device. */
+async function locateHere(signal: AbortSignal): Promise<Place | null> {
+  if ((await geoState()) !== 'denied') {
+    const fix = await geolocate()
+    if (fix) return named(fix, signal)
+  }
+  return ipLocate(signal)
+}
+/** Resolve the device's place from whichever view asks; only the owner actually asks. */
+export async function locate(): Promise<Place | null> {
+  if (!os.owner) {
+    const request = crypto.randomUUID()
+    // The owner's clock bounds its own work; this cap covers an owner that dies
+    // mid-answer, since commands.send itself waits forever.
+    const ask = (async () => {
+      await os.commands.send('locate', request)
+      const value = await os.session.get(`locate:${request}`)
+      await os.session.del(`locate:${request}`)
+      return value
+    })()
+    const value = await Promise.race([ask, new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000))])
+    try {
+      const place = JSON.parse(value ?? 'null')
+      return place && typeof place.id === 'string' ? (place as Place) : null
+    } catch {
+      return null
+    }
+  }
+  return locateHere(ownerAbort.signal)
+}
+let locating = false
+/**
+ * First launch asks for a fix and files My Location first; later launches refresh it quietly.
+ * An undecided prompt must not fire on every launch while a list already has places, and a
+ * copy never asks at all: it draws the weather, it does not start the prompt.
+ */
+async function autoLocate() {
+  if (!os.owner || locating) return
+  locating = true
+  try {
+    const local = preferences.places.find((p) => p.id.startsWith('local:'))
+    if (!local) {
+      const place = await locateHere(ownerAbort.signal)
+      if (place) {
+        select(place)
+        void refresh(place, true)
+      }
+      return
+    }
+    if ((await geoState()) === 'prompt') return
+    const place = await locateHere(ownerAbort.signal)
+    if (
+      place &&
+      (place.id !== local.id || place.name !== local.name || place.region !== local.region || place.via !== local.via)
+    ) {
+      const keep = preferences.selected.startsWith('local:') ? { selected: place.id } : {}
+      update({ places: [place, ...preferences.places.filter((p) => !p.id.startsWith('local:'))], ...keep })
+      void refresh(place)
+    }
+  } finally {
+    locating = false
+  }
 }
 export const temperature = (value: number | undefined, unit: 'C' | 'F') =>
   value == null ? '—' : `${Math.round(unit === 'F' ? (value * 9) / 5 + 32 : value)}°`
@@ -305,6 +459,7 @@ export async function initializeWeather() {
     ownerAbort.abort()
     ownerAbort = new AbortController()
     reconcile()
+    void autoLocate()
   })
   os.onView((view) => {
     if (view.visible) reconcile()
@@ -318,6 +473,9 @@ export async function initializeWeather() {
       const { query, request } = JSON.parse(payload)
       await os.session.set(`search:${request}`, JSON.stringify(await search(query, ownerAbort.signal)))
     }
+    if (type === 'locate') {
+      await os.session.set(`locate:${payload}`, JSON.stringify(await locateHere(ownerAbort.signal)))
+    }
   })
   os.session.onArg((arg) => {
     if (preferences.places.some((p) => p.id === arg)) update({ selected: arg })
@@ -325,4 +483,5 @@ export async function initializeWeather() {
   if (os.session.arg && preferences.places.some((p) => p.id === os.session.arg)) update({ selected: os.session.arg })
   setInterval(reconcile, 30000)
   reconcile()
+  void autoLocate()
 }

@@ -315,3 +315,11 @@ site build must copy both directories out of `dist/` beside `/model` and
 `/icons` (`packages/web/scripts/simulator.ts` does). "Loading apps…" for a few
 seconds after that is the registry seeding Notes and Weather; a screenshot
 taken before it ends shows the same black screen.
+
+False alarm: a `/apps` community link (`?app=App%20Store&arg=<id>`) that lands
+on Discover with **Community 0** under `bun run dev` is not a broken deep link.
+`serve.ts` serves `/catalog` from the root `public/`, which holds no catalog on a
+fresh checkout, so the Store has no row to open. Unpack the branch for the
+check (`git fetch --depth=1 origin catalog && mkdir -p public/catalog && git
+archive origin/catalog | tar -x -C public/catalog`) and delete `public/catalog/`
+afterwards; it is not gitignored at the root.

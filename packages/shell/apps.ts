@@ -71,7 +71,7 @@ export const LEFT: App[] = [
   { name: 'Maps', light: true, edge: true, view: Maps },
   { name: 'TV', mock: true, view: Tv },
   { name: 'News', id: 'labs.doan.ipduo.news', light: true, ...RELEASE },
-  { name: 'Health', mock: true, light: true, view: Health },
+  { name: 'Health', light: true, view: Health },
   { name: 'Wallet', mock: true, view: Wallet },
   { name: 'Siri', mock: true, view: Siri },
   // `edge`: the sidebar's material runs to the top corner, so each column pads its own status band.
@@ -89,7 +89,7 @@ export const RIGHT: App[] = [
   { name: 'Stocks', view: Stocks },
   { name: 'Find My', mock: true, light: true, view: FindMy },
   { name: 'Home', mock: true, view: Home },
-  { name: 'Fitness', mock: true, view: Fitness },
+  { name: 'Fitness', view: Fitness },
   { name: 'Watch', mock: true, view: Watch },
   { name: 'Reminders', id: 'labs.doan.ipduo.reminders', light: true, ...RELEASE },
   { name: 'Files', mock: true, light: true, view: Files },

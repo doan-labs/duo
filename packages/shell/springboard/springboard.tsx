@@ -41,11 +41,12 @@ import { Spotlight } from './spotlight.tsx'
 import { StatusBar } from './status-bar.tsx'
 import { Switcher } from './switcher.tsx'
 import { Flash, Thumbs, TorchHud, useScreenshot, useVolumeHud, Veil, VolumeHud } from './system-hud.tsx'
+import { useToggles } from './toggles.ts'
 import { useWallpaper } from './wallpaper.ts'
 
-export type SpringBoardProps = { w: number; hgt: number; boot?: string | null; shots: string[] }
+export type SpringBoardProps = { w: number; hgt: number; boot?: string | null; arg?: string | null; shots: string[] }
 
-export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
+export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   // Folded, the cover display shows the left half of both the grid and the
   // wallpaper, so the picture does not jump when the hinge closes.
   const wide = w > 600
@@ -58,6 +59,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
 
   const ctl = useScenes({ w, hgt, shots, disp, pageRef: pageNow })
   const { at, parkAll, launch, open, openFrom, scenes, split } = ctl
+  const t = useToggles()
 
   const [drop, setDrop] = useState<Drop>(null)
   const [switcher, setSwitcher] = useState(false)
@@ -138,7 +140,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
   const away = switcher || cur.length === 2 || cur.some((e) => !e.side)
   // The status stack sits top-right, so the app under it decides its colour.
   const topRight = cur.find((e) => e.side !== 'left')
-  const lit = !!topRight?.a.light
+  const lit = !!topRight?.a.light && !t.darkMode
   // A `rail` app on the cover runs its chrome down the punch-hole column, so the stack stays whole.
   const railed = !wide && !!topRight?.a.rail
   // One half taken, the home screen squeezes into the other as a whole narrow
@@ -247,7 +249,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
     }
     const detach = addDisplay(d, { home: [() => setSwitcher(false), parkAll, ccClose], lock, unlock })
     const first = boot && byName(boot)
-    if (first) open(first)
+    if (first) open(first, undefined, arg ?? undefined)
     return detach
   }, [])
 
@@ -365,7 +367,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
                 e.side === 'right' && styles.appRight(split * 100),
                 (drop?.id === e.id || switcher) && styles.appDrag,
                 e.parked && !switcher && styles.appParked,
-                e.a.light ? light : dark
+                e.a.light && !t.darkMode ? light : dark
               )}
             >
               {e.a.id ? <Sandbox id={e.a.id} os={e.ctx} wide={wide} side={e.side} /> : <View os={e.ctx} />}

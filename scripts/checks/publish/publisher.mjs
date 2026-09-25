@@ -4,7 +4,7 @@
 // is refused; a failed copy leaves the tree untouched; delisting hides a release without
 // deleting its files.
 import assert from 'node:assert/strict'
-import { chmod, mkdir, rm } from 'node:fs/promises'
+import { chmod, cp, mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { buildApp } from '../../build-app.ts'
 import { publish } from '../../publish-catalog.ts'
@@ -17,13 +17,12 @@ const app = join(scratch, 'app')
 const index = async () => JSON.parse(await Bun.file(join(tree, 'index.json')).text())
 const stage = async (version, marker = '') => {
   const out = join(scratch, `built-${crypto.randomUUID()}`)
+  await cp('community-apps/fold-compass', app, { recursive: true })
   const manifest = await Bun.file('community-apps/fold-compass/manifest.json').json()
   manifest.version = version
   await Bun.write(join(app, 'manifest.json'), JSON.stringify(manifest))
   const main = await Bun.file('community-apps/fold-compass/main.tsx').text()
   await Bun.write(join(app, 'main.tsx'), marker ? main.replace('Fold Compass', `Fold Compass ${marker}`) : main)
-  await Bun.write(join(app, 'icon.png'), Bun.file('community-apps/fold-compass/icon.png'))
-  await Bun.write(join(app, 'package.json'), Bun.file('community-apps/fold-compass/package.json'))
   return { out, ...(await buildApp(app, { output: out })) }
 }
 try {

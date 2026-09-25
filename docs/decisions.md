@@ -1413,7 +1413,72 @@ column; only a missing key falls back to the factory five. That asymmetry is wha
 makes "dock down to zero" stick across reloads while a pre-change `os.home` still
 yields the factory dock untouched.
 
-## 89. Stocks quotes the market instead of inventing one
+## 89. Health and Fitness share one book and wear iPadOS's chrome
+
+2026-09-24. Health and Fitness shipped as mock pills: invented rings on invented
+cards, with no data behind them and none of the gestures that make the pair feel
+like one system on the real phones.
+
+Both now read `packages/fixtures/health.ts`, a single persisted book: the
+profile and goals, the pinned metrics Health's Summary shows, per-day accruals
+and measurements over a deterministic 90-day seed, and the workout log. The
+book's mutations (`log`, `measure`, `logWorkout`, `removeWorkout`, `setGoals`,
+`setPin`, `setProfile`) are the only way values change, so a workout logged in
+Fitness is already on Health's charts and a weigh-in in Health is already in
+Fitness's activity history - there is no sync to configure, which is exactly
+what Health's Sharing page now says. `health.test.ts` pins the book's
+guarantees: same date, same seed; logged amounts sit on top of the seed and
+reverse on delete; series span the asked range.
+
+The chrome is iPadOS's, per the rules already in this document: the floating
+glass sidebar with search, the tab bar on the cover, ~380 ms pushes, the glass
+recipe from decision 18. Health keeps `light: true` in the registry; Fitness is
+the same recipe on `tintDark`. Ring colours live in the kit (`RING_TINTS`) so
+Health's mini rings, Fitness's hero and Watch's glance can never drift apart -
+the token gate would have rejected a cross-app `appAppearance` read.
+
+Both drop `mock`. The screens are no longer invented data: every rendered
+number is the book's, every button writes back to it, and the two displays'
+copies stay in lockstep through the same module cells decision 59 set.
+
+## 90. Dark Mode is a switch, and the apps it does not draw stay dark
+
+2026-09-25. Apps baked light stayed light forever: `apps.ts`'s `light` flag was
+the whole appearance story. There was no Dark Mode.
+
+`Switches` gains `darkMode`, flipped from Control Center's new tile (the
+half-lit circle, next to the brightness slider where iOS puts it) or Settings >
+Display & Brightness. The SpringBoard theme pick becomes
+`app.light && !darkMode ? light : dark`, so every light app - Health, Settings,
+the sandboxed releases - wears the kit's dark theme when it is on, and the
+status stack follows the app under it as before. Apps declared dark in the
+registry (Fitness, and Apple's Fitness really is always dark) do not read the
+switch, which is the point of the flag surviving: `light` means "follows the
+system", its absence means "always dark".
+
+An app's own glass chrome could not ride the theme before: `glass.tint` is a
+const. The `app` var set gains `glass` - light glass in the light theme,
+`tintDark` in the dark one - so a themed app's sidebar, tab bar and menus
+(including the kit's `Menu`) retint without a prop. Chrome that is not the
+app's, like `shared.glass` on the dock and widgets, keeps `glass.tint`:
+Dark Mode does not repaint the system the way it repaints apps.
+
+The switch is device-wide through `toggles.ts`, so both displays flip together.
+Like the rest of that object it is session state, not persisted.
+
+## 91. Sheets are non-modal dialogs
+
+`Sheet` used `dialog.showModal()`, which lifts the card into the top layer. The
+top layer ignores the scene's transforms when Chromium hit-tests it: every
+pointer event inside the card resolved to the untransformed position behind
+the preserve-3d `matrix3d`, so real clicks passed through the sheet to the app
+underneath. The sheet renders with the `open` attribute instead - a non-modal
+dialog stays in the transformed tree where hit-testing is honest - and draws
+its own scrim, focus and Escape handling (`show`/`open` never raise `cancel`).
+A side effect worth keeping: the captured Escape no longer reaches the shell's
+Esc-goes-Home binding while a sheet is up.
+
+## 92. Stocks quotes the market instead of inventing one
 
 2026-09-25. The Stocks app was the last fake feed on the phone: a seeded `walk()`
 that produced plausible numbers for every ticker, hardcoded rows, dead range pills
@@ -1436,7 +1501,7 @@ decoupled from the list so a searched or unfollowed symbol still has a detail,
 and every fetch and timer is gated on `!os.mirror` so the second copy draws
 everything and starts nothing.
 
-## 90. The Stocks detail chart is LiveLine, not a drawn SVG
+## 93. The Stocks detail chart is LiveLine, not a drawn SVG
 
 2026-09-25. The detail chart now renders through `liveline` (LiveLine) instead of
 the app's hand-drawn SVG: a 60fps canvas line with a live dot, value badge,

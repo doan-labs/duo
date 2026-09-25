@@ -449,7 +449,8 @@ export const light = stylex.createTheme(app, {
   fill: 'rgba(120,120,128,.2)',
   fill2: 'rgba(120,120,128,.16)',
   fill3: 'rgba(118,118,128,.12)',
-  control: colors.white
+  control: colors.white,
+  glass: 'rgba(255,255,255,.18)'
 })
 export const dark = stylex.createTheme(app, {
   bg: colors.black,
@@ -463,7 +464,8 @@ export const dark = stylex.createTheme(app, {
   fill: 'rgba(120,120,128,.36)',
   fill2: 'rgba(120,120,128,.32)',
   fill3: 'rgba(118,118,128,.24)',
-  control: colors.grey2Dark
+  control: colors.grey2Dark,
+  glass: 'rgba(30,30,32,.55)'
 })
 
 /** Stagger for lists: `stylex.props(shared.rise, delay(i * 40))`. */

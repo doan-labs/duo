@@ -148,6 +148,14 @@ function rootList(os: Os, host: SettingsHost, sw: Switches): Group[] {
           detail: SOFTWARE,
           page: () => <GeneralPage os={os} host={host} />
         },
+        {
+          id: 'display',
+          label: 'Display & Brightness',
+          glyph: 'sun',
+          tint: colors.blue,
+          detail: sw.darkMode ? 'Dark' : 'Light',
+          page: () => <DisplayPage host={host} />
+        },
         { id: 'battery', label: 'Battery', glyph: 'battery', tint: colors.green, detail: `${host.battery}%` },
         {
           id: 'privacy',
@@ -250,6 +258,36 @@ function Radio({
       </Section>
       {sw.airplane && <Note>Airplane Mode is on. Turning this back on leaves Airplane Mode on, as iOS does.</Note>}
       {sw[name] && children}
+    </>
+  )
+}
+
+/** Appearance, iOS's own pair of radio rows: Light and Dark over the same Dark Mode switch Control Center flips. */
+function DisplayPage({ host }: { host: SettingsHost }) {
+  const sw = useSwitches(host)
+  const pick = (dark: boolean) => () => host.flip('darkMode', dark)
+  return (
+    <>
+      <Hero name="sun" bg={colors.blue} title="Display & Brightness">
+        The look light apps wear. The ones drawn dark already are untouched, the way Apple's Fitness always is.
+      </Hero>
+      <Section>
+        <Row
+          as="button"
+          label="Light"
+          detail={!sw.darkMode ? <Sym name="check" size={15} /> : null}
+          onClick={pick(false)}
+          xstyle={styles.link}
+        />
+        <Row
+          as="button"
+          label="Dark"
+          detail={sw.darkMode ? <Sym name="check" size={15} /> : null}
+          onClick={pick(true)}
+          xstyle={styles.link}
+        />
+      </Section>
+      <Note>Control Center's Dark Mode tile flips the same switch.</Note>
     </>
   )
 }

@@ -12,8 +12,14 @@ import { bootRegistry } from './runtime/registry.ts'
 import { BOOT_FADE_MS, BOOT_MS, BootScreen } from './springboard/power.tsx'
 import { SpringBoard } from './springboard/springboard.tsx'
 
-/** Builds one display's OS. `w`/`hgt` in CSS px. */
-export function os(w: number, hgt: number, container: HTMLElement, boot?: string | null): HTMLElement {
+/** Builds one display's OS. `w`/`hgt` in CSS px. `arg` is the deep link `boot` opens with. */
+export function os(
+  w: number,
+  hgt: number,
+  container: HTMLElement,
+  boot?: string | null,
+  arg?: string | null
+): HTMLElement {
   const wide = w > 600
   // The root is handed to CSS3DObject before React has rendered anything, so
   // its own look is applied here by hand; everything inside is React.
@@ -40,7 +46,7 @@ export function os(w: number, hgt: number, container: HTMLElement, boot?: string
   void Promise.all([bootRegistry(), new Promise((r) => setTimeout(r, BOOT_MS))])
     .then(() => {
       const dev = [...development].find(([, value]) => value.bundle.release.manifest.id === boot)
-      const board = <SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} shots={shots} />
+      const board = <SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} arg={arg} shots={shots} />
       // The logo fades over the springboard rather than cutting to it; same fragment
       // shape both times so React keeps the one SpringBoard instance.
       view.render(
