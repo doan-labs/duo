@@ -1,66 +1,70 @@
-import { Row, Screen, Section, Title } from '@doan-labs/duo-uikit'
+// Apple Reminders, rebuilt for the Duo: a floating glass sidebar of smart
+// lists and My Lists on the inner display, the cover's push-navigated Lists
+// page, and one details editor everywhere. Both displays draw the same path
+// cell, so they never disagree.
 
-// Reminders. A checklist kept in the app's storage, so it survives a reload and both displays agree on it.
-
-import { beep } from '@doan-labs/duo-fixtures'
-import { os } from '@doan-labs/duo-sdk'
-import { useJSON } from '@doan-labs/duo-sdk/react.ts'
+import { Push, useDisplay, useWide } from '@doan-labs/duo-uikit'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type KeyboardEvent, useState } from 'react'
+import { DetailsPage, DetailsSheet } from './details.tsx'
+import { DestPage } from './list-page.tsx'
+import { ListsPage } from './lists-page.tsx'
+import { ListSheet } from './sheets.tsx'
+import { Sidebar } from './sidebar.tsx'
+import { destOf, detailOf, useGo, useNow, usePath, useReminders, useSideOff } from './store.ts'
 import { styles } from './styles.ts'
 
-type Task = { t: string; done: boolean }
+export function Reminders() {
+  const [ref, wide] = useWide()
+  useNow(!useDisplay().active)
+  const path = usePath()
+  const dest = destOf(path)
+  const detailId = detailOf(path)
+  const { items } = useReminders()
+  const { back } = useGo()
+  const detail = items.find((r) => r.id === detailId)
 
-const DEFAULTS: Task[] = [
-  { t: 'Re-render the macro shot at 400 samples', done: false },
-  { t: 'Measure the spine radius against the mock', done: false },
-  { t: 'Ship the WebGL studio port', done: true },
-  { t: 'Ask about the CSS3D panel tone mapping', done: false },
-  { t: 'Polish the titanium', done: false }
-]
-
-export const Reminders = () => {
-  const kv = useJSON<Task[]>(os.storage, 'tasks', DEFAULTS)
-  const items = kv.value
-  const [draft, setDraft] = useState('')
-  const flip = (i: number) => {
-    const next = items.map((task, j) => (j === i ? { ...task, done: !task.done } : task))
-    kv.set(next)
-    if (next[i]!.done) beep([1320, 1760], 0.05, 0.05)
-  }
-  const add = (e: KeyboardEvent<HTMLInputElement>) => {
-    const t = draft.trim()
-    if (e.key !== 'Enter' || !t) return
-    kv.set([...items, { t, done: false }])
-    setDraft('')
-  }
   return (
-    <Screen>
-      <Title xstyle={[styles.blue]}>
-        Reminders
-        <Title as="span" variant="accessory">
-          {items.filter((i) => !i.done).length} open
-        </Title>
-      </Title>
-      <Section xstyle={[styles.white]}>
-        {items.map((task, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: tasks are only ever appended, never reordered or removed
-          <Row key={i} onClick={() => flip(i)}>
-            <span {...stylex.props(styles.chk, task.done && styles.chkOn)} />
-            <span {...stylex.props(styles.label, task.done && styles.done)}>{task.t}</span>
-          </Row>
-        ))}
-        <Row>
-          <span {...stylex.props(styles.chk, styles.dim)} />
-          <input
-            {...stylex.props(styles.input)}
-            placeholder="New Reminder"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={add}
-          />
-        </Row>
-      </Section>
-    </Screen>
+    <div ref={ref} {...stylex.props(styles.split)}>
+      {wide ? (
+        <>
+          <Sidebar sel={dest} />
+          <Pane dest={dest} />
+          <DetailsSheet open={!!detail} onClose={back} r={detail} />
+        </>
+      ) : (
+        <Cover dest={dest} detail={detail} />
+      )}
+      <ListSheet />
+    </div>
+  )
+}
+
+/** The inner display's detail pane; `key={dest}` swaps pages with the shared fade. */
+function Pane({ dest }: { dest?: string }) {
+  const [off] = useSideOff()
+  return (
+    <div {...stylex.props(styles.pane, !off && styles.paneSide)}>
+      <div key={dest ?? 'root'} {...stylex.props(shared.column, shared.swap, styles.paneRoot)}>
+        <DestPage dest={dest ?? 'today'} wide />
+      </div>
+    </div>
+  )
+}
+
+/** The cover: Lists at the root, a destination pushed over it, Details on top. */
+function Cover({ dest, detail }: { dest?: string; detail?: ReturnType<typeof useReminders>['items'][number] }) {
+  const { back } = useGo()
+  return (
+    <Push
+      open={!!dest}
+      sheet={
+        <Push open={!!detail} sheet={<DetailsPage r={detail} back={back} />}>
+          <DestPage dest={dest ?? 'today'} wide={false} />
+        </Push>
+      }
+    >
+      <ListsPage />
+    </Push>
   )
 }
