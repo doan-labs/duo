@@ -63,7 +63,22 @@ export function DestPage({ dest, wide }: { dest: string; wide: boolean }) {
     const open = groups.flatMap((g) => g.items.filter((r) => !r.done).map((r) => `- ${r.t}`))
     const done = groups.flatMap((g) => g.items.filter((r) => r.done).map((r) => `- ${r.t} (done)`))
     const text = [name, '', ...open, ...done].join('\n')
-    void (navigator.share?.({ title: name, text }) ?? navigator.clipboard?.writeText(text))
+    if (navigator.share) {
+      void navigator.share({ title: name, text })
+      return
+    }
+    // The sandbox's opaque origin denies the async clipboard API no matter what
+    // the manifest grants, but a real tap still carries the activation
+    // execCommand wants; the textarea never paints.
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.append(ta)
+    ta.focus()
+    ta.select()
+    document.execCommand('copy')
+    ta.remove()
   }
 
   return (

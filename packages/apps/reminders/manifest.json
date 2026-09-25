@@ -8,6 +8,5 @@
   "light": true,
   "author": "Doan Labs",
   "repo": "https://github.com/doan-labs/duo",
-  "license": "MIT",
-  "permissions": ["clipboard-write"]
+  "license": "MIT"
 }

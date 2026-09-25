@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { createContext, type ReactNode, type Ref, useContext, useEffect, useRef, useState } from 'react'
+import { useDisplay } from './display.ts'
 import { usePresence } from './presence.ts'
 import { animations, shared } from './styles.ts'
 import { Sym } from './sym.tsx'
@@ -81,15 +82,25 @@ export function Nav({ children }: { children: ReactNode }) {
  */
 export function Push({ open, sheet, children }: { open: boolean; sheet: ReactNode; children: ReactNode }) {
   const { mounted, closing } = usePresence(open, 380)
+  const { visible } = useDisplay()
   // Born with the sheet already up, the way a fold mounts the cover's copy of an
   // app mid-path (decisions.md 24): the slide-in has nothing to add to a mount
   // that restores state, and a keyframe suspended mid-flight on a display the
   // eye cannot see leaves the sheet stuck over the edge as a blurred sliver.
-  // It rests there until the path drops it; the next push slides as usual.
+  // The same goes for any stretch where this copy is the hidden one - the
+  // shared path cell flips `open` here too, and a slide played on a surface
+  // nobody paints just freezes. `rested` latches every hidden stretch so the
+  // reveal never applies slideIn to a sheet that is already up.
   const cold = useRef(open)
+  const rested = useRef(false)
+  if (!visible) rested.current = true
   useEffect(() => {
-    if (!mounted) cold.current = false
+    if (!mounted) {
+      cold.current = false
+      rested.current = false
+    }
   }, [mounted])
+  const still = cold.current || rested.current
   return (
     <div {...stylex.props(styles.nav)}>
       <div {...stylex.props(styles.pg, open && styles.under)}>{children}</div>
@@ -98,8 +109,8 @@ export function Push({ open, sheet, children }: { open: boolean; sheet: ReactNod
           {...stylex.props(
             styles.pg,
             styles.shadow,
-            !cold.current && animations.sheet,
-            closing && !cold.current && animations.sheetOut
+            !still && animations.sheet,
+            closing && visible && animations.sheetOut
           )}
         >
           {sheet}
