@@ -32,6 +32,14 @@ agent-browser connect 9222
 - `agent-browser eval` shares one JS context per page — `const` redeclarations collide across calls; wrap probes in an IIFE.
 - `agent-browser frame` does not reliably switch eval context for cross-origin iframes. To read a same-origin iframe's localStorage, open a second tab on that origin — storage is shared.
 
+## Probing baked-app DOM (Health, Fitness, Settings...)
+
+- Baked apps render same-document inside `div[data-app="<name>"]` under each `div[data-os="wide"|"narrow"]` - unlike sandboxed apps, top-doc `eval` and `querySelector` reach them. `data-app` also tags the home-screen tile, so pick the element that contains the app's `nav` (e.g. `nav[aria-label="Health"]`), not index 0. Both displays mount a copy; when folded the idle display is `display:none`.
+- Row/cell labels are often bare text nodes inside elements that have icon/detail children, so leaf-only text searches miss them. Match a direct text node instead: `[...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim() === '<text>')`.
+- `getBoundingClientRect` inside the CSS3D panel returns projected rects that do not preserve top/bottom order - do not measure sibling gaps from rects. Assert `getComputedStyle` values (paddingTop/marginTop/gap/borderRadius) and verify visually from screenshots; for click coordinates, scan `elementFromPoint` for the element tagged with a `data-mark` attribute.
+- A live "before/after" comparison needs no second build: set `el.style.<prop>` to the pre-change value (e.g. `marginTop = '0px'`, `borderRadius = '12px'`), screenshot, then `removeProperty` to restore - the old rendering is reproduced exactly for pure-CSS changes.
+- `agent-browser scroll` does not reach an app's own scroll region: set `scrollTop` on the scrollable div via `eval` (find it with `scrollHeight > clientHeight`), or send a real wheel over that region.
+
 ## Persistence surface
 
 Prefs live under `os.*` localStorage keys: `os.view` (deg/yaw/az/pol/dist/spin, gestures only - HUD slider/buttons, orbit 'change' debounced 300 ms past damping, spin checkbox), `os.toggles`, `os.level`, `os.bright`. `?deg=`/`?yaw=`/`?spin=` and postMessage poses win over saved values and never write. Erase All Content and Settings (Settings -> General -> Transfer or Reset iPhone -> Erase All Content and Settings -> Erase iPhone Duo) wipes `os.*`/`duo.*` keys + IndexedDB and reloads. Embed test: a parent on another localhost port passes the `local()` origin check - iframe `localhost:3000/?debug` from e.g. a `python3 -m http.server` page and `contentWindow.postMessage({deg, yaw}, 'http://localhost:3000')`.
