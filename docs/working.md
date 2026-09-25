@@ -212,7 +212,12 @@ the search column, `place.tsx` the selected place, `directions.tsx` the ways the
 steps. `live.ts` holds the backends: Photon geocodes the search field and reverse-geocodes
 dropped pins and the blue dot, and FOSSGIS's OSRM hosts (`routed-car`, `routed-bike`,
 `routed-foot`) return the routes - all keyless and CORS-open, so no secret rides in the
-bundle. `camera.ts` is the fly plan behind every jump: `flyTo` runs it through a rAF
+bundle. `share.ts` is the store both copies draw: query, results, selection, directions,
+routes, estimate, `me` and recents are one module state, so the fold hands the same map
+over whole - either copy writes intent and only the `!os.mirror` copy fetches. Results
+and routes are keyed by the request that asked for them, which is what keeps a failure
+from refiring and a stale answer from being picked. `camera.ts` is the fly plan behind
+every jump: `flyTo` runs it through a rAF
 driver, drag and wheel interrupt it, a released drag coasts on its velocity, and zoom is
 fractional - tiles render at the nearest integer level scaled by `2 ** (z - tileZ)`.
 Explore uses OpenStreetMap Japan's MapTiler Basic raster and Satellite uses Esri World
