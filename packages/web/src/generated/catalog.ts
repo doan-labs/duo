@@ -11,6 +11,8 @@ export type CatalogApp = {
   updated: string
   permissions: { name: string; label: string }[]
   icon: string
+  /** Raw CHANGELOG.md text; null when the app's source folder is not in this repo. */
+  changelog: string | null
 }
 export const CATALOG: CatalogApp[] = [
   {
@@ -24,7 +26,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-19T00:36:44.232Z",
     "updated": "2026-09-24T14:30:03.226Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.2048/1.1.0+17a50d77/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.2048/1.1.0+17a50d77/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned the app: dark arcade look with gradient tile faces, glass score\n  chips, an inset board well, a d-pad tray, and a settled board overlay for\n  win and game over.\n- Board state now syncs through session storage, so folding the phone hands\n  the same game to the other display.\n- Fixed \"won\" firing again on moves made while a 2048 tile was already on\n  the board; the game-over test now reads settled tile values.\n- Bottom padding clears the home indicator; the New game button no longer\n  sits under it.\n\n## 1.0.4\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.3\n\n- Both merging tiles now glide into the target cell; the merged value appears on arrival.\n\n## 1.0.2\n\n- Added responsive tile reveals, press feedback, and a gentle game-state transition.\n\n## 1.0.1\n\n- Constrained the board, controls, and game-over message to the active display.\n\n## 1.0.0\n\n- Added the 2048 puzzle with swipe, keyboard, and on-screen controls.\n- Added responsive layouts for the inner and cover displays.\n"
   },
   {
     "id": "com.mnismt.duo.flappyduo",
@@ -37,7 +40,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-19T10:54:31.264Z",
     "updated": "2026-09-19T15:45:19.344Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.flappyduo/1.0.1+e0580af9/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.flappyduo/1.0.1+e0580af9/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Initial release.\n- Canvas 2D game loop with the Duo as the player character; obstacles are numbered glass slabs.\n- Per-run fold counter; best score and money spent persisted via `os.storage`.\n- Difficulty keyed to game number and score: oscillating gaps, periodic blur, notification banners, slabs that snap shut, thrown accessories, speed increase; each game narrows the gap and adds speed.\n- Game-over dialog with score, best and medal tier; the only action is the purchase.\n- Payment sheet confirmed by a double-click of the frame side button, claimed through the SDK while the sheet is open. A glow marks the button position; confirmation runs processing, an animated check and a dismiss transition, then adds the price to the spent total and shows a notification with avatar from Tim Cook, John Ternus or Apple on the first three purchases only. The price rises 25% per game from $2,399.\n- Small home-screen widget via `os.widget.set`.\n- Synthesised flap, score, crash and payment cues via Web Audio.\n- Supports the inner and cover displays.\n"
   },
   {
     "id": "com.mnismt.duo.habitstreaks",
@@ -45,12 +49,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "mnismt",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/habit-streaks",
-    "version": "1.0.1",
-    "releases": 2,
+    "version": "1.1.0",
+    "releases": 3,
     "created": "2026-09-19T02:44:33.747Z",
-    "updated": "2026-09-19T15:45:21.325Z",
+    "updated": "2026-09-25T01:59:46.064Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.habitstreaks/1.0.1+2dd374bf/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.habitstreaks/1.1.0+71a61bff/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned the app on the UI kit token scales: a dark arcade look with a\n  green glow, a glass completion chip, and Dynamic Type sizes throughout.\n- Added a wide layout for the inner display - brand, counter and hint sit\n  beside the habit list - while the cover keeps the compact stack.\n- Added motion: a staggered list entrance, a streak pulse on completion and\n  an all-done celebration, all off under reduced motion.\n- Today's checkmarks now sync through session storage, so folding the phone\n  hands the same day to the other display; history still lives in app\n  storage.\n- Bottom padding clears the home indicator.\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added three daily habits with one-tap completion.\n- Added persistent completion dates and streak counts.\n"
   },
   {
     "id": "com.mnismt.duo.memorymatch",
@@ -58,12 +63,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "mnismt",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/memory-match",
-    "version": "1.0.1",
-    "releases": 2,
+    "version": "1.1.0",
+    "releases": 3,
     "created": "2026-09-19T02:47:25.458Z",
-    "updated": "2026-09-19T15:45:22.638Z",
+    "updated": "2026-09-25T02:25:00.266Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.memorymatch/1.0.1+e56a8c87/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.memorymatch/1.1.0+d83047d4/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned with a dark arcade look on UI kit token scales.\n- Split the deck logic into `game.ts` and the styles into `styles.ts`.\n- Added reduced-motion-gated animations: card flip, match pulse, mismatch shake, and a board-cleared celebration.\n- Rebuilt the layout on `useWide`: stats and New game sit beside the board on the inner display and stack on the cover.\n- Persisted a best (fewest moves) score through `os.storage`.\n- Synced the live board through `os.session`, so folding to the other display continues the identical shuffle.\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added a twelve-card memory matching game.\n- Added move tracking and a compact cover-friendly board.\n"
   },
   {
     "id": "com.mnismt.duo.pomodoro",
@@ -71,12 +77,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "mnismt",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pomodoro-timer",
-    "version": "1.0.1",
-    "releases": 1,
+    "version": "1.1.0",
+    "releases": 2,
     "created": "2026-09-19T15:45:23.924Z",
-    "updated": "2026-09-19T15:45:23.924Z",
+    "updated": "2026-09-25T02:01:00.829Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.pomodoro/1.0.1+c6106bf5/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.pomodoro/1.1.0+19d3c5db/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.1.0\n\n- Fixed the countdown tick: the phase flip no longer hides inside a `setSeconds` updater. The timer now runs off a single end timestamp, so focus-to-break rollovers are deterministic under StrictMode and concurrent rendering.\n- Rebuilt the layout on `useWide`: the inner display puts the controls beside the timer card, the cover stacks them clear of the home bar.\n- Restyled on the UI kit token scales (radius, shadow, easing, space, typeScale, weight, tracking, leading, glass) in the dark arcade look, with `cardIn`/`modeIn` motion gated behind `prefers-reduced-motion`.\n- Split the single file into `main.tsx`, `timer.ts` and `styles.ts`.\n- Made the fold sync real: mode, running state and the countdown itself publish through `os.session`, so folding mid-block continues the same timer on the other display.\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added a fold-aware Pomodoro focus and break timer.\n- Added a large inner-display timeline and compact cover controls.\n"
   },
   {
     "id": "com.mnismt.duo.snake",
@@ -89,7 +96,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-19T00:39:24.492Z",
     "updated": "2026-09-24T14:52:29.430Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.snake/1.2.3+9d3bf860/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.snake/1.2.3+9d3bf860/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.2.3\n\n- Rebuilt the UI: on wide boxes the arrow pad sits in a control deck on the right of the board; on the cover the pad is right-aligned with New run on the left and extra edge insets keep it clear of the screen's corner mask.\n- Added a food ripple ring, an eat burst with a floating +1, a death shake with a red flash, a tapered snake tail, ready-state pulses, and a pressed-arrow flash; all gated behind reduced-motion.\n- Restyled on the UI kit token scales: radius, shadow, easing, motion press, type scale, tracking, leading, and space.\n\n## 1.2.2\n\n- Fixed the food dot rendering at the board's corner instead of its cell: the pulse animation overrode the translate used for placement, so the point could never be reached.\n- Fixed instant self-collision from quick turns: steering input now queues one turn per tick instead of applying a reversal mid-tick.\n\n## 1.2.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.2.0\n\n- Made the folded Duo mark the animated snake head using the exact product-icon geometry.\n- Added a calm breathing glow and reduced-motion fallback to the logo character.\n\n## 1.1.0\n\n- Added smooth snake movement, a breathing food animation, score feedback and a polished game-over state.\n- Added swipe steering, focus states and reduced-motion fallbacks for both displays.\n\n## 1.0.1\n\n- Constrained the board, controls, and game-over message to the active display.\n\n## 1.0.0\n\n- Added a touch-friendly Snake game with keyboard support.\n- Added responsive layouts for the inner and cover displays.\n"
   },
   {
     "id": "com.mnismt.duo.tictactoe",
@@ -97,12 +105,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "mnismt",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tic-tac-toe",
-    "version": "1.0.1",
-    "releases": 2,
+    "version": "1.1.0",
+    "releases": 3,
     "created": "2026-09-19T02:44:02.579Z",
-    "updated": "2026-09-19T15:45:26.664Z",
+    "updated": "2026-09-25T02:41:55.763Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.tictactoe/1.0.1+a83a158a/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.tictactoe/1.1.0+82bf1ef2/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned the app: dark arcade look with glass score chips, an inset\n  board well, glowing X and O marks, and a floating result card that clears\n  the home indicator.\n- Rebuilt the layout on `useWide`: on wide boxes the controls sit on a rail\n  beside the board; on the cover they stack under it.\n- Added a mark pop, a board-in entrance, a win-line reveal, and a reset\n  transition; every animation is one-shot, composited, and gated behind\n  reduced-motion.\n- Added synth sound cues: a woodblock tick on each placement, a rising win\n  jingle, and a soft two-note motif on a draw. A win also pops sparkles off\n  the line and makes the board rumble, with `navigator.vibrate` where the\n  hardware has it.\n- Live game state (board, turn, scores) now syncs through session storage,\n  so folding the phone hands the same in-progress match to the other\n  display. The win tally stays persisted across launches.\n- Split the source into game.ts (pure logic and wire helpers), styles.ts\n  (StyleX on the UI kit token scales), and main.tsx (wiring).\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added a two-player Tic-Tac-Toe board.\n- Added round reset and persistent win tracking.\n"
   },
   {
     "id": "com.mnismt.duo.wordlemini",
@@ -110,12 +119,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "mnismt",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
-    "version": "1.0.1",
-    "releases": 2,
+    "version": "1.1.0",
+    "releases": 3,
     "created": "2026-09-19T02:45:10.608Z",
-    "updated": "2026-09-19T15:45:27.967Z",
+    "updated": "2026-09-25T02:24:24.143Z",
     "permissions": [],
-    "icon": "/catalog/apps/com.mnismt.duo.wordlemini/1.0.1+39867db4/icon-1024.png"
+    "icon": "/catalog/apps/com.mnismt.duo.wordlemini/1.1.0+8b3eca1f/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned as a retro CRT cabinet: pixel-bevel tile faces, a dithered board\n  well, chunky raised keys with magenta action accents, a marquee header, a\n  blinking prompt caret, and a scanline overlay.\n- Added motion: staggered sprite-stepped per-tile flips on submit, a row\n  shake for short words, a win bounce on the solving row, and tinted key\n  transitions - all off under prefers-reduced-motion.\n- The in-progress attempt (guesses, the half-typed row, status) now syncs\n  through os.session, so folding the phone continues the same puzzle mid-guess\n  on the other display; daily results still persist per day.\n- Rebuilt the layout on useWide: side-by-side board and keyboard with larger\n  keys on the wide display, a compact stack on the cover, and padding that\n  clears the home indicator.\n- Added physical keyboard support (letters, Enter, Backspace).\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added a six-guess daily Wordle-style puzzle.\n- Added an on-screen keyboard and local daily progress.\n"
   },
   {
     "id": "labs.doan.fold-compass",
@@ -123,12 +133,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "community",
     "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/fold-compass",
-    "version": "1.0.1",
-    "releases": 1,
+    "version": "1.1.0",
+    "releases": 2,
     "created": "2026-09-19T15:45:19.935Z",
-    "updated": "2026-09-19T15:45:19.935Z",
+    "updated": "2026-09-25T02:00:26.649Z",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.fold-compass/1.0.1+425fab54/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.fold-compass/1.1.0+112a7cfe/icon-1024.png",
+    "changelog": "# 1.1.0\n\nMoved the reference interface onto UI kit spacing, type, radius, glass, shadow and motion\ntokens. Added box-aware inner-display layout, a reduced-motion-safe card entrance and a\nsmooth live hinge-meter transition while preserving per-display hinge state and field-note\nstorage.\n\n# 1.0.1\n\nBuilt against UI kit 1.0.0 token names.\n\n# 1.0.0\n\nFirst community release. A hinge meter with distinct desk, folded and pocket layouts,\nlive display state and an app-private field note. No network, no device permissions.\n"
   },
   {
     "id": "labs.doan.ipduo.calculator",
@@ -141,7 +152,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.0.1+939d0484/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.0.1+5192a9fd/icon-1024.png",
+    "changelog": "# 1.0.1\n\nThe keypad shrinks to the display height, so the readout is no longer clipped at the top.\n\n# 1.0.0\n\nThe iOS calculator: one pending operator, immediate evaluation on the next.\n"
   },
   {
     "id": "labs.doan.ipduo.calendar",
@@ -154,7 +166,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-21T21:34:57+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+6121f139/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+b7f0c171/icon-1024.png",
+    "changelog": "# 1.1.0\n\nThe tablet layout: sidebar with calendars and a mini month, Day, Week, Month and\nYear views, events that are created, edited, deleted and searched, and stored in\napp storage.\n\nMonth draws the sheet each display asks for. Inside, it is the Mac's: ruled both\nways in a hairline well under the UIKit separator, the weekend shaded, numbers\nhung on the right of their day, the picked day lifted whole. On the cover it is\nthe phone's: no rules, no shading, the number centred over its dots. Events pack\ninto lanes either way, so a multi-day event is a single bar across the days it\ncovers, and a week only draws the rows the month has instead of ruling an empty\nsixth. A day that runs out of lanes counts the rest and opens on Day.\n\nDay and Week are ruled to match, with the weekend shaded, the hours hung on\ntheir own lines, and now drawn the way Calendar draws it: pale across the week,\nsolid with a dot on today, and the time itself in the gutter. The sidebar lists\ncalendars as tinted checkboxes and its mini month follows the pane instead of\nstranding September under a February sheet. Paging slides the sheet the way the\narrow points; arriving at a view raises it.\n\nA fresh install opens on a working month around today, the keynote the\nhome-screen widget shows included.\n\n# 1.0.0\n\nMonth view with today marked, as an isolated release.\n"
   },
   {
     "id": "labs.doan.ipduo.clock",
@@ -167,7 +180,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-24T21:30:20+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+3552b7ac/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+8b3355db/icon-1024.png",
+    "changelog": "# 1.1.0\n\nThe Clock app rebuilt end to end as the iPadOS Clock: a sidebar on the wide\ndisplay, a floating tab bar on the cover, and four working tabs. World Clock\nlists cities with relative-day offsets and an add-city sheet with search.\nAlarms add, edit, toggle and delete, with an iOS wheel picker for the time,\nrepeat days, sounds, snooze, and a full-screen snooze/stop alert that only the\nowning display sounds. Stopwatch runs a digital and an analog face off one\nshared timer with laps, best and worst highlights. Timers pick hours, minutes\nand seconds on wheels, run as orange-ring cards that pause, resume and cancel,\nand remember recents. All state lives in app storage, so the two display\ncopies agree while only the owner fires sounds.\n\n# 1.0.0\n\nWorld clock: local time large, six cities below, ticking once a second.\n"
   },
   {
     "id": "labs.doan.ipduo.freeform",
@@ -180,7 +194,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+7d9eacda/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+bcfa5e67/icon-1024.png",
+    "changelog": "# 1.0.0\n\nFreehand ink on a canvas with a palette of inks.\n"
   },
   {
     "id": "labs.doan.ipduo.news",
@@ -188,12 +203,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00",
+    "updated": "2026-09-25T12:38:04+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.news/1.0.0+aabc78d2/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.news/1.1.0+83163c94/icon-1024.png",
+    "changelog": "# 1.1.0\n\nRebuilt as Apple News for the Duo: a floating glass sidebar (channels, followed topics, Saved Stories, History) on the inner display and a tab bar on the cover. Today opens with a Top Story hero over a Latest wire, articles push over the whole app in a serif column with the live discussion underneath, and every list animates in staggered. Feeds cache through storage so the mirror copy paints the same stories without fetching.\n\n# 1.0.0\n\nHacker News front page dressed as Apple News, opening stories in Safari.\n"
   },
   {
     "id": "labs.doan.ipduo.notes",
@@ -206,7 +222,8 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-21T21:34:57+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.0.0+361375ca/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.0.0+dfafc635/icon-1024.png",
+    "changelog": "# 1.0.0\n\nRun Notes in an isolated document with persistent text, shared session navigation\nand explicit saving and failure states.\n"
   },
   {
     "id": "labs.doan.ipduo.photos",
@@ -224,7 +241,8 @@ export const CATALOG: CatalogApp[] = [
         "label": "Photos"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+c8d3546d/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+bc72c121/icon-1024.png",
+    "changelog": "# 1.0.0\n\nThe photos taken in Camera, read through the Photos service, with a full-bleed viewer.\n"
   },
   {
     "id": "labs.doan.ipduo.reminders",
@@ -232,12 +250,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-21T21:34:57+07:00",
+    "updated": "2026-09-25T12:37:54+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.0.0+d619d533/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.0+9c8dfe5d/icon-1024.png",
+    "changelog": "# 1.1.0\n\nA full Reminders rebuild after the iPad app: a glass sidebar of Today,\nScheduled, All, Flagged and Completed tiles with My Lists and tags on the inner\ndisplay, push navigation on the cover, round tinted checkboxes, inline editing,\na details sheet with dates, flags, priorities, tags and subtasks, list editing,\nsearch and a legacy tasks migration - all in the app storage, shared by both\ndisplays.\n\n# 1.0.0\n\nA checklist kept in the app storage, shared by both displays.\n"
   },
   {
     "id": "labs.doan.ipduo.weather",
@@ -245,44 +264,56 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-23T00:24:19+07:00",
+    "updated": "2026-09-25T10:02:40+07:00",
     "permissions": [
       {
         "name": "geolocation",
         "label": "Location"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.0.0+66f38ebe/icon-1024.png"
+    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+457d0df0/icon-1024.png",
+    "changelog": "# 1.1.0\n\nLaunch now asks for the device's place on its own: the geolocation prompt runs first\nand the public IP answers when the prompt is refused, unnamed or times out, named\nthrough a free reverse geocoder. My Location files itself first in the list, cannot\nbe removed, and refreshes quietly on later launches while permission holds.\n\nThe inner display becomes the iPad layout: a floating glass sidebar carries the\nsearch field, the units and location menu, and sky-tinted location cards beside the\ndetail pane, with a sidebar toggle in the top bar. The cover display keeps the\niPhone list and bottom bar.\n\n# 1.0.0\n\nIsolated Weather with owner-only forecast requests, shared persistent preferences,\nrefresh commands, delegated geolocation and declarative widget snapshots.\n\nRedesigned after the iOS Weather app: large hero temperature, condition-driven sky\nbackgrounds with moon, stars, clouds, rain, snow and fog layers, frosted glass cards,\nSF Symbol condition glyphs, an hourly strip with sunrise and sunset, ten-day rows with\ntemperature range bars and a today marker, visual detail tiles (UV, sunrise/sunset arc,\nwind compass, feels like, 24-hour precipitation bars, humidity, visibility, pressure\ngauge, air quality from Open-Meteo), sky-card locations list, and a page-dot toolbar\nwith a bottom bar on the outer display.\n"
   }
 ]
 /** Official apps built into the simulator; `mock` marks a static screen still in development.
  *  Baked apps carry no release, so their dates are the first and last commit on their package. */
-export const SHELL: { name: string; icon: string; mock: boolean; created?: string; updated?: string }[] =
+export const SHELL: {
+  name: string
+  icon: string
+  mock: boolean
+  changelog: string | null
+  created?: string
+  updated?: string
+}[] =
   [
   {
     "name": "FaceTime",
     "icon": "/icons/facetime.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "Calendar",
     "icon": "/icons/calendar.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Photos",
     "icon": "/icons/photos.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Camera",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%0A%3ClinearGradient%20id%3D%22b%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.35%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23b2b2b7%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%234b4b50%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22r%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fbfbfd%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237d7d82%22%2F%3E%3C%2FlinearGradient%3E%0A%3CradialGradient%20id%3D%22i%22%20cx%3D%22.34%22%20cy%3D%22.27%22%20r%3D%22.95%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%235d6d7a%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%231b2025%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23090b0e%22%2F%3E%3C%2FradialGradient%3E%0A%3C%2Fdefs%3E%0A%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23b)%22%2F%3E%0A%3Crect%20x%3D%2254%22%20y%3D%2235%22%20width%3D%2232%22%20height%3D%2212%22%20rx%3D%226%22%20fill%3D%22%23eaeaec%22%20opacity%3D%22.9%22%2F%3E%0A%3Ccircle%20cx%3D%2296%22%20cy%3D%22108%22%20r%3D%2247%22%20fill%3D%22url(%23r)%22%2F%3E%0A%3Ccircle%20cx%3D%2296%22%20cy%3D%22108%22%20r%3D%2238%22%20fill%3D%22url(%23i)%22%2F%3E%0A%3Cellipse%20cx%3D%2279%22%20cy%3D%2292%22%20rx%3D%2214%22%20ry%3D%229%22%20fill%3D%22%23fff%22%20opacity%3D%22.22%22%20transform%3D%22rotate(-32%2079%2092)%22%2F%3E%3C%2Fsvg%3E",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -290,23 +321,27 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Mail",
     "icon": "/icons/mail.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "Clock",
     "icon": "/icons/clock.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Notes",
     "icon": "/icons/notes.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Maps",
     "icon": "/icons/maps.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-23T00:24:19+07:00"
   },
@@ -314,44 +349,51 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "TV",
     "icon": "/icons/tv.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "News",
     "icon": "/icons/news.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Health",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22ht%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.3%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff375f%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23e4053c%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%23fdfdff%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Cpath%20d%3D%22M96%20156C60%20130%2034%20110%2034%2082a30%2030%200%200%201%2062-12%2030%2030%200%200%201%2062%2012c0%2028-26%2048-62%2074Z%22%20fill%3D%22url(%23ht)%22%2F%3E%3C%2Fsvg%3E",
-    "mock": true,
+    "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-25T12:35:54+07:00"
   },
   {
     "name": "Wallet",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22w1%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffd60a%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ff9f0a%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22w2%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%235ac8fa%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a84ff%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22w3%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff6482%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ff375f%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%230b0b0d%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%2252%22%20width%3D%22124%22%20height%3D%2246%22%20rx%3D%2211%22%20fill%3D%22url(%23w1)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%2276%22%20width%3D%22124%22%20height%3D%2246%22%20rx%3D%2211%22%20fill%3D%22url(%23w3)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%22100%22%20width%3D%22124%22%20height%3D%2246%22%20rx%3D%2211%22%20fill%3D%22url(%23w2)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%22110%22%20width%3D%22124%22%20height%3D%2210%22%20fill%3D%22%23f2f2f7%22%20fill-opacity%3D%22.92%22%2F%3E%3C%2Fsvg%3E",
-    "mock": true,
+    "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-25T13:03:43+07:00"
   },
   {
     "name": "Siri",
     "icon": "/icons/siri.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "Weather",
     "icon": "/icons/weather.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Stocks",
     "icon": "/icons/stocks.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -359,39 +401,45 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Find My",
     "icon": "/icons/findmy.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "Home",
     "icon": "/icons/home.webp",
-    "mock": true,
+    "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-25T13:03:43+07:00"
   },
   {
     "name": "Fitness",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%230b0b0d%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2263%22%20fill%3D%22none%22%20stroke%3D%22%23fa114f%22%20stroke-width%3D%2217%22%20stroke-opacity%3D%22.28%22%2F%3E%0A%20%20%20%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2263%22%20fill%3D%22none%22%20stroke%3D%22%23fa114f%22%20stroke-width%3D%2217%22%20stroke-linecap%3D%22round%22%0A%20%20%20%20%20stroke-dasharray%3D%22395.84067435231395%22%20stroke-dashoffset%3D%2255.41769440932396%22%20transform%3D%22rotate(-90%2096%2096)%22%2F%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%23a6f425%22%20stroke-width%3D%2217%22%20stroke-opacity%3D%22.28%22%2F%3E%0A%20%20%20%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%23a6f425%22%20stroke-width%3D%2217%22%20stroke-linecap%3D%22round%22%0A%20%20%20%20%20stroke-dasharray%3D%22257.610597594363%22%20stroke-dashoffset%3D%2236.06548366321083%22%20transform%3D%22rotate(-90%2096%2096)%22%2F%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2219%22%20fill%3D%22none%22%20stroke%3D%22%2322e0f5%22%20stroke-width%3D%2217%22%20stroke-opacity%3D%22.28%22%2F%3E%0A%20%20%20%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2219%22%20fill%3D%22none%22%20stroke%3D%22%2322e0f5%22%20stroke-width%3D%2217%22%20stroke-linecap%3D%22round%22%0A%20%20%20%20%20stroke-dasharray%3D%22119.38052083641213%22%20stroke-dashoffset%3D%2216.7132729170977%22%20transform%3D%22rotate(-90%2096%2096)%22%2F%3E%3C%2Fsvg%3E",
-    "mock": true,
+    "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-25T12:35:54+07:00"
   },
   {
     "name": "Watch",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22wc%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.4%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f2f2f5%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%238e8e94%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%230b0b0d%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Crect%20x%3D%22120%22%20y%3D%2272%22%20width%3D%2213%22%20height%3D%2230%22%20rx%3D%226%22%20fill%3D%22url(%23wc)%22%2F%3E%0A%3Crect%20x%3D%2247%22%20y%3D%2226%22%20width%3D%2298%22%20height%3D%22140%22%20rx%3D%2242%22%20fill%3D%22none%22%20stroke%3D%22url(%23wc)%22%20stroke-width%3D%229%22%2F%3E%0A%3Crect%20x%3D%2256%22%20y%3D%2235%22%20width%3D%2280%22%20height%3D%22122%22%20rx%3D%2234%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "Reminders",
     "icon": "/icons/reminders.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Files",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22fo%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%233fb9ff%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a7cff%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%23fdfdff%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Cpath%20d%3D%22M34%2066a12%2012%200%200%201%2012-12h30l14%2016h56a12%2012%200%200%201%2012%2012v56a12%2012%200%200%201-12%2012H46a12%2012%200%200%201-12-12Z%22%20fill%3D%22%2359c4ff%22%2F%3E%0A%3Cpath%20d%3D%22M34%2084a12%2012%200%200%201%2012-12h100a12%2012%200%200%201%2012%2012v54a12%2012%200%200%201-12%2012H46a12%2012%200%200%201-12-12Z%22%20fill%3D%22url(%23fo)%22%2F%3E%3C%2Fsvg%3E",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -399,6 +447,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Preview",
     "icon": "/icons/preview.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -406,6 +455,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Contacts",
     "icon": "/icons/contacts.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-24T21:51:58+07:00"
   },
@@ -413,18 +463,21 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "iTunes Store",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22it%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.3%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23d84bff%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%239a1ee8%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22st%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f3d7ff%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23it)%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Cpath%20d%3D%22M96%2030%20118%2076l50%207-36%2035%209%2050-45-24-45%2024%209-50-36-35%2050-7Z%22%20fill%3D%22url(%23st)%22%2F%3E%3C%2Fsvg%3E",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
   {
     "name": "Freeform",
     "icon": "/icons/freeform.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Tips",
     "icon": "/icons/tips.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-24T20:45:31+07:00"
   },
@@ -432,6 +485,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Phone",
     "icon": "/icons/phone.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-23T23:45:33+07:00"
   },
@@ -439,6 +493,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Safari",
     "icon": "/icons/safari.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-23T00:24:19+07:00"
   },
@@ -446,6 +501,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Messages",
     "icon": "/icons/messages.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -453,6 +509,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Music",
     "icon": "/icons/music.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-24T21:30:50+07:00"
   },
@@ -460,18 +517,21 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "App Store",
     "icon": "/icons/appstore.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-24T01:03:54+07:00"
+    "updated": "2026-09-25T09:04:21+07:00"
   },
   {
     "name": "Calculator",
     "icon": "/icons/calculator.webp",
-    "mock": false
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Voice Memos",
     "icon": "/icons/voicememos.webp",
     "mock": false,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -479,6 +539,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Shortcuts",
     "icon": "/icons/shortcuts.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -486,6 +547,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Podcasts",
     "icon": "/icons/podcasts.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -493,6 +555,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "Books",
     "icon": "/icons/books.webp",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   },
@@ -500,6 +563,7 @@ export const SHELL: { name: string; icon: string; mock: boolean; created?: strin
     "name": "YouTube",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%23fff%22%2F%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2260%22%20width%3D%22132%22%20height%3D%2280%22%20rx%3D%2226%22%20fill%3D%22%23f00%22%2F%3E%0A%3Cpath%20d%3D%22M84%2082%20122%20100%2084%20118Z%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E",
     "mock": true,
+    "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00"
   }
