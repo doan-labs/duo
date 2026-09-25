@@ -217,9 +217,13 @@ routes, estimate, `me`, recents, the camera `view` and the layer `kind` are one 
 state, so the fold hands the same map over whole - either copy writes intent and only
 the `!os.mirror` copy fetches or animates. The mirror's `flyTo` writes the target view
 flat instead of scheduling frames; the live copy's animation frames land in the store
-and the folded display draws them. Results
-and routes are keyed by the request that asked for them, which is what keeps a failure
-from refiring and a stale answer from being picked. `camera.ts` is the fly plan behind
+and the folded display draws them. The directions scroll offset shares the store too:
+the live copy writes it debounced, the folded copy restores it when it becomes live,
+and a new destination, mode or route remounts the scroller at the top. Results
+and routes are keyed by the request that asked for them - the search key carries a
+~0.5-degree camera bucket so a query re-biases when the map crosses towns - and each
+record counts `tries`: a failure retries once, reopening directions clears the failed
+record to ask again, and no render can loop a fetch. `camera.ts` is the fly plan behind
 every jump: `flyTo` runs it through a rAF
 driver, drag and wheel interrupt it, a released drag coasts on its velocity, and zoom is
 fractional - tiles render at the nearest integer level scaled by `2 ** (z - tileZ)`.
