@@ -89,6 +89,22 @@ compatibility have already been verified.
 
 Newest first. Each pass records what changed and how it was verified.
 
+### Kit scenes follow the page's appearance
+
+- The `/kit` tiles and the `/kit/docs` preview frame carry the app's own `app`
+  colours, which CSS cannot reach through the site's `color` theme. They pinned
+  `styles.light`, so a dark page carried light panels. `useDark` (`src/theme.ts`)
+  resolves the saved pick or the system's, and the frames swap
+  `styles.light`/`styles.dark` to match, the way springboard themes shell apps.
+- A `night` tile was already dark in both appearances; a dark page now makes
+  every tile a night one. The palette and symbols scenes show the `*Dark` hue
+  siblings when the page is dark.
+
+| Run | Result |
+| --- | --- |
+| `bun run typecheck`, `bunx biome check` on the changed files | clean |
+| agent-browser, headless Chromium, `/kit` and `/kit/docs/Button` in light and dark | tiles and the preview frame take the page's appearance; `night` tiles unchanged |
+
 ### The core idea and the store step use the real shell too
 
 - "The fold is not a breakpoint" (`src/home/fold.tsx`) drives a `Simulator bare`

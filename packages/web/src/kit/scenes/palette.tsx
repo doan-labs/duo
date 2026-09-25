@@ -1,39 +1,44 @@
 // The iOS 26 system hues from the kit's tokens, arriving one after another.
-// Pointing at one names the token it is.
+// Pointing at one names the token it is. In a dark appearance each swatch
+// shows its `*Dark` sibling, which is the row of colours a dark app reads.
 import { app, colors, easing, fonts, leading, space, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
+import { useDark } from '../../theme'
 
 const HUES = [
-  ['red', colors.red],
-  ['orange', colors.orange],
-  ['yellow', colors.yellow],
-  ['green', colors.green],
-  ['mint', colors.mint],
-  ['teal', colors.teal],
-  ['cyan', colors.cyan],
-  ['blue', colors.blue],
-  ['indigo', colors.indigo],
-  ['purple', colors.purple],
-  ['pink', colors.pink],
-  ['brown', colors.brown]
+  ['red', colors.red, colors.redDark],
+  ['orange', colors.orange, colors.orangeDark],
+  ['yellow', colors.yellow, colors.yellowDark],
+  ['green', colors.green, colors.greenDark],
+  ['mint', colors.mint, colors.mintDark],
+  ['teal', colors.teal, colors.tealDark],
+  ['cyan', colors.cyan, colors.cyanDark],
+  ['blue', colors.blue, colors.blueDark],
+  ['indigo', colors.indigo, colors.indigoDark],
+  ['purple', colors.purple, colors.purpleDark],
+  ['pink', colors.pink, colors.pinkDark],
+  ['brown', colors.brown, colors.brownDark]
 ] as const
 
 export default function Palette() {
   const [hover, setHover] = useState<string>()
+  const night = useDark()
   return (
     <div {...stylex.props(styles.scene)}>
       <ul {...stylex.props(styles.grid)}>
-        {HUES.map(([name, c], i) => (
+        {HUES.map(([name, day, dark], i) => (
           <li
             key={name}
             onPointerEnter={() => setHover(name)}
             onPointerLeave={() => setHover(undefined)}
-            {...stylex.props(styles.swatch, styles.fill(c, i * 45))}
+            {...stylex.props(styles.swatch, styles.fill(night ? dark : day, i * 45))}
           />
         ))}
       </ul>
-      <p {...stylex.props(styles.name)}>{hover ? `colors.${hover}` : 'Dark siblings for every one'}</p>
+      <p {...stylex.props(styles.name)}>
+        {hover ? `colors.${hover}${night ? 'Dark' : ''}` : 'Dark siblings for every one'}
+      </p>
     </div>
   )
 }

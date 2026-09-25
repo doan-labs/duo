@@ -1,10 +1,12 @@
-import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { dark as kitDark, light as kitLight } from '@doan-labs/duo-uikit/styles.ts'
+import { app, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { type ComponentType, useState } from 'react'
 import { Line } from './highlight'
 import { CURVE } from './motion'
 import { Segmented } from './segmented'
+import { useDark } from './theme'
 import { color, font, radius } from './tokens.stylex'
 
 // One file per component in kit-demos/: `button.tsx` is the Button demo. The
@@ -28,14 +30,15 @@ const demos = new Map(
 export const hasDemo = (name: string) => demos.has(name)
 
 /**
- * The real kit component, live, in the light app theme at a display width.
- * 387 is the cover display in points, 790 the inner one.
+ * The real kit component, live, in the appearance the page is in, at a display
+ * width. 387 is the cover display in points, 790 the inner one.
  */
 export function KitFrame({ name, width = 387, height = 360 }: { name: string; width?: number; height?: number }) {
   const demo = demos.get(name)
+  const night = useDark()
   if (!demo) return null
   return (
-    <div data-kit-frame="" {...stylex.props(styles.frame, theme, styles.size(width, height))}>
+    <div data-kit-frame="" {...stylex.props(styles.frame, night ? kitDark : kitLight, styles.size(width, height))}>
       <demo.Demo />
     </div>
   )
@@ -43,7 +46,7 @@ export function KitFrame({ name, width = 387, height = 360 }: { name: string; wi
 
 type Tab = 'preview' | 'usage'
 
-/** The real kit component in a phone-width frame with the light app theme, and a Usage tab with the source that renders it. */
+/** The real kit component in a phone-width frame, themed with the page, and a Usage tab with the source that renders it. */
 export function KitPreview({ name }: { name: string }) {
   const demo = demos.get(name)
   const [tab, setTab] = useState<Tab>('preview')
@@ -111,9 +114,6 @@ export function KitPreview({ name }: { name: string }) {
   )
 }
 
-// The same light app theme the Developer gallery applies to its root.
-const theme = stylex.createTheme(app, { bg: colors.grey6, fg: colors.black })
-
 const styles = stylex.create({
   tabs: { marginBottom: '16px' },
   stage: {
@@ -138,8 +138,8 @@ const styles = stylex.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderRadius: '18px',
-    backgroundColor: colors.grey6,
-    color: colors.black,
+    backgroundColor: app.bg,
+    color: app.fg,
     // The shell's body font: 400 15px/1.4 on the system stack.
     fontFamily: fonts.system,
     fontSize: '15px',

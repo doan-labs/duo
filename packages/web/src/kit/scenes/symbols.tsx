@@ -6,6 +6,7 @@ import { app, colors, easing, fonts, leading, radius, space, typeScale } from '@
 import * as stylex from '@stylexjs/stylex'
 import { useReducedMotion } from 'motion/react'
 import { useEffect, useState } from 'react'
+import { useDark } from '../../theme'
 
 type Name = SymProps['name']
 
@@ -57,19 +58,21 @@ const WALL: Name[] = [
   'drop'
 ]
 
+// The tint a lit cell takes, dark siblings in a dark appearance like the swatches in palette.
 const TINTS = [
-  colors.blue,
-  colors.orange,
-  colors.pink,
-  colors.green,
-  colors.indigo,
-  colors.teal,
-  colors.yellow,
-  colors.purple
+  [colors.blue, colors.blueDark],
+  [colors.orange, colors.orangeDark],
+  [colors.pink, colors.pinkDark],
+  [colors.green, colors.greenDark],
+  [colors.indigo, colors.indigoDark],
+  [colors.teal, colors.tealDark],
+  [colors.yellow, colors.yellowDark],
+  [colors.purple, colors.purpleDark]
 ]
 
 export default function Symbols() {
   const still = useReducedMotion() ?? false
+  const night = useDark()
   const [lit, setLit] = useState<[number, number]>([0, 0])
   const [hover, setHover] = useState<Name>()
   useEffect(() => {
@@ -91,7 +94,7 @@ export default function Symbols() {
                 styles.cell,
                 styles.arrive(((i % 6) + Math.floor(i / 6)) * 40),
                 on && styles.on,
-                on && styles.tint(TINTS[(hover ? i : lit[1]) % TINTS.length]!)
+                on && styles.tint(TINTS[(hover ? i : lit[1]) % TINTS.length]![night ? 1 : 0]!)
               )}
             >
               <Sym name={name} size={22} />
