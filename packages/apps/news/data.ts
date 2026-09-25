@@ -93,7 +93,11 @@ export async function refresh(key: string, force = false) {
   if (!os.owner) {
     // The mirror copy never fetches; it asks the owner and reads the storage echo.
     const prior = feeds.get(key)
-    if (force || !prior?.fetched || Date.now() - prior.fetched >= STALE) await os.commands.send('refresh', key)
+    try {
+      if (force || !prior?.fetched || Date.now() - prior.fetched >= STALE) await os.commands.send('refresh', key)
+    } catch {
+      /* The owner answering is best-effort; the storage echo can still arrive. */
+    }
     return
   }
   const epoch = os.owner.epoch
@@ -135,9 +139,20 @@ export function useFeed(key: string) {
 }
 
 const CM_MAX = 12
+const emptyComments: CEntry = { loading: true }
 async function requestComments(id: string, force = false) {
   if (!os.owner) {
-    await os.commands.send('comments', id)
+    // Seed the same loading placeholder the owner writes, then ask for the real discussion.
+    if (!comments.get(id)?.items) {
+      comments.set(id, { loading: true })
+      emit()
+    }
+    try {
+      await os.commands.send('comments', id)
+    } catch {
+      comments.set(id, { loading: false, error: 'Discussion could not be loaded.' })
+      emit()
+    }
     return
   }
   if (comments.get(id)?.items && !force) return
@@ -173,7 +188,9 @@ async function requestComments(id: string, force = false) {
   }
 }
 export function useComments(id: string) {
-  const entry = useSyncExternalStore(subscribe, () => comments.get(id) || { loading: true })
+  // The fallback must be one stable object: a fresh literal per call reads as a
+  // changed snapshot and useSyncExternalStore re-renders forever.
+  const entry = useSyncExternalStore(subscribe, () => comments.get(id) || emptyComments)
   useEffect(() => {
     void requestComments(id)
   }, [id])
