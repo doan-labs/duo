@@ -89,7 +89,7 @@ export const styles = stylex.create({
     '::placeholder': { color: app.label3 },
     '::-webkit-search-cancel-button': { display: 'none' }
   },
-  sideList: { display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
+  sideList: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
   sideSec: {
     paddingTop: 12,
     paddingRight: 10,
@@ -134,7 +134,7 @@ export const styles = stylex.create({
     paddingRight: 8,
     paddingBottom: 8,
     paddingLeft: 8,
-    borderRadius: radius.lg,
+    borderRadius: layout.screenInnerPanel,
     backgroundColor: app.fill3,
     color: app.fg,
     textAlign: 'left',
@@ -226,6 +226,7 @@ export const styles = stylex.create({
     gap: space.sm,
     paddingTop: space.xs,
     paddingRight: space.lg,
+    paddingBottom: space.xs,
     paddingLeft: space.lg
   },
   headSide: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: space.sm },
@@ -236,6 +237,7 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
     gap: 12,
+    paddingTop: space.sm,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },
@@ -328,7 +330,7 @@ export const styles = stylex.create({
   },
   bodyWide: { paddingRight: space.lg },
   col: { width: '100%', maxWidth: 620, marginRight: 'auto', marginLeft: 'auto' },
-  pageHead: { paddingTop: space.xl, paddingRight: space.lg, paddingLeft: space.lg },
+  pageHead: { paddingTop: space.xl, paddingRight: space.lg, paddingBottom: space.sm, paddingLeft: space.lg },
   bigVal: {
     fontSize: typeScale.largeTitle,
     lineHeight: leading.largeTitle,
@@ -336,8 +338,9 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     fontVariantNumeric: 'tabular-nums'
   },
-  segRow: { display: 'flex', justifyContent: 'center', paddingTop: space.sm, paddingBottom: 10 },
+  segRow: { display: 'flex', justifyContent: 'center', paddingTop: space.sm },
   chartBox: {
+    marginTop: space.lg,
     marginRight: space.lg,
     marginLeft: space.lg,
     paddingTop: 12,
@@ -350,6 +353,8 @@ export const styles = stylex.create({
   },
   chartSvg: { width: '100%', height: 'auto', display: 'block' },
   axis: { fill: app.label3, fontSize: typeScale.caption2, fontFamily: fonts.system },
+  gridLine: { stroke: app.fill3, strokeWidth: 1, strokeDasharray: '1 5', strokeLinecap: 'round' },
+  baseline: { stroke: app.separator, strokeWidth: 1 },
   barGrow: (tint: string) => ({
     fill: tint,
     transformBox: 'fill-box',
@@ -359,7 +364,33 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'backwards'
   }),
-  goalLine: { stroke: app.label3, strokeDasharray: '4 4', strokeWidth: 1 },
+  goalLine: { stroke: app.label3, strokeDasharray: '1 5', strokeLinecap: 'round', strokeWidth: 1.5 },
+  lineDot: (tint: string) => ({ fill: tint }),
+  lineDotRing: (tint: string) => ({ fill: tint, opacity: 0.18 }),
+  hypnoRun: (tint: string, w: number) => ({
+    stroke: tint,
+    strokeWidth: w,
+    strokeLinecap: 'round',
+    fill: 'none',
+    strokeDasharray: 1600,
+    strokeDashoffset: 1600,
+    animationName: { default: drawIn, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.9s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'forwards'
+  }),
+  hypnoLink: (tint: string, w: number) => ({
+    stroke: tint,
+    strokeWidth: Math.max(1.5, w * 0.55),
+    strokeLinecap: 'round',
+    fill: 'none',
+    strokeDasharray: 1600,
+    strokeDashoffset: 1600,
+    animationName: { default: drawIn, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.5s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'forwards'
+  }),
   lineDraw: {
     strokeDasharray: 1600,
     strokeDashoffset: 1600,
@@ -376,11 +407,12 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'forwards'
   },
-  lineFill: (tint: string) => ({ fill: tint, opacity: 0.1 }),
+
   statGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
     gap: 10,
+    paddingTop: space.lg,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },
