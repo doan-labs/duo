@@ -12,7 +12,8 @@ native parity.
 For the built browser builder, run `bun scripts/check-builder.mjs <site-url>/build`.
 It uses agent-browser, isolated storage and fake streamed provider replies. Inspect captures
 under `.cache/debug/builder/`. This verifies real compilation/preview but not a paid provider
-call. Stop other task-owned simulator sessions before heavy render tests. Nested iframe
+call. Undo must return the restored app to `ready`, not leave a `Connecting` sheet; a
+stuck sheet indicates a parked scene reused after session revocation. Stop other task-owned simulator sessions before heavy render tests. Nested iframe
 buttons need fresh frame snapshot refs; the CLI's page-level eval can still target the top
 page after frame selection. Scroll a nested panel's control into view before clicking.
 Mobile builder tabs use opacity and inert input handling rather than display/visibility
@@ -299,7 +300,8 @@ static build (`dist/client` served on 3011, mapping a directory to its
 
 The removed website scripts described earlier layout checks. Current verification uses
 agent-browser, including the committed builder check
-above. `/simulator` now redirects to `/build`; its phone stays mounted while folding.
+above. `/simulator` is standalone and `/build` is the builder; both keep the phone
+mounted while folding.
 Use fresh frame snapshot refs to enter `iframe[title="Duo simulator"]`, inspect shell
 state, and operate the fold control. Under SwiftShader the shell can take 20 to 60 s
 to reach `[data-os]`; model and texture startup is separate from app readiness.

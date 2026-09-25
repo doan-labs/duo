@@ -1546,3 +1546,25 @@ dotted, and the hypnogram as one continuous wave that changes colour at each
 stage instead of disjoint blocks. Fitness's WeekBars moves to the same
 vocabulary. Cost: the wave hypnogram no longer shows per-segment time labels
 directly on the blocks; the stage legend under it carries the totals.
+## 95. Duo Build returns as a separate browser workspace
+
+2026-09-25. This supersedes only the parking and routing portion of decision 67:
+`/build` is live and discoverable as the highlighted `Build` navigation item,
+`/get-started` routes there, and `/simulator` remains a separate public page where a
+visitor drives the phone with nothing to configure. The workspace keeps its established
+shape: the trusted chat page sits beside the real phone, and generated apps retain
+opaque sandboxes with zero OS authority.
+
+Provider requests are orchestrated by the Vercel AI SDK's OpenAI-compatible provider
+inside the trusted page. The transport keeps the parked rules: direct browser BYOK with
+no Duo server in the path, HTTPS base URLs without credentials, cookies omitted,
+redirects refused, no referrer, a three-minute timeout, a 2 MB response cap, no retries
+and status-only provider errors. The key stays in page memory and provider
+authorization headers only. OpenAI is the default preset with `gpt-6-luna` as its
+model; OpenRouter, Google Gemini, Groq and custom compatible endpoints remain.
+
+Compilation still uses the fixed browser compiler and runtime from decision 65: no
+runtime installs, no generated code executing in the trusted page, and verified
+document bytes behind the token-bound preview channel. Hosted CORS and MIME behavior,
+live provider compatibility, Safari and native parity remain unproven; verification so
+far is fixture-driven Chromium evidence.

@@ -164,6 +164,21 @@ After integrating main's UI kit 0.2.0 and `/kit/docs` routes, typecheck, provide
 the production build and the complete builder browser check passed again. This run
 used the refreshed browser runtime descriptor, including the new kit exports and styles.
 
+2026-09-25: `/build` was reactivated as a separate workspace and generation moved to
+Vercel AI SDK 7 with `@ai-sdk/openai-compatible`; OpenAI `gpt-6-luna` is the default
+preset. `bun test ./packages/web/src/builder/provider.test.ts` (8 tests),
+`bun run typecheck` and the production build passed, and
+`bun scripts/check-builder.mjs http://localhost:3019/build` completed its full pass
+with every fixture request carrying `gpt-6-luna` through the AI SDK transport. The run
+covered Undo after folding, where a parked scene could previously be revived with a
+revoked view: `scenes.ts` now cold-opens a parked scene when `sessionRunning()` is
+false or its context is in `deadViews`, and `device.open` defers until the first
+display attaches so a replayed apply cannot reach an unbooted shell. Captures under
+`.cache/debug/builder/duo-builder-check-1790311287882/` (desktop, folded, mobile chat
+and mobile preview) were inspected. All provider traffic was fixture-only against the
+local mock: no live provider call, no real key, and no hosted CORS, Safari or native
+parity evidence was produced.
+
 The completed local audit verified all four MVP outcomes in Chromium, including stable
 view IDs across 180/120/0 degrees and unchanged hashes for all 378 simulator build files.
 The external workflow exercised create/develop/install, process restart, update staging,

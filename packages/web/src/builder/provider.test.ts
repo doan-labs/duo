@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { example } from './example'
-import { completion, endpointURL } from './provider'
+import { completion, endpointURL, PROVIDERS } from './provider'
 import { parseResponse, parseSource } from './types'
 
 const original = globalThis.fetch
@@ -21,11 +21,17 @@ function response(chunks: string[], type = 'text/event-stream') {
   )
 }
 test('direct requests omit cookies, refuse redirects and keep the key out of the body', async () => {
+  let calls = 0
   globalThis.fetch = (async (url, options) => {
+    calls++
     expect(url).toBe('https://provider.example/v1/chat/completions')
     expect(options?.credentials).toBe('omit')
     expect(options?.redirect).toBe('error')
+    expect(options?.referrerPolicy).toBe('no-referrer')
     expect(options?.body).not.toContain(connection.key)
+    const body = JSON.parse(String(options?.body))
+    expect(body.model).toBe('test')
+    expect(body.stream).toBe(true)
     expect(new Headers(options?.headers).get('Authorization')).toBe(`Bearer ${connection.key}`)
     return response([
       'data: {"choices":[{"delta":{"content":"Hi"}}]}\r',
@@ -34,6 +40,7 @@ test('direct requests omit cookies, refuse redirects and keep the key out of the
     ])
   }) as typeof fetch
   expect(await completion(connection, messages, new AbortController().signal)).toBe('Hi')
+  expect(calls).toBe(1)
 })
 test('accepts a non-streaming compatible provider', async () => {
   globalThis.fetch = (async () =>
@@ -49,9 +56,25 @@ test('truncation and disconnected streams never become revisions', async () => {
     'before a complete response'
   )
 })
+test('refuses provider responses over the 2 MB size limit', async () => {
+  globalThis.fetch = (async () =>
+    response([
+      `data: {"choices":[{"delta":{"content":"${'x'.repeat(2_000_001)}"}}]}\n\n`,
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+    ])) as typeof fetch
+  await expect(completion(connection, messages, new AbortController().signal)).rejects.toThrow('size limit')
+})
 test('does not display provider error bodies containing credentials', async () => {
   globalThis.fetch = (async () => new Response(connection.key, { status: 401 })) as typeof fetch
   await expect(completion(connection, messages, new AbortController().signal)).rejects.toThrow('API key was rejected')
+  globalThis.fetch = (async () => new Response(connection.key, { status: 429 })) as typeof fetch
+  await expect(completion(connection, messages, new AbortController().signal)).rejects.toThrow(
+    'Provider rate limit reached; retry later'
+  )
+})
+test('OpenAI with gpt-6-luna is the default provider preset', () => {
+  expect(PROVIDERS[0]).toMatchObject({ id: 'openai', name: 'OpenAI', model: 'gpt-6-luna' })
+  expect(PROVIDERS.map((p) => p.id)).toEqual(['openai', 'openrouter', 'google', 'groq'])
 })
 test('endpoint credentials, fragments, queries and insecure transport are refused', () => {
   for (const url of [

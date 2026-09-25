@@ -66,9 +66,14 @@ try {
     window.__previewPost = __shell.contentWindow.postMessage.bind(__shell.contentWindow);
     __shell.contentWindow.postMessage = (message, origin) => { if (message.bundle) window.__lastPreview = structuredClone(message); __previewPost(message, origin) };
     window.__fetch = fetch.bind(window);
-    window.fetch = async (url, options) => {
-      if (String(url) === 'https://openrouter.ai/api/v1/chat/completions') {
-        __requests.push({body: JSON.parse(options.body), credentials: options.credentials, redirect: options.redirect});
+    window.fetch = async (input, options) => {
+      const request = input instanceof Request ? input : null;
+      const url = request ? request.url : String(input);
+      if (url === 'https://api.openai.com/v1/models') return new Response('{"data":[]}', {headers:{'Content-Type':'application/json'}});
+      if (url === 'https://api.openai.com/v1/chat/completions') {
+        const init = request ? request : (options ?? {});
+        const body = request ? await request.clone().text() : init.body;
+        __requests.push({body: JSON.parse(body), credentials: init.credentials, redirect: init.redirect});
         const text = window.__builderFixture; const encoder = new TextEncoder(); let index = 0;
         return new Response(new ReadableStream({pull(controller) {
           if (index >= text.length) { controller.enqueue(encoder.encode('data: '+JSON.stringify({choices:[{delta:{},finish_reason:'stop'}]})+'\\n\\ndata: [DONE]\\n\\n')); controller.close(); return }
@@ -76,7 +81,7 @@ try {
           controller.enqueue(encoder.encode('data: '+JSON.stringify({choices:[{delta:{content:part}}]})+'\\n\\n'))
         }}), {headers:{'Content-Type':'text/event-stream'}})
       }
-      return __fetch(url, options)
+      return __fetch(input, options)
     }; 'Fixture installed'`)
   fixture(changed)
   const initial = appSnapshot()
@@ -84,8 +89,15 @@ try {
   button('Start 25 minutes')
   browser('frame', 'main')
   button('Connection')
+  browser('wait', '--text', 'API key')
   browser('find', 'label', 'API key', 'fill', 'test-only-secret')
-  browser('find', 'label', 'Describe your app or ask for a change', 'fill', 'Add a five-minute preset')
+  browser(
+    'find',
+    'first',
+    'textarea[aria-label="Describe your app or ask for a change"]',
+    'fill',
+    'Add a five-minute preset'
+  )
   button('Build app ↗')
   browser('wait', '--text', changed.summary)
   assert(
@@ -93,8 +105,8 @@ try {
     'Simulator reloaded'
   )
   assert(
-    '__requests.length === 1 && !JSON.stringify(__requests).includes("test-only-secret")',
-    'Key entered request body or unexpected repair'
+    '__requests.length === 1 && __requests[0].body.model === "gpt-6-luna" && !JSON.stringify(__requests).includes("test-only-secret")',
+    'Key entered request body, wrong model or unexpected repair'
   )
   const updated = appSnapshot()
   if (
@@ -129,10 +141,19 @@ try {
   browser('frame', 'main')
   const invalid = { ...changed, files: { 'app.tsx': 'export default function App( {' } }
   fixture(invalid)
-  browser('find', 'label', 'Describe your app or ask for a change', 'fill', 'Broken compiler fixture')
-  button('Build app ↗')
+  browser(
+    'find',
+    'first',
+    'textarea[aria-label="Describe your app or ask for a change"]',
+    'fill',
+    'Broken compiler fixture'
+  )
+  button('Update app ↗')
   browser('wait', '--text', 'Could not update')
-  assert('__requests.length === 3', 'Repair did not stop after one extra request')
+  assert(
+    '__requests.length === 3 && __requests.every(r => r.body.model === "gpt-6-luna")',
+    'Repair did not stop after one extra request or used a wrong model'
+  )
   if (!appSnapshot().includes('Time to focus.')) throw new Error('Compiler failure replaced working preview')
   browser('frame', 'main')
   const broken = {
@@ -142,18 +163,24 @@ try {
     }
   }
   fixture(broken)
-  browser('find', 'label', 'Describe your app or ask for a change', 'fill', 'Startup failure fixture')
-  button('Build app ↗')
+  browser(
+    'find',
+    'first',
+    'textarea[aria-label="Describe your app or ask for a change"]',
+    'fill',
+    'Startup failure fixture'
+  )
+  button('Update app ↗')
   browser('wait', '--text', 'Could not update')
   const recovered = appSnapshot()
   if (!recovered.includes('Time to focus.') || !/2[0-4]:[0-5][0-9]/.test(recovered))
     throw new Error('Startup failure did not restore preview and data')
   browser('frame', 'main')
   evaluate(
-    `window.fetch = (url, options) => String(url).includes('/chat/completions') ? new Promise((resolve, reject) => { options.signal.addEventListener('abort', () => { window.__cancelled = true; reject(new DOMException('Stopped', 'AbortError')) }, {once:true}) }) : __fetch(url, options)`
+    `window.fetch = (input, options) => { const url = input instanceof Request ? input.url : String(input); const signal = input instanceof Request ? input.signal : options?.signal; return url.includes('/chat/completions') ? new Promise((resolve, reject) => { signal.addEventListener('abort', () => { window.__cancelled = true; reject(new DOMException('Stopped', 'AbortError')) }, {once:true}) }) : __fetch(input, options) }`
   )
-  browser('find', 'label', 'Describe your app or ask for a change', 'fill', 'Cancelled fixture')
-  button('Build app ↗')
+  browser('find', 'first', 'textarea[aria-label="Describe your app or ask for a change"]', 'fill', 'Cancelled fixture')
+  button('Update app ↗')
   browser('wait', '--text', 'Generating')
   button('Stop')
   browser('wait', '--text', 'Stopped')
@@ -178,10 +205,11 @@ try {
   browser('open', url)
   browser('wait', '--text', 'Ready')
   button('Connection')
+  browser('wait', '--text', 'API key')
   assert('document.querySelector("input[type=password]").value === ""', 'Key survived reload')
   assert('document.body.innerText.includes("Add a five-minute preset")', 'Conversation did not persist')
   console.log(
-    `PASS: browser compilation, streaming revision, timer continuity, folding, Undo, bounded repair, startup/data rollback, cancellation, integrity refusal, mobile, persistence and key omission. Screenshots: ${output}`
+    `PASS: AI SDK fixture requests (gpt-6-luna), browser compilation, streaming revision, timer continuity, folding, Undo, bounded repair, startup/data rollback, cancellation, integrity refusal, mobile, persistence and key omission. Screenshots: ${output}`
   )
 } catch (error) {
   browser('frame', 'main')

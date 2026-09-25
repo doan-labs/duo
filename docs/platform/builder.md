@@ -1,18 +1,20 @@
 # Browser app builder
 
-Status: upcoming. The builder workspace (`packages/web/src/builder`) stays in the tree
-but is not linked; `/build` and `/get-started` redirect to `/simulator`, the public page
-where visitors drive the phone directly. `/device/` remains the embedded shell. Local CLI
-authoring remains under `/docs/getting-started`. The rest of this page describes the
-parked workspace as built.
+Status: live at `/build`. The builder workspace (`packages/web/src/builder`) is a
+trusted browser page: describe an app and each revision compiles locally and runs on
+the real phone beside the chat. `/simulator` remains the standalone public page where
+a visitor drives the phone with nothing to configure, and `/get-started` redirects to
+`/build`. `/device/` remains the embedded shell. Local CLI authoring remains under
+`/docs/getting-started`.
 
 ## Credentials and requests
 
 The trusted chat page calls the selected HTTPS provider's Chat Completions endpoint
-directly, with bearer authorization, omitted cookies and refused redirects. There is
+directly, orchestrated by the Vercel AI SDK's OpenAI-compatible provider, with bearer
+authorization, omitted cookies and refused redirects. There is
 no AI server route. Providers must support browser CORS. Base URLs exclude credentials,
 queries and fragments. Changing the endpoint clears the key. The Connection panel offers
-OpenRouter, OpenAI, Google Gemini and Groq presets plus a custom base URL; while it is open
+OpenAI (the default, `gpt-6-luna`), OpenRouter, Google Gemini and Groq presets plus a custom base URL; while it is open
 it fetches the endpoint's `/models` list (with the key when one is entered) to fill a
 datalist for the model field. Manual model entry still works when that list is unavailable.
 

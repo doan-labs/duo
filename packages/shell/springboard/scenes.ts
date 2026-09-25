@@ -14,6 +14,7 @@ import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
 import { device, type Stage } from '../device.ts'
 import { store } from '../runtime/catalog.ts'
+import { deadViews, sessionRunning } from '../runtime/sessions.ts'
 import { type Box, type Side, settle, spot, zone, zoom } from './gestures.ts'
 import type { Open } from './tile.tsx'
 
@@ -95,9 +96,14 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (on.some((e) => !e.side)) return
     if (!side && on[0]) side = on[0].side === 'left' ? 'right' : 'left'
     if (on.some((e) => e.side === side)) return
-    // Already parked: the app comes back as it was, not as a second copy.
+    // Already parked: the app comes back as it was, not as a second copy. A
+    // parked shell whose session ended or whose view was revoked cannot be
+    // reused, so it goes instead.
     const kept = live.current.find((e) => e.parked && !e.leaving && same(e, a))
-    if (kept) return unpark(kept.id, side)
+    if (kept) {
+      if (!kept.a.id || (sessionRunning(kept.a.id) && !deadViews.has(kept.ctx))) return unpark(kept.id, side)
+      close(kept.id, [])
+    }
     const z = box(side)
     from ??= { x: z.x + z.w / 2 - 30, y: z.y + z.h / 2 - 30, w: 60, h: 60 }
     const id = ++seq
@@ -139,6 +145,14 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
   function unpark(id: number, side?: Side, anims?: Animation[] | ((el: HTMLElement) => Animation[])) {
     const e = live.current.find((x) => x.id === id && x.parked && !x.leaving)
     if (!e) return
+    // A parked sandboxed app whose session ended or whose view was revoked holds
+    // a dead view; the mounted component would never start a new session, so
+    // reopen it cold.
+    if (e.a.id && (!sessionRunning(e.a.id) || deadViews.has(e.ctx))) {
+      close(id, [])
+      open(e.a, e.from, e.ctx.arg, side)
+      return
+    }
     flushSync(() => setList(live.current.map((x) => (x === e ? { ...x, parked: false, side, used: Date.now() } : x))))
     const el = els.current.get(e.id)
     if (!el) return

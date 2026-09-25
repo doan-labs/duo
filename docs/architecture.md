@@ -104,7 +104,10 @@ and power; most radio/focus switches are visual state only.
 Each display has its own SpringBoard/scenes. The inner display holds at most two apps
 on the glass, split at a draggable divider (`split` in scenes.ts; a free half shows narrow
 home at the middle). Going Home parks a scene: mounted, hidden, listed by the app
-switcher (`springboard/switcher.tsx`), which transforms the live app elements into cards. `follow()` mirrors the active display without launch zoom.
+switcher (`springboard/switcher.tsx`), which transforms the live app elements into cards.
+A parked sandbox scene is reusable only while its runtime session still exists; a preview
+activation that revokes the session remounts that scene instead of reviving a dead view.
+`follow()` mirrors the active display without launch zoom.
 The lead changes at 40°; the cover takes the first split app and the inner split collapses
 to it. `goHome()` closes both. Baked apps share module state but retain local component
 state; sandbox views share only SDK state. Gesture scrubbing uses `swipe()`/`settle()`;
