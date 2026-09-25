@@ -599,6 +599,8 @@ const lead = () => follow(targetAngle > HANDOVER)
 pose = (m) => {
   if (typeof m.deg === 'number') setAngle(m.deg)
   if (typeof m.yaw === 'number') {
+    // A page turns the phone to face its reader, which only holds from the front: a new yaw brings the camera home.
+    homing ||= m.yaw !== targetYaw
     targetYaw = m.yaw
     hud.yaw(targetYaw)
   }
@@ -765,7 +767,8 @@ renderer.setAnimationLoop((now) => {
   bend.value = ((180 - angle) / 180) * Math.PI
   hinge.rotation.y = bend.value
   phone.rotation.y = yaw
-  setPose(yaw, angle)
+  // Facing you means facing the eye: a drag orbits the camera, not the phone, and still turns it as you see it.
+  setPose(yaw - controls.getAzimuthalAngle(), angle)
   hardware.tick(dt / 1000)
   const torch = toggles.torch && !device.off
   for (const m of led) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = torch ? 6 : 0

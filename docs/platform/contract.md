@@ -733,7 +733,7 @@ watches on the first listener and unwatches on the last. Types (`DeviceEvents` i
 | `volume` | `press`/`release` of `up` or `down` | Taken: no ringer step, HUD or Camera shutter |
 | `camera-control` | `press`/`release`, `slide` with `offset` cm since the press | Taken: Camera neither opens, shoots, records nor zooms |
 | `side` | `press`/`release` | Kept: sleep, wake, Wallet, Siri and power still run |
-| `orientation` | `{ yaw, hinge }` degrees, current value first | None; the simulated pose, rounded to 0.1° |
+| `orientation` | `{ yaw, hinge }` degrees, current value first | None; the simulated pose as seen from the camera (an orbit drag turns it), rounded to 0.1° |
 | `switches` | the Control Center `Switches`, current value first | None; read-only, no method writes them |
 
 A press goes to the first watching view, in watch order, whose `ViewInfo` is visible

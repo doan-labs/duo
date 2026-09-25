@@ -1604,3 +1604,7 @@ switches are read-only and the reader has to flip them in the phone.
 Only one frame renders, for the WebGL budget decision 76 set, and the page
 never hears anything until it asks, as with apps.
 
+`yaw` is measured from the eye, not the world: it is the phone's own turn less
+the camera's orbit azimuth. Dragging the phone orbits the camera, and to the
+person that is turning the phone, so an app hears it. Only the azimuth counts;
+tilting the camera up or down is not a turn about the long axis.

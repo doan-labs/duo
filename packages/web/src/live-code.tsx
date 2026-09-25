@@ -40,11 +40,12 @@ export function Readout({ children }: { children: ReactNode }) {
   )
 }
 
-export function Field({ k, v, wide = false }: { k: string; v: ReactNode; wide?: boolean }) {
+/** No `k` when the value names itself, as a row of labelled glyphs does. */
+export function Field({ k, v, wide = false }: { k?: string; v: ReactNode; wide?: boolean }) {
   return (
     <div {...stylex.props(styles.field, wide && styles.wide)}>
-      <dt {...stylex.props(styles.key)}>{k}</dt>
-      <dd {...stylex.props(styles.val)}>{v}</dd>
+      {k && <dt {...stylex.props(styles.key)}>{k}</dt>}
+      <dd {...stylex.props(styles.val, !!k && styles.valUnder)}>{v}</dd>
     </div>
   )
 }
@@ -138,11 +139,11 @@ const styles = stylex.create({
   key: { fontFamily: font.mono, fontSize: '11px', letterSpacing: '0.06em', color: color.text3 },
   val: {
     margin: 0,
-    marginTop: '6px',
     fontFamily: font.mono,
     fontSize: '15px',
     color: color.text,
     transitionProperty: 'color',
     transitionDuration: '0.35s'
-  }
+  },
+  valUnder: { marginTop: '6px' }
 })

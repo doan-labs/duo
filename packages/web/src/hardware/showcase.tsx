@@ -3,7 +3,6 @@
 // embed-device.ts), so each readout is the payload itself, not a mock of it.
 // The chapter in the middle of the screen poses the phone to show its buttons.
 import type { DeviceEvent, DeviceEvents, Switches } from '@doan-labs/duo-sdk'
-import { Sym, type SymProps } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
 import { type ReactNode, useEffect, useReducer, useRef, useState } from 'react'
 import { Block, Cap, Headline, Lede, TextLink } from '../home/parts'
@@ -12,6 +11,9 @@ import { Segmented } from '../segmented'
 import { type Cue, type Heard, Simulator } from '../simulator'
 import { color, ease, font, radius } from '../tokens.stylex'
 import { PoseDial } from './pose-dial'
+import { SwitchTiles } from './switch-tiles'
+import { Viewfinder } from './viewfinder'
+import { Score, VolumeKeys } from './volume-keys'
 
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
@@ -166,7 +168,7 @@ const CHAPTERS: Chapter[] = [
       '})'
     ],
     runs: (l) => (l.last.orientation ? (l.last.orientation.hinge < 120 ? 2 : 1) : undefined),
-    how: 'Turn it or fold it with the controls below. The shell eases there, and every step of the ease is an event.'
+    how: 'Drag the phone to turn it, or use the controls above. Every step of the ease is an event.'
   },
   {
     type: 'switches',
@@ -199,23 +201,6 @@ const HINGES = [
   { value: 110, label: 'Tent' },
   { value: 0, label: 'Closed' }
 ]
-const sym = (name: SymProps['name']) => () => <Sym name={name} size={17} />
-// Control Center's own glyphs, so a tile here is the tile you tap in the phone. The kit's
-// `bluetooth` symbol is AirDrop's; the Bluetooth rune is drawn, as control-center.tsx does.
-const SWITCHES: [keyof Switches, string, (on: boolean) => ReactNode][] = [
-  ['airplane', 'Airplane Mode', sym('airplane')],
-  ['cell', 'Cellular', sym('antenna')],
-  ['wifi', 'Wi-Fi', sym('wifi')],
-  ['bt', 'Bluetooth', () => <Rune />],
-  ['drop', 'AirDrop', sym('bluetooth')],
-  ['hotspot', 'Personal Hotspot', sym('iphone')],
-  ['rotate', 'Rotation Lock', sym('lock')],
-  ['mirror', 'Screen Mirroring', sym('tabs')],
-  ['focus', 'Focus', sym('moon')],
-  ['torch', 'Torch', (on) => <Sym name={on ? 'torchOn' : 'torchOff'} size={17} />],
-  ['darkMode', 'Dark Mode', sym('moonStars')]
-]
-
 export function Showcase() {
   const [live, dispatch] = useReducer(hear, START)
   const [active, setActive] = useState<DeviceEvent>('volume')
@@ -311,9 +296,9 @@ function Values({ type, live, onPull }: { type: DeviceEvent; live: Live; onPull:
   if (type === 'volume') {
     return (
       <Readout>
+        <Field k="e.button" v={<VolumeKeys e={last.volume} />} />
         <Field k="e.action" v={q(last.volume?.action)} />
-        <Field k="e.button" v={q(last.volume?.button)} />
-        <Field k="score" v={String(live.score)} wide />
+        <Field k="score" v={<Score score={live.score} up={last.volume && last.volume.button === 'up'} />} wide />
       </Readout>
     )
   }
@@ -325,9 +310,10 @@ function Values({ type, live, onPull }: { type: DeviceEvent; live: Live; onPull:
         <Field k="e.offset" v={e?.action === 'slide' ? `${e.offset.toFixed(2)} cm` : '-'} />
         <Field
           k="zoom"
-          v={<Meter value={Math.min(1, Math.max(0, (live.zoom - 1) / 4))} label={`${live.zoom.toFixed(2)}×`} />}
+          v={<Viewfinder zoom={live.zoom} focusing={!!e && e.action !== 'release'} shots={live.shots} />}
+          wide
         />
-        <Field k="shots" v={String(live.shots)} />
+        <Field k="shots" v={String(live.shots)} wide />
       </Readout>
     )
   }
@@ -353,25 +339,7 @@ function Values({ type, live, onPull }: { type: DeviceEvent; live: Live; onPull:
   const s = last.switches
   return (
     <Readout>
-      <Field
-        k="s"
-        wide
-        v={
-          <span {...stylex.props(styles.pills)}>
-            {SWITCHES.map(([k, label, glyph]) => (
-              <span
-                key={k}
-                role="img"
-                aria-label={`${label}: ${s?.[k] ? 'on' : 'off'}`}
-                title={label}
-                {...stylex.props(styles.pill, s?.[k] && styles.pillOn)}
-              >
-                {glyph(!!s?.[k])}
-              </span>
-            ))}
-          </span>
-        }
-      />
+      <Field v={<SwitchTiles s={s} />} wide />
       <Field
         k="show"
         wide
@@ -404,33 +372,6 @@ function Log({ entries }: { entries: { n: number; text: string }[] }) {
     </ol>
   )
 }
-
-function Meter({ value, label }: { value: number; label: string }) {
-  return (
-    <span {...stylex.props(styles.meter)}>
-      <span {...stylex.props(styles.track)}>
-        <span {...stylex.props(styles.fill, styles.fillTo(value))} />
-      </span>
-      {label}
-    </span>
-  )
-}
-
-const Rune = () => (
-  <svg
-    viewBox="0 0 24 24"
-    width={17}
-    height={17}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9" />
-  </svg>
-)
 
 function Kbd({ children }: { children: ReactNode }) {
   return <kbd {...stylex.props(styles.kbd)}>{children}</kbd>
@@ -539,21 +480,6 @@ const styles = stylex.create({
     borderRadius: radius.sm,
     color: color.text2
   },
-  pills: { display: 'flex', flexWrap: 'wrap', gap: '7px' },
-  pill: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '34px',
-    height: '34px',
-    borderRadius: radius.pill,
-    backgroundColor: color.well,
-    color: color.text3,
-    transitionProperty: 'background-color, color',
-    transitionDuration: '0.3s',
-    transitionTimingFunction: ease.out
-  },
-  pillOn: { backgroundColor: color.accent, color: color.onAccent },
   split: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' },
   button: {
     fontFamily: font.sans,
@@ -576,22 +502,5 @@ const styles = stylex.create({
     outlineWidth: '2px',
     outlineOffset: '2px'
   },
-  meter: { display: 'flex', alignItems: 'center', gap: '10px' },
-  track: {
-    flexGrow: 1,
-    height: '4px',
-    borderRadius: radius.pill,
-    backgroundColor: color.well,
-    overflow: 'hidden'
-  },
-  fill: {
-    display: 'block',
-    height: '100%',
-    backgroundColor: color.accent,
-    transformOrigin: 'left',
-    transitionProperty: 'transform',
-    transitionDuration: '0.12s'
-  },
-  fillTo: (v: number) => ({ transform: `scaleX(${v})` }),
   end: { marginTop: '24px', marginBottom: 0, fontSize: '16px', lineHeight: 1.55, color: color.text2 }
 })

@@ -297,7 +297,9 @@ bun run api            # only the TSDoc reference
   element that carries only `style`.
 - The embedded shell is driven over the bridge in `packages/shell/main.ts`:
   `?bg=` at load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage from
-  the same origin: `paused` parks the render loop while the frame is off screen,
+  the same origin: a `yaw` that differs from the current one also eases the
+  camera home, since a page poses the phone as its reader sees it and an orbit
+  drag would otherwise leave it showing its back; `paused` parks the render loop while the frame is off screen,
   `app` clears the stage and launches an app by home screen name (empty string
   is Home; `arg` reaches it as `os.arg`, so `app: 'App Store'` plus a catalog id
   opens that app's page in the Store), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
