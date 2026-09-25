@@ -11,6 +11,8 @@ type Props = {
   /** Live geocoder hits for the query; local catalogue matches lead. */
   results: Place[]
   searching: boolean
+  /** The geocoder answered with an error rather than a list. */
+  failed: boolean
   recents: Recent[]
   onClear: () => void
   /** Folded, this content is the bottom sheet, which has no collapse control. */
@@ -25,6 +27,7 @@ export function Sidebar({
   onQuery,
   results,
   searching,
+  failed,
   recents,
   onClear,
   sheet,
@@ -75,7 +78,10 @@ export function Sidebar({
           <>
             {found.map((p) => row(p, p.kind))}
             {searching && <div {...stylex.props(styles.note, styles.searching)}>Searching…</div>}
-            {!searching && !found.length && <div {...stylex.props(styles.empty)}>No results for “{query.trim()}”</div>}
+            {!searching && failed && <div {...stylex.props(styles.empty)}>Search isn’t available right now.</div>}
+            {!searching && !failed && !found.length && (
+              <div {...stylex.props(styles.empty)}>No results for “{query.trim()}”</div>
+            )}
           </>
         ) : (
           <>

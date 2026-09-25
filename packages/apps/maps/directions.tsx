@@ -64,10 +64,12 @@ export function Directions({ to, origin, mode, onMode, routes, active, onPick, e
           </div>
         </div>
 
-        {error || routes?.length === 0 ? (
+        {error ? (
           <div {...stylex.props(styles.dirNote)}>Directions aren’t available right now.</div>
         ) : !routes ? (
           <div {...stylex.props(styles.dirNote)}>Finding the best route…</div>
+        ) : routes.length === 0 ? (
+          <div {...stylex.props(styles.dirNote)}>No route between these places.</div>
         ) : (
           <>
             {(routes.length > 1 ? routes : []).map((r, i) => (
