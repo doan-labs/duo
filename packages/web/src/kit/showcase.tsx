@@ -9,6 +9,7 @@ import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { type ComponentType, useState } from 'react'
 import { CURVE } from '../motion'
+import { useDark } from '../theme'
 import { color, dark, ease, font, light, radius } from '../tokens.stylex'
 import { kit } from './data'
 import Activity from './scenes/activity'
@@ -33,7 +34,7 @@ type Tile = {
   uses: string[]
   Scene: ComponentType
   shape: Shape
-  /** The scene draws on black, so the caption above it does too. */
+  /** The scene draws on black in both appearances, so the caption above it does too. */
   night?: boolean
 }
 
@@ -81,11 +82,14 @@ function Card({ tile, delay }: { tile: Tile; delay: number }) {
   const still = useReducedMotion() ?? false
   const [seen, setSeen] = useState(false)
   const { Scene } = tile
+  const page = useDark()
+  // A `night` tile is dark in either appearance; the rest take the page's, so a
+  // dark page makes every tile a night one. The caption is ink on the tile's
+  // own ground, so it takes the theme that ground is in.
+  const night = tile.night || page
   return (
     <motion.li
-      // The caption takes the site theme of the ground it is printed on, not the
-      // page's: a grey tile keeps dark ink when the site itself is dark.
-      {...stylex.props(tile.night ? dark : light, styles.card, styles[tile.shape], tile.night && styles.night)}
+      {...stylex.props(night ? dark : light, styles.card, styles[tile.shape], night && styles.night)}
       initial={{ opacity: 0, y: 28, scale: 0.98 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={SEEN}
@@ -109,7 +113,7 @@ function Card({ tile, delay }: { tile: Tile; delay: number }) {
         </p>
         <h3 {...stylex.props(styles.title)}>{tile.title}</h3>
       </header>
-      <div data-kit-frame="" {...stylex.props(tile.night ? kitDark : kitLight, styles.scene)}>
+      <div data-kit-frame="" {...stylex.props(night ? kitDark : kitLight, styles.scene)}>
         {seen && <Scene />}
       </div>
     </motion.li>

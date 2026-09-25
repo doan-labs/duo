@@ -3,6 +3,7 @@
 // flash, and the toggle in the nav flips it at runtime.
 import * as stylex from '@stylexjs/stylex'
 import { useSyncExternalStore } from 'react'
+import { useMedia } from './media'
 import { type color, dark, light } from './tokens.stylex'
 
 export type Theme = 'system' | 'light' | 'dark'
@@ -41,4 +42,15 @@ export function useTheme(): Theme {
     read,
     () => 'system'
   )
+}
+
+/**
+ * The appearance the page is actually in: the saved pick when there is one,
+ * else the system's. Use this where a subtree carries its own second theme
+ * (the kit's `app` colours) that CSS cannot reach through `color`.
+ */
+export function useDark(): boolean {
+  const theme = useTheme()
+  const system = useMedia('(prefers-color-scheme: dark)')
+  return theme === 'dark' || (theme === 'system' && system)
 }
