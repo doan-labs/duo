@@ -1,0 +1,11 @@
+{
+  "id": "com.mnismt.duo.wordlemini",
+  "name": "Wordle Mini",
+  "version": "1.1.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "mnismt",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
+  "license": "MIT"
+}

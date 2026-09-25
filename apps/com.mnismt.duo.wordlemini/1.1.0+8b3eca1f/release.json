@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.wordlemini",
+    "name": "Wordle Mini",
+    "version": "1.1.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-09-25T02:24:24.143Z",
+    "commit": "7b13c316ac9ddfd667dbf6a6268940be3db4f618",
+    "hash": "8b3eca1f"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 280699,
+      "sha256": "0ef363ea5a2c7cbf0f6b036f543f9c711d162c78d42d3b871648e232efb9a6d1"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 735509,
+      "sha256": "65200da0bb2321d26bb0b456e9bf68c0ac1e8b8f867c28375be800a4462bff3f"
+    }
+  ]
+}

@@ -195,6 +195,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
       "releases": [
         {
+          "release": "1.1.0+8b3eca1f",
+          "sdk": "0.0.0",
+          "bytes": 280699,
+          "sha256": "176c415f0543142a165eaef92616a18b46df4c7369a85c21f96b5245af5f0c9e"
+        },
+        {
           "release": "1.0.1+39867db4",
           "sdk": "0.0.0",
           "bytes": 260495,
