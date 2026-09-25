@@ -21,7 +21,7 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { daysLeft, type Folder, longStamp, type Note, type TextStyle, textOf, uid } from './data.ts'
+import { daysLeft, type Folder, longStamp, type Note, recovered, type TextStyle, textOf, uid } from './data.ts'
 import { Editor, type EditorApi, type EditState } from './doc.tsx'
 import { type Stroke, useDoc, useFolders, useMarkup, useNotes } from './store.ts'
 
@@ -180,7 +180,7 @@ function NoteBody({
 
   const menu: MenuEntry[] = isDeleted
     ? [
-        { label: 'Recover', icon: 'undo', onSelect: () => putNote({ ...note, deleted: undefined }) },
+        { label: 'Recover', icon: 'undo', onSelect: () => putNote(recovered(note, folders)) },
         { label: 'Delete', icon: 'trash', onSelect: () => trash(note) }
       ]
     : [
@@ -205,6 +205,11 @@ function NoteBody({
       ]
 
   const aaMenu: MenuEntry[] = [
+    { label: 'Bold', checked: edit.b, onSelect: () => api.current?.inline('bold') },
+    { label: 'Italic', checked: edit.i, onSelect: () => api.current?.inline('italic') },
+    { label: 'Underline', checked: edit.u, onSelect: () => api.current?.inline('underline') },
+    { label: 'Strikethrough', checked: edit.strike, onSelect: () => api.current?.inline('strikeThrough') },
+    'separator',
     ...(
       [
         ['title', 'Title'],
@@ -319,7 +324,7 @@ function NoteBody({
   return (
     <div {...stylex.props(styles.pane, shared.swap)}>
       {wide && tools}
-      {isDeleted && <DeletedBar note={note} onRecover={() => putNote({ ...note, deleted: undefined })} />}
+      {isDeleted && <DeletedBar note={note} onRecover={() => putNote(recovered(note, folders))} />}
       {finding && (
         <div {...stylex.props(styles.findBar, animations.row)}>
           <Sym name="search" size={13} />

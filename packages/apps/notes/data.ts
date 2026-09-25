@@ -215,6 +215,13 @@ export const groupDeleted = (notes: Note[]) =>
     notes: notes.filter((n) => daysLeft(n) === days)
   }))
 
+/** Recovering keeps the note's folder only when that folder still exists. */
+export const recovered = (note: Note, folders: Folder[]): Note => ({
+  ...note,
+  deleted: undefined,
+  folder: folders.some((f) => f.id === note.folder) ? note.folder : undefined
+})
+
 export type Sort = 'edited' | 'created' | 'title'
 export const SORTS: [Sort, string][] = [
   ['edited', 'Date Edited'],

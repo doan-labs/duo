@@ -21,7 +21,7 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useMemo, useState } from 'react'
-import { group, groupDeleted, hasAttachment, type Note, parse, previewOf, sorted, stamp } from './data.ts'
+import { group, groupDeleted, hasAttachment, type Note, parse, previewOf, recovered, sorted, stamp } from './data.ts'
 import { MoveSheet } from './editor.tsx'
 import { ClipGlyph } from './glyphs.tsx'
 import { type Dest, useFolders, useNotes, useSort, useView } from './store.ts'
@@ -116,7 +116,7 @@ function useNoteMenu(note: Note) {
   const [moving, setMoving] = useState(false)
   const items: MenuEntry[] = note.deleted
     ? [
-        { label: 'Recover', icon: 'undo', onSelect: () => put({ ...note, deleted: undefined }) },
+        { label: 'Recover', icon: 'undo', onSelect: () => put(recovered(note, folders)) },
         { label: 'Delete', icon: 'trash', onSelect: () => remove(note) }
       ]
     : [
