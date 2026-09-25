@@ -458,7 +458,15 @@ export const appAppearance = stylex.defineConsts({
   /** Keeps card text readable over artwork at the bottom edge of hero tiles. */
   musicShade: 'linear-gradient(180deg,rgba(0,0,0,0) 34%,rgba(0,0,0,.62) 100%)',
   // news
+  /** The Apple News brand red: the selected section, follow pills and the save mark. */
+  newsAccent: '#fa2d55',
+  /** The accent's rest fill: a follow chip's back, a selected pill's tint. */
+  newsAccentSoft: 'rgba(250,45,85,.12)',
   newsHairline: 'rgba(60,60,67,.12)',
+  /** Sidebar and tab bar: glass the feed shows through, not paper. */
+  newsPanel: 'rgba(255,255,255,.62)',
+  /** Bottom scrim so the kicker and title read over a story's generated artwork. */
+  newsShade: 'linear-gradient(180deg,rgba(0,0,0,0) 36%,rgba(0,0,0,.6) 100%)',
   // notes
   notesMuted: '#c8c9cd',
   notesRed: '#e8453c',
