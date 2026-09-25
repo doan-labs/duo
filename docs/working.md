@@ -66,6 +66,10 @@ that lays scenes out through `ctl.els` (the switcher) must do so from a passive 
 the shell re-creates the scenes' ref callbacks every render, so React empties the map in
 the mutation phase and refills it in the layout phase, after a child's layout effect.
 
+Preview replacement closes a sandbox session while its park animation may still be
+settling, so `scenes.ts` checks `sessionRunning()` and `deadViews` before unparking and
+cold-opens when either says the parked view is gone; do not key this on animation timing.
+
 The active display changes at 40°. Ordinary folding keeps the existing views; split
 collapse replaces the inner half view. Camera gestures and clicks use screen-space
 coordinates, so zoom affects gesture distances. See [architecture](architecture.md#state-and-folding).

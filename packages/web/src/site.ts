@@ -22,8 +22,8 @@ export const NAV = [
   { to: '/kit', label: 'UI kit', icon: 'M2.5 2.5h8v8h-8zM5.5 5.5h8v8h-8' },
   { to: '/docs', label: 'Docs', icon: 'M4 1.75h5.5L13 5.25v9H4zM9.5 1.75v3.5H13M6.25 8.5h3.5M6.25 11h3.5' },
   {
-    to: '/simulator',
-    label: 'Simulator',
+    to: '/build',
+    label: 'Build',
     icon: 'M4.75 1.75h6.5a1 1 0 0 1 1 1v10.5a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1V2.75a1 1 0 0 1 1-1zM6.75 3.5h2.5',
     highlight: true
   }

@@ -9,7 +9,7 @@ import { development } from './development.ts'
 import { observeDisplay, viewInfo } from './display.ts'
 import { restore } from './lifecycle.ts'
 import { previewState } from './preview-events.ts'
-import { closeSession, session } from './sessions.ts'
+import { closeSession, deadViews, session } from './sessions.ts'
 
 export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: boolean; side?: 'left' | 'right' }) {
   const root = useRef<HTMLDivElement>(null)
@@ -21,6 +21,7 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
   placement.current = side
   useEffect(() => {
     let disposed = false
+    deadViews.delete(os)
     setError(false)
     setStatus('Connecting…')
     const refresh = () => {
@@ -45,6 +46,7 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
               if (app) os.open(app.id ?? app.name, arg)
             },
             state: (state, message) => {
+              if (state === 'revoked') deadViews.add(os)
               if (disposed) return
               previewState(id, app.bundle.release.build.hash, state, message)
               setError(state === 'revoked')
@@ -55,6 +57,7 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
         )
       })
       .catch((e) => {
+        deadViews.add(os)
         previewState(id, '', 'revoked', String(e.message))
         if (!disposed) {
           setError(true)

@@ -49,6 +49,15 @@ export type Display = {
 export type Stage = { name: string; side?: 'left' | 'right' }[]
 const displays: Display[] = []
 const inUse = () => displays.find((d) => d.wide === active.wide) ?? displays[0]!
+// An open that beats the displays booting (a builder preview apply arrives with
+// the module, os.tsx mounts them once the registry is in) replays when the active
+// one attaches, the same way `late` poses do in main.ts.
+const pending: { name: string; arg?: string }[] = []
+function flushPending() {
+  const d = displays.find((display) => display.wide === active.wide)
+  if (!d) return
+  for (const request of pending.splice(0)) d.launch(request.name, request.arg)
+}
 /** The displays have booted (os.tsx renders them once the registry is in); before that there is nothing to launch on. */
 export const booted = () => displays.length > 0
 /** An app is up somewhere, so the baked home screen is not what the device is doing. */
@@ -63,6 +72,7 @@ export const busy = () => displays.some((d) => d.covered())
  */
 export function follow(wide: boolean) {
   active.wide = wide
+  flushPending()
   const lead = displays.find((d) => d.wide === wide)
   const other = displays.find((d) => d.wide !== wide)
   if (!lead || !other) return
@@ -110,7 +120,14 @@ export const device = {
     else device.sleep()
   },
   /** An app by name on the display in use; `arg` reaches it as `os.arg`. The embed bridge in main.ts uses this. */
-  open: (name: string, arg?: string) => inUse().launch(name, arg),
+  open: (name: string, arg?: string) => {
+    const d = displays.find((display) => display.wide === active.wide)
+    if (!d) {
+      pending.push({ name, arg })
+      return
+    }
+    d.launch(name, arg)
+  },
   siri: () => inUse().launch('Siri'),
   wallet: () => {
     for (const claim of sideClaims) if (claim()) return
@@ -164,6 +181,7 @@ export function addDisplay(
   for (const f of hooks.home) homes.push(f)
   locks.push(hooks.lock)
   unlocks.push(hooks.unlock)
+  flushPending()
   return () => {
     pull(displays, d)
     for (const f of hooks.home) pull(homes, f)

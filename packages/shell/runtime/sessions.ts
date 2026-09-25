@@ -168,6 +168,10 @@ export class Session {
   }
 }
 const sessions = new Map<string, Promise<Session>>()
+/** True while a session for `id` is open or opening; `end` removes the entry. */
+export const sessionRunning = (id: string) => sessions.has(id)
+/** Scene contexts whose sandbox view was revoked; they must never be unparked back live. */
+export const deadViews = new WeakSet<object>()
 export async function closeSession(id: string) {
   const current = await sessions.get(id)
   if (current) {
