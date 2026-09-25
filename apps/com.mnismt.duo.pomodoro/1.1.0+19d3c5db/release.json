@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.pomodoro",
+    "name": "Pomo Timer",
+    "version": "1.1.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "mnismt",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pomodoro-timer",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-09-25T02:01:00.829Z",
+    "commit": "04ca47b86bf005dabac814b29de26a3a332c7c99",
+    "hash": "19d3c5db"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 266857,
+      "sha256": "aea7e9567866af21c5dc5bedf1c217847a42c337299c006d73cd9a16e2ddc049"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 940774,
+      "sha256": "65de11088b3d228840b4bef088e6f592b3296452df8f73cbdf05ea927c3199fc"
+    }
+  ]
+}

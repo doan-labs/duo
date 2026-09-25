@@ -117,6 +117,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pomodoro-timer",
       "releases": [
         {
+          "release": "1.1.0+19d3c5db",
+          "sdk": "0.0.0",
+          "bytes": 266857,
+          "sha256": "66513f9065d9ba3ae8b7bb5d551e9f32ac78f0e63338d608867a2a27ee6b9101"
+        },
+        {
           "release": "1.0.1+c6106bf5",
           "sdk": "0.0.0",
           "bytes": 255126,
