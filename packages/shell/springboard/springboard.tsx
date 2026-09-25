@@ -43,9 +43,9 @@ import { Switcher } from './switcher.tsx'
 import { Flash, Thumbs, TorchHud, useScreenshot, useVolumeHud, Veil, VolumeHud } from './system-hud.tsx'
 import { useWallpaper } from './wallpaper.ts'
 
-export type SpringBoardProps = { w: number; hgt: number; boot?: string | null; shots: string[] }
+export type SpringBoardProps = { w: number; hgt: number; boot?: string | null; arg?: string | null; shots: string[] }
 
-export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
+export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   // Folded, the cover display shows the left half of both the grid and the
   // wallpaper, so the picture does not jump when the hinge closes.
   const wide = w > 600
@@ -247,7 +247,7 @@ export function SpringBoard({ w, hgt, boot, shots }: SpringBoardProps) {
     }
     const detach = addDisplay(d, { home: [() => setSwitcher(false), parkAll, ccClose], lock, unlock })
     const first = boot && byName(boot)
-    if (first) open(first)
+    if (first) open(first, undefined, arg ?? undefined)
     return detach
   }, [])
 
