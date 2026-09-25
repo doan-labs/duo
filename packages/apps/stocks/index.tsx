@@ -343,7 +343,7 @@ function Detail({ item, showNews, live }: { item: Item; showNews?: boolean; live
         </div>
       )}
       {ranges.length > 0 && (
-        <div {...stylex.props(styles.chartWrap)} onPointerUp={() => setHover(null)}>
+        <div {...stylex.props(styles.chartWrap)}>
           {live ? (
             <Live pts={pts} px={q?.px} prev={q?.stats.prev} loading={entry.loading} onHover={setHover} />
           ) : (
