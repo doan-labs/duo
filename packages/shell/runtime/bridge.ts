@@ -6,6 +6,7 @@ import { type Change, LIMITS, PROTOCOL, type Req, type Res, type ViewInfo } from
 import { claimSide } from '../device.ts'
 import { authority, broadcast, put, transaction } from './database.ts'
 import { deviceEvents } from './device-events.ts'
+import { clearNotices, postNotice } from './notifications.ts'
 import { photoService } from './photos.ts'
 import type { Session, SessionView } from './sessions.ts'
 import { snapshot, storage } from './storage.ts'
@@ -172,6 +173,13 @@ export function launchFrame(
       if (!deviceEventName(p.type)) throw new PlatformError('E_ARGS')
       if (req.m === 'device.unwatch') return { value: hardware.unwatch(p.type) }
       return { value: hardware.watch(p.type) }
+    }
+    // Ungated like `open` and `home`: any view may post; the hidden copy never
+    // invokes it, and an E_STALE would silently drop a notice the user caused.
+    if (req.m === 'notify.post') return { value: postNotice(session.app.id, session.bundle.release.manifest.name, p) }
+    if (req.m === 'notify.clear') {
+      clearNotices(session.app.id, typeof p.id === 'string' ? p.id : undefined)
+      return {}
     }
     throw new PlatformError('E_ARGS')
   }

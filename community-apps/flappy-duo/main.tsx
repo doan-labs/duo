@@ -4,7 +4,6 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { cue } from './audio.ts'
-import { AVATARS } from './avatars.ts'
 import {
   FLOOR_ROASTS,
   has,
@@ -21,7 +20,6 @@ import { drawOverlay, drawWorld } from './draw.ts'
 import { styles } from './styles.ts'
 import { flap, newWorld, step } from './world.ts'
 
-type Notice = { title: string; text: string }
 function Game() {
   const view = useDisplay()
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -35,7 +33,6 @@ function Game() {
   const [roast, setRoast] = useState('')
   const [pay, setPay] = useState<'sheet' | 'processing' | 'done' | 'leaving' | null>(null)
   const onPay = useRef(() => {})
-  const [notice, setNotice] = useState<Notice | null>(null)
   const cover = view.display === 'cover'
   const width = view.width || 740
   const height = view.height || 480
@@ -60,12 +57,6 @@ function Game() {
       })
       .catch(() => {})
   }, [best, spent])
-
-  useEffect(() => {
-    if (!notice) return
-    const id = window.setTimeout(() => setNotice(null), 3400)
-    return () => window.clearTimeout(id)
-  }, [notice])
 
   const doFlap = () => {
     if (world.current.status === 'over') return
@@ -100,7 +91,8 @@ function Game() {
     window.setTimeout(() => setPay('leaving'), 2500)
     window.setTimeout(() => {
       setPay(null)
-      if (receipt) setNotice(receipt)
+      // A real OS notification: banner over the display, then Notification Center.
+      if (receipt) void os.notify.post({ title: receipt.title, body: receipt.text }).catch(() => {})
       reset()
     }, 2850)
   }
@@ -359,16 +351,6 @@ function Game() {
           </section>
           {pay === 'sheet' && <div aria-hidden="true" {...stylex.props(styles.sideGlow)} />}
         </>
-      )}
-      {notice && (
-        <div role="status" {...stylex.props(styles.notice, cover && styles.noticeCover)}>
-          <img src={AVATARS[notice.title]} alt="" {...stylex.props(styles.noticeIcon)} />
-          <div {...stylex.props(styles.noticeText)}>
-            <strong>{notice.title}</strong>
-            <span>{notice.text}</span>
-          </div>
-          <span {...stylex.props(styles.noticeTime)}>now</span>
-        </div>
       )}
     </main>
   )

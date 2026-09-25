@@ -70,6 +70,10 @@ Each iframe is a separate document. Share persistence through `os.storage`, navi
 through `os.session`, and nonowner intent through acknowledged commands. Ownership is
 sticky across folding; it does not follow the active display. Apps remain responsible
 for idempotent effects and cleanup. `os.open` uses app ids; Escape is forwarded by the SDK.
+`os.notify.post({ title, body, arg })` posts an OS notification: a banner over
+whatever is showing, then a card in Notification Center on the lock screen. A tap
+unlocks and opens the app with `arg`; `os.notify.clear(id?)` removes this app's
+own cards. See [the contract](contract.md) §3.9.
 
 ## Install and update
 

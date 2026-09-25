@@ -29,12 +29,14 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
 import { addDisplay, type Display, device, lockState, unlockAll } from '../device.ts'
+import type { Posted } from '../runtime/notifications.ts'
 import { Sandbox } from '../runtime/sandbox.tsx'
 import { ControlCenter } from './control-center.tsx'
 import { settle, swipe } from './gestures.ts'
 import { type Drop, HomeBar, HomeBars } from './home-bar.tsx'
 import { HomeScreen } from './home-screen.tsx'
 import { LockScreen } from './lock-screen.tsx'
+import { NoticeBanner } from './notifications.tsx'
 import { BOOT_FADE_MS, BOOT_MS, BootScreen, PowerSheet } from './power.tsx'
 import { useScenes } from './scenes.ts'
 import { Spotlight } from './spotlight.tsx'
@@ -154,6 +156,12 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
       setBooting('leaving')
       setTimeout(() => setBooting(false), BOOT_FADE_MS)
     }, BOOT_MS)
+  }
+
+  /** A notification tap: the device unlocks, the app opens with the deep link. */
+  const openNotice = (n: Posted) => {
+    unlockAll()
+    launch(n.app, n.arg)
   }
 
   const cur = scenes.filter((e) => !e.leaving && !e.parked)
@@ -338,6 +346,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
               })
             }
             onCamera={(el) => open(byName('Camera')!, at(el))}
+            onOpenNotice={openNotice}
           />
         )}
 
@@ -395,6 +404,9 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
             </div>
           )
         })}
+
+        {/* Over apps, lock and Spotlight, under the system HUDs: iOS's order. */}
+        <NoticeBanner onOpen={openNotice} />
 
         <VolumeHud wide={wide} on={vol.on} level={vol.level} />
         <Flash on={flash} />

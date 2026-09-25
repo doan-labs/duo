@@ -48,6 +48,12 @@ and `camera-control` (taken from the system while a visible, active view listens
 `side` (heard, never taken), and the states `orientation` (`{ yaw, hinge }`) and read-only
 `switches`, which deliver their current value first. Only watched types cross the bridge.
 
+`os.notify.post({ title, body, arg })` posts an OS notification, ungated like
+`os.open`: a banner over whatever is showing, then a card in Notification Center
+on the lock screen. A tap unlocks and opens the app with `arg`, delivered to a
+running session like a launch arg. `os.notify.clear(id?)` removes this app's own
+cards. The center is in-memory; a reload clears it.
+
 Camera/microphone declarations are rejected and frame policy always denies
 them. Other permission adapters remain, but external developer catalogs accept
 no device permissions at the MVP gate. This is not a claim of full browser or

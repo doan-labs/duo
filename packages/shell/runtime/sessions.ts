@@ -168,6 +168,15 @@ export class Session {
   }
 }
 const sessions = new Map<string, Promise<Session>>()
+/**
+ * An arg for an app already running, parked or on stage: delivered like the
+ * launch arg, without opening a session that does not exist (a notification's
+ * deep link into a parked scene).
+ */
+export async function deliverArg(id: string, arg: string) {
+  const current = await sessions.get(id)
+  current?.setArg(arg)
+}
 export async function closeSession(id: string) {
   const current = await sessions.get(id)
   if (current) {

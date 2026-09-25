@@ -3,7 +3,6 @@ import * as stylex from '@stylexjs/stylex'
 
 const pulse = stylex.keyframes({ '0%': { opacity: 0.6 }, '50%': { opacity: 1 }, '100%': { opacity: 0.6 } })
 const rise = stylex.keyframes({ from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } })
-const drop = stylex.keyframes({ from: { transform: 'translateY(-140%)' }, to: { transform: 'translateY(0)' } })
 const breathe = stylex.keyframes({
   '0%': { transform: 'scale(1)' },
   '50%': { transform: 'scale(1.1)' },
@@ -297,37 +296,5 @@ export const styles = stylex.create({
     animationDuration: '1.3s',
     animationIterationCount: 'infinite',
     animationTimingFunction: 'ease-in-out'
-  },
-  // ---- the notification after paying ----
-  notice: {
-    position: 'absolute',
-    top: 10,
-    insetInline: 0,
-    marginInline: 'auto',
-    width: 'min(92%, 380px)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    paddingBlock: 10,
-    paddingInline: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,.94)',
-    color: '#0b1a3a',
-    fontSize: 13,
-    boxShadow: '0 10px 30px rgba(20,60,120,.3)',
-    animationName: drop,
-    animationDuration: '.4s',
-    animationTimingFunction: 'cubic-bezier(.2,.8,.2,1)',
-    pointerEvents: 'none'
-  },
-  noticeCover: { fontSize: 11, paddingBlock: 6, gap: 6 },
-  noticeIcon: {
-    flexShrink: 0,
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    objectFit: 'cover'
-  },
-  noticeText: { display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 },
-  noticeTime: { alignSelf: 'flex-start', fontSize: 11, color: '#8a95a8' }
+  }
 })

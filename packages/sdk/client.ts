@@ -5,6 +5,7 @@ import {
   envelope,
   keyValid,
   mutating,
+  noticeValid,
   PlatformError,
   valueValid,
   viewValid
@@ -19,6 +20,7 @@ import {
   type KV,
   LIMITS,
   type Method,
+  type Notice,
   PROTOCOL,
   type Req,
   type Res,
@@ -346,6 +348,19 @@ export function createClient() {
     },
     open: (id: string, arg?: string) => request<void>('open', { id, arg }),
     home: () => request<void>('home'),
+    notify: {
+      /**
+       * Posts an OS notification: a banner over whatever is on screen, then a
+       * card in Notification Center. Tapping it opens the app with `arg`, the
+       * same deep link `os.open` carries. Ungated, like `open` and `home`.
+       */
+      post: (notice: Notice) =>
+        noticeValid(notice)
+          ? request<{ id: string }>('notify.post', notice)
+          : Promise.reject(new PlatformError('E_ARGS')),
+      /** Clears this app's own notices, one by `id` or all of them. */
+      clear: (id?: string) => request<void>('notify.clear', { id })
+    },
     sideButton: {
       claim: () => request<void>('side.claim'),
       release: () => request<void>('side.release'),
