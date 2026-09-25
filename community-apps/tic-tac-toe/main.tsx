@@ -1,69 +1,141 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { useDisplay } from '@doan-labs/duo-uikit'
-import { app, colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { cue } from './audio.ts'
+import {
+  adoptBoard,
+  type Board,
+  CELL_KEYS,
+  emptyBoard,
+  fitLayout,
+  isDraw,
+  type Mark,
+  parseScores,
+  type SavedBoard,
+  type Scores,
+  SIZE,
+  serializeBoard,
+  type WinLine,
+  winLine
+} from './game.ts'
+import { BOARD_GAP, BOARD_PAD, styles } from './styles.ts'
 
-type Mark = 'X' | 'O'
-type Scores = { X: number; O: number }
+// Why a writer id: both displays share one session key whose store is
+// last-writer-wins, so a value not written by this copy is always the newer
+// settled board - adopting it unconditionally is what converges the two
+// displays, including the race where both seed an empty session at once.
+const ME = crypto.randomUUID()
+type SavedGame = { by: string; board: SavedBoard; turn: Mark; scores: Scores; round: number }
 
-const WIN_LINES: [number, number, number][] = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6]
-]
-const CELL_KEYS = ['a1', 'b1', 'c1', 'a2', 'b2', 'c2', 'a3', 'b3', 'c3']
-const motion = '@media (prefers-reduced-motion: reduce)'
-const markPop = stylex.keyframes({
-  from: { opacity: 0, transform: 'scale(.78)' },
-  '70%': { opacity: 1, transform: 'scale(1.06)' },
-  to: { opacity: 1, transform: 'scale(1)' }
-})
-
-function winner(board: Array<Mark | null>) {
-  for (const [a, b, c] of WIN_LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a]
+// Bar geometry for the win line: a beam from just past the first cell's centre
+// to just past the last, so the stroke overshoots the marks it connects.
+function cellCentre(index: number, board: number) {
+  const cell = (board - BOARD_PAD * 2 - BOARD_GAP * (SIZE - 1)) / SIZE
+  const row = Math.floor(index / SIZE)
+  const column = index % SIZE
+  return {
+    x: BOARD_PAD + column * (cell + BOARD_GAP) + cell / 2,
+    y: BOARD_PAD + row * (cell + BOARD_GAP) + cell / 2,
+    cell
   }
-  return null
 }
 
-function parseScores(value: string | null): Scores {
-  if (!value) return { X: 0, O: 0 }
-  try {
-    const parsed = JSON.parse(value) as Partial<Scores>
-    return { X: Number(parsed.X) || 0, O: Number(parsed.O) || 0 }
-  } catch {
-    return { X: 0, O: 0 }
+function lineGeometry(line: WinLine, board: number) {
+  const a = cellCentre(line[0], board)
+  const c = cellCentre(line[2], board)
+  const dx = c.x - a.x
+  const dy = c.y - a.y
+  const dist = Math.hypot(dx, dy)
+  const overshoot = a.cell * 0.34
+  const height = Math.max(4, Math.round(a.cell * 0.09))
+  return {
+    width: dist + overshoot * 2,
+    height,
+    x: a.x - (dx / dist) * overshoot,
+    y: a.y - (dy / dist) * overshoot,
+    deg: (Math.atan2(dy, dx) * 180) / Math.PI
   }
 }
+
+// Pops along the win bar, alternately thrown to each side.
+const SPARKS = [0.07, 0.19, 0.31, 0.43, 0.55, 0.67, 0.79, 0.91]
 
 function Game() {
   const view = useDisplay()
-  const cover = view.display === 'cover'
+  const [rootRef, wide] = useWide<HTMLElement>()
+  const saved = useKV(os.session, 'match')
   const stored = useKV(os.storage, 'match-scores')
-  const [board, setBoard] = useState<Array<Mark | null>>(Array(9).fill(null))
+  const [board, setBoard] = useState<Board>(emptyBoard)
   const [turn, setTurn] = useState<Mark>('X')
-  const [scores, setScores] = useState<Scores>({ X: 0, O: 0 })
-  const [moveNumber, setMoveNumber] = useState(0)
-  const result = winner(board)
-  const draw = !result && board.every(Boolean)
+  const [round, setRound] = useState(0)
+  const seeded = useRef(false)
+  const lastSeen = useRef<string | null>(null)
+  const celebrated = useRef(-1)
+  const fit = fitLayout(view, wide)
+
+  const line = winLine(board)
+  const result = line ? board[line[0]]! : null
+  const draw = isDraw(board)
   const finished = Boolean(result || draw)
-  const boardSize = Math.max(
-    0,
-    Math.floor(Math.min((view.width || 740) - (cover ? 20 : 36), (view.height || 480) - (cover ? 158 : 178)))
+  const scores = parseScores(stored.value)
+
+  const publish = useCallback(
+    (nextBoard: Board, nextTurn: Mark, nextScores: Scores, nextRound: number) => {
+      saved.set(
+        JSON.stringify({
+          by: ME,
+          board: serializeBoard(nextBoard),
+          turn: nextTurn,
+          scores: nextScores,
+          round: nextRound
+        })
+      )
+    },
+    [saved]
   )
 
+  // Why adopt on the session key: the fold carries the running match to the
+  // other display. A write this copy did not make is the new settled match;
+  // own writes are already on screen and are ignored. The raw string is the
+  // guard: the effect body must not re-fire on every render of a remote value
+  // already on screen, or the setBoard below loops forever.
   useEffect(() => {
-    if (stored.status === 'hydrating') return
-    setScores(parseScores(stored.value))
-  }, [stored.status, stored.value])
+    if (saved.status === 'hydrating' || saved.status === 'saving') return
+    const raw = saved.value
+    if (raw !== null && raw === lastSeen.current) return
+    lastSeen.current = raw
+    if (!raw) {
+      // Seed only after the tally hydrates: a fresh copy publishing zeroed
+      // scores would otherwise have the other display repair its real tally
+      // away through the adopt path below.
+      if (!seeded.current && stored.status !== 'hydrating') {
+        seeded.current = true
+        publish(emptyBoard(), 'X', parseScores(stored.value), 0)
+      }
+      return
+    }
+    const next = JSON.parse(raw) as SavedGame
+    if (next.by === ME) return
+    setBoard(adoptBoard(next.board))
+    setTurn(next.turn)
+    setRound(next.round)
+    if (next.scores.X !== scores.X || next.scores.O !== scores.O) {
+      void stored.set(JSON.stringify(next.scores))
+    }
+  }, [saved.value, saved.status, publish, stored.status, stored.value, stored.set, scores])
+
+  // Celebrate once per round: only the glass the player is looking at plays
+  // the jingle, so the two views never double it. The rumble pattern is the
+  // hardware half of the same beat; the board's own jitter is the visible half.
+  useEffect(() => {
+    if (!finished || celebrated.current === round) return
+    celebrated.current = round
+    if (view.active) cue(result ? 'win' : 'draw')
+    if (result) navigator.vibrate?.([50, 40, 80])
+  }, [finished, result, round, view.active])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -73,165 +145,144 @@ function Game() {
     if (board[index] || finished) return
     const next = [...board]
     next[index] = turn
-    const nextWinner = winner(next)
+    const nextLine = winLine(next)
+    const over = Boolean(nextLine) || next.every(Boolean)
+    const nextTurn = over ? turn : turn === 'X' ? 'O' : 'X'
+    const nextScores = nextLine ? { ...scores, [turn]: scores[turn] + 1 } : scores
     setBoard(next)
-    setMoveNumber((current) => current + 1)
-    if (!nextWinner && next.some((cell) => cell === null)) setTurn(turn === 'X' ? 'O' : 'X')
-    if (nextWinner) {
-      const nextScores = { ...scores, [nextWinner]: scores[nextWinner] + 1 }
-      setScores(nextScores)
-      void stored.set(JSON.stringify(nextScores))
-    }
+    setTurn(nextTurn)
+    if (nextLine) void stored.set(JSON.stringify(nextScores))
+    cue('place')
+    publish(next, nextTurn, nextScores, round)
   }
 
-  const resetRound = () => {
-    setBoard(Array(9).fill(null))
+  const resetRound = (nextScores = scores) => {
+    const nextRound = round + 1
+    setBoard(emptyBoard())
     setTurn('X')
-    setMoveNumber((current) => current + 1)
+    setRound(nextRound)
+    publish(emptyBoard(), 'X', nextScores, nextRound)
   }
 
   const resetScores = () => {
-    const nextScores = { X: 0, O: 0 }
-    setScores(nextScores)
+    const nextScores: Scores = { X: 0, O: 0 }
     void stored.set(JSON.stringify(nextScores))
-    resetRound()
+    resetRound(nextScores)
   }
 
+  const markFont = Math.round(((fit.board - BOARD_PAD * 2 - BOARD_GAP * (SIZE - 1)) / SIZE) * 0.52)
+  const beam = line ? lineGeometry(line, fit.board) : null
+
   return (
-    <main data-display={view.display} {...stylex.props(styles.root, cover && styles.cover)}>
+    <main ref={rootRef} {...stylex.props(styles.root, !wide && styles.rootCover)}>
       <header {...stylex.props(styles.header)}>
-        <div>
-          <span {...stylex.props(styles.kicker)}>DUO ARCADE</span>
-          <h1 {...stylex.props(styles.title)}>Tic-Tac-Toe</h1>
+        <div {...stylex.props(styles.brand)}>
+          <span {...stylex.props(styles.kicker)}>Duo Arcade</span>
+          <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>Tic-Tac-Toe</h1>
         </div>
         <div {...stylex.props(styles.scores)}>
-          <span {...stylex.props(styles.scoreX)}>X {scores.X}</span>
-          <span {...stylex.props(styles.scoreO)}>O {scores.O}</span>
+          <div {...stylex.props(styles.chip)}>
+            <span {...stylex.props(styles.chipLabel, styles.chipLabelX)}>X</span>
+            <strong {...stylex.props(styles.chipValue)}>{scores.X}</strong>
+          </div>
+          <div {...stylex.props(styles.chip)}>
+            <span {...stylex.props(styles.chipLabel, styles.chipLabelO)}>O</span>
+            <strong {...stylex.props(styles.chipValue)}>{scores.O}</strong>
+          </div>
         </div>
       </header>
-      <p {...stylex.props(styles.status)}>{result ? `${result} wins` : draw ? 'Draw game' : `${turn} plays next`}</p>
-      <div role="grid" aria-label="Tic-Tac-Toe board" {...stylex.props(styles.board, styles.fitBoard(boardSize))}>
-        {board.map((mark, index) => (
-          <button
-            key={mark ? `${CELL_KEYS[index]}-${moveNumber}` : CELL_KEYS[index]}
-            type="button"
-            aria-label={mark ? mark : 'Empty cell'}
-            onClick={() => play(index)}
-            {...stylex.props(
-              styles.cell,
-              mark && styles.cellMark,
-              mark === 'X' && styles.cellX,
-              mark === 'O' && styles.cellO
-            )}
-          >
-            {mark}
+      <p aria-live="polite" {...stylex.props(styles.status, !finished && styles.statusLive)}>
+        {result ? `${result} wins the round` : draw ? 'Draw game' : `${turn} to move`}
+      </p>
+      <section {...stylex.props(styles.stage, !wide && styles.stageCover)}>
+        <div
+          key={round}
+          role="grid"
+          aria-label="Tic-Tac-Toe board"
+          {...stylex.props(
+            styles.board,
+            styles.fitBoard(fit.board),
+            line && styles.celebrate,
+            !line && draw && styles.celebrateDraw
+          )}
+        >
+          {board.map((mark, index) => (
+            <button
+              key={mark ? `${round}-${CELL_KEYS[index]}` : CELL_KEYS[index]}
+              type="button"
+              aria-label={`Cell ${CELL_KEYS[index]}, ${mark ?? 'empty'}`}
+              onClick={() => play(index)}
+              {...stylex.props(
+                styles.cell,
+                styles.fitMark(markFont),
+                mark && styles.cellMark,
+                mark === 'X' && styles.cellX,
+                mark === 'O' && styles.cellO
+              )}
+            >
+              {mark}
+            </button>
+          ))}
+          {beam && (
+            <div
+              aria-hidden="true"
+              {...stylex.props(
+                styles.line,
+                styles.fitLine(beam.width, beam.height, beam.x, beam.y, beam.deg),
+                result === 'X' ? styles.lineX : styles.lineO
+              )}
+            />
+          )}
+          {beam &&
+            SPARKS.map((f, i) => {
+              const rad = (beam.deg * Math.PI) / 180
+              const x = beam.x + Math.cos(rad) * beam.width * f - 3.5
+              const y = beam.y + Math.sin(rad) * beam.width * f - 3.5
+              return (
+                <span
+                  key={f}
+                  aria-hidden="true"
+                  {...stylex.props(
+                    styles.spark,
+                    result === 'X' ? styles.sparkX : styles.sparkO,
+                    styles.fitSpark(x, y, beam.deg + (i % 2 === 0 ? 90 : -90), 0.3 + i * 0.05)
+                  )}
+                />
+              )
+            })}
+        </div>
+        <aside {...stylex.props(styles.rail, !wide && styles.railCover)}>
+          <div role="group" aria-label="Game controls" {...stylex.props(styles.controls, wide && styles.controlsWide)}>
+            <button type="button" onClick={() => resetRound()} {...stylex.props(styles.primary)}>
+              <Sym name="reload" size={13} />
+              New round
+            </button>
+            <button type="button" onClick={resetScores} {...stylex.props(styles.secondary)}>
+              Reset wins
+            </button>
+          </div>
+          {wide && <p {...stylex.props(styles.hint)}>Two players, one board. X opens every round.</p>}
+        </aside>
+      </section>
+      {finished && (
+        <section {...stylex.props(styles.result)}>
+          <div {...stylex.props(styles.resultCopy)}>
+            <span {...stylex.props(styles.resultKicker, result && styles.resultKickerWin)}>
+              {result ? 'Round over' : 'Draw game'}
+            </span>
+            <strong {...stylex.props(styles.resultTitle)}>
+              {result ? `${result} wins the round` : 'Nobody takes it'}
+            </strong>
+          </div>
+          <button type="button" onClick={() => resetRound()} {...stylex.props(styles.primary)}>
+            <Sym name="reload" size={13} />
+            {result ? 'New round' : 'Play again'}
           </button>
-        ))}
-      </div>
-      <div role="group" aria-label="Game controls" {...stylex.props(styles.controls)}>
-        <button type="button" onClick={resetRound} {...stylex.props(styles.primary)}>
-          New round
-        </button>
-        <button type="button" onClick={resetScores} {...stylex.props(styles.secondary)}>
-          Reset wins
-        </button>
-      </div>
+        </section>
+      )}
     </main>
   )
 }
-
-const styles = stylex.create({
-  root: {
-    position: 'absolute',
-    inset: 0,
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 10,
-    paddingBlock: 16,
-    paddingInline: 18,
-    color: colors.white,
-    backgroundColor: colors.grey6Dark,
-    fontFamily: fonts.system
-  },
-  cover: { gap: 6, paddingBlock: 10, paddingInline: 10 },
-  header: {
-    width: '100%',
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 10,
-    flexShrink: 0
-  },
-  kicker: { color: colors.cyan, fontSize: 9, fontWeight: 700, letterSpacing: 1.5 },
-  title: { marginBlock: 0, fontSize: 34, lineHeight: 0.95, fontWeight: 800, letterSpacing: -1 },
-  scores: { display: 'flex', gap: 6, fontSize: 11, fontWeight: 800 },
-  scoreX: { color: colors.cyan },
-  scoreO: { color: colors.orange },
-  status: { marginBlock: 0, color: colors.grey3, fontSize: 13, flexShrink: 0 },
-  board: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gridTemplateRows: 'repeat(3, minmax(0, 1fr))',
-    gap: 6,
-    flexShrink: 0
-  },
-  fitBoard: (size: number) => ({ width: `${String(size)}px`, height: `${String(size)}px` }),
-  cell: {
-    display: 'grid',
-    placeItems: 'center',
-    minWidth: 0,
-    minHeight: 0,
-    borderWidth: 0,
-    borderRadius: 12,
-    color: colors.white,
-    backgroundColor: app.fill,
-    fontSize: 42,
-    fontWeight: 800,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color, color',
-    transitionDuration: '.16s, .2s, .2s',
-    transitionTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
-  },
-  cellMark: {
-    animationName: { default: markPop, [motion]: 'none' },
-    animationDuration: '.22s',
-    animationTimingFunction: 'cubic-bezier(.23, 1, .32, 1)',
-    animationFillMode: 'both'
-  },
-  cellX: { color: colors.cyan, backgroundColor: app.fill3 },
-  cellO: { color: colors.orange, backgroundColor: app.fill3 },
-  controls: { display: 'flex', justifyContent: 'center', gap: 8, flexShrink: 0 },
-  primary: {
-    borderWidth: 0,
-    borderRadius: 999,
-    paddingBlock: 9,
-    paddingInline: 16,
-    color: colors.grey6Dark,
-    backgroundColor: colors.cyan,
-    fontWeight: 800,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.14s, .18s',
-    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
-  },
-  secondary: {
-    borderWidth: 0,
-    borderRadius: 999,
-    paddingBlock: 9,
-    paddingInline: 14,
-    color: colors.white,
-    backgroundColor: app.fill,
-    fontWeight: 700,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: '.14s, .18s',
-    transform: { default: 'scale(1)', ':active': 'scale(.96)' }
-  }
-})
 
 await os.connect()
 createRoot(document.body).render(<Game />)
