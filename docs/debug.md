@@ -41,7 +41,9 @@ rasterizer whenever the capture is about pixels.
 Use identical state/viewports before and after a change. 818×664 matches the native window;
 use deviceScaleFactor 2 for detail and crop rather than shrink. Baselines use
 `?debug&app=Notes&deg=180` and `deg=0`; use 120 for clipping. Live fold tests must omit the
-pinned `deg` parameter and drive the hinge control.
+pinned `deg` parameter and drive the hinge control: the blur/bake fold look only exists
+while the hinge is moving and ~250 ms after (decisions.md 95), so capture mid-transition;
+a pinned `deg` renders the settled, live state.
 
 ### The state probe
 

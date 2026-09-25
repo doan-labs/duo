@@ -166,6 +166,9 @@ const body = new THREE.Group()
 phone.add(body)
 // 0 open, PI closed. Shared by every moving mesh's vertex shader.
 const bend = { value: 0 }
+// 0 while the hinge rests: the blur, darkening and ramp layers of the fold are
+// a motion effect and ease out once the hinge settles (decisions.md 95).
+const foldMotion = { value: 0 }
 
 // Screen textures, baked by packages/shell/screen.ts (metres in, canvas out).
 const icons = await loadIcons(wallpaper())
@@ -281,6 +284,7 @@ model.traverse((object) => {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.foldAngle = bend
       if (kind) {
+        shader.uniforms.foldMotion = foldMotion
         shader.uniforms.uiFrame = screens[kind].frame
         shader.uniforms.uiGradient = screens[kind].gradient
         shader.uniforms.uiReferenceEye = { value: EYE }
@@ -566,8 +570,17 @@ let angle = targetAngle
 let yaw = Number(q.get('yaw') ?? view().yaw ?? 0)
 let targetYaw = yaw
 
+// Folding is a motion state, not a pose. The hinge counts as folding while the
+// eased angle still travels (more than SETTLE to go) or a new target just
+// landed, and for SETTLE_DEBOUNCE ms after it rests; then the live panels take
+// their displays back so a resting fold is a working screen, not a blur.
+const SETTLE = 0.75
+const SETTLE_DEBOUNCE = 250
+let lastMotion = -SETTLE_DEBOUNCE
+
 function setAngle(v: number) {
   targetAngle = Math.min(180, Math.max(0, v))
+  if (Math.abs(targetAngle - angle) > SETTLE) lastMotion = performance.now()
   hud.target(targetAngle)
 }
 // The buttons on the frame have keys too, in packages/shell/buttons.ts.
@@ -745,6 +758,9 @@ renderer.setAnimationLoop((now) => {
   last = now
   angle = mix(angle, targetAngle, k)
   yaw = mix(yaw, targetYaw, k)
+  if (Math.abs(angle - targetAngle) > SETTLE) lastMotion = now
+  const folding = now - lastMotion < SETTLE_DEBOUNCE
+  foldMotion.value = folding ? 1 : Math.max(0, foldMotion.value - dt / 300)
   // Not while the boot screen is up: the phone turns once the OS is on the glass.
   if (hud.spinning() && booted()) targetYaw += 0.004
   hud.angle(angle)
@@ -793,13 +809,13 @@ renderer.setAnimationLoop((now) => {
   // Open flat, the cover is off like the bake has it: from the back you should
   // see a sleeping display, not a blurred copy of the app. It fades out over the
   // last 30° so the mirror is never a pop when the fold begins.
-  outerLive.visible = facing(outerLive) && (angle < 1 || (app && angle < FLAT))
+  outerLive.visible = facing(outerLive) && (angle < 1 || (angle < FLAT && (app || !folding)))
   outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
-  coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) : 0)
+  coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) * foldMotion.value : 0)
   // The clip is what keeps the inner panel inside the half that is still
   // facing you, so it holds all the way to closed.
   const clip = foldClip()
-  innerLive.visible = facing(innerLive) && (angle > FLAT || app)
+  innerLive.visible = facing(innerLive) && (angle > FLAT || app || (!folding && clip < 1))
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
   updateDisplays(
     { visible: innerLive.visible && !device.asleep, active: angle > 40, angle, clip },
@@ -811,7 +827,7 @@ renderer.setAnimationLoop((now) => {
     }
   )
   // Past half way the clip has eaten the whole band, as it has in the shader.
-  innerFold(clip < 0.5 && angle < FLAT ? smooth(Math.min(1, bend.value / (Math.PI / 2))) : 0)
+  innerFold(clip < 0.5 && angle < FLAT ? smooth(Math.min(1, bend.value / (Math.PI / 2))) * foldMotion.value : 0)
   // No depth test either: a turned panel would still take the clicks meant for
   // the frame drawn over it, so it is scenery until it is flat.
   const touch = angle < 1

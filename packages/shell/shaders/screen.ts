@@ -6,6 +6,9 @@ export default /* glsl */ `
 // black margin instead of stopping at a hard line. Needs INNER_Z, HINGE_Z,
 // OUTER_Z defined by the caller (see packages/shell/main.ts).
 uniform float foldAngle;
+// 1 only while the hinge is moving: a resting fold keeps its geometry but drops
+// the blur and darkening (packages/shell/main.ts, foldMotion).
+uniform float foldMotion;
 uniform vec2 uiPixel;
 uniform vec4 uiFrame;
 uniform vec2 uiGradient;
@@ -28,7 +31,7 @@ vec3 screenColor() {
     float progress = clamp((3.141592654 - foldAngle) / 1.570796327, 0.0, 1.0);
   #endif
   float edge = (sourceUV.x - uiGradient.x) / (uiGradient.y - uiGradient.x);
-  float motion = smoothstep(0.0, 1.0, progress);
+  float motion = smoothstep(0.0, 1.0, progress) * foldMotion;
   float blurGradient = clamp(edge, 0.0, 1.0);
   float darkenGradient = clamp((edge - 0.2) / 0.8, 0.0, 1.0);
   float effect = motion * pow(darkenGradient, 1.35);

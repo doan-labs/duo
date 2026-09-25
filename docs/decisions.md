@@ -1546,3 +1546,26 @@ dotted, and the hypnogram as one continuous wave that changes colour at each
 stage instead of disjoint blocks. Fitness's WeekBars moves to the same
 vocabulary. Cost: the wave hypnogram no longer shows per-segment time labels
 directly on the blocks; the stage legend under it carries the totals.
+
+## 95. The fold effect is a motion state, not a pose
+
+2026-09-25. Amends 24. A resting fold used to hold the blurred, darkened bake
+forever: at 131° the inner display stayed a frozen picture because the live
+panel only appears flat or under an app - so the screen was not a screen.
+
+"Folding" is now measured as motion: the eased angle still travelling past
+SETTLE (0.75°), or a new target within the last SETTLE_DEBOUNCE (250 ms).
+While it holds, everything is as 24 designed - bake, shader curves, live DOM
+only flat or under an app. Once the hinge rests, `foldMotion` fades the blur
+and darkening out over ~300 ms in shaders/screen.ts and both ramp layers, and
+the live panels take any display that faces the camera: the inner wherever
+foldClip() leaves it, the cover whenever the phone is not open flat. The
+clipped opaque panel over the unblurred projected bake reads as one working
+screen that happens to bend at the silhouette.
+
+Costs: a pinned `?deg=` capture no longer shows the fold look, which now
+exists only while the hinge moves (live fold tests already drive the hinge
+control); the silhouette sliver keeps the shell's projected bake, so with an
+app up it still blacks out past the clip; and the eased angle's tail below
+SETTLE still counts as motion, so the real hand-off is ~SETTLE_DEBOUNCE after
+the last visible turn.
