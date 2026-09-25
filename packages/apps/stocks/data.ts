@@ -142,7 +142,10 @@ const update = (patch: Partial<Store>) => {
 
 export const useStore = () => useSyncExternalStore(subscribe, () => store)
 export function select(v: Item) {
-  if (store.viewing.sym !== v.sym) update({ viewing: v })
+  if (store.viewing.sym !== v.sym) {
+    update({ viewing: v })
+    void refreshQuotes()
+  }
 }
 export function follow(candidate: Item) {
   update({
@@ -176,9 +179,14 @@ export const useSpark = (v: Item | undefined) => {
 }
 export const useNews = () => useSyncExternalStore(subscribe, () => news)
 
+const SUFFIX_SCALE: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }
+
+/** CNBC mixes plain numbers and pre-scaled strings ("45.84M", "4.902T"). */
 const num = (value: unknown): number | undefined => {
-  const n = Number.parseFloat(String(value ?? '').replace(/,/g, ''))
-  return Number.isFinite(n) ? n : undefined
+  const text = String(value ?? '').replace(/,/g, '')
+  const n = Number.parseFloat(text)
+  if (!Number.isFinite(n)) return undefined
+  return n * (SUFFIX_SCALE[text.slice(-1).toUpperCase()] ?? 1)
 }
 
 // -- CNBC quotes ---------------------------------------------------------------
@@ -212,7 +220,8 @@ const parseQuote = (q: Raw): Quote | null => {
       prev: num(q.previous_day_closing),
       vol: num(q.volume),
       avg: num(q.tendayavgvol),
-      cap: num(q.mktcap),
+      // `mktcap` is often null; the scaled string lives in `mktcapView`.
+      cap: num(q.mktcap) ?? num(q.mktcapView),
       pe: num(q.pe),
       eps: num(q.eps),
       beta: num(q.beta),
