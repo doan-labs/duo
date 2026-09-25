@@ -7,11 +7,23 @@ export type Aspect = '4:3' | '16:9' | '1:1'
 
 const RATIO: Record<Aspect, number> = { '4:3': 4 / 3, '16:9': 16 / 9, '1:1': 1 }
 
-/** The centre crop a still takes: zoom first, then the aspect inside it. */
-export function crop(w: number, h: number, aspect: Aspect, z: number): [number, number, number, number] {
-  let sw = w / z
-  let sh = h / z
-  const r = RATIO[aspect]
+/**
+ * The centre crop a still takes: zoom first, then the aspect inside it.
+ * `upright` flips the ratio for the cover's portrait framing. A sub-1 zoom
+ * plays the ultrawide fake and keeps the whole frame - a sensor cannot crop
+ * wider than itself, which is what the preview shows at 0.5x too.
+ */
+export function crop(
+  w: number,
+  h: number,
+  aspect: Aspect,
+  z: number,
+  upright = false
+): [number, number, number, number] {
+  const cz = Math.max(z, 1)
+  let sw = w / cz
+  let sh = h / cz
+  const r = upright ? 1 / RATIO[aspect] : RATIO[aspect]
   if (sw / sh > r) sw = sh * r
   else sh = sw / r
   return [(w - sw) / 2, (h - sh) / 2, sw, sh]
@@ -58,12 +70,14 @@ export type StillOpts = {
   night: number
   /** Portrait f-stop, or 0 for a plain still. */
   fstop: number
+  /** Held upright on the cover: the crop goes portrait like the frame does. */
+  upright?: boolean
 }
 
 /** One frame of the feed as a JPEG data URL, with the whole effect stack baked in. */
 export function still(video: HTMLVideoElement, o: StillOpts): string | undefined {
   if (!video.videoWidth) return
-  const [sx, sy, sw, sh] = crop(video.videoWidth, video.videoHeight, o.aspect, o.zoom)
+  const [sx, sy, sw, sh] = crop(video.videoWidth, video.videoHeight, o.aspect, o.zoom, o.upright)
   const c = document.createElement('canvas')
   c.width = Math.round(sw)
   c.height = Math.round(sh)
@@ -129,7 +143,9 @@ export function pano(video: HTMLVideoElement, zoom: number): Pano {
       if (x >= w || !video.videoWidth) return false
       const s = Math.min(slice, w - x)
       ctx.drawImage(video, video.videoWidth / 2 - slice / 2, sy, slice, sh0, x, 0, s * scale, h)
-      x += s
+      // The painted column is s*scale wide; advancing by s alone left blank
+      // stripes whenever the feed was taller than the strip's cap.
+      x += s * scale
       return x < w
     },
     progress: () => x / w,

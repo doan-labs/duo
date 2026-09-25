@@ -23,10 +23,10 @@ import { Num } from '@doan-labs/duo-uikit/num.tsx'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { type Aspect, bokeh, evCss, LOOKS, luminance, pano, still } from './capture.ts'
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type Aspect, bokeh, evCss, LOOKS, luminance, nightCss, pano, still } from './capture.ts'
 import { FocusGlyph, TimerGlyph } from './glyphs.tsx'
-import { styles } from './styles.ts'
+import { styles, WHEEL_STEP } from './styles.ts'
 
 type Facing = 'user' | 'environment'
 type Flash = 'off' | 'auto' | 'on'
@@ -91,6 +91,76 @@ const FSTOPS = [16, 11, 8, 5.6, 4, 2.8, 1.8, 1.4]
 const NIGHTS = [0, 1, 2, 3]
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
+/**
+ * The camera session, shared by both displays: the mirror copy renders this
+ * same state, so folding keeps the mode, zoom, toggles and running record
+ * clock you had - the way the real phone keeps its camera across a fold.
+ * Per-copy things (the video node, timers, transient flashes) stay local.
+ */
+type Session = {
+  facing: Facing
+  mode: Mode
+  z: number
+  flash: Flash
+  live: boolean
+  grid: boolean
+  aspect: Aspect
+  timerSecs: number
+  look: number
+  ev: number
+  fstIdx: number
+  night: number
+  /** The last luminance verdict, shared so Night's badge survives the fold. */
+  dark: boolean
+  torch: boolean
+  recing: boolean
+  clock: string
+}
+const cam = {
+  s: {
+    facing: 'user',
+    mode: 'PHOTO',
+    z: 1,
+    flash: 'off',
+    live: true,
+    grid: false,
+    aspect: '4:3',
+    timerSecs: 0,
+    look: 0,
+    ev: 0,
+    fstIdx: 3,
+    night: 0,
+    dark: false,
+    torch: false,
+    recing: false,
+    clock: '00:00'
+  } as Session,
+  /** Where the record clock keeps its epoch; a fold doesn't restart it. */
+  recT0: 0,
+  /** The mode a QuickTake suspends and restores. */
+  quickMode: null as Mode | null,
+  subs: new Set<() => void>(),
+  set(p: Partial<Session>) {
+    cam.s = { ...cam.s, ...p }
+    for (const f of cam.subs) f()
+  },
+  get: () => cam.s,
+  sub(f: () => void) {
+    cam.subs.add(f)
+    return () => {
+      cam.subs.delete(f)
+    }
+  }
+}
+const useSession = () => useSyncExternalStore(cam.sub, cam.get)
+
+/** A value that slides in on change - the soft swap, not a hard cut. */
+const Roll = ({ k, children }: { k: string | number; children: ReactNode }) => (
+  <span key={k} {...stylex.props(styles.roll)}>
+    {children}
+  </span>
+)
+
 /** A round glyph button; `on` tints it yellow like a lit toggle. */
 const Tog = ({
   sym,
@@ -126,35 +196,19 @@ const Pill = ({ label, on, onClick }: { label: ReactNode; on?: boolean; onClick:
 export const Camera = ({ os }: { os: Os }) => {
   const root = useRef<HTMLDivElement>(null)
   const [land, setLand] = useState(true)
-  const [facing, setFacing] = useState<Facing>('user')
+  const { facing, mode, z, flash, live, grid, aspect, timerSecs, look, ev, fstIdx, night, dark, torch, recing, clock } =
+    useSession()
   const { video, bokehVideo, denied } = useWebcam(facing)
-  const [mode, setMode] = useState<Mode>('PHOTO')
-  const [z, setZ] = useState(1)
-  const zRef = useRef(1)
-  const [flash, setFlash] = useState<Flash>('off')
-  const [live, setLive] = useState(true)
-  const [grid, setGrid] = useState(false)
-  const [aspect, setAspect] = useState<Aspect>('4:3')
-  const [timerSecs, setTimerSecs] = useState(0)
-  const [look, setLook] = useState(0)
   const [tray, setTray] = useState(false)
   const [strip, setStrip] = useState(false)
-  const [ev, setEv] = useState(0)
-  const [fstIdx, setFstIdx] = useState(3)
-  const [night, setNight] = useState(0)
-  const [dark, setDark] = useState(false)
-  const [torch, setTorch] = useState(false)
   const [focus, setFocus] = useState<{ x: number; y: number } | null>(null)
   const [count, setCount] = useState(0)
-  const [recing, setRecing] = useState(false)
-  const [clock, setClock] = useState('00:00')
   const [bursts, setBursts] = useState(0)
   const [panoOn, setPanoOn] = useState(false)
   const [panoP, setPanoP] = useState(0)
   const [flashOn, setFlashOn] = useState(false)
   const [liveTag, setLiveTag] = useState(false)
 
-  const recTimer = useRef(0)
   const countTimer = useRef(0)
   const burstTimer = useRef(0)
   const flashTimer = useRef(0)
@@ -162,10 +216,12 @@ export const Camera = ({ os }: { os: Os }) => {
   const tagTimer = useRef(0)
   const panoRef = useRef<ReturnType<typeof pano> | null>(null)
   const panoFrame = useRef(0)
-  const quickMode = useRef<Mode | null>(null)
   const thumbRow = useRef<HTMLDivElement>(null)
+  // The torch state the unmount cleanup reads; the effect's closure is stale.
+  const torchRef = useRef(false)
+  torchRef.current = torch
   // The mirror copy draws everything and starts nothing: it samples no
-  // luminance and repaints no filter thumbs.
+  // luminance, repaints no filter thumbs and never drives the LED.
   const quiet = !!os.mirror
 
   const mirror = facing === 'user'
@@ -181,9 +237,8 @@ export const Camera = ({ os }: { os: Os }) => {
     '1:1': land ? styles.frameSqL : styles.frameSqP
   }[aspect]
   const nightSecs = () => (dark ? night || 1 : 0)
-  const previewCss = [LOOKS[look]!.css, evCss(ev), nightSecs() ? `brightness(${1 + nightSecs() * 0.2})` : '']
-    .filter(Boolean)
-    .join(' ')
+  // Preview and still share the night term, so the shot is the frame you saw.
+  const previewCss = [LOOKS[look]!.css, evCss(ev), nightCss(nightSecs())].filter(Boolean).join(' ')
 
   // The box decides the layout: a split half on the wide display is portrait too.
   useEffect(() => {
@@ -200,7 +255,7 @@ export const Camera = ({ os }: { os: Os }) => {
     if (quiet) return
     const id = setInterval(() => {
       const v = video.current
-      if (v) setDark(luminance(v) < 0.22)
+      if (v) cam.set({ dark: luminance(v) < 0.22 })
     }, 900)
     return () => clearInterval(id)
   }, [quiet])
@@ -227,10 +282,16 @@ export const Camera = ({ os }: { os: Os }) => {
   }, [tray, quiet])
 
   // The LED belongs to Control Center too: the video torch writes the same
-  // switch, and a rear flash pulses it.
+  // switch, and a rear flash pulses it. Only the leading copy drives it.
   useEffect(() => {
-    os.led?.(torch)
-  }, [torch, os])
+    if (!quiet) os.led?.(torch)
+  }, [torch, quiet, os])
+
+  // The torch only exists while the config that offers it does: leaving the
+  // rear camera or a video mode turns it off, like iOS does.
+  useEffect(() => {
+    if (torch && !(videoish && facing === 'environment')) cam.set({ torch: false })
+  }, [torch, videoish, facing])
 
   const flashPulse = (warm: boolean) => {
     setFlashOn(true)
@@ -254,11 +315,12 @@ export const Camera = ({ os }: { os: Os }) => {
     if (!v) return
     const url = still(v, {
       aspect,
-      zoom: zRef.current,
+      zoom: cam.s.z,
       look: LOOKS[look]!.css,
       ev,
       night: nightSecs(),
-      fstop: portrait ? fstop : 0
+      fstop: portrait ? fstop : 0,
+      upright: !land
     })
     if (!url) return
     os.shots.unshift(url)
@@ -305,29 +367,35 @@ export const Camera = ({ os }: { os: Os }) => {
 
   // Recording is the indicator and the clock; nothing is kept - Photos shows
   // stills only. Started mid-PHOTO it is QuickTake: the mode restores on stop.
+  // recing and the clock live on the session: the display you fold to keeps it.
   const record = (on: boolean) => {
-    if (on === !!recTimer.current) return
-    setRecing(on)
-    clearInterval(recTimer.current)
-    recTimer.current = 0
+    if (on === cam.s.recing) return
     if (!on) {
-      if (quickMode.current) {
-        setMode(quickMode.current)
-        quickMode.current = null
+      cam.set({ recing: false })
+      if (cam.quickMode) {
+        cam.set({ mode: cam.quickMode })
+        cam.quickMode = null
       }
       return
     }
     if (!videoish) {
-      quickMode.current = mode
-      setMode('VIDEO')
+      cam.quickMode = mode
+      cam.set({ mode: 'VIDEO' })
     }
-    const t0 = Date.now()
-    setClock('00:00')
-    recTimer.current = window.setInterval(() => {
-      const s = (Date.now() - t0) / 1000
-      setClock(`${two(s / 60)}:${two(s % 60)}`)
-    }, 250)
+    cam.recT0 = Date.now()
+    cam.set({ recing: true, clock: '00:00' })
   }
+
+  // The leading copy ticks the record clock; the epoch on the session means a
+  // fold hands the count to the other display without a hiccup.
+  useEffect(() => {
+    if (quiet || !recing) return
+    const id = setInterval(() => {
+      const s = (Date.now() - cam.recT0) / 1000
+      cam.set({ clock: `${two(s / 60)}:${two(s % 60)}` })
+    }, 250)
+    return () => clearInterval(id)
+  }, [quiet, recing])
 
   const burst = (on: boolean) => {
     if (on === !!burstTimer.current) return
@@ -344,7 +412,7 @@ export const Camera = ({ os }: { os: Os }) => {
   const startPano = () => {
     const v = video.current
     if (!v?.videoWidth) return
-    panoRef.current = pano(v, zRef.current)
+    panoRef.current = pano(v, cam.s.z)
     setPanoOn(true)
     setPanoP(0)
     cancelAnimationFrame(panoFrame.current)
@@ -370,9 +438,11 @@ export const Camera = ({ os }: { os: Os }) => {
     if (!quiet) beep([1400, 2100], 0.03, 0.06)
   }
 
-  /** The shutter's tap: still, pano step, countdown cancel or record toggle. */
+  /** The shutter's tap: still, pano step, countdown cancel or record toggle.
+   *  While recording it is the stop square - the stills dot beside it is what
+   *  grabs a frame. */
   const shoot = () => {
-    if (recing) return takeShot()
+    if (recing) return record(false)
     if (panoOn) return finishPano()
     if (countTimer.current) return cancelCount()
     if (videoish) return record(true)
@@ -382,14 +452,10 @@ export const Camera = ({ os }: { os: Os }) => {
     takeShot()
   }
 
-  // A ref beside the state so the shell gets the current factor back synchronously.
+  // The session holds the factor so both displays read it synchronously.
   const zoom = (v?: number) => {
-    if (v !== undefined) {
-      const next = clamp(v, 0.5, 5)
-      zRef.current = next
-      setZ(next)
-    }
-    return zRef.current
+    if (v !== undefined) cam.set({ z: clamp(v, 0.5, 5) })
+    return cam.s.z
   }
 
   // Every render publishes fresh closures, so the frame buttons always act on
@@ -403,8 +469,6 @@ export const Camera = ({ os }: { os: Os }) => {
     () => () => {
       os.camera.current = null
       cancelCount()
-      clearInterval(recTimer.current)
-      recTimer.current = 0
       clearInterval(burstTimer.current)
       burstTimer.current = 0
       cancelAnimationFrame(panoFrame.current)
@@ -412,6 +476,9 @@ export const Camera = ({ os }: { os: Os }) => {
       clearTimeout(flashTimer.current)
       clearTimeout(focusTimer.current)
       clearTimeout(tagTimer.current)
+      // A torch the camera lit goes off with it; a Control Center flashlight
+      // shares the LED but was never this copy's to write.
+      if (!quiet && torchRef.current) os.led?.(false)
     },
     [os]
   )
@@ -471,7 +538,8 @@ export const Camera = ({ os }: { os: Os }) => {
   const dragEv = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     const r = el.getBoundingClientRect()
-    const grab = (y: number) => setEv(Math.round(clamp((r.top + r.height / 2 - y) / (r.height / 2), -1, 1) * 20) / 10)
+    const grab = (y: number) =>
+      cam.set({ ev: Math.round(clamp((r.top + r.height / 2 - y) / (r.height / 2), -1, 1) * 20) / 10 })
     grab(e.clientY)
     el.setPointerCapture(e.pointerId)
     const move = (ev2: PointerEvent) => grab(ev2.clientY)
@@ -484,7 +552,7 @@ export const Camera = ({ os }: { os: Os }) => {
   const zoomDrag = useRef<{ pos: number; z: number; moved: boolean } | null>(null)
   const [scrub, setScrub] = useState(false)
   const zoomDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    zoomDrag.current = { pos: land ? e.clientY : e.clientX, z: zRef.current, moved: false }
+    zoomDrag.current = { pos: land ? e.clientY : e.clientX, z: cam.s.z, moved: false }
     e.currentTarget.setPointerCapture(e.pointerId)
     setScrub(true)
   }
@@ -506,24 +574,48 @@ export const Camera = ({ os }: { os: Os }) => {
     })
   }
 
-  // The mode dial drags too: a swipe across it steps modes, Apple's gesture.
-  const dialDrag = useRef<number | null>(null)
+  // The mode dial drags too. Held wide it is a wheel: the strip rides a drum
+  // and a swipe turns it under your finger, settling on the nearest mode.
+  // Upright it stays Apple's stepping strip.
+  const dialDrag = useRef<{ at: number; from: number; moved: boolean } | null>(null)
+  const [dPos, setDPos] = useState<number | null>(null)
+  const wheelPos = dPos ?? MODES.indexOf(mode)
   const dialDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    dialDrag.current = land ? e.clientY : e.clientX
-    e.currentTarget.setPointerCapture(e.pointerId)
+    dialDrag.current = { at: land ? e.clientY : e.clientX, from: wheelPos, moved: false }
+    // Synthetic or assistive pointers can't be captured; the tap still works.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
   }
   const dialMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (dialDrag.current === null || !e.currentTarget.hasPointerCapture(e.pointerId)) return
+    const g = dialDrag.current
+    if (!g) return
     const pos = land ? e.clientY : e.clientX
-    const d = pos - dialDrag.current
+    const d = pos - g.at
+    if (land) {
+      if (Math.abs(d) < 4) return
+      g.moved = true
+      setDPos(clamp(g.from + d / WHEEL_STEP, 0, MODES.length - 1))
+      return
+    }
     if (Math.abs(d) < 34) return
-    dialDrag.current = pos
+    g.at = pos
+    g.moved = true
     // Both axes run the same way: dragging against the order lands the next mode.
     pickMode(MODES[clamp(MODES.indexOf(mode) - Math.sign(d), 0, MODES.length - 1)]!)
   }
   const dialUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    dialDrag.current = null
-    e.currentTarget.releasePointerCapture(e.pointerId)
+    const g = dialDrag.current
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
+    if (g?.moved && land) pickMode(MODES[clamp(Math.round(wheelPos), 0, MODES.length - 1)]!)
+    setDPos(null)
+    // A release click still follows; the ref outlives it so a real drag's
+    // landing doesn't fire the item under the finger.
+    setTimeout(() => {
+      dialDrag.current = null
+    })
   }
 
   const pickMode = (m: Mode) => {
@@ -531,7 +623,8 @@ export const Camera = ({ os }: { os: Os }) => {
     record(false)
     burst(false)
     if (m !== 'PANO') finishPanoReset()
-    setMode(m)
+    cancelCount()
+    cam.set({ mode: m })
     setFocus(null)
   }
   const finishPanoReset = () => {
@@ -558,23 +651,23 @@ export const Camera = ({ os }: { os: Os }) => {
       sym={flash === 'off' ? 'boltOff' : 'bolt'}
       label={`Flash ${flash}`}
       on={flash !== 'off'}
-      onClick={() => setFlash(FLASHES[(FLASHES.indexOf(flash) + 1) % FLASHES.length]!)}
+      onClick={() => cam.set({ flash: FLASHES[(FLASHES.indexOf(flash) + 1) % FLASHES.length]! })}
     />
   )
   const nightChip = dark && (
     <Pill
       label={
         <>
-          <Sym name="moonStars" size={14} /> {night ? `${night}s` : 'Auto'}
+          <Sym name="moonStars" size={14} /> <Roll k={night}>{night ? `${night}s` : 'Auto'}</Roll>
         </>
       }
       on
-      onClick={() => setNight(NIGHTS[(NIGHTS.indexOf(night) + 1) % NIGHTS.length]!)}
+      onClick={() => cam.set({ night: NIGHTS[(NIGHTS.indexOf(night) + 1) % NIGHTS.length]! })}
     />
   )
-  const liveBtn = <Tog sym="live" label="Live Photo" on={live} onClick={() => setLive(!live)} />
+  const liveBtn = <Tog sym="live" label="Live Photo" on={live} onClick={() => cam.set({ live: !live })} />
   const filtersBtn = <Tog sym="filters" label="Filters" on={tray} onClick={() => setTray(!tray)} />
-  const gridBtn = <Tog sym="grid" label="Grid" on={grid} onClick={() => setGrid(!grid)} />
+  const gridBtn = <Tog sym="grid" label="Grid" on={grid} onClick={() => cam.set({ grid: !grid })} />
   const chevronBtn = (
     <Tog
       glyph={
@@ -592,24 +685,29 @@ export const Camera = ({ os }: { os: Os }) => {
       label={
         <>
           <TimerGlyph size={15} />
-          {timerSecs ? `${timerSecs}s` : ''}
+          {timerSecs ? <Roll k={timerSecs}>{`${timerSecs}s`}</Roll> : ''}
         </>
       }
       on={!!timerSecs}
-      onClick={() => setTimerSecs(TIMERS[(TIMERS.indexOf(timerSecs) + 1) % TIMERS.length]!)}
+      onClick={() => cam.set({ timerSecs: TIMERS[(TIMERS.indexOf(timerSecs) + 1) % TIMERS.length]! })}
     />
   )
   const aspectBtn = (
     <Pill
-      label={aspect}
+      label={<Roll k={aspect}>{aspect}</Roll>}
       on={aspect !== '4:3'}
-      onClick={() => setAspect(ASPECTS[(ASPECTS.indexOf(aspect) + 1) % ASPECTS.length]!)}
+      onClick={() => cam.set({ aspect: ASPECTS[(ASPECTS.indexOf(aspect) + 1) % ASPECTS.length]! })}
     />
   )
   const torchBtn = videoish && facing === 'environment' && (
-    <Tog sym={torch ? 'torchOn' : 'torchOff'} label="Torch" on={torch} onClick={() => setTorch(!torch)} />
+    <Tog sym={torch ? 'torchOn' : 'torchOff'} label="Torch" on={torch} onClick={() => cam.set({ torch: !torch })} />
   )
-  const fstopBtn = portrait && <Pill label={`ƒ${fstop}`} onClick={() => setFstIdx((fstIdx + 1) % FSTOPS.length)} />
+  const fstopBtn = portrait && (
+    <Pill
+      label={<Roll k={fstop}>{`\u0192${fstop}`}</Roll>}
+      onClick={() => cam.set({ fstIdx: (fstIdx + 1) % FSTOPS.length })}
+    />
+  )
   const exposureBtn = (
     <Tog
       sym="exposure"
@@ -622,7 +720,9 @@ export const Camera = ({ os }: { os: Os }) => {
       }}
     />
   )
-  const flipBtn = <Tog sym="flip" label="Switch camera" onClick={() => setFacing(mirror ? 'environment' : 'user')} />
+  const flipBtn = (
+    <Tog sym="flip" label="Switch camera" onClick={() => cam.set({ facing: mirror ? 'environment' : 'user' })} />
+  )
   const thumb: ReactNode = (
     <div {...stylex.props(styles.thumbWrap)}>
       <button
@@ -635,7 +735,9 @@ export const Camera = ({ os }: { os: Os }) => {
       </button>
       {bursts > 0 && (
         <div {...stylex.props(styles.burstBadge)}>
-          <Num value={bursts} />
+          <Roll k={bursts}>
+            <Num value={bursts} />
+          </Roll>
         </div>
       )}
     </div>
@@ -666,14 +768,47 @@ export const Camera = ({ os }: { os: Os }) => {
   )
   const zoomPill = (scrub || !ZOOMS.includes(z)) && (
     <div {...stylex.props(styles.zPill, land ? styles.zPillLand : styles.zPillPort)}>
-      <Num value={z} format={{ maximumFractionDigits: 1 }} suffix="×" />
+      <Roll k={z.toFixed(1)}>
+        <Num value={z} format={{ maximumFractionDigits: 1 }} suffix="×" />
+      </Roll>
     </div>
   )
 
-  const dial = (
+  const dial = land ? (
+    // The wheel: modes ride a drum, the pick sits at its centre and the turn
+    // eases to a stop rather than jumping.
     <div
       role="tablist"
-      {...stylex.props(styles.dial, land && styles.dialLand)}
+      {...stylex.props(styles.wheel)}
+      onPointerDown={dialDown}
+      onPointerMove={dialMove}
+      onPointerUp={dialUp}
+      onPointerCancel={dialUp}
+    >
+      {MODES.map((m, i) => (
+        <button
+          type="button"
+          role="tab"
+          key={m}
+          aria-selected={m === mode}
+          {...stylex.props(
+            styles.wheelBtn,
+            styles.wheelAt(i - wheelPos),
+            dPos === null && styles.wheelEase,
+            m === mode && styles.modeOn
+          )}
+          onClick={() => {
+            if (!dialDrag.current?.moved) pickMode(m)
+          }}
+        >
+          <span {...stylex.props(styles.wheelText)}>{m}</span>
+        </button>
+      ))}
+    </div>
+  ) : (
+    <div
+      role="tablist"
+      {...stylex.props(styles.dial)}
       onPointerDown={dialDown}
       onPointerMove={dialMove}
       onPointerUp={dialUp}
@@ -685,7 +820,7 @@ export const Camera = ({ os }: { os: Os }) => {
           role="tab"
           key={m}
           aria-selected={m === mode}
-          {...stylex.props(styles.modeBtn, land && styles.modeBtnLand, m === mode && styles.modeOn)}
+          {...stylex.props(styles.modeBtn, m === mode && styles.modeOn)}
           onClick={() => pickMode(m)}
         >
           {m}
@@ -743,7 +878,7 @@ export const Camera = ({ os }: { os: Os }) => {
             type="button"
             key={l.name}
             {...stylex.props(styles.thumbBtn)}
-            onClick={() => setLook(i)}
+            onClick={() => cam.set({ look: i })}
             aria-pressed={i === look}
           >
             <canvas width={72} height={72} {...stylex.props(styles.thumbCanvas, i === look && styles.thumbOn)} />
@@ -770,8 +905,8 @@ export const Camera = ({ os }: { os: Os }) => {
         onPointerUp={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setEv(clamp(ev + 0.1, -2, 2))
-          if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setEv(clamp(ev - 0.1, -2, 2))
+          if (e.key === 'ArrowUp' || e.key === 'ArrowRight') cam.set({ ev: clamp(ev + 0.1, -2, 2) })
+          if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') cam.set({ ev: clamp(ev - 0.1, -2, 2) })
         }}
       >
         <div {...stylex.props(styles.evZero)} />
@@ -781,7 +916,9 @@ export const Camera = ({ os }: { os: Os }) => {
       </div>
       {ev !== 0 && (
         <div {...stylex.props(styles.evReadout)}>
-          <Num value={ev} format={{ maximumFractionDigits: 1, signDisplay: 'always' }} />
+          <Roll k={ev.toFixed(1)}>
+            <Num value={ev} format={{ maximumFractionDigits: 1, signDisplay: 'always' }} />
+          </Roll>
         </div>
       )}
     </div>

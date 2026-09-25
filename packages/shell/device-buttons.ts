@@ -32,8 +32,10 @@ let sideSpent = false
 let chord = 0
 let chordSpent = false
 let repeat = 0
-let volHold = 0
-let volAction: 'burst' | 'rec' | null = null
+// Per key: holding both volume keys is a real grip, so each keeps its own hold
+// timer and camera action; releasing one must not end the other's.
+const volHold: Record<'up' | 'down', number> = { up: 0, down: 0 }
+const volAction: Record<'up' | 'down', 'burst' | 'rec' | null> = { up: null, down: null }
 let camHold = 0
 let camSlid = false
 let recording = false
@@ -110,12 +112,12 @@ function volume(b: 'up' | 'down', down: boolean) {
   if (!down) {
     clearTimeout(repeat)
     repeat = 0
-    clearTimeout(volHold)
-    volHold = 0
+    clearTimeout(volHold[b])
+    volHold[b] = 0
     // A camera action that started with the hold ends with the button.
-    if (volAction === 'burst') device.burst(false)
-    if (volAction === 'rec') device.record(false)
-    volAction = null
+    if (volAction[b] === 'burst') device.burst(false)
+    if (volAction[b] === 'rec') device.record(false)
+    volAction[b] = null
     if (chord || chordSpent) chordEnd()
     tell(b, { action: 'release', button: b }, true)
     return
@@ -124,10 +126,10 @@ function volume(b: 'up' | 'down', down: boolean) {
   if (give(b, 'volume', { action: 'press', button: b })) return
   if (device.cameraOpen()) {
     device.shoot()
-    volHold = setTimeout(() => {
-      volHold = 0
-      volAction = b === 'up' ? 'burst' : 'rec'
-      if (volAction === 'burst') device.burst(true)
+    volHold[b] = setTimeout(() => {
+      volHold[b] = 0
+      volAction[b] = b === 'up' ? 'burst' : 'rec'
+      if (volAction[b] === 'burst') device.burst(true)
       else device.record(true)
     }, HOLD)
     return

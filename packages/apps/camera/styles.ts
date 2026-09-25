@@ -1,6 +1,7 @@
 import {
   appAppearance,
   colors,
+  easing,
   leading,
   motion,
   radius,
@@ -14,9 +15,15 @@ import * as stylex from '@stylexjs/stylex'
 const RAIL = 156
 /** The portrait frame clears the top bar, the zoom chips, the dial and the shutter row. */
 const PORT_BOTTOM = 212
+/** Pixels of wheel travel per mode - the gap the drum keeps between items. */
+export const WHEEL_STEP = 52
 
 const blink = stylex.keyframes({ '50%': { opacity: 0.15 } })
 const pulse = stylex.keyframes({ '50%': { transform: 'scale(1.06)' } })
+const rollIn = stylex.keyframes({
+  from: { transform: 'translateY(38%)', opacity: 0 },
+  to: { transform: 'translateY(0)', opacity: 1 }
+})
 
 export const styles = stylex.create({
   root: { paddingBottom: 0, overflow: 'hidden' },
@@ -237,8 +244,6 @@ export const styles = stylex.create({
   thumbNameOn: { color: colors.yellow },
 
   dial: { display: 'flex', alignItems: 'center', gap: 4, touchAction: 'none' },
-  // Stood up beside the shutter, read bottom to top like Apple's.
-  dialLand: { flexDirection: 'column-reverse', gap: 1 },
   modeBtn: {
     paddingTop: 5,
     paddingRight: 10,
@@ -252,8 +257,56 @@ export const styles = stylex.create({
     color: colors.white,
     cursor: 'pointer'
   },
-  modeBtnLand: { writingMode: 'vertical-rl', transform: 'rotate(180deg)' },
   modeOn: { color: colors.yellow, backgroundColor: appAppearance.cameraChip },
+
+  // The landscape dial is a wheel: modes ride a drum beside the shutter, text
+  // stood up and read bottom to top like Apple's, the pick at its centre.
+  wheel: {
+    position: 'relative',
+    height: 320,
+    width: 92,
+    flexShrink: 0,
+    perspective: 480,
+    touchAction: 'none',
+    WebkitMaskImage: 'linear-gradient(transparent, black 16%, black 84%, transparent)',
+    maskImage: 'linear-gradient(transparent, black 16%, black 84%, transparent)'
+  },
+  wheelBtn: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    paddingTop: 6,
+    paddingRight: 12,
+    paddingBottom: 6,
+    paddingLeft: 12,
+    borderRadius: radius.pill,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    color: colors.white,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
+  },
+  // d slots away from the pick ride the drum back and fade; the centre stays.
+  wheelAt: (d: number) => ({
+    transform: `translate(-50%,-50%) translateY(${-d * WHEEL_STEP}px) rotateX(${d * 20}deg)`,
+    opacity: Math.max(0, 1 - Math.abs(d) * 0.42)
+  }),
+  wheelEase: {
+    transitionProperty: 'transform, opacity',
+    transitionDuration: '.3s',
+    transitionTimingFunction: easing.spring
+  },
+  wheelText: { display: 'inline-block', writingMode: 'vertical-rl', transform: 'rotate(180deg)' },
+
+  // A value change slides in rather than snapping - the soft number swap.
+  roll: {
+    display: 'inline-block',
+    animationName: rollIn,
+    animationDuration: '.18s',
+    animationTimingFunction: easing.out
+  },
 
   zoomRow: { display: 'flex', gap: 6, touchAction: 'none' },
   // Stood up in the landscape rail, the way the iPad camera's strip runs.
