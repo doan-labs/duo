@@ -112,7 +112,7 @@ export const styles = stylex.create({
     paddingRight: 8,
     paddingBottom: 8,
     paddingLeft: 8,
-    borderRadius: radius.xl,
+    borderRadius: layout.screenInnerPanel,
     backgroundColor: app.fill3,
     color: app.fg
   },
@@ -302,7 +302,9 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'backwards'
   }),
-  goalLine: { stroke: app.label3, strokeDasharray: '4 4', strokeWidth: 1 },
+  goalLine: { stroke: app.label3, strokeDasharray: '1 5', strokeLinecap: 'round', strokeWidth: 1.5 },
+  gridLine: { stroke: app.fill3, strokeWidth: 1, strokeDasharray: '1 5', strokeLinecap: 'round' },
+  baseline: { stroke: app.separator, strokeWidth: 1 },
 
   /** Workout rows on dark. */
   woRow: { display: 'flex', alignItems: 'center', gap: 12, paddingTop: 10, paddingBottom: 10 },

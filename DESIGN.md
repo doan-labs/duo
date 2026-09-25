@@ -118,7 +118,14 @@ flush to the block above it is a bug, not a look.
 
 Round a step past enough: a filled row, chip or footer card spanning a panel
 is `radius.xl` or more. `radius.lg` on a full-width filled bar still reads
-as a rectangle.
+as a rectangle. A chip sitting inside a floating panel takes the panel's own
+radius (`layout.screenInnerPanel`) - a smaller curve reads mismatched under
+the corner it shares.
+
+Charts share one look of our own, not Apple's: a dotted hairline grid at the
+quartiles, capsule bars off a baseline hairline, a smooth line over a gradient
+that fades to nothing, and sleep drawn as a continuous wave that changes
+colour at each stage rather than stacked blocks.
 
 ## 6. Motion
 

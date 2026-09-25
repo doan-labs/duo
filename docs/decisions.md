@@ -1526,3 +1526,23 @@ titles stop hugging the pane. Rounding errs a step upward: a filled row,
 chip or footer card spanning a panel is `radius.xl` or more, which is what
 the sidebar account and streak chips now take. Cost: under a `secHead` some
 pairs settle a step airier than before; the uniformity is the point.
+
+## 94. Panel chips take the panel's radius, and charts draw their own look
+
+2026-09-25. Two follow-ups to 93: the sidebar account chip still read
+mismatched under the floating panel's corner at `radius.xl`, and the Health
+charts read as flat knock-offs of Apple's - a hard-edged area fill, plain
+bars, disjoint hypnogram blocks.
+
+The chip now takes `layout.screenInnerPanel`, the same radius the sidebar
+itself draws, in both Health and Fitness - a floating child borrows the
+panel's curve rather than picking a step from the radius scale. The rule in
+DESIGN.md says so alongside the `radius.xl` floor.
+
+The chart vocabulary is rebuilt on our own look: a dotted hairline grid at
+the quartiles behind every big chart, capsule bars off a baseline hairline,
+a smoothed line over a tint-to-transparent gradient with the latest point
+dotted, and the hypnogram as one continuous wave that changes colour at each
+stage instead of disjoint blocks. Fitness's WeekBars moves to the same
+vocabulary. Cost: the wave hypnogram no longer shows per-segment time labels
+directly on the blocks; the stage legend under it carries the totals.

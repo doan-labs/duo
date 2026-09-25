@@ -134,7 +134,7 @@ export const styles = stylex.create({
     paddingRight: 8,
     paddingBottom: 8,
     paddingLeft: 8,
-    borderRadius: radius.xl,
+    borderRadius: layout.screenInnerPanel,
     backgroundColor: app.fill3,
     color: app.fg,
     textAlign: 'left',
@@ -353,6 +353,8 @@ export const styles = stylex.create({
   },
   chartSvg: { width: '100%', height: 'auto', display: 'block' },
   axis: { fill: app.label3, fontSize: typeScale.caption2, fontFamily: fonts.system },
+  gridLine: { stroke: app.fill3, strokeWidth: 1, strokeDasharray: '1 5', strokeLinecap: 'round' },
+  baseline: { stroke: app.separator, strokeWidth: 1 },
   barGrow: (tint: string) => ({
     fill: tint,
     transformBox: 'fill-box',
@@ -362,7 +364,33 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'backwards'
   }),
-  goalLine: { stroke: app.label3, strokeDasharray: '4 4', strokeWidth: 1 },
+  goalLine: { stroke: app.label3, strokeDasharray: '1 5', strokeLinecap: 'round', strokeWidth: 1.5 },
+  lineDot: (tint: string) => ({ fill: tint }),
+  lineDotRing: (tint: string) => ({ fill: tint, opacity: 0.18 }),
+  hypnoRun: (tint: string, w: number) => ({
+    stroke: tint,
+    strokeWidth: w,
+    strokeLinecap: 'round',
+    fill: 'none',
+    strokeDasharray: 1600,
+    strokeDashoffset: 1600,
+    animationName: { default: drawIn, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.9s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'forwards'
+  }),
+  hypnoLink: (tint: string, w: number) => ({
+    stroke: tint,
+    strokeWidth: Math.max(1.5, w * 0.55),
+    strokeLinecap: 'round',
+    fill: 'none',
+    strokeDasharray: 1600,
+    strokeDashoffset: 1600,
+    animationName: { default: drawIn, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.5s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'forwards'
+  }),
   lineDraw: {
     strokeDasharray: 1600,
     strokeDashoffset: 1600,
@@ -379,7 +407,7 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'forwards'
   },
-  lineFill: (tint: string) => ({ fill: tint, opacity: 0.1 }),
+
   statGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
