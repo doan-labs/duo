@@ -1,27 +1,41 @@
-// Wallet as Reminders on iPad: a floating glass sidebar and the browse pane of
-// smart-group tiles over "My Passes" unfolded, a cover that pushes the same
-// pages as a stack. The card fan stays as the app's second root, one `path`
-// cell is the navigation for both displays, and one book in fixtures holds the
-// passes and their ledgers.
+// Wallet the way the real app wears it: the big title with the +/search/menu
+// pills, the passes promo, and the overlapping fan of payment cards as the
+// hero; stubs carry what is not a payment card. Unfolded it gains a floating
+// glass sidebar of every pass, the cover pushes the same pages as a stack,
+// and one `path` cell navigates both displays over the persisted book.
 
 import type { Pass, PassGroup } from '@doan-labs/duo-fixtures/wallet.ts'
 import { groupName, passesOf, removePass } from '@doan-labs/duo-fixtures/wallet.ts'
 import type { Os } from '@doan-labs/duo-sdk'
-import { Nav, Row, Section, Sym, type SymProps, useNav, useWide } from '@doan-labs/duo-uikit'
+import { Menu, Nav, Row, Section, Sym, type SymProps, useNav, useWide } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState } from 'react'
 import { AddPassSheet, Dot, FACES, Face, Find, PaySheet } from './parts.tsx'
-import { armPay, goBack, goTo, goToPath, openAdd, selFan, useBook, useFanSel, usePath } from './store.ts'
+import {
+  armPay,
+  dismissPromo,
+  goBack,
+  goTo,
+  goToPath,
+  openAdd,
+  selFan,
+  useBook,
+  useFanSel,
+  usePath,
+  usePromo
+} from './store.ts'
 import { styles } from './styles.ts'
 
-/** The smart tiles, Reminders' Today/Scheduled/All/Flagged pattern. */
-const TILES: { id: PassGroup | 'all'; sym: SymProps['name']; tint: string }[] = [
-  { id: 'all', sym: 'stack', tint: colors.grey3Dark },
-  { id: 'cards', sym: 'building', tint: colors.blue },
-  { id: 'transit', sym: 'tram', tint: colors.mint },
-  { id: 'passes', sym: 'star', tint: colors.orange }
+/** The promo's little pass icons, coloured and tilted like the real banner. */
+const PROMO_TILES: { sym: SymProps['name']; tint: string; rot: number }[] = [
+  { sym: 'film', tint: colors.green, rot: -9 },
+  { sym: 'cup', tint: colors.yellow, rot: 5 },
+  { sym: 'star', tint: colors.blue, rot: -4 },
+  { sym: 'cart', tint: colors.pink, rot: 8 },
+  { sym: 'bolt', tint: colors.grey3Dark, rot: -7 },
+  { sym: 'book', tint: colors.brown, rot: 6 }
 ]
 
 /** What the bottom action of a pass detail does. */
@@ -178,25 +192,80 @@ function SideRow({
 }
 
 /**
- * The browse root, Reminders' home: the four smart tiles, then "My Passes" as
- * a grouped list, the "+ New Pass" / "Add Card" bar pinned at the bottom.
+ * The wallet screen itself: the title with the +/search/menu cluster, the
+ * passes promo until it is dismissed, then the fan of payment cards, a tap
+ * lifting one to the front and the front one opening its page, and stubs for
+ * transit and other passes underneath.
  */
 function BrowsePage({ wide }: { wide: boolean }) {
   const book = useBook()
+  const promo = usePromo()
+  const [searchOn, setSearchOn] = useState(false)
+  const [menu, setMenu] = useState(false)
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   const found = q ? book.passes.filter((p) => p.name.toLowerCase().includes(q)) : []
   const dest = (d: string) => (wide ? goToPath(['browse', d]) : goTo(d))
+  const cards = book.passes.filter((p) => p.group === 'cards')
+  const transit = book.passes.filter((p) => p.group === 'transit')
+  const tickets = book.passes.filter((p) => p.group === 'passes')
+  const w = wide ? 340 : 296
   return (
     <>
       <div {...stylex.props(styles.head)}>
         <span {...stylex.props(typography.largeTitle)}>Wallet</span>
-        {!wide && (
-          <div {...stylex.props(styles.headSide)}>
-            <Find query={query} onQuery={setQuery} />
+        <div {...stylex.props(styles.headSide)}>
+          <div {...stylex.props(styles.pills)}>
+            <button
+              type="button"
+              aria-label="Add pass"
+              onClick={() => openAdd({ group: 'cards' })}
+              {...stylex.props(styles.pillBtn, shared.press)}
+            >
+              <Sym name="plus" size={16} />
+            </button>
+            <div {...stylex.props(styles.pillBar)}>
+              <button
+                type="button"
+                aria-label="Search"
+                aria-expanded={searchOn}
+                onClick={() => setSearchOn((on) => !on)}
+                {...stylex.props(styles.pillItem, shared.press)}
+              >
+                <Sym name="search" size={15} />
+              </button>
+              <span {...stylex.props(styles.pillSep)} />
+              <button
+                type="button"
+                aria-label="More"
+                aria-expanded={menu}
+                onClick={() => setMenu(true)}
+                {...stylex.props(styles.pillItem, shared.press, styles.pillDots)}
+              >
+                ···
+              </button>
+            </div>
+            <Menu
+              open={menu}
+              onClose={() => setMenu(false)}
+              xstyle={styles.menuPos}
+              items={[
+                { label: 'New Pass', icon: 'plus', onSelect: () => openAdd({ group: 'cards' }) },
+                'separator',
+                { label: 'Card Stack', icon: 'stack', onSelect: () => dest('stack') },
+                { label: 'Transit', icon: 'tram', onSelect: () => dest('g:transit') },
+                { label: 'Passes', icon: 'star', onSelect: () => dest('g:passes') },
+                { label: 'All Passes', icon: 'grid', onSelect: () => dest('g:all') }
+              ]}
+            />
           </div>
-        )}
+        </div>
       </div>
+      {searchOn && (
+        <div {...stylex.props(styles.findBar)}>
+          <Find query={query} onQuery={setQuery} />
+        </div>
+      )}
       <div {...stylex.props(styles.body)}>
         {q ? (
           <Section>
@@ -207,38 +276,103 @@ function BrowsePage({ wide }: { wide: boolean }) {
           </Section>
         ) : (
           <>
-            <div {...stylex.props(styles.tiles, wide && styles.tilesWide)}>
-              {TILES.map((t) => (
-                <button key={t.id} type="button" onClick={() => dest(`g:${t.id}`)} {...stylex.props(styles.tile)}>
-                  <span {...stylex.props(styles.tileIc(t.tint))}>
-                    <Sym name={t.sym} size={16} />
-                  </span>
-                  <span {...stylex.props(styles.tileNum)}>{passesOf(t.id).length}</span>
-                  <span {...stylex.props(styles.tileLabel)}>{groupName(t.id)}</span>
+            {promo && (
+              <div {...stylex.props(styles.promo)}>
+                <button type="button" aria-label="Dismiss" onClick={dismissPromo} {...stylex.props(styles.promoX)}>
+                  <Sym name="xmark" size={12} />
                 </button>
-              ))}
+                <div {...stylex.props(styles.promoArt)}>
+                  {PROMO_TILES.map((t) => (
+                    <span key={t.sym} {...stylex.props(styles.promoTile(t.tint, t.rot))}>
+                      <Sym name={t.sym} size={22} />
+                    </span>
+                  ))}
+                </div>
+                <div {...stylex.props(styles.promoBand)}>
+                  <div {...stylex.props(styles.promoTxt)}>
+                    <span {...stylex.props(typography.headline)}>Passes and Tickets</span>
+                    <span {...stylex.props(typography.footnote, styles.heroSub)}>
+                      Find apps and start collecting your passes in one place.
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => dest('g:passes')} {...stylex.props(styles.promoGet)}>
+                    Get
+                  </button>
+                </div>
+              </div>
+            )}
+            <div {...stylex.props(styles.fanBox(w, cards.length))}>
+              {cards.map((p, i) => {
+                const lift = i === cards.length - 1
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    aria-label={p.name}
+                    onClick={() => (lift ? dest(`p:${p.id}`) : selFan(p.id))}
+                    {...stylex.props(
+                      styles.fanCard(FACES[p.face].bg, w),
+                      p.ink === 'dark' ? styles.faceInkDark : styles.faceInk,
+                      styles.fanShift(i, lift, 62)
+                    )}
+                  >
+                    <span {...stylex.props(styles.faceMark)}>
+                      <Sym name={p.icon as SymProps['name']} size={18} />
+                    </span>
+                    <span {...stylex.props(styles.faceBig)}>
+                      <Sym name={p.icon as SymProps['name']} size={110} />
+                    </span>
+                    <span {...stylex.props(styles.faceName)}>{p.name}</span>
+                    <span {...stylex.props(styles.faceNum)}>{p.last4 ? `··· ${p.last4}` : p.detail}</span>
+                  </button>
+                )
+              })}
             </div>
-            <div {...stylex.props(styles.sec)}>My Passes</div>
-            <div {...stylex.props(styles.col)}>
-              <Section>
-                {book.passes.map((p) => (
-                  <PassRow key={p.id} pass={p} pick={() => dest(`p:${p.id}`)} />
-                ))}
-              </Section>
-            </div>
+            {transit.length > 0 && (
+              <>
+                <div {...stylex.props(styles.sec)}>Transit</div>
+                <div {...stylex.props(styles.stubs)}>
+                  {transit.map((p) => (
+                    <Stub key={p.id} pass={p} pick={() => dest(`p:${p.id}`)} />
+                  ))}
+                </div>
+              </>
+            )}
+            {tickets.length > 0 && (
+              <>
+                <div {...stylex.props(styles.sec)}>Passes</div>
+                <div {...stylex.props(styles.stubs)}>
+                  {tickets.map((p) => (
+                    <Stub key={p.id} pass={p} pick={() => dest(`p:${p.id}`)} />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
-      <div {...stylex.props(styles.bar)}>
-        <button type="button" onClick={() => openAdd({ group: 'cards' })} {...stylex.props(styles.barBtn)}>
-          <Sym name="plus" size={16} />
-          New Pass
-        </button>
-        <button type="button" onClick={() => dest('stack')} {...stylex.props(styles.barBtn, styles.barRight)}>
-          Card Stack
-        </button>
-      </div>
     </>
+  )
+}
+
+/** A pass's ticket stub: its gradient band, glyph, name and detail line. */
+function Stub({ pass, pick }: { pass: Pass; pick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={pick}
+      aria-label={pass.name}
+      {...stylex.props(styles.stub(FACES[pass.face].bg), pass.ink === 'dark' ? styles.faceInkDark : styles.faceInk)}
+    >
+      <span {...stylex.props(styles.stubMark)}>
+        <Sym name={pass.icon as SymProps['name']} size={20} />
+      </span>
+      <span {...stylex.props(styles.stubBig)}>
+        <Sym name={pass.icon as SymProps['name']} size={90} />
+      </span>
+      <span {...stylex.props(styles.stubName)}>{pass.name}</span>
+      <span {...stylex.props(styles.stubDetail)}>{pass.detail}</span>
+    </button>
   )
 }
 
@@ -260,14 +394,13 @@ function PassRow({ pass, pick }: { pass: Pass; pick: () => void }) {
 
 /** A group's pass list: its coloured title over the rows of that group. */
 function GroupPage({ group, wide }: { group: string; wide: boolean }) {
-  const tile = TILES.find((t) => t.id === group)
   const passes = passesOf(group)
   const name = groupName(group)
   return (
     <>
       <div {...stylex.props(styles.head)}>
         {!wide && <BackBtn />}
-        <span {...stylex.props(styles.title(tile?.tint ?? app.fg))}>{name}</span>
+        <span {...stylex.props(styles.title(app.fg))}>{name}</span>
       </div>
       <div {...stylex.props(styles.body)}>
         <div {...stylex.props(styles.col)}>
@@ -376,9 +509,9 @@ function StackPage({ wide }: { wide: boolean }) {
                 aria-label={p.name}
                 onClick={() => selFan(p.id)}
                 {...stylex.props(
-                  styles.fanCard(FACES[p.face].bg),
+                  styles.fanCard(FACES[p.face].bg, 240),
                   p.ink === 'dark' ? styles.faceInkDark : styles.faceInk,
-                  styles.fanShift(i, lift)
+                  styles.fanShift(i, lift, 48)
                 )}
               >
                 <span {...stylex.props(styles.faceMark)}>

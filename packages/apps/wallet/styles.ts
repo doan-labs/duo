@@ -1,7 +1,8 @@
-// Wallet's chrome, rebuilt as Reminders on iPad: the floating glass sidebar
-// unfolded (decision 18: a tint, a rim, a shadow), smart-group tiles over a
-// "My Passes" grouped list, the card-stack fan kept as the app's second root,
-// and the pay sheet rising over a dimmed stack.
+// Wallet's chrome in the real Apple Wallet idiom: the +/search/menu pill
+// cluster next to the big title, the dismissible passes promo, the overlapping
+// fan of cards as the hero, ticket stubs for what is not a payment card, the
+// floating glass sidebar unfolded (decision 18), and the pay sheet rising over
+// a dimmed stack.
 
 import {
   app,
@@ -182,59 +183,131 @@ export const styles = stylex.create({
   },
   col: { width: '100%', maxWidth: 660, marginRight: 'auto', marginLeft: 'auto' },
 
-  /** The smart-group tiles: two columns like Reminders, icon circle top-left. */
-  tiles: {
+  /** The top-right cluster: a + circle, then the joined search/menu pill. */
+  pills: { display: 'flex', alignItems: 'center', gap: 8, position: 'relative' },
+  pillBtn: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
-    paddingTop: space.sm,
-    paddingRight: space.lg,
-    paddingLeft: space.lg
-  },
-  tilesWide: { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' },
-  tile: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingTop: 10,
-    paddingRight: 14,
-    paddingBottom: 12,
-    paddingLeft: 14,
-    borderRadius: radius.xxl,
+    placeItems: 'center',
+    width: 34,
+    height: 34,
+    borderRadius: radius.circle,
     backgroundColor: app.surface,
     boxShadow: shadow.card,
     color: app.fg,
-    textAlign: 'left',
     cursor: 'pointer',
     transitionProperty: 'transform',
     transitionDuration: motion.pressDuration,
     transform: { default: null, ':active': motion.press }
   },
-  tileIc: (c: string) => ({
+  pillBar: {
+    display: 'flex',
+    alignItems: 'center',
+    height: 34,
+    borderRadius: radius.pill,
+    backgroundColor: app.surface,
+    boxShadow: shadow.card,
+    overflow: 'hidden'
+  },
+  pillItem: {
     display: 'grid',
     placeItems: 'center',
-    width: 30,
-    height: 30,
-    borderRadius: radius.circle,
-    backgroundColor: c,
+    width: 38,
+    height: 34,
+    color: app.fg,
+    cursor: 'pointer',
+    transitionProperty: 'transform',
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
+  },
+  pillSep: { width: 1, height: 18, backgroundColor: app.separator, flexShrink: 0 },
+  pillDots: {
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    fontWeight: weight.semibold
+  },
+  menuPos: { position: 'absolute', top: '100%', right: 0, marginTop: 8 },
+
+  /** The search field the pill reveals, under the title. */
+  findBar: { paddingTop: space.sm, paddingRight: space.lg, paddingLeft: space.lg },
+
+  /** The "Passes and Tickets" promo: tinted art band, white text band, a Get pill. */
+  promo: {
+    position: 'relative',
+    overflow: 'hidden',
+    marginTop: space.sm,
+    marginRight: space.lg,
+    marginLeft: space.lg,
+    marginBottom: 4,
+    borderRadius: radius.xxl,
+    backgroundColor: app.surface,
+    boxShadow: shadow.card,
+    flexShrink: 0
+  },
+  promoArt: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 14,
+    paddingTop: 22,
+    paddingBottom: 18,
+    paddingRight: 10,
+    paddingLeft: 10,
+    backgroundColor: app.fill3
+  },
+  promoTile: (bg: string, rot: number) => ({
+    display: 'grid',
+    placeItems: 'center',
+    width: 46,
+    height: 46,
+    borderRadius: radius.lg,
+    backgroundColor: bg,
     color: colors.white,
+    transform: `rotate(${rot}deg)`,
+    boxShadow: shadow.card,
     flexShrink: 0
   }),
-  tileNum: {
-    marginTop: 'auto',
-    fontSize: typeScale.title1,
-    lineHeight: leading.title1,
-    letterSpacing: tracking.title1,
-    fontWeight: weight.bold,
-    fontVariantNumeric: 'tabular-nums'
+  promoBand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.md,
+    paddingTop: 12,
+    paddingRight: 14,
+    paddingBottom: 14,
+    paddingLeft: 14
   },
-  tileLabel: {
-    fontSize: typeScale.footnote,
-    lineHeight: leading.footnote,
-    letterSpacing: tracking.footnote,
-    fontWeight: weight.medium,
-    color: app.label2
+  promoTxt: { display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1, minWidth: 0 },
+  promoGet: {
+    display: 'grid',
+    placeItems: 'center',
+    height: 32,
+    paddingRight: 18,
+    paddingLeft: 18,
+    borderRadius: radius.pill,
+    backgroundColor: app.fill3,
+    color: app.fg,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold,
+    cursor: 'pointer',
+    flexShrink: 0,
+    transitionProperty: 'transform',
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
+  },
+  promoX: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    display: 'grid',
+    placeItems: 'center',
+    width: 26,
+    height: 26,
+    borderRadius: radius.circle,
+    backgroundColor: app.fill3,
+    color: app.label2,
+    cursor: 'pointer'
   },
 
   /** "My Passes" header over the grouped rows; Reminders sets it small-caps grey. */
@@ -338,23 +411,35 @@ export const styles = stylex.create({
 
   /** The stack: cards fanned, the top one the live selection. */
   fan: { position: 'relative', flexGrow: 1, minHeight: 0 },
-  fanCard: (bg: string) => ({
+  /** The browse fan, centred in the column: height covers the peeks plus the front card. */
+  fanBox: (w: number, n: number) => ({
+    position: 'relative',
+    width: w,
+    height: Math.max(0, n - 1) * 62 + Math.round(w / 1.586),
+    marginTop: 14,
+    marginRight: 'auto',
+    marginLeft: 'auto',
+    flexShrink: 0
+  }),
+  fanCard: (bg: string, w: number) => ({
     position: 'absolute',
     left: '50%',
     top: 10,
-    width: 240,
+    width: w,
     aspectRatio: '1.586',
     borderRadius: radius.xl,
     backgroundImage: bg,
     boxShadow: shadow.float,
-    marginLeft: -120,
+    marginLeft: -w / 2,
     transitionProperty: 'transform',
     transitionDuration: '.45s',
     transitionTimingFunction: easing.pop,
     cursor: 'pointer'
   }),
   /** Where a card sits in the fan: depth steps down, the front one full size. */
-  fanShift: (i: number, top: boolean) => ({ transform: `translateY(${i * 48}px) scale(${top ? 1 : 0.92})` }),
+  fanShift: (i: number, top: boolean, step: number) => ({
+    transform: `translateY(${i * step}px) scale(${top ? 1 : 0.92})`
+  }),
   fanHint: {
     position: 'absolute',
     right: 0,
@@ -396,6 +481,45 @@ export const styles = stylex.create({
     animationName: { default: tick, '@media (prefers-reduced-motion: reduce)': 'none' },
     animationDuration: '.45s',
     animationTimingFunction: easing.spring
+  },
+
+  /** A pass stub: the ticket look for what is not a payment card. */
+  stubs: { display: 'flex', flexDirection: 'column', gap: 10, paddingRight: space.lg, paddingLeft: space.lg },
+  stub: (bg: string) => ({
+    position: 'relative',
+    display: 'block',
+    width: '100%',
+    height: 92,
+    borderRadius: radius.xl,
+    backgroundImage: bg,
+    boxShadow: shadow.card,
+    overflow: 'hidden',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transitionProperty: 'transform',
+    transitionDuration: motion.pressDuration,
+    transform: { default: null, ':active': motion.press }
+  }),
+  stubMark: { position: 'absolute', top: 10, left: 12, opacity: 0.9 },
+  stubBig: { position: 'absolute', right: -14, bottom: -22, opacity: 0.16 },
+  stubName: {
+    position: 'absolute',
+    left: 40,
+    top: 10,
+    fontSize: typeScale.callout,
+    lineHeight: leading.callout,
+    letterSpacing: tracking.callout,
+    fontWeight: weight.semibold
+  },
+  stubDetail: {
+    position: 'absolute',
+    left: 12,
+    bottom: 10,
+    fontFamily: fonts.mono,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    opacity: 0.85
   },
 
   /** Sheet internals. */

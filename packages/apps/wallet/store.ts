@@ -57,6 +57,11 @@ const fanCell = cell<string>('')
 export const useFanSel = () => useSyncExternalStore(fanCell.sub, fanCell.get)
 export const selFan = (id: string) => fanCell.set(id)
 
+/** The browse promo card: the "Passes and Tickets" banner until it is dismissed. */
+const promoCell = cell(true)
+export const usePromo = () => useSyncExternalStore(promoCell.sub, promoCell.get)
+export const dismissPromo = () => promoCell.set(false)
+
 /** The add-pass sheet, open for one group (the picker lives in the sheet). */
 const addCell = cell<{ group: PassGroup } | null>(null)
 export const useAdd = () => useSyncExternalStore(addCell.sub, addCell.get)
