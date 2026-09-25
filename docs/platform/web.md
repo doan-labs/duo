@@ -336,10 +336,10 @@ published, no host is chosen, no CI deploys it.
 | Get started | `/get-started` | Clone, model fetch, `bun run dev`, `?app=`/`?deg=` poses, how a baked app is added; the CLI and `?dev=` path as a plan | First half works today; SDK path marked not built |
 | Docs | `/docs`, `/docs/<path>` | Every file under `docs/` rendered from source with a badge and a source link; sidebar grouped Platform plan, Progress, Repository | Planning document, Proposed, or Works today per file |
 | UI kit | `/kit`, `/kit/docs`, `/kit/docs/<export>` | `/kit` is the hero with the export counts and install line over a showcase grid of live scenes composed from the kit. Under it the reference is generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today |
-| SDK | `/sdk` | Generated legacy types marked Transitional; the runtime contract summarised and linked by section, marked Proposed | Two badges, never mixed |
+| SDK | `/sdk` | The hardware showcase (decision 96); out of the global bar and unlinked since decision 100, the route still builds | Hidden |
 | Publish | `/publish` | `publishing.md` rendered; PR template marked not built | Planning document |
 | Guidelines | `/guidelines` | The three fold rules and the iOS rules that still hold, with Notes on the cover to fold | Works today (describes current shell behaviour) |
-| Changelog | `/changelog` | Package names and versions read at build time; renders `CHANGELOG.md` when one exists | Not built yet (all packages are 0.0.0, no changelog exists) |
+| Changelog | `/changelog` | The root `CHANGELOG.md`, one list per Duo version with package releases inside it; in the global bar since decision 100 | Works today |
 | Simulator | `/simulator` | Full-width embed with Closed / Half open / Open, the URL parameters the shell reads today | Works today; `?dev=` marked not built |
 
 Design follows Apple's marketing site: a 44 px translucent global nav with a
@@ -442,8 +442,7 @@ rebase onto stages 2–5:
 - [x] Kit component demos: every `/kit/<Component>` page renders the real
       component from `src/kit-demos/<name>.tsx` with its source, and the props
       table carries defaults and what the props extend.
-- [ ] Changelog entries once any package publishes a version and a
-      `CHANGELOG.md`; the page reads them at build time already.
+- [x] Changelog: the root `CHANGELOG.md`, with package releases inside each Duo version.
 - [ ] Manifest and permission tables from `packages/sdk/manifest.ts` and
       `permissions.ts` once they exist, replacing the pointers into the contract.
 - [ ] Download links once CI publishes installers; the page says they are not

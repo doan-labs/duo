@@ -65,7 +65,7 @@ export function Fold() {
             </Readout>
             <p {...stylex.props(styles.list)}>
               Apps hear about the display in use, their placement on it, its size and the hinge angle, every time one
-              changes. The buttons and sensors are events too: <TextLink to="/sdk">press them live</TextLink>.
+              changes. The buttons and sensors are events too, <TextLink to="/docs/sdk">in the SDK</TextLink>.
             </p>
           </div>
           <div {...stylex.props(styles.device)}>

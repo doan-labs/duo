@@ -1681,3 +1681,18 @@ lock screen is the center rather than a separate pull-down layer because Duo's
 lock lives on both displays and a Notification Center swipe would collide with
 the unlock swipe and the Control Center pull at the top edge.
 
+
+## 100. The global bar trades SDK for Changelog; Duo keeps one changelog
+
+2026-09-25, accepted. `/sdk` (decision 96's hardware showcase) leaves the global
+bar for now; the route still builds and the home fold section links
+`/docs/sdk` instead. Changelog joins the bar last, just before GitHub. The repository root gains
+`CHANGELOG.md`, the only changelog `/changelog` renders: one `##` per Duo
+version, newest first, and under it one concise `###` per part (UI kit, SDK,
+CLI, Shell, Apps, Community apps, Site) that the page folds into an accordion.
+A package's releases sit inside the Duo version that shipped them, as a range
+(UI kit 0.1.0 → 1.0.0 inside 0.1.0), not in a section of their own. A line
+that lists apps by name renders their real icons. 0.1.0 is the
+initial release, cut on 2026-09-19; 0.2.0 was cut on 2026-09-26. Later
+work goes under the next version marked `(Unreleased)` until it is cut. Add an entry in the same change as
+anything a visitor would notice.
