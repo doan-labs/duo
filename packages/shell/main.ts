@@ -48,7 +48,8 @@ startBuilderPreview()
 
 // An embedding page drives the backdrop, the pose and what the phone is doing: `?bg=` at
 // load, then `{ deg, yaw, bg, paused, app, arg, cue }` by postMessage (cues in cues.ts),
-// and `{ hear }` to be told the hardware events an app would hear (embed-device.ts).
+// and `{ hear }` to be told the hardware events an app would hear (embed-device.ts),
+// `{ spots }` to be told where the buttons are on screen, every frame they move.
 // Same-origin only, so the site that ships the shell is the only sender. Registered before the model loads so a
 // message sent at the frame's load event is not lost; the pose waits below.
 type Pose = {
@@ -61,9 +62,13 @@ type Pose = {
   cue?: Cue
   hello?: boolean
   hear?: unknown[]
+  spots?: boolean
 }
 /** An embedding page parks the frame while it is off screen: no render, no GPU time. */
 let paused = false
+/** The page that asked where the buttons are, and what it was last told. */
+let spotsTo: string | null = null
+let spotsSent = ''
 const paint = (bg: string | null) => {
   if (bg) document.body.style.background = bg
 }
@@ -94,6 +99,10 @@ addEventListener('message', (e: MessageEvent<Pose>) => {
   if (typeof e.data.bg === 'string') paint(e.data.bg)
   if (typeof e.data.paused === 'boolean') paused = e.data.paused
   if (Array.isArray(e.data.hear)) hear(e.data.hear, e.origin)
+  if (typeof e.data.spots === 'boolean') {
+    spotsTo = e.data.spots ? e.origin : null
+    spotsSent = ''
+  }
   if (pose) pose(e.data)
   else queued = { ...queued, ...e.data }
 })
@@ -794,6 +803,12 @@ renderer.setAnimationLoop((now) => {
   frame()
   hud.orbit(controls.getAzimuthalAngle(), controls.getPolarAngle(), controls.getDistance(), yaw)
   renderer.render(scene, camera)
+  if (spotsTo) {
+    const spots = hardware.spots()
+    const now = JSON.stringify(spots)
+    if (now !== spotsSent) parent.postMessage({ spots }, spotsTo)
+    spotsSent = now
+  }
   // A DOM panel has no depth test and can't bend, so a panel stands in for the
   // bake only where the bake cannot draw what is up: the inner one flat, or
   // holding an app through the fold; the cover closed, or holding the app at

@@ -311,7 +311,10 @@ bun run api            # only the TSDoc reference
   the device events an app would hear (`packages/shell/embed-device.ts`), each
   posted back to the asking origin as `{ device: { type, data } }`; the page
   listens as a visible, active view, so while it hears volume or Camera Control
-  those presses are its, and `hear: []` stops. The shell
+  those presses are its, and `hear: []` stops. `spots: true` asks where the
+  four caps are, answered as `{ spots: { side, camera, up, down } }` in frame
+  pixels after every rendered frame that moved one, so a page can point at a
+  button while the phone eases into a pose; `spots: false` stops. The shell
   also accepts a localhost parent on another port, so `vite dev` on 3001 can
   drive the root dev server on 3000; anything else must be the same origin. `src/simulator.tsx` posts the body colour and
   its `deg`, `yaw`, `app`, `cue` and `hear` props (re-sent on every load, so a

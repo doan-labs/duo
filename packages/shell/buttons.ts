@@ -212,6 +212,16 @@ export function buttons(body: THREE.Group, camera: THREE.Camera, canvas: HTMLEle
       body.rotation.set(rock.x.x, rock.x.y, rock.x.z)
     },
     /** For scripts and tests: the same path a finger takes. */
-    press: set
+    press: set,
+    /** Where each cap is on the page, in CSS pixels, as last rendered: for an embedding page to point at. */
+    spots() {
+      const r = canvas.getBoundingClientRect()
+      const out = {} as Record<Button, [number, number]>
+      for (const name of Object.keys(parts) as Button[]) {
+        const v = parts[name].hit.getWorldPosition(new THREE.Vector3()).project(camera)
+        out[name] = [Math.round(r.left + ((v.x + 1) / 2) * r.width), Math.round(r.top + ((1 - v.y) / 2) * r.height)]
+      }
+      return out
+    }
   }
 }

@@ -1608,3 +1608,13 @@ never hears anything until it asks, as with apps.
 the camera's orbit azimuth. Dragging the phone orbits the camera, and to the
 person that is turning the phone, so an app hears it. Only the azimuth counts;
 tilting the camera up or down is not a turn about the long axis.
+
+The page opens on a tour: a ring pulses on the cap the chapter is about and a
+card beside it says what to do, with Back and Next walking the chapters. The
+page cannot see into the frame, so the shell reports where the caps are
+(`{ spots }` on the bridge, projected from the same hit boxes a pointer
+presses) after each frame that moved one, and the ring rides the pose ease
+instead of landing where the phone used to be. A ring goes once its chapter
+is tried: a press for the buttons, a turn away from the page's pose for the
+orientation, a flip for the switches, since those two arrive as state on
+their own.

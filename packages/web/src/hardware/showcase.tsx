@@ -8,10 +8,11 @@ import { type ReactNode, useEffect, useReducer, useRef, useState } from 'react'
 import { Block, Cap, Headline, Lede, TextLink } from '../home/parts'
 import { Field, LiveCode, Readout } from '../live-code'
 import { Segmented } from '../segmented'
-import { type Cue, type Heard, Simulator } from '../simulator'
+import { type Cue, type Heard, Simulator, type Spots } from '../simulator'
 import { color, ease, font, radius } from '../tokens.stylex'
 import { PoseDial } from './pose-dial'
 import { SwitchTiles } from './switch-tiles'
+import { type Stop, Tour } from './tour'
 import { Viewfinder } from './viewfinder'
 import { Score, VolumeKeys } from './volume-keys'
 
@@ -88,6 +89,7 @@ type Chapter = {
   runs: (l: Live) => number | undefined
   pose?: Pose
   how: ReactNode
+  tour: Stop
 }
 
 // Open and turned, all four caps face the camera: volume on the top edge, side and Camera Control down the right.
@@ -109,6 +111,12 @@ const CHAPTERS: Chapter[] = [
     ],
     runs: (l) => (l.last.volume ? (l.last.volume.action === 'press' ? 3 : 2) : undefined),
     pose: EDGE,
+    tour: {
+      title: 'Volume buttons',
+      text: 'Click either cap, or press ↑ and ↓ with the phone focused.',
+      at: ['up', 'down'],
+      below: true
+    },
     how: (
       <>
         Click the two small caps on the top edge, near the right corner. With the phone focused, <Kbd>↑</Kbd> and{' '}
@@ -132,6 +140,11 @@ const CHAPTERS: Chapter[] = [
       return a && { press: 1, slide: 2, release: 3 }[a]
     },
     pose: SHUT,
+    tour: {
+      title: 'Camera Control',
+      text: 'Press the cap and drag along it to zoom. Let go to shoot.',
+      at: ['camera']
+    },
     how: (
       <>
         Press the lower cap on the right edge and drag along it before you let go. <Kbd>C</Kbd> presses it.
@@ -150,6 +163,11 @@ const CHAPTERS: Chapter[] = [
     ],
     runs: (l) => (l.last.side ? 2 : undefined),
     pose: SHUT,
+    tour: {
+      title: 'Side button',
+      text: 'Click it and the phone sleeps, as it should. Click again to wake it.',
+      at: ['side']
+    },
     how: (
       <>
         Click the upper cap on the right edge. The screen goes dark, as it should; click again to wake it. <Kbd>L</Kbd>{' '}
@@ -168,6 +186,7 @@ const CHAPTERS: Chapter[] = [
       '})'
     ],
     runs: (l) => (l.last.orientation ? (l.last.orientation.hinge < 120 ? 2 : 1) : undefined),
+    tour: { title: 'Turn it', text: 'Drag the phone left or right. Every step of the turn is an event.', at: 'drag' },
     how: 'Drag the phone to turn it, or use the controls above. Every step of the ease is an event.'
   },
   {
@@ -186,6 +205,7 @@ const CHAPTERS: Chapter[] = [
     ],
     runs: (l) => l.last.switches && network(l.last.switches)[0],
     pose: { deg: 180, yaw: 0 },
+    tour: { title: 'Control Center', text: 'Tap Wi-Fi, Airplane Mode or the torch, right in the phone.', at: null },
     how: 'Control Center comes down when you get here. Tap Wi-Fi, Airplane Mode or the torch.'
   }
 ]
@@ -207,6 +227,10 @@ export function Showcase() {
   const [turn, setTurn] = useState(-30)
   const [hinge, setHinge] = useState(180)
   const [cue, setCue] = useState<Cue>({})
+  const [spots, setSpots] = useState<Spots | null>(null)
+  const [touring, setTouring] = useState(true)
+  /** Chapters whose event the reader has made happen: their ring has done its job. */
+  const [tried, setTried] = useState<ReadonlySet<DeviceEvent>>(new Set())
   const chapters = useRef<(HTMLElement | null)[]>([])
 
   // The chapter crossing the middle band of the screen is the one the phone is posed for. A band, not a
@@ -233,8 +257,26 @@ export function Showcase() {
     else setCue({})
   }, [active])
 
-  const chapter = CHAPTERS.find((c) => c.type === active) ?? CHAPTERS[0]!
+  const step = Math.max(
+    0,
+    CHAPTERS.findIndex((c) => c.type === active)
+  )
+  const chapter = CHAPTERS[step]!
+  const go = (i: number) => chapters.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   const pose = chapter.pose ?? { deg: hinge, yaw: turn * RAD }
+
+  // The pose and the switches arrive on their own as state, so for those, trying is a turn away from
+  // where the page put the phone, or a flip. Once tried, a chapter stays tried.
+  const o = live.last.orientation
+  const now =
+    active === 'orientation'
+      ? !!o && Math.abs(((((o.yaw - turn) % 360) + 540) % 360) - 180) > 10
+      : active === 'switches'
+        ? live.log.switches.some((e) => e.text !== 'current state')
+        : live.log[active].length > 0
+  useEffect(() => {
+    if (now) setTried((t) => (t.has(active) ? t : new Set(t).add(active)))
+  }, [now, active])
 
   return (
     <Block labelledBy="sdk-title">
@@ -247,7 +289,27 @@ export function Showcase() {
 
       <div {...stylex.props(styles.stage)}>
         <div {...stylex.props(styles.device)}>
-          <Simulator deg={pose.deg} yaw={pose.yaw} cue={cue} hear={TYPES} onDevice={dispatch} bare fill />
+          <Simulator
+            deg={pose.deg}
+            yaw={pose.yaw}
+            cue={cue}
+            hear={TYPES}
+            onDevice={dispatch}
+            onSpots={touring ? setSpots : undefined}
+            bare
+            fill
+          />
+          {touring && (
+            <Tour
+              stop={chapter.tour}
+              step={step}
+              steps={CHAPTERS.length}
+              spots={spots}
+              done={tried.has(active)}
+              onStep={go}
+              onClose={() => setTouring(false)}
+            />
+          )}
         </div>
         <div>
           {CHAPTERS.map((c, i) => (

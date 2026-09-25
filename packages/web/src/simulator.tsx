@@ -20,6 +20,9 @@ export type Cue = {
 /** One hardware event as the shell forwards it: what `os.device.on(type)` hands an app. */
 export type Heard = { [K in DeviceEvent]: { type: K; data: DeviceEvents[K] } }[DeviceEvent]
 
+/** Where each hardware cap is, in pixels from the frame's top left: `up` and `down` are volume. */
+export type Spots = Record<'side' | 'camera' | 'up' | 'down', [x: number, y: number]>
+
 /**
  * The real shell in a frame, sitting on the page rather than in a card. It
  * mounts when it comes within a screen of the viewport, takes its backdrop
@@ -45,6 +48,7 @@ export function Simulator({
   onPainted,
   hear,
   onDevice,
+  onSpots,
   children
 }: {
   deg?: number
@@ -74,6 +78,8 @@ export function Simulator({
   /** Device events to be told of, as an app listening to them would be: its volume and Camera Control presses are the page's. */
   hear?: DeviceEvent[]
   onDevice?: (e: Heard) => void
+  /** Told where the buttons are on screen, every frame they move, for a page to point at them. */
+  onSpots?: (s: Spots) => void
   /** Shown while the frame has not mounted yet. */
   children?: ReactNode
 }) {
@@ -90,6 +96,9 @@ export function Simulator({
   told.current = onDevice
   const hearing = useRef(hear)
   hearing.current = hear
+  const placed = useRef(onSpots)
+  placed.current = onSpots
+  const spotting = !!onSpots
   const theme = useTheme()
 
   useEffect(() => {
@@ -122,7 +131,7 @@ export function Simulator({
     if (!near || !f) return
     const loaded = () => {
       setReady(true)
-      post(f, { bg: bg(box.current), deg, yaw, hear: hearing.current })
+      post(f, { bg: bg(box.current), deg, yaw, hear: hearing.current, spots: !!placed.current })
     }
     const heard = (e: MessageEvent<{ live?: boolean; ready?: boolean }>) => {
       if (e.source !== f.contentWindow || !e.data) return
@@ -185,6 +194,19 @@ export function Simulator({
       post(f, { hear: [] })
     }
   }, [ready, hearKey])
+  useEffect(() => {
+    const f = frame.current
+    if (!ready || !f || !spotting) return
+    const heard = (e: MessageEvent<{ spots?: Spots }>) => {
+      if (e.source === f.contentWindow && e.data?.spots) placed.current?.(e.data.spots)
+    }
+    addEventListener('message', heard)
+    post(f, { spots: true })
+    return () => {
+      removeEventListener('message', heard)
+      post(f, { spots: false })
+    }
+  }, [ready, spotting])
   const cueKey = JSON.stringify(cue ?? null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: `cueKey` stands for `cue`; an equal object is not a new cue.
   useEffect(() => {
@@ -249,6 +271,7 @@ const post = (
     cue?: Cue
     hello?: boolean
     hear?: DeviceEvent[]
+    spots?: boolean
   }
 ) => f?.contentWindow?.postMessage(msg, new URL(BASE, location.href).origin)
 // The box's own colour, not the body's: a frame inside a dark section takes the section's backdrop.
