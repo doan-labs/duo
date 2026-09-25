@@ -47,13 +47,23 @@ export function Directions({
 
   // Both copies settle on the shared offset whenever it changes: the one in
   // hand is already there, so only the folded-away one actually moves - and it
-  // stays caught up, ready for whenever the fold swaps them.
+  // stays caught up, ready for whenever the fold swaps them. The scroller can
+  // mount while the sheet is still animating, where scrollTop clamps to 0, so
+  // the apply retries as the element gets its real height.
   useEffect(() => {
     const el = list.current
-    if (el && Math.abs(el.scrollTop - scroll) > 1) {
-      applying.current = performance.now()
-      el.scrollTop = scroll
+    if (!el) return
+    const settle = () => {
+      const n = list.current
+      if (n && Math.abs(n.scrollTop - scroll) > 1) {
+        applying.current = performance.now()
+        n.scrollTop = scroll
+      }
     }
+    settle()
+    const size = new ResizeObserver(settle)
+    size.observe(el)
+    return () => size.disconnect()
   }, [scroll])
 
   useEffect(

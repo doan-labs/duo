@@ -221,8 +221,9 @@ and the folded display draws them. `os.mirror` reads live from `active.wide`, so
 flag follows the fold rather than the spawn - whichever display is in use counts as
 the running copy at that moment, even one opened quietly long before. The directions
 scroll offset shares the store too: either copy writes its scrollTop debounced, both
-settle on the shared value whenever it changes (only the folded-away one actually
-moves), and a new destination, mode or route remounts the scroller at the top. Results
+settle on the shared value whenever it changes and as the scroller's sheet expands
+(its scrollTop clamps to 0 while the sheet is still animating), and a new
+destination, mode or route remounts the scroller at the top. Results
 and routes are keyed by the request that asked for them - the search key carries a
 ~0.5-degree camera bucket so a query re-biases when the map crosses towns - and each
 record counts `tries`: a failure retries once, reopening directions clears the failed
