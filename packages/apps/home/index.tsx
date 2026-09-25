@@ -6,14 +6,12 @@
 import { beep } from '@doan-labs/duo-fixtures'
 import type { Acc, Room } from '@doan-labs/duo-fixtures/home.ts'
 import {
-  accOf,
   accsOf,
   applyScene,
   flipAcc,
   GROUPS,
   KIND_NAME,
   removeAcc,
-  roomOf,
   SCENES,
   setLevel,
   setTemp,
@@ -322,9 +320,15 @@ function AccRow({ room, acc, pick }: { room: Room; acc: Acc; pick: () => void })
 
 /** A group's accessory list: the tinted title over every matching accessory. */
 function GroupPage({ group, wide }: { group: string; wide: boolean }) {
+  // The book has to be subscribed here: Nav's stack keeps page elements by
+  // reference, so only fibers holding a store subscription re-render on writes.
+  const book = useBook()
   const g = GROUPS.find((x) => x.id === group)
   if (!g) return <BrowsePage wide={wide} />
   const t = TILES[g.id]!
+  const accs = book.rooms.flatMap((room) =>
+    room.accs.filter((a) => g.kinds.includes(a.kind)).map((acc) => ({ room, acc }))
+  )
   const dest = (d: string) => (wide ? goToPath(['browse', d]) : goTo(d))
   return (
     <>
@@ -335,10 +339,10 @@ function GroupPage({ group, wide }: { group: string; wide: boolean }) {
       <div {...stylex.props(styles.body)}>
         <div {...stylex.props(styles.col)}>
           <Section>
-            {accsOf(g.kinds).map(({ room, acc }) => (
+            {accs.map(({ room, acc }) => (
               <AccRow key={acc.id} room={room} acc={acc} pick={() => dest(`a:${acc.id}`)} />
             ))}
-            {accsOf(g.kinds).length === 0 && <Row label={`No ${g.name.toLowerCase()}`} />}
+            {accs.length === 0 && <Row label={`No ${g.name.toLowerCase()}`} />}
           </Section>
         </div>
       </div>
@@ -348,7 +352,10 @@ function GroupPage({ group, wide }: { group: string; wide: boolean }) {
 
 /** A room, Reminders' list view: tinted title, its accessories, the add bar. */
 function RoomPage({ id, wide }: { id: string; wide: boolean }) {
-  const room = roomOf(id)
+  // The book has to be subscribed here: Nav's stack keeps page elements by
+  // reference, so only fibers holding a store subscription re-render on writes.
+  const book = useBook()
+  const room = book.rooms.find((r) => r.id === id)
   if (!room) return <BrowsePage wide={wide} />
   const dest = (d: string) => (wide ? goToPath(['browse', `r:${id}`, d]) : goTo(d))
   return (
@@ -386,7 +393,10 @@ function RoomPage({ id, wide }: { id: string; wide: boolean }) {
  * the remove row - the Reminders detail's list-info equivalent.
  */
 function AccPage({ id, wide }: { id: string; wide: boolean }) {
-  const found = accOf(id)
+  // The book has to be subscribed here: Nav's stack keeps page elements by
+  // reference, so only fibers holding a store subscription re-render on writes.
+  const book = useBook()
+  const found = book.rooms.flatMap((r) => r.accs.map((acc) => ({ room: r, acc }))).find((x) => x.acc.id === id)
   if (!found) return <BrowsePage wide={wide} />
   const { room, acc } = found
   const tint = tintOf(room.tint)

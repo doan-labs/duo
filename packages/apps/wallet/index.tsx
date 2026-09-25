@@ -5,7 +5,7 @@
 // and one `path` cell navigates both displays over the persisted book.
 
 import type { Pass, PassGroup } from '@doan-labs/duo-fixtures/wallet.ts'
-import { groupName, passesOf, removePass } from '@doan-labs/duo-fixtures/wallet.ts'
+import { groupName, removePass } from '@doan-labs/duo-fixtures/wallet.ts'
 import type { Os } from '@doan-labs/duo-sdk'
 import { Menu, Nav, Row, Section, Sym, type SymProps, useNav, useWide } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
@@ -37,6 +37,13 @@ const PROMO_TILES: { sym: SymProps['name']; tint: string; rot: number }[] = [
   { sym: 'bolt', tint: colors.grey3Dark, rot: -7 },
   { sym: 'book', tint: colors.brown, rot: 6 }
 ]
+
+/** The accent each group page's title takes. */
+const GROUP_TINTS: Record<string, string> = {
+  cards: colors.blue,
+  transit: colors.mint,
+  passes: colors.orange
+}
 
 /** What the bottom action of a pass detail does. */
 const ACT: Record<PassGroup, { label: string; sym: SymProps['name'] }> = {
@@ -209,6 +216,8 @@ function BrowsePage({ wide }: { wide: boolean }) {
   const cards = book.passes.filter((p) => p.group === 'cards')
   const transit = book.passes.filter((p) => p.group === 'transit')
   const tickets = book.passes.filter((p) => p.group === 'passes')
+  const fanSel = useFanSel()
+  const order = [...cards.filter((p) => p.id !== fanSel), ...cards.filter((p) => p.id === fanSel)]
   const w = wide ? 340 : 296
   return (
     <>
@@ -301,9 +310,9 @@ function BrowsePage({ wide }: { wide: boolean }) {
                 </div>
               </div>
             )}
-            <div {...stylex.props(styles.fanBox(w, cards.length))}>
-              {cards.map((p, i) => {
-                const lift = i === cards.length - 1
+            <div {...stylex.props(styles.fanBox(w, order.length))}>
+              {order.map((p, i) => {
+                const lift = i === order.length - 1
                 return (
                   <button
                     key={p.id}
@@ -394,13 +403,16 @@ function PassRow({ pass, pick }: { pass: Pass; pick: () => void }) {
 
 /** A group's pass list: its coloured title over the rows of that group. */
 function GroupPage({ group, wide }: { group: string; wide: boolean }) {
-  const passes = passesOf(group)
+  // The book has to be subscribed here: Nav's stack keeps page elements by
+  // reference, so only fibers holding a store subscription re-render on writes.
+  const book = useBook()
+  const passes = book.passes.filter((p) => group === 'all' || p.group === group)
   const name = groupName(group)
   return (
     <>
       <div {...stylex.props(styles.head)}>
         {!wide && <BackBtn />}
-        <span {...stylex.props(styles.title(app.fg))}>{name}</span>
+        <span {...stylex.props(styles.title(GROUP_TINTS[group] ?? app.fg))}>{name}</span>
       </div>
       <div {...stylex.props(styles.body)}>
         <div {...stylex.props(styles.col)}>

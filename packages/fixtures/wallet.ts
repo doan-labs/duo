@@ -209,7 +209,7 @@ export function addPass(name: string, group: PassGroup) {
   const id = `p-${Date.now().toString(36)}-${seq++}`
   const pass: Pass = {
     id,
-    name: name.trim() || `New ${GROUPS.find((g) => g.id === group)?.name ?? 'Pass'}`,
+    name: name.trim() || `New ${(GROUPS.find((g) => g.id === group)?.name ?? 'Pass').replace(/s$/, '')}`,
     group,
     face: t.face,
     ink: 'light',
