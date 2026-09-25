@@ -213,8 +213,11 @@ steps. `live.ts` holds the backends: Photon geocodes the search field and revers
 dropped pins and the blue dot, and FOSSGIS's OSRM hosts (`routed-car`, `routed-bike`,
 `routed-foot`) return the routes - all keyless and CORS-open, so no secret rides in the
 bundle. `share.ts` is the store both copies draw: query, results, selection, directions,
-routes, estimate, `me` and recents are one module state, so the fold hands the same map
-over whole - either copy writes intent and only the `!os.mirror` copy fetches. Results
+routes, estimate, `me`, recents, the camera `view` and the layer `kind` are one module
+state, so the fold hands the same map over whole - either copy writes intent and only
+the `!os.mirror` copy fetches or animates. The mirror's `flyTo` writes the target view
+flat instead of scheduling frames; the live copy's animation frames land in the store
+and the folded display draws them. Results
 and routes are keyed by the request that asked for them, which is what keeps a failure
 from refiring and a stale answer from being picked. `camera.ts` is the fly plan behind
 every jump: `flyTo` runs it through a rAF

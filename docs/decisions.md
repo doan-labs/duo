@@ -1680,7 +1680,9 @@ New files split the live half out of `data.ts`: `live.ts` (the clients, the
 Photon/OSRM mappers, the formatters), `camera.ts` (the fly plan - a zoom dip on
 long hauls, cubic easing - and its rAF driver), `directions.tsx` (modes, the
 ways there, the steps), `glyphs.tsx` (car, bike and the turn arrows SYM lacks),
-`share.ts` (the module store both displays draw, so the fold keeps the map).
+`share.ts` (the module store both displays draw - intent, results and the camera
+and layer too, so the fold keeps the whole map; the mirror never schedules a
+frame, it writes views flat while the live copy's frames land in the store).
 Zoom is fractional now: tiles render at the nearest integer level scaled by
 `2 ** (z - tileZ)`, so wheel and fly zoom without a reload between levels, and
 a released drag coasts on its last velocity. A tap on a grey alternative picks
