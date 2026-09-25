@@ -190,7 +190,7 @@ export function EditorRow({ tint }: { tint: string }) {
       flag: draft.flag,
       pri: draft.pri
     })
-    set(keep ? { t: '', list: draft.list } : null)
+    set(keep ? { t: '', list: draft.list, dest: draft.dest } : null)
   }
 
   return (

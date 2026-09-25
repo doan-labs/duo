@@ -5,6 +5,7 @@
 
 import { Menu, Sym } from '@doan-labs/duo-uikit'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
+import { app } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { destName, destTint, type Group, groupsFor, search, todayKey } from './data.ts'
@@ -38,12 +39,12 @@ export function DestPage({ dest, wide }: { dest: string; wide: boolean }) {
   const groups: Group[] = searching ? search(items, q) : groupsFor(dest, items, lists, showDone)
   const isList = dest.startsWith('list:')
   const list = lists.find((l) => `list:${l.id}` === dest)
-  const canAdd = !searching && dest !== 'completed' && !dest.startsWith('tag:')
+  const canAdd = !searching && (dest === 'today' || dest === 'scheduled' || dest === 'all' || isList)
   const name = searching ? `Results for “${q.trim()}”` : destName(dest, lists)
 
   const newReminder = () => {
     const base: Draft = { t: '', list: list?.id ?? lists[0]?.id ?? 'reminders', dest }
-    if (dest === 'today') base.date = todayKey()
+    if (dest === 'today' || dest === 'scheduled') base.date = todayKey()
     setDraft(base)
   }
 
@@ -92,7 +93,7 @@ export function DestPage({ dest, wide }: { dest: string; wide: boolean }) {
           </span>
         </span>
       </div>
-      <span {...stylex.props(styles.destTitle(tint))}>{name}</span>
+      <span {...stylex.props(styles.destTitle(searching ? app.fg : tint))}>{name}</span>
       <div {...stylex.props(styles.body)}>
         {groups.map((g) => (
           <div key={g.id} {...stylex.props(styles.sec)}>
@@ -107,7 +108,7 @@ export function DestPage({ dest, wide }: { dest: string; wide: boolean }) {
         )}
         {draft && draft.dest === dest && <EditorRow tint={tint} />}
       </div>
-      {canAdd && !draft && (
+      {canAdd && draft?.dest !== dest && (
         <div {...stylex.props(styles.newBar)}>
           <button type="button" onClick={newReminder} {...stylex.props(styles.barBtn, shared.press)}>
             <Sym name="plus" size={17} />

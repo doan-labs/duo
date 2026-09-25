@@ -178,6 +178,34 @@ export function DetailsForm({ r }: { r: Reminder }) {
       </Section>
 
       <Section xstyle={styles.detGroup}>
+        <span {...stylex.props(styles.toolWrap)}>
+          <button
+            type="button"
+            aria-expanded={menu === 'list'}
+            onClick={() => setMenu(menu === 'list' ? null : 'list')}
+            {...stylex.props(styles.detRow, shared.select)}
+          >
+            <span {...stylex.props(styles.detIc(list ? LIST_TINT[list.color] : colors.blue))}>
+              <Sym name={list?.icon ?? 'list'} size={15} />
+            </span>
+            <span {...stylex.props(styles.detLabel)}>List</span>
+            <span {...stylex.props(styles.detValue)}>{list?.name ?? 'Reminders'}</span>
+            <Sym name="forward" size={13} />
+          </button>
+          <Menu
+            open={menu === 'list'}
+            onClose={() => setMenu(null)}
+            xstyle={styles.detMenu}
+            items={lists.map((l) => ({
+              label: l.name,
+              checked: l.id === r.list,
+              onSelect: () => patch({ list: l.id })
+            }))}
+          />
+        </span>
+      </Section>
+
+      <Section xstyle={styles.detGroup}>
         <label {...stylex.props(styles.detRow)}>
           <span {...stylex.props(styles.detIc(colors.blue))}>
             <Sym name="bookmark" size={15} />
