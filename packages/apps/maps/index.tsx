@@ -12,7 +12,7 @@ import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fly, run } from './camera.ts'
-import { fit, localMatches, type Place, project, RECENT, unproject, type View } from './data.ts'
+import { fit, localMatches, type Place, project, RECENT, samePlace, unproject, type View } from './data.ts'
 import { Directions } from './directions.tsx'
 import { reverse, routes, search } from './live.ts'
 import { MapCanvas } from './map.tsx'
@@ -52,7 +52,8 @@ export const Maps = ({ os }: { os: Os }) => {
   const searchFailed = found?.q === q && found.failed
   // A live query narrows the pins to what matches it, locally and on Photon.
   const local = localMatches(q.toLowerCase())
-  const marks = q ? [...local, ...results.filter((r) => !local.some((l) => l.name === r.name))] : null
+  // A Photon namesake near a curated pin is the same place; far away it is not.
+  const marks = q ? [...local, ...results.filter((r) => !local.some((l) => samePlace(l, r)))] : null
   // Route keys and route requests normalize the origin the same way, so a GPS
   // fix inside an ~11m bucket neither refetches nor lies about where it started.
   const from = useMemo(() => ({ lat: +me.lat.toFixed(4), lon: +me.lon.toFixed(4) }), [me.lat, me.lon])
@@ -329,7 +330,13 @@ export const Maps = ({ os }: { os: Os }) => {
   )
 
   const card = sel && (
-    <PlaceCard place={sel} estimate={estimate} onDirections={() => go(sel)} onClose={() => share.set({ sel: null })} />
+    <PlaceCard
+      key={sel.id}
+      place={sel}
+      estimate={estimate}
+      onDirections={() => go(sel)}
+      onClose={() => share.set({ sel: null })}
+    />
   )
 
   return (

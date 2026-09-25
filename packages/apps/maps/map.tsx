@@ -93,6 +93,9 @@ export function MapCanvas({
     return () => ro.disconnect()
   }, [])
 
+  // A held press can outlive the component; don't let it drop a pin after close.
+  useEffect(() => () => hold.current !== null && clearTimeout(hold.current), [])
+
   // React's wheel listener is passive; zoom must preventDefault, so it binds natively.
   useEffect(() => {
     const el = surface.current!

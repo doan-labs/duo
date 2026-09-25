@@ -445,6 +445,10 @@ export const byId = (id: string) => PLACES.find((p) => p.id === id)
 export const localMatches = (q: string) =>
   PLACES.filter((p) => `${p.name} ${p.kind} ${p.address.join(' ')}`.toLowerCase().includes(q))
 
+/** Same name close together is one place; a namesake far away is not (~300m). */
+export const samePlace = (a: Place, b: Place) =>
+  a.name === b.name && Math.abs(a.lat - b.lat) + Math.abs(a.lon - b.lon) < 0.003
+
 /** What the sidebar opens with: Siri's guess first, then the last few lookups. */
 export const SUGGESTED = 'eye-stop'
 

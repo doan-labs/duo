@@ -1,6 +1,6 @@
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { byId, GLYPH, localMatches, type Place, type Recent, SUGGESTED } from './data.ts'
+import { byId, GLYPH, localMatches, type Place, type Recent, SUGGESTED, samePlace } from './data.ts'
 import { styles } from './styles.ts'
 
 type Props = {
@@ -35,7 +35,7 @@ export function Sidebar({
 }: Props) {
   const q = query.trim().toLowerCase()
   const local = q ? localMatches(q) : []
-  const found = [...local, ...results.filter((r) => !local.some((l) => l.name === r.name))]
+  const found = [...local, ...results.filter((r) => !local.some((l) => samePlace(l, r)))]
   const suggestion = byId(SUGGESTED)
   const row = (p: Place, note: string) => (
     <button
