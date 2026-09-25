@@ -16,6 +16,7 @@ import { device, type Stage } from '../device.ts'
 import { store } from '../runtime/catalog.ts'
 import { type Box, type Side, settle, spot, zone, zoom } from './gestures.ts'
 import type { Open } from './tile.tsx'
+import { flip } from './toggles.ts'
 
 /**
  * `side` unset is the whole display; `from` is the icon it grew out of and
@@ -110,7 +111,10 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
       arg,
       display: w > 600 ? 'inner' : 'cover',
       mirror: quiet || undefined,
-      camera: { current: null }
+      camera: { current: null },
+      // The LED is the flashlight switch: the Camera's rear flash and video
+      // torch light the same light Control Center does.
+      led: (on) => flip('torch', on)
     }
     setList([...live.current, { id, a, ctx, leaving: false, used: Date.now(), side, from }])
   }

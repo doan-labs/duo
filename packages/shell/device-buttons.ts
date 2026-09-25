@@ -4,7 +4,8 @@
 //   side       click: sleep, or wake to the lock screen. Double-click: Wallet.
 //              Hold: Siri (powered off: boot).
 //   side+vol   click: screenshot. Held: slide to power off.
-//   volume     volume, held: keeps going. In Camera: shutter.
+//   volume     volume, held: keeps going. In Camera: shutter on press; Volume
+//              Up held is a burst, Volume Down held a QuickTake recording.
 //   camera     click: Camera, or the shutter once it is open. Hold: record.
 //              Slide along the cap: zoom.
 //
@@ -31,6 +32,8 @@ let sideSpent = false
 let chord = 0
 let chordSpent = false
 let repeat = 0
+let volHold = 0
+let volAction: 'burst' | 'rec' | null = null
 let camHold = 0
 let camSlid = false
 let recording = false
@@ -107,13 +110,28 @@ function volume(b: 'up' | 'down', down: boolean) {
   if (!down) {
     clearTimeout(repeat)
     repeat = 0
+    clearTimeout(volHold)
+    volHold = 0
+    // A camera action that started with the hold ends with the button.
+    if (volAction === 'burst') device.burst(false)
+    if (volAction === 'rec') device.record(false)
+    volAction = null
     if (chord || chordSpent) chordEnd()
     tell(b, { action: 'release', button: b }, true)
     return
   }
   if (held.has('side')) return chordStart()
   if (give(b, 'volume', { action: 'press', button: b })) return
-  if (device.cameraOpen()) return device.shoot()
+  if (device.cameraOpen()) {
+    device.shoot()
+    volHold = setTimeout(() => {
+      volHold = 0
+      volAction = b === 'up' ? 'burst' : 'rec'
+      if (volAction === 'burst') device.burst(true)
+      else device.record(true)
+    }, HOLD)
+    return
+  }
   const step = () => {
     device.volume(b === 'up' ? 1 : -1)
     repeat = setTimeout(step, repeat ? REPEAT : 3 * REPEAT)

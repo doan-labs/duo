@@ -7,6 +7,8 @@ export type CameraHooks = {
   record: (on: boolean) => void
   /** Sets the zoom factor when given one; returns the current one. */
   zoom: (z?: number) => number
+  /** Volume Up held: a burst starts (`on` true) and ends (`on` false) around the shots it fires. */
+  burst?: (on: boolean) => void
 }
 
 export type Os = {
@@ -28,6 +30,12 @@ export type Os = {
   mirror?: boolean
   /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */
   camera: { current: CameraHooks | null }
+  /**
+   * The LED beside the rear cameras, the same light Control Center's flashlight
+   * and the lock screen's torch flip: the Camera app drives it for rear flash
+   * and video torch.
+   */
+  led?: (on: boolean) => void
 }
 
 /**
