@@ -1465,3 +1465,15 @@ Dark Mode does not repaint the system the way it repaints apps.
 
 The switch is device-wide through `toggles.ts`, so both displays flip together.
 Like the rest of that object it is session state, not persisted.
+
+## 91. Sheets are non-modal dialogs
+
+`Sheet` used `dialog.showModal()`, which lifts the card into the top layer. The
+top layer ignores the scene's transforms when Chromium hit-tests it: every
+pointer event inside the card resolved to the untransformed position behind
+the preserve-3d `matrix3d`, so real clicks passed through the sheet to the app
+underneath. The sheet renders with the `open` attribute instead - a non-modal
+dialog stays in the transformed tree where hit-testing is honest - and draws
+its own scrim, focus and Escape handling (`show`/`open` never raise `cancel`).
+A side effect worth keeping: the captured Escape no longer reaches the shell's
+Esc-goes-Home binding while a sheet is up.

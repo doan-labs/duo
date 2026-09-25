@@ -201,7 +201,7 @@ function DataForm({ m }: { m: NonNullable<ReturnType<typeof metric>> }) {
       </div>
       <div {...stylex.props(styles.sheetBtns)}>
         <Button onClick={closeSheet}>Cancel</Button>
-        <Button variant="filled" onClick={save} disabled={!Number(value)}>
+        <Button variant="filled" onClick={save} disabled={!(Number(value) > 0)}>
           Add
         </Button>
       </div>

@@ -292,10 +292,9 @@ export const healthStore = {
   }
 }
 
-/** The fraction of a seeded day that has happened when `key` is today; whole days otherwise. */
+/** Logged amounts always show whole, on any date; the seed only accrues while it is still today. */
 const accrue = (key: string, s: DaySample): DaySample => {
-  if (key !== todayKey()) return s
-  const f = dayFrac(new Date().getHours() + new Date().getMinutes() / 60)
+  const f = key === todayKey() ? dayFrac(new Date().getHours() + new Date().getMinutes() / 60) : 1
   const lg = book.logged[key] ?? {}
   const grown = (seeded: number, field: Accrued, rate = 1) =>
     Math.round(seeded * Math.min(1, f * rate) + (lg[field] ?? 0))

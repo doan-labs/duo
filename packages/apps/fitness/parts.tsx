@@ -217,6 +217,14 @@ function WorkoutForm() {
 export function GoalsSheet() {
   const sheet = useSheet()
   const book = useBook()
+  return (
+    <Sheet open={sheet === 'goals'} onClose={closeSheet} aria-label="Change goals">
+      {sheet === 'goals' ? <GoalsForm book={book} /> : null}
+    </Sheet>
+  )
+}
+
+function GoalsForm({ book }: { book: ReturnType<typeof useBook> }) {
   const [draft, setDraft] = useState(book.goals)
   const bump = (k: keyof typeof draft, d: number) => setDraft((g) => ({ ...g, [k]: Math.max(1, g[k] + d) }))
   const rows: { id: keyof typeof draft; label: string; tint: string; unit: string; step: number }[] = [
@@ -225,47 +233,45 @@ export function GoalsSheet() {
     { id: 'stand', label: 'Stand', tint: RING_TINTS.stand, unit: 'hrs', step: 1 }
   ]
   return (
-    <Sheet open={sheet === 'goals'} onClose={closeSheet} aria-label="Change goals">
-      <div {...stylex.props(styles.sheetPad)}>
-        <div {...stylex.props(typography.headline)}>Daily Goals</div>
-        {rows.map((r) => (
-          <div key={r.id} {...stylex.props(styles.sheetRow)}>
-            <span {...stylex.props(styles.dot(r.tint))} />
-            <span {...stylex.props(styles.fieldLabel)}>{r.label}</span>
-            <button
-              type="button"
-              aria-label={`Less ${r.label}`}
-              onClick={() => bump(r.id, -r.step)}
-              {...stylex.props(styles.stepper, shared.press)}
-            >
-              −
-            </button>
-            <span {...stylex.props(styles.val)}>{draft[r.id]}</span>
-            <span {...stylex.props(shared.sub)}>{r.unit}</span>
-            <button
-              type="button"
-              aria-label={`More ${r.label}`}
-              onClick={() => bump(r.id, r.step)}
-              {...stylex.props(styles.stepper, shared.press)}
-            >
-              +
-            </button>
-          </div>
-        ))}
-        <div {...stylex.props(styles.sheetBtns)}>
-          <Button onClick={closeSheet}>Cancel</Button>
-          <Button
-            variant="filled"
-            onClick={() => {
-              setGoals(draft)
-              closeSheet()
-            }}
+    <div {...stylex.props(styles.sheetPad)}>
+      <div {...stylex.props(typography.headline)}>Daily Goals</div>
+      {rows.map((r) => (
+        <div key={r.id} {...stylex.props(styles.sheetRow)}>
+          <span {...stylex.props(styles.dot(r.tint))} />
+          <span {...stylex.props(styles.fieldLabel)}>{r.label}</span>
+          <button
+            type="button"
+            aria-label={`Less ${r.label}`}
+            onClick={() => bump(r.id, -r.step)}
+            {...stylex.props(styles.stepper, shared.press)}
           >
-            Save
-          </Button>
+            −
+          </button>
+          <span {...stylex.props(styles.val)}>{draft[r.id]}</span>
+          <span {...stylex.props(shared.sub)}>{r.unit}</span>
+          <button
+            type="button"
+            aria-label={`More ${r.label}`}
+            onClick={() => bump(r.id, r.step)}
+            {...stylex.props(styles.stepper, shared.press)}
+          >
+            +
+          </button>
         </div>
+      ))}
+      <div {...stylex.props(styles.sheetBtns)}>
+        <Button onClick={closeSheet}>Cancel</Button>
+        <Button
+          variant="filled"
+          onClick={() => {
+            setGoals(draft)
+            closeSheet()
+          }}
+        >
+          Save
+        </Button>
       </div>
-    </Sheet>
+    </div>
   )
 }
 
