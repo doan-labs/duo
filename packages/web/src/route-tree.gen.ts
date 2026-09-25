@@ -20,6 +20,7 @@ import { Route as KitRouteImport } from './routes/kit'
 import { Route as PublishRouteImport } from './routes/publish'
 import { Route as SdkRouteImport } from './routes/sdk'
 import { Route as SimulatorRouteImport } from './routes/simulator'
+import { Route as AppsSlugRouteImport } from './routes/apps.$slug'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as DocsSdkRouteImport } from './routes/docs.sdk'
@@ -83,6 +84,11 @@ const SimulatorRoute = SimulatorRouteImport.update({
   path: '/simulator',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppsSlugRoute = AppsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AppsRoute,
+} as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -121,7 +127,7 @@ const KitDocsNameRoute = KitDocsNameRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/apps': typeof AppsRoute
+  '/apps': typeof AppsRouteWithChildren
   '/build': typeof BuildRoute
   '/changelog': typeof ChangelogRoute
   '/docs': typeof DocsRouteWithChildren
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/publish': typeof PublishRoute
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
+  '/apps/$slug': typeof AppsSlugRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
   '/kit/docs': typeof KitDocsRouteWithChildren
@@ -141,7 +148,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/apps': typeof AppsRoute
+  '/apps': typeof AppsRouteWithChildren
   '/build': typeof BuildRoute
   '/changelog': typeof ChangelogRoute
   '/get-started': typeof GetStartedRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/publish': typeof PublishRoute
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
+  '/apps/$slug': typeof AppsSlugRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
   '/docs': typeof DocsIndexRoute
@@ -159,7 +167,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/apps': typeof AppsRoute
+  '/apps': typeof AppsRouteWithChildren
   '/build': typeof BuildRoute
   '/changelog': typeof ChangelogRoute
   '/docs': typeof DocsRouteWithChildren
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/publish': typeof PublishRoute
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
+  '/apps/$slug': typeof AppsSlugRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
   '/kit/docs': typeof KitDocsRouteWithChildren
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/publish'
     | '/sdk'
     | '/simulator'
+    | '/apps/$slug'
     | '/docs/$'
     | '/docs/sdk'
     | '/kit/docs'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/publish'
     | '/sdk'
     | '/simulator'
+    | '/apps/$slug'
     | '/docs/$'
     | '/docs/sdk'
     | '/docs'
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/publish'
     | '/sdk'
     | '/simulator'
+    | '/apps/$slug'
     | '/docs/$'
     | '/docs/sdk'
     | '/kit/docs'
@@ -239,7 +251,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AppsRoute: typeof AppsRoute
+  AppsRoute: typeof AppsRouteWithChildren
   BuildRoute: typeof BuildRoute
   ChangelogRoute: typeof ChangelogRoute
   DocsRoute: typeof DocsRouteWithChildren
@@ -330,6 +342,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SimulatorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/apps/$slug': {
+      id: '/apps/$slug'
+      path: '/$slug'
+      fullPath: '/apps/$slug'
+      preLoaderRoute: typeof AppsSlugRouteImport
+      parentRoute: typeof AppsRoute
+    }
     '/docs/': {
       id: '/docs/'
       path: '/'
@@ -382,6 +401,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppsRouteChildren {
+  AppsSlugRoute: typeof AppsSlugRoute
+}
+
+const AppsRouteChildren: AppsRouteChildren = {
+  AppsSlugRoute: AppsSlugRoute,
+}
+
+const AppsRouteWithChildren = AppsRoute._addFileChildren(AppsRouteChildren)
+
 interface DocsRouteChildren {
   DocsSplatRoute: typeof DocsSplatRoute
   DocsSdkRoute: typeof DocsSdkRoute
@@ -423,7 +452,7 @@ const KitRouteWithChildren = KitRoute._addFileChildren(KitRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AppsRoute: AppsRoute,
+  AppsRoute: AppsRouteWithChildren,
   BuildRoute: BuildRoute,
   ChangelogRoute: ChangelogRoute,
   DocsRoute: DocsRouteWithChildren,

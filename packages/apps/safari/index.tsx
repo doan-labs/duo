@@ -6,8 +6,9 @@ import type { Os } from '@doan-labs/duo-sdk'
 import { animations, dark } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState } from 'react'
-import { Bookmarks, recent } from './bookmarks.tsx'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Bookmarks } from './bookmarks.tsx'
+import { host, type MarkList, mark, retitle, safari, visit } from './store.ts'
 import { styles } from './styles.ts'
 
 // The home page is our own site, and only our own site can run the scroll
@@ -19,16 +20,6 @@ import { styles } from './styles.ts'
 const HOME = 'https://duo.doan-labs.com'
 const DEV_HOME = 'http://localhost:3001'
 const isDev = (h: string) => h === 'localhost' || h === '127.0.0.1' || h.endsWith('.localhost')
-const MARKS: [string, string][] = [
-  ['Duo', 'duo.doan-labs.com'],
-  ['Wikipedia', 'en.m.wikipedia.org'],
-  ['three.js', 'threejs.org'],
-  ['Bun', 'bun.sh/docs'],
-  ['Internet Archive', 'archive.org'],
-  ['Bing', 'www.bing.com/search?q=iphone+duo']
-]
-
-const host = (url: string) => url.replace(/^https?:\/\//, '').split('/')[0]!
 // The compact pill hugs the host name, and an input never sizes to its own text.
 const textWidth = (el: HTMLInputElement | null, s: string) => {
   const c = document.createElement('canvas').getContext('2d')
@@ -40,7 +31,8 @@ const textWidth = (el: HTMLInputElement | null, s: string) => {
 // Safari's Page Zoom steps, 50% to 300%, remembered per site.
 const ZOOM = [0.5, 0.75, 0.85, 1, 1.15, 1.25, 1.5, 1.75, 2, 2.5, 3]
 
-// Cross-origin frames hide their own history, so each tab keeps its own list.
+// Cross-origin frames hide their own history, so each tab keeps its own back
+// list; the store's history is the app's, across tabs and launches.
 type Tab = { id: number; hist: string[]; at: number; priv: boolean }
 let seq = 0
 // A tab with no history shows the start page: favourites and a focused address bar.
@@ -50,6 +42,7 @@ const name = (x: Tab) => (at(x) ? host(at(x)!) : 'Start Page')
 
 export const Safari = ({ os }: { os: Os }) => {
   const home = typeof window !== 'undefined' && isDev(window.location.hostname) ? DEV_HOME : HOME
+  const book = useSyncExternalStore(safari.subscribe, safari.get)
   const [tabs, setTabs] = useState(() => [tab(os.arg ?? home)])
   // The open tab by id, which a tab closing before it cannot shift; the first
   // tab until one is picked.
@@ -58,6 +51,8 @@ export const Safari = ({ os }: { os: Os }) => {
   // The overview's segment: the private list or the normal one.
   const [priv, setPriv] = useState(false)
   const [bookmarks, setBookmarks] = useState(false)
+  // Set by "Add Bookmark to…": the sheet asks which list to save it in.
+  const [pickFor, setPickFor] = useState<{ url: string; title: string } | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const [pageMenu, setPageMenu] = useState(false)
   const [urlCompact, setUrlCompact] = useState(false)
@@ -104,11 +99,21 @@ export const Safari = ({ os }: { os: Os }) => {
   useEffect(() => {
     if (bookmarks) surface.current?.scrollTo({ top: 0, behavior: 'instant' })
   }, [bookmarks])
+  // The page a fresh tab opens on counts as a visit too; a mirror copy draws it
+  // but starts nothing, so only the live display writes it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mounts once; `url` and `os.mirror` are only read for that first page
+  useEffect(() => {
+    if (!os.mirror && url) visit(url, host(url), true)
+  }, [])
   const show = (hist: string[], at: number) => {
     setTabs(tabs.map((x) => (x.id === t.id ? { ...x, hist, at } : x)))
     setText(host(hist[at]!))
   }
-  const step = (d: number) => show(t.hist, Math.min(t.hist.length - 1, Math.max(0, t.at + d)))
+  const step = (d: number) => {
+    const next = Math.min(t.hist.length - 1, Math.max(0, t.at + d))
+    show(t.hist, next)
+    if (!t.priv && next !== t.at) visit(t.hist[next]!, host(t.hist[next]!))
+  }
   const go = (v: string) => {
     v = v.trim()
     if (!v) return
@@ -118,7 +123,9 @@ export const Safari = ({ os }: { os: Os }) => {
         : `https://${v}`
     const h = [...t.hist.slice(0, t.at + 1), v]
     show(h, h.length - 1)
+    if (!t.priv) visit(v, host(v))
     setBookmarks(false)
+    setPickFor(null)
     setMoreOpen(false)
     setPageMenu(false)
     setUrlCompact(false)
@@ -141,6 +148,7 @@ export const Safari = ({ os }: { os: Os }) => {
     setCur(x.id)
     setText('')
     setBookmarks(false)
+    setPickFor(null)
     setMoreOpen(false)
     setGrid(false)
     setUrlCompact(false)
@@ -183,6 +191,18 @@ export const Safari = ({ os }: { os: Os }) => {
     const i = Math.min(ZOOM.length - 1, Math.max(0, ZOOM.indexOf(zoom) + d))
     setZooms({ ...zooms, [key]: ZOOM[i]! })
   }
+  // The start page's Frequently Visited: hosts ranked by real visits, each
+  // pointing at the most recent page seen there.
+  const frequent = (() => {
+    const seen = new Map<string, { url: string; title: string; n: number }>()
+    for (const v of book.history) {
+      const k = host(v.url)
+      const e = seen.get(k)
+      if (e) e.n++
+      else seen.set(k, { url: v.url, title: v.title, n: 1 })
+    }
+    return [...seen.values()].sort((a, b) => b.n - a.n).slice(0, 8)
+  })()
   const none = () => {}
   const actions: MenuEntry[] = [
     { icon: 'eyeSlash', label: 'Hide Distracting Items', disabled: true, onSelect: none },
@@ -208,19 +228,55 @@ export const Safari = ({ os }: { os: Os }) => {
     }
   ]
   // The round more button beside the pill, row for row. A private tab is a plain
-  // one in a list of its own: the shell keeps no history or storage for any tab
-  // to begin with.
+  // one in a list of its own: its visits never reach the store's history, which
+  // is all a private tab promises.
   const share = () => url && (navigator.share?.({ url }) ?? navigator.clipboard?.writeText(url))
+  // The page's own title, when the frame is same-origin enough to read one.
+  const pageTitle = () => {
+    try {
+      return frame.current?.contentDocument?.title || undefined
+    } catch {
+      return undefined
+    }
+  }
+  const page = () => (url ? { url, title: pageTitle() ?? host(url) } : null)
+  const closeBookmarks = () => {
+    setBookmarks(false)
+    setPickFor(null)
+  }
   const more: MenuEntry[] = [
     { icon: 'share', label: 'Share', onSelect: share },
-    { icon: 'bookmark', label: 'Add to Bookmarks', disabled: !url, onSelect: () => recent.push([key, url!, key]) },
-    { icon: 'bookOutline', label: 'Add Bookmark to…', onSelect: () => setBookmarks(true) },
+    {
+      icon: 'bookmark',
+      label: 'Add to Bookmarks',
+      disabled: !url,
+      onSelect: () => {
+        const p = page()
+        if (p) mark(p.url, p.title, 'bookmarks')
+      }
+    },
+    {
+      icon: 'bookOutline',
+      label: 'Add Bookmark to…',
+      disabled: !url,
+      onSelect: () => {
+        setPickFor(page())
+        setBookmarks(true)
+      }
+    },
     'separator',
     { icon: 'plus', label: 'New Tab', onSelect: () => open() },
     { icon: 'privacy', label: 'New Private Tab', onSelect: () => open(true) }
   ]
   const moreFoot: MenuItem[] = [
-    { icon: 'book', label: 'Bookmarks', onSelect: () => setBookmarks(true) },
+    {
+      icon: 'book',
+      label: 'Bookmarks',
+      onSelect: () => {
+        setPickFor(null)
+        setBookmarks(true)
+      }
+    },
     { icon: 'tabs', label: 'All Tabs', onSelect: overview }
   ]
   // The cover's camera column: Apple runs Safari's buttons down beside the status
@@ -236,31 +292,57 @@ export const Safari = ({ os }: { os: Os }) => {
       <div {...stylex.props(styles.page)}>
         <div ref={surface} {...stylex.props(styles.scroll)}>
           {url ? (
+            // biome-ignore lint/a11y/noNoninteractiveElementInteractions: a page frame's load is how a real title reaches the store
             <iframe
               ref={frame}
               title="Page"
               src={url}
               referrerPolicy="no-referrer"
+              onLoad={() => {
+                const title = pageTitle()
+                if (!t.priv && url && title) retitle(url, title)
+              }}
               {...stylex.props(styles.frame, zoom !== 1 && styles.zoom(zoom))}
             />
           ) : (
             <div {...stylex.props(styles.start, animations.fade)}>
-              <div {...stylex.props(styles.startTitle)}>Favourites</div>
+              <div {...stylex.props(styles.startTitle)}>Favorites</div>
               <div {...stylex.props(styles.favs)}>
-                {MARKS.map(([n, u]) => (
-                  <button type="button" key={u} {...stylex.props(styles.fav)} onClick={() => go(u)}>
-                    <span {...stylex.props(styles.favIcon)}>{n[0]}</span>
-                    <span {...stylex.props(styles.favName)}>{n}</span>
+                {book.favorites.map((m) => (
+                  <button type="button" key={m.url} {...stylex.props(styles.fav)} onClick={() => go(m.url)}>
+                    <span {...stylex.props(styles.favIcon)}>{m.title[0]}</span>
+                    <span {...stylex.props(styles.favName)}>{m.title}</span>
                   </button>
                 ))}
               </div>
+              {frequent.length > 0 && (
+                <>
+                  <div {...stylex.props(styles.startTitle)}>Frequently Visited</div>
+                  <div {...stylex.props(styles.favs)}>
+                    {frequent.map((f) => (
+                      <button type="button" key={f.url} {...stylex.props(styles.fav)} onClick={() => go(f.url)}>
+                        <span {...stylex.props(styles.favIcon)}>{f.title[0]}</span>
+                        <span {...stylex.props(styles.favName)}>{f.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
           {bookmarkPage.mounted && (
             <div
               {...stylex.props(styles.bookmarkLayer, bookmarkPage.closing ? styles.bookmarksOut : styles.bookmarksIn)}
             >
-              <Bookmarks onNavigate={go} onClose={rail ? undefined : () => setBookmarks(false)} />
+              <Bookmarks
+                onNavigate={go}
+                onClose={rail ? undefined : closeBookmarks}
+                pickFor={pickFor}
+                onPick={(list: MarkList) => {
+                  if (pickFor) mark(pickFor.url, pickFor.title, list)
+                  closeBookmarks()
+                }}
+              />
             </div>
           )}
           {cards.mounted && (
@@ -309,7 +391,7 @@ export const Safari = ({ os }: { os: Os }) => {
               itemStyle={styles.moreItem}
               items={[
                 { label: 'New Tab', onSelect: () => open() },
-                { label: 'Close Bookmarks', onSelect: () => setBookmarks(false) }
+                { label: 'Close Bookmarks', onSelect: closeBookmarks }
               ]}
             />
           )}
@@ -459,7 +541,7 @@ export const Safari = ({ os }: { os: Os }) => {
               <Btn
                 name="close"
                 onClick={() => {
-                  setBookmarks(false)
+                  closeBookmarks()
                   setMoreOpen(false)
                 }}
               />
@@ -472,6 +554,7 @@ export const Safari = ({ os }: { os: Os }) => {
                   name="bookOutline"
                   onClick={() => {
                     setMoreOpen(false)
+                    setPickFor(null)
                     setBookmarks(true)
                   }}
                 />

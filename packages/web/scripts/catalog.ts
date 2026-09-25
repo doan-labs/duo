@@ -51,6 +51,13 @@ const repoDir = (id: string) => {
   const dir = id.split('.').at(-1)!
   return existsSync(`${root}packages/apps/${dir}`) ? dir : undefined
 }
+// The registry pins each community app's id to its folder, beside the manifest.
+const registry = JSON.parse(readFileSync(`${root}community-apps/registry.json`, 'utf8')) as {
+  apps: Record<string, { folder: string }>
+}
+/** The app's own CHANGELOG.md, so the app's sheet on the site can show real version notes. */
+const changelog = (dir: string | undefined) =>
+  dir && existsSync(`${root}${dir}/CHANGELOG.md`) ? readFileSync(`${root}${dir}/CHANGELOG.md`, 'utf8') : null
 
 // The shelf on / and /apps reads the same index the Store installs from, so the site
 // never lists an app that is not actually published.
@@ -65,6 +72,10 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
   // the deploy minute, not a date. The package history carries the real dates.
   const dir = app.lane === 'official' ? repoDir(id) : undefined
   const committed = dir ? dates(dir) : undefined
+  const source =
+    app.lane === 'official'
+      ? dir && `packages/apps/${dir}`
+      : registry.apps[id]?.folder && `community-apps/${registry.apps[id]!.folder}`
   return {
     id,
     name: app.name,
@@ -76,7 +87,8 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
     created: committed?.created ?? released[0]!,
     updated: committed?.updated ?? released.at(-1)!,
     permissions: (app.permissions ?? []).map((name) => ({ name, label: PERMISSIONS[name].label })),
-    icon: `/catalog/apps/${id}/${releaseId(newest)}/icon-1024.png`
+    icon: `/catalog/apps/${id}/${releaseId(newest)}/icon-1024.png`,
+    changelog: changelog(source)
   }
 })
 // Every official app the simulator ships, from the shell's home-screen data: the ones
@@ -93,7 +105,13 @@ const seen = new Set<string>()
 const shell = [...shellSource.matchAll(/\{ name: '([^']+)'(.*)$/gm)]
   .map(([, name = '', rest = '']) => {
     const dir = [...dirs].find(([component]) => new RegExp(`\\b${component}\\b`).test(rest))?.[1]
-    return { name, icon: ICONS[name] ?? '', mock: rest.includes('mock: true'), ...(dir ? dates(dir) : {}) }
+    return {
+      name,
+      icon: ICONS[name] ?? '',
+      mock: rest.includes('mock: true'),
+      changelog: changelog(dir && `packages/apps/${dir}`),
+      ...(dir ? dates(dir) : {})
+    }
   })
   // Folders (Utilities) have no app icon and are not apps.
   .filter(({ name, icon }) => name && icon && !seen.has(name) && seen.add(name))
@@ -114,11 +132,20 @@ writeFileSync(
     '  updated: string',
     '  permissions: { name: string; label: string }[]',
     '  icon: string',
+    "  /** Raw CHANGELOG.md text; null when the app's source folder is not in this repo. */",
+    '  changelog: string | null',
     '}',
     `export const CATALOG: CatalogApp[] = ${JSON.stringify(shelf, null, 2)}`,
     '/** Official apps built into the simulator; `mock` marks a static screen still in development.',
     ' *  Baked apps carry no release, so their dates are the first and last commit on their package. */',
-    'export const SHELL: { name: string; icon: string; mock: boolean; created?: string; updated?: string }[] =',
+    'export const SHELL: {',
+    '  name: string',
+    '  icon: string',
+    '  mock: boolean',
+    '  changelog: string | null',
+    '  created?: string',
+    '  updated?: string',
+    '}[] =',
     `  ${JSON.stringify(shell, null, 2)}`,
     ''
   ].join('\n')

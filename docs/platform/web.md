@@ -89,6 +89,22 @@ compatibility have already been verified.
 
 Newest first. Each pass records what changed and how it was verified.
 
+### Kit scenes follow the page's appearance
+
+- The `/kit` tiles and the `/kit/docs` preview frame carry the app's own `app`
+  colours, which CSS cannot reach through the site's `color` theme. They pinned
+  `styles.light`, so a dark page carried light panels. `useDark` (`src/theme.ts`)
+  resolves the saved pick or the system's, and the frames swap
+  `styles.light`/`styles.dark` to match, the way springboard themes shell apps.
+- A `night` tile was already dark in both appearances; a dark page now makes
+  every tile a night one. The palette and symbols scenes show the `*Dark` hue
+  siblings when the page is dark.
+
+| Run | Result |
+| --- | --- |
+| `bun run typecheck`, `bunx biome check` on the changed files | clean |
+| agent-browser, headless Chromium, `/kit` and `/kit/docs/Button` in light and dark | tiles and the preview frame take the page's appearance; `night` tiles unchanged |
+
 ### The core idea and the store step use the real shell too
 
 - "The fold is not a breakpoint" (`src/home/fold.tsx`) drives a `Simulator bare`
@@ -241,9 +257,9 @@ nothing is published, no host is chosen, no CI deploys it.
 | 4 | The core idea | "The fold is not a breakpoint. It is input." Four postures, `useDisplay()` code, a live readout | `home/fold.tsx`; a `Segmented` posture control easing the real shell to each `deg` |
 | 5 | Build | "Build software for hardware that doesn't exist yet." Terminal, editor beside the device; a colour line changes and the phone folds on a loop; "Change code. Fold the phone. See what breaks." | `home/build.tsx` |
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
-| 7 | The apps | The catalog (`/catalog/index.json`) and the shell's home-screen list, read at build time into `src/generated/catalog.ts`. `/apps` groups the official lane by status behind `<details>`: Published (open), Built in and In development (folded) | `home/apps.tsx`, reused by `routes/apps.tsx` |
+| 7 | The apps | The catalog (`/catalog/index.json`) and the shell's home-screen list, read at build time into `src/generated/catalog.ts` alongside each app's `CHANGELOG.md`. `/apps` is an App Store-style catalog: a search field over name, author and version, lane sections (Official, Community) that fold behind `<details>`, grid/list view, and a per-app sheet (native `<dialog>`) at the deep link `/apps/<slug>` - the slug is the app's last id segment, the sheet is the child route `routes/apps.$slug.tsx` rendered over the still-mounted catalog. Inside the sheet: the facts, each changelog version folded in its own `<details>` (latest open), the privacy card and an Open button - straight to `/simulator` for on-device apps, through the in-shell Store (`?app=App Store&arg=`) for catalog-only ones | `home/apps.tsx`, reused by `routes/apps.tsx`; changelogs emitted by `scripts/catalog.ts` |
 | 8 | Open | "The platform is open. So are the apps." Four facts, the Berlin sentence, fork → PR → review → Duo Store | `home/open.tsx` |
-| 9 | Go | "Build something strange for a phone that doesn't exist." Try Duo, Read the docs, View on GitHub | `home/cta.tsx` |
+| 9 | Go | "Build something strange for a phone that folds." Try Duo, Read the docs, View on GitHub, then "A product by Doan Labs" with the Doan mark from `footer.tsx` | `home/cta.tsx` |
 
 Nav: Duo · Apps · SDK · Docs · Build an app · GitHub · theme toggle · Try Duo.
 Footer: Duo · GitHub · Docs · Apps · License, then the Doan mark with "Made by

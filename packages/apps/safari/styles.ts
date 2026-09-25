@@ -113,13 +113,21 @@ export const styles = stylex.create({
     flexDirection: 'column',
     minHeight: 0,
     height: '100%',
-    overflowY: 'auto',
     paddingTop: 16,
     paddingRight: 16,
-    paddingBottom: 32,
+    paddingBottom: 16,
     paddingLeft: 16,
     backgroundColor: app.bg,
     color: app.fg
+  },
+  // The lists scroll under a header that stays put, and above the foot's Edit.
+  bookmarkBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    paddingBottom: 16
   },
   bookmarkHeader: {
     display: 'flex',
@@ -235,6 +243,52 @@ export const styles = stylex.create({
     transitionProperty: 'background-color',
     transitionDuration: { default: '.3s', ':active': '0s' }
   },
+  // Editing wraps the row in a box that carries the rule and the minus dot, so
+  // the row's own :last-child border would never see the group end.
+  bookmarkRowWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    borderBottomWidth: { default: 1, ':last-child': 0 },
+    borderBottomStyle: 'solid',
+    borderBottomColor: app.separator
+  },
+  bookmarkRowIn: { flexGrow: 1, minWidth: 0, borderBottomWidth: 0 },
+  // iOS's edit mode minus: a red dot leading the row.
+  bookmarkMinus: {
+    display: 'grid',
+    placeItems: 'center',
+    width: 22,
+    height: 22,
+    marginLeft: 12,
+    padding: 0,
+    borderRadius: radius.circle,
+    backgroundColor: colors.red,
+    color: colors.white,
+    flexShrink: 0,
+    ...PRESS,
+    transitionProperty: 'transform'
+  },
+  bookmarkName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  // The sheet's bottom bar: Clear on the leading edge, Edit on the trailing.
+  bookmarkFoot: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingTop: 16
+  },
+  bookmarkFootBtn: {
+    paddingTop: 4,
+    paddingRight: 8,
+    paddingBottom: 4,
+    paddingLeft: 8,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    color: app.link,
+    ...PRESS,
+    transitionProperty: 'transform'
+  },
   bookmarkIcon: {
     display: 'grid',
     placeItems: 'center',
@@ -246,13 +300,6 @@ export const styles = stylex.create({
   bookmarkIconStar: { backgroundColor: appAppearance.safariMarkTile, color: colors.blue },
   bookmarkIconFolder: { backgroundColor: appAppearance.safariMarkTile, color: colors.blue },
   bookmarkIconLink: { backgroundColor: app.fill3, color: app.link },
-  bookmarkIconApple: {
-    backgroundColor: app.fill3,
-    color: app.label2,
-    fontSize: typeScale.title3,
-    lineHeight: 1,
-    textAlign: 'center'
-  },
   bookmarkCount: { marginLeft: 'auto', color: app.label2 },
   bookmarkLabel: {
     display: 'flex',
@@ -281,6 +328,15 @@ export const styles = stylex.create({
   },
   // No hairline per row: iOS 26 rules only between groups, and the menu draws that.
   moreItem: { color: colors.black },
+  // The Clear sheet rises inside the bookmarks panel, anchored to its foot.
+  bookmarkMenu: {
+    position: 'absolute',
+    left: 16,
+    bottom: 16,
+    zIndex: 4,
+    minWidth: 220,
+    backgroundColor: appAppearance.safariMenu
+  },
   bookmarkEmpty: {
     display: 'flex',
     flexDirection: 'column',
