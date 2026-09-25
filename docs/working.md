@@ -217,9 +217,12 @@ routes, estimate, `me`, recents, the camera `view` and the layer `kind` are one 
 state, so the fold hands the same map over whole - either copy writes intent and only
 the `!os.mirror` copy fetches or animates. The mirror's `flyTo` writes the target view
 flat instead of scheduling frames; the live copy's animation frames land in the store
-and the folded display draws them. The directions scroll offset shares the store too:
-the live copy writes it debounced, the folded copy restores it when it becomes live,
-and a new destination, mode or route remounts the scroller at the top. Results
+and the folded display draws them. `os.mirror` reads live from `active.wide`, so the
+flag follows the fold rather than the spawn - whichever display is in use counts as
+the running copy at that moment, even one opened quietly long before. The directions
+scroll offset shares the store too: either copy writes its scrollTop debounced, both
+settle on the shared value whenever it changes (only the folded-away one actually
+moves), and a new destination, mode or route remounts the scroller at the top. Results
 and routes are keyed by the request that asked for them - the search key carries a
 ~0.5-degree camera bucket so a query re-biases when the map crosses towns - and each
 record counts `tries`: a failure retries once, reopening directions clears the failed

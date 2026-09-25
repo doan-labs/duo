@@ -20,8 +20,7 @@ type Props = {
   /** Fetch failed or the engine found no road there. */
   error: boolean
   onEnd: () => void
-  /** Only the copy on the visible display writes the shared offset. */
-  track: boolean
+  /** The shared steps offset; both copies converge on it so the fold keeps the turn. */
   scroll: number
   onScrolled: (n: number) => void
 }
@@ -37,21 +36,25 @@ export function Directions({
   onPick,
   error,
   onEnd,
-  track,
   scroll,
   onScrolled
 }: Props) {
   const chosen = routes?.[active]
   const list = useRef<HTMLDivElement>(null)
   const deb = useRef<number | null>(null)
-  const at = useRef(scroll)
-  at.current = scroll
+  // A programmatic set fires its own scroll event; skip writing it back.
+  const applying = useRef(0)
 
-  // Becoming the live display lands the steps where the shared offset says;
-  // a new destination, mode or route remounts the scroller at the top instead.
+  // Both copies settle on the shared offset whenever it changes: the one in
+  // hand is already there, so only the folded-away one actually moves - and it
+  // stays caught up, ready for whenever the fold swaps them.
   useEffect(() => {
-    if (track && list.current) list.current.scrollTop = at.current
-  }, [track])
+    const el = list.current
+    if (el && Math.abs(el.scrollTop - scroll) > 1) {
+      applying.current = performance.now()
+      el.scrollTop = scroll
+    }
+  }, [scroll])
 
   useEffect(
     () => () => {
@@ -61,7 +64,7 @@ export function Directions({
   )
 
   const scrolled = () => {
-    if (!track || !list.current) return
+    if (!list.current || performance.now() - applying.current < 120) return
     const el = list.current
     if (deb.current !== null) window.clearTimeout(deb.current)
     deb.current = window.setTimeout(() => onScrolled(el.scrollTop), 140)

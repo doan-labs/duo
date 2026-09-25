@@ -1707,3 +1707,19 @@ still starts nothing: every fetch gates on `!os.mirror`. Cost: recents are now
 real history from the session (seeded by the same sample as before), and the
 backends are best-effort free services - Photon and FOSSGIS can throttle, in
 which case the search note and the directions note say so rather than hang.
+
+## 101. The mirror flag follows the pose, not the spawn
+
+2026-09-25, accepted; amends 24. `os.mirror` used to be decided once, at
+`open()`: a scene born quietly was the twin forever. But `follow()` only ever
+re-opens the display going out of use, so after one fold both copies could
+carry the flag - the visible one kept drawing but could never start anything,
+which made "the one in use is running too" untrue for any app that gates
+effects on it (Maps's fetches, Safari's `visit`, the ticker apps). The flag is
+now a getter on the scene's `Os` that reads `active.wide`: whichever display
+the pose puts in hand counts as the running copy at that moment, and the
+folded-away one is the mirror. Renders re-read it, so liveness flips with the
+fold without a remount, and the quiet flag on `open()` is back to meaning only
+"born with no zoom". Cost: a copy learns it became live on its next render,
+not at the crossover frame - an app that needed to react at the instant of
+the fold would still have to notice on its own; none does.

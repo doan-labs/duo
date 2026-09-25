@@ -339,7 +339,6 @@ export const Maps = ({ os }: { os: Os }) => {
       onPick={(i) => share.set({ dir: { ...dir, active: i }, scroll: 0 })}
       error={routeError}
       onEnd={() => share.set({ dir: null })}
-      track={live}
       scroll={s.scroll}
       onScrolled={(n) => share.set({ scroll: n })}
     />
