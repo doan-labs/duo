@@ -64,5 +64,21 @@ export const styles = stylex.create({
     backgroundColor: app.fill2,
     color: colors.white,
     flexShrink: 0
-  }
+  },
+  menuWrap: { position: 'relative', display: 'flex' },
+  listMenu: { position: 'absolute', right: 0, top: 30, width: 190, zIndex: 6 },
+  searchBox: { paddingBottom: 4, flexShrink: 0 },
+  searchX: { display: 'flex', color: colors.grey },
+  listFoot: {
+    display: 'flex',
+    justifyContent: 'center',
+    paddingBlock: 6,
+    flexShrink: 0,
+    color: colors.grey,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2
+  },
+  coverTitle: { fontWeight: weight.bold },
+  coverFind: { paddingBottom: 4, flexShrink: 0 }
 })

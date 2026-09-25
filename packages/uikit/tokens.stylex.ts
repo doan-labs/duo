@@ -475,6 +475,8 @@ export const appAppearance = stylex.defineConsts({
   notesPaper: '#ffffff',
   notesHairline: 'rgba(255,255,255,.11)',
   notesYellow: '#e2b93b',
+  /** The find-in-note wash behind every match but the current one. */
+  notesFind: 'rgba(226,185,59,.38)',
   // phone
   phoneKey: 'rgba(255,255,255,.4)',
   phoneDial: 'linear-gradient(#3a3a3c,#101012)',
