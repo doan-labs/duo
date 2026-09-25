@@ -1618,3 +1618,6 @@ instead of landing where the phone used to be. A ring goes once its chapter
 is tried: a press for the buttons, a turn away from the page's pose for the
 orientation, a flip for the switches, since those two arrive as state on
 their own.
+Closed, the tour leaves a "Show the tour" bubble in the stage's top right,
+breathing a ring so a reader who closed it by accident finds the way back; it
+reopens on the chapter in view.

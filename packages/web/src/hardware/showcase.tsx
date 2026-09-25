@@ -12,7 +12,7 @@ import { type Cue, type Heard, Simulator, type Spots } from '../simulator'
 import { color, ease, font, radius } from '../tokens.stylex'
 import { PoseDial } from './pose-dial'
 import { SwitchTiles } from './switch-tiles'
-import { type Stop, Tour } from './tour'
+import { type Stop, Tour, TourBubble } from './tour'
 import { Viewfinder } from './viewfinder'
 import { Score, VolumeKeys } from './volume-keys'
 
@@ -299,6 +299,7 @@ export function Showcase() {
             bare
             fill
           />
+          {!touring && <TourBubble onOpen={() => setTouring(true)} />}
           {touring && (
             <Tour
               stop={chapter.tour}

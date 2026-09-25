@@ -124,6 +124,30 @@ export function Tour({
   )
 }
 
+/** The way back into a closed tour: a bubble in the stage's top right that breathes until it is pressed. */
+export function TourBubble({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} {...stylex.props(styles.bubble)}>
+      <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden="true">
+        <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth={1.5} />
+        <path
+          d="M6.2 6.3a1.9 1.9 0 0 1 3.6.7c0 1.2-1.8 1.5-1.8 2.6M8 11.6v.1"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+        />
+      </svg>
+      Show the tour
+    </button>
+  )
+}
+
+// A ring that swells off the bubble and fades: seen from across the page, never in the way.
+const breathe = stylex.keyframes({
+  '0%': { boxShadow: `${color.shadow}, 0 0 0 0 ${color.ring}` },
+  '70%, 100%': { boxShadow: `${color.shadow}, 0 0 0 12px transparent` }
+})
 const pulse = stylex.keyframes({
   from: { opacity: 0.6, transform: 'scale(1)' },
   to: { opacity: 0, transform: 'scale(2.4)' }
@@ -276,6 +300,40 @@ const styles = stylex.create({
     cursor: { default: 'pointer', ':disabled': 'default' },
     transitionProperty: 'background-color, border-color, color',
     transitionDuration: '0.2s'
+  },
+  bubble: {
+    position: 'absolute',
+    zIndex: 2,
+    top: '12px',
+    right: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontFamily: font.sans,
+    fontSize: '12.5px',
+    fontWeight: 500,
+    paddingTop: '7px',
+    paddingBottom: '7px',
+    paddingLeft: '11px',
+    paddingRight: '13px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: color.border,
+    borderRadius: radius.pill,
+    backgroundColor: { default: color.surface, ':hover': color.accentSoft },
+    boxShadow: color.shadow,
+    color: color.accent,
+    cursor: 'pointer',
+    animationName: { default: breathe, [REDUCE]: 'none' },
+    animationDuration: '2.4s',
+    animationTimingFunction: ease.out,
+    animationIterationCount: 'infinite',
+    transitionProperty: 'background-color',
+    transitionDuration: '0.2s',
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
   },
   primary: { backgroundColor: color.accent, borderColor: color.accent, color: color.onAccent }
 })
