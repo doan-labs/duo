@@ -103,7 +103,7 @@ export const Safari = ({ os }: { os: Os }) => {
   // but starts nothing, so only the live display writes it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: mounts once; `url` and `os.mirror` are only read for that first page
   useEffect(() => {
-    if (!os.mirror && url) visit(url, host(url))
+    if (!os.mirror && url) visit(url, host(url), true)
   }, [])
   const show = (hist: string[], at: number) => {
     setTabs(tabs.map((x) => (x.id === t.id ? { ...x, hist, at } : x)))
@@ -300,7 +300,7 @@ export const Safari = ({ os }: { os: Os }) => {
               referrerPolicy="no-referrer"
               onLoad={() => {
                 const title = pageTitle()
-                if (url && title) retitle(url, title)
+                if (!t.priv && url && title) retitle(url, title)
               }}
               {...stylex.props(styles.frame, zoom !== 1 && styles.zoom(zoom))}
             />

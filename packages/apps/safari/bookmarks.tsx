@@ -29,15 +29,16 @@ const destinations: [MarkList, string, 'star' | 'bookmark' | 'eye'][] = [
   ['reading', 'Reading List', 'eye']
 ]
 
-const today = () => {
+// Calendar midnights, not 24h steps: a daylight-saving day is 23 or 25 hours.
+const midnight = (daysBack = 0) => {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - daysBack)
   return d.getTime()
 }
 const dayLabel = (at: number) => {
-  const t = today()
-  if (at >= t) return 'Today'
-  if (at >= t - 86_400_000) return 'Yesterday'
+  if (at >= midnight()) return 'Today'
+  if (at >= midnight(1)) return 'Yesterday'
   return new Date(at).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
@@ -134,7 +135,9 @@ export const Bookmarks = ({ onNavigate, onClose, pickFor, onPick }: Props) => {
             : section === 'reading-list'
               ? book.reading.length
               : book.bookmarks.length
-  const canEdit = !pickFor && rows > 0
+  // Done must stay reachable while editing, or deleting the last row strands
+  // the mode with no way out and a later row arrives disabled.
+  const canEdit = !pickFor && (editing || rows > 0)
 
   const selectSection = (next: Section) => {
     setSection(next)
@@ -151,8 +154,8 @@ export const Bookmarks = ({ onNavigate, onClose, pickFor, onPick }: Props) => {
   }
   const clearMenu: MenuEntry[] = [
     { label: 'the last hour', onSelect: () => clearHistory(Date.now() - 3_600_000) },
-    { label: 'today', onSelect: () => clearHistory(today()) },
-    { label: 'today and yesterday', onSelect: () => clearHistory(today() - 86_400_000) },
+    { label: 'today', onSelect: () => clearHistory(midnight()) },
+    { label: 'today and yesterday', onSelect: () => clearHistory(midnight(1)) },
     { label: 'all time', onSelect: () => clearHistory(0) }
   ]
 

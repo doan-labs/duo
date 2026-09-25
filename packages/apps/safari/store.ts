@@ -43,7 +43,14 @@ let book: Book = (() => {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const v = JSON.parse(raw) as Book
-      if (v.schema === 1) return v
+      if (
+        v.schema === 1 &&
+        Array.isArray(v.favorites) &&
+        Array.isArray(v.bookmarks) &&
+        Array.isArray(v.reading) &&
+        Array.isArray(v.history)
+      )
+        return v
     }
   } catch {}
   const fresh = seed()
@@ -71,11 +78,12 @@ export const safari = {
 }
 
 /**
- * A page the address bar went to. Neither a reload nor the second display's
- * mount is a new place: the entry repeats only once another url sits on top.
+ * A page the address bar went to. Every navigation is an entry, whichever tab
+ * it came from; only a mount asks to coalesce, so a reload or the second
+ * display's copy of the same page on top does not repeat it.
  */
-export function visit(url: string, title: string) {
-  if (book.history[0]?.url === url) return
+export function visit(url: string, title: string, coalesce = false) {
+  if (coalesce && book.history[0]?.url === url) return
   set({ ...book, history: [{ url, title, at: Date.now() }, ...book.history].slice(0, HIST_MAX) })
 }
 
