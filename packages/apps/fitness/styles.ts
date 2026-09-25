@@ -67,7 +67,7 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     color: colors.white
   },
-  sideList: { display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
+  sideList: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
   sideRow: {
     display: 'flex',
     alignItems: 'center',
@@ -112,7 +112,7 @@ export const styles = stylex.create({
     paddingRight: 8,
     paddingBottom: 8,
     paddingLeft: 8,
-    borderRadius: radius.lg,
+    borderRadius: layout.screenInnerPanel,
     backgroundColor: app.fill3,
     color: app.fg
   },
@@ -172,11 +172,12 @@ export const styles = stylex.create({
     gap: space.sm,
     paddingTop: space.xs,
     paddingRight: space.lg,
+    paddingBottom: space.xs,
     paddingLeft: space.lg
   },
   headSide: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: space.sm },
   date: { paddingRight: space.lg, paddingBottom: space.sm, paddingLeft: space.lg, color: app.label2 },
-  pageHead: { paddingTop: space.xl, paddingRight: space.lg, paddingLeft: space.lg },
+  pageHead: { paddingTop: space.xl, paddingRight: space.lg, paddingBottom: space.sm, paddingLeft: space.lg },
   bigVal: {
     fontSize: typeScale.largeTitle,
     lineHeight: leading.largeTitle,
@@ -225,6 +226,7 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
     gap: 12,
+    paddingTop: space.sm,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },
@@ -300,7 +302,9 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'backwards'
   }),
-  goalLine: { stroke: app.label3, strokeDasharray: '4 4', strokeWidth: 1 },
+  goalLine: { stroke: app.label3, strokeDasharray: '1 5', strokeLinecap: 'round', strokeWidth: 1.5 },
+  gridLine: { stroke: app.fill3, strokeWidth: 1, strokeDasharray: '1 5', strokeLinecap: 'round' },
+  baseline: { stroke: app.separator, strokeWidth: 1 },
 
   /** Workout rows on dark. */
   woRow: { display: 'flex', alignItems: 'center', gap: 12, paddingTop: 10, paddingBottom: 10 },
@@ -347,6 +351,7 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
     gap: 12,
+    paddingTop: space.sm,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },
@@ -423,6 +428,7 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
     gap: 10,
+    paddingTop: space.lg,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },

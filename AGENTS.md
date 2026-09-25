@@ -75,6 +75,9 @@ web UI, behavior checks, and screenshots; load its workflow first with
 browser driver unless the user asks for one. Follow
 [docs/debug.md](docs/debug.md) for what to assert: run the local web server,
 exercise the real page, and inspect both state and captured pixels.
+`.agents/skills/duo-shell-testing` carries the Duo-specific conventions
+for it: coordinate clicks (selector clicks miss CSS3D panels), `?deg=0`
+to fold, `?debug` for `window.__duo`, and the SwiftShader boot time.
 
 Use the visible Tauri app when testing native integration, window behavior,
 WKWebView-specific rendering, or a GPU/timing issue a Chromium browser cannot
@@ -92,6 +95,8 @@ verified; Chromium results do not establish native WebKit parity.
 - `packages/shell/native.ts` owns every Tauri check. The rest of the web code never touches `window.__TAURI__`.
 - Shaders are TS modules exporting a string, not `.glsl` files - the bundler treats those as assets.
 - UI is React function components styled with StyleX: `stylex.create` at the bottom of the file, longhand properties only, pseudo-classes and media queries as nested values, no descendant selectors, never `className` or `style` next to `stylex.props`. Colours and easings come from `packages/uikit/tokens.stylex.ts`; [DESIGN.md](DESIGN.md) governs what you build out of them. The only plain CSS is the `@layer reset` block in `packages/shell/index.html`.
+- StyleX tokens (`colors`, `app.*`, `layout.*`) are `var(--…)` strings at runtime. They work anywhere a CSS value works, including SVG `stroke`, `fill` and `stopColor`, but never inside an identifier: an `id` built from a token gives `url(#x-var(--y))`, which fails to parse and silently renders black. Generate plain alphanumeric ids for `linearGradient`, `clipPath` and friends.
+- `animationFillMode: 'backwards'` only holds the first frame during the delay, then reverts to the element's static style. Use it for staggers whose resting state is the shown one; a draw-in whose static style is hidden (a `strokeDashoffset` offset) needs `forwards` or the element vanishes right after drawing.
 - Assets belong in `public/`, imported by URL. Apple's model is not redistributable, so it stays out of git.
 - Units are centimetres. The camera is fixed at z=40 and the screen shader projects from that eye; moving it breaks the projection.
 - Biome owns formatting and lint: single quotes, no semicolons, 2-space indent, 120 columns. Matching edits are formatted by the PostToolUse hook in `.codex/hooks.json`, and staged files again on pre-commit. Codex hooks require user trust before running; see docs/working.md. Use `apply_patch` for Codex edits so the hook runs; shell-written files do not trigger this matcher. Never hand-format or run `biome check --write` or `bun run format` yourself. If the hook is inactive, report it rather than assuming formatting ran. Lint errors are handed back to fix.

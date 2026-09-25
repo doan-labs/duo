@@ -136,7 +136,7 @@ export const shared = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: space.sm,
-    paddingTop: space.xs,
+    paddingTop: space.sm,
     paddingRight: 56,
     paddingBottom: space.sm,
     paddingLeft: space.lg,
@@ -196,6 +196,7 @@ export const shared = stylex.create({
   rowR: { marginLeft: 'auto', color: app.label2 },
   /** Inset group of rows. */
   grp: {
+    marginTop: space.sm,
     marginRight: space.lg,
     marginBottom: space.xl,
     marginLeft: space.lg,

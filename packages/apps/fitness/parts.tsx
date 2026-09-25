@@ -78,18 +78,23 @@ export function WeekBars({ pts, tint, goal }: { pts: Point[]; tint: string; goal
   const W = 340
   const H = 120
   const bw = W / pts.length
+  const barW = Math.min(24, Math.max(1.5, bw * 0.58))
   return (
     <svg viewBox={`0 0 ${W} ${H + 18}`} aria-hidden="true" {...stylex.props(styles.chartSvg)}>
+      {[0.25, 0.5, 0.75].map((t) => (
+        <line key={t} x1={0} x2={W} y1={H * t} y2={H * t} {...stylex.props(styles.gridLine)} />
+      ))}
+      <line x1={0} x2={W} y1={H + 0.5} y2={H + 0.5} {...stylex.props(styles.baseline)} />
       {pts.map((p, i) => {
-        const h = Math.max(1.5, (p.value / max) * H)
+        const h = Math.max(3, (p.value / max) * H)
         return (
           <rect
             key={p.key}
-            x={i * bw + bw * 0.2}
+            x={i * bw + (bw - barW) / 2}
             y={H - h}
-            width={Math.max(1.5, bw * 0.6)}
+            width={barW}
             height={h}
-            rx={Math.min(4, bw * 0.2)}
+            rx={Math.min(barW / 2, 6)}
             {...stylex.props(styles.barGrow(tint), delay.ms(i * 30))}
           />
         )

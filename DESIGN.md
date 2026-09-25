@@ -109,6 +109,24 @@ Blue is the one interaction colour, and it comes from `app.link`, not from a
 hue. Text and surfaces come from `app`; the hues in `colors` are for tinting an
 icon square, a chart, a switch.
 
+Space between siblings belongs to the block below, styled once on the block,
+never wired at each call site: `paddingTop` on a transparent stack,
+`marginTop` on a surfaced card or `Section`, `gap` on a flex or grid parent.
+`space.sm` is the floor and `space.lg` separates major blocks; a section
+header still owns the room to its own rows. No two siblings touch - a card
+flush to the block above it is a bug, not a look.
+
+Round a step past enough: a filled row, chip or footer card spanning a panel
+is `radius.xl` or more. `radius.lg` on a full-width filled bar still reads
+as a rectangle. A chip sitting inside a floating panel takes the panel's own
+radius (`layout.screenInnerPanel`) - a smaller curve reads mismatched under
+the corner it shares.
+
+Charts share one look of our own, not Apple's: a dotted hairline grid at the
+quartiles, capsule bars off a baseline hairline, a smooth line over a gradient
+that fades to nothing, and sleep drawn as a continuous wave that changes
+colour at each stage rather than stacked blocks.
+
 ## 6. Motion
 
 Every curve is in `easing`; a push takes about 380 ms; nothing bounces twice.

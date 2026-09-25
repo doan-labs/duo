@@ -1,6 +1,8 @@
-// The charts the metric pages draw. Bars grow from the baseline, lines draw
-// left to right, the hypnogram stacks its stages - one animation vocabulary,
-// and every point on it comes out of the book, never invented.
+// The charts the metric pages draw, on a look of our own: a dotted hairline
+// grid behind everything, capsule bars off a baseline, a smooth line over a
+// gradient that fades to nothing, and sleep as one continuous wave that
+// changes colour at each stage. One animation vocabulary, and every point
+// comes out of the book, never invented.
 
 import type { Point, Sleep, SleepStage } from '@doan-labs/duo-fixtures/health.ts'
 import { delay } from '@doan-labs/duo-uikit/styles.ts'
@@ -11,7 +13,28 @@ import { styles } from './styles.ts'
 const W = 340
 const H = 140
 
-/** Vertical bars with an optional dashed goal line and a label per stride. */
+/** Catmull-Rom through the points, the way every soft chart in the kit curves. */
+const smooth = (points: [number, number][]) =>
+  points
+    .map(([x, y], i) => {
+      if (!i) return `M${x} ${y}`
+      const [px, py] = points[i - 1]!
+      const ny = points[Math.min(points.length - 1, i + 1)]![1]
+      const dx = (x - px) / 6
+      return `C${px + dx} ${py} ${x - dx} ${ny} ${x} ${y}`
+    })
+    .join(' ')
+
+/** Dotted hairlines at the quartiles - the chart paper every big chart shares. */
+const Grid = () => (
+  <>
+    {[0.25, 0.5, 0.75].map((t) => (
+      <line key={t} x1={0} x2={W} y1={H * t} y2={H * t} {...stylex.props(styles.gridLine)} />
+    ))}
+  </>
+)
+
+/** Capsule bars off a baseline hairline, an optional dotted goal, a label per stride. */
 export function Bars({
   pts,
   tint,
@@ -25,18 +48,21 @@ export function Bars({
 }) {
   const max = Math.max(goal ?? 0, ...pts.map((p) => p.value)) * 1.08 || 1
   const bw = W / pts.length
+  const barW = Math.min(24, Math.max(1.5, bw * 0.58))
   return (
     <svg viewBox={`0 0 ${W} ${H + 18}`} aria-hidden="true" {...stylex.props(styles.chartSvg)}>
+      <Grid />
+      <line x1={0} x2={W} y1={H + 0.5} y2={H + 0.5} {...stylex.props(styles.baseline)} />
       {pts.map((p, i) => {
-        const h = Math.max(1.5, (p.value / max) * H)
+        const h = Math.max(3, (p.value / max) * H)
         return (
           <rect
             key={p.key}
-            x={i * bw + bw * 0.18}
+            x={i * bw + (bw - barW) / 2}
             y={H - h}
-            width={Math.max(1.5, bw * 0.64)}
+            width={barW}
             height={h}
-            rx={Math.min(3, bw * 0.22)}
+            rx={Math.min(barW / 2, 6)}
             {...stylex.props(styles.barGrow(tint), delay.ms(i * 24))}
           />
         )
@@ -56,7 +82,7 @@ export function Bars({
   )
 }
 
-/** A smoothed line over a translucent fill, drawn in. */
+/** A smoothed line over a fading gradient, drawn in, latest point dotted. */
 export function Line({ pts, tint, floor }: { pts: Point[]; tint: string; floor?: number }) {
   const vals = pts.map((p) => p.value)
   const lo = Math.min(...vals)
@@ -66,20 +92,30 @@ export function Line({ pts, tint, floor }: { pts: Point[]; tint: string; floor?:
   const max = hi + pad
   const X = (i: number) => (i / (pts.length - 1)) * W
   const Y = (v: number) => H - ((v - min) / (max - min || 1)) * H
-  // Catmull-Rom to cubic, the way every other soft chart in the kit curves.
-  const d = pts
-    .map((p, i) => {
-      const p0 = pts[Math.max(0, i - 1)]!.value
-      const p1 = p.value
-      const p2 = pts[Math.min(pts.length - 1, i + 1)]!.value
-      if (!i) return `M${X(0)} ${Y(p1)}`
-      return `C${X(i - 1) + (X(i) - X(i - 1)) / 6} ${Y(p0)} ${X(i) - (X(i) - X(i - 1)) / 6} ${Y(p2)} ${X(i)} ${Y(p1)}`
-    })
-    .join(' ')
+  const d = smooth(pts.map((p, i) => [X(i), Y(p.value)] as [number, number]))
+  const gid = `line-${tint.replace(/[^a-zA-Z0-9]/g, '')}`
+  const last = pts.at(-1)!
   return (
     <svg viewBox={`0 0 ${W} ${H + 18}`} aria-hidden="true" {...stylex.props(styles.chartSvg)}>
-      <path d={`${d} L${W} ${H} L0 ${H} Z`} {...stylex.props(styles.lineFill(tint))} />
-      <path d={d} fill="none" stroke={tint} strokeWidth={2} strokeLinejoin="round" {...stylex.props(styles.lineDraw)} />
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={tint} stopOpacity="0.3" />
+          <stop offset="1" stopColor={tint} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <Grid />
+      <path d={`${d} L${W} ${H} L0 ${H} Z`} fill={`url(#${gid})`} />
+      <path
+        d={d}
+        fill="none"
+        stroke={tint}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...stylex.props(styles.lineDraw)}
+      />
+      <circle cx={X(pts.length - 1)} cy={Y(last.value)} r={5.5} {...stylex.props(styles.lineDotRing(tint))} />
+      <circle cx={X(pts.length - 1)} cy={Y(last.value)} r={3} {...stylex.props(styles.lineDot(tint))} />
       {pts.map((p, i) =>
         i % Math.ceil(pts.length / 6) === 0 ? (
           <text key={p.key} x={X(i)} y={H + 14} textAnchor="middle" {...stylex.props(styles.axis)}>
@@ -91,23 +127,29 @@ export function Line({ pts, tint, floor }: { pts: Point[]; tint: string; floor?:
   )
 }
 
-/** The card-size sparkline: a bare polyline, no axes. */
+/** The card-size sparkline: the same smooth line and fade, no axes. */
 export function Spark({ pts, tint, w = 120, h = 44 }: { pts: number[]; tint: string; w?: number; h?: number }) {
   const lo = Math.min(...pts)
   const hi = Math.max(...pts)
-  const d = pts
-    .map(
-      (v, i) =>
-        `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * w).toFixed(1)} ${((1 - (v - lo) / (hi - lo || 1)) * h).toFixed(1)}`
-    )
-    .join(' ')
+  const pad = (hi - lo) * 0.08
+  const Y = (v: number) => h - ((v - (lo - pad)) / (hi - lo + pad * 2 || 1)) * h
+  const d = smooth(pts.map((v, i) => [(i / (pts.length - 1)) * w, Y(v)] as [number, number]))
+  const gid = `spark-${tint.replace(/[^a-zA-Z0-9]/g, '')}`
   return (
     <svg viewBox={`0 0 ${w} ${h}`} aria-hidden="true" {...stylex.props(styles.spark)}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={tint} stopOpacity="0.24" />
+          <stop offset="1" stopColor={tint} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${d} L${w} ${h} L0 ${h} Z`} fill={`url(#${gid})`} />
       <path
         d={d}
         fill="none"
         stroke={tint}
-        strokeWidth={1.6}
+        strokeWidth={1.8}
+        strokeLinecap="round"
         strokeLinejoin="round"
         {...stylex.props(styles.lineDrawShort)}
       />
@@ -123,61 +165,93 @@ const STAGE_TINT: Record<SleepStage, string> = {
 }
 
 /**
- * One night's hypnogram: the time axis runs left to right from bedtime to
- * wake, stages as colored bars at their level - deep low, awake high.
+ * One night's hypnogram, drawn as a wave instead of a bar chart: the level of
+ * each stage is a row, and the line runs along a segment's row then eases to
+ * the next stage's row at the boundary - deep low, awake high.
  */
 export function Hypnogram({ sleep, w = 320, h = 96 }: { sleep: Sleep; w?: number; h?: number }) {
   const last = sleep.segs.at(-1)!
   const span = last.at + last.mins
   const lvl: Record<SleepStage, number> = { awake: 0, rem: 1, core: 2, deep: 3 }
   const rowH = h / 4
+  const sw = Math.min(6, rowH * 0.45)
+  const X0 = (s: Sleep['segs'][number]) => (s.at / span) * w
+  const X1 = (s: Sleep['segs'][number]) => ((s.at + s.mins) / span) * w
+  const Y = (s: Sleep['segs'][number]) => lvl[s.stage] * rowH + rowH / 2
+  const rows = ['awake', 'rem', 'core', 'deep'] as const
   return (
     <svg viewBox={`0 0 ${w} ${h}`} aria-hidden="true" {...stylex.props(styles.spark)}>
-      {sleep.segs.map((s, i) => (
-        <rect
-          // Segments are consecutive clock spans: positional, never reordered.
-          // biome-ignore lint/suspicious/noArrayIndexKey: time segments have no id
-          key={i}
-          x={(s.at / span) * w}
-          y={lvl[s.stage] * rowH + 3}
-          width={Math.max(1.5, (s.mins / span) * w - 1)}
-          height={rowH - 6}
-          rx={4}
-          {...stylex.props(styles.barGrow(STAGE_TINT[s.stage]), delay.ms(i * 14))}
+      {rows.map((stage) => (
+        <line
+          key={stage}
+          x1={sw}
+          x2={w - sw}
+          y1={lvl[stage] * rowH + rowH / 2}
+          y2={lvl[stage] * rowH + rowH / 2}
+          {...stylex.props(styles.gridLine)}
         />
       ))}
+      {sleep.segs.map((s, i) => {
+        const next = sleep.segs[i + 1]
+        const x0 = X0(s)
+        const x1 = X1(s)
+        const y = Y(s)
+        const off = Math.min(11, Math.max(4, (x1 - x0) * 0.4))
+        return (
+          // Segments are consecutive clock spans: positional, never reordered.
+          // biome-ignore lint/suspicious/noArrayIndexKey: time segments have no id
+          <g key={i}>
+            <path
+              d={`M${x0} ${y} L${x1} ${y}`}
+              {...stylex.props(styles.hypnoRun(STAGE_TINT[s.stage], sw), delay.ms(i * 30))}
+            />
+            {next && (
+              <path
+                d={`M${x1} ${y} C${x1 + off * 0.5} ${y} ${x1 + off * 0.5} ${Y(next)} ${x1 + off} ${Y(next)}`}
+                {...stylex.props(styles.hypnoLink(STAGE_TINT[next.stage], sw), delay.ms(i * 30 + 25))}
+              />
+            )}
+          </g>
+        )
+      })}
     </svg>
   )
 }
 export { STAGE_TINT }
 
-/** The sleep page's night bars: each night a vertical stack of its stages. */
+/** The sleep page's night bars: each night a capsule stack of its stages. */
 export function SleepBars({ sleeps }: { sleeps: { key: string; s: Sleep }[] }) {
   const max = Math.max(...sleeps.map(({ s }) => s.bed)) * 1.05 || 1
   const bw = W / sleeps.length
+  const barW = Math.min(14, Math.max(1.5, bw * 0.56))
   return (
     <svg viewBox={`0 0 ${W} ${H + 18}`} aria-hidden="true" {...stylex.props(styles.chartSvg)}>
+      <Grid />
+      <line x1={0} x2={W} y1={H + 0.5} y2={H + 0.5} {...stylex.props(styles.baseline)} />
       {sleeps.map(({ key, s }, i) => {
         let y = H
         const totals: Record<SleepStage, number> = { awake: 0, rem: 0, core: 0, deep: 0 }
         for (const seg of s.segs) totals[seg.stage] += seg.mins
+        const segs = (['deep', 'core', 'rem', 'awake'] as SleepStage[]).filter(
+          (stage) => (totals[stage] / max) * H > 0.5
+        )
         return (
           <g key={key}>
-            {(['deep', 'core', 'rem', 'awake'] as SleepStage[]).map((stage) => {
+            {segs.map((stage, j) => {
               const v = totals[stage]
               const h = (v / max) * H
               y -= h
-              return h > 0.5 ? (
+              return (
                 <rect
                   key={stage}
-                  x={i * bw + bw * 0.2}
+                  x={i * bw + (bw - barW) / 2}
                   y={y}
-                  width={Math.max(1.5, bw * 0.6)}
+                  width={barW}
                   height={h}
-                  rx={Math.min(2.5, bw * 0.18)}
+                  rx={Math.min(j === segs.length - 1 ? barW / 2 : 1, 3)}
                   {...stylex.props(styles.barGrow(STAGE_TINT[stage]), delay.ms(i * 24))}
                 />
-              ) : null
+              )
             })}
             <text x={i * bw + bw / 2} y={H + 14} textAnchor="middle" {...stylex.props(styles.axis)}>
               {key.slice(8)}
