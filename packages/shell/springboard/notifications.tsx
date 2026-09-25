@@ -252,7 +252,7 @@ const styles = stylex.create({
   },
   bannerOut: { transform: 'translateY(-120%)', opacity: 0 },
   // Under the clock, over the lock buttons: the dates above come to ~150 px on
-  // both displays; the torch and camera row starts ~100 px from the bottom.
+  // both displays; the button row tops out at ~128 px on wide, ~90 on narrow.
   list: {
     position: 'absolute',
     left: 8,
@@ -265,7 +265,7 @@ const styles = stylex.create({
     // Hide the bar but keep the scroll.
     scrollbarWidth: 'none'
   },
-  listWide: { top: 176, bottom: 76 },
+  listWide: { top: 176, bottom: 134 },
   listNarrow: { top: 178, bottom: 100 },
   listHead: { display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 6, paddingRight: 2 },
   listTitle: {
