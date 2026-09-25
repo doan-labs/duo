@@ -25,6 +25,7 @@ export type HudEvents = {
   flip: () => void
   home: () => void
   reset: () => void
+  spin: (on: boolean) => void
 }
 
 type State = { target: number; yaw: number; hint: boolean; spin: boolean; away: boolean }
@@ -62,11 +63,12 @@ const wrap = (rad: number) => Math.atan2(Math.sin(rad), Math.cos(rad))
 /** The default pose main.ts homes to: camera at z = 40, level, in front. */
 const HOME_DISTANCE = 40
 
-export function mountHud(events: HudEvents) {
+export function mountHud(events: HudEvents, spun = false) {
   const q = new URLSearchParams(location.search)
-  // `?spin=1`: start turning as soon as the scene draws (the hero). A stated
-  // preference for less motion wins; the checkbox still turns it on by hand.
-  const spin = q.get('spin') === '1' && !matchMedia('(prefers-reduced-motion: reduce)').matches
+  // `?spin=1` or the checkbox's saved pick: start turning as soon as the scene
+  // draws (the hero). A stated preference for less motion wins; the checkbox
+  // still turns it on by hand.
+  const spin = (q.has('spin') ? q.get('spin') === '1' : spun) && !matchMedia('(prefers-reduced-motion: reduce)').matches
   const store = createStore({ target: 180, yaw: 0, hint: true, spin, away: false })
   const live: Live = { deg: 180, degEl: null }
   const web = document.documentElement.classList.contains('web')
@@ -213,7 +215,10 @@ function Hud({
             {...stylex.props(styles.checkbox, s.spin && styles.checkboxOn)}
             type="checkbox"
             checked={s.spin}
-            onChange={(e) => store.set({ spin: e.currentTarget.checked })}
+            onChange={(e) => {
+              store.set({ spin: e.currentTarget.checked })
+              events.spin(e.currentTarget.checked)
+            }}
             aria-label="Auto-rotate"
           />
           <svg
