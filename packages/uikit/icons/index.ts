@@ -175,6 +175,10 @@ const personFill = '/icons/sym/person-crop-circle-fill.webp'
 const keypad = '/icons/sym/circle-grid-3x3-fill.webp'
 const voicemail = '/icons/sym/recordingtape.webp'
 const call = '/icons/sym/phone-fill.webp'
+// Wallet's card stack, a bank and a sheet's close.
+const stack = '/icons/sym/rectangle-stack.webp'
+const building = '/icons/sym/building-columns-fill.webp'
+const xmark = '/icons/sym/xmark.webp'
 
 /** Apple's icon outline is a superellipse, not a rounded rect. */
 function squircle(size: number, n = 5) {
@@ -435,7 +439,10 @@ export const SYM = {
   personFill,
   keypad,
   voicemail,
-  call
+  call,
+  stack,
+  building,
+  xmark
 }
 
 /** The wallpaper rides along under this key: screen.ts needs it decoded too. */

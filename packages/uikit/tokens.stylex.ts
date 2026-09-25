@@ -547,6 +547,12 @@ export const appAppearance = stylex.defineConsts({
   walletTransit: 'linear-gradient(150deg,#0091ff,#6d7cff)',
   walletBadge: 'linear-gradient(150deg,#1c1c1e,#3a3a3c)',
   walletPass: 'linear-gradient(150deg,#ff375f,#ff9230)',
+  walletCash: 'linear-gradient(150deg,#6d7cff,#0037a8)',
+  walletLoop: 'linear-gradient(150deg,#00c8b3,#006d77)',
+  walletKey: 'linear-gradient(150deg,#38c86a,#0d6e2f)',
+  walletTicket: 'linear-gradient(150deg,#bf5af2,#6a3ea8)',
+  /** A card the owner adds: graphite, the way an unnamed payment card reads. */
+  walletPlain: 'linear-gradient(150deg,#48484a,#1c1c1e)',
   // watch
   watchCase: '0 0 0 5px #6e6e73,0 16px 34px rgba(0,0,0,.45)',
   // weather
