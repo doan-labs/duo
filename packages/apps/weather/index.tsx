@@ -1,5 +1,5 @@
 import type { Os } from '@doan-labs/duo-sdk'
-import { WidgetLabel } from '@doan-labs/duo-uikit'
+import { useWide, WidgetLabel } from '@doan-labs/duo-uikit'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
@@ -26,7 +26,9 @@ export function Weather(_: { os: Os }) {
   const preferences = usePreferences()
   const place = preferences.places.find((p) => p.id === preferences.selected) || preferences.places[0]!
   const { data: f, loading, error, fetched } = useForecast(place)
+  const [root, wide] = useWide<HTMLDivElement>()
   const [locations, setLocations] = useState(false)
+  const [aside, setAside] = useState(true)
   const [detail, setDetail] = useState<number | null>(null)
   const content = useRef<HTMLDivElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
@@ -129,173 +131,192 @@ export function Weather(_: { os: Os }) {
     </button>
   )
   return (
-    <div data-weather {...stylex.props(styles.root, styles[sky])}>
+    <div data-weather ref={root} {...stylex.props(styles.root, styles[sky])}>
       <Sky sky={sky} code={current?.weather_code} />
-      <div inert={detail !== null} {...stylex.props(styles.top)}>
-        <div {...stylex.props(styles.topLeft)}>
-          <div {...stylex.props(styles.wideOnly)}>{list}</div>
-        </div>
-        <div>{!locations && <div {...stylex.props(styles.wideOnly)}>{dots}</div>}</div>
-        <div {...stylex.props(styles.topRight)}>
-          <button
-            type="button"
-            aria-label="Refresh weather"
-            disabled={loading}
-            onClick={() => void refresh(place, true)}
-            {...stylex.props(styles.control)}
-          >
-            <span {...stylex.props(loading && styles.spin)}>
-              <Sym name="reload" size={15} />
-            </span>
-          </button>
-        </div>
-      </div>
-      {locations ? (
-        <Locations onClose={() => setLocations(false)} temp={temp} />
-      ) : (
-        <div ref={content} inert={detail !== null} {...stylex.props(styles.scroll, styles.scrollbar)}>
-          <header {...stylex.props(styles.hero)}>
-            <div {...stylex.props(styles.eyebrow)}>
-              {place.id.startsWith('local:') ? 'MY LOCATION' : place.region.toUpperCase()}
-            </div>
-            <h1 {...stylex.props(styles.city)}>{place.name}</h1>
-            <div {...stylex.props(styles.temperature)}>{temp(current?.temperature_2m)}</div>
-            <div {...stylex.props(styles.condition)}>
-              {current
-                ? condition(current.weather_code!, current.is_day)[1]
-                : loading
-                  ? 'Loading forecast…'
-                  : 'Weather unavailable'}
-            </div>
-            {f && (
-              <div {...stylex.props(styles.highLow)}>
-                <span>H:{temp(f.daily.temperature_2m_max?.[0])}</span>
-                <span>L:{temp(f.daily.temperature_2m_min?.[0])}</span>
-              </div>
-            )}
-            {f && <div {...stylex.props(styles.localTime)}>{clock(f.current.time!, f.timezone)} local time</div>}
-          </header>
-          {error && (
-            <div role="alert" {...stylex.props(styles.card, styles.notice)}>
-              {f && 'Showing the last successful forecast. '}
-              {error}{' '}
+      {wide && aside && (
+        <aside aria-label="Locations" inert={detail !== null} {...stylex.props(styles.side)}>
+          <Locations wide temp={temp} />
+        </aside>
+      )}
+      <div {...stylex.props(styles.pane, wide && aside && styles.paneSide)}>
+        <div inert={detail !== null} {...stylex.props(styles.top)}>
+          <div {...stylex.props(styles.topLeft)}>
+            {wide && (
               <button
                 type="button"
-                onClick={() => void refresh(place, true)}
-                {...stylex.props(styles.control, styles.pill)}
+                aria-label={aside ? 'Hide locations sidebar' : 'Show locations sidebar'}
+                aria-expanded={aside}
+                onClick={() => setAside(!aside)}
+                {...stylex.props(styles.control)}
               >
-                Retry
+                <Sym name="sidebar" size={17} />
               </button>
-            </div>
-          )}
-          {f && (
-            <>
-              <section {...stylex.props(styles.card)} aria-label="Hourly forecast">
-                <div {...stylex.props(styles.summary)}>
-                  {condition(current!.weather_code!, current!.is_day)[1]} conditions
-                  {(f.daily.precipitation_probability_max?.[0] ?? 0) > 30
-                    ? ' with a chance of precipitation later today'
-                    : ' will continue for the rest of the day'}
-                  . Wind gusts are up to <Num value={current!.wind_gusts_10m} suffix=" km/h" />.
-                </div>
-                <div {...stylex.props(styles.hourly)}>
-                  {strip.map((s) =>
-                    s.kind === 'hour' ? (
-                      <button
-                        key={hours[s.i]}
-                        type="button"
-                        aria-label={`View forecast for ${clock(hours[s.i]!, f.timezone)}`}
-                        onClick={() =>
-                          setDetail(
-                            Math.max(
-                              0,
-                              f.daily.time!.findIndex((day) => sameDay(day, hours[s.i]!))
-                            )
-                          )
-                        }
-                        {...stylex.props(styles.hour)}
-                      >
-                        <span>{s.i === start ? 'Now' : hour(hours[s.i]!, f.timezone)}</span>
-                        <Glyph name={condition(f.hourly.weather_code![s.i]!, f.hourly.is_day![s.i])[0]} size={26} />
-                        {(f.hourly.precipitation_probability?.[s.i] ?? 0) >= 20 ? (
-                          <span {...stylex.props(styles.chance)}>
-                            <Num value={f.hourly.precipitation_probability?.[s.i]} suffix="%" />
-                          </span>
-                        ) : null}
-                        <span>{temp(s.i === start ? current!.temperature_2m : f.hourly.temperature_2m?.[s.i])}</span>
-                      </button>
-                    ) : (
-                      <div key={s.kind + s.time} {...stylex.props(styles.hour)}>
-                        <span>{clock(s.time, f.timezone).replace(' ', '')}</span>
-                        <Glyph name={s.kind} size={26} />
-                        <span {...stylex.props(styles.hourEvent)}>{s.kind === 'sunrise' ? 'Sunrise' : 'Sunset'}</span>
-                      </div>
-                    )
-                  )}
-                </div>
-              </section>
-              <div {...stylex.props(styles.grid)}>
-                <section {...stylex.props(styles.card, styles.forecast)} aria-label="10-day forecast">
-                  <h2 {...stylex.props(styles.label)}>
-                    <Sym name="calendarSym" size={12} />
-                    10-day forecast
-                  </h2>
-                  {f.daily.time!.map((time, i) => {
-                    const min = f.daily.temperature_2m_min![i]!
-                    const max = f.daily.temperature_2m_max![i]!
-                    const left = ((min - low) / span) * 100
-                    const width = Math.max(4, ((max - min) / span) * 100)
-                    return (
-                      <button
-                        key={time}
-                        type="button"
-                        aria-label={`View ${i === 0 ? 'today' : clock(time, f.timezone, { weekday: 'long' })} forecast`}
-                        onClick={() => setDetail(i)}
-                        {...stylex.props(styles.daily)}
-                      >
-                        <span>{i === 0 ? 'Today' : clock(time, f.timezone, { weekday: 'short' })}</span>
-                        <span {...stylex.props(styles.dailyIcon)}>
-                          <Glyph name={condition(f.daily.weather_code![i]!)[0]} size={24} />
-                          {(f.daily.precipitation_probability_max?.[i] ?? 0) >= 20 && (
-                            <small {...stylex.props(styles.chance)}>
-                              <Num value={f.daily.precipitation_probability_max?.[i]} suffix="%" />
-                            </small>
-                          )}
-                        </span>
-                        <span {...stylex.props(styles.muted)}>{temp(min)}</span>
-                        <span {...stylex.props(styles.track)}>
-                          <span {...stylex.props(styles.range(left, Math.min(width, 100 - left)))} />
-                          {i === 0 && current && (
-                            <span
-                              aria-hidden="true"
-                              {...stylex.props(
-                                styles.marker(
-                                  Math.min(100, Math.max(0, ((current.temperature_2m! - low) / span) * 100))
-                                )
-                              )}
-                            />
-                          )}
-                        </span>
-                        <span>{temp(max)}</span>
-                      </button>
-                    )
-                  })}
-                </section>
-                <Tiles f={f} start={start} temp={temp} />
-              </div>
-              <footer {...stylex.props(styles.footnote)}>
-                Updated{' '}
-                {fetched ? new Date(fetched).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}{' '}
-                · Forecast times are local to {place.name}.<br />
-                <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
-                  Weather data by Open-Meteo
-                </a>{' '}
-                · Model estimates, not a live station.
-              </footer>
-            </>
-          )}
+            )}
+          </div>
+          <div />
+          <div {...stylex.props(styles.topRight)}>
+            <button
+              type="button"
+              aria-label="Refresh weather"
+              disabled={loading}
+              onClick={() => void refresh(place, true)}
+              {...stylex.props(styles.control)}
+            >
+              <span {...stylex.props(loading && styles.spin)}>
+                <Sym name="reload" size={15} />
+              </span>
+            </button>
+          </div>
         </div>
-      )}
+        {!wide && locations ? (
+          <Locations onClose={() => setLocations(false)} temp={temp} />
+        ) : (
+          <div ref={content} inert={detail !== null} {...stylex.props(styles.scroll, styles.scrollbar)}>
+            <header {...stylex.props(styles.hero)}>
+              <div {...stylex.props(styles.eyebrow)}>
+                {place.id.startsWith('local:') ? 'MY LOCATION' : place.region.toUpperCase()}
+              </div>
+              <h1 {...stylex.props(styles.city)}>{place.name}</h1>
+              <div {...stylex.props(styles.temperature)}>{temp(current?.temperature_2m)}</div>
+              <div {...stylex.props(styles.condition)}>
+                {current
+                  ? condition(current.weather_code!, current.is_day)[1]
+                  : loading
+                    ? 'Loading forecast…'
+                    : 'Weather unavailable'}
+              </div>
+              {f && (
+                <div {...stylex.props(styles.highLow)}>
+                  <span>H:{temp(f.daily.temperature_2m_max?.[0])}</span>
+                  <span>L:{temp(f.daily.temperature_2m_min?.[0])}</span>
+                </div>
+              )}
+              {f && <div {...stylex.props(styles.localTime)}>{clock(f.current.time!, f.timezone)} local time</div>}
+            </header>
+            {error && (
+              <div role="alert" {...stylex.props(styles.card, styles.notice)}>
+                {f && 'Showing the last successful forecast. '}
+                {error}{' '}
+                <button
+                  type="button"
+                  onClick={() => void refresh(place, true)}
+                  {...stylex.props(styles.control, styles.pill)}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            {f && (
+              <>
+                <section {...stylex.props(styles.card)} aria-label="Hourly forecast">
+                  <div {...stylex.props(styles.summary)}>
+                    {condition(current!.weather_code!, current!.is_day)[1]} conditions
+                    {(f.daily.precipitation_probability_max?.[0] ?? 0) > 30
+                      ? ' with a chance of precipitation later today'
+                      : ' will continue for the rest of the day'}
+                    . Wind gusts are up to <Num value={current!.wind_gusts_10m} suffix=" km/h" />.
+                  </div>
+                  <div {...stylex.props(styles.hourly)}>
+                    {strip.map((s) =>
+                      s.kind === 'hour' ? (
+                        <button
+                          key={hours[s.i]}
+                          type="button"
+                          aria-label={`View forecast for ${clock(hours[s.i]!, f.timezone)}`}
+                          onClick={() =>
+                            setDetail(
+                              Math.max(
+                                0,
+                                f.daily.time!.findIndex((day) => sameDay(day, hours[s.i]!))
+                              )
+                            )
+                          }
+                          {...stylex.props(styles.hour)}
+                        >
+                          <span>{s.i === start ? 'Now' : hour(hours[s.i]!, f.timezone)}</span>
+                          <Glyph name={condition(f.hourly.weather_code![s.i]!, f.hourly.is_day![s.i])[0]} size={26} />
+                          {(f.hourly.precipitation_probability?.[s.i] ?? 0) >= 20 ? (
+                            <span {...stylex.props(styles.chance)}>
+                              <Num value={f.hourly.precipitation_probability?.[s.i]} suffix="%" />
+                            </span>
+                          ) : null}
+                          <span>{temp(s.i === start ? current!.temperature_2m : f.hourly.temperature_2m?.[s.i])}</span>
+                        </button>
+                      ) : (
+                        <div key={s.kind + s.time} {...stylex.props(styles.hour)}>
+                          <span>{clock(s.time, f.timezone).replace(' ', '')}</span>
+                          <Glyph name={s.kind} size={26} />
+                          <span {...stylex.props(styles.hourEvent)}>{s.kind === 'sunrise' ? 'Sunrise' : 'Sunset'}</span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </section>
+                <div {...stylex.props(styles.grid)}>
+                  <section {...stylex.props(styles.card, styles.forecast)} aria-label="10-day forecast">
+                    <h2 {...stylex.props(styles.label)}>
+                      <Sym name="calendarSym" size={12} />
+                      10-day forecast
+                    </h2>
+                    {f.daily.time!.map((time, i) => {
+                      const min = f.daily.temperature_2m_min![i]!
+                      const max = f.daily.temperature_2m_max![i]!
+                      const left = ((min - low) / span) * 100
+                      const width = Math.max(4, ((max - min) / span) * 100)
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          aria-label={`View ${i === 0 ? 'today' : clock(time, f.timezone, { weekday: 'long' })} forecast`}
+                          onClick={() => setDetail(i)}
+                          {...stylex.props(styles.daily)}
+                        >
+                          <span>{i === 0 ? 'Today' : clock(time, f.timezone, { weekday: 'short' })}</span>
+                          <span {...stylex.props(styles.dailyIcon)}>
+                            <Glyph name={condition(f.daily.weather_code![i]!)[0]} size={24} />
+                            {(f.daily.precipitation_probability_max?.[i] ?? 0) >= 20 && (
+                              <small {...stylex.props(styles.chance)}>
+                                <Num value={f.daily.precipitation_probability_max?.[i]} suffix="%" />
+                              </small>
+                            )}
+                          </span>
+                          <span {...stylex.props(styles.muted)}>{temp(min)}</span>
+                          <span {...stylex.props(styles.track)}>
+                            <span {...stylex.props(styles.range(left, Math.min(width, 100 - left)))} />
+                            {i === 0 && current && (
+                              <span
+                                aria-hidden="true"
+                                {...stylex.props(
+                                  styles.marker(
+                                    Math.min(100, Math.max(0, ((current.temperature_2m! - low) / span) * 100))
+                                  )
+                                )}
+                              />
+                            )}
+                          </span>
+                          <span>{temp(max)}</span>
+                        </button>
+                      )
+                    })}
+                  </section>
+                  <Tiles f={f} start={start} temp={temp} />
+                </div>
+                <footer {...stylex.props(styles.footnote)}>
+                  Updated{' '}
+                  {fetched
+                    ? new Date(fetched).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                    : '—'}{' '}
+                  · Forecast times are local to {place.name}.<br />
+                  <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+                    Weather data by Open-Meteo
+                  </a>{' '}
+                  · Model estimates, not a live station.
+                </footer>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       {!locations && (
         <div inert={detail !== null} {...stylex.props(styles.bottom)}>
           <span />

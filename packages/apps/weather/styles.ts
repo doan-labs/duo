@@ -161,7 +161,9 @@ export const styles = stylex.create({
   },
   topLeft: { display: 'flex', justifyContent: 'flex-start' },
   topRight: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
-  wideOnly: { display: { default: 'none', [wide]: 'flex' } },
+  /** The detail column beside the floating sidebar; the pane pads clear of it. */
+  pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
+  paneSide: { paddingLeft: 310 },
   bottom: {
     position: 'relative',
     zIndex: 1,
@@ -224,7 +226,7 @@ export const styles = stylex.create({
     },
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: appAppearance.weatherCardRim,
+    boxShadow: shadow.rim,
     outlineWidth: { default: 0, ':focus-visible': 2 },
     outlineStyle: 'solid',
     outlineColor: appAppearance.weatherOutline,
@@ -321,7 +323,7 @@ export const styles = stylex.create({
     backgroundColor: appAppearance.weatherCard,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: appAppearance.weatherCardRim
+    boxShadow: shadow.rim
   },
   summary: {
     fontSize: typeScale.subheadline,
@@ -571,6 +573,48 @@ export const styles = stylex.create({
     paddingRight: 8
   },
 
+  // The iPad sidebar: a floating glass panel that runs from under the status
+  // stack to 8 px off the glass, the same idiom the store's panel uses. The
+  // shell reserves the top 40 px for the clock, which sits on the far right,
+  // so the panel's 8 px gap collides with nothing.
+  side: {
+    position: 'absolute',
+    zIndex: 2,
+    top: 8,
+    bottom: 8,
+    left: 8,
+    width: 292,
+    display: 'flex',
+    flexDirection: 'column',
+    borderRadius: radius.xxl,
+    backgroundColor: appAppearance.weatherSide,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    boxShadow: `${shadow.rim},${shadow.float}`,
+    overflow: 'hidden'
+  },
+  sideFrame: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
+  /** Search and the menu share the sidebar's top row, as on iPad. */
+  sideHead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 10,
+    paddingInline: 10,
+    paddingBottom: 8,
+    flexShrink: 0
+  },
+  searchGrow: { flexGrow: 1, minWidth: 0, marginBottom: 0 },
+  sideList: {
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingInline: 10,
+    scrollbarGutter: 'stable'
+  },
+  sideFoot: { flexShrink: 0, marginBlock: 10, paddingInline: 14 },
+
   // Locations list.
   listHead: {
     display: 'flex',
@@ -596,8 +640,8 @@ export const styles = stylex.create({
     minWidth: 190,
     padding: 6,
     borderRadius: radius.xl,
-    backgroundColor: appAppearance.weatherMenu,
-    boxShadow: `${appAppearance.weatherCardRim},${shadow.float}`
+    backgroundColor: glass.tintDark,
+    boxShadow: `${shadow.rim},${shadow.float}`
   },
   menuItem: {
     gap: 12,
@@ -668,7 +712,7 @@ export const styles = stylex.create({
     backgroundColor: { default: appAppearance.weatherCard, ':hover': appAppearance.weatherControlHover },
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: appAppearance.weatherCardRim,
+    boxShadow: shadow.rim,
     cursor: 'pointer',
     transitionProperty: 'transform, background-color',
     transitionDuration: pressed,
@@ -700,21 +744,16 @@ export const styles = stylex.create({
     overflow: 'hidden',
     backgroundColor: appAppearance.weatherNight,
     boxShadow: {
-      default: `${appAppearance.weatherCardRim},${shadow.card}`,
+      default: `${shadow.rim},${shadow.card}`,
       ':hover': `${shadow.rim},${shadow.float}`
     },
     transitionProperty: 'transform, box-shadow',
     transitionDuration: '.2s',
     transform: { default: null, ':active': motion.press }
   },
-  // Selection is a ring, so it is an outline; the card keeps its glass rim.
-  locationSelected: {
-    boxShadow: `${shadow.rim},${shadow.float}`,
-    outlineWidth: 2,
-    outlineStyle: 'solid',
-    outlineColor: appAppearance.weatherOutline,
-    outlineOffset: -2
-  },
+  // Selection lifts the card, it does not ring it: the only edge glass may wear
+  // is the hairline rim.
+  locationSelected: { boxShadow: `${shadow.rim},${shadow.float}` },
   locationMain: {
     position: 'relative',
     display: 'grid',

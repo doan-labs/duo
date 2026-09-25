@@ -579,7 +579,6 @@ export const appAppearance = stylex.defineConsts({
   weatherFogBands:
     'linear-gradient(180deg,transparent 0%,rgba(255,255,255,.10) 30%,transparent 45%,rgba(255,255,255,.12) 70%,transparent 100%)',
   weatherCard: 'rgba(20,45,85,.30)',
-  weatherCardRim: 'inset 0 0 0 0.5px rgba(255,255,255,.24),inset 0 1px 0 rgba(255,255,255,.10)',
   weatherHairline: 'rgba(255,255,255,.16)',
   weatherControl: 'rgba(255,255,255,.14)',
   weatherControlHover: 'rgba(255,255,255,.22)',
@@ -589,7 +588,8 @@ export const appAppearance = stylex.defineConsts({
   weatherAqiSpectrum: 'linear-gradient(90deg,#3fbf5f,#f7d539,#f5a623,#e94b3c,#a55ad6,#7e0023)',
   weatherDot: 'rgba(255,255,255,.45)',
   weatherBottomBar: 'rgba(15,35,65,.55)',
-  weatherMenu: 'rgba(30,50,80,.92)',
+  /** The iPad sidebar's glass: deeper than a card, lighter than the sheet. */
+  weatherSide: 'rgba(14,30,55,.55)',
   // youtube
   youtubeMuted: '#aaa'
 })

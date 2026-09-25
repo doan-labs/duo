@@ -1,7 +1,7 @@
 {
   "id": "labs.doan.ipduo.weather",
   "name": "Weather",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "lane": "official",
   "entry": "./main.tsx",
   "icon": "./icon.png",
@@ -11,7 +11,9 @@
   "network": [
     "https://api.open-meteo.com",
     "https://geocoding-api.open-meteo.com",
-    "https://air-quality-api.open-meteo.com"
+    "https://air-quality-api.open-meteo.com",
+    "https://ipwho.is",
+    "https://api.bigdatacloud.net"
   ],
   "author": "Doan Labs",
   "repo": "https://github.com/doan-labs/duo",
