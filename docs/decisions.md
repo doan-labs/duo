@@ -1506,3 +1506,23 @@ asleep should wake to the lock screen, not to sleep.
 
 This supersedes decision 90's "session state, not persisted" for `toggles.ts`:
 the switches do persist now, and Dark Mode rides along with them.
+
+## 93. Sibling gaps belong to the block below, and corners err rounder
+
+2026-09-25. Health and Fitness shipped a crop of flush elements: the
+Average/Minimum/Maximum cards touching the chart above them, the Sleep hero
+touching its hypnogram, category titles touching their grouped lists, and
+the sidebar account chip rounded only enough to still read as a rectangle.
+Every page had hand-wired spacing and the wiring had holes.
+
+Separation now lives on the block that can be followed, not at each call
+site: `paddingTop` on transparent stacks (`statGrid`, `grid`, `awardGrid`),
+`marginTop` on surfaced blocks (`chartBox`, `shared.grp`), `gap` on flex and
+grid parents (`sideList`). `space.sm` is the floor and `space.lg` separates
+major blocks; a section header keeps the room to its own rows, so under a
+header the pair can breathe past the floor. `shared.grp` carries the floor
+for every app at once, and `shared.hdr` gets `space.sm` on top so pushed
+titles stop hugging the pane. Rounding errs a step upward: a filled row,
+chip or footer card spanning a panel is `radius.xl` or more, which is what
+the sidebar account and streak chips now take. Cost: under a `secHead` some
+pairs settle a step airier than before; the uniformity is the point.

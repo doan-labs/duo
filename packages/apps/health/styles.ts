@@ -89,7 +89,7 @@ export const styles = stylex.create({
     '::placeholder': { color: app.label3 },
     '::-webkit-search-cancel-button': { display: 'none' }
   },
-  sideList: { display: 'flex', flexDirection: 'column', gap: 1, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
+  sideList: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
   sideSec: {
     paddingTop: 12,
     paddingRight: 10,
@@ -134,7 +134,7 @@ export const styles = stylex.create({
     paddingRight: 8,
     paddingBottom: 8,
     paddingLeft: 8,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     backgroundColor: app.fill3,
     color: app.fg,
     textAlign: 'left',
@@ -226,6 +226,7 @@ export const styles = stylex.create({
     gap: space.sm,
     paddingTop: space.xs,
     paddingRight: space.lg,
+    paddingBottom: space.xs,
     paddingLeft: space.lg
   },
   headSide: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: space.sm },
@@ -236,6 +237,7 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
     gap: 12,
+    paddingTop: space.sm,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },
@@ -328,7 +330,7 @@ export const styles = stylex.create({
   },
   bodyWide: { paddingRight: space.lg },
   col: { width: '100%', maxWidth: 620, marginRight: 'auto', marginLeft: 'auto' },
-  pageHead: { paddingTop: space.xl, paddingRight: space.lg, paddingLeft: space.lg },
+  pageHead: { paddingTop: space.xl, paddingRight: space.lg, paddingBottom: space.sm, paddingLeft: space.lg },
   bigVal: {
     fontSize: typeScale.largeTitle,
     lineHeight: leading.largeTitle,
@@ -336,8 +338,9 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     fontVariantNumeric: 'tabular-nums'
   },
-  segRow: { display: 'flex', justifyContent: 'center', paddingTop: space.sm, paddingBottom: 10 },
+  segRow: { display: 'flex', justifyContent: 'center', paddingTop: space.sm },
   chartBox: {
+    marginTop: space.lg,
     marginRight: space.lg,
     marginLeft: space.lg,
     paddingTop: 12,
@@ -381,6 +384,7 @@ export const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
     gap: 10,
+    paddingTop: space.lg,
     paddingRight: space.lg,
     paddingLeft: space.lg
   },
