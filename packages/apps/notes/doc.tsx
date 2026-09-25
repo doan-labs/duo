@@ -424,7 +424,19 @@ export function Editor({
         if (n.nodeType !== 1) continue
         let el = n as HTMLElement
         if (el.dataset.mk) continue
-        const rename = RENAME[el.tagName]
+        const rename =
+          RENAME[el.tagName] ??
+          (el.tagName === 'SPAN'
+            ? el.style.fontWeight === 'bold' || Number(el.style.fontWeight) >= 600
+              ? 'b'
+              : el.style.fontStyle === 'italic'
+                ? 'i'
+                : /underline/.test(el.style.textDecorationLine)
+                  ? 'u'
+                  : /line-through/.test(el.style.textDecorationLine)
+                    ? 's'
+                    : undefined
+            : undefined)
         if (rename) {
           const to = document.createElement(rename)
           while (el.firstChild) to.append(el.firstChild)
@@ -584,6 +596,7 @@ export function Editor({
       commit(true)
     },
     inline: (cmd) => {
+      document.execCommand?.('styleWithCSS', false, 'false')
       document.execCommand(cmd)
       normalize()
       commit(true)
@@ -887,7 +900,9 @@ export function Editor({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: mount-time build only; later doc changes flow through the other effect
   useEffect(() => {
-    document.execCommand?.('styleWithCSS', false)
+    // Without an explicit value Chrome treats styleWithCSS as a toggle and leaves
+    // it on, so inline commands emit styled spans that normalize() unwraps.
+    document.execCommand?.('styleWithCSS', false, 'false')
     if (ce.current) rebuild(doc)
   }, [])
 
