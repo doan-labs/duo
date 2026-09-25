@@ -70,3 +70,30 @@ Both displays run the same app session as separate views on one set of iframes. 
 - App bundles embed `packages/shell/index.html`'s FIRST `<style>` block as their own reset (scripts/build-app.ts extracts only the first block). Scene-only rules - e.g. the `canvas { opacity: 0; }` fade-in for the WebGL model - must live in a SECOND `<style>` block, or they leak into every sandboxed app bundle and invisibly hide app canvases (markup strokes draw but never appear).
 - `press Escape` / `agent-browser key Escape` maps to the device's Home button - it sends the running app back to SpringBoard. Never use it to dismiss an in-app menu or sheet; click the scrim/outside region instead.
 - The `?app=<id>` autolaunch leaves a `div.sandbox__styles.sheet` "Connecting..." scrim over the display while the app's session comes up. `agent-browser click` refuses clicks through it - wait for the app iframe to mount instead of clicking the scrim away.
+
+## Testing community apps served by the CLI dev server
+
+Serve the app with `bun packages/cli/index.mjs dev community-apps/<app> --simulator http://localhost:3000/` (port 5173) and open
+`http://localhost:3000/?debug&dev=http%3A%2F%2Flocalhost%3A5173&app=<manifest id>`. If the `?app=` autolaunch does not fire, the
+app is still on SpringBoard as an "<Name> DEV" tile - click it with a real mouse click.
+
+### Prefer real-mouse UI over CDP for the sandboxed copies
+
+- The blob: iframe targets Chrome exposes over CDP (`Target.setAutoAttach` / `Runtime.evaluate`) are NOT reliably the documents
+  painted inside the CSS3D displays: in one session a CDP `New game` click and a `document.body.style.outline` change never showed
+  on screen, while real mouse clicks on the display did. Treat CDP reads of app state as unverified unless a visible change confirms
+  the target; use `agent-browser snapshot -i` refs or coordinate clicks instead.
+- `getBoundingClientRect` of the display iframes is not where they are painted, so `Page.captureScreenshot` clipped to it captures
+  the wrong region. Screenshot the whole page and crop/zoom.
+
+### Cross-display (inner vs cover) checks through the UI
+
+Fold with the HUD hinge slider (drag the knob to the left edge -> 0 deg), press Flip twice if the back faces you, and the cover
+display shows the same app in its narrow layout. Make a move on the cover, open again with the "Open" HUD button, and check the
+inner copy adopted it. This exercises the os.session sync with rendering running and needs no CDP.
+
+### Render loop
+
+`__duo.renderer.setAnimationLoop(null)` cannot be resumed (the loop is a closure in main.ts) - only a reload recovers, and a reload
+costs a 3-5 minute SwiftShader boot. Pause it last, if at all. After a reload the loop may stall (`__duo.renderer.info.render.frame`
+stops increasing while `requestAnimationFrame` still fires, boot logo stays up with iframes `ready`); reload again.
