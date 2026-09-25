@@ -217,7 +217,8 @@ function Game() {
         key={hint}
         {...stylex.props(styles.hint, status === 'won' && styles.hintWon, status === 'lost' && styles.hintLost)}
       >
-        {hint}
+        {'>'} {hint}
+        <span {...stylex.props(styles.caret)} />
       </p>
       <section {...stylex.props(styles.stage, wide && styles.stageWide)}>
         <div role="grid" aria-label="Wordle guesses" {...stylex.props(styles.board, styles.fitBoard(fit.boardPad))}>
@@ -316,6 +317,7 @@ function Game() {
           ))}
         </div>
       </section>
+      <div {...stylex.props(styles.scanlines)} />
     </main>
   )
 }
