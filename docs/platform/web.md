@@ -243,7 +243,7 @@ nothing is published, no host is chosen, no CI deploys it.
 | 6 | SDK | "Four primitives. That is the whole surface." `useDisplay` `useStorage` `requestCamera` `openURL` as four rows | `home/sdk.tsx`; names are the brief's, the SDK page says what exists today |
 | 7 | The apps | The catalog (`/catalog/index.json`) and the shell's home-screen list, read at build time into `src/generated/catalog.ts`. `/apps` groups the official lane by status behind `<details>`: Published (open), Built in and In development (folded) | `home/apps.tsx`, reused by `routes/apps.tsx` |
 | 8 | Open | "The platform is open. So are the apps." Four facts, the Berlin sentence, fork → PR → review → Duo Store | `home/open.tsx` |
-| 9 | Go | "Build something strange for a phone that doesn't exist." Try Duo, Read the docs, View on GitHub | `home/cta.tsx` |
+| 9 | Go | "Build something strange for a phone that folds." Try Duo, Read the docs, View on GitHub, then "A product by Doan Labs" with the Doan mark from `footer.tsx` | `home/cta.tsx` |
 
 Nav: Duo · Apps · SDK · Docs · Build an app · GitHub · theme toggle · Try Duo.
 Footer: Duo · GitHub · Docs · Apps · License, then the Doan mark with "Made by
