@@ -1,6 +1,6 @@
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { byId, GLYPH, PLACES, type Place, SUGGESTED } from './data.ts'
+import { byId, GLYPH, PLACES, type Place, type Recent, SUGGESTED } from './data.ts'
 import { styles } from './styles.ts'
 
 type Props = {
@@ -8,16 +8,31 @@ type Props = {
   onSelect: (p: Place) => void
   query: string
   onQuery: (q: string) => void
-  recents: [string, string][]
+  /** Live geocoder hits for the query; local catalogue matches lead. */
+  results: Place[]
+  searching: boolean
+  recents: Recent[]
   onClear: () => void
   /** Folded, this content is the bottom sheet, which has no collapse control. */
   sheet?: boolean
   onCollapse: () => void
 }
 
-export function Sidebar({ sel, onSelect, query, onQuery, recents, onClear, sheet, onCollapse }: Props) {
+export function Sidebar({
+  sel,
+  onSelect,
+  query,
+  onQuery,
+  results,
+  searching,
+  recents,
+  onClear,
+  sheet,
+  onCollapse
+}: Props) {
   const q = query.trim().toLowerCase()
-  const found = q ? PLACES.filter((p) => `${p.name} ${p.kind} ${p.address.join(' ')}`.toLowerCase().includes(q)) : []
+  const local = q ? PLACES.filter((p) => `${p.name} ${p.kind} ${p.address.join(' ')}`.toLowerCase().includes(q)) : []
+  const found = [...local, ...results.filter((r) => !local.some((l) => l.name === r.name))]
   const suggestion = byId(SUGGESTED)
   const row = (p: Place, note: string) => (
     <button
@@ -43,7 +58,7 @@ export function Sidebar({ sel, onSelect, query, onQuery, recents, onClear, sheet
           <input
             type="search"
             value={query}
-            placeholder="Duo Maps"
+            placeholder="Search Duo Maps"
             aria-label="Search Maps"
             onChange={(e) => onQuery(e.target.value)}
             {...stylex.props(styles.input)}
@@ -57,11 +72,11 @@ export function Sidebar({ sel, onSelect, query, onQuery, recents, onClear, sheet
       </div>
       <div {...stylex.props(styles.scroll)}>
         {q ? (
-          found.length ? (
-            found.map((p) => row(p, p.kind))
-          ) : (
-            <div {...stylex.props(styles.empty)}>No results for “{query.trim()}”</div>
-          )
+          <>
+            {found.map((p) => row(p, p.kind))}
+            {searching && <div {...stylex.props(styles.note, styles.searching)}>Searching…</div>}
+            {!searching && !found.length && <div {...stylex.props(styles.empty)}>No results for “{query.trim()}”</div>}
+          </>
         ) : (
           <>
             {suggestion && (
@@ -70,11 +85,8 @@ export function Sidebar({ sel, onSelect, query, onQuery, recents, onClear, sheet
                 {row(suggestion, 'Recently viewed')}
               </>
             )}
-            <div {...stylex.props(styles.section)}>Recents</div>
-            {recents.map(([id, note]) => {
-              const p = byId(id)
-              return p ? row(p, note) : null
-            })}
+            {recents.length > 0 && <div {...stylex.props(styles.section)}>Recents</div>}
+            {recents.map(({ p, note }) => row(p, note))}
             {recents.length > 0 && (
               <button type="button" onClick={onClear} {...stylex.props(styles.link)}>
                 Clear Recents

@@ -2,10 +2,25 @@ import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { Place } from './data.ts'
+import { Glyph } from './glyphs.tsx'
+import { formatLength, formatMin } from './live.ts'
 import { styles } from './styles.ts'
 
-/** Apple's place card: a header, the walking time, the details it knows, and the tray. */
-export function PlaceCard({ place, onClose }: { place: Place; onClose: () => void }) {
+/** The drive-time estimate the card shows once the router has answered. */
+export type Estimate = { duration: number; distance: number }
+
+/** Apple's place card: a header, the directions button, the details it knows, and the tray. */
+export function PlaceCard({
+  place,
+  estimate,
+  onDirections,
+  onClose
+}: {
+  place: Place
+  estimate: Estimate | null
+  onDirections: () => void
+  onClose: () => void
+}) {
   const [pinned, setPinned] = useState(false)
   const [starred, setStarred] = useState(false)
   return (
@@ -18,9 +33,9 @@ export function PlaceCard({ place, onClose }: { place: Place; onClose: () => voi
       <div {...stylex.props(styles.scroll)}>
         <h1 {...stylex.props(styles.title)}>{place.name}</h1>
         <div {...stylex.props(styles.kind)}>{place.kind}</div>
-        <button type="button" {...stylex.props(styles.go)}>
-          <Sym name="walk" size={15} />
-          {place.walk} min
+        <button type="button" onClick={onDirections} {...stylex.props(styles.go)}>
+          <Glyph name="car" size={16} />
+          {estimate ? `${formatMin(estimate.duration)} · ${formatLength(estimate.distance)}` : 'Directions'}
         </button>
         <div {...stylex.props(styles.hdr)}>Details</div>
         <Field label="Phone" value={place.phone} />
@@ -28,9 +43,13 @@ export function PlaceCard({ place, onClose }: { place: Place; onClose: () => voi
         <div {...stylex.props(styles.detail)}>
           <span {...stylex.props(styles.label)}>Address</span>
           <span {...stylex.props(styles.value)}>
-            {place.address.map((line) => (
-              <span key={line}>{line}</span>
-            ))}
+            {place.address.length ? (
+              place.address.map((line) => <span key={line}>{line}</span>)
+            ) : (
+              <span>
+                {place.lat.toFixed(5)}, {place.lon.toFixed(5)}
+              </span>
+            )}
           </span>
         </div>
         <button type="button" aria-pressed={pinned} onClick={() => setPinned(!pinned)} {...stylex.props(styles.action)}>
