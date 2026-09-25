@@ -51,6 +51,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flappy-duo",
       "releases": [
         {
+          "release": "1.0.2+a6daf032",
+          "sdk": "0.0.0",
+          "bytes": 287868,
+          "sha256": "bfde796d9a582e584575b6a4351f119211fb253226fbaa8970daa9030dbd6234"
+        },
+        {
           "release": "1.0.1+e0580af9",
           "sdk": "0.0.0",
           "bytes": 301346,
