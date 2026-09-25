@@ -49,7 +49,8 @@ mutations acknowledge transaction completion. See contract §§2.2–2.5.
 
 ## Sessions and displays
 
-One session exists per app id per shell document; each display copy is a separate view.
+One session exists per app id per shell document; each display copy is a separate view,
+including the inner display's inert folded-half copy (decisions.md 97).
 Different tabs have separate sessions/owners and share only persistent data. Baked apps
 can share module state; isolated documents use `os.session` and `os.storage` instead.
 Revisioned snapshot/watch subscriptions prevent hydration gaps. Unshared component state

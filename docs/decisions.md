@@ -1546,3 +1546,76 @@ dotted, and the hypnogram as one continuous wave that changes colour at each
 stage instead of disjoint blocks. Fitness's WeekBars moves to the same
 vocabulary. Cost: the wave hypnogram no longer shows per-segment time labels
 directly on the blocks; the stage legend under it carries the totals.
+
+## 95. The fold effect is a motion state, not a pose
+
+2026-09-25. Amends 24. A resting fold used to hold the blurred, darkened bake
+forever: at 131° the inner display stayed a frozen picture because the live
+panel only appears flat or under an app - so the screen was not a screen.
+
+"Folding" is now measured as motion: the eased angle still travelling past
+SETTLE (0.75°), or a new target within the last SETTLE_DEBOUNCE (250 ms).
+While it holds, everything is as 24 designed - bake, shader curves, live DOM
+only flat or under an app. Once the hinge rests, `foldMotion` fades the blur
+and darkening out over ~300 ms in shaders/screen.ts and both ramp layers, and
+the live panels take any display that faces the camera: the inner wherever
+foldClip() leaves it, the cover whenever the phone is not open flat. The
+clipped opaque panel over the unblurred projected bake reads as one working
+screen that happens to bend at the silhouette.
+
+Costs: a pinned `?deg=` capture no longer shows the fold look, which now
+exists only while the hinge moves (live fold tests already drive the hinge
+control); the silhouette sliver keeps the shell's projected bake, so with an
+app up it still blacks out past the clip; and the eased angle's tail below
+SETTLE still counts as motion, so the real hand-off is ~SETTLE_DEBOUNCE after
+the last visible turn.
+
+## 96. A settled live panel is clipped at the hinge
+
+2026-09-25. Amends 95. The first settle fix clipped the flat inner panel only
+where `foldClip()` cuts it, so at a held fold the whole unfurled picture stayed
+on flat glass while the device surface bent away behind it - a straight
+billboard over a curve, with a projected-bake sliver leaking where the camera
+clip and the shader's fixed eye disagree. Wrong read: it made the fold look
+like a rendering bug instead of a bent display.
+
+At rest the panel is now clipped at the hinge once the bend is past a shallow
+~15 deg (`Math.PI / 12`): the half still facing the camera stays live DOM, and
+the half the fold took shows the projected bake - the same picture wrapped
+around the curve. The hinge seam is where bake and panel hold the same
+content, so the display reads as one screen bent around the fold. During
+motion nothing changes: `foldClip()` still bounds the ramped panel. Near flat
+the bend is too shallow to lift the surface out from under the panel, so the
+whole display stays live; deep folds already clip past the hinge on their
+own, so the settled clip is `max(foldClip(), hingeClip)` and glides in over
+the same ~300 ms `foldMotion` fade.
+
+Costs: the folded-away half is a crisp but dead bake at rest - taps on it do
+nothing, which matches hardware whose surface faces away; `viewInfo.clip`
+reports 0.5 there, so a `left`-placed scene correctly reads as hidden; and a
+settled bend just under the threshold keeps a fully live, essentially flat
+panel.
+
+## 97. The folded half is a live copy of the inner display
+
+2026-09-25. Amends 96. The settled hinge clip left the folded half to the projected
+bake, which drew the wrong picture twice over: the fixed-eye projection windows the flat
+image instead of wrapping it, so the half nearer the camera outgrew it and showed black
+wedges, and with an app up the bake is black altogether. The folded half read as a dead
+panel, not the same screen bent round the fold.
+
+A DOM panel cannot bend, so the folded half gets its own. `main.ts` builds a third OS
+root (`os(..., fold)`, `data-os=fold`) as a CSS3D panel on the hinge group, where the
+cover rides, clipped to its left half plus a pixel. The hinge axis is 0.26 mm behind the
+glass, so it meets the original's hinge clip within a few px at any angle. It shows only
+where decision 96 clips the original at the hinge - resting, past ~15 deg, facing the
+camera - and fades in with the same `foldMotion`. `Display.fold` keeps it out of the lead
+and the frame buttons; `follow()` mirrors the inner display's stage and split onto it
+every frame, lock and sleep reach it like any display, and the root is `inert`. While the
+hinge moves nothing changes: 95's bake and ramps still carry the fold.
+
+Costs: a third React root is always mounted and every open app runs a third view - a
+sandboxed iframe loads again and `os.mirror` keeps it silent; scroll, the home page,
+Control Center, the switcher and Spotlight are local to the original, so the folded half
+can disagree with the live one after they change; the folded half still takes no input;
+probes must scope to `[data-os="wide"]`.

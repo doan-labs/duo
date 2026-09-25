@@ -41,7 +41,11 @@ rasterizer whenever the capture is about pixels.
 Use identical state/viewports before and after a change. 818×664 matches the native window;
 use deviceScaleFactor 2 for detail and crop rather than shrink. Baselines use
 `?debug&app=Notes&deg=180` and `deg=0`; use 120 for clipping. Live fold tests must omit the
-pinned `deg` parameter and drive the hinge control.
+pinned `deg` parameter and drive the hinge control: the blur/bake fold look only exists
+while the hinge is moving and ~250 ms after (decisions.md 95), so capture mid-transition;
+a pinned `deg` renders the settled state: past ~15° of bend the live inner panel is
+clipped at the hinge and the folded half is the inert `data-os=fold` copy riding the moving
+half, so taps there are expected to do nothing (decisions.md 96, 97).
 
 ### The state probe
 
@@ -49,7 +53,7 @@ StyleX classes are unstable; use shell data attributes:
 
 | Area | Selectors/state |
 | --- | --- |
-| Display/app | data-os=wide/narrow; data-app; data-side=left/right; data-lock/data-hidden; data-pages; data-homebar; data-drop=left/right/none while an app is on a finger |
+| Display/app | data-os=wide/narrow/fold (fold is the inert folded-half copy of wide); data-app; data-side=left/right; data-lock/data-hidden; data-pages; data-homebar; data-drop=left/right/none while an app is on a finger |
 | HUD/hardware | data-hud=vol/thumb/poff/flash/torch/cc/dim; data-on; data-torch; data-boot |
 | Control Center | data-cc; data-cc-slider=bright/volume; data-cc-pull; data-cc-page=0/1/2 |
 | Split | data-drop=left/right/none |

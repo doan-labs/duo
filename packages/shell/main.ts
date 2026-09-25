@@ -166,6 +166,9 @@ const body = new THREE.Group()
 phone.add(body)
 // 0 open, PI closed. Shared by every moving mesh's vertex shader.
 const bend = { value: 0 }
+// 0 while the hinge rests: the blur, darkening and ramp layers of the fold are
+// a motion effect and ease out once the hinge settles (decisions.md 95).
+const foldMotion = { value: 0 }
 
 // Screen textures, baked by packages/shell/screen.ts (metres in, canvas out).
 const icons = await loadIcons(wallpaper())
@@ -281,6 +284,7 @@ model.traverse((object) => {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.foldAngle = bend
       if (kind) {
+        shader.uniforms.foldMotion = foldMotion
         shader.uniforms.uiFrame = screens[kind].frame
         shader.uniforms.uiGradient = screens[kind].gradient
         shader.uniforms.uiReferenceEye = { value: EYE }
@@ -389,10 +393,10 @@ const px = (cm: number) => Math.round(cm / PXCM)
 // A deep link into an app lands past the lock screen; `?arg=` reaches the app as `os.arg`.
 const deep = new URLSearchParams(location.search)
 lockState.locked = !deep.get('app')
-function live(w: number, h: number) {
+function live(w: number, h: number, fold = false) {
   // Pre-attach hidden roots to the renderer's camera layer: moving a live iframe reloads its document.
   const container = css.domElement.firstElementChild!.firstElementChild as HTMLElement
-  const o = new CSS3DObject(os(w, h, container, deep.get('app'), deep.get('arg')))
+  const o = new CSS3DObject(os(w, h, container, fold ? null : deep.get('app'), deep.get('arg'), fold))
   o.scale.setScalar(PXCM)
   return o
 }
@@ -407,6 +411,16 @@ const outerLive = live(px(7.73936), px(11.2513))
 outerLive.position.set(-0.23396 - 7.73936 / 2, 0.27173 - 5.8974 + 11.2513 / 2, OUTER_Z - HINGE_Z - 0.005)
 outerLive.rotation.y = Math.PI
 hinge.add(outerLive)
+// A DOM panel cannot bend, so a resting fold gets a second inner panel riding
+// the moving half: an inert copy of the inner display (device.ts `Display.fold`),
+// clipped to the half that folded while the original keeps the half that did
+// not. The hinge axis is 0.26 mm behind the glass, so the two meet within a
+// few px at any angle (decisions.md 97).
+const foldLive = live(px(INNER.z), px(INNER.w), true)
+foldLive.position.set(INNER.x + INNER.z / 2, INNER.y + INNER.w / 2, INNER_Z - HINGE_Z + 0.005)
+// A pixel past the hinge: two clip edges that meet exactly leave a hairline of the bake between them.
+foldLive.element.style.clipPath = 'inset(0 calc(50% - 1px) 0 0)'
+hinge.add(foldLive)
 
 // The bands around the phone, in pixels: it hangs centred in what they leave.
 // Everything outside it is transparent desktop the window blocks for nothing, so
@@ -566,8 +580,17 @@ let angle = targetAngle
 let yaw = Number(q.get('yaw') ?? view().yaw ?? 0)
 let targetYaw = yaw
 
+// Folding is a motion state, not a pose. The hinge counts as folding while the
+// eased angle still travels (more than SETTLE to go) or a new target just
+// landed, and for SETTLE_DEBOUNCE ms after it rests; then the live panels take
+// their displays back so a resting fold is a working screen, not a blur.
+const SETTLE = 0.75
+const SETTLE_DEBOUNCE = 250
+let lastMotion = -SETTLE_DEBOUNCE
+
 function setAngle(v: number) {
   targetAngle = Math.min(180, Math.max(0, v))
+  if (Math.abs(targetAngle - angle) > SETTLE) lastMotion = performance.now()
   hud.target(targetAngle)
 }
 // The buttons on the frame have keys too, in packages/shell/buttons.ts.
@@ -745,6 +768,9 @@ renderer.setAnimationLoop((now) => {
   last = now
   angle = mix(angle, targetAngle, k)
   yaw = mix(yaw, targetYaw, k)
+  if (Math.abs(angle - targetAngle) > SETTLE) lastMotion = now
+  const folding = now - lastMotion < SETTLE_DEBOUNCE
+  foldMotion.value = folding ? 1 : Math.max(0, foldMotion.value - dt / 300)
   // Not while the boot screen is up: the phone turns once the OS is on the glass.
   if (hud.spinning() && booted()) targetYaw += 0.004
   hud.angle(angle)
@@ -793,14 +819,23 @@ renderer.setAnimationLoop((now) => {
   // Open flat, the cover is off like the bake has it: from the back you should
   // see a sleeping display, not a blurred copy of the app. It fades out over the
   // last 30° so the mirror is never a pop when the fold begins.
-  outerLive.visible = facing(outerLive) && (angle < 1 || (app && angle < FLAT))
+  outerLive.visible = facing(outerLive) && (angle < 1 || (angle < FLAT && (app || !folding)))
   outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
-  coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) : 0)
-  // The clip is what keeps the inner panel inside the half that is still
-  // facing you, so it holds all the way to closed.
-  const clip = foldClip()
-  innerLive.visible = facing(innerLive) && (angle > FLAT || app)
+  coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) * foldMotion.value : 0)
+  // The clip keeps the inner panel inside glass that is still flat. While the
+  // hinge moves the fold only takes `foldClip` of it, but a settled panel laid
+  // flat across the fold would hide the bent surface under a straight edge -
+  // so past a shallow bend it is clipped at the hinge, and `foldLive` takes the
+  // half the fold took: the same picture on the moving half's glass. Near
+  // flat the fold is too shallow to lift the surface out from under the
+  // panel, which keeps the whole display live (decisions.md 96).
+  const bent = bend.value > Math.PI / 12
+  const clip = Math.max(foldClip(), bent ? 0.5 * (1 - foldMotion.value) : 0)
+  innerLive.visible = facing(innerLive) && (angle > FLAT || app || (!folding && clip < 1))
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
+  // The folded half, live, in step with the clip that hands it over.
+  foldLive.visible = innerLive.visible && bent && foldMotion.value < 1 && facing(foldLive)
+  foldLive.element.style.opacity = (1 - foldMotion.value).toFixed(3)
   updateDisplays(
     { visible: innerLive.visible && !device.asleep, active: angle > 40, angle, clip },
     {
@@ -811,7 +846,7 @@ renderer.setAnimationLoop((now) => {
     }
   )
   // Past half way the clip has eaten the whole band, as it has in the shader.
-  innerFold(clip < 0.5 && angle < FLAT ? smooth(Math.min(1, bend.value / (Math.PI / 2))) : 0)
+  innerFold(clip < 0.5 && angle < FLAT ? smooth(Math.min(1, bend.value / (Math.PI / 2))) * foldMotion.value : 0)
   // No depth test either: a turned panel would still take the clicks meant for
   // the frame drawn over it, so it is scenery until it is flat.
   const touch = angle < 1

@@ -12,13 +12,18 @@ import { bootRegistry } from './runtime/registry.ts'
 import { BOOT_FADE_MS, BOOT_MS, BootScreen } from './springboard/power.tsx'
 import { SpringBoard } from './springboard/springboard.tsx'
 
-/** Builds one display's OS. `w`/`hgt` in CSS px. `arg` is the deep link `boot` opens with. */
+/**
+ * Builds one display's OS. `w`/`hgt` in CSS px. `arg` is the deep link `boot` opens with.
+ * `fold` builds the inner display's folded-half copy: inert, because it is a picture of the
+ * inner display that happens to run, and a finger or a screen reader belongs to the original.
+ */
 export function os(
   w: number,
   hgt: number,
   container: HTMLElement,
   boot?: string | null,
-  arg?: string | null
+  arg?: string | null,
+  fold = false
 ): HTMLElement {
   const wide = w > 600
   // The root is handed to CSS3DObject before React has rendered anything, so
@@ -26,7 +31,8 @@ export function os(
   // Glass corners measured off Apple's mesh (10.7 mm inner; 11.4 mm outer,
   // 1.3 mm on its hinge edge). The active area sits 6 px in, concentric.
   const root = document.createElement('div')
-  root.dataset.os = wide ? 'wide' : 'narrow'
+  root.dataset.os = fold ? 'fold' : wide ? 'wide' : 'narrow'
+  root.inert = fold
   const p = stylex.props(styles.os, styles.size(w, hgt), wide ? styles.osWide : styles.osNarrow)
   root.className = p.className ?? ''
   for (const [k, v] of Object.entries(p.style ?? {})) root.style.setProperty(k, String(v))
@@ -46,7 +52,7 @@ export function os(
   void Promise.all([bootRegistry(), new Promise((r) => setTimeout(r, BOOT_MS))])
     .then(() => {
       const dev = [...development].find(([, value]) => value.bundle.release.manifest.id === boot)
-      const board = <SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} arg={arg} shots={shots} />
+      const board = <SpringBoard w={w} hgt={hgt} boot={dev?.[0] ?? boot} arg={arg} shots={shots} fold={fold} />
       // The logo fades over the springboard rather than cutting to it; same fragment
       // shape both times so React keeps the one SpringBoard instance.
       view.render(

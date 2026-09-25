@@ -64,3 +64,18 @@ Both displays run the same app session as separate views on one set of iframes. 
 - `?app=<id>` auto-launches the app only on the inner display. At `deg=0` the cover shows the lock/wallpaper screen - tap the display once to wake/unlock and reveal the running app.
 - `device.wake()` is bound to `pointerdown` on the top document; `agent-browser click @eN` does NOT fire it (no top-doc pointerdown). Real-mouse clicks do.
 - `os.open('Safari', url)` from an app launches the real sim Safari app on that display's slot (full URL bar + live external page). The host remounts the slot's iframe - a JS expando on the old element is lost, which is how an app-switch remount differs from an in-place reload.
+
+## Fold-motion tests (foldMotion uniform, decisions.md 95)
+
+The fold blur/darken exists only while the hinge is moving (+250ms debounce, ~300ms fade); at rest the live DOM panels take whatever faces the camera. To observe it:
+
+- `?deg=N` loads ALREADY SETTLED (angle==target at boot) - use it for settled-state proof only. Drive `input[aria-label="Hinge angle"]` for motion: set `.value` via `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set` + dispatch `input` (React's onChange).
+- DOM oracle for the fold effect: `ramp()` appends layer divs inside the `[data-os]` roots - `display:'block'` + backdrop-filter while the effect is on, `display:'none'` at rest. Stale `backdrop-filter`/`background` values persist on hidden layers - assert on `style.display`, never on the filter value. `__duo.bend.value` is the eased angle in rad (deg = 180 - bend*180/PI); during no-app motion both `[data-os]` panels get `display:'none'`.
+- Mid-motion screenshots: eased travel is ~1s for big jumps - a screenshot right after driving the slider usually lands mid-travel. More reliable: real-mouse `left_mouse_down` on the HUD slider knob, stepwise `mouse_move`, screenshot while the button is still held (motion persists through the drag), then `left_mouse_up`.
+- Order constraint: an open app keeps `innerLive` visible through the whole fold and blacks the bakes, so the blur band never appears - capture no-app mid-motion blur BEFORE launching any app.
+- The folded half at rest is a third, `inert` OS root, `[data-os="fold"]`, on the moving half (decisions.md 97). It is `display:none` while the hinge moves, flat past ~165°, and when its face turns from the camera (below ~90°). It mounts its own copy of every open app (baked `data-app` nodes and sandboxed iframes, which reach `ready` with no `owner`), so scope probes to `[data-os="wide"]`.
+- The cover panel's `pointerEvents` only turn on at angle<1 - wait for a full settle to 0 before tapping the cover; at held mid angles the cover may be visible but is scenery.
+
+## Page-to-screen coordinate mapping (computer tool)
+
+The computer tool's 1024x768 space covers the whole display; agent-browser/eval coords are page CSS px. Map: `computer_x = page_x * (1024/display_w)` and `computer_y = (page_y + browser_chrome_px) * (768/display_h)`. On a 1600x1200 display with a maximized window this is x*0.64 and (y+143)*0.64 - the 143px is tab strip + omnibox + any infobar, and changes if the infobar closes. Calibrate before gestures: `getBoundingClientRect()` on `input[aria-label="Hinge angle"]` (plain DOM, real rect) and compare with where a real click/drag actually lands on the track.

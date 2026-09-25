@@ -31,6 +31,8 @@ export const unlockAll = () => {
 export const active = { wide: true }
 export type Display = {
   wide: boolean
+  /** The inner display's folded half: an inert copy that only ever mirrors the inner display (decisions.md 97). */
+  fold?: boolean
   dark: (on: boolean) => void
   launch: (name: string, arg?: string) => void
   cam: () => CameraHooks | null
@@ -40,15 +42,17 @@ export type Display = {
   boot: () => void
   /** What is open here, in stage order. */
   stage: () => Stage
-  /** Shows exactly `want`, with no zooms: this display is mirroring the other, not launching. */
-  mirror: (want: Stage) => void
+  /** Shows exactly `want`, with no zooms: this display is mirroring the other, not launching. `split` is the divider's too. */
+  mirror: (want: Stage, split?: number) => void
+  /** Where the divider between two halves sits, as a fraction of the width. */
+  split: () => number
   /** Nothing of the home screen shows: an app has this display, or two halves do. */
   covered: () => boolean
 }
 /** The apps on a display: the whole of it when `side` is unset, one half each otherwise. */
 export type Stage = { name: string; side?: 'left' | 'right' }[]
 const displays: Display[] = []
-const inUse = () => displays.find((d) => d.wide === active.wide) ?? displays[0]!
+const inUse = () => displays.find((d) => !d.fold && d.wide === active.wide) ?? displays[0]!
 /** The displays have booted (os.tsx renders them once the registry is in); before that there is nothing to launch on. */
 export const booted = () => displays.length > 0
 /** An app is up somewhere, so the baked home screen is not what the device is doing. */
@@ -59,15 +63,18 @@ export const busy = () => displays.some((d) => d.covered())
  * the cover already shows the app before the fold turns it to you and the inner
  * display already has it back before it opens — nothing launches at the
  * crossover, and a fold and return touch nothing. The cover cannot split
- * (decisions.md 21), so it mirrors the first app, whole.
+ * (decisions.md 21), so it mirrors the first app, whole. The folded half's copy
+ * mirrors the inner display after that, whichever display leads.
  */
 export function follow(wide: boolean) {
   active.wide = wide
-  const lead = displays.find((d) => d.wide === wide)
-  const other = displays.find((d) => d.wide !== wide)
+  const lead = displays.find((d) => !d.fold && d.wide === wide)
+  const other = displays.find((d) => !d.fold && d.wide !== wide)
   if (!lead || !other) return
   const stage = lead.stage()
   other.mirror(other.wide ? stage : stage.slice(0, 1).map((s) => ({ name: s.name })))
+  const inner = lead.wide ? lead : other
+  for (const d of displays) if (d.fold) d.mirror(inner.stage(), inner.split())
 }
 
 // The ringer level, `os.level` in localStorage so a reload does not reset it.
