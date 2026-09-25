@@ -1478,7 +1478,36 @@ its own scrim, focus and Escape handling (`show`/`open` never raise `cancel`).
 A side effect worth keeping: the captured Escape no longer reaches the shell's
 Esc-goes-Home binding while a sheet is up.
 
-## 92. Stocks quotes the market instead of inventing one
+## 92. The view, the switches and the levels are remembered
+
+A reload forgot everything but the grid and the wallpaper: the phone came back
+open, level, front-facing at the reference size, auto-rotate off, radios and
+torch at their defaults, ringer at ten sixteenths, brightness at 70%. Every one
+of those is a preference the finger can set, so all of them persist now.
+
+`view.ts` keeps `os.view` - hinge angle, yaw, camera orbit (azimuth, polar,
+distance) and auto-rotate - restored once at load with `?deg=`, `?yaw=` and
+`?spin=` still winning, since a deep link or an embedding page poses the phone
+on purpose. Writes happen on gestures only: the slider, the fold/flip/reset
+buttons, a trailing debounce on the orbit 'change' event (damping keeps the
+camera moving past 'end', so the write waits for the pose to rest) and the
+auto-rotate checkbox. A postMessage pose never saves, so a page posing the
+phone for a section cannot overwrite what the user left. The camera restore
+happens before the model lands and clamps polar and distance to the controls'
+limits, so a saved pose can never strand the phone out of reach.
+
+`toggles.ts`, `device.ts` and `springboard.tsx` keep the rest: `os.toggles` for
+the Control Center switches (saved keys resolve against the defaults, so a
+switch added or removed since still lands right), `os.level` for the ringer,
+`os.bright` for brightness. All `os.` keys, so Erase All Content and Settings
+forgets them with the rest of the phone, and none of it reaches the website's
+own hyphenated keys. The sleep, lock and power states stay transient - what is
+asleep should wake to the lock screen, not to sleep.
+
+This supersedes decision 90's "session state, not persisted" for `toggles.ts`:
+the switches do persist now, and Dark Mode rides along with them.
+
+## 93. Stocks quotes the market instead of inventing one
 
 2026-09-25. The Stocks app was the last fake feed on the phone: a seeded `walk()`
 that produced plausible numbers for every ticker, hardcoded rows, dead range pills
@@ -1501,7 +1530,7 @@ decoupled from the list so a searched or unfollowed symbol still has a detail,
 and every fetch and timer is gated on `!os.mirror` so the second copy draws
 everything and starts nothing.
 
-## 93. The Stocks detail chart is LiveLine, not a drawn SVG
+## 94. The Stocks detail chart is LiveLine, not a drawn SVG
 
 2026-09-25. The detail chart now renders through `liveline` (LiveLine) instead of
 the app's hand-drawn SVG: a 60fps canvas line with a live dot, value badge,

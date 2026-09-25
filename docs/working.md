@@ -158,6 +158,14 @@ The grid order and the wallpaper persist in localStorage (`os.home`, `os.wallpap
 them for a factory home. `screen.ts` bakes from the same `grid()` snapshot the live home
 renders, so a change to either must keep the two reading the same data.
 
+The shell's other preferences persist the same way, all under `os.` keys so erase.ts wipes
+them with the phone: `view.ts` keeps the 3D view (`os.view` - hinge angle, yaw, camera orbit
+and zoom, auto-rotate), `toggles.ts` keeps the Control Center switches (`os.toggles`), and
+device.ts and springboard.tsx keep ringer level and brightness (`os.level`, `os.bright`).
+Pose writes happen on user gestures only - a `?deg=` param or a postMessage pose poses the
+phone for the visit without becoming a preference, so an embedding page cannot overwrite
+what the finger saved.
+
 ## Notes maintenance
 
 `main.tsx` connects the SDK; `index.tsx` selects columns above 600 px or Nav below it.

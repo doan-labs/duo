@@ -20,6 +20,7 @@ import screenGlsl from './shaders/screen.ts'
 import { subscribeGrid } from './springboard/grid.ts'
 import { toggles } from './springboard/toggles.ts'
 import { subscribeWallpaper, wallpaper } from './springboard/wallpaper.ts'
+import { saveView, view } from './view.ts'
 
 // Units are centimetres: Apple's USDZ is in metres and gets scaled by 100, then
 // dropped by 5.8974 so the hinge sits at the origin. The body is Apple's own
@@ -145,6 +146,17 @@ controls.minDistance = 21
 controls.maxDistance = 65
 controls.target.set(0, 0, HINGE_Z)
 controls.update()
+// Back where the finger left the camera: no orbit crosses the pose bridge, so
+// the saved orbit always applies, embedded or not.
+{
+  const { az, pol, dist } = view()
+  if (az !== undefined || pol !== undefined || dist !== undefined) {
+    const p = Math.min(Math.PI - 0.01, Math.max(0.01, pol ?? Math.PI / 2))
+    const d = Math.min(controls.maxDistance, Math.max(controls.minDistance, dist ?? EYE.z))
+    camera.position.setFromSphericalCoords(d, p, az ?? 0).add(controls.target)
+    controls.update()
+  }
+}
 
 // `phone` turns with the Flip button; `body` inside it gives a little under a
 // finger on a button (packages/shell/buttons.ts) and carries every mesh and panel.
@@ -507,29 +519,51 @@ resize()
 const q = new URLSearchParams(location.search)
 /** Reset pressed: the camera eases back to EYE until a drag takes over. */
 let homing = false
-const hud = mountHud({
-  angle: (v) => setAngle(v),
-  toggle: () => setAngle(targetAngle > 90 ? 0 : 180),
-  flip: () => {
-    targetYaw += Math.PI
-    hud.yaw(targetYaw)
+const hud = mountHud(
+  {
+    angle: (v) => {
+      setAngle(v)
+      saveView({ deg: targetAngle })
+    },
+    toggle: () => {
+      setAngle(targetAngle > 90 ? 0 : 180)
+      saveView({ deg: targetAngle })
+    },
+    flip: () => {
+      targetYaw += Math.PI
+      hud.yaw(targetYaw)
+      saveView({ yaw: targetYaw })
+    },
+    home: goHome,
+    reset: () => {
+      // Back to the front view: yaw unwinds the short way, the camera eases home.
+      targetYaw = 0
+      hud.yaw(0)
+      homing = true
+      saveView({ yaw: 0, az: 0, pol: Math.PI / 2, dist: EYE.z })
+    },
+    spin: (on) => saveView({ spin: on })
   },
-  home: goHome,
-  reset: () => {
-    // Back to the front view: yaw unwinds the short way, the camera eases home.
-    targetYaw = 0
-    hud.yaw(0)
-    homing = true
-  }
-})
+  view().spin
+)
 controls.addEventListener('start', () => {
   hud.hideHint()
   homing = false
 })
+// Orbit or zoom settled, drag or wheel alike: damping keeps the camera moving
+// past 'end', so the write trails 'change' until the pose actually rests.
+let orbitSave = 0
+controls.addEventListener('change', () => {
+  clearTimeout(orbitSave)
+  orbitSave = setTimeout(
+    () => saveView({ az: controls.getAzimuthalAngle(), pol: controls.getPolarAngle(), dist: controls.getDistance() }),
+    300
+  )
+})
 
-let targetAngle = Number(q.get('deg') ?? 180)
+let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
 let angle = targetAngle
-let yaw = Number(q.get('yaw') ?? 0)
+let yaw = Number(q.get('yaw') ?? view().yaw ?? 0)
 let targetYaw = yaw
 
 function setAngle(v: number) {

@@ -70,6 +70,20 @@ export function follow(wide: boolean) {
   other.mirror(other.wide ? stage : stage.slice(0, 1).map((s) => ({ name: s.name })))
 }
 
+// The ringer level, `os.level` in localStorage so a reload does not reset it.
+const LEVEL_KEY = 'os.level'
+const savedLevel = () => {
+  try {
+    const raw = localStorage.getItem(LEVEL_KEY)
+    // `getItem` is null, never the string "null", on a miss: Number(null) is 0.
+    if (raw === null) return null
+    const v = Number(raw)
+    return Number.isFinite(v) ? Math.min(16, Math.max(0, v)) : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * What the buttons on the frame reach. Sleep, wake and power are device-wide; the
  * rest goes to the display in use, as iOS does with one screen at a time.
@@ -78,7 +92,7 @@ export const device = {
   asleep: false,
   off: false,
   /** Ringer level, sixteenths like iOS. */
-  level: 10,
+  level: savedLevel() ?? 10,
   sleep() {
     lockAll()
     device.asleep = true
@@ -107,8 +121,17 @@ export const device = {
   shoot: () => inUse().cam()?.shoot(),
   record: (on: boolean) => inUse().cam()?.record(on),
   zoom: (z?: number) => inUse().cam()?.zoom(z) ?? 1,
+  /** Sets the ringer level and keeps it. Control Center's slider and the volume buttons share this. */
+  setLevel(n: number) {
+    device.level = Math.min(16, Math.max(0, n))
+    try {
+      localStorage.setItem(LEVEL_KEY, String(device.level))
+    } catch {
+      // Private mode or quota: the level holds until the page reloads.
+    }
+  },
   volume(d: number) {
-    device.level = Math.min(16, Math.max(0, device.level + d))
+    device.setLevel(device.level + d)
     if (!device.asleep) inUse().hud()
   },
   screenshot() {
