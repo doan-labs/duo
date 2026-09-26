@@ -10,7 +10,7 @@ import { useJSON } from '@doan-labs/duo-sdk/react.ts'
 import { Menu, Screen, useWide } from '@doan-labs/duo-uikit'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ERROR, memPress, press } from './calc-state.ts'
 import { Convert } from './convert.tsx'
 import { fmt } from './engine.ts'
@@ -61,14 +61,22 @@ export const Calculator = (_: { os: Os }) => {
   const noteEval = useNoteEval(notes.value.lines, rad)
 
   // FX rates refresh when the cached table is stale; the app works offline on
-  // the last fetched table. fetchRates dedupes concurrent calls.
+  // the last fetched table. fetchRates dedupes concurrent calls. The ref stops
+  // a refetch loop when the served table itself is older than FX_MAX_AGE.
+  const fxTried = useRef(NaN)
   useEffect(() => {
-    const t = fx.value
-    if (t && Date.now() - t.at < FX_MAX_AGE) return
+    const at = fx.value?.at ?? -1
+    if (at >= 0 && Date.now() - at < FX_MAX_AGE) return
+    if (fxTried.current === at) return
     let live = true
     fetchRates()
-      .then((r) => live && fx.set(r))
-      .catch(() => {})
+      .then((r) => {
+        fxTried.current = r.at
+        if (live) fx.set(r)
+      })
+      .catch(() => {
+        fxTried.current = at
+      })
     return () => {
       live = false
     }
@@ -169,7 +177,16 @@ export const Calculator = (_: { os: Os }) => {
         open={histOpen}
         entries={hist.value}
         onPick={(e) => {
-          pad.set({ ...pad.value, cur: e.r.replace(/,/g, ''), fresh: true, expr: '', curInExpr: false })
+          pad.set({
+            ...pad.value,
+            acc: null,
+            op: null,
+            stack: [],
+            cur: e.r.replace(/,/g, ''),
+            fresh: true,
+            expr: '',
+            curInExpr: false
+          })
           setHistOpen(false)
         }}
         onDel={(i) => hist.set(hist.value.filter((_, j) => j !== i))}

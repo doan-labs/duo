@@ -110,6 +110,10 @@ export const styles = stylex.create({
   keysBasic: {
     gridTemplateColumns: 'repeat(4, min(72px, (100cqh - 160px) / 5))'
   },
+  keysConv: {
+    // Convert trades the readout for rows + the category strip (~330px).
+    gridTemplateColumns: 'repeat(4, min(72px, max(24px, (100cqh - 330px) / 5)))'
+  },
   keysBasicSci: {
     // Under the scientific block both grids share the budget: 10 rows.
     gridTemplateColumns: 'repeat(4, min(64px, (100cqh - 210px) / 10, (100cqw - 70px) / 4))'
@@ -227,7 +231,8 @@ export const styles = stylex.create({
     flexDirection: 'column',
     gap: space.xs,
     paddingInline: space.lg,
-    paddingBottom: space.sm
+    paddingBottom: space.sm,
+    flexShrink: 0
   },
   convRow: {
     display: 'flex',
@@ -288,7 +293,8 @@ export const styles = stylex.create({
     overflowY: 'hidden',
     paddingInline: space.lg,
     paddingBottom: space.sm,
-    scrollbarWidth: 'none'
+    scrollbarWidth: 'none',
+    flexShrink: 0
   },
   cat: {
     flexShrink: 0,
@@ -311,7 +317,8 @@ export const styles = stylex.create({
     paddingBottom: space.xs,
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
-    color: app.label3
+    color: app.label3,
+    flexShrink: 0
   },
   convMenu: {
     position: 'absolute',

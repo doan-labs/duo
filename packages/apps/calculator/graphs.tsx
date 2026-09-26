@@ -72,7 +72,7 @@ const Plot2D = ({ items, scope, sliders, rad }: { items: Plotted[]; scope: Scope
   const xLines = []
   for (let x = Math.floor((view.cx - w / 2 / view.k) / step) * step; px(x) <= w; x += step) xLines.push(x)
   const yLines = []
-  for (let y = Math.floor((view.cy - h / 2 / view.k) / step) * step; py(y) <= h; y += step) yLines.push(y)
+  for (let y = Math.ceil((view.cy - h / 2 / view.k) / step) * step; py(y) >= 0; y += step) yLines.push(y)
 
   const paths = items.map((p, i) => {
     const full: Scope = { ...scope, ...sliders }

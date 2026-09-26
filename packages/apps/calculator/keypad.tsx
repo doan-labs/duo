@@ -105,29 +105,34 @@ export const BasicKeys = ({
   s,
   onKey,
   sci,
-  disabled
-}: Pick<PadProps, 's' | 'onKey'> & { sci?: boolean; disabled?: string[] }) => (
-  <div {...stylex.props(styles.keys, sci ? styles.keysBasicSci : styles.keysBasic)}>
+  disabled,
+  bs
+}: Pick<PadProps, 's' | 'onKey'> & { sci?: boolean; disabled?: string[]; bs?: boolean }) => (
+  <div {...stylex.props(styles.keys, sci ? styles.keysBasicSci : bs ? styles.keysConv : styles.keysBasic)}>
     <button type="button" {...stylex.props(styles.key, styles.g)} onClick={() => onKey(clearLabel(s))}>
       {clearLabel(s)}
     </button>
-    {BASIC.flat().map((k) => (
-      <button
-        type="button"
-        key={k}
-        disabled={disabled?.includes(k)}
-        {...stylex.props(
-          styles.key,
-          /[÷×−+=]/.test(k) && styles.o,
-          /[±%]/.test(k) && styles.g,
-          k === '0' && styles.z,
-          disabled?.includes(k) && styles.off
-        )}
-        onClick={() => onKey(k)}
-      >
-        {k}
-      </button>
-    ))}
+    {BASIC.flat().map((k0) => {
+      // Convert pads show a backspace where `=` sits.
+      const k = bs && k0 === '=' ? '⌫' : k0
+      return (
+        <button
+          type="button"
+          key={k0}
+          disabled={disabled?.includes(k)}
+          {...stylex.props(
+            styles.key,
+            /[÷×−+=]/.test(k) && styles.o,
+            /[±%⌫]/.test(k) && styles.g,
+            k === '0' && styles.z,
+            disabled?.includes(k) && styles.off
+          )}
+          onClick={() => onKey(k)}
+        >
+          {k}
+        </button>
+      )
+    })}
   </div>
 )
 

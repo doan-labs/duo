@@ -99,7 +99,12 @@ export const Convert = ({
             <button
               type="button"
               {...stylex.props(styles.convTap)}
-              onClick={() => onChange({ ...c, editing: side, cur: Number.isFinite(other) ? String(other) : '0' })}
+              onClick={() => {
+                // Only switching sides copies the shown value; re-tapping the
+                // live field must not clobber what's being typed.
+                if (c.editing !== side)
+                  onChange({ ...c, editing: side, cur: Number.isFinite(other) ? String(other) : '0' })
+              }}
             >
               <span {...stylex.props(styles.convVal)}>{rowVal(side)}</span>
             </button>
@@ -129,7 +134,7 @@ export const Convert = ({
         items={menuFor ? menuItems(menuFor) : []}
         xstyle={styles.convMenu}
       />
-      <BasicKeys s={EMPTY_PAD} disabled={['÷', '×', '−', '+', '=', '%']} onKey={(k) => onChange(convPress(c, k))} />
+      <BasicKeys s={EMPTY_PAD} bs disabled={['÷', '×', '−', '+', '%']} onKey={(k) => onChange(convPress(c, k))} />
     </>
   )
 }

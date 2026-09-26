@@ -264,8 +264,7 @@ class Parser {
     return t
   }
   atEnd() {
-    const t = this.peek()
-    return !t || (t.t === 'op' && t.o === ')') || t.t === 'sep' || t.t === 'eq'
+    return !this.peek()
   }
   parseExpr(): Node {
     return this.parseAdd()

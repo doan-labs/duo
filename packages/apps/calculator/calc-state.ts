@@ -106,7 +106,7 @@ export const sciApply = (fn: SciFn, v: number, deg: boolean): number => {
     case '³√x':
       return Math.cbrt(v)
     case 'x!':
-      return factorial(v)
+      return v < 0 && Number.isInteger(v) ? NaN : factorial(v)
     case 'ln':
       return v <= 0 ? NaN : Math.log(v)
     case 'log10':
@@ -171,7 +171,19 @@ export function press(s: CalcState, k: string): CalcState {
   // A key after `=` starts a new expression's trail.
   if (expr.endsWith('=') && k !== '=') expr = ''
   if (isError) {
-    if (k === 'AC') return { ...s, acc: null, op: null, cur: '0', expr: '', stack: [], curInExpr: false, fresh: true }
+    if (k === 'AC')
+      return {
+        ...s,
+        acc: null,
+        op: null,
+        cur: '0',
+        expr: '',
+        lastOp: null,
+        lastB: null,
+        stack: [],
+        curInExpr: false,
+        fresh: true
+      }
     if (/^\d$/.test(k)) return { ...s, cur: k, expr, stack, fresh: false, curInExpr: false }
     if (k === '.') return { ...s, cur: '0.', expr, stack, fresh: false, curInExpr: false }
     return s
@@ -191,7 +203,18 @@ export function press(s: CalcState, k: string): CalcState {
       if (cur.includes('e') || cur.includes('.')) return s
       return { ...s, cur: `${cur}.`, expr, curInExpr: false }
     case 'AC':
-      return { ...s, acc: null, op: null, cur: '0', expr: '', stack: [], curInExpr: false, fresh: true }
+      return {
+        ...s,
+        acc: null,
+        op: null,
+        cur: '0',
+        expr: '',
+        lastOp: null,
+        lastB: null,
+        stack: [],
+        curInExpr: false,
+        fresh: true
+      }
     case 'C':
       return { ...s, cur: '0', fresh: true, curInExpr: false }
     case '±':

@@ -586,11 +586,29 @@ export function recognize(strokes: Stroke[]): string | null {
         .join('')
     )
     const isOp = (t: string) => /^[+−×÷-]$/.test(t)
-    const ops = cells.filter(isOp)
-    const nums = cells.filter((t) => /^[0-9.]+$/.test(t))
-    if (rows.length >= 2 && nums.length >= 2) {
+    const term = /^([+−×÷-]?)([0-9.]+)$/
+    // Fold row text into a left-to-right expression: a bare operator row applies
+    // to the next number, and a row may carry its own operator (`+2` under `1`).
+    let pending: string | null = null
+    const parts: string[] = []
+    let bad = false
+    for (const t of cells) {
+      if (isOp(t)) {
+        pending = t === '-' ? '−' : t
+        continue
+      }
+      const m = term.exec(t)
+      if (!m) {
+        bad = true
+        break
+      }
+      const lead = m[1] === '-' ? '−' : m[1] || pending || '+'
+      pending = null
+      parts.push(parts.length === 0 ? (lead === '−' ? `−${m[2]}` : m[2]!) : `${lead} ${m[2]!}`)
+    }
+    if (!bad && rows.length >= 2 && parts.length >= 2) {
       const belowTxt = below.length ? cluster(below).map(recognizeOne).join('') : ''
-      return `${nums.join(` ${ops[0] ?? '+'} `)} =${belowTxt ? ` ${belowTxt}` : ''}`
+      return `${parts.join(' ')} =${belowTxt ? ` ${belowTxt}` : ''}`
     }
   }
 
