@@ -158,11 +158,16 @@ export function HomeScreen({
   // The let-go onto another cell: rather than vanishing at the fingertip the
   // tile keeps flying, shrinking into the icon it was dropped on, and the grid
   // commits the stack as it lands so the folder it made or grew pops in under
-  // it. `cell` is measured before the commit, which re-keys the element when
-  // an app turns into a folder.
+  // it. The carry frees the tile's own cell, so a target after it in the same
+  // half slides back one index on commit - fly at and pop `dest`, the cell the
+  // folder lands in, not the one the finger saw.
   const stackTile = (app: string, target: Slot, was: Carried, el: HTMLElement, cell: HTMLElement) => {
-    const cid = cell.dataset.cell
-    const ir = (cell.querySelector<HTMLElement>('[data-icon]') ?? cell).getBoundingClientRect()
+    const root: ParentNode = el.closest('[data-os]') ?? document
+    const [ch, ci] = (cell.dataset.cell ?? ':').split(':')
+    const [fh, fi] = (el.dataset.cell ?? ':').split(':')
+    const dest = `${ch}:${Number(ci) - (fh === ch && Number(fi) < Number(ci) ? 1 : 0)}`
+    const into = root.querySelector<HTMLElement>(`[data-cell="${CSS.escape(dest)}"]`) ?? cell
+    const ir = (into.querySelector<HTMLElement>('[data-icon]') ?? into).getBoundingClientRect()
     const my = (el.querySelector<HTMLElement>('[data-icon]') ?? el).getBoundingClientRect()
     const now = el.getBoundingClientRect()
     const cx = now.left + now.width / 2
@@ -187,9 +192,8 @@ export function HomeScreen({
       () => {
         fly.cancel()
         el.style.transform = ''
-        const root = el.closest('[data-os]') ?? document
         flushSync(() => stack(app, target))
-        const tile = cid ? root.querySelector<HTMLElement>(`[data-tile][data-cell="${CSS.escape(cid)}"]`) : null
+        const tile = root.querySelector<HTMLElement>(`[data-tile][data-cell="${CSS.escape(dest)}"]`)
         if (!tile) return
         for (const x of tile.getAnimations()) x.cancel()
         // A folder that was already one just swells; a new one materialises as
