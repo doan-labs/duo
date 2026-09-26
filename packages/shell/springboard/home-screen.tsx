@@ -155,6 +155,73 @@ export function HomeScreen({
     )
     return true
   }
+  // The let-go onto another cell: rather than vanishing at the fingertip the
+  // tile keeps flying, shrinking into the icon it was dropped on, and the grid
+  // commits the stack as it lands so the folder it made or grew pops in under
+  // it. The carry frees the tile's own cell, so a target after it in the same
+  // half slides back one index on commit - fly at and pop `dest`, the cell the
+  // folder lands in, not the one the finger saw.
+  const stackTile = (app: string, target: Slot, was: Carried, el: HTMLElement, cell: HTMLElement) => {
+    const root: ParentNode = el.closest('[data-os]') ?? document
+    const [ch, ci] = (cell.dataset.cell ?? ':').split(':')
+    const [fh, fi] = (el.dataset.cell ?? ':').split(':')
+    const dest = `${ch}:${Number(ci) - (fh === ch && Number(fi) < Number(ci) ? 1 : 0)}`
+    const into = root.querySelector<HTMLElement>(`[data-cell="${CSS.escape(dest)}"]`) ?? cell
+    const ir = (into.querySelector<HTMLElement>('[data-icon]') ?? into).getBoundingClientRect()
+    const my = (el.querySelector<HTMLElement>('[data-icon]') ?? el).getBoundingClientRect()
+    const now = el.getBoundingClientRect()
+    const cx = now.left + now.width / 2
+    const cy = now.top + now.height / 2
+    // Icon centres, not tile centres: the label under the icon pulls the tile's
+    // centre down, and the fly-in ends with the icon dead on the target's.
+    const mx = my.left + my.width / 2
+    const mY = my.top + my.height / 2
+    const k = ir.width / my.width
+    const at = `translate(${(was.box.left + was.box.width / 2 - cx) * was.s}px,${(was.box.top + was.box.height / 2 - cy) * was.s}px) scale(1.12)`
+    const inX = (ir.left + ir.width / 2 - cx - k * (mx - cx)) * was.s
+    const inY = (ir.top + ir.height / 2 - cy - k * (mY - cy)) * was.s
+    el.style.zIndex = '5'
+    el.style.pointerEvents = 'none'
+    el.style.transform = at
+    const fly = el.animate([{ transform: at }, { transform: `translate(${inX}px,${inY}px) scale(${k})` }], {
+      duration: 190,
+      easing: 'cubic-bezier(.2,.9,.3,1)',
+      fill: 'forwards'
+    })
+    fly.finished.then(
+      () => {
+        fly.cancel()
+        el.style.transform = ''
+        flushSync(() => stack(app, target))
+        const tile = root.querySelector<HTMLElement>(`[data-tile][data-cell="${CSS.escape(dest)}"]`)
+        if (!tile) return
+        for (const x of tile.getAnimations()) x.cancel()
+        // A folder that was already one just swells; a new one materialises as
+        // the icon lands, over the cell the target app occupied a frame ago.
+        const pop = tile.animate(
+          isFolder(target)
+            ? [{ transform: 'scale(1)' }, { transform: 'scale(1.14)', offset: 0.45 }, { transform: 'scale(1)' }]
+            : [
+                { transform: 'scale(.72)', opacity: 0 },
+                { transform: 'scale(1.1)', opacity: 1, offset: 0.55 },
+                { transform: 'scale(1)' }
+              ],
+          { duration: 320, easing: 'cubic-bezier(.2,.9,.3,1)' }
+        )
+        pop.finished.then(
+          () => pop.cancel(),
+          () => {}
+        )
+      },
+      () => {
+        // The fly-in never ran: put the tile back rather than leave it mid-air.
+        el.style.transform = ''
+        el.style.zIndex = ''
+        el.style.pointerEvents = ''
+      }
+    )
+    return true
+  }
   /** A tile held on the grid or in the dock: carried until let go, onto another cell (they stack), into the dock, or onto the paper of a half (it lands there loose); anywhere else it springs back. */
   const carryOff = (app: string, from: 'dock' | 'grid', down: PointerEvent, el: HTMLElement) => {
     lifting.current = true
@@ -185,8 +252,10 @@ export function HomeScreen({
         const target = cellAt(under)
         if (target) {
           if (target === app) return false
-          stack(app, target)
-          return true
+          const cell = under?.closest<HTMLElement>('[data-cell]')
+          // cellAt found the slot through data-cell; without one there is nothing to fly into.
+          if (!cell) return false
+          return stackTile(app, target, was, el, cell)
         }
         const half = under?.closest<HTMLElement>('[data-half]')?.dataset.half as Half | undefined
         if (half) return landTile(app, was, el, () => place(app, half))
