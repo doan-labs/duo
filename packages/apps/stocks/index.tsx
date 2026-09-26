@@ -2,8 +2,8 @@
 // symbols beside the detail pane - and the same destinations pushed folded.
 // Quotes and headlines come from CNBC, daily history and symbol search from
 // stockanalysis.com, crypto intraday from Coinbase; every number on screen is
-// fetched, nothing is walked. The mirror copy never calls start(): it draws
-// the same stores with no network and no timers.
+// fetched, nothing is walked. The mirror copy starts nothing: start() and the
+// fetch hooks all gate on the `os.mirror` getter, which follows the fold.
 
 import type { Os } from '@doan-labs/duo-sdk'
 import { Button, Nav, Page, Text, Title, useNav, useWide } from '@doan-labs/duo-uikit'
@@ -39,9 +39,13 @@ const compact = { notation: 'compact' as const, maximumFractionDigits: 1 }
 export function Stocks({ os }: { os: Os }) {
   const [root, wide] = useWide()
   const { items, viewing } = useStore()
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the arg applies once at open; later picks are the user's
+  // `os.mirror` follows the pose, so the live copy starts polling when the fold
+  // hands it the device, not only when the app was first opened.
   useEffect(() => {
     if (!os.mirror) start()
+  }, [os.mirror])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the arg applies once at open; later picks are the user's
+  useEffect(() => {
     if (os.arg) {
       const hit = items.find((v) => v.sym === os.arg)
       if (hit) select(hit)
@@ -49,15 +53,15 @@ export function Stocks({ os }: { os: Os }) {
   }, [])
   return (
     <div ref={root} {...stylex.props(styles.split)}>
-      {wide && <Side />}
+      {wide && <Side os={os} />}
       <div {...stylex.props(styles.detail)}>
         {wide ? (
           <div {...stylex.props(styles.detailScroll)}>
-            <Detail key={viewing.sym} item={viewing} showNews live={!os.mirror} />
+            <Detail key={viewing.sym} item={viewing} showNews os={os} />
           </div>
         ) : (
           <Nav>
-            <Home live={!os.mirror} />
+            <Home os={os} />
           </Nav>
         )}
       </div>
@@ -67,7 +71,7 @@ export function Stocks({ os }: { os: Os }) {
 
 // -- the sidebar ----------------------------------------------------------------
 
-function Side() {
+function Side({ os }: { os: Os }) {
   const { items, viewing } = useStore()
   const [query, setQuery] = useState('')
   const searching = query.trim().length > 0
@@ -83,7 +87,7 @@ function Side() {
               My Symbols
             </Text>
             {items.map((v) => (
-              <SymbolRow key={v.sym} item={v} side on={v.sym === viewing.sym} onPick={select} />
+              <SymbolRow key={v.sym} item={v} os={os} side on={v.sym === viewing.sym} onPick={select} />
             ))}
           </>
         )}
@@ -94,14 +98,16 @@ function Side() {
 
 // -- the cover's list page --------------------------------------------------------
 
-function Home({ live }: { live?: boolean }) {
+function Home({ os }: { os: Os }) {
   const { push } = useNav()
   const { items } = useStore()
   const [query, setQuery] = useState('')
   const searching = query.trim().length > 0
   const open = (v: Item) => {
     select(v)
-    push((back) => <DetailPage item={v} back={back} live={live} />)
+    // `os` is the same object on every copy, so a page pushed before a fold
+    // still reads the live `mirror` getter when it next renders.
+    push((back) => <DetailPage item={v} back={back} os={os} />)
   }
   return (
     <Page
@@ -120,7 +126,7 @@ function Home({ live }: { live?: boolean }) {
       ) : (
         <>
           {items.map((v) => (
-            <SymbolRow key={v.sym} item={v} onPick={open} />
+            <SymbolRow key={v.sym} item={v} os={os} onPick={open} />
           ))}
           <Business />
         </>
@@ -129,11 +135,11 @@ function Home({ live }: { live?: boolean }) {
   )
 }
 
-function DetailPage({ item, back, live }: { item: Item; back: () => void; live?: boolean }) {
+function DetailPage({ item, back, os }: { item: Item; back: () => void; os: Os }) {
   return (
     <Page title={item.sym} back={back}>
       <div {...stylex.props(styles.detailPad)}>
-        <Detail item={item} live={live} />
+        <Detail item={item} os={os} />
       </div>
     </Page>
   )
@@ -234,17 +240,19 @@ function SearchResults({ query, onPick, side }: { query: string; onPick: (v: Ite
 
 function SymbolRow({
   item,
+  os,
   side,
   on,
   onPick
 }: {
   item: Item
+  os: Os
   side?: boolean
   on?: boolean
   onPick: (v: Item) => void
 }) {
   const quote = useQuote(item.sym)
-  const spark = useSpark(item)
+  const spark = useSpark(item, !os.mirror)
   const q = quote.data
   const dn = (q?.chgPct ?? 0) < 0
   return (
@@ -278,13 +286,16 @@ function SymbolRow({
 const extTone = (v: number) => (v < 0 ? styles.deltaDn : styles.delta)
 
 /** The quote block, range pills, chart, stats grid and follow toggle. */
-function Detail({ item, showNews, live }: { item: Item; showNews?: boolean; live?: boolean }) {
+function Detail({ item, showNews, os }: { item: Item; showNews?: boolean; os: Os }) {
   const { items } = useStore()
   const inList = items.some((v) => v.sym === item.sym)
   const quote = useQuote(item.sym)
   const ranges = RANGES[item.kind]
   const [range, setRange] = useState(item.kind === 'crypto' ? '1D' : '1M')
-  const { entry, pts } = useHistory(item, range)
+  // Read at render: the getter follows the fold, and this component re-renders
+  // on every store emit even when it sits in a pushed Nav page.
+  const live = !os.mirror
+  const { entry, pts } = useHistory(item, range, live)
   const q = quote.data
   const dn = (q?.chgPct ?? 0) < 0
   // Scrubbing the live chart borrows Apple's gesture: the big price and the

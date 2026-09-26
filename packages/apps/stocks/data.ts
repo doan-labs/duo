@@ -3,7 +3,9 @@
 // plus localStorage is the shared state. Sources are the free, CORS-open
 // feeds verified for this app: CNBC quotes and RSS, stockanalysis.com daily
 // history and symbol search, Coinbase candles for crypto intraday. The mirror
-// copy never calls start(): no network, no timer, it draws the same stores.
+// copy starts nothing: the fetch hooks take a `live` flag and the pump only
+// the live copy starts, so the second document copy draws the same stores
+// without network or timers.
 
 import { useEffect, useSyncExternalStore } from 'react'
 
@@ -106,8 +108,8 @@ const isItem = (v: Item) => typeof v?.sym === 'string' && typeof v.cnbc === 'str
 function read(raw: string | null): Store {
   try {
     const s = JSON.parse(raw || 'null')
-    if (s && Array.isArray(s.items) && s.items.length && s.items.every(isItem)) {
-      const viewing = isItem(s.viewing) ? s.viewing : s.items[0]
+    if (s && Array.isArray(s.items) && s.items.every(isItem)) {
+      const viewing = isItem(s.viewing) ? s.viewing : (s.items[0] ?? DEFAULTS[0]!)
       return { items: s.items, viewing }
     }
   } catch {
@@ -156,7 +158,7 @@ export function follow(candidate: Item) {
   void refreshQuotes()
 }
 export function unfollow(sym: string) {
-  if (store.items.length > 1) update({ items: store.items.filter((v) => v.sym !== sym) })
+  update({ items: store.items.filter((v) => v.sym !== sym) })
 }
 
 // -- caches --------------------------------------------------------------------
@@ -170,11 +172,11 @@ const empty: Entry<never> = { loading: true }
 const stale = (entry: Entry<unknown>, ttl: number) => !entry.fetched || Date.now() - entry.fetched > ttl
 
 export const useQuote = (sym: string) => useSyncExternalStore(subscribe, () => quotes.get(sym) || empty)
-export const useSpark = (v: Item | undefined) => {
+export const useSpark = (v: Item | undefined, live: boolean) => {
   const entry = useSyncExternalStore(subscribe, () => (v ? sparks.get(v.sym) || empty : empty))
   useEffect(() => {
-    if (v) void spark(v)
-  }, [v])
+    if (v && live) void spark(v)
+  }, [v, live])
   return entry
 }
 export const useNews = () => useSyncExternalStore(subscribe, () => news)
@@ -274,6 +276,13 @@ async function refreshQuotes() {
   } finally {
     pending.delete('quotes')
     emit()
+    // A symbol picked mid-flight was not in this batch and is still due; run it
+    // now rather than leave it blank until the next poll.
+    const batched = new Set(due.map((v) => v.sym))
+    if (
+      [...store.items, store.viewing].some((v) => !batched.has(v.sym) && stale(quotes.get(v.sym) || empty, QUOTE_TTL))
+    )
+      void refreshQuotes()
   }
 }
 
@@ -332,24 +341,30 @@ async function fullSeries(v: Item): Promise<Point[]> {
   return (rows as [number, number][]).map(([t, c]) => ({ t, c })).filter((p) => Number.isFinite(p.c))
 }
 
-/** Coinbase candles come newest-first; flip them and slice to the range. */
+/** Coinbase candles come newest-first, 300 per fetch; page back over the range. */
 async function candlePoints(v: Item, granularity: number, days?: number): Promise<Point[]> {
   const pair = v.coinbase ?? `${v.sym}-USD`
-  const response = await fetch(
-    `https://api.exchange.coinbase.com/products/${encodeURIComponent(pair)}/candles?granularity=${granularity}`,
-    {
-      credentials: 'omit',
-      signal: AbortSignal.timeout(15000)
-    }
-  )
-  if (!response.ok) throw new Error('History unavailable')
-  const rows = await response.json()
-  if (!Array.isArray(rows) || !rows.length) throw new Error('History unavailable')
-  let pts = (rows as [number, number, number, number, number, number][])
-    .map(([t, , , , c]) => ({ t: t * 1000, c }))
-    .sort((a, b) => a.t - b.t)
-  if (days) pts = slice(pts, days)
-  return pts
+  const end = Math.floor(Date.now() / 1000)
+  const begin = days ? end - days * 86400 : end - granularity * 300
+  const candles = new Map<number, number>()
+  for (let to = end; to > begin; to -= granularity * 300) {
+    const from = Math.max(begin, to - granularity * 300)
+    const response = await fetch(
+      `https://api.exchange.coinbase.com/products/${encodeURIComponent(pair)}/candles?granularity=${granularity}&start=${from}&end=${to}`,
+      {
+        credentials: 'omit',
+        signal: AbortSignal.timeout(15000)
+      }
+    )
+    if (!response.ok) throw new Error('History unavailable')
+    const rows = await response.json()
+    if (!Array.isArray(rows) || !rows.length) break
+    for (const [t, , , , c] of rows as [number, number, number, number, number, number][]) candles.set(t, c)
+    if (from <= begin || rows.length < 300) break
+  }
+  if (!candles.size) throw new Error('History unavailable')
+  const pts = [...candles.entries()].map(([t, c]) => ({ t: t * 1000, c })).sort((a, b) => a.t - b.t)
+  return days ? slice(pts, days) : pts
 }
 
 const slice = (pts: Point[], days: number) => {
@@ -380,11 +395,11 @@ async function history(v: Item, range: string) {
   }
 }
 
-export function useHistory(v: Item | undefined, range: string): { entry: Entry<Point[]>; pts: Point[] } {
+export function useHistory(v: Item | undefined, range: string, live: boolean): { entry: Entry<Point[]>; pts: Point[] } {
   const entry = useSyncExternalStore(subscribe, () => (v ? hists.get(historyKey(v, range)) || empty : empty))
   useEffect(() => {
-    if (v && RANGES[v.kind].includes(range)) void history(v, range)
-  }, [v, range])
+    if (v && live && RANGES[v.kind].includes(range)) void history(v, range)
+  }, [v, range, live])
   const pts = !v
     ? []
     : v.kind === 'crypto' || range === 'All'
