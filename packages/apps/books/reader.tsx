@@ -73,6 +73,9 @@ export function Reader({ id }: { id: string }) {
   const vert = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number } | null>(null)
   const sought = useRef(false)
+  // Which layout mode the saved position was last restored into; switching
+  // modes re-restores instead of landing on a stale spread/scroll.
+  const restored = useRef<'paged' | 'vert' | null>(null)
   const [w, setW] = useState(0)
   const [map, setMap] = useState<{ spreads: number; block: number[] }>({ spreads: 1, block: [] })
   const [at, setAt] = useState(0)
@@ -113,30 +116,31 @@ export function Reader({ id }: { id: string }) {
     setMap({ spreads: count, block })
     if (ui.seek != null) {
       sought.current = true
+      restored.current = 'paged'
       setAt(block[ui.seek] ?? 0)
       clearSeek()
-    } else if (!sought.current) {
+    } else if (!sought.current || restored.current !== 'paged') {
       sought.current = true
-      setAt(Math.round((lib.progress[id]?.frac ?? 0) * (count - 1)))
+      restored.current = 'paged'
+      setAt(block[Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))] ?? 0)
     } else {
       setAt((a) => Math.min(count - 1, a))
     }
   }, [w, pw, cols, prefs.size, prefs.font, prefs.theme, vertical, blks, id, step, lib.progress, ui.seek])
 
-  // Vertical mode: restore the saved scroll fraction once on mount.
+  // Vertical mode: restore the saved position once per entry into the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the prefs entries re-run it after the text reflows
   useEffect(() => {
     const el = vert.current
-    if (!vertical || !el || sought.current) return
+    if (!vertical || !el) return
+    if (restored.current === 'vert' && ui.seek == null) return
     sought.current = true
-    if (ui.seek != null) {
-      const t = el.querySelector(`[data-b="${ui.seek}"]`) as HTMLElement | null
-      el.scrollTop = t ? t.offsetTop - 20 : 0
-      clearSeek()
-    } else {
-      el.scrollTop = (lib.progress[id]?.frac ?? 0) * (el.scrollHeight - el.clientHeight)
-    }
-  }, [vertical, id, prefs.size, prefs.font, lib.progress, ui.seek])
+    restored.current = 'vert'
+    const to = ui.seek ?? Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))
+    const t = el.querySelector(`[data-b="${to}"]`) as HTMLElement | null
+    if (t) el.scrollTop = t.offsetTop - 20
+    clearSeek()
+  }, [vertical, id, prefs.size, prefs.font, lib.progress, ui.seek, blks])
 
   const turn = (d: number) => {
     if (vertical) {
@@ -147,13 +151,6 @@ export function Reader({ id }: { id: string }) {
     setAt((a) => Math.max(0, Math.min(spreads - 1, a + d)))
   }
 
-  // Persist position (throttled): a fraction of the book, so both displays agree.
-  useEffect(() => {
-    if (!sought.current || spreads <= 1) return
-    const t = setTimeout(() => setProgress(id, at / (spreads - 1)), 120)
-    return () => clearTimeout(t)
-  }, [at, spreads, id])
-
   const jumpTo = (block: number) => {
     if (vertical) {
       const el = vert.current?.querySelector(`[data-b="${block}"]`) as HTMLElement | null
@@ -161,8 +158,8 @@ export function Reader({ id }: { id: string }) {
     } else {
       setAt(map.block[block] ?? 0)
     }
-    showChrome(false)
     openCard(undefined)
+    showChrome(false)
   }
 
   // The block at the top of the visible spread is what the bookmark pins.
@@ -179,6 +176,14 @@ export function Reader({ id }: { id: string }) {
     while (i + 1 < blks.length && (map.block[i + 1] ?? Number.POSITIVE_INFINITY) <= at) i++
     return i
   }, [at, map, blks.length, vertical, starts, lib.progress, id])
+
+  // Persist position (throttled): the topmost block as a book fraction, so both
+  // displays agree and no precision is lost in spread rounding.
+  useEffect(() => {
+    if (!sought.current || spreads <= 1) return
+    const t = setTimeout(() => setProgress(id, head / Math.max(1, blks.length - 1)), 120)
+    return () => clearTimeout(t)
+  }, [head, spreads, id, blks.length])
   const marked = marks.some((m) => (vertical ? m.b === head : (map.block[m.b] ?? -1) === at))
 
   // Keyboard turns.
@@ -220,12 +225,12 @@ export function Reader({ id }: { id: string }) {
     return c
   }, [head, starts])
 
-  // Pages left in the chapter = its last block's spread minus this one.
+  // Pages left in the chapter, in display pages (spreads times columns).
   const pagesLeft = useMemo(() => {
     const next = starts[Math.min(curChapter + 1, starts.length - 1)]
     const end = curChapter + 1 >= starts.length ? spreads : (map.block[next!] ?? spreads)
-    return Math.max(0, end - at)
-  }, [at, curChapter, map, spreads, starts])
+    return Math.max(0, (end - at) * cols)
+  }, [at, curChapter, map, spreads, cols, starts])
 
   const sizeIdx = prefs.size
   const setSize = (d: number) => setPrefs({ size: Math.max(0, Math.min(SIZES.length - 1, sizeIdx + d)) })
@@ -320,7 +325,14 @@ export function Reader({ id }: { id: string }) {
             {...stylex.props(styles.readVert)}
             onScroll={(e) => {
               const el = e.currentTarget
-              const frac = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)
+              const top = el.scrollTop + 24
+              const kids = el.querySelectorAll('[data-b]')
+              let h = 0
+              for (let i = 0; i < kids.length; i++) {
+                if ((kids[i] as HTMLElement).offsetTop <= top) h = i
+                else break
+              }
+              const frac = h / Math.max(1, blks.length - 1)
               setTimeout(() => setProgress(id, frac), 200)
             }}
             onPointerDown={(e) => e.stopPropagation()}
@@ -383,7 +395,7 @@ export function Reader({ id }: { id: string }) {
               >
                 <span {...stylex.props(styles.sheetT)}>{c.title}</span>
                 <span {...stylex.props(styles.sheetN)}>
-                  {vertical ? '' : `Page ${(map.block[starts[i]!] ?? 0) + 1}`}
+                  {vertical ? '' : `Page ${(map.block[starts[i]!] ?? 0) * cols + 1}`}
                 </span>
               </button>
             ))
@@ -396,7 +408,9 @@ export function Reader({ id }: { id: string }) {
                 onClick={() => jumpTo(m.b)}
               >
                 <span {...stylex.props(styles.sheetT)}>{blks[m.b]?.text.slice(0, 64) ?? 'Page'}...</span>
-                <span {...stylex.props(styles.sheetN)}>{vertical ? '' : `Page ${(map.block[m.b] ?? 0) + 1}`}</span>
+                <span {...stylex.props(styles.sheetN)}>
+                  {vertical ? '' : `Page ${(map.block[m.b] ?? 0) * cols + 1}`}
+                </span>
               </button>
             ))
           ) : (
@@ -428,7 +442,9 @@ export function Reader({ id }: { id: string }) {
                   <span {...stylex.props(styles.sheetT)}>
                     {blks[h.i]!.text.slice(Math.max(0, h.at - 24), h.at + 48)}...
                   </span>
-                  <span {...stylex.props(styles.sheetN)}>{vertical ? '' : `Page ${(map.block[h.i] ?? 0) + 1}`}</span>
+                  <span {...stylex.props(styles.sheetN)}>
+                    {vertical ? '' : `Page ${(map.block[h.i] ?? 0) * cols + 1}`}
+                  </span>
                 </button>
               ))
             ) : (
