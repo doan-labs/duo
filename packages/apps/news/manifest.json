@@ -1,12 +1,12 @@
 {
   "id": "labs.doan.ipduo.news",
   "name": "News",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "lane": "official",
   "entry": "./main.tsx",
   "icon": "./icon.png",
   "light": true,
-  "network": ["https://hn.algolia.com"],
+  "network": ["https://dev.to", "https://images.weserv.nl", "https://hn.algolia.com"],
   "author": "Doan Labs",
   "repo": "https://github.com/doan-labs/duo",
   "license": "MIT"

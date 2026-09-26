@@ -1,7 +1,7 @@
 // News. Apple News for the Duo: a floating sidebar of channels and followed
 // topics on the inner display, a tab bar on the cover, Today with its hero,
-// and articles that push over everything. The stories are live from Hacker
-// News; the artwork is generated per story so nothing needs another fetch.
+// and articles that push over everything. The stories are live from DEV
+// Community with their real cover art; search still reaches Hacker News.
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON } from '@doan-labs/duo-sdk/react.ts'
 import { Push } from '@doan-labs/duo-uikit/nav.tsx'
@@ -16,14 +16,15 @@ import { fetchStory, refresh, type Story } from './data.ts'
 import { Feed, type Open, Today } from './feed.tsx'
 import { styles } from './styles.ts'
 
-const TOPICS_SEED = ['Apple', 'AI', 'Space', 'Open Source']
+const TOPICS_SEED = ['Web Dev', 'AI', 'Open Source', 'Programming']
 
 const LABELS: Record<string, string> = {
   today: 'Today',
   latest: 'Latest',
-  show: 'Show HN',
-  ask: 'Ask HN',
-  jobs: 'Jobs',
+  rising: 'Trending',
+  showdev: 'Showcase',
+  discuss: 'Discuss',
+  career: 'Career',
   following: 'Following',
   saved: 'Saved',
   history: 'History',
@@ -100,7 +101,7 @@ export function News() {
     />
   ) : view === 'today' ? (
     <Today wide={wide} open={open} />
-  ) : view === 'latest' || view === 'show' || view === 'ask' || view === 'jobs' ? (
+  ) : view === 'latest' || view === 'rising' || view === 'showdev' || view === 'discuss' || view === 'career' ? (
     <Feed feed={view} title={LABELS[view] ?? 'News'} wide={wide} open={open} />
   ) : view === 'following' ? (
     <Following topics={topics.value} onTopics={topics.set} pick={tab.set} />

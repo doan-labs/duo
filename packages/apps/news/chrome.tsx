@@ -10,9 +10,10 @@ import { styles } from './styles.ts'
 export type Section = { key: string; label: string; glyph: keyof typeof SYM }
 export const CHANNELS: Section[] = [
   { key: 'latest', label: 'Latest', glyph: 'bolt' },
-  { key: 'show', label: 'Show HN', glyph: 'star' },
-  { key: 'ask', label: 'Ask HN', glyph: 'people' },
-  { key: 'jobs', label: 'Jobs', glyph: 'folder' }
+  { key: 'rising', label: 'Trending', glyph: 'gauge' },
+  { key: 'showdev', label: 'Showcase', glyph: 'star' },
+  { key: 'discuss', label: 'Discuss', glyph: 'activity' },
+  { key: 'career', label: 'Career', glyph: 'building' }
 ]
 export const TABS: Section[] = [
   { key: 'today', label: 'Today', glyph: 'document' },
@@ -115,8 +116,8 @@ export function Sidebar({
       </div>
       <div {...stylex.props(styles.sideFoot)}>
         <span {...stylex.props(styles.sideFootText)}>
-          <span {...stylex.props(styles.sideFootName)}>Hacker News</span>
-          <span {...stylex.props(styles.sideFootSub)}>hn.algolia.com</span>
+          <span {...stylex.props(styles.sideFootName)}>DEV Community</span>
+          <span {...stylex.props(styles.sideFootSub)}>dev.to</span>
         </span>
         <button
           type="button"

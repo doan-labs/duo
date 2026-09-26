@@ -23,6 +23,11 @@ const shimmer = stylex.keyframes({
   to: { opacity: 0.45 }
 })
 
+const develop = stylex.keyframes({
+  from: { opacity: 0 },
+  to: { opacity: 1 }
+})
+
 export const styles = stylex.create({
   /** A story or topic's generated artwork, seeded per call site. */
   bgImg: (image: string) => ({ backgroundImage: image }),
@@ -34,7 +39,7 @@ export const styles = stylex.create({
   scroll: { flexGrow: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: space.xxl },
   pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, minWidth: 0 },
   /** Room for the floating sidebar; rows still run under the glass. */
-  paneSide: { paddingLeft: 232 },
+  paneSide: { paddingLeft: 240 },
   /** Room for the floating tab bar on the cover. */
   paneScroll: { paddingBottom: 92 },
 
@@ -47,8 +52,8 @@ export const styles = stylex.create({
     position: 'absolute',
     zIndex: 2,
     top: -32,
-    bottom: 8,
-    left: 8,
+    bottom: space.xxl,
+    left: space.md,
     width: 216,
     display: 'flex',
     flexDirection: 'column',
@@ -297,7 +302,19 @@ export const styles = stylex.create({
     transform: 'translateZ(0)'
   },
   heroSm: { minHeight: 200 },
-  heroArt: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  heroArt: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    animationName: { default: develop, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.4s',
+    animationTimingFunction: easing.out,
+    animationFillMode: 'backwards'
+  },
   heroShade: {
     position: 'absolute',
     top: 0,
@@ -387,10 +404,12 @@ export const styles = stylex.create({
     whiteSpace: 'nowrap'
   },
   thumb: {
+    position: 'relative',
     width: 64,
     height: 64,
     flexShrink: 0,
     borderRadius: radius.lg,
+    overflow: 'hidden',
     display: 'grid',
     placeItems: 'center',
     color: colors.white,
@@ -398,6 +417,20 @@ export const styles = stylex.create({
     lineHeight: leading.title2,
     fontWeight: weight.bold,
     boxShadow: shadow.card
+  },
+  /** The fetched cover, fading in over the tile's seeded gradient. */
+  thumbImg: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    animationName: { default: develop, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.4s',
+    animationTimingFunction: easing.out,
+    animationFillMode: 'backwards'
   },
   thumbSm: { width: 56, height: 56 },
 
@@ -442,6 +475,21 @@ export const styles = stylex.create({
     cursor: 'pointer'
   },
 
+  /** The article's fetched artwork over its seeded gradient. */
+  artImg: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    animationName: { default: develop, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.4s',
+    animationTimingFunction: easing.out,
+    animationFillMode: 'backwards'
+  },
+
   /** The article, pushed over the whole app. */
   artTop: {
     flexShrink: 0,
@@ -465,7 +513,7 @@ export const styles = stylex.create({
   },
   artActs: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14, color: appAppearance.newsAccent },
   artAct: { display: 'flex', alignItems: 'center', cursor: 'pointer' },
-  artHero: { flexShrink: 0, minHeight: 190 },
+  artHero: { position: 'relative', flexShrink: 0, minHeight: 190, overflow: 'hidden' },
   artHeroSm: { minHeight: 130 },
   artWrap: { flexGrow: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 40 },
   artBody: { width: '100%', maxWidth: 680, marginLeft: 'auto', marginRight: 'auto', paddingRight: 18, paddingLeft: 18 },
@@ -532,6 +580,16 @@ export const styles = stylex.create({
     lineHeight: leading.callout,
     letterSpacing: tracking.callout,
     color: app.fg,
+    whiteSpace: 'pre-line'
+  },
+  /** The deck, set slightly larger than body copy. */
+  artLede: {
+    marginTop: 16,
+    fontFamily: fonts.serif,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    color: app.label2,
     whiteSpace: 'pre-line'
   },
   disc: { marginTop: 22 },
