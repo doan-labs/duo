@@ -12,8 +12,11 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
 export type Plan = { ms: number; at: (t: number) => View }
 
 export function fly(from: View, to: View): Plan {
+  // The shorter ground path can cross the date line: fly the equivalent
+  // longitude nearest the start, and put the landing back inside +-180.
+  const lon = from.lon + ((((to.lon - from.lon) % 360) + 540) % 360) - 180
   const a = project(from.lat, from.lon, to.z)
-  const b = project(to.lat, to.lon, to.z)
+  const b = project(to.lat, lon, to.z)
   const d = Math.hypot(b.x - a.x, b.y - a.y)
   // Far jumps pull the zoom out first so the ground stays readable en route.
   const dip = Math.min(2.5, Math.max(0, Math.log2(d / 1200)))
@@ -23,7 +26,10 @@ export function fly(from: View, to: View): Plan {
     at: (t) => {
       const e = ease(t)
       const z = Math.min(MAX_Z, Math.max(MIN_Z, from.z + (to.z - from.z) * e - dip * Math.sin(Math.PI * t)))
-      return { ...unproject(a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e, to.z), z }
+      const v = unproject(a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e, to.z)
+      // Tiles wrap the columns already; keeping the view inside +-180 keeps
+      // the pins' wrapped deltas on the same side of the seam as the ground.
+      return { ...v, lon: ((((v.lon + 180) % 360) + 360) % 360) - 180, z }
     }
   }
 }

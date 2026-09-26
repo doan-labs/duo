@@ -168,7 +168,11 @@ export function MapCanvas({
 
   const place = (lat: number, lon: number) => {
     const p = project(lat, lon, view.z)
-    return { x: p.x - left, y: p.y - top }
+    // The world repeats every `span` columns, so a pin just across the date
+    // line sits a few degrees away, not a full world to the left.
+    const wx = TILE * 2 ** view.z
+    const dx = ((((p.x - centre.x + wx / 2) % wx) + wx) % wx) - wx / 2
+    return { x: dx + (box.w + padX) / 2, y: p.y - top }
   }
   // Point-to-polyline distance, so a tap on a grey route picks it.
   const near = (px: number, py: number, r: Route) => {

@@ -19,7 +19,7 @@ export type RoutesRec = { key: string; list: Route[] | null; failed: boolean; tr
 export type ResultsRec = { key: string; q: string; list: Place[]; failed: boolean; tries: number }
 
 /** The card's drive-time answer for one selection, keyed like a route request. */
-export type EstRec = { key: string; duration: number; distance: number }
+export type EstRec = { key: string; duration: number; distance: number; failed?: boolean; tries?: number }
 
 export type MapState = {
   query: string

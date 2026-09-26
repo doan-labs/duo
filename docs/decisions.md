@@ -1735,6 +1735,6 @@ now a getter on the scene's `Os` that reads `active.wide`: whichever display
 the pose puts in hand counts as the running copy at that moment, and the
 folded-away one is the mirror. Renders re-read it, so liveness flips with the
 fold without a remount, and the quiet flag on `open()` is back to meaning only
-"born with no zoom". Cost: a copy learns it became live on its next render,
-not at the crossover frame - an app that needed to react at the instant of
-the fold would still have to notice on its own; none does.
+"born with no zoom". And because the flag only reaches effects at render
+time, `follow()` pokes both displays' scene lists on crossover (`wake`), so
+the flip lands at the fold rather than on the next store write.

@@ -165,23 +165,35 @@ export const Maps = ({ os }: { os: Os }) => {
   useEffect(() => () => motion.current?.(), [])
 
   // A place card asks for its drive time up front; the same answer warms the
-  // routes record, so Directions opens loaded.
+  // routes record, so Directions opens already loaded. The pin's id keys it,
+  // so the street name landing mid-request does not abort it; a failure
+  // retries once, and reopening the card clears a failed record to ask again.
+  const selRef = useRef(sel)
+  selRef.current = sel
   useEffect(() => {
-    if (!sel || dir || !live || estTried.current === estKey) return
-    if (share.get().estimate?.key === estKey) return
+    const p = selRef.current
+    if (!p || dir || !live || estTried.current === estKey) return
+    if (estimate && (!estimate.failed || (estimate.tries ?? 0) >= 2)) return
     estTried.current = estKey
+    const tries = estimate?.tries ?? 0
     const ctl = new AbortController()
-    routes('drive', from, sel, ctl.signal)
+    routes('drive', from, p, ctl.signal)
       .then((list) => {
         if (!list[0]) return
         share.set({
-          estimate: { key: estKey, duration: list[0].duration, distance: list[0].distance },
-          routes: { key: estKey, list, failed: false, tries: 1 }
+          estimate: { key: estKey, duration: list[0].duration, distance: list[0].distance, tries: tries + 1 },
+          routes: { key: estKey, list, failed: false, tries: tries + 1 }
         })
       })
-      .catch(() => {})
+      .catch((e) => {
+        if (!aborted(e))
+          share.set({ estimate: { key: estKey, duration: 0, distance: 0, failed: true, tries: tries + 1 } })
+      })
+      .finally(() => {
+        if (estTried.current === estKey) estTried.current = ''
+      })
     return () => ctl.abort()
-  }, [sel, dir, from, live, estKey])
+  }, [dir, from, live, estKey, estimate])
 
   // Fetch the routes whenever the directions panel wants them. The record lands
   // keyed by the request; a failure gets one retry on its own and another when
@@ -275,8 +287,15 @@ export const Maps = ({ os }: { os: Os }) => {
   const padX = wide ? (dir ? ASIDE : (aside ? ASIDE : 44) + (sel ? CARD : 0)) : 0
   const padYFrac = wide ? 0 : SHEET
 
+  // A failed estimate keeps its key, so picking the pin again is the retry:
+  // drop the record and the card effect asks again.
+  const estRetry = (p: Place) => {
+    const est = share.get().estimate
+    return est?.key === `drive|${from.lat},${from.lon}|${p.id}` && est.failed ? { estimate: null } : {}
+  }
+
   const pick = (p: Place) => {
-    share.set({ sel: p })
+    share.set({ sel: p, ...estRetry(p) })
     remember(p)
     if (dir) {
       // Mid-route, another pin is just the new destination.
@@ -325,7 +344,7 @@ export const Maps = ({ os }: { os: Os }) => {
       lon,
       address: []
     }
-    share.set(dir ? { sel: p, dir: { ...dir, to: p, active: 0 }, scroll: 0 } : { sel: p })
+    share.set(dir ? { sel: p, dir: { ...dir, to: p, active: 0 }, scroll: 0 } : { sel: p, ...estRetry(p) })
   }
 
   const panel = dir ? (

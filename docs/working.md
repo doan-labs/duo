@@ -217,9 +217,9 @@ routes, estimate, `me`, recents, the camera `view` and the layer `kind` are one 
 state, so the fold hands the same map over whole - either copy writes intent and only
 the `!os.mirror` copy fetches or animates. The mirror's `flyTo` writes the target view
 flat instead of scheduling frames; the live copy's animation frames land in the store
-and the folded display draws them. `os.mirror` reads live from `active.wide`, so the
-flag follows the fold rather than the spawn - whichever display is in use counts as
-the running copy at that moment, even one opened quietly long before. The directions
+and the folded display draws them. `os.mirror` reads live from `active.wide` and
+`follow()` pokes both displays' scene lists at the crossover (`wake`), so the flag
+reaches the apps' effects at the fold itself, not on the next store write. The directions
 scroll offset shares the store too: either copy writes its scrollTop debounced, both
 settle on the shared value whenever it changes and as the scroller's sheet expands
 (its scrollTop clamps to 0 while the sheet is still animating), and a new
@@ -231,6 +231,9 @@ record to ask again, and no render can loop a fetch. `camera.ts` is the fly plan
 every jump: `flyTo` runs it through a rAF
 driver, drag and wheel interrupt it, a released drag coasts on its velocity, and zoom is
 fractional - tiles render at the nearest integer level scaled by `2 ** (z - tileZ)`.
+Flights take the short path across the date line (the wrapped longitude nearest the
+start) and views stay inside +-180; pins and route taps resolve their x the same
+wrapped way the tile columns already did.
 Explore uses OpenStreetMap Japan's MapTiler Basic raster and Satellite uses Esri World
 Imagery, both keyless: CARTO watermarks anonymous requests and Stadia rejects them. Recents
 start from the same sample as before and grow with what the session actually looks up.

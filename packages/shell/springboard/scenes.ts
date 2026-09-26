@@ -81,6 +81,10 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     return on.length === 2 || on.some((e) => !e.side)
   }
 
+  // `active.wide` flipped at a crossover: a fresh list re-renders the scenes so
+  // `ctx.mirror` - a live read of the pose - reaches the apps' effects.
+  const wake = () => setList([...live.current])
+
   // `?app=` opens before the panel is in the document, where clientWidth is 0
   // and the scale factor comes out infinite. Fall back to the known size.
   const panel = () => [disp.current?.clientWidth || w - 22, disp.current?.clientHeight || hgt - 22] as const
@@ -275,6 +279,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     launch,
     stage,
     mirror,
+    wake,
     cam
   }
 }
