@@ -114,9 +114,13 @@ export function Reader({ id }: { id: string }) {
       const col = Math.round(((el.getBoundingClientRect().left - fr.left) * k) / step)
       return Math.max(0, Math.min(count - 1, Math.floor(col / cols)))
     })
-    // Mid-fold the panel is edge-on and projected rects collapse every block to
-    // spread 0. Don't trust that map - re-measure once the transition settles.
-    const bad = count > 1 && block.every((v) => v === 0)
+    // Mid-fold the panel is edge-on and projected rects collapse: hinge-side
+    // blocks can keep real columns while far-side blocks compress to 0, so a
+    // healthy map is monotonic and its last block reaches the final spreads.
+    // Don't trust anything else - re-measure once the transition settles.
+    const mono = block.every((v, i) => i === 0 || v >= block[i - 1]!)
+    const last = block[block.length - 1] ?? 0
+    const bad = count > 1 && (!mono || last < count - 2)
     if (bad && tick < 8) {
       const t = setTimeout(() => setTick((x) => x + 1), 250)
       return () => clearTimeout(t)
