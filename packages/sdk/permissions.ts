@@ -7,11 +7,30 @@ export const PERMISSIONS = {
     methods: ['photos.list', 'photos.get', 'photos.add'],
     mutating: ['photos.add'],
     label: 'Photos'
+  },
+  // Capture itself never enters the frame: `microphone` stays in DENIED_FEATURES,
+  // so `allow` keeps 'none' and this permission only unlocks the host-owned
+  // recorder in shell/runtime/mic.ts (decisions.md 42).
+  microphone: {
+    kind: 'service',
+    methods: ['mic.status', 'mic.start', 'mic.pause', 'mic.resume', 'mic.stop'],
+    mutating: ['mic.start', 'mic.pause', 'mic.resume', 'mic.stop'],
+    label: 'Microphone'
+  },
+  // Durable blobs beside the string-only `appdata` KV: audio does not fit a
+  // 256 KiB value cap, and base64 in there would be the workaround this ends.
+  files: {
+    kind: 'service',
+    methods: ['file.list', 'file.get', 'file.put', 'file.del'],
+    mutating: ['file.put', 'file.del'],
+    label: 'Files'
   }
 } as const
 
 export type PermissionName = keyof typeof PERMISSIONS
-export type ServiceMethod = (typeof PERMISSIONS.photos.methods)[number]
+export type ServiceMethod = {
+  [K in PermissionName]: (typeof PERMISSIONS)[K] extends { methods: readonly (infer M)[] } ? M : never
+}[PermissionName]
 export type Photo = { id: string; takenAt: number; width: number; height: number }
 export const DENIED_FEATURES = [
   'camera',

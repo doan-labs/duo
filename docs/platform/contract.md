@@ -297,6 +297,7 @@ export type Evt =
   | { ev: 'device'; p: { type: DeviceEvent; data: DeviceEvents[DeviceEvent] } }  // only watched types, §3.8
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
   | { ev: 'command-result'; p: { cmdId: string } }
+  | { ev: 'mic'; p: MicStatus }                                  // only to a session that touched `mic.*`, §6.3
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }
 export type AppEvt =
   | { ev: 'ack' } | { ev: 'ready' }
@@ -318,6 +319,7 @@ export type ErrCode =
   | 'E_ARGS' | 'E_QUOTA' | 'E_RATE' | 'E_CLOSED' | 'E_TIMEOUT' | 'E_PROTOCOL' | 'E_DENIED'
   | 'E_STALE'      // epoch or generation no longer current
   | 'E_GONE'       // the app was uninstalled or its generation changed under this view
+  | 'E_UNSUPPORTED' // the capability exists but this device or context cannot run it (insecure context, no device, no MediaRecorder)
   | 'E_STORAGE'    // the database refused or is unavailable; nothing was written
 ```
 
@@ -376,6 +378,8 @@ write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch`,
 | Widget snapshot | ≤ 8 lines of ≤ 64 chars, `arg` ≤ 256 | `E_ARGS` |
 | Command payload | ≤ 16 KiB; ≤ 32 unacknowledged per session | `E_ARGS` |
 | Notification | title ≤ 64 chars, body ≤ 240 chars, arg ≤ 4096; retained ≤ 10 per app, ≤ 100 total | `E_ARGS` |
+| File | one blob ≤ 32 MiB, name ≤ 128 bytes printable | `E_ARGS` |
+| Files per app | ≤ 256 files, ≤ 64 MiB total, checked in the write transaction | `E_QUOTA` |
 | In-flight requests per view | 64 | `E_ARGS` |
 | Request rate per view | 200 per second sustained, burst 400 (token bucket) | `E_RATE`, with `retryAfterMs` in `msg` |
 
@@ -447,7 +451,9 @@ A sandboxed app document must observe all of these, from `srcdoc` and from
   `window.ipc` object if present) is refused.
 - `window.parent.document` throws; `window.parent.localStorage` throws.
 - `localStorage`, `indexedDB` and `caches` throw or are unavailable.
-- `navigator.mediaDevices.getUserMedia` always rejects; `navigator.geolocation.getCurrentPosition`
+- `navigator.mediaDevices.getUserMedia` always rejects in the frame; capture runs
+  in the shell behind the `mic.*` service the manifest must declare (§6), so the
+  sandbox never holds a stream of its own. `navigator.geolocation.getCurrentPosition`
   rejects with a permissions error unless the manifest declares the feature;
   `document.fullscreenEnabled` is false. A service method the manifest did not
   declare answers `E_DENIED` and nothing else happens.
@@ -490,7 +496,31 @@ export const os: {
   notify: { post(notice: Notice): Promise<{ id: string }>; clear(id?: string): Promise<void> }
   /** Host services (§6). Present on the object; each call is E_DENIED unless declared. */
   photos: { list(): Promise<Photo[]>; get(id: string): Promise<Blob>; add(blob: Blob): Promise<Photo> }
+  /** Shell-owned capture (§6.3): the shell, not the frame, runs getUserMedia and the MediaRecorder. */
+  mic: {
+    start(): Promise<void>          // E_DENIED/E_UNSUPPORTED before any stream opens
+    pause(): void; resume(): void   // owner only
+    stop(): Promise<MicResult | null>  // ends the take and returns it, or claims an orphaned one
+    status(): Promise<MicStatus>
+    onStatus(cb: (s: MicStatus) => void): () => void
+  }
+  /** Durable blobs (§4.1 `appfiles`): what audio and other binaries use instead of `appdata`. */
+  files: {
+    list(): Promise<StoredFile[]>
+    get(name: string): Promise<Blob | null>
+    put(name: string, blob: Blob): Promise<StoredFile>
+    del(name: string): Promise<void>
+  }
 }
+
+export type MicStatus = {
+  state: 'idle' | 'recording' | 'paused' | 'ended' | 'denied' | 'unavailable'
+  elapsed: number
+  level: number
+  detail?: string
+}
+export type MicResult = { mime: string; durationMs: number; blob: Blob }
+export type StoredFile = { name: string; size: number; type: string; at: number }
 
 export type Notice = { title: string; body?: string; arg?: string }
 
@@ -792,6 +822,7 @@ Accepted with change (R4): **IndexedDB is the only authority.** Database
 | `installed` | `id` | `Installed` below |
 | `releases` | `ReleaseId` | `{ release: Release; html: string; icons: Blob[]; committedAt }` |
 | `appdata` | `[ns, key]` | `string`; `ns` is `<id>` or `dev:<origin>:<id>` |
+| `appfiles` | `[ns, name]` | `{ blob, type, size, at }`; blobs too big for `appdata`, reached via `file.*` |
 | `meta` | `ns` | `{ rev: number; used: number; schema?: string }` |
 | `checkpoints` | `[ns, ReleaseId]` | `{ entries: [string, string][]; meta; widgets; takenAt }` |
 | `recovery` | `[ns, ReleaseId]` | data written by a release that was later rolled back, bounded to one per app |
@@ -1058,24 +1089,29 @@ and record the actual runtime and coverage when extending verification.
 The retained permission design covers browser features and host services. Enabled
 scope is narrower than the original day-one proposal: previews and external developer
 catalogs reject all device permissions. Trusted bundled releases may declare supported
-permissions, as Weather declares geolocation. Camera/microphone cannot be declared.
-Browser/OS permission prompts are additional to host authorization; no new runtime
-permission UI or broad native/browser support is claimed.
+permissions, as Weather declares geolocation. Camera cannot be declared; microphone is
+a host-mediated service grant (§6.3), never a frame capability. Browser/OS permission
+prompts are additional to host authorization; no new runtime permission UI or broad
+native/browser support is claimed.
 
 ### 6.1 One table
 
 ```ts
 /** packages/sdk/permissions.ts — the single source of truth */
 export type PermissionName = keyof typeof PERMISSIONS
-export type ServiceMethod = 'photos.list' | 'photos.get' | 'photos.add'
+/** Mapped over the table so a new service row's methods join automatically. */
+export type ServiceMethod = { [K in PermissionName]: (typeof PERMISSIONS)[K] extends { methods: readonly (infer M)[] } ? M : never }[PermissionName]
 
 export const PERMISSIONS = {
   // kind 'feature': a browser API the document calls itself; the shell delegates it through `allow`.
   geolocation:     { kind: 'feature', allow: 'geolocation' },
   'clipboard-read':  { kind: 'feature', allow: 'clipboard-read' },
   'clipboard-write': { kind: 'feature', allow: 'clipboard-write' },
-  // kind 'service': shell-owned data reached over the bridge; the host gates each method.
-  photos:          { kind: 'service', methods: ['photos.list', 'photos.get', 'photos.add'], mutating: ['photos.add'] }
+  // kind 'service': shell-owned data or devices reached over the bridge; the host gates each method.
+  photos:          { kind: 'service', methods: ['photos.list', 'photos.get', 'photos.add'], mutating: ['photos.add'] },
+  // `microphone` stays in `allow` as 'none' - capture lives in shell/runtime/mic.ts, not the frame.
+  microphone:      { kind: 'service', methods: ['mic.status', 'mic.start', 'mic.pause', 'mic.resume', 'mic.stop'], mutating: ['mic.start', 'mic.pause', 'mic.resume', 'mic.stop'] },
+  files:           { kind: 'service', methods: ['file.list', 'file.get', 'file.put', 'file.del'], mutating: ['file.put', 'file.del'] }
   // kind 'native' (a Rust command behind native.ts and a Tauri capability) is reserved, not shipped.
 } as const
 ```
@@ -1113,21 +1149,52 @@ handlers and guards. The table is not authorization to expand the current permis
 shell keeps the stills the Camera app takes (`shots`). The host handler lists
 them, returns one as a Blob over the port, and appends one. Notifications have
 an enabled contract but not through this table: `os.notify` is a base method
-(§3.9), an OS intent the way `open` is, not permission-gated data. Files and
-contacts have no enabled host-service contract; they remain roadmap work.
+(§3.9), an OS intent the way `open` is, not permission-gated data.
+
+`microphone` is the host-mediated capture contract decision 42 deferred
+(`shell/runtime/mic.ts`). The frame keeps `allow="microphone 'none'"`; the shell
+document owns `getUserMedia`, the `MediaRecorder` and every track's teardown.
+One take exists at a time across all sessions and baked apps: a `mic.start`
+from a non-owner is `E_DENIED`; `mic.pause`, `mic.resume` and `mic.stop` are
+mutating, so the owner epoch applies like any mutating service. Status rides
+`{ev:'mic'}` to every view of the session, including a folded-away mirror, so a
+second view renders the take but cannot start one. Browser/OS consent is
+requested inside `mic.start` - on the user's Record press, never at mount - and
+its refusal is `E_DENIED` ('denied' on the status); missing capture support
+(insecure context, no `mediaDevices`, no `MediaRecorder`) is `E_UNSUPPORTED`
+('unavailable'). A track that ends on its own (device pulled, permission
+revoked) finishes the take with the audio captured so far claimable once by the
+owner's `mic.stop`; a session ending mid-take stops every track.
+
+`files` is the durable binary store behind `os.files` (`shell/runtime/files.ts`,
+§4.1 `appfiles`): `appdata` stays string-only, so audio, photos and other
+binaries never serialize into the KV quota. Names are printable path fragments
+the app picks; blobs cross the port by structured clone the way `photos.get`'s
+do. Files share the app's namespace and its uninstall cleanup.
+
+Contacts have no enabled host-service contract; they remain roadmap work.
 
 ```ts
 export type Photo = { id: string; takenAt: number; width: number; height: number }
+export type MicStatus = {
+  state: 'idle' | 'recording' | 'paused' | 'ended' | 'denied' | 'unavailable'
+  elapsed: number   // ms, paused segments banked
+  level: number     // 0..1 input peak for the meter
+  detail?: string
+}
+export type MicResult = { mime: string; durationMs: number; blob: Blob }
+export type StoredFile = { name: string; size: number; type: string; at: number }
 ```
 
 ### 6.4 Open, closed by check M
 
 Permissions Policy delegation to an opaque-origin sandboxed frame (`allow="geolocation *"`)
 must actually let the API run in Chromium and in WKWebView under Tauri. Check
-M proves geolocation with declared and undeclared test apps. Capture is deferred:
-the Chromium experiment returned SecurityError for an opaque origin even with
-camera policy and browser permission granted. The sandbox remains unchanged;
-camera and microphone need a separately reviewed host-mediated media contract.
+M proves geolocation with declared and undeclared test apps. Microphone capture
+no longer waits on that experiment: it is the host-mediated service of §6.3,
+because the Chromium attempt returned SecurityError for an opaque origin even
+with camera policy and browser permission granted. The sandbox remains
+unchanged; camera would join `microphone`'s shape only after its own review.
 
 ## Current verification limits
 

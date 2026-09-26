@@ -75,6 +75,14 @@ whatever is showing, then a card in Notification Center on the lock screen. A ta
 unlocks and opens the app with `arg`; `os.notify.clear(id?)` removes this app's
 own cards. See [the contract](contract.md) §3.9.
 
+Declared permissions unlock host services (contract.md §6). `microphone` gives
+`os.mic`: shell-owned capture where `start()` asks the browser for consent on
+the Record press, `pause()`/`resume()`/`stop()` are owner-only, and `onStatus`
+mirrors `{ state, elapsed, level }` to every view so a folded copy draws the
+take without starting one. `files` gives `os.files`: named blobs (≤ 32 MiB each,
+≤ 64 MiB per app) in the durable `appfiles` store - the place audio, photos and
+other binaries go when `os.storage`'s string quota cannot hold them.
+
 ## Install and update
 
 Serve a built catalog, select its `index.json` in Store, then GET/OPEN. External catalogs

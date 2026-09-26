@@ -3,7 +3,9 @@ import {
   deviceEventName,
   deviceEventValid,
   envelope,
+  fileNameValid,
   keyValid,
+  micStatusValid,
   mutating,
   noticeValid,
   PlatformError,
@@ -20,10 +22,13 @@ import {
   type KV,
   LIMITS,
   type Method,
+  type MicResult,
+  type MicStatus,
   type Notice,
   PROTOCOL,
   type Req,
   type Res,
+  type StoredFile,
   type ViewInfo,
   type Welcome,
   type WidgetSnapshot
@@ -58,6 +63,7 @@ export function createClient() {
   const commands = new Set<(c: Command) => Promise<void> | void>()
   const commandWaiters = new Map<string, { resolve: () => void; reject: (e: Error) => void }>()
   const devices = new Map<DeviceEvent, Set<Listener>>()
+  const mics = new Set<(s: MicStatus) => void>()
   const latest = new Map<DeviceEvent, unknown>()
   const executing = new Set<string>()
   const completed = new Set<string>()
@@ -241,6 +247,10 @@ export function createClient() {
           return stop('E_PROTOCOL')
         void command(event.p)
         break
+      case 'mic':
+        if (!micStatusValid(event.p)) return stop('E_PROTOCOL')
+        for (const cb of mics) cb(event.p)
+        break
       default:
         stop('E_PROTOCOL')
     }
@@ -396,6 +406,31 @@ export function createClient() {
       list: () => request<Photo[]>('photos.list'),
       get: (id: string) => request<Blob>('photos.get', { id }),
       add: (blob: Blob) => request<Photo>('photos.add', { blob })
+    },
+    /**
+     * The host's recorder, not a device handle: `start` is what asks the
+     * browser for the microphone, so calling it is the Record press. `stop`
+     * resolves with the take, or null when nothing was captured; an 'ended'
+     * status means capture died on its own (track ended, device gone) and the
+     * partial take is waiting for one `stop` to claim it.
+     */
+    mic: {
+      start: () => request<void>('mic.start'),
+      pause: () => request<void>('mic.pause'),
+      resume: () => request<void>('mic.resume'),
+      stop: () => request<MicResult | null>('mic.stop'),
+      status: () => request<MicStatus>('mic.status'),
+      onStatus: (cb: (s: MicStatus) => void) => subscribe(mics, cb)
+    },
+    /** Durable blobs in the app's own `appfiles` namespace; see LIMITS.file/filesBytes. */
+    files: {
+      list: () => request<StoredFile[]>('file.list'),
+      get: (name: string) => request<Blob | null>('file.get', { name }),
+      put: (name: string, blob: Blob) =>
+        fileNameValid(name) && blob instanceof Blob
+          ? request<StoredFile>('file.put', { name, blob })
+          : Promise.reject(new PlatformError('E_ARGS')),
+      del: (name: string) => request<void>('file.del', { name })
     }
   }
   return client

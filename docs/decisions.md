@@ -1783,3 +1783,22 @@ LiveLine's absolutely positioned canvas.
 The chart still scrubs like Apple's: `onHover` feeds the big price and swaps
 the delta line to the hovered point's date, and the previous close draws as a
 dashed reference only when it sits inside the visible range.
+
+## 105. Capture is a host service, and audio lives in `appfiles`
+
+2026-09-26, accepted; implements the contract decision 42 deferred. `getUserMedia`
+cannot run inside an opaque-origin frame, so rather than weaken the sandbox the
+microphone moved out of it entirely: `shell/runtime/mic.ts` owns acquisition,
+the `MediaRecorder`, metering and teardown, while the SDK exposes only a narrow
+`mic.*`/`os.mic` surface (status, start, pause, resume, stop -> blob). Permission
+is a manifest service grant (`microphone`), browser consent is asked on the
+user's Record press, one take exists per shell document and mutating calls are
+owner-only, so a mirror view can draw the meter but never start a stream; the
+last view leaving starts a 600 ms grace for the fold, and a session ending
+mid-take stops every track. Because blobs had no durable home, the same change
+adds the `appfiles` store (`[ns, name] -> { blob }`) and a `file.*` service -
+`appdata` stays string-only. Voice Memos, a baked app, gets the same engine via
+`os.mic`/`os.files` props keyed `baked:<name>` instead of the bridge; its UI is
+the recording deck, library, detail, edit and Recently Deleted screens, with
+synthesized demo takes always labeled Demo and transcripts kept honest to the
+Web Speech API's presence.

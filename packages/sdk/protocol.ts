@@ -87,13 +87,34 @@ export const LIMITS = {
   inflight: 64,
   rate: 200,
   burst: 400,
-  dedupe: 256
+  dedupe: 256,
+  /** Durable file store: one blob, a name, the count and the total per app. */
+  file: 32 * 1024 * 1024,
+  fileName: 128,
+  files: 256,
+  filesBytes: 64 * 1024 * 1024
 } as const
 /**
  * What `os.notify.post` takes: the OS shows `name` and `title`, `body` under it,
  * and hands `arg` back to the app when the notice is opened, like `os.open`'s arg.
  */
 export type Notice = { title: string; body?: string; arg?: string }
+/**
+ * What `mic.status` returns and `{ ev: 'mic' }` pushes to the owning session's
+ * views. `level` is the meter's latest peak in [0,1]; `elapsed` is milliseconds
+ * and runs only while `recording`, so a paused take's clock stops like the one
+ * on screen. `denied`/`unavailable`/`ended` are terminal for that take.
+ */
+export type MicStatus = {
+  state: 'idle' | 'recording' | 'paused' | 'ended' | 'denied' | 'unavailable'
+  elapsed: number
+  level: number
+  detail?: string
+}
+/** `mic.stop`'s take: the captured audio, its container and what the shell measured. */
+export type MicResult = { mime: string; durationMs: number; blob: Blob }
+/** A `file.list`/`file.put` row: an app-owned blob in the durable `appfiles` store. */
+export type StoredFile = { name: string; size: number; type: string; at: number }
 export type ErrCode =
   | 'E_ARGS'
   | 'E_QUOTA'
@@ -105,6 +126,7 @@ export type ErrCode =
   | 'E_STALE'
   | 'E_GONE'
   | 'E_STORAGE'
+  | 'E_UNSUPPORTED'
 export type Method =
   | `${'storage' | 'session'}.${'get' | 'set' | 'del' | 'keys' | 'snapshot' | 'watch' | 'unwatch'}`
   | 'cmd.send'
@@ -140,6 +162,7 @@ export type Evt =
   | { [K in DeviceEvent]: { ev: 'device'; p: { type: K; data: DeviceEvents[K] } } }[DeviceEvent]
   | { ev: 'cmd'; p: { cmdId: string; type: string; payload: string } }
   | { ev: 'command-result'; p: { cmdId: string } }
+  | { ev: 'mic'; p: MicStatus }
   | { ev: 'bye'; p: { reason: 'closed' | 'uninstalled' | 'updating' | 'error' | 'revoked' } }
 export type AppEvt =
   | { ev: 'ack' }

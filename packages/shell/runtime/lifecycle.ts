@@ -291,7 +291,7 @@ async function finishRemoval(id: string) {
       const releases = (await result(tx.objectStore('releases').getAll())) as StoredRelease[]
       for (const bundle of releases)
         if (bundle.release.manifest.id === id) tx.objectStore('releases').delete(releaseId(bundle.release))
-      for (const store of ['appdata', 'checkpoints', 'recovery', 'widgets', 'leases'] as const)
+      for (const store of ['appdata', 'appfiles', 'checkpoints', 'recovery', 'widgets', 'leases'] as const)
         tx.objectStore(store).delete(range(id))
       for (const store of ['installed', 'meta', 'legacy'] as const) tx.objectStore(store).delete(id)
     })
