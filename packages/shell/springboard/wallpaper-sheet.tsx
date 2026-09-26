@@ -16,7 +16,7 @@ import {
   weight
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { photoRevision, shots, subscribePhotos } from '../runtime/photos.ts'
 import { setWallpaper, useWallpaper, WALLPAPERS } from './wallpaper.ts'
 
@@ -38,12 +38,24 @@ async function pick(file: File) {
 export function WallpaperSheet({ onClose }: { onClose: () => void }) {
   const current = useWallpaper()
   useSyncExternalStore(subscribePhotos, photoRevision)
+  // The sheet rises in; a tap outside sinks it back out before the unmount,
+  // Spotlight's shut the same shape.
+  const [closing, setClosing] = useState(false)
+  const shut = () => {
+    if (closing) return
+    setClosing(true)
+    setTimeout(onClose, 220)
+  }
   // A picture off the disk is in neither list; it still gets its swatch, marked.
   const papers = [...WALLPAPERS, ...shots]
   if (!papers.includes(current)) papers.push(current)
   return (
-    <div data-wallpapers {...stylex.props(styles.scrim)} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div {...stylex.props(shared.glass, styles.sheet)}>
+    <div
+      data-wallpapers
+      {...stylex.props(styles.scrim, closing && styles.scrimOut)}
+      onClick={(e) => e.target === e.currentTarget && shut()}
+    >
+      <div {...stylex.props(shared.glass, styles.sheet, closing && styles.sheetOut)}>
         <div {...stylex.props(styles.title)}>Wallpaper</div>
         <div {...stylex.props(styles.strip)}>
           {papers.map((url) => (
@@ -74,10 +86,13 @@ export function WallpaperSheet({ onClose }: { onClose: () => void }) {
 }
 
 const up = stylex.keyframes({ from: { opacity: 0, transform: 'translateY(24px) scale(.96)' } })
+const down = stylex.keyframes({ to: { opacity: 0, transform: 'translateY(24px) scale(.96)' } })
 
 const styles = stylex.create({
   // Clear, so the paper being chosen is what you see; over the dock and the search button.
   scrim: { position: 'absolute', inset: 0, zIndex: 5 },
+  // Deaf while it sinks: a tap mid-exit must not reopen it.
+  scrimOut: { pointerEvents: 'none' },
   sheet: {
     position: 'absolute',
     left: 14,
@@ -94,6 +109,12 @@ const styles = stylex.create({
     animationName: up,
     animationDuration: '.34s',
     animationTimingFunction: easing.pop
+  },
+  // The rise played backwards, a touch quicker as exits go.
+  sheetOut: {
+    animationName: { default: down, '@media (prefers-reduced-motion: reduce)': 'none' },
+    animationDuration: '.22s',
+    animationFillMode: 'forwards'
   },
   title: {
     fontSize: typeScale.subheadline,
