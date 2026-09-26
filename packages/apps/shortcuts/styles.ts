@@ -128,9 +128,11 @@ export const styles = stylex.create({
     textAlign: 'center',
     color: app.label2
   },
-  /** The header line: the large title and the New Shortcut button beside it. */
+  /** The header line keeps the large title on its own: the badge floats over its right edge. */
   headRow: { display: 'flex', alignItems: 'center', paddingRight: space.lg },
   hero: { flexGrow: 1 },
+  /** The + control under the title, right-aligned - the badge floats over the top-right corner. */
+  toolRow: { display: 'flex', justifyContent: 'flex-end', paddingRight: space.lg, paddingBottom: space.xs },
   histTitle: { display: 'flex', alignItems: 'center' },
   clear: {
     marginLeft: 'auto',

@@ -46,13 +46,6 @@ export const Podcasts = (_: { os: Os }) => {
               <Screen xstyle={[styles.pane]}>
                 <div {...stylex.props(styles.headRow)}>
                   <LargeTitle xstyle={[styles.hero]}>{TABS[ui.tab]}</LargeTitle>
-                  <IconButton
-                    name="list"
-                    size={16}
-                    variant="tinted"
-                    aria-label="Up Next"
-                    onClick={() => setQueueOpen(true)}
-                  />
                 </div>
                 <div {...stylex.props(styles.tabs)}>
                   <Segmented
@@ -60,6 +53,13 @@ export const Podcasts = (_: { os: Os }) => {
                     value={TABS[ui.tab]}
                     onChange={(v) => go(TABS_BY_LABEL[v]!)}
                     aria-label="Podcasts sections"
+                  />
+                  <IconButton
+                    name="list"
+                    size={16}
+                    variant="tinted"
+                    aria-label="Up Next"
+                    onClick={() => setQueueOpen(true)}
                   />
                 </div>
                 {ui.tab === 'listen' && <Home />}

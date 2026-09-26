@@ -126,6 +126,9 @@ export const Shortcuts = ({ os }: { os: Os }) => {
     <Screen>
       <div {...stylex.props(styles.headRow)}>
         <LargeTitle xstyle={[styles.hero]}>Shortcuts</LargeTitle>
+      </div>
+      {/* A row of its own: the shell's Mockup badge floats over the title's trailing edge. */}
+      <div {...stylex.props(styles.toolRow)}>
         <IconButton
           name="plus"
           size={17}

@@ -30,7 +30,14 @@ export const styles = stylex.create({
     paddingBottom: space.xs
   },
   hero: { flexGrow: 1 },
-  tabs: { paddingLeft: space.lg, paddingRight: space.lg, paddingBottom: space.md },
+  tabs: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: space.lg,
+    paddingRight: space.lg,
+    paddingBottom: space.md
+  },
   shelf: {
     display: 'flex',
     gap: space.md,
@@ -329,6 +336,7 @@ export const styles = stylex.create({
     flexGrow: 1,
     flexBasis: 0,
     minHeight: 0,
+    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -338,18 +346,21 @@ export const styles = stylex.create({
     paddingRight: space.xl,
     paddingBottom: space.md
   },
+  // Height-bound, not width-bound: the wide pane is only ~500 px tall, so a
+  // percentage of it keeps the art square and leaves the transport on glass.
   npArt: {
-    width: '78%',
+    height: '32%',
     aspectRatio: 1,
+    flexShrink: 0,
     borderRadius: radius.lg,
     boxShadow: shadow.float,
     display: 'flex',
     alignItems: 'flex-end',
-    paddingTop: space.md,
-    paddingRight: space.md,
-    paddingBottom: space.md,
-    paddingLeft: space.md,
-    marginBottom: space.lg,
+    paddingTop: space.sm,
+    paddingRight: space.sm,
+    paddingBottom: space.sm,
+    paddingLeft: space.sm,
+    marginBottom: space.md,
     color: colors.white,
     transitionProperty: 'transform',
     transitionDuration: '.3s',

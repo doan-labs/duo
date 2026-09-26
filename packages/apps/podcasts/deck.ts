@@ -134,7 +134,13 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
     },
     toggle() {
       if (!queue.length) api.play([eps[0]!], 0)
-      else {
+      else if (!a?.src) {
+        // Queued without a play ('Add to Queue' on an empty deck): the head is
+        // only ever loaded when something actually plays it, so Play works here.
+        on = true
+        tickStart()
+        load(i)
+      } else {
         on = !on
         if (on) {
           tickStart()
@@ -172,7 +178,8 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
     },
     /** Jumps to a position in the queue; how an Up Next row plays early. */
     load,
-    /** 'Play Next' inserts after the current episode; 'Add to Queue' appends. */
+    /** 'Play Next' inserts after the current episode; 'Add to Queue' appends. On an
+     * empty deck the episode lands at the head and is loaded on the first play. */
     enqueue(ep: Ep, next = false) {
       const cut = queue.length ? i + 1 : 0
       queue.splice(next ? cut : queue.length, 0, ep)

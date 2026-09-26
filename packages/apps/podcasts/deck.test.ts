@@ -111,6 +111,19 @@ test('running off the end of Up Next stops instead of wrapping', () => {
   assert.equal(d.at, 0)
 })
 
+test('an episode queued on an empty deck loads and plays on the first toggle', () => {
+  const { a, calls } = fakeAudio()
+  const d = deck(EPS, () => a)
+  d.enqueue(EPS[2]!)
+  assert.equal(d.now!.id, EPS[2]!.id)
+  assert.equal(d.started, true)
+  assert.equal(a.src, '')
+  d.toggle()
+  assert.equal(d.playing, true)
+  assert.equal(a.src, EPS[2]!.src)
+  assert.equal(calls.play, 1)
+})
+
 test('every episode that starts is reported once', () => {
   const { a } = fakeAudio()
   const started: string[] = []
