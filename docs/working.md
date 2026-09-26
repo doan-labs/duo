@@ -336,7 +336,7 @@ bun run api            # only the TSDoc reference
   opens that app's page in the Store), `cue` makes the phone do something once it is up (`packages/shell/cues.ts`:
   `split` drags it onto the left half by synthetic pointer events and opens the
   named app beside it, `switcher` holds the home bar and lets go, `folder` resets
-  the grid and carries Find My onto Stocks, `wallpaper` holds the paper and taps
+  the grid and carries Home onto Stocks, `wallpaper` holds the paper and taps
   the next swatch, `screenshot`, `play` starts the deck muted, `control` pulls
   Control Center down on the inner display). `hear: [...types]` asks to be told
   the device events an app would hear (`packages/shell/embed-device.ts`), each

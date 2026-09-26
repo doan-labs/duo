@@ -458,9 +458,6 @@ export const appAppearance = stylex.defineConsts({
   /** The ring pulsing out of the caller's avatar, over the video. */
   facetimeRipple: 'rgba(255,255,255,.45)',
   // files
-  // findmy
-  findmyPulse: 'rgba(0,136,255,.35)',
-  findmyTint: '#eaf3ff',
   /** Apple Maps: the land tone a tile paints over, the sidebar material and the floating card. */
   // fitness
   fitnessMove: '#fa114f',
@@ -481,7 +478,6 @@ export const appAppearance = stylex.defineConsts({
   homeHairline: 'rgba(255,255,255,.12)',
   homeFill: 'rgba(255,255,255,.09)',
   homeInk: '#111',
-  // itunes
   // mail
   // maps
   mapsLand: '#f2efe9',

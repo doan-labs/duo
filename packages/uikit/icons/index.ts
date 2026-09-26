@@ -17,7 +17,6 @@ const calendar = '/icons/calendar.webp'
 const clock = '/icons/clock.webp'
 const contacts = '/icons/contacts.webp'
 const facetime = '/icons/facetime.webp'
-const findmy = '/icons/findmy.webp'
 const freeform = '/icons/freeform.webp'
 const home = '/icons/home.webp'
 const mail = '/icons/mail.webp'
@@ -250,12 +249,6 @@ const wallet = svg(`<defs>${SHEEN}
 <rect x="34" y="100" width="124" height="46" rx="11" fill="url(#w2)"/>
 <rect x="34" y="110" width="124" height="10" fill="#f2f2f7" fill-opacity=".92"/>`)
 
-const itunes = svg(`<defs>${SHEEN}
-<linearGradient id="it" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#d84bff"/><stop offset="1" stop-color="#9a1ee8"/></linearGradient>
-<linearGradient id="st" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#f3d7ff"/></linearGradient>
-</defs>${body('url(#it)')}
-<path d="M96 30 118 76l50 7-36 35 9 50-45-24-45 24 9-50-36-35 50-7Z" fill="url(#st)"/>`)
-
 /** App icon by display name. */
 export const ICONS: Record<string, string> = {
   Phone: phone,
@@ -283,7 +276,6 @@ export const ICONS: Record<string, string> = {
   Home: home,
   Freeform: freeform,
   Shortcuts: shortcuts,
-  'Find My': findmy,
   'Voice Memos': voicememos,
   Preview: preview,
   Contacts: contacts,
@@ -292,8 +284,7 @@ export const ICONS: Record<string, string> = {
   Fitness: fitness,
   Files: files,
   Health: health,
-  Wallet: wallet,
-  'iTunes Store': itunes
+  Wallet: wallet
 }
 
 /** SF Symbols, as white glyphs to be recoloured through a CSS mask. */

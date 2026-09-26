@@ -15,7 +15,7 @@ xcrun swift scripts/appicons.swift "$out" 192 \
   "tv|$A/TV.app" "podcasts|$A/Podcasts.app" "appstore|$A/App Store.app" "maps|$A/Maps.app" \
   "weather|$A/Weather.app" "calculator|$A/Calculator.app" "settings|$A/System Settings.app" "books|$A/Books.app" \
   "stocks|$A/Stocks.app" "home|$A/Home.app" "freeform|$A/Freeform.app" "shortcuts|$A/Shortcuts.app" \
-  "findmy|$A/FindMy.app" "voicememos|$A/VoiceMemos.app" \
+  "voicememos|$A/VoiceMemos.app" \
   "preview|$A/Preview.app" "contacts|$A/Contacts.app" "tips|$A/Tips.app" "siri|$A/Siri.app"
 
 xcrun swift scripts/symbols.swift "$out/sym" 128 \
