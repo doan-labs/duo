@@ -49,5 +49,5 @@ jobs:
               *) exit 0 ;;
             esac
           done
-          gh workflow run platform.yml --ref main -f source_sha="$GITHUB_SHA"
-          gh run cancel "$GITHUB_RUN_ID"
+          gh workflow run platform.yml -R "$GITHUB_REPOSITORY" --ref main -f source_sha="$GITHUB_SHA"
+          gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"
