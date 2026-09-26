@@ -42,6 +42,8 @@ export type Display = {
   stage: () => Stage
   /** Shows exactly `want`, with no zooms: this display is mirroring the other, not launching. */
   mirror: (want: Stage) => void
+  /** Pokes a re-render so `os.mirror` - which reads `active.wide` live - reaches its scenes. */
+  wake: () => void
   /** Nothing of the home screen shows: an app has this display, or two halves do. */
   covered: () => boolean
 }
@@ -62,10 +64,17 @@ export const busy = () => displays.some((d) => d.covered())
  * (decisions.md 21), so it mirrors the first app, whole.
  */
 export function follow(wide: boolean) {
+  const crossed = active.wide !== wide
   active.wide = wide
   const lead = displays.find((d) => d.wide === wide)
   const other = displays.find((d) => d.wide !== wide)
   if (!lead || !other) return
+  // The flag on the scenes flips with the pose; without a poke the apps keep
+  // rendering - and gating - on the side of the fold they spawned on.
+  if (crossed) {
+    lead.wake()
+    other.wake()
+  }
   const stage = lead.stage()
   other.mirror(other.wide ? stage : stage.slice(0, 1).map((s) => ({ name: s.name })))
 }

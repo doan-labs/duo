@@ -1663,7 +1663,6 @@ Favorites grid is the favourites list, and a Frequently Visited section ranks
 hosts by visit count. Cost: the Tab Group Favorites folder and the seeded
 iPhone User Guide row are gone - both were invented, and a bookmark whose page
 refuses to frame would open to a blank screen anyway.
-
 ## 99. Notifications are an ungated base method, not a permission
 
 2026-09-25, accepted. `os.notify.post({ title, body, arg })` stores a notice under
@@ -1681,7 +1680,6 @@ lock screen is the center rather than a separate pull-down layer because Duo's
 lock lives on both displays and a Notification Center swipe would collide with
 the unlock swipe and the Control Center pull at the top edge.
 
-
 ## 100. The global bar trades SDK for Changelog; Duo keeps one changelog
 
 2026-09-25, accepted. `/sdk` (decision 96's hardware showcase) leaves the global
@@ -1696,3 +1694,47 @@ that lists apps by name renders their real icons. 0.1.0 is the
 initial release, cut on 2026-09-19; 0.2.0 was cut on 2026-09-26. Later
 work goes under the next version marked `(Unreleased)` until it is cut. Add an entry in the same change as
 anything a visitor would notice.
+
+## 101. Maps searches, geocodes and routes live
+
+2026-09-25, accepted; supersedes the "nothing routes or geocodes" half of 60. The
+tile drawing and furniture from 60 stand; what changed is that the controls
+behind them now answer for real, all on keyless CORS-open services so no secret
+lives in the bundle. Photon (`photon.komoot.io`) geocodes the search field and
+reverse-geocodes dropped pins and the blue dot; Nominatim lost the geocoder seat
+because it sends no `Access-Control-Allow-Origin`. Routes come from FOSSGIS's
+OSRM mirrors (`routing.openstreetmap.de`), one host per engine -
+`routed-car`, `routed-bike`, `routed-foot` - because the public demo at
+router.project-osrm.org silently aliases every profile to driving.
+
+New files split the live half out of `data.ts`: `live.ts` (the clients, the
+Photon/OSRM mappers, the formatters), `camera.ts` (the fly plan - a zoom dip on
+long hauls, cubic easing - and its rAF driver), `directions.tsx` (modes, the
+ways there, the steps), `glyphs.tsx` (car, bike and the turn arrows SYM lacks),
+`share.ts` (the module store both displays draw - intent, results and the camera
+and layer too, so the fold keeps the whole map; the mirror never schedules a
+frame, it writes views flat while the live copy's frames land in the store).
+Zoom is fractional now: tiles render at the nearest integer level scaled by
+`2 ** (z - tileZ)`, so wheel and fly zoom without a reload between levels, and
+a released drag coasts on its last velocity. A tap on a grey alternative picks
+it; a hold drops a pin that reverse-geocodes into its address. The mirror copy
+still starts nothing: every fetch gates on `!os.mirror`. Cost: recents are now
+real history from the session (seeded by the same sample as before), and the
+backends are best-effort free services - Photon and FOSSGIS can throttle, in
+which case the search note and the directions note say so rather than hang.
+
+## 102. The mirror flag follows the pose, not the spawn
+
+2026-09-25, accepted; amends 24. `os.mirror` used to be decided once, at
+`open()`: a scene born quietly was the twin forever. But `follow()` only ever
+re-opens the display going out of use, so after one fold both copies could
+carry the flag - the visible one kept drawing but could never start anything,
+which made "the one in use is running too" untrue for any app that gates
+effects on it (Maps's fetches, Safari's `visit`, the ticker apps). The flag is
+now a getter on the scene's `Os` that reads `active.wide`: whichever display
+the pose puts in hand counts as the running copy at that moment, and the
+folded-away one is the mirror. Renders re-read it, so liveness flips with the
+fold without a remount, and the quiet flag on `open()` is back to meaning only
+"born with no zoom". And because the flag only reaches effects at render
+time, `follow()` pokes both displays' scene lists on crossover (`wake`), so
+the flip lands at the fold rather than on the next store write.

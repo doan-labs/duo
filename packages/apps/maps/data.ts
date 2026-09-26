@@ -1,8 +1,8 @@
-// Real OpenStreetMap raster tiles under invented Apple Maps furniture. The
-// places sit where they really are — District 1 and 3 of Ho Chi Minh City,
-// where the map opens, then San Francisco and a few cities further out for
-// search and recents to travel to. Nothing here routes or geocodes, and the
-// walking times are invented.
+// Real OpenStreetMap raster tiles under Apple Maps furniture. PLACES are the
+// curated pins the map opens on - District 1 and 3 of Ho Chi Minh City, then
+// San Francisco and a few cities further out; live.ts covers what is real-time
+// (search, routes), this file is the static half: the catalogue, the Web
+// Mercator maths and the tile URLs.
 
 export type Category =
   | 'transit'
@@ -28,8 +28,6 @@ export type Place = {
   address: string[]
   phone?: string
   site?: string
-  /** Minutes on foot from the blue dot: the number on the card's blue button. */
-  walk: number
 }
 
 export type View = { lat: number; lon: number; z: number }
@@ -64,8 +62,7 @@ export const PLACES: Place[] = [
     category: 'transit',
     lat: 10.7818,
     lon: 106.6836,
-    address: ['289B Dien Bien Phu', 'Xuan Hoa', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 4
+    address: ['289B Dien Bien Phu', 'Xuan Hoa', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'clinic',
@@ -75,8 +72,7 @@ export const PLACES: Place[] = [
     lat: 10.7826,
     lon: 106.6828,
     address: ['269 Dien Bien Phu', 'Xuan Hoa', 'Ho Chi Minh City', 'Vietnam'],
-    phone: '+84 28 3930 1010',
-    walk: 6
+    phone: '+84 28 3930 1010'
   },
   {
     id: 'alley',
@@ -85,8 +81,7 @@ export const PLACES: Place[] = [
     category: 'address',
     lat: 10.7844,
     lon: 106.6852,
-    address: ['382/15 Nguyen Dinh Chieu', 'Ward 4, District 3', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 2
+    address: ['382/15 Nguyen Dinh Chieu', 'Ward 4, District 3', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'tan-dinh',
@@ -96,8 +91,7 @@ export const PLACES: Place[] = [
     lat: 10.791,
     lon: 106.6898,
     address: ['336 Hai Ba Trung', 'Tan Dinh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    site: 'chotandinh.com',
-    walk: 23
+    site: 'chotandinh.com'
   },
   {
     id: 'popeyes',
@@ -106,8 +100,7 @@ export const PLACES: Place[] = [
     category: 'food',
     lat: 10.7934,
     lon: 106.6906,
-    address: ['2 Tran Quang Khai', 'Tan Dinh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 28
+    address: ['2 Tran Quang Khai', 'Tan Dinh, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'le-van-tam',
@@ -116,8 +109,7 @@ export const PLACES: Place[] = [
     category: 'park',
     lat: 10.7888,
     lon: 106.6942,
-    address: ['Vo Thi Sau', 'Ward 6, District 3', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 14
+    address: ['Vo Thi Sau', 'Ward 6, District 3', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'pho-hoa',
@@ -127,8 +119,7 @@ export const PLACES: Place[] = [
     lat: 10.7885,
     lon: 106.6885,
     address: ['260C Pasteur', 'Ward 8, District 3', 'Ho Chi Minh City', 'Vietnam'],
-    phone: '+84 28 3829 7943',
-    walk: 11
+    phone: '+84 28 3829 7943'
   },
   {
     id: 'gem',
@@ -138,8 +129,7 @@ export const PLACES: Place[] = [
     lat: 10.7878,
     lon: 106.7017,
     address: ['8 Nguyen Binh Khiem', 'Da Kao, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    site: 'gemcenter.com.vn',
-    walk: 26
+    site: 'gemcenter.com.vn'
   },
   {
     id: 'nhi-dong',
@@ -149,8 +139,7 @@ export const PLACES: Place[] = [
     lat: 10.7855,
     lon: 106.702,
     address: ['14 Ly Tu Trong', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    phone: '+84 28 3829 5723',
-    walk: 27
+    phone: '+84 28 3829 5723'
   },
   {
     id: 'turtle-lake',
@@ -159,8 +148,7 @@ export const PLACES: Place[] = [
     category: 'landmark',
     lat: 10.7825,
     lon: 106.696,
-    address: ['Cong Truong Quoc Te', 'Ward 6, District 3', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 17
+    address: ['Cong Truong Quoc Te', 'Ward 6, District 3', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'book-street',
@@ -169,8 +157,7 @@ export const PLACES: Place[] = [
     category: 'shop',
     lat: 10.7797,
     lon: 106.6985,
-    address: ['Nguyen Van Binh', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 24
+    address: ['Nguyen Van Binh', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'playground',
@@ -179,8 +166,7 @@ export const PLACES: Place[] = [
     category: 'shop',
     lat: 10.779,
     lon: 106.7003,
-    address: ['26 Ly Tu Trong', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 26
+    address: ['26 Ly Tu Trong', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'cong',
@@ -190,8 +176,7 @@ export const PLACES: Place[] = [
     lat: 10.7762,
     lon: 106.6938,
     address: ['26 Ly Tu Trong', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    site: 'congcaphe.com',
-    walk: 19
+    site: 'congcaphe.com'
   },
   {
     id: 'independence',
@@ -201,8 +186,7 @@ export const PLACES: Place[] = [
     lat: 10.7772,
     lon: 106.6955,
     address: ['135 Nam Ky Khoi Nghia', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    site: 'dinhdoclap.gov.vn',
-    walk: 21
+    site: 'dinhdoclap.gov.vn'
   },
   {
     id: 'opera',
@@ -211,8 +195,7 @@ export const PLACES: Place[] = [
     category: 'museum',
     lat: 10.7767,
     lon: 106.703,
-    address: ['7 Cong Truong Lam Son', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 29
+    address: ['7 Cong Truong Lam Son', 'Ben Nghe, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'tao-dan',
@@ -221,8 +204,7 @@ export const PLACES: Place[] = [
     category: 'park',
     lat: 10.7745,
     lon: 106.6913,
-    address: ['Truong Dinh', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 20
+    address: ['Truong Dinh', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'galaxy',
@@ -232,8 +214,7 @@ export const PLACES: Place[] = [
     lat: 10.7745,
     lon: 106.6945,
     address: ['116 Nguyen Du', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    site: 'galaxycine.vn',
-    walk: 22
+    site: 'galaxycine.vn'
   },
   {
     id: 'ben-thanh',
@@ -242,8 +223,7 @@ export const PLACES: Place[] = [
     category: 'shop',
     lat: 10.7724,
     lon: 106.698,
-    address: ['Le Loi', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 31
+    address: ['Le Loi', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'banh-mi',
@@ -252,8 +232,7 @@ export const PLACES: Place[] = [
     category: 'food',
     lat: 10.7692,
     lon: 106.692,
-    address: ['26 Le Thi Rieng', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 34
+    address: ['26 Le Thi Rieng', 'Ben Thanh, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'tu-du',
@@ -263,8 +242,7 @@ export const PLACES: Place[] = [
     lat: 10.769,
     lon: 106.6875,
     address: ['284 Cong Quynh', 'Pham Ngu Lao, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    phone: '+84 28 5404 2829',
-    walk: 33
+    phone: '+84 28 5404 2829'
   },
   {
     id: 'bui-vien',
@@ -273,8 +251,7 @@ export const PLACES: Place[] = [
     category: 'landmark',
     lat: 10.767,
     lon: 106.693,
-    address: ['Bui Vien', 'Pham Ngu Lao, District 1', 'Ho Chi Minh City', 'Vietnam'],
-    walk: 36
+    address: ['Bui Vien', 'Pham Ngu Lao, District 1', 'Ho Chi Minh City', 'Vietnam']
   },
   {
     id: 'saigon-station',
@@ -284,8 +261,7 @@ export const PLACES: Place[] = [
     lat: 10.7822,
     lon: 106.6775,
     address: ['1 Nguyen Thong', 'Ward 9, District 3', 'Ho Chi Minh City', 'Vietnam'],
-    site: 'dsvn.vn',
-    walk: 15
+    site: 'dsvn.vn'
   },
 
   // Somewhere to travel to: search or a recent jumps the map out of Saigon.
@@ -297,8 +273,7 @@ export const PLACES: Place[] = [
     lat: 37.7955,
     lon: -122.3937,
     address: ['1 Ferry Building', 'Embarcadero', 'San Francisco, CA 94111', 'United States'],
-    site: 'ferrybuildingmarketplace.com',
-    walk: 12
+    site: 'ferrybuildingmarketplace.com'
   },
   {
     id: 'blue-bottle',
@@ -308,8 +283,7 @@ export const PLACES: Place[] = [
     lat: 37.7763,
     lon: -122.4232,
     address: ['315 Linden St', 'Hayes Valley', 'San Francisco, CA 94102', 'United States'],
-    site: 'bluebottlecoffee.com',
-    walk: 4
+    site: 'bluebottlecoffee.com'
   },
   {
     id: 'tartine',
@@ -319,8 +293,7 @@ export const PLACES: Place[] = [
     lat: 37.7614,
     lon: -122.4241,
     address: ['600 Guerrero St', 'Mission District', 'San Francisco, CA 94110', 'United States'],
-    phone: '+1 (415) 487-2600',
-    walk: 7
+    phone: '+1 (415) 487-2600'
   },
   {
     id: 'dolores',
@@ -329,8 +302,7 @@ export const PLACES: Place[] = [
     category: 'park',
     lat: 37.7596,
     lon: -122.4269,
-    address: ['Dolores St & 19th St', 'Mission District', 'San Francisco, CA 94114', 'United States'],
-    walk: 9
+    address: ['Dolores St & 19th St', 'Mission District', 'San Francisco, CA 94114', 'United States']
   },
   {
     id: 'sfmoma',
@@ -340,8 +312,7 @@ export const PLACES: Place[] = [
     lat: 37.7857,
     lon: -122.4011,
     address: ['151 3rd St', 'South of Market', 'San Francisco, CA 94103', 'United States'],
-    site: 'sfmoma.org',
-    walk: 15
+    site: 'sfmoma.org'
   },
   {
     id: 'powell',
@@ -350,8 +321,7 @@ export const PLACES: Place[] = [
     category: 'rail',
     lat: 37.7844,
     lon: -122.4079,
-    address: ['899 Market St', 'Union Square', 'San Francisco, CA 94102', 'United States'],
-    walk: 6
+    address: ['899 Market St', 'Union Square', 'San Francisco, CA 94102', 'United States']
   },
   {
     id: 'coit',
@@ -360,8 +330,7 @@ export const PLACES: Place[] = [
     category: 'landmark',
     lat: 37.8024,
     lon: -122.4058,
-    address: ['1 Telegraph Hill Blvd', 'Telegraph Hill', 'San Francisco, CA 94133', 'United States'],
-    walk: 26
+    address: ['1 Telegraph Hill Blvd', 'Telegraph Hill', 'San Francisco, CA 94133', 'United States']
   },
   {
     id: 'castro',
@@ -371,8 +340,7 @@ export const PLACES: Place[] = [
     lat: 37.762,
     lon: -122.4348,
     address: ['429 Castro St', 'Castro District', 'San Francisco, CA 94114', 'United States'],
-    site: 'castrotheatre.com',
-    walk: 11
+    site: 'castrotheatre.com'
   },
   {
     id: 'ucsf',
@@ -382,8 +350,7 @@ export const PLACES: Place[] = [
     lat: 37.7632,
     lon: -122.458,
     address: ['505 Parnassus Ave', 'Inner Sunset', 'San Francisco, CA 94143', 'United States'],
-    phone: '+1 (415) 476-1000',
-    walk: 18
+    phone: '+1 (415) 476-1000'
   },
   {
     id: 'valencia',
@@ -392,8 +359,7 @@ export const PLACES: Place[] = [
     category: 'address',
     lat: 37.7515,
     lon: -122.4207,
-    address: ['1290 Valencia St', 'Mission District', 'San Francisco, CA 94110', 'United States'],
-    walk: 3
+    address: ['1290 Valencia St', 'Mission District', 'San Francisco, CA 94110', 'United States']
   },
   {
     id: 'ggpark',
@@ -402,8 +368,7 @@ export const PLACES: Place[] = [
     category: 'park',
     lat: 37.7694,
     lon: -122.4862,
-    address: ['501 Stanyan St', 'Richmond District', 'San Francisco, CA 94117', 'United States'],
-    walk: 22
+    address: ['501 Stanyan St', 'Richmond District', 'San Francisco, CA 94117', 'United States']
   },
   {
     id: 'pike',
@@ -413,8 +378,7 @@ export const PLACES: Place[] = [
     lat: 47.6097,
     lon: -122.3422,
     address: ['85 Pike St', 'Downtown', 'Seattle, WA 98101', 'United States'],
-    site: 'pikeplacemarket.org',
-    walk: 8
+    site: 'pikeplacemarket.org'
   },
   {
     id: 'griffith',
@@ -424,8 +388,7 @@ export const PLACES: Place[] = [
     lat: 34.1184,
     lon: -118.3004,
     address: ['2800 E Observatory Rd', 'Los Feliz', 'Los Angeles, CA 90027', 'United States'],
-    site: 'griffithobservatory.org',
-    walk: 34
+    site: 'griffithobservatory.org'
   },
   {
     id: 'katz',
@@ -435,8 +398,7 @@ export const PLACES: Place[] = [
     lat: 40.7223,
     lon: -73.9874,
     address: ['205 E Houston St', 'Lower East Side', 'New York, NY 10002', 'United States'],
-    phone: '+1 (212) 254-2246',
-    walk: 5
+    phone: '+1 (212) 254-2246'
   },
   {
     id: 'grand-central',
@@ -445,8 +407,7 @@ export const PLACES: Place[] = [
     category: 'rail',
     lat: 40.7527,
     lon: -73.9772,
-    address: ['89 E 42nd St', 'Midtown', 'New York, NY 10017', 'United States'],
-    walk: 13
+    address: ['89 E 42nd St', 'Midtown', 'New York, NY 10017', 'United States']
   },
   {
     id: 'cloud-gate',
@@ -455,8 +416,7 @@ export const PLACES: Place[] = [
     category: 'landmark',
     lat: 41.8827,
     lon: -87.6233,
-    address: ['201 E Randolph St', 'The Loop', 'Chicago, IL 60602', 'United States'],
-    walk: 10
+    address: ['201 E Randolph St', 'The Loop', 'Chicago, IL 60602', 'United States']
   },
   {
     id: 'shibuya',
@@ -465,8 +425,7 @@ export const PLACES: Place[] = [
     category: 'rail',
     lat: 35.658,
     lon: 139.7016,
-    address: ['2-1 Dogenzaka', 'Shibuya City', 'Tokyo 150-0043', 'Japan'],
-    walk: 6
+    address: ['2-1 Dogenzaka', 'Shibuya City', 'Tokyo 150-0043', 'Japan']
   },
   {
     id: 'louvre',
@@ -476,12 +435,19 @@ export const PLACES: Place[] = [
     lat: 48.8606,
     lon: 2.3376,
     address: ['Rue de Rivoli', '1st arrondissement', '75001 Paris', 'France'],
-    site: 'louvre.fr',
-    walk: 17
+    site: 'louvre.fr'
   }
 ]
 
 export const byId = (id: string) => PLACES.find((p) => p.id === id)
+
+/** Catalogue rows a trimmed-lowercased query hits - the sidebar and the map agree through this. */
+export const localMatches = (q: string) =>
+  PLACES.filter((p) => `${p.name} ${p.kind} ${p.address.join(' ')}`.toLowerCase().includes(q))
+
+/** Same name close together is one place; a namesake far away is not (~300m). */
+export const samePlace = (a: Place, b: Place) =>
+  a.name === b.name && Math.abs(a.lat - b.lat) + Math.abs(a.lon - b.lon) < 0.003
 
 /** What the sidebar opens with: Siri's guess first, then the last few lookups. */
 export const SUGGESTED = 'eye-stop'
@@ -492,11 +458,14 @@ const sample = <T>(xs: T[], n: number) => {
   return Array.from({ length: Math.min(n, pool.length) }, () => pool.splice((Math.random() * pool.length) | 0, 1)[0]!)
 }
 
+/** Recents keep the whole place so a searched-up result can be one too. */
+export type Recent = { p: Place; note: string }
+
 /** No history to read, so the session opens on a handful of places picked at random. */
-export const RECENT: [string, string][] = sample(PLACES, 3).map((p) => [
-  p.id,
-  p.category === 'address' ? 'From My Location' : `${p.address[0]}, ${p.address[1]}`
-])
+export const RECENT: Recent[] = sample(PLACES, 3).map((p) => ({
+  p,
+  note: `${p.address[0]}, ${p.address[1]}`
+}))
 
 // ---------- web mercator ----------
 
@@ -531,6 +500,42 @@ export const unproject = (x: number, y: number, z: number) => {
   return {
     lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / world))) * 180) / Math.PI,
     lon: (x / world) * 360 - 180
+  }
+}
+
+/** Zoom by `dz` keeping the world point under (ax, ay) still - the wheel's anchor. */
+export const zoomAt = (
+  view: View,
+  dz: number,
+  ax: number,
+  ay: number,
+  w: number,
+  h: number,
+  padX: number,
+  padY: number
+) => {
+  const z = Math.min(MAX_Z, Math.max(MIN_Z, view.z + dz))
+  if (z === view.z) return view
+  const centre = project(view.lat, view.lon, view.z)
+  const anchor = { x: centre.x - (w + padX) / 2 + ax, y: centre.y - (h - padY) / 2 + ay }
+  const k = 2 ** (z - view.z)
+  return {
+    ...unproject(anchor.x * k - ax + (w + padX) / 2, anchor.y * k - ay + (h - padY) / 2, z),
+    z
+  }
+}
+
+/** The view that frames every point, centred in what the panels leave uncovered. */
+export const fit = (pts: [number, number][], w: number, h: number, padX: number, padY: number): View => {
+  const sx = Math.max(1, w - padX)
+  const sy = Math.max(1, h - padY)
+  for (let z = MAX_Z; ; z--) {
+    const ps = pts.map(([lat, lon]) => project(lat, lon, z))
+    const lo = { x: Math.min(...ps.map((p) => p.x)), y: Math.min(...ps.map((p) => p.y)) }
+    const hi = { x: Math.max(...ps.map((p) => p.x)), y: Math.max(...ps.map((p) => p.y)) }
+    // Bounds and unproject share a zoom: a route bigger than MIN_Z still centres on itself.
+    if ((hi.x - lo.x <= sx * 0.82 && hi.y - lo.y <= sy * 0.82) || z === MIN_Z)
+      return { ...unproject((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, z), z }
   }
 }
 

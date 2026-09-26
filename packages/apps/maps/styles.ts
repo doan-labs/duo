@@ -26,6 +26,10 @@ export const SHEET = 0.54
 /** The shell's status stack runs over the map; every panel starts below it. */
 const STATUS = 40
 const grow = stylex.keyframes({ from: { opacity: 0, transform: 'translate(-50%,-50%) scale(.6)' } })
+const ping = stylex.keyframes({
+  from: { opacity: 0.55, transform: 'translate(-50%,-50%) scale(.5)' },
+  to: { opacity: 0, transform: 'translate(-50%,-50%) scale(3.4)' }
+})
 const slide = stylex.keyframes({ from: { opacity: 0, transform: 'translateX(-12px)' } })
 const raise = stylex.keyframes({ from: { transform: 'translateY(100%)' } })
 const reduce = '@media (prefers-reduced-motion: reduce)'
@@ -50,8 +54,10 @@ export const styles = stylex.create({
 
   surface: { position: 'absolute', inset: 0, overflow: 'hidden', touchAction: 'none', cursor: 'grab' },
   dragging: { cursor: 'grabbing' },
-  tile: { position: 'absolute', width: 256, height: 256, pointerEvents: 'none' },
+  tile: { position: 'absolute', pointerEvents: 'none' },
   at: (x: number, y: number) => ({ left: x, top: y }),
+  /** Tiles carry their own edge length so a fractional zoom can stretch them. */
+  tileAt: (x: number, y: number, size: number) => ({ left: x, top: y, width: size, height: size }),
   /** Map chrome, boxed into what the status stack, the panels and the sheet leave over. */
   chrome: { position: 'absolute', top: STATUS, right: 0, bottom: 0, left: 0, pointerEvents: 'none' },
   pad: (left: number, bottom: number) => ({ left, bottom }),
@@ -127,6 +133,176 @@ export const styles = stylex.create({
     pointerEvents: 'none',
     zIndex: 1
   },
+  /** The ring the dot breathes out, once per couple of seconds. */
+  mePulse: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    transform: 'translate(-50%,-50%)',
+    borderRadius: radius.circle,
+    backgroundColor: colors.blue,
+    pointerEvents: 'none',
+    animationName: { default: ping, [reduce]: 'none' },
+    animationDuration: '2.2s',
+    animationTimingFunction: easing.out,
+    animationIterationCount: 'infinite'
+  },
+
+  // ---------- the route ----------
+
+  route: { position: 'absolute', inset: 0, pointerEvents: 'none' },
+  /** Unchosen ways there, grey under the blue one like Apple's alternates. */
+  routeOff: {
+    stroke: colors.grey3,
+    strokeWidth: 5,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  },
+  /** White casing under the chosen line so it reads over any tile. */
+  routeCase: {
+    stroke: colors.white,
+    strokeWidth: 8,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  },
+  routeOn: {
+    stroke: colors.blue,
+    strokeWidth: 4.5,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  },
+
+  // ---------- directions ----------
+
+  dirTop: { display: 'flex', alignItems: 'center', gap: 8, paddingInline: 10, paddingTop: 10 },
+  dirTitle: {
+    flexGrow: 1,
+    minWidth: 0,
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    fontWeight: weight.bold
+  },
+  dirModes: {
+    display: 'flex',
+    gap: 4,
+    marginInline: 10,
+    marginTop: 8,
+    marginBottom: 6,
+    padding: 2,
+    borderRadius: radius.md,
+    backgroundColor: appAppearance.mapsField
+  },
+  modeBtn: {
+    flexGrow: 1,
+    display: 'grid',
+    placeItems: 'center',
+    height: 26,
+    borderRadius: radius.sm,
+    color: app.label2,
+    backgroundColor: 'transparent',
+    cursor: 'pointer'
+  },
+  modeBtnOn: { backgroundColor: appAppearance.mapsCard, color: colors.blue, boxShadow: shadow.card },
+  ends: {
+    marginInline: 10,
+    marginBottom: 8,
+    paddingInline: 10,
+    paddingBlock: 6,
+    borderRadius: radius.md,
+    backgroundColor: appAppearance.mapsField
+  },
+  endRow: { display: 'flex', alignItems: 'center', gap: 8, paddingBlock: 4, color: colors.black },
+  endDot: { width: 8, height: 8, flexShrink: 0, borderRadius: radius.circle, backgroundColor: colors.blue },
+  endPin: {
+    display: 'grid',
+    placeItems: 'center',
+    width: 14,
+    height: 14,
+    marginInline: -3,
+    flexShrink: 0,
+    color: colors.red
+  },
+  dirNote: {
+    paddingInline: 14,
+    paddingTop: 12,
+    color: app.label2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
+  dirSummary: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    marginInline: 10,
+    marginTop: 2,
+    marginBottom: 6,
+    paddingInline: 10,
+    paddingBlock: 8,
+    borderRadius: radius.md,
+    backgroundColor: appAppearance.mapsField
+  },
+  routeRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    width: 'calc(100% - 20px)',
+    marginInline: 10,
+    marginTop: 4,
+    paddingInline: 10,
+    paddingBlock: 8,
+    borderRadius: radius.md,
+    textAlign: 'left',
+    cursor: 'pointer',
+    backgroundColor: { default: appAppearance.mapsField, ':hover': appAppearance.mapsHover },
+    color: colors.black
+  },
+  routeRowOn: { backgroundColor: appAppearance.mapsSelected },
+  routeMin: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold
+  },
+  routeMeta: {
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    color: app.label2
+  },
+  fastest: {
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    paddingInline: 6,
+    paddingBlock: 1,
+    borderRadius: radius.xs,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    color: colors.green,
+    backgroundColor: appAppearance.mapsField
+  },
+  step: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 9,
+    paddingInline: 14,
+    paddingBlock: 6,
+    color: colors.black
+  },
+  stepIcon: {
+    display: 'grid',
+    placeItems: 'center',
+    width: 20,
+    height: 20,
+    flexShrink: 0,
+    color: app.label2
+  },
+  stepText: { minWidth: 0, flexGrow: 1 },
+  stepDist: { color: app.label2 },
+  searching: { paddingInline: 14, paddingTop: 10 },
 
   // ---------- map controls ----------
 
