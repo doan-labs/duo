@@ -4,7 +4,7 @@ import { delay, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { refresh, type Story, useFeed } from './data.ts'
+import { refresh, type Story, useFeed, useImage } from './data.ts'
 import { ago, host, today } from './fmt.ts'
 import { styles } from './styles.ts'
 
@@ -30,22 +30,25 @@ export const Head2 = ({ title, sub, first }: { title: string; sub?: string; firs
 const meta = (s: Story) =>
   [
     host(s.url),
-    s.points ? `${s.points} points` : '',
+    s.points ? `${s.points} ${s.hn ? 'points' : 'reactions'}` : '',
     s.comments ? `${s.comments} comments` : '',
     s.time ? ago(s.time) : ''
   ]
     .filter(Boolean)
     .join(' · ')
 
-/** What stands in for photography: a deterministic palette per story and its source's initial. */
+/** The seeded gradient under the real artwork, so a missing or late image still holds a tile. */
 const thumb = (s: Story) => styles.bgImg(art(s.url || s.title))
 const initial = (s: Story) => (host(s.url)[0] ?? '?').toUpperCase()
 
-export const Thumb = ({ s, small }: { s: Story; small?: boolean }) => (
-  <span aria-hidden="true" {...stylex.props(styles.thumb, small && styles.thumbSm, thumb(s))}>
-    {initial(s)}
-  </span>
-)
+export const Thumb = ({ s, small }: { s: Story; small?: boolean }) => {
+  const uri = useImage(s.image)
+  return (
+    <span aria-hidden="true" {...stylex.props(styles.thumb, small && styles.thumbSm, thumb(s))}>
+      {uri ? <span {...stylex.props(styles.thumbImg, styles.bgImg(`url("${uri}")`))} /> : initial(s)}
+    </span>
+  )
+}
 
 export const StoryRow = ({ s, i, open }: { s: Story; i: number; open: Open }) => (
   <div {...stylex.props(styles.row)}>
@@ -71,20 +74,24 @@ export const Rows = ({ hits, open }: { hits: Story[]; open: Open }) => (
   </div>
 )
 
-const Hero = ({ s, wide, open }: { s: Story; wide: boolean; open: Open }) => (
-  <button
-    type="button"
-    onClick={() => open(s)}
-    {...stylex.props(shared.rise, styles.hero, !wide && styles.heroSm, thumb(s), shared.press)}
-  >
-    <span {...stylex.props(styles.heroShade)} />
-    <span {...stylex.props(styles.heroText)}>
-      <span {...stylex.props(styles.kicker)}>Top Story</span>
-      <span {...stylex.props(styles.heroTitle, !wide && styles.heroTitleSm)}>{s.title}</span>
-      <span {...stylex.props(styles.heroMeta)}>{meta(s)}</span>
-    </span>
-  </button>
-)
+const Hero = ({ s, wide, open }: { s: Story; wide: boolean; open: Open }) => {
+  const uri = useImage(s.image, 'hero')
+  return (
+    <button
+      type="button"
+      onClick={() => open(s)}
+      {...stylex.props(shared.rise, styles.hero, !wide && styles.heroSm, thumb(s), shared.press)}
+    >
+      {uri && <span {...stylex.props(styles.heroArt, styles.bgImg(`url("${uri}")`))} />}
+      <span {...stylex.props(styles.heroShade)} />
+      <span {...stylex.props(styles.heroText)}>
+        <span {...stylex.props(styles.kicker)}>Top Story</span>
+        <span {...stylex.props(styles.heroTitle, !wide && styles.heroTitleSm)}>{s.title}</span>
+        <span {...stylex.props(styles.heroMeta)}>{meta(s)}</span>
+      </span>
+    </button>
+  )
+}
 
 export const Skeleton = ({ hero }: { hero?: boolean }) => (
   <div {...stylex.props(styles.sk)}>

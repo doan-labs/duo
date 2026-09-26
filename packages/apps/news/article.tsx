@@ -1,13 +1,13 @@
 // The article page: a serif column pushed over the whole app, with the
-// discussion underneath. Everything it shows is real: the story, its text and
-// the comment tree from Algolia.
+// discussion underneath. Everything it shows is real: the story, its body and
+// the comment thread from the story's own source.
 import { art } from '@doan-labs/duo-fixtures'
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON } from '@doan-labs/duo-sdk/react.ts'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type Comment, type Story, useComments } from './data.ts'
+import { type Comment, type Story, useBody, useComments, useImage } from './data.ts'
 import { ago, detag, host, paras } from './fmt.ts'
 import { styles } from './styles.ts'
 
@@ -64,6 +64,8 @@ const Discussion = ({ s }: { s: Story }) => {
 
 export function Article({ s, wide, back, from }: { s: Story; wide: boolean; back: () => void; from: string }) {
   const saved = useJSON<Record<string, Story>>(os.storage, 'saved', {})
+  const artUri = useImage(s.image, 'hero')
+  const body = useBody(s)
   const on = !!saved.value[s.id]
   const toggle = () => {
     const next = { ...saved.value }
@@ -71,7 +73,7 @@ export function Article({ s, wide, back, from }: { s: Story; wide: boolean; back
     else next[s.id] = s
     saved.set(next)
   }
-  const safari = () => void os.open('Safari', s.url || `https://news.ycombinator.com/item?id=${s.id}`)
+  const safari = () => void os.open('Safari', s.url || `https://news.ycombinator.com/item?id=${s.id.replace(/^h/, '')}`)
   return (
     <div {...stylex.props(shared.column)}>
       <div {...stylex.props(styles.artTop)}>
@@ -99,14 +101,22 @@ export function Article({ s, wide, back, from }: { s: Story; wide: boolean; back
         </div>
       </div>
       <div {...stylex.props(styles.artWrap)}>
-        <div {...stylex.props(styles.artHero, !wide && styles.artHeroSm, hero(s))} />
+        <div {...stylex.props(styles.artHero, !wide && styles.artHeroSm, hero(s))}>
+          {artUri && <span {...stylex.props(styles.artImg, styles.bgImg(`url("${artUri}")`))} />}
+        </div>
         <div {...stylex.props(styles.artBody)}>
-          <div {...stylex.props(styles.artKick)}>{host(s.url)}</div>
+          <div {...stylex.props(styles.artKick)}>
+            {s.tags?.length ? s.tags.map((t) => `#${t}`).join(' ') : host(s.url)}
+          </div>
           <h1 {...stylex.props(styles.artTitle)}>{s.title}</h1>
           <div {...stylex.props(styles.artMeta)}>
             <span {...stylex.props(styles.artBy)}>{s.author}</span>
             <span>{ago(s.time)}</span>
-            {s.points ? <span>{s.points} points</span> : null}
+            {s.points ? (
+              <span>
+                {s.points} {s.hn ? 'points' : 'reactions'}
+              </span>
+            ) : null}
             {s.comments ? <span>{s.comments} comments</span> : null}
           </div>
           <div {...stylex.props(styles.artActions)}>
@@ -126,11 +136,26 @@ export function Article({ s, wide, back, from }: { s: Story; wide: boolean; back
             )}
           </div>
           {s.text &&
-            paras(s.text).map((p) => (
-              <p key={p} {...stylex.props(styles.artText)}>
-                {p}
-              </p>
-            ))}
+            paras(s.text)
+              .slice(0, 1)
+              .map((p) => (
+                <p key={p} {...stylex.props(styles.artLede)}>
+                  {p}
+                </p>
+              ))}
+          {body.paras?.map((p) => (
+            <p key={p} {...stylex.props(styles.artText)}>
+              {p}
+            </p>
+          ))}
+          {body.loading && (
+            <div {...stylex.props(styles.sk)}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} {...stylex.props(styles.skLine, i === 2 && styles.skLineS)} />
+              ))}
+            </div>
+          )}
+          {body.error && <div {...stylex.props(styles.artText)}>{body.error}</div>}
           <Discussion s={s} />
         </div>
       </div>

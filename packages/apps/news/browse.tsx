@@ -12,18 +12,18 @@ import { Head, Head2, type Open, Skeleton, StoryRow } from './feed.tsx'
 import { styles } from './styles.ts'
 
 const SUGGESTED = [
-  'Apple',
-  'AI',
-  'Google',
+  'JavaScript',
+  'Python',
+  'React',
+  'Rust',
+  'Go',
+  'DevOps',
+  'Cloud',
+  'Machine Learning',
   'Security',
-  'Space',
-  'Startups',
-  'Programming',
-  'Science',
-  'Open Source',
-  'Games',
+  'Game Dev',
   'Design',
-  'Crypto'
+  'Beginners'
 ]
 
 const mark = (seed: string) => styles.bgImg(art(seed))
