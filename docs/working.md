@@ -26,6 +26,20 @@ Bun 1.4.0 can miscompile StyleX's parser after repeated compilations, rejecting 
 media queries; see [Bun #41609](https://github.com/oven-sh/bun/issues/41609).
 Keep reduced-motion rules and media-query ordering enabled.
 
+## CI runner
+
+`.github/workflows/platform.yml` runs pull requests on GitHub-hosted runners. A push to
+`main` uses the `duo-wsl2` runner in the `duo-trusted-ci` organization runner group.
+The group allows only this workflow from `refs/heads/main`. The submission and catalog
+publishing workflows stay on GitHub-hosted runners because they build community code.
+
+The platform workflow starts a GitHub-hosted watchdog beside the local build. If the
+local job is still queued after 90 seconds, it dispatches the same commit to a
+GitHub-hosted runner and cancels the queued run. This uses about 90 seconds of
+GitHub-hosted time per push and handles an unavailable or busy workstation. It does
+not retry a build that started and later failed. The local build removes its
+`node_modules`, `.cache` and Bun download cache after each run.
+
 StyleX compiles through `stylex-plugin.ts`: dev injects rules, production extracts CSS.
 The plugin includes installed `@doan-labs` sources importing StyleX. Use the kit's exported
 `tokens.stylex.ts`; an isolated document cannot inherit shell styles or assets.
