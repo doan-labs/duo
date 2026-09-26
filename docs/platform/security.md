@@ -12,7 +12,8 @@ official, community and development documents; lane grants no execution privileg
 
 Frames use only `sandbox="allow-scripts"`, never `allow-same-origin`. The opaque document
 cannot read parent DOM/storage or use origin storage directly. Explicit iframe feature
-policy denies undeclared capabilities; camera and microphone are always denied.
+policy denies undeclared capabilities; camera and microphone are always denied in the
+frame - capture is a host service the manifest declares (§6.3).
 `packages/sdk/permissions.ts` owns the permission table and denial list.
 
 A host launch record binds the expected frame, nonce, release, SDK and generation.
@@ -71,9 +72,13 @@ not the host machine's sensors. Revocation drops every listener. See contract §
 
 ## Enabled permissions
 
-Camera/microphone are rejected globally pending a separate host-mediated media design.
-Local previews and external developer catalogs currently accept no device permissions.
-The retained table includes geolocation, clipboard and the host photos service; Weather
+Camera is rejected globally; microphone capture is a host-owned service
+(`shell/runtime/mic.ts`) the manifest must declare - the stream never enters a
+frame, one take runs at a time, mutating calls are owner-only, and every track
+stops when the take ends or its owner goes away. Local previews and external
+developer catalogs currently accept no device permissions.
+The retained table includes geolocation, clipboard, the host photos service, the
+host microphone service and the host files store; Weather
 uses its declared geolocation. Undeclared host services fail before processing arguments;
 mutating services require the current owner epoch. Browser/OS consent is additional to
 the host's manifest gate. Retained adapters are not proof of full native/browser support.

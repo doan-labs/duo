@@ -23,6 +23,8 @@ export const STORES = [
   'installed',
   'releases',
   'appdata',
+  // Blobs too big for the string-only `appdata`: [ns, name] -> { blob, type, size, at }.
+  'appfiles',
   'meta',
   'checkpoints',
   'recovery',
@@ -49,7 +51,7 @@ export function listenDatabase() {
 }
 export function database(): Promise<IDBDatabase> {
   opening ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open('ipduo', 2)
+    const request = indexedDB.open('ipduo', 3)
     request.onupgradeneeded = () => {
       for (const name of STORES)
         if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name)

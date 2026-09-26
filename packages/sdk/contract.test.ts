@@ -46,10 +46,16 @@ test('table grants only declared features and identifies service methods', () =>
   assert.match(frameAllow(), /fullscreen 'none'/)
   assert.equal(permissionsValid(['unknown']), false)
   assert.equal(permissionsValid(['camera']), false)
-  assert.equal(permissionsValid(['microphone']), false)
+  // `microphone` is a declarable service grant, but never a frame capability:
+  // declaring it must not open `allow` - capture stays host-side (decisions 42/103).
+  assert.equal(permissionsValid(['microphone', 'files']), true)
+  assert.match(frameAllow(['microphone']), /microphone 'none'/)
   assert.match(frameAllow(['geolocation']), /microphone 'none'/)
   assert.equal(permissionsValid(['photos', 'photos']), false)
   assert.equal(servicePermission('photos.add'), 'photos')
+  assert.equal(servicePermission('mic.stop'), 'microphone')
+  assert.equal(servicePermission('file.put'), 'files')
+  assert.equal(servicePermission('mic.none'), undefined)
 })
 test('UTF-8 bounds and request/widget guards', () => {
   assert.equal(bytes('🐈'), 4)

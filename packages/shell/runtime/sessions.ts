@@ -3,6 +3,7 @@ import { type Change, type Evt, LIMITS, type ViewInfo } from '../../sdk/protocol
 import { changes, getInstalled, getRelease, type Installed, type StoredRelease } from './database.ts'
 import { development } from './development.ts'
 import { launchAttempt, lease, ready } from './lifecycle.ts'
+import { micRelease } from './mic.ts'
 import { MemoryKV, snapshot } from './storage.ts'
 
 export type SessionView = {
@@ -90,6 +91,8 @@ export class Session {
     clearInterval(this.timer)
     changes.removeEventListener('change', this.change)
     for (const view of [...this.views.values()]) view.revoke(reason)
+    // A session that dies mid-take cannot keep the microphone.
+    micRelease(this)
     for (const cmd of this.commands.values()) cmd.reject(new PlatformError('E_CLOSED'))
     this.commands.clear()
     if (sessions.get(this.app.id)) sessions.delete(this.app.id)

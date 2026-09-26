@@ -47,7 +47,7 @@ and no published URL is ever overwritten. See contract.md §1.2.
 | `cover` | removed (accepted) | Every view is the app's own document at its own box; responsive cover support is a requirement of every app, verified by contract.md check F. |
 | `widgets` | no | Sizes the app publishes declarative snapshots for through `os.widget.set`. The shell renders the snapshot; no widget code runs in the shell (contract.md §3.6). |
 | `network` | no | Exact HTTPS origins (scheme, host, optional port; no paths or wildcards) the app document may connect to. The builder writes them into the document's `connect-src` and `media-src`, which bounds fetch, XHR, WebSocket and media, not every form of egress (contract.md §2.6). |
-| `permissions` | no | Names from the SDK permission table (contract.md §6): `geolocation`, `clipboard-read`, `clipboard-write`, and the host service `photos`. Undeclared means refused; local previews and external catalogs accept no device permissions. Camera/microphone capture is deferred; native services are reserved. |
+| `permissions` | no | Names from the SDK permission table (contract.md §6): `geolocation`, `clipboard-read`, `clipboard-write`, and the host services `photos`, `microphone` and `files`. Undeclared means refused; local previews and external catalogs accept no device permissions. Camera capture is deferred; native services are reserved. |
 | `author`, `repo`, `license` | yes | Shown in the store. `license` must be `MIT`. |
 
 ## Rules

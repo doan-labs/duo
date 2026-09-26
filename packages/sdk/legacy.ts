@@ -1,5 +1,33 @@
 // Transitional host types for baked apps. Not the future sandbox bridge contract.
-import type { Switches } from './protocol.ts'
+import type { MicResult, MicStatus, StoredFile, Switches } from './protocol.ts'
+
+/**
+ * The shell's recorder handed to a baked app — the same engine `os.mic` reaches
+ * over the bridge, minus the owner epoch. `attach` counts the app's mounted
+ * copies: both displays hold one, and capture survives the fold because the
+ * last detach is held back a beat while the mirror copy mounts. When the count
+ * really reaches zero (the app closed) every track is stopped and the take is
+ * dropped.
+ */
+export type MicHost = {
+  attach(): () => void
+  status(): MicStatus
+  onStatus(cb: (s: MicStatus) => void): () => void
+  /** Presses Record: the browser ask happens here, never at mount. */
+  start(): Promise<void>
+  pause(): void
+  resume(): void
+  /** Stops capture; resolves with the take, or null when nothing was captured. */
+  stop(): Promise<MicResult | null>
+}
+
+/** Durable app-owned blobs in the `appfiles` store; the baked half of `os.files`. */
+export type FileHost = {
+  list(): Promise<StoredFile[]>
+  get(name: string): Promise<Blob | null>
+  put(name: string, blob: Blob): Promise<StoredFile>
+  del(name: string): Promise<void>
+}
 
 /** What the Camera app publishes for Camera Control and the volume buttons. */
 export type CameraHooks = {
@@ -36,6 +64,10 @@ export type Os = {
    * and video torch.
    */
   led?: (on: boolean) => void
+  /** The shell-owned microphone channel; only apps that capture audio use it. */
+  mic?: MicHost
+  /** Durable binary storage for the app's own files (audio, renders). */
+  files?: FileHost
 }
 
 /**

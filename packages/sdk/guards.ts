@@ -6,6 +6,7 @@ import {
   type DeviceEvents,
   type ErrCode,
   LIMITS,
+  type MicStatus,
   type Notice,
   type Req,
   type Switches,
@@ -38,6 +39,22 @@ export function keyValid(value: unknown): value is string {
   )
 }
 export const valueValid = (value: unknown): value is string => typeof value === 'string' && bytes(value) <= LIMITS.value
+/** File names are path fragments the app picks; keep them printable and dot-safe. */
+export const fileNameValid = (value: unknown): value is string =>
+  typeof value === 'string' && bytes(value) <= LIMITS.fileName && /^[a-zA-Z0-9][\w.() -]*$/.test(value)
+const MIC_STATES = ['idle', 'recording', 'paused', 'ended', 'denied', 'unavailable'] as const
+export function micStatusValid(v: unknown): v is MicStatus {
+  return (
+    record(v) &&
+    (MIC_STATES as readonly unknown[]).includes(v.state) &&
+    finite(v.elapsed) &&
+    v.elapsed >= 0 &&
+    finite(v.level) &&
+    v.level >= 0 &&
+    v.level <= 1 &&
+    (v.detail === undefined || typeof v.detail === 'string')
+  )
+}
 export function requestValid(value: unknown): value is Req {
   return (
     record(value) &&

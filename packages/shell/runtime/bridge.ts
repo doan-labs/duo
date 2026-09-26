@@ -6,6 +6,8 @@ import { type Change, LIMITS, PROTOCOL, type Req, type Res, type ViewInfo } from
 import { claimSide } from '../device.ts'
 import { authority, broadcast, put, transaction } from './database.ts'
 import { deviceEvents } from './device-events.ts'
+import { fileService } from './files.ts'
+import { micService } from './mic.ts'
 import { clearNotices, postNotice } from './notifications.ts'
 import { photoService } from './photos.ts'
 import type { Session, SessionView } from './sessions.ts'
@@ -91,7 +93,11 @@ export function launchFrame(
     if (launch.state === 'revoked') throw new PlatformError('E_CLOSED')
     if (['widget.set', 'cmd.ack'].includes(req.m) || mutatingService(req.m)) session.assertOwner(view, req.epoch)
     const p = record(req.p) ? req.p : {}
-    if (permission) return { value: await photoService(req.m, p) }
+    if (permission) {
+      if (req.m.startsWith('mic.')) return { value: await micService(session, req.m) }
+      if (req.m.startsWith('file.')) return { value: await fileService(session.app.id, req.m, p) }
+      return { value: await photoService(req.m, p) }
+    }
     if (req.m.startsWith('storage.') || req.m.startsWith('session.')) {
       const [space, action] = req.m.split('.') as ['storage' | 'session', string]
       if (action === 'watch') {

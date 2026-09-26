@@ -1,154 +1,38 @@
-import { mmss } from '@doan-labs/duo-fixtures'
+// Voice Memos, a baked app: the shell hands it `os.mic` and `os.files` as
+// props, so capture never happens inside this document. One attach per mount
+// keeps the engine alive while the fold copy mounts and unmounts - the running
+// second copy draws this state, it never opens a second stream.
+
 import type { Os } from '@doan-labs/duo-sdk'
-import { Button, Placeholder, Row, Screen, Section, Text, Title } from '@doan-labs/duo-uikit'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { Nav, Screen } from '@doan-labs/duo-uikit'
+import { app } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState } from 'react'
-import { styles } from './styles.ts'
+import { useEffect } from 'react'
+import { Deck } from './deck.tsx'
+import { bindHost, reconcileFiles } from './engine.ts'
+import { Library } from './library.tsx'
 
-type Memo = { url: string; len: number; at: Date }
-
-/** Lazy, like `beep`'s: constructing one before a gesture gets it suspended. */
-let ac: AudioContext | undefined
-
-/** What a recording in progress holds on to. */
-type Live = { rec?: MediaRecorder; stream?: MediaStream; ana?: AnalyserNode }
-
-const stopRec = (live: Live, clock: HTMLDivElement | null) => {
-  if (live.rec?.state === 'recording') live.rec.stop()
-  live.stream?.getTracks().forEach((t) => t.stop())
-  live.ana = undefined
-  live.rec = undefined
-  if (clock) clock.textContent = '00:00'
-}
-
-const MemoRow = ({ memo, n }: { memo: Memo; n: number }) => {
-  const a = useRef<HTMLAudioElement>(null)
-  return (
-    <Row xstyle={[styles.darkRow]}>
-      <div {...stylex.props(styles.grow)}>
-        <div {...stylex.props(styles.name)}>Recording {n}</div>
-        <Text as="div" size="caption">
-          {memo.at.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' })} · {mmss(memo.len)}
-        </Text>
-      </div>
-      {/* biome-ignore lint/a11y/useMediaCaption: a voice memo has no transcript */}
-      <audio ref={a} src={memo.url} />
-      <Button type="button" onClick={() => (a.current!.paused ? a.current!.play() : a.current!.pause())}>
-        ▶ Play
-      </Button>
-    </Row>
-  )
-}
-
-export const Memos = (_: { os: Os }) => {
-  const cv = useRef<HTMLCanvasElement>(null)
-  const clock = useRef<HTMLDivElement>(null)
-  const [list, setList] = useState<Memo[]>([])
-  const listRef = useRef(list)
-  listRef.current = list
-  const [on, setOn] = useState(false)
-  const [denied, setDenied] = useState(false)
-
-  const live = useRef<Live>({})
-  const t0 = useRef(0)
-  const hist = useRef<number[]>([])
-
+export function Memos({ os }: { os: Os }) {
   useEffect(() => {
-    const c = cv.current!
-    const g = c.getContext('2d')!
-    const buf = new Uint8Array(64)
-    let raf = 0
-    const frame = () => {
-      raf = requestAnimationFrame(frame)
-      const w = c.clientWidth,
-        ht = c.clientHeight
-      if (c.width !== w * 2) {
-        c.width = w * 2
-        c.height = ht * 2
-      }
-      const a = live.current.ana
-      if (a) {
-        a.getByteTimeDomainData(buf)
-        let peak = 0
-        for (const v of buf) peak = Math.max(peak, Math.abs(v - 128) / 128)
-        hist.current.push(peak)
-        if (hist.current.length > w / 3) hist.current.shift()
-        clock.current!.textContent = mmss((Date.now() - t0.current) / 1000)
-      }
-      g.setTransform(2, 0, 0, 2, 0, 0)
-      g.clearRect(0, 0, w, ht)
-      g.fillStyle = colors.redDark
-      hist.current.forEach((v, i) => {
-        const bh = Math.max(2, v * ht * 0.92)
-        g.fillRect(i * 3, (ht - bh) / 2, 2, bh)
-      })
-    }
-    raf = requestAnimationFrame(frame)
-    return () => {
-      cancelAnimationFrame(raf)
-      stopRec(live.current, clock.current)
-      listRef.current.forEach((m) => URL.revokeObjectURL(m.url))
-    }
-  }, [])
-
-  const start = async () => {
-    const s = await navigator.mediaDevices.getUserMedia({ audio: true })
-    live.current.stream = s
-    ac ??= new AudioContext()
-    const a = ac.createAnalyser()
-    a.fftSize = 128
-    ac.createMediaStreamSource(s).connect(a)
-    live.current.ana = a
-    const chunks: Blob[] = []
-    const r = new MediaRecorder(s)
-    r.ondataavailable = (e) => chunks.push(e.data)
-    r.onstop = () =>
-      setList((l) => [
-        {
-          url: URL.createObjectURL(new Blob(chunks, { type: r.mimeType })),
-          len: (Date.now() - t0.current) / 1000,
-          at: new Date()
-        },
-        ...l
-      ])
-    r.start()
-    live.current.rec = r
-    t0.current = Date.now()
-    hist.current.length = 0
-  }
-  const toggle = () => {
-    if (live.current.rec) {
-      setOn(false)
-      stopRec(live.current, clock.current)
-      return
-    }
-    setOn(true)
-    start().catch(() => {
-      setOn(false)
-      setDenied(true)
-    })
-  }
+    bindHost(os)
+    void reconcileFiles()
+  }, [os])
+  // attach() returns the release: React hands it to cleanup on unmount, and
+  // the host's grace window rides out a fold instead of killing the take.
+  useEffect(() => os.mic?.attach(), [os.mic])
 
   return (
-    <Screen>
-      <Title>Voice Memos</Title>
-      <div {...stylex.props(styles.deck)}>
-        <canvas ref={cv} {...stylex.props(styles.wave)} />
-        <div ref={clock} {...stylex.props(styles.clock)}>
-          00:00
-        </div>
-        <button type="button" {...stylex.props(styles.rec)} onClick={toggle}>
-          <i {...stylex.props(styles.dot, on && styles.dotOn)} />
-        </button>
-        {denied && <Placeholder xstyle={[styles.note]}>Microphone unavailable. Allow access and reopen.</Placeholder>}
-      </div>
-      <Title xstyle={[styles.hdrSm]}>All Recordings</Title>
-      <Section>
-        {list.map((m, i) => (
-          <MemoRow key={m.url} memo={m} n={list.length - i} />
-        ))}
-      </Section>
+    <Screen xstyle={styles.app}>
+      <Nav>
+        <Library />
+      </Nav>
+      <Deck />
     </Screen>
   )
 }
+
+const styles = stylex.create({
+  // Screen's shared.body is a scroll box, not a flex column - Nav's pane is a
+  // flexGrow child, so without this the stack collapses to zero height.
+  app: { backgroundColor: app.bg, color: app.fg, position: 'relative', display: 'flex', flexDirection: 'column' }
+})
