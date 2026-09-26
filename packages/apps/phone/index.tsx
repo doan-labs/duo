@@ -7,7 +7,7 @@ import { Push, Screen } from '@doan-labs/duo-uikit'
 import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { CallScreen, IncomingScreen, Picker, ReturnPill } from './call.tsx'
 import { ContactsList } from './contacts.tsx'
 import type { Contact, Recent, Voicemail } from './data.ts'
@@ -66,11 +66,15 @@ export const Phone = ({ os }: { os: Os }) => {
   // '' closed; 'add' adds a line to the live call, 'fav' picks a new favorite,
   // 'exist:<id>' links an unknown recent to a contact.
   const [pick, setPick] = useShared('pick', '')
-  const [draft, setDraft] = useState<Draft | null>(null)
+  // The form is shared state like the panes' pushes: folding mid-edit must not
+  // drop the draft off the other display.
+  const [draft, setDraft] = useShared<Draft | null>('draft', null)
   const { toast, closing, setToast } = useToast()
 
   const live = calls.filter((c) => c.phase !== 'ended')
-  const front = live.find((c) => c.phase === 'active') ?? live[0]
+  // The newest line owns the screen: while a second call dials nothing is
+  // active yet, and the held first call must not cover it.
+  const front = live.find((c) => c.phase === 'active') ?? live.at(-1)
   const held = calls.find((c) => c.phase === 'held')
   const unheard = voicemails.filter((v) => !v.heard).length
 

@@ -72,11 +72,11 @@ function Player({
       <div {...stylex.props(styles.vmTrack)}>
         <button
           type="button"
-          aria-label={play ? 'Pause' : 'Play'}
+          aria-label={play?.playing ? 'Pause' : 'Play'}
           {...stylex.props(styles.vmCtl)}
-          onClick={() => (play ? vmPause() : vmPlay(v.id))}
+          onClick={() => (play?.playing ? vmPause() : vmPlay(v.id))}
         >
-          <Glyph name={play ? 'pause' : 'play'} size={22} />
+          <Glyph name={play?.playing ? 'pause' : 'play'} size={22} />
         </button>
         <input
           type="range"

@@ -188,7 +188,7 @@ export function end(id: number) {
     callsCell.set(rest)
     // Hand the line back: a call surviving on hold resumes when the other ends.
     if (rest.length === 1 && rest[0]!.phase === 'held') {
-      patchCall(rest[0]!.id, { phase: 'active' })
+      patchCall(rest[0]!.id, { phase: 'active', connectAt: Date.now() - rest[0]!.secs * 1000 })
       ensureTicker()
     }
   }, 700)
@@ -219,13 +219,14 @@ export function ring(raw?: { name?: string; number?: string }) {
   const pick = raw?.number ? resolve(raw.number) : undefined
   const caller = raw?.name
     ? { name: raw.name, number: raw.number ?? '' }
-    : (pick ?? {
-        ...(() => {
-          const pool = book.contacts.filter((c) => c.phone && !c.blocked)
-          const c = pool[((Date.now() / 1000 + pool.length) % pool.length) | 0]!
-          return { name: fullName(c), number: c.phone, contactId: c.id }
-        })()
-      })
+    : (pick ??
+      (() => {
+        const pool = book.contacts.filter((c) => c.phone && !c.blocked)
+        // An emptied or fully blocked book still needs someone to ring in.
+        if (!pool.length) return { name: 'Unknown', number: '+1 (800) 555-0199' }
+        const c = pool[((Date.now() / 1000 + pool.length) % pool.length) | 0]!
+        return { name: fullName(c), number: c.phone, contactId: c.id }
+      })())
   incomingCell.set({ name: caller.name, number: caller.number, contactId: caller.contactId, screening: false })
   beep([880, 990, 1180], 0.9, 0.08)
   window.clearTimeout(ringTimer)
@@ -362,47 +363,61 @@ export function usePhone() {
     calls,
     incoming,
     playback,
+    // The actions read the cells, not the render's snapshot: two mutations in
+    // one gesture (save a contact, then link a recent to it) must not lose the
+    // first write to a stale closure.
     save(c: Contact) {
-      const exists = book.contacts.some((v) => v.id === c.id)
-      const next = exists ? book.contacts.map((v) => (v.id === c.id ? c : v)) : [...book.contacts, c]
-      const favOrder = c.favorite && !book.favOrder.includes(c.id) ? [...book.favOrder, c.id] : book.favOrder
+      const bookNow = bookCell.get()
+      const exists = bookNow.contacts.some((v) => v.id === c.id)
+      const next = exists ? bookNow.contacts.map((v) => (v.id === c.id ? c : v)) : [...bookNow.contacts, c]
+      const favOrder = c.favorite && !bookNow.favOrder.includes(c.id) ? [...bookNow.favOrder, c.id] : bookNow.favOrder
       bookCell.set({ contacts: next, favOrder: c.favorite ? favOrder : favOrder.filter((i) => i !== c.id) })
     },
     remove(id: string) {
+      const bookNow = bookCell.get()
       bookCell.set({
-        contacts: book.contacts.filter((c) => c.id !== id),
-        favOrder: book.favOrder.filter((i) => i !== id)
+        contacts: bookNow.contacts.filter((c) => c.id !== id),
+        favOrder: bookNow.favOrder.filter((i) => i !== id)
       })
+      // iOS keeps the call but forgets the name: linked recents and voicemails
+      // fall back to showing the bare number.
+      const detach = <T extends { name: string; number: string; contactId?: string }>(r: T): T =>
+        r.contactId === id ? { ...r, contactId: undefined, name: formatNumber(r.number) || r.number } : r
+      recentsCell.set(recentsCell.get().map(detach))
+      vmCell.set(vmCell.get().map(detach))
     },
     /** Favorite is a flag on the contact and a slot in the order; both move together. */
     toggleFavorite(id: string) {
-      const c = findContact(book, id)
+      const bookNow = bookCell.get()
+      const c = findContact(bookNow, id)
       if (!c) return
       bookCell.set({
-        contacts: book.contacts.map((v) => (v.id === id ? { ...v, favorite: !v.favorite } : v)),
-        favOrder: c.favorite ? book.favOrder.filter((i) => i !== id) : [...book.favOrder, id]
+        contacts: bookNow.contacts.map((v) => (v.id === id ? { ...v, favorite: !v.favorite } : v)),
+        favOrder: c.favorite ? bookNow.favOrder.filter((i) => i !== id) : [...bookNow.favOrder, id]
       })
     },
     /** Edit-mode drag: put `id` before the favorite at `to`, or last when `to` is the end. */
     moveFavorite(id: string, to: number) {
-      const rest = book.favOrder.filter((i) => i !== id)
+      const bookNow = bookCell.get()
+      const rest = bookNow.favOrder.filter((i) => i !== id)
       rest.splice(Math.max(0, Math.min(to, rest.length)), 0, id)
-      bookCell.set({ ...book, favOrder: rest })
+      bookCell.set({ ...bookNow, favOrder: rest })
     },
     toggleBlocked(id: string) {
+      const bookNow = bookCell.get()
       bookCell.set({
-        ...book,
-        contacts: book.contacts.map((c) => (c.id === id ? { ...c, blocked: !c.blocked } : c))
+        ...bookNow,
+        contacts: bookNow.contacts.map((c) => (c.id === id ? { ...c, blocked: !c.blocked } : c))
       })
     },
     removeRecent(id: string) {
-      recentsCell.set(recents.filter((r) => r.id !== id))
+      recentsCell.set(recentsCell.get().filter((r) => r.id !== id))
     },
     /** A Recent tied to a contact gains their name, the way Add to Existing works. */
     linkRecent(id: string, contactId: string) {
-      const c = findContact(book, contactId)
+      const c = findContact(bookCell.get(), contactId)
       if (!c) return
-      recentsCell.set(recents.map((r) => (r.id === id ? { ...r, contactId, name: fullName(c) } : r)))
+      recentsCell.set(recentsCell.get().map((r) => (r.id === id ? { ...r, contactId, name: fullName(c) } : r)))
     },
     clearRecents() {
       recentsCell.set([])
@@ -412,7 +427,7 @@ export function usePhone() {
         window.clearInterval(playTimer)
         playCell.set(null)
       }
-      vmCell.set(voicemails.filter((v) => v.id !== id))
+      vmCell.set(vmCell.get().filter((v) => v.id !== id))
     }
   }
 }

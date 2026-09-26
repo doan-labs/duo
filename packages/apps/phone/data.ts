@@ -201,7 +201,9 @@ export function formatNumber(raw: string) {
     else groups.push(rest)
     return `+${groups.filter(Boolean).join(' ')}`
   }
-  const n = d.length > 10 && d.startsWith('1') ? d.slice(1) : d
+  const n = d.length === 11 && d.startsWith('1') ? d.slice(1) : d
+  // Longer than NANP: keep every digit, grouped like the international path.
+  if (n.length > 10) return n.match(/.{1,3}/g)!.join(' ')
   const parts = [n.slice(0, 3), n.slice(3, 6), n.slice(6, 10)]
   if (n.length <= 3) return n
   if (n.length <= 6) return `(${parts[0]}) ${parts[1]}`
