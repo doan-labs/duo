@@ -109,16 +109,6 @@
         "react": "^19",
       },
     },
-    "packages/apps/findmy": {
-      "name": "@doan-labs/duo-app-findmy",
-      "version": "0.0.0",
-      "dependencies": {
-        "@doan-labs/duo-sdk": "workspace:*",
-        "@doan-labs/duo-uikit": "workspace:*",
-        "@stylexjs/stylex": "0.19.0",
-        "react": "^19",
-      },
-    },
     "packages/apps/fitness": {
       "name": "@doan-labs/duo-app-fitness",
       "version": "0.0.0",
@@ -151,16 +141,6 @@
     },
     "packages/apps/home": {
       "name": "@doan-labs/duo-app-home",
-      "version": "0.0.0",
-      "dependencies": {
-        "@doan-labs/duo-sdk": "workspace:*",
-        "@doan-labs/duo-uikit": "workspace:*",
-        "@stylexjs/stylex": "0.19.0",
-        "react": "^19",
-      },
-    },
-    "packages/apps/itunes": {
-      "name": "@doan-labs/duo-app-itunes",
       "version": "0.0.0",
       "dependencies": {
         "@doan-labs/duo-sdk": "workspace:*",
@@ -408,12 +388,10 @@
         "@doan-labs/duo-app-contacts": "workspace:*",
         "@doan-labs/duo-app-facetime": "workspace:*",
         "@doan-labs/duo-app-files": "workspace:*",
-        "@doan-labs/duo-app-findmy": "workspace:*",
         "@doan-labs/duo-app-fitness": "workspace:*",
         "@doan-labs/duo-app-freeform": "workspace:*",
         "@doan-labs/duo-app-health": "workspace:*",
         "@doan-labs/duo-app-home": "workspace:*",
-        "@doan-labs/duo-app-itunes": "workspace:*",
         "@doan-labs/duo-app-mail": "workspace:*",
         "@doan-labs/duo-app-maps": "workspace:*",
         "@doan-labs/duo-app-memos": "workspace:*",
@@ -550,8 +528,6 @@
 
     "@doan-labs/duo-app-files": ["@doan-labs/duo-app-files@workspace:packages/apps/files"],
 
-    "@doan-labs/duo-app-findmy": ["@doan-labs/duo-app-findmy@workspace:packages/apps/findmy"],
-
     "@doan-labs/duo-app-fitness": ["@doan-labs/duo-app-fitness@workspace:packages/apps/fitness"],
 
     "@doan-labs/duo-app-freeform": ["@doan-labs/duo-app-freeform@workspace:packages/apps/freeform"],
@@ -559,8 +535,6 @@
     "@doan-labs/duo-app-health": ["@doan-labs/duo-app-health@workspace:packages/apps/health"],
 
     "@doan-labs/duo-app-home": ["@doan-labs/duo-app-home@workspace:packages/apps/home"],
-
-    "@doan-labs/duo-app-itunes": ["@doan-labs/duo-app-itunes@workspace:packages/apps/itunes"],
 
     "@doan-labs/duo-app-mail": ["@doan-labs/duo-app-mail@workspace:packages/apps/mail"],
 

@@ -27,7 +27,7 @@ ICON_DIR = os.path.join(os.path.dirname(HERE), "src", "icons")
 APPS = ["FaceTime", "Calendar", "Photos", "Camera", "Mail", "Notes", "Reminders",
         "Clock", "News", "TV", "Podcasts", "App Store", "Maps", "Weather",
         "Calculator", "Settings", "Books", "Stocks", "Home",
-        "Freeform", "Shortcuts", "Find My", "Voice Memos"]
+        "Freeform", "Shortcuts", "Voice Memos"]
 DOCK = ["Phone", "Safari", "Messages", "Music"]
 
 

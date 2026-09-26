@@ -43,7 +43,7 @@ test('the app opens on the seeded gallery: eight cards and three automations', (
       'Play Music',
       'Today’s News',
       'Call Home',
-      'Find My Duo',
+      'Record a Memo',
       'Start Sketch',
       'Go Home'
     ]

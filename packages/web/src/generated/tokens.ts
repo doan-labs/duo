@@ -1123,16 +1123,6 @@ export const appAppearance: Token[] = [
     "doc": "The ring pulsing out of the caller's avatar, over the video."
   },
   {
-    "name": "findmyPulse",
-    "value": "rgba(0,136,255,.35)",
-    "doc": "findmy"
-  },
-  {
-    "name": "findmyTint",
-    "value": "#eaf3ff",
-    "doc": ""
-  },
-  {
     "name": "fitnessMove",
     "value": "#fa114f",
     "doc": "fitness"

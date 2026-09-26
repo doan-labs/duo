@@ -18,7 +18,7 @@ export type Cue = {
   at?: number
   /** Up from the home bar, a pause, let go: the running apps as cards. */
   switcher?: boolean
-  /** On the home screen: hold Find My, carry it onto Stocks, let go. The grid is factory first, so a return visit makes the same folder. */
+  /** On the home screen: hold Home, carry it onto Stocks, let go. The grid is factory first, so a return visit makes the same folder. */
   folder?: boolean
   /** Hold the paper, pick the next swatch along, put the sheet away. */
   wallpaper?: boolean
@@ -212,13 +212,13 @@ async function control(my: number) {
 const tile = (os: HTMLElement, name: string) =>
   [...os.querySelectorAll<HTMLElement>('[data-cell]')].find((t) => t.textContent === name)
 
-/** Hold Find My until it lifts, carry it onto Stocks, let go: the two become a folder. */
+/** Hold Home until it lifts, carry it onto Stocks, let go: the two become a folder. */
 async function folder(my: number) {
   const p = await panel(my)
   if (!p) return
   reset()
   await wait(400)
-  const from = tile(p.os, 'Find My')
+  const from = tile(p.os, 'Home')
   const to = tile(p.os, 'Stocks')
   if (!ok(my) || !from || !to) return
   const f = finger(from)

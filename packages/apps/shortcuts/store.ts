@@ -27,7 +27,6 @@ export const OPENABLE = [
   'Contacts',
   'FaceTime',
   'Files',
-  'Find My',
   'Fitness',
   'Freeform',
   'Health',
@@ -51,10 +50,7 @@ export const OPENABLE = [
   'Tips',
   'Voice Memos',
   'Wallet',
-  'Watch',
-  'Weather',
-  'YouTube',
-  'iTunes Store'
+  'Weather'
 ]
 
 /** The glyphs the icon picker offers. */
@@ -98,7 +94,7 @@ const seedShortcuts = (): Shortcut[] => [
   { id: 'sc-music', name: 'Play Music', icon: '🎧', steps: [{ action: 'Music' }] },
   { id: 'sc-news', name: 'Today’s News', icon: '📰', steps: [{ action: 'News' }] },
   { id: 'sc-call', name: 'Call Home', icon: '☎️', steps: [{ action: 'Phone' }] },
-  { id: 'sc-find', name: 'Find My Duo', icon: '📍', steps: [{ action: 'Find My' }] },
+  { id: 'sc-memo', name: 'Record a Memo', icon: '🎙️', steps: [{ action: 'Voice Memos' }] },
   { id: 'sc-sketch', name: 'Start Sketch', icon: '✏️', steps: [{ action: 'Freeform' }] },
   { id: 'sc-home', name: 'Go Home', icon: '🏠', steps: [{ action: GO_HOME }] }
 ]

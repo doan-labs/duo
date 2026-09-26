@@ -9,11 +9,9 @@ import { Camera } from '@doan-labs/duo-app-camera/index.tsx'
 import { Contacts } from '@doan-labs/duo-app-contacts/index.tsx'
 import { FaceTime } from '@doan-labs/duo-app-facetime/index.tsx'
 import { Files } from '@doan-labs/duo-app-files/index.tsx'
-import { FindMy } from '@doan-labs/duo-app-findmy/index.tsx'
 import { Fitness } from '@doan-labs/duo-app-fitness/index.tsx'
 import { Health } from '@doan-labs/duo-app-health/index.tsx'
 import { Home } from '@doan-labs/duo-app-home/index.tsx'
-import { Itunes } from '@doan-labs/duo-app-itunes/index.tsx'
 import { Mail } from '@doan-labs/duo-app-mail/index.tsx'
 import { Maps } from '@doan-labs/duo-app-maps/index.tsx'
 import { Memos } from '@doan-labs/duo-app-memos/index.tsx'
@@ -85,7 +83,6 @@ export const LEFT: App[] = [
 export const RIGHT: App[] = [
   { name: 'Weather', id: 'labs.doan.ipduo.weather', edge: true, ...RELEASE },
   { name: 'Stocks', view: Stocks },
-  { name: 'Find My', mock: true, light: true, view: FindMy },
   { name: 'Home', light: true, view: Home },
   { name: 'Fitness', view: Fitness },
   { name: 'Reminders', id: 'labs.doan.ipduo.reminders', light: true, ...RELEASE },
@@ -94,7 +91,6 @@ export const RIGHT: App[] = [
   // A folder opens on the home screen, never as a scene; springboard/grid.ts reads what it holds.
   { name: 'Utilities', folder: UTILITIES, view: () => null },
   { name: 'Contacts', light: true, view: Contacts },
-  { name: 'iTunes Store', mock: true, light: true, view: Itunes },
   { name: 'Freeform', id: 'labs.doan.ipduo.freeform', light: true, ...RELEASE },
   { name: 'Tips', light: true, view: Tips }
 ]
