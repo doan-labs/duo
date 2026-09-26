@@ -70,6 +70,7 @@ Both displays run the same app session as separate views on one set of iframes. 
 - App bundles embed `packages/shell/index.html`'s FIRST `<style>` block as their own reset (scripts/build-app.ts extracts only the first block). Scene-only rules - e.g. the `canvas { opacity: 0; }` fade-in for the WebGL model - must live in a SECOND `<style>` block, or they leak into every sandboxed app bundle and invisibly hide app canvases (markup strokes draw but never appear).
 - `press Escape` / `agent-browser key Escape` maps to the device's Home button - it sends the running app back to SpringBoard. Never use it to dismiss an in-app menu or sheet; click the scrim/outside region instead.
 - The `?app=<id>` autolaunch leaves a `div.sandbox__styles.sheet` "Connecting..." scrim over the display while the app's session comes up. `agent-browser click` refuses clicks through it - wait for the app iframe to mount instead of clicking the scrim away.
+- The app switcher cannot be opened by dragging a parked app's home bar (that grab exists only on the live scene's bar). The reliable path is the faint SpringBoard home bar's `rise` handler: `onPointerDown` on it, then a `pointermove` past `dy > 49` px. If the camera ended up orbited behind the phone, `__duo.controls.reset()` recovers the front view.
 
 ## Testing community apps served by the CLI dev server
 
