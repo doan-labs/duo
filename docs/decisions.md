@@ -1738,3 +1738,48 @@ fold without a remount, and the quiet flag on `open()` is back to meaning only
 "born with no zoom". And because the flag only reaches effects at render
 time, `follow()` pokes both displays' scene lists on crossover (`wake`), so
 the flip lands at the fold rather than on the next store write.
+
+## 103. Stocks quotes the market instead of inventing one
+
+2026-09-25. The Stocks app was the last fake feed on the phone: a seeded `walk()`
+that produced plausible numbers for every ticker, hardcoded rows, dead range pills
+and a Mockup pill to say so.
+
+Both copies now read a module-level store backed by three free public feeds, all
+CORS-open so no proxy or key exists: CNBC's quote service batches the watchlist
+plus the viewed symbol every 25s (price, delta, company name, market state and
+the extended-hours print, OHLCV and fundamentals into the stats grid), CNBC's
+Business RSS feeds the headline section every 15 minutes, stockanalysis.com
+serves the daily history that drives the chart and the row sparklines plus the
+symbol search that Follow works from, and Coinbase candles give crypto the true
+intraday series no free equity feed offers.
+
+Honesty over completeness, the same rule as decision 7: indexes quote and stat
+but say "Historical data is not available for index symbols." rather than draw a
+line, and equities carry no 1D range because no keyless intraday source exists.
+The watchlist and the viewed symbol persist in localStorage, `viewing` is
+decoupled from the list so a searched or unfollowed symbol still has a detail,
+and every fetch and timer is gated on `!os.mirror` so the second copy draws
+everything and starts nothing.
+
+## 104. The Stocks detail chart is LiveLine, not a drawn SVG
+
+2026-09-25. The detail chart now renders through `liveline` (LiveLine) instead of
+the app's hand-drawn SVG: a 60fps canvas line with a live dot, value badge,
+scrub crosshair and a morph between ranges, so the chart feels live rather than
+replaced. The small SVG remains the row sparkline and the mirror copy's chart.
+
+Three integration gotchas, all handled at the boundary in `chart.tsx`. LiveLine
+wants unix seconds while the store keeps points in ms, so `Live` divides at the
+edge. Its `window` prop defaults to a 30s streaming window and clips anything
+before `now - window`, so it is computed as `now - first.time` to cover the full
+fetched range. And StyleX tokens resolve to `var(--x)` strings that a DOM can
+read but a canvas `strokeStyle` silently ignores, so the line colour passes
+through `canvasColor`, which reads the resolved custom property off
+`:root`. The shell reset also had to stop claiming every canvas: the scene
+canvas rule in `index.html` is scoped to `body > canvas` or it hijacks
+LiveLine's absolutely positioned canvas.
+
+The chart still scrubs like Apple's: `onHover` feeds the big price and swaps
+the delta line to the hovered point's date, and the previous close draws as a
+dashed reference only when it sits inside the visible range.

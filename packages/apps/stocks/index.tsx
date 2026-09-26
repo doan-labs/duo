@@ -1,144 +1,115 @@
-import { Row, Screen, Section, Text, Title, VStack } from '@doan-labs/duo-uikit'
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+// Stocks, rebuilt on live feeds. The iPadOS shape unfolded - a sidebar of
+// symbols beside the detail pane - and the same destinations pushed folded.
+// Quotes and headlines come from CNBC, daily history and symbol search from
+// stockanalysis.com, crypto intraday from Coinbase; every number on screen is
+// fetched, nothing is walked. The mirror copy starts nothing: start() and the
+// fetch hooks all gate on the `os.mirror` getter, which follows the fold.
 
-// Stocks: a watchlist with sparklines, and a detail page whose chart draws itself in.
-
-import { poly, walk } from '@doan-labs/duo-fixtures'
-import { Nav, Page, useNav } from '@doan-labs/duo-uikit/nav.tsx'
+import type { Os } from '@doan-labs/duo-sdk'
+import { Button, Nav, Page, Text, Title, useNav, useWide } from '@doan-labs/duo-uikit'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
+import { useEffect, useState } from 'react'
+import { Chart, Live, Spark, tickFmt } from './chart.tsx'
+import {
+  follow,
+  type Item,
+  type Point,
+  type Quote,
+  RANGES,
+  type StatKey,
+  searchSymbols,
+  select,
+  start,
+  unfollow,
+  useHistory,
+  useNews,
+  useQuote,
+  useSpark,
+  useStore
+} from './data.ts'
 import { styles } from './styles.ts'
 
-const TICKERS: [string, string, number][] = [
-  ['AAPL', 'Apple Inc.', 231.4],
-  ['NVDA', 'NVIDIA Corp.', 118.9],
-  ['TSM', 'Taiwan Semi.', 182.6],
-  ['MSFT', 'Microsoft', 421.7],
-  ['ADBE', 'Adobe Inc.', 512.3],
-  ['SONY', 'Sony Group', 88.2],
-  ['^GSPC', 'S&P 500', 5738.2]
-]
-
-const RANGES = ['1D', '1W', '1M', '3M', '1Y', 'ALL']
-
-// Deterministic walks, not a quote feed: every free real-time quote API needs
-// a key, and this only has to move convincingly.
-const Spark = ({ t, w, ht, animate = false }: { t: string; w: number; ht: number; animate?: boolean }) => {
-  const pts = walk(t, 34)
-  return (
-    <svg viewBox={`0 0 ${w} ${ht}`} {...stylex.props(styles.spark, styles.size(w, ht))}>
-      <path
-        d={poly(pts, w, ht)}
-        fill="none"
-        strokeWidth={1.8}
-        strokeLinejoin="round"
-        stroke={pts[pts.length - 1]! >= pts[0]! ? colors.greenDark : colors.redDark}
-        {...stylex.props(animate && styles.draw)}
-      />
-    </svg>
-  )
-}
-
-const pct = (t: string) => {
-  const pts = walk(t, 34)
-  return (pts[pts.length - 1]! - pts[0]!) / 12
-}
 const two = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
 const signed = { ...two, signDisplay: 'exceptZero' as const }
+const compact = { notation: 'compact' as const, maximumFractionDigits: 1 }
 
-const List = () => {
-  const { push } = useNav()
+export function Stocks({ os }: { os: Os }) {
+  const [root, wide] = useWide()
+  const { items, viewing } = useStore()
+  // `os.mirror` follows the pose, so the live copy starts polling when the fold
+  // hands it the device, not only when the app was first opened.
+  useEffect(() => {
+    if (!os.mirror) start()
+  }, [os.mirror])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the arg applies once at open; later picks are the user's
+  useEffect(() => {
+    if (os.arg) {
+      const hit = items.find((v) => v.sym === os.arg)
+      if (hit) select(hit)
+    }
+  }, [])
   return (
-    <div>
-      {TICKERS.map(([t, name, base]) => {
-        const d = pct(t)
-        return (
-          <div
-            key={t}
-            {...stylex.props(styles.tik)}
-            onClick={() => push((back) => <Detail t={t} name={name} base={base} d={d} back={back} />)}
-          >
-            <div {...stylex.props(styles.nm)}>
-              <b {...stylex.props(typography.callout, styles.symbol)}>{t}</b>
-              <Text as="div" size="caption">
-                {name}
-              </Text>
-            </div>
-            <Spark t={t} w={64} ht={30} />
-            <div {...stylex.props(styles.right)}>
-              <div {...stylex.props(styles.price)}>
-                <Num value={base} format={two} />
-              </div>
-              <div {...stylex.props(typography.footnote, styles.chip, d < 0 && styles.dn)}>
-                <Num value={d} format={signed} suffix="%" />
-              </div>
-            </div>
+    <div ref={root} {...stylex.props(styles.split)}>
+      {wide && <Side os={os} />}
+      <div {...stylex.props(styles.detail)}>
+        {wide ? (
+          <div {...stylex.props(styles.detailScroll)}>
+            <Detail key={viewing.sym} item={viewing} showNews os={os} />
           </div>
-        )
-      })}
+        ) : (
+          <Nav>
+            <Home os={os} />
+          </Nav>
+        )}
+      </div>
     </div>
   )
 }
 
-const Detail = ({ t, name, base, d, back }: { t: string; name: string; base: number; d: number; back: () => void }) => {
-  const stats: [string, number][] = [
-    ['Open', base * 0.994],
-    ['High', base * 1.012],
-    ['Low', base * 0.981],
-    ['Vol', 41.2],
-    ['Mkt Cap', base * 15.6],
-    ['P/E', 29.4]
-  ]
+// -- the sidebar ----------------------------------------------------------------
+
+function Side({ os }: { os: Os }) {
+  const { items, viewing } = useStore()
+  const [query, setQuery] = useState('')
+  const searching = query.trim().length > 0
   return (
-    <VStack>
-      <Title xstyle={[typography.headline]}>
-        <button type="button" {...stylex.props(shared.bk)} onClick={back}>
-          <Sym name="back" size={20} />
-          Stocks
-        </button>
-      </Title>
-      <Screen>
-        <div {...stylex.props(styles.quote)}>
-          <div {...stylex.props(typography.title1)}>{t}</div>
-          <Text as="div" size="caption">
-            {name}
-          </Text>
-          <div {...stylex.props(typography.title1, styles.bigPrice)}>
-            <Num value={base} format={two} />
-          </div>
-          <div {...stylex.props(typography.footnote, styles.delta, d < 0 && styles.deltaDn)}>
-            <Num value={(base * d) / 100} format={signed} /> (<Num value={d} format={two} suffix="%" />)
-          </div>
-        </div>
-        <div {...stylex.props(styles.chart)}>
-          <Spark t={t} w={340} ht={150} animate />
-        </div>
-        <div {...stylex.props(styles.ranges)}>
-          {RANGES.map((r, i) => (
-            <span key={r} {...stylex.props(shared.pill, i === 2 && styles.pillOn)}>
-              {r}
-            </span>
-          ))}
-        </div>
-        <Section>
-          {stats.map(([k, v]) => (
-            <Row key={k}>
-              {k}
-              <span {...stylex.props(shared.rowR, styles.value)}>
-                <Num value={v} format={two} />
-              </span>
-            </Row>
-          ))}
-        </Section>
-      </Screen>
-    </VStack>
+    <nav aria-label="Stocks" {...stylex.props(styles.side)}>
+      <div {...stylex.props(styles.sideScroll)}>
+        <SearchBox query={query} setQuery={setQuery} side />
+        {searching ? (
+          <SearchResults query={query} onPick={select} side />
+        ) : (
+          <>
+            <Text as="div" size="footnote" color="secondary" xstyle={[styles.secLabel, styles.secLabelSide]}>
+              My Symbols
+            </Text>
+            {items.map((v) => (
+              <SymbolRow key={v.sym} item={v} os={os} side on={v.sym === viewing.sym} onPick={select} />
+            ))}
+          </>
+        )}
+      </div>
+    </nav>
   )
 }
 
-export const Stocks = () => (
-  <Nav>
+// -- the cover's list page --------------------------------------------------------
+
+function Home({ os }: { os: Os }) {
+  const { push } = useNav()
+  const { items } = useStore()
+  const [query, setQuery] = useState('')
+  const searching = query.trim().length > 0
+  const open = (v: Item) => {
+    select(v)
+    // `os` is the same object on every copy, so a page pushed before a fold
+    // still reads the live `mirror` getter when it next renders.
+    push((back) => <DetailPage item={v} back={back} os={os} />)
+  }
+  return (
     <Page
       title={
         <>
@@ -149,7 +120,394 @@ export const Stocks = () => (
         </>
       }
     >
-      <List />
+      <SearchBox query={query} setQuery={setQuery} />
+      {searching ? (
+        <SearchResults query={query} onPick={open} />
+      ) : (
+        <>
+          {items.map((v) => (
+            <SymbolRow key={v.sym} item={v} os={os} onPick={open} />
+          ))}
+          <Business />
+        </>
+      )}
     </Page>
-  </Nav>
+  )
+}
+
+function DetailPage({ item, back, os }: { item: Item; back: () => void; os: Os }) {
+  return (
+    <Page title={item.sym} back={back}>
+      <div {...stylex.props(styles.detailPad)}>
+        <Detail item={item} os={os} />
+      </div>
+    </Page>
+  )
+}
+
+// -- search -----------------------------------------------------------------------
+
+function SearchBox({ query, setQuery, side }: { query: string; setQuery: (q: string) => void; side?: boolean }) {
+  return (
+    <div {...stylex.props(styles.searchWrap, side && styles.searchWrapSide)}>
+      <span {...stylex.props(styles.searchBox)}>
+        <Sym name="search" size={15} />
+        <input
+          type="text"
+          placeholder="Search"
+          value={query}
+          aria-label="Search symbols"
+          autoCorrect="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          onChange={(e) => setQuery(e.target.value)}
+          {...stylex.props(styles.searchInput)}
+        />
+        {query !== '' && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            {...stylex.props(styles.clearBtn)}
+            onClick={() => setQuery('')}
+          >
+            <Sym name="close" size={14} />
+          </button>
+        )}
+      </span>
+      {query !== '' && (
+        <button type="button" {...stylex.props(styles.cancel)} onClick={() => setQuery('')}>
+          Cancel
+        </button>
+      )}
+    </div>
+  )
+}
+
+function SearchResults({ query, onPick, side }: { query: string; onPick: (v: Item) => void; side?: boolean }) {
+  const { items } = useStore()
+  const have = new Set(items.map((v) => v.sym))
+  const [results, setResults] = useState<Item[] | null>(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    setPending(true)
+    setError(undefined)
+    const ac = new AbortController()
+    const id = setTimeout(() => {
+      void searchSymbols(query.trim(), ac.signal)
+        .then((found) => {
+          setResults(found)
+          setPending(false)
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return
+          setResults(null)
+          setError('Search unavailable. Try again.')
+          setPending(false)
+        })
+    }, 260)
+    return () => {
+      clearTimeout(id)
+      ac.abort()
+    }
+  }, [query])
+  if (pending && !results?.length) return <div {...stylex.props(styles.empty)}>Searching…</div>
+  if (error) return <div {...stylex.props(styles.empty)}>{error}</div>
+  if (!results?.length) return <div {...stylex.props(styles.empty)}>No results</div>
+  return (
+    <div>
+      {results.map((v) => (
+        <button
+          key={v.sym}
+          type="button"
+          onClick={() => onPick(v)}
+          {...stylex.props(styles.result, side && styles.resultSide, shared.press)}
+        >
+          <span {...stylex.props(styles.tickMain)}>
+            <span {...stylex.props(typography.headline, styles.symbol)}>{v.sym}</span>
+            <Text as="span" size="footnote" color="secondary" xstyle={styles.tickName}>
+              {v.name}
+            </Text>
+          </span>
+          <Sym name={have.has(v.sym) ? 'check' : 'plus'} size={16} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// -- the watchlist row ------------------------------------------------------------
+
+function SymbolRow({
+  item,
+  os,
+  side,
+  on,
+  onPick
+}: {
+  item: Item
+  os: Os
+  side?: boolean
+  on?: boolean
+  onPick: (v: Item) => void
+}) {
+  const quote = useQuote(item.sym)
+  const spark = useSpark(item, !os.mirror)
+  const q = quote.data
+  const dn = (q?.chgPct ?? 0) < 0
+  return (
+    <button
+      type="button"
+      aria-current={on || undefined}
+      onClick={() => onPick(item)}
+      {...stylex.props(styles.tick, side && styles.tickSide, on && styles.tickOn, !side && shared.press)}
+    >
+      <span {...stylex.props(styles.tickMain)}>
+        <span {...stylex.props(typography.headline, styles.symbol)}>{item.sym}</span>
+        <Text as="span" size="footnote" color="secondary" xstyle={styles.tickName}>
+          {q?.name || item.name || ' '}
+        </Text>
+      </span>
+      {item.kind !== 'index' && <Spark pts={spark.data ?? []} w={56} ht={28} />}
+      <span {...stylex.props(styles.right)}>
+        <span {...stylex.props(typography.callout, styles.price)}>
+          <Num value={q?.px} format={two} />
+        </span>
+        <span {...stylex.props(typography.footnote, styles.chip, dn && styles.dn)}>
+          {q ? <Num value={q.chgPct} format={signed} suffix="%" /> : '—'}
+        </span>
+      </span>
+    </button>
+  )
+}
+
+// -- the detail pane ----------------------------------------------------------------
+
+const extTone = (v: number) => (v < 0 ? styles.deltaDn : styles.delta)
+
+/** The quote block, range pills, chart, stats grid and follow toggle. */
+function Detail({ item, showNews, os }: { item: Item; showNews?: boolean; os: Os }) {
+  const { items } = useStore()
+  const inList = items.some((v) => v.sym === item.sym)
+  const quote = useQuote(item.sym)
+  const ranges = RANGES[item.kind]
+  const [range, setRange] = useState(item.kind === 'crypto' ? '1D' : '1M')
+  // Read at render: the getter follows the fold, and this component re-renders
+  // on every store emit even when it sits in a pushed Nav page.
+  const live = !os.mirror
+  const { entry, pts } = useHistory(item, range, live)
+  const q = quote.data
+  const dn = (q?.chgPct ?? 0) < 0
+  // Scrubbing the live chart borrows Apple's gesture: the big price and the
+  // line under it show the hovered point's close and time instead.
+  const [hover, setHover] = useState<Point | null>(null)
+  const fmt = tickFmt(pts)
+  return (
+    <>
+      <div {...stylex.props(styles.quoteTop)}>
+        <span {...stylex.props(styles.tickMain)}>
+          <span {...stylex.props(typography.title1)}>{item.sym}</span>
+          <Text as="div" size="footnote" color="secondary" xstyle={styles.quoteName}>
+            {q?.name || item.name}
+          </Text>
+        </span>
+        <Button
+          variant="tinted"
+          onClick={() => {
+            if (inList) unfollow(item.sym)
+            else follow(item)
+          }}
+        >
+          {inList ? 'Following' : '+ Follow'}
+        </Button>
+      </div>
+      <div {...stylex.props(styles.bigPrice)}>
+        <Num value={hover?.c ?? q?.px} format={two} />
+      </div>
+      <div {...stylex.props(typography.subheadline, styles.delta, dn && styles.deltaDn)}>
+        {hover ? (
+          <span {...stylex.props(styles.hoverDate)}>{fmt(hover.t)}</span>
+        ) : q ? (
+          <>
+            <Num value={q.chg} format={signed} /> (<Num value={q.chgPct} format={two} suffix="%" />)
+          </>
+        ) : (
+          (quote.error ?? ' ')
+        )}
+      </div>
+      {q && <MarketLine q={q} />}
+      {ranges.length > 0 && (
+        <div {...stylex.props(styles.ranges)}>
+          {ranges.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => {
+                setRange(r)
+                setHover(null)
+              }}
+              {...stylex.props(styles.rangePill, typography.footnote, r === range && styles.pillOn)}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      )}
+      {ranges.length > 0 && (
+        <div {...stylex.props(styles.chartWrap)}>
+          {live ? (
+            <Live pts={pts} px={q?.px} prev={q?.stats.prev} loading={entry.loading} onHover={setHover} />
+          ) : (
+            <Chart pts={pts} />
+          )}
+        </div>
+      )}
+      {ranges.length > 0 && (
+        <Text as="div" size="caption1" xstyle={styles.chartFoot}>
+          {entry.error ??
+            (pts.length
+              ? new Date(pts[pts.length - 1]!.t).toLocaleDateString('en', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+              : entry.loading
+                ? 'Loading…'
+                : ' ')}
+        </Text>
+      )}
+      {ranges.length === 0 && (
+        <Text as="div" size="footnote" color="secondary" xstyle={styles.chartFoot}>
+          Historical data is not available for index symbols.
+        </Text>
+      )}
+      <Stats q={q} />
+      {showNews && <Business />}
+    </>
+  )
+}
+
+/** Extended-hours or market-state line, as the real app prints it. */
+function MarketLine({ q }: { q: Quote }) {
+  const ext = q.ext
+  if ((q.status === 'POST_MKT' || q.status === 'CLOSED') && !ext)
+    return (
+      <Text as="div" size="footnote" xstyle={styles.mktLine}>
+        Market Closed
+      </Text>
+    )
+  if ((q.status === 'POST_MKT' || q.status === 'CLOSED') && ext)
+    return (
+      <Text as="div" size="footnote" xstyle={styles.mktLine}>
+        Extended Hours: <Num value={ext.px} format={two} />{' '}
+        <Text as="span" size="footnote" xstyle={extTone(ext.chgPct)}>
+          <Num value={ext.chgPct} format={signed} suffix="%" />
+        </Text>
+        {ext.when ? ` · ${ext.when}` : ''}
+      </Text>
+    )
+  if (q.status === 'PRE_MKT' && ext)
+    return (
+      <Text as="div" size="footnote" xstyle={styles.mktLine}>
+        Pre-Market: <Num value={ext.px} format={two} />{' '}
+        <Text as="span" size="footnote" xstyle={extTone(ext.chgPct)}>
+          <Num value={ext.chgPct} format={signed} suffix="%" />
+        </Text>
+        {ext.when ? ` · ${ext.when}` : ''}
+      </Text>
+    )
+  return null
+}
+
+const STAT_ROWS: [StatKey, string][] = [
+  ['open', 'Open'],
+  ['high', 'High'],
+  ['low', 'Low'],
+  ['prev', 'Prev Close'],
+  ['vol', 'Vol'],
+  ['avg', 'Avg Vol'],
+  ['cap', 'Mkt Cap'],
+  ['pe', 'P/E'],
+  ['eps', 'EPS'],
+  ['beta', 'Beta'],
+  ['div', 'Div Yield'],
+  ['hi52', '52W High'],
+  ['lo52', '52W Low']
+]
+
+function Stats({ q }: { q?: Quote }) {
+  const rows = STAT_ROWS.filter(([k]) => q?.stats[k] != null)
+  if (!rows.length) return null
+  return (
+    <div {...stylex.props(styles.statGrid)}>
+      {rows.map(([k, label]) => (
+        <div key={k} {...stylex.props(styles.stat)}>
+          <Text as="span" size="caption1" color="secondary" xstyle={styles.statLabel}>
+            {label}
+          </Text>
+          <Text as="span" size="callout" weight="medium" xstyle={styles.statVal}>
+            <Num
+              value={q!.stats[k]}
+              format={k === 'vol' || k === 'avg' || k === 'cap' ? compact : two}
+              suffix={k === 'div' ? '%' : undefined}
+            />
+          </Text>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// -- the Business feed ----------------------------------------------------------------
+
+const ago = (when: number) => {
+  const m = Math.max(0, Math.round((Date.now() - when) / 60_000))
+  if (m < 60) return `${m}m ago`
+  const h = Math.round(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.round(h / 24)}d ago`
+}
+
+function Business() {
+  const news = useNews()
+  const items = news.data ?? []
+  if (!items.length && !news.data) {
+    if (news.loading) return null
+    if (news.error) {
+      return (
+        <>
+          <SectionLabel>Business</SectionLabel>
+          <div {...stylex.props(styles.empty)}>{news.error}</div>
+        </>
+      )
+    }
+    return null
+  }
+  return (
+    <>
+      <SectionLabel>Business</SectionLabel>
+      {items.map((h, i) => (
+        <a
+          key={h.url}
+          href={h.url}
+          target="_blank"
+          rel="noreferrer"
+          {...stylex.props(styles.newsItem, i === 0 && styles.newsFirst)}
+        >
+          <Text as="span" size="subheadline" xstyle={styles.newsTitle}>
+            {h.title}
+          </Text>
+          <Text as="span" size="caption1" xstyle={styles.newsMeta}>
+            CNBC · {ago(h.when)}
+          </Text>
+        </a>
+      ))}
+    </>
+  )
+}
+
+const SectionLabel = ({ children }: { children: string }) => (
+  <Text as="div" size="footnote" color="secondary" xstyle={styles.secLabel}>
+    {children}
+  </Text>
 )
