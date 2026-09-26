@@ -205,13 +205,40 @@ must launch the browser without `--hide-scrollbars`.
 
 ## Maps maintenance
 
-`data.ts` owns the places, the tile URLs and the Web Mercator maths; `map.tsx` draws the
-tile grid, the pins and the map chrome, `sidebar.tsx` the search column, `place.tsx` the
-selected place. Explore uses OpenStreetMap Japan's MapTiler Basic raster and Satellite uses
-Esri World Imagery, both keyless: CARTO watermarks anonymous requests and Stadia rejects
-them. Places sit at their real coordinates; walking times are invented, and recents are
-sampled from the list at load rather than persisted. Nothing routes or geocodes, so search
-filters the place list and no control opens a backend.
+`data.ts` owns the places, the tile URLs and the Web Mercator maths (`zoomAt` keeps the
+point under the cursor still, `fit` frames a route in what the panels leave uncovered);
+`map.tsx` draws the tile grid, the pins, the route overlay and the map chrome, `sidebar.tsx`
+the search column, `place.tsx` the selected place, `directions.tsx` the ways there and the
+steps. `live.ts` holds the backends: Photon geocodes the search field and reverse-geocodes
+dropped pins and the blue dot, and FOSSGIS's OSRM hosts (`routed-car`, `routed-bike`,
+`routed-foot`) return the routes - all keyless and CORS-open, so no secret rides in the
+bundle. `share.ts` is the store both copies draw: query, results, selection, directions,
+routes, estimate, `me`, recents, the camera `view` and the layer `kind` are one module
+state, so the fold hands the same map over whole - either copy writes intent and only
+the `!os.mirror` copy fetches or animates. The mirror's `flyTo` writes the target view
+flat instead of scheduling frames; the live copy's animation frames land in the store
+and the folded display draws them. `os.mirror` reads live from `active.wide` and
+`follow()` pokes both displays' scene lists at the crossover (`wake`), so the flag
+reaches the apps' effects at the fold itself, not on the next store write. The directions
+scroll offset shares the store too: either copy writes its scrollTop debounced, both
+settle on the shared value whenever it changes and as the scroller's sheet expands
+(its scrollTop clamps to 0 while the sheet is still animating), and a new
+destination, mode or route remounts the scroller at the top. Results
+and routes are keyed by the request that asked for them - the search key carries a
+~0.5-degree camera bucket so a query re-biases when the map crosses towns - and each
+record counts `tries`: a failure retries once, reopening directions clears the failed
+record to ask again, and no render can loop a fetch. `camera.ts` is the fly plan behind
+every jump: `flyTo` runs it through a rAF
+driver, drag and wheel interrupt it, a released drag coasts on its velocity, and zoom is
+fractional - tiles render at the nearest integer level scaled by `2 ** (z - tileZ)`.
+Flights take the short path across the date line (the wrapped longitude nearest the
+start) and views stay inside +-180; pins and route taps resolve their x the same
+wrapped way the tile columns already did.
+Explore uses OpenStreetMap Japan's MapTiler Basic raster and Satellite uses Esri World
+Imagery, both keyless: CARTO watermarks anonymous requests and Stadia rejects them. Recents
+start from the same sample as before and grow with what the session actually looks up.
+Every fetch gates on `!os.mirror`: the folded-away copy draws but searches, routes and
+locates nothing.
 
 Panels run the full height of the display and pad their own content past the 40 px status
 stack, which the map draws under. `ASIDE` and `CARD` in `styles.ts` are also what the map

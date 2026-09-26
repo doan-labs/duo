@@ -12,7 +12,7 @@ import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
-import { device, type Stage } from '../device.ts'
+import { active, device, type Stage } from '../device.ts'
 import { store } from '../runtime/catalog.ts'
 import { deliverArg } from '../runtime/sessions.ts'
 import { type Box, type Side, settle, spot, zone, zoom } from './gestures.ts'
@@ -81,6 +81,10 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     return on.length === 2 || on.some((e) => !e.side)
   }
 
+  // `active.wide` flipped at a crossover: a fresh list re-renders the scenes so
+  // `ctx.mirror` - a live read of the pose - reaches the apps' effects.
+  const wake = () => setList([...live.current])
+
   // `?app=` opens before the panel is in the document, where clientWidth is 0
   // and the scale factor comes out infinite. Fall back to the known size.
   const panel = () => [disp.current?.clientWidth || w - 22, disp.current?.clientHeight || hgt - 22] as const
@@ -115,7 +119,12 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
       home: () => park(id),
       arg,
       display: w > 600 ? 'inner' : 'cover',
-      mirror: quiet || undefined,
+      get mirror() {
+        // Decision 24 reads live: the twin on the folded-away display is the
+        // mirror, so the flag follows the pose - whichever side is not in use
+        // right now - rather than staying with the spawn that made it.
+        return w > 600 !== active.wide || undefined
+      },
       camera: { current: null },
       // The LED is the flashlight switch: the Camera's rear flash and video
       // torch light the same light Control Center does.
@@ -270,6 +279,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     launch,
     stage,
     mirror,
+    wake,
     cam
   }
 }

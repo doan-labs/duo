@@ -268,6 +268,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
       launch,
       stage: ctl.stage,
       mirror: ctl.mirror,
+      wake: ctl.wake,
       covered: ctl.covered,
       cam: ctl.cam,
       hud,
