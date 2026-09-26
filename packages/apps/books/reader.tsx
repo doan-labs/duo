@@ -77,7 +77,8 @@ export function Reader({ id }: { id: string }) {
   // modes re-restores instead of landing on a stale spread/scroll.
   const restored = useRef<'paged' | 'vert' | null>(null)
   const [w, setW] = useState(0)
-  const [map, setMap] = useState<{ spreads: number; block: number[] }>({ spreads: 1, block: [] })
+  const [tick, setTick] = useState(0)
+  const [map, setMap] = useState<{ spreads: number; block: number[]; bad?: boolean }>({ spreads: 1, block: [] })
   const [at, setAt] = useState(0)
   const [tocSeg, setTocSeg] = useState<'Contents' | 'Bookmarks'>('Contents')
   const [find, setFind] = useState('')
@@ -113,20 +114,29 @@ export function Reader({ id }: { id: string }) {
       const col = Math.round(((el.getBoundingClientRect().left - fr.left) * k) / step)
       return Math.max(0, Math.min(count - 1, Math.floor(col / cols)))
     })
-    setMap({ spreads: count, block })
+    // Mid-fold the panel is edge-on and projected rects collapse every block to
+    // spread 0. Don't trust that map - re-measure once the transition settles.
+    const bad = count > 1 && block.every((v) => v === 0)
+    if (bad && tick < 8) {
+      const t = setTimeout(() => setTick((x) => x + 1), 250)
+      return () => clearTimeout(t)
+    }
+    setMap({ spreads: count, block, bad })
     if (ui.seek != null) {
       sought.current = true
       restored.current = 'paged'
-      setAt(block[ui.seek] ?? 0)
+      setAt(bad ? Math.min(count - 1, Math.round((ui.seek / (blks.length - 1)) * (count - 1))) : (block[ui.seek] ?? 0))
       clearSeek()
     } else if (!sought.current || restored.current !== 'paged') {
       sought.current = true
-      restored.current = 'paged'
-      setAt(block[Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))] ?? 0)
+      const h = Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))
+      setAt(bad ? Math.round((lib.progress[id]?.frac ?? 0) * (count - 1)) : (block[h] ?? 0))
+      // A healed re-measure should re-restore to block precision.
+      if (!bad) restored.current = 'paged'
     } else {
       setAt((a) => Math.min(count - 1, a))
     }
-  }, [w, pw, cols, prefs.size, prefs.font, prefs.theme, vertical, blks, id, step, lib.progress, ui.seek])
+  }, [w, pw, cols, prefs.size, prefs.font, prefs.theme, vertical, blks, id, step, lib.progress, ui.seek, tick])
 
   // Vertical mode: restore the saved position once per entry into the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the prefs entries re-run it after the text reflows
@@ -180,10 +190,10 @@ export function Reader({ id }: { id: string }) {
   // Persist position (throttled): the topmost block as a book fraction, so both
   // displays agree and no precision is lost in spread rounding.
   useEffect(() => {
-    if (!sought.current || spreads <= 1) return
+    if (!sought.current || spreads <= 1 || map.bad) return
     const t = setTimeout(() => setProgress(id, head / Math.max(1, blks.length - 1)), 120)
     return () => clearTimeout(t)
-  }, [head, spreads, id, blks.length])
+  }, [head, spreads, map.bad, id, blks.length])
   const marked = marks.some((m) => (vertical ? m.b === head : (map.block[m.b] ?? -1) === at))
 
   // Keyboard turns.
