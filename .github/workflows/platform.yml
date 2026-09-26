@@ -3,51 +3,19 @@ on:
   pull_request:
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      source_sha:
-        description: 'Commit to build after workstation fallback'
-        type: string
-        required: false
 permissions:
   contents: read
 jobs:
   platform:
-    runs-on: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && fromJSON('{"group":"duo-trusted-ci","labels":["duo-wsl2"]}') || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       # Bun's FTL optimizer miscompiles StyleX's media-query parser: oven-sh/bun#41609.
       BUN_JSC_useFTLJIT: 'false'
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.source_sha || github.sha }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
       - run: bun scripts/check-platform.ts
-      - name: Remove local build files
-        if: always() && github.event_name == 'push'
-        run: rm -rf "$GITHUB_WORKSPACE/node_modules" "$GITHUB_WORKSPACE/.cache" "$HOME/.bun/install/cache"
-  fallback:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
-    permissions:
-      actions: write
-    steps:
-      - name: Move a queued build to GitHub-hosted CI
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for attempt in 1 2 3 4 5 6; do
-            sleep 15
-            status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "platform") | .status' | head -n1)"
-            case "$status" in
-              queued|waiting|pending|'') ;;
-              *) exit 0 ;;
-            esac
-          done
-          gh workflow run platform.yml -R "$GITHUB_REPOSITORY" --ref main -f source_sha="$GITHUB_SHA"
-          gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"
