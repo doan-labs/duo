@@ -279,6 +279,11 @@ export const app: Token[] = [
     "name": "control",
     "value": "#fff",
     "doc": "The raised segment of a segmented control."
+  },
+  {
+    "name": "glass",
+    "value": "rgba(255,255,255,.18)",
+    "doc": "The app's own glass chrome (sidebar, tab bar, menu): `glass.tint` on a light app, `glass.tintDark` on a dark one."
   }
 ]
 
@@ -472,6 +477,82 @@ export const tracking: Token[] = [
   {
     "name": "caption2",
     "value": "0.07px",
+    "doc": ""
+  }
+]
+
+export const booksFonts: Token[] = [
+  {
+    "name": "athelas",
+    "value": "Athelas,\"Charis SIL\",\"Iowan Old Style\",Georgia,serif",
+    "doc": ""
+  },
+  {
+    "name": "charter",
+    "value": "Charter,\"Bitstream Charter\",Cambria,serif",
+    "doc": ""
+  },
+  {
+    "name": "georgia",
+    "value": "Georgia,\"Times New Roman\",serif",
+    "doc": ""
+  },
+  {
+    "name": "iowan",
+    "value": "\"Iowan Old Style\",\"Palatino Linotype\",Palatino,serif",
+    "doc": ""
+  },
+  {
+    "name": "palatino",
+    "value": "Palatino,\"Palatino Linotype\",\"Book Antiqua\",serif",
+    "doc": ""
+  },
+  {
+    "name": "seravek",
+    "value": "Seravek,\"Gill Sans\",\"Avenir Next\",system-ui,sans-serif",
+    "doc": ""
+  },
+  {
+    "name": "times",
+    "value": "\"Times New Roman\",Times,serif",
+    "doc": ""
+  }
+]
+
+export const booksLeading: Token[] = [
+  {
+    "name": "caption2",
+    "value": "17px",
+    "doc": ""
+  },
+  {
+    "name": "footnote",
+    "value": "20px",
+    "doc": ""
+  },
+  {
+    "name": "subheadline",
+    "value": "23px",
+    "doc": ""
+  },
+  {
+    "name": "callout",
+    "value": "25px",
+    "doc": ""
+  },
+  {
+    "name": "body",
+    "value": "27px",
+    "doc": ""
+  },
+  {
+    "name": "title3",
+    "value": "30px",
+    "doc": ""
+  },
+  {
+    "name": "title2",
+    "value": "33px",
     "doc": ""
   }
 ]
@@ -1003,6 +1084,111 @@ export const appAppearance: Token[] = [
     "doc": ""
   },
   {
+    "name": "booksAccent",
+    "value": "#ff8d28",
+    "doc": "The icon's orange, as the app's own tint: selected rows, progress, tinted actions."
+  },
+  {
+    "name": "booksAccentSoft",
+    "value": "rgba(255,141,40,.18)",
+    "doc": ""
+  },
+  {
+    "name": "booksPanel",
+    "value": "rgba(255,255,255,.62)",
+    "doc": "Sidebar and tab bar: glass the shelves show through, not paper."
+  },
+  {
+    "name": "booksSpine",
+    "value": "inset 9px 0 14px -8px rgba(30,20,10,.38)",
+    "doc": "A cover's spine shading, inner frame hairline and fore-edge drop."
+  },
+  {
+    "name": "booksCoverFrame",
+    "value": "inset 0 0 0 1px rgba(255,255,255,.16)",
+    "doc": ""
+  },
+  {
+    "name": "booksAudioBadge",
+    "value": "rgba(0,0,0,.55)",
+    "doc": ""
+  },
+  {
+    "name": "booksShade",
+    "value": "linear-gradient(180deg,transparent 30%,rgba(0,0,0,.45) 100%)",
+    "doc": "The store hero's bottom scrim over its generated wash."
+  },
+  {
+    "name": "booksOriginalBg",
+    "value": "#fffefb",
+    "doc": "The reader's six themes, Apple's own names and palettes: Original is the\nwhite page, Quiet a warm grey, Paper the sepia above, Bold the white page\nunder heavier type, Calm a low-contrast dark, Focus the black one."
+  },
+  {
+    "name": "booksOriginalInk",
+    "value": "#1d1c19",
+    "doc": ""
+  },
+  {
+    "name": "booksOriginalMute",
+    "value": "rgba(29,28,25,.45)",
+    "doc": ""
+  },
+  {
+    "name": "booksQuietBg",
+    "value": "#efede6",
+    "doc": ""
+  },
+  {
+    "name": "booksQuietInk",
+    "value": "#3f3c34",
+    "doc": ""
+  },
+  {
+    "name": "booksQuietMute",
+    "value": "rgba(63,60,52,.48)",
+    "doc": ""
+  },
+  {
+    "name": "booksBoldMute",
+    "value": "rgba(0,0,0,.52)",
+    "doc": ""
+  },
+  {
+    "name": "booksCalmBg",
+    "value": "#262019",
+    "doc": ""
+  },
+  {
+    "name": "booksCalmInk",
+    "value": "#b5a98f",
+    "doc": ""
+  },
+  {
+    "name": "booksCalmMute",
+    "value": "rgba(181,169,143,.5)",
+    "doc": ""
+  },
+  {
+    "name": "booksFocusBg",
+    "value": "#0b0b0c",
+    "doc": ""
+  },
+  {
+    "name": "booksFocusInk",
+    "value": "#f1efe9",
+    "doc": ""
+  },
+  {
+    "name": "booksFocusMute",
+    "value": "rgba(241,239,233,.48)",
+    "doc": ""
+  },
+  {
+    "name": "booksEndInk",
+    "value": "#fff9f0",
+    "doc": "The end-of-book card's ink over any theme."
+  },
+  {
     "name": "calculatorKey",
     "value": "#333",
     "doc": "calculator"
@@ -1323,9 +1509,29 @@ export const appAppearance: Token[] = [
     "doc": "Keeps card text readable over artwork at the bottom edge of hero tiles."
   },
   {
+    "name": "newsAccent",
+    "value": "#fa2d55",
+    "doc": "The Apple News brand red: the selected section, follow pills and the save mark."
+  },
+  {
+    "name": "newsAccentSoft",
+    "value": "rgba(250,45,85,.12)",
+    "doc": "The accent's rest fill: a follow chip's back, a selected pill's tint."
+  },
+  {
     "name": "newsHairline",
     "value": "rgba(60,60,67,.12)",
-    "doc": "news"
+    "doc": ""
+  },
+  {
+    "name": "newsPanel",
+    "value": "rgba(255,255,255,.62)",
+    "doc": "Sidebar and tab bar: glass the feed shows through, not paper."
+  },
+  {
+    "name": "newsShade",
+    "value": "linear-gradient(180deg,rgba(0,0,0,0) 36%,rgba(0,0,0,.6) 100%)",
+    "doc": "Bottom scrim so the kicker and title read over a story's generated artwork."
   },
   {
     "name": "notesMuted",
@@ -1361,6 +1567,11 @@ export const appAppearance: Token[] = [
     "name": "notesYellow",
     "value": "#e2b93b",
     "doc": ""
+  },
+  {
+    "name": "notesFind",
+    "value": "rgba(226,185,59,.38)",
+    "doc": "The find-in-note wash behind every match but the current one."
   },
   {
     "name": "phoneKey",
@@ -1586,6 +1797,31 @@ export const appAppearance: Token[] = [
     "name": "walletPass",
     "value": "linear-gradient(150deg,#ff375f,#ff9230)",
     "doc": ""
+  },
+  {
+    "name": "walletCash",
+    "value": "linear-gradient(150deg,#6d7cff,#0037a8)",
+    "doc": ""
+  },
+  {
+    "name": "walletLoop",
+    "value": "linear-gradient(150deg,#00c8b3,#006d77)",
+    "doc": ""
+  },
+  {
+    "name": "walletKey",
+    "value": "linear-gradient(150deg,#38c86a,#0d6e2f)",
+    "doc": ""
+  },
+  {
+    "name": "walletTicket",
+    "value": "linear-gradient(150deg,#bf5af2,#6a3ea8)",
+    "doc": ""
+  },
+  {
+    "name": "walletPlain",
+    "value": "linear-gradient(150deg,#48484a,#1c1c1e)",
+    "doc": "A card the owner adds: graphite, the way an unnamed payment card reads."
   },
   {
     "name": "weatherStars",

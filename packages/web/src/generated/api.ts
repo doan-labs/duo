@@ -7,7 +7,7 @@ export const api: ApiEntry[] = [
     "name": "PlatformError",
     "kind": "class",
     "file": "packages/sdk/guards.ts",
-    "line": 15,
+    "line": 17,
     "doc": "",
     "signature": "class PlatformError extends Error"
   },
@@ -16,7 +16,7 @@ export const api: ApiEntry[] = [
     "name": "CameraHooks",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 5,
+    "line": 33,
     "doc": "What the Camera app publishes for Camera Control and the volume buttons.",
     "signature": "type CameraHooks = {\n  shoot: () => void\n  record: (on: boolean) => void\n  /** Sets the zoom factor when given one; returns the current one. */\n  zoom: (z?: number) => number\n  /** Volume Up held: a burst starts (`on` true) and ends (`on` false) around the shots it fires. */\n  burst?: (on: boolean) => void\n}",
     "members": [
@@ -48,12 +48,32 @@ export const api: ApiEntry[] = [
   },
   {
     "pkg": "@doan-labs/duo-sdk",
+    "name": "FileHost",
+    "kind": "type",
+    "file": "packages/sdk/legacy.ts",
+    "line": 25,
+    "doc": "Durable app-owned blobs in the `appfiles` store; the baked half of `os.files`.",
+    "signature": "type FileHost = {\n  list(): Promise<StoredFile[]>\n  get(name: string): Promise<Blob | null>\n  put(name: string, blob: Blob): Promise<StoredFile>\n  del(name: string): Promise<void>\n}",
+    "members": []
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "MicHost",
+    "kind": "type",
+    "file": "packages/sdk/legacy.ts",
+    "line": 12,
+    "doc": "The shell's recorder handed to a baked app — the same engine `os.mic` reaches\nover the bridge, minus the owner epoch. `attach` counts the app's mounted\ncopies: both displays hold one, and capture survives the fold because the\nlast detach is held back a beat while the mirror copy mounts. When the count\nreally reaches zero (the app closed) every track is stopped and the take is\ndropped.",
+    "signature": "type MicHost = {\n  attach(): () => void\n  status(): MicStatus\n  onStatus(cb: (s: MicStatus) => void): () => void\n  /** Presses Record: the browser ask happens here, never at mount. */\n  start(): Promise<void>\n  pause(): void\n  resume(): void\n  /** Stops capture; resolves with the take, or null when nothing was captured. */\n  stop(): Promise<MicResult | null>\n}",
+    "members": []
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
     "name": "Os",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 14,
+    "line": 42,
     "doc": "",
-    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /** The glass this instance draws on: the folded cover or the open inner display. */\n  display?: 'inner' | 'cover'\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n  /**\n   * The LED beside the rear cameras, the same light Control Center's flashlight\n   * and the lock screen's torch flip: the Camera app drives it for rear flash\n   * and video torch.\n   */\n  led?: (on: boolean) => void\n}",
+    "signature": "type Os = {\n  store?: import('./store.ts').Store\n  /** Photos taken in Camera, newest first. One array per display. */\n  shots: string[]\n  /** Switch apps. `arg` arrives as `os.arg` in the app that opens. */\n  open: (name: string, arg?: string) => void\n  home: () => void\n  arg?: string\n  /** The glass this instance draws on: the folded cover or the open inner display. */\n  display?: 'inner' | 'cover'\n  /**\n   * This instance is the copy the other display holds while the phone folds\n   * (docs/decisions.md 24); the one in use is running too. A copy draws\n   * everything and starts no sound of its own - shared playback (music.tsx's\n   * `deck`) is module state and already plays once.\n   */\n  mirror?: boolean\n  /** Set by the Camera app while it is open; the shell reads it for the frame buttons. */\n  camera: { current: CameraHooks | null }\n  /**\n   * The LED beside the rear cameras, the same light Control Center's flashlight\n   * and the lock screen's torch flip: the Camera app drives it for rear flash\n   * and video torch.\n   */\n  led?: (on: boolean) => void\n  /** The shell-owned microphone channel; only apps that capture audio use it. */\n  mic?: MicHost\n  /** Durable binary storage for the app's own files (audio, renders). */\n  files?: FileHost\n}",
     "members": [
       {
         "name": "store",
@@ -108,6 +128,18 @@ export const api: ApiEntry[] = [
         "type": "(on: boolean) => void",
         "optional": true,
         "doc": "The LED beside the rear cameras, the same light Control Center's flashlight\nand the lock screen's torch flip: the Camera app drives it for rear flash\nand video torch."
+      },
+      {
+        "name": "mic",
+        "type": "MicHost",
+        "optional": true,
+        "doc": "The shell-owned microphone channel; only apps that capture audio use it."
+      },
+      {
+        "name": "files",
+        "type": "FileHost",
+        "optional": true,
+        "doc": "Durable binary storage for the app's own files (audio, renders)."
       }
     ]
   },
@@ -116,7 +148,7 @@ export const api: ApiEntry[] = [
     "name": "SettingsHost",
     "kind": "type",
     "file": "packages/sdk/legacy.ts",
-    "line": 46,
+    "line": 78,
     "doc": "What the shell hands the Settings app. Baked apps never import the shell, so\nthe switches, the eraser and the link opener arrive as a prop from apps.ts,\nthe way the Store gets `openExternal`.",
     "signature": "type SettingsHost = {\n  /** The live switch object; `subscribe` and `revision` drive `useSyncExternalStore`. */\n  switches: Readonly<Switches>\n  subscribe: (cb: () => void) => () => void\n  revision: () => number\n  flip: (key: keyof Switches, value?: boolean) => void\n  /** The Wi-Fi network and the charge the status stack reports. */\n  network: string\n  battery: number\n  /** Erase All Content and Settings: clears device storage and reloads the shell. */\n  erase: () => Promise<void>\n  openExternal: (url: string) => void\n  /** Claim the side button's double-click while a sheet is up; the claim returns whether it consumed the press. */\n  claimSide: (claim: () => boolean) => () => void\n}",
     "members": [
@@ -314,7 +346,7 @@ export const api: ApiEntry[] = [
     "name": "PermissionName",
     "kind": "type",
     "file": "packages/sdk/permissions.ts",
-    "line": 13,
+    "line": 30,
     "doc": "",
     "signature": "type PermissionName = keyof typeof PERMISSIONS"
   },
@@ -323,7 +355,7 @@ export const api: ApiEntry[] = [
     "name": "Photo",
     "kind": "type",
     "file": "packages/sdk/permissions.ts",
-    "line": 15,
+    "line": 34,
     "doc": "",
     "signature": "type Photo = { id: string; takenAt: number; width: number; height: number }",
     "members": [
@@ -402,16 +434,16 @@ export const api: ApiEntry[] = [
     "name": "ErrCode",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 87,
+    "line": 118,
     "doc": "",
-    "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'"
+    "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'\n  | 'E_UNSUPPORTED'"
   },
   {
     "pkg": "@doan-labs/duo-sdk",
     "name": "KV",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 138,
+    "line": 173,
     "doc": "",
     "signature": "type KV = {\n  get(k: string): Promise<string | null>\n  set(k: string, v: string): Promise<{ rev: number }>\n  del(k: string): Promise<{ rev: number }>\n  keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>\n  snapshot(cursor?: string): Promise<Snapshot>\n  watch(since: number, cb: (e: Change) => void): () => void\n}",
     "members": []
@@ -424,6 +456,134 @@ export const api: ApiEntry[] = [
     "line": 71,
     "doc": "",
     "signature": "type Limits = typeof LIMITS"
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "MicResult",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 115,
+    "doc": "`mic.stop`'s take: the captured audio, its container and what the shell measured.",
+    "signature": "type MicResult = { mime: string; durationMs: number; blob: Blob }",
+    "members": [
+      {
+        "name": "mime",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "durationMs",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "blob",
+        "type": "Blob",
+        "optional": false,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "MicStatus",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 108,
+    "doc": "What `mic.status` returns and `{ ev: 'mic' }` pushes to the owning session's\nviews. `level` is the meter's latest peak in [0,1]; `elapsed` is milliseconds\nand runs only while `recording`, so a paused take's clock stops like the one\non screen. `denied`/`unavailable`/`ended` are terminal for that take.",
+    "signature": "type MicStatus = {\n  state: 'idle' | 'recording' | 'paused' | 'ended' | 'denied' | 'unavailable'\n  elapsed: number\n  level: number\n  detail?: string\n}",
+    "members": [
+      {
+        "name": "state",
+        "type": "'idle' | 'recording' | 'paused' | 'ended' | 'denied' | 'unavailable'",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "elapsed",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "level",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "detail",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "Notice",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 101,
+    "doc": "What `os.notify.post` takes: the OS shows `name` and `title`, `body` under it,\nand hands `arg` back to the app when the notice is opened, like `os.open`'s arg.",
+    "signature": "type Notice = { title: string; body?: string; arg?: string }",
+    "members": [
+      {
+        "name": "title",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      },
+      {
+        "name": "arg",
+        "type": "string",
+        "optional": true,
+        "doc": ""
+      }
+    ]
+  },
+  {
+    "pkg": "@doan-labs/duo-sdk",
+    "name": "StoredFile",
+    "kind": "type",
+    "file": "packages/sdk/protocol.ts",
+    "line": 117,
+    "doc": "A `file.list`/`file.put` row: an app-owned blob in the durable `appfiles` store.",
+    "signature": "type StoredFile = { name: string; size: number; type: string; at: number }",
+    "members": [
+      {
+        "name": "name",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "size",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "optional": false,
+        "doc": ""
+      },
+      {
+        "name": "at",
+        "type": "number",
+        "optional": false,
+        "doc": ""
+      }
+    ]
   },
   {
     "pkg": "@doan-labs/duo-sdk",
@@ -607,7 +767,7 @@ export const api: ApiEntry[] = [
     "name": "os",
     "kind": "value",
     "file": "packages/sdk/index.ts",
-    "line": 18,
+    "line": 22,
     "doc": "",
     "signature": "os = createClient()"
   },
@@ -991,7 +1151,7 @@ export const api: ApiEntry[] = [
     "name": "Nav",
     "kind": "component",
     "file": "packages/uikit/nav.tsx",
-    "line": 21,
+    "line": 22,
     "doc": "iOS push navigation: the new page slides in from the right and the one behind\ndrifts left and dims, so the stack reads as depth rather than a cross-fade.\n`children` is the root page.",
     "signature": "function Nav({ children }: { children: ReactNode })",
     "members": [
@@ -1008,7 +1168,7 @@ export const api: ApiEntry[] = [
     "name": "Page",
     "kind": "function",
     "file": "packages/uikit/nav.tsx",
-    "line": 96,
+    "line": 125,
     "doc": "",
     "signature": "const Page = ({ title, back, backRef, children }: PageProps) => ( …"
   },
@@ -1017,7 +1177,7 @@ export const api: ApiEntry[] = [
     "name": "PageProps",
     "kind": "type",
     "file": "packages/uikit/nav.tsx",
-    "line": 95,
+    "line": 124,
     "doc": "One page in a `Nav`: fixed header with an optional back chevron, scrolling body.",
     "signature": "type PageProps = { title: ReactNode; back?: () => void; backRef?: Ref<HTMLButtonElement>; children?: ReactNode }",
     "members": [
@@ -1052,7 +1212,7 @@ export const api: ApiEntry[] = [
     "name": "Push",
     "kind": "type",
     "file": "packages/uikit/nav.tsx",
-    "line": 8,
+    "line": 9,
     "doc": "",
     "signature": "type Push = (make: (back: () => void) => ReactNode) => void"
   },
@@ -1061,7 +1221,7 @@ export const api: ApiEntry[] = [
     "name": "useNav",
     "kind": "hook",
     "file": "packages/uikit/nav.tsx",
-    "line": 11,
+    "line": 12,
     "doc": "Inside a `<Nav>`: `push((back) => <Page title=\"…\" back={back}>…</Page>)`.",
     "signature": "const useNav = () => …"
   },
@@ -1070,7 +1230,7 @@ export const api: ApiEntry[] = [
     "name": "useNavigation",
     "kind": "hook",
     "file": "packages/uikit/nav.tsx",
-    "line": 11,
+    "line": 12,
     "doc": "Inside a `<Nav>`: `push((back) => <Page title=\"…\" back={back}>…</Page>)`.",
     "signature": "const useNav = () => …"
   },

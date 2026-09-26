@@ -11,16 +11,21 @@
 
 - Device events for the frame's buttons and sensors.
 - `os.notify.post` and `os.notify.clear`: a banner, then a card on the lock screen.
+- `microphone` and `files` permissions: a shell-owned recorder and durable file storage.
 
 ### Shell
 
 - Drag apps out of, into and around the dock.
 - The frame remembers its view, switches and levels across reloads.
+- Apps fly into folders on drop; folders and the wallpaper sheet animate out.
 
 ### Apps
 
 - Rebuilt after Apple's: Camera, Notes, Safari, Reminders, News, Wallet, Home, Health, Fitness,
-  Weather, Contacts, Clock, Tips, Music, Phone, Calendar, Settings and the App Store.
+  Weather, Contacts, Clock, Tips, Music, Phone, Calendar, Settings, the App Store, Messages, Maps,
+  Books, Calculator, Voice Memos, Shortcuts, Podcasts and Stocks.
+- Live data: Stocks quotes, News articles from DEV Community, Maps search and routing.
+- Removed the YouTube, Watch, iTunes Store and Find My mocks.
 
 ### Community apps
 
