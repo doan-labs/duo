@@ -16,6 +16,7 @@ import {
   weight
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
+import { useEffect, useState } from 'react'
 import { discardRec, pauseRec, replaceState, resumeRec, startRec, stopAndSave, useLevels, useRec } from './engine.ts'
 import { Glyph } from './glyphs.tsx'
 import { useMemos } from './store.ts'
@@ -28,9 +29,17 @@ export function Deck() {
   const busy = ['starting', 'recording', 'paused', 'saving'].includes(rec.phase)
   // A take armed for the editor is not the deck's to control or end.
   const replacing = replaceState.get().active && (rec.phase === 'recording' || rec.phase === 'paused')
+  // Not Now's latch: the denied/unavailable phase persists until the next
+  // attempt, so dismissal needs to outlive it. The next Record press passes
+  // through 'starting' first, which is what clears it.
+  const [dismissed, setDismissed] = useState(false)
+  useEffect(() => {
+    if (rec.phase !== 'denied' && rec.phase !== 'unavailable') setDismissed(false)
+  }, [rec.phase])
   // Collapse only asks to hide the card: a live take keeps running under the
   // rail, and the dot there turns into the take's indicator and its way back.
-  const open = !replacing && (deck === 'open' || rec.phase === 'denied' || rec.phase === 'unavailable')
+  const open =
+    !replacing && (deck === 'open' || (!dismissed && (rec.phase === 'denied' || rec.phase === 'unavailable')))
 
   if (!open)
     return (
@@ -66,13 +75,20 @@ export function Deck() {
             <Button
               variant="plain"
               onClick={() => {
+                setDismissed(true)
                 setDeck('closed')
               }}
             >
               Not Now
             </Button>
             {rec.phase === 'denied' && (
-              <Button variant="tinted" onClick={() => void startRec()}>
+              <Button
+                variant="tinted"
+                onClick={() => {
+                  setDismissed(false)
+                  void startRec()
+                }}
+              >
                 Try Again
               </Button>
             )}
