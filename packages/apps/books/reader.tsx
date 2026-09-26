@@ -15,7 +15,7 @@ import { Cover } from './cover.tsx'
 import { blocks, byId, chapterStarts } from './data.ts'
 import { type FontId, setPrefs, setProgress, type ThemeId, toggleFinished, toggleMark, useLib } from './store.ts'
 import { styles } from './styles.ts'
-import { clearSeek, closeReader, openCard, showChrome, useUi } from './ui.ts'
+import { clearSeek, closeBook, closeReader, openCard, showChrome, useUi } from './ui.ts'
 
 const GAP = 64
 
@@ -72,6 +72,8 @@ export function Reader({ id }: { id: string }) {
   const flow = useRef<HTMLDivElement>(null)
   const vert = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number } | null>(null)
+  const scrollT = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollFrac = useRef<number | null>(null)
   const sought = useRef(false)
   // Which layout mode the saved position was last restored into; switching
   // modes re-restores instead of landing on a stale spread/scroll.
@@ -200,7 +202,11 @@ export function Reader({ id }: { id: string }) {
     }
     let i = 0
     while (i + 1 < blks.length && (map.block[i + 1] ?? Number.POSITIVE_INFINITY) <= at) i++
-    return i
+    // Pin the spread's first block when one starts there: a saved position or
+    // bookmark should land on the top of the spread, not its end. Spreads with
+    // no block start fall back to the closest preceding block.
+    const first = map.block.indexOf(at)
+    return first === -1 ? i : first
   }, [at, map, blks.length, vertical, starts, lib.progress, id])
 
   // Persist position (throttled): the topmost block as a book fraction, so both
@@ -210,12 +216,28 @@ export function Reader({ id }: { id: string }) {
     const t = setTimeout(() => setProgress(id, head / Math.max(1, blks.length - 1)), 120)
     return () => clearTimeout(t)
   }, [head, spreads, map.bad, id, blks.length])
+
+  // A pending vertical-scroll write must not fire after the reader closes -
+  // flush it on unmount instead so the final position still lands.
+  useEffect(
+    () => () => {
+      if (scrollT.current) clearTimeout(scrollT.current)
+      if (scrollFrac.current != null) setProgress(id, scrollFrac.current)
+    },
+    [id]
+  )
   const marked = marks.some((m) => (vertical ? m.b === head : (map.block[m.b] ?? -1) === at))
 
   // Keyboard turns.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (ui.card) return
+      const t = e.target as HTMLElement | null
+      // Typing in a field (any app's) is never a page turn; keys aimed at
+      // another mounted app aren't ours either. Unfocused keys land on body.
+      if (!t || t.closest('input, textarea, select, [contenteditable="true"]')) return
+      const app = t.closest('[data-app]')
+      if (app && app.getAttribute('data-app') !== 'Books') return
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') turn(1)
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') turn(-1)
       else if (e.key === 'Escape') closeReader()
@@ -359,7 +381,12 @@ export function Reader({ id }: { id: string }) {
                 else break
               }
               const frac = h / Math.max(1, blks.length - 1)
-              setTimeout(() => setProgress(id, frac), 200)
+              scrollFrac.current = frac
+              if (scrollT.current) clearTimeout(scrollT.current)
+              scrollT.current = setTimeout(() => {
+                scrollFrac.current = null
+                setProgress(id, frac)
+              }, 200)
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onPointerUp={(e) => e.stopPropagation()}
@@ -567,7 +594,14 @@ const EndCard = ({ b, id }: { b: ReturnType<typeof byId>; id: string }) => {
       <button type="button" {...stylex.props(styles.btn, shared.press)} onClick={() => toggleFinished(id)}>
         {finished ? 'Finished' : 'Mark as Finished'}
       </button>
-      <button type="button" {...stylex.props(styles.endLink, shared.press)} onClick={() => closeReader()}>
+      <button
+        type="button"
+        {...stylex.props(styles.endLink, shared.press)}
+        onClick={() => {
+          closeReader()
+          closeBook()
+        }}
+      >
         Back to {lib.owned.includes(id) ? 'Library' : 'Book Store'}
       </button>
     </div>

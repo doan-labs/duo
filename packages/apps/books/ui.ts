@@ -42,8 +42,7 @@ export const useUi = () =>
 export const go = (tab: Section) => set({ tab, detail: undefined })
 export const openBook = (id: string) => set({ detail: id })
 export const closeBook = () => set({ detail: undefined })
-export const openReader = (id: string, seek?: number) =>
-  set({ reading: id, chrome: true, card: undefined, detail: undefined, seek })
+export const openReader = (id: string, seek?: number) => set({ reading: id, chrome: true, card: undefined, seek })
 export const clearSeek = () => set({ seek: undefined })
 export const closeReader = () => set({ reading: undefined, card: undefined })
 export const showChrome = (chrome: boolean) => set({ chrome })
