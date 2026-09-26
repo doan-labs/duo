@@ -3,7 +3,7 @@ const run = async (args: string[]) => {
   if (await child.exited) throw new Error(`Failed: ${args.join(' ')}`)
 }
 await run(['bun', 'run', 'typecheck'])
-await run(['bun', 'test', 'packages/sdk', 'packages/fixtures'])
+await run(['bun', 'test', 'packages/sdk', 'packages/fixtures', 'packages/apps'])
 await run(['bun', 'scripts/generate-kit-docs.ts', '--check'])
 await run(['bun', 'scripts/check-app-tokens.ts'])
 await run(['bun', 'scripts/checks/stage4/validation.mjs'])
