@@ -26,7 +26,7 @@ ICON_DIR = os.path.join(os.path.dirname(HERE), "src", "icons")
 # Home-screen order, mirroring HOME_APPS / HOME_DOCK in src/os.ts.
 APPS = ["FaceTime", "Calendar", "Photos", "Camera", "Mail", "Notes", "Reminders",
         "Clock", "News", "TV", "Podcasts", "App Store", "Maps", "Weather",
-        "Calculator", "Settings", "YouTube", "Books", "Stocks", "Home",
+        "Calculator", "Settings", "Books", "Stocks", "Home",
         "Freeform", "Shortcuts", "Find My", "Voice Memos"]
 DOCK = ["Phone", "Safari", "Messages", "Music"]
 
@@ -132,7 +132,7 @@ def resample(a, w, h):
 # -- real Apple artwork ------------------------------------------------------
 
 _SPRITES = {}
-DRAWN = ("Camera", "YouTube")  # no macOS app to take the artwork from
+DRAWN = ("Camera",)  # no macOS app to take the artwork from
 
 
 def _load(path):
@@ -156,7 +156,7 @@ def _trim(a):
 
 
 def _drawn(name):
-    """Camera and YouTube, on the same superellipse as the real icons."""
+    """Camera, on the same superellipse as the real icons."""
     n = 192
     xx = np.arange(n, dtype="f4")[None, :]
     yy = np.arange(n, dtype="f4")[:, None]
@@ -166,12 +166,6 @@ def _drawn(name):
     def put(rgb, a):
         img[..., :3] = img[..., :3] * (1 - a[..., None]) + np.asarray(rgb, "f4") * a[..., None]
         img[..., 3] = img[..., 3] * (1 - a) + a
-
-    if name == "YouTube":
-        put((1, 1, 1), body)
-        put(hx("#ff0000"), cov(sdf_rrect(xx, yy, 30, 60, 132, 80, 26)) * body)
-        put((1, 1, 1), cov(sdf_poly(xx, yy, [(84, 82), (122, 100), (84, 118)])) * body)
-        return img
 
     g = np.clip((0.35 * xx + yy) / (n * 1.35), 0, 1) + 0 * yy
     put(lerp3(g, [(0, "#b2b2b7"), (1, "#4b4b50")]), body)

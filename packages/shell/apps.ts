@@ -30,8 +30,6 @@ import { Stocks } from '@doan-labs/duo-app-stocks/index.tsx'
 import { Tips } from '@doan-labs/duo-app-tips/index.tsx'
 import { Tv } from '@doan-labs/duo-app-tv/index.tsx'
 import { Wallet } from '@doan-labs/duo-app-wallet/index.tsx'
-import { Watch } from '@doan-labs/duo-app-watch/index.tsx'
-import { YouTube } from '@doan-labs/duo-app-youtube/index.tsx'
 import type { SettingsHost } from '@doan-labs/duo-sdk'
 import type { App } from '@doan-labs/duo-uikit/app.ts'
 import { createElement } from 'react'
@@ -57,7 +55,7 @@ const SETTINGS_HOST: SettingsHost = {
   claimSide
 }
 /** The apps inside Utilities, Apple's one shipped folder: Spotlight finds them, the grid does not. */
-const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books', 'YouTube']
+const UTILITIES = ['Calculator', 'Voice Memos', 'Shortcuts', 'Podcasts', 'Books']
 
 /** Left half — the cover display, rows 3 to 6. */
 export const LEFT: App[] = [
@@ -90,7 +88,6 @@ export const RIGHT: App[] = [
   { name: 'Find My', mock: true, light: true, view: FindMy },
   { name: 'Home', light: true, view: Home },
   { name: 'Fitness', view: Fitness },
-  { name: 'Watch', mock: true, view: Watch },
   { name: 'Reminders', id: 'labs.doan.ipduo.reminders', light: true, ...RELEASE },
   { name: 'Files', mock: true, light: true, view: Files },
   { name: 'Preview', mock: true, light: true, view: Preview },
@@ -121,8 +118,7 @@ export const APPS: App[] = [
   { name: 'Voice Memos', view: Memos },
   { name: 'Shortcuts', mock: true, light: true, view: Shortcuts },
   { name: 'Podcasts', mock: true, light: true, view: Podcasts },
-  { name: 'Books', light: true, view: Books },
-  { name: 'YouTube', mock: true, light: true, view: YouTube }
+  { name: 'Books', light: true, view: Books }
 ]
 
 /** Look an app up by name, case-insensitively; undefined if nothing matches. */

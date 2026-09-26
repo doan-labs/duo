@@ -615,8 +615,6 @@ export const appAppearance = stylex.defineConsts({
   walletTicket: 'linear-gradient(150deg,#bf5af2,#6a3ea8)',
   /** A card the owner adds: graphite, the way an unnamed payment card reads. */
   walletPlain: 'linear-gradient(150deg,#48484a,#1c1c1e)',
-  // watch
-  watchCase: '0 0 0 5px #6e6e73,0 16px 34px rgba(0,0,0,.45)',
   // weather
   weatherStars:
     'radial-gradient(1px 1px at 15% 12%,#fff,transparent),radial-gradient(1px 1px at 70% 20%,#fff,transparent),radial-gradient(1.5px 1.5px at 88% 30%,#fff,transparent),radial-gradient(1px 1px at 40% 30%,#fff,transparent),radial-gradient(1px 1px at 55% 8%,#fff,transparent),radial-gradient(1px 1px at 30% 42%,#fff,transparent)',
@@ -667,7 +665,5 @@ export const appAppearance = stylex.defineConsts({
   weatherDot: 'rgba(255,255,255,.45)',
   weatherBottomBar: 'rgba(15,35,65,.55)',
   /** The iPad sidebar's glass: deeper than a card, lighter than the sheet. */
-  weatherSide: 'rgba(14,30,55,.55)',
-  // youtube
-  youtubeMuted: '#aaa'
+  weatherSide: 'rgba(14,30,55,.55)'
 })

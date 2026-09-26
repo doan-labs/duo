@@ -49,8 +49,6 @@
     "@doan-labs/duo-app-tips": "workspace:*",
     "@doan-labs/duo-app-tv": "workspace:*",
     "@doan-labs/duo-app-wallet": "workspace:*",
-    "@doan-labs/duo-app-watch": "workspace:*",
-    "@doan-labs/duo-app-weather": "workspace:*",
-    "@doan-labs/duo-app-youtube": "workspace:*"
+    "@doan-labs/duo-app-weather": "workspace:*"
   }
 }

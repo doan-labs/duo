@@ -18,7 +18,7 @@ Installed-app activation is unchanged.
 
 Calculator, Calendar, Clock, Freeform, News, Notes, Photos, Reminders and Weather are separately built,
 preinstalled sandbox apps (`scripts/build-preinstalled.ts` builds every `packages/apps/*/manifest.json`).
-Camera, Voice Memos, Maps, Safari, YouTube and App Store remain trusted baked components:
+Camera, Voice Memos, Maps, Safari and App Store remain trusted baked components:
 the document policy allows no camera, microphone or frames. Voice Memos reaches the
 microphone the way sandboxed apps do - the host-mediated `mic` service and `appfiles`
 blob store, exposed to baked code as `os.mic`/`os.files` props - so the device's

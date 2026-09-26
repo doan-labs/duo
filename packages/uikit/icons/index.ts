@@ -210,10 +210,6 @@ const camera = svg(`<defs>
 <circle cx="96" cy="108" r="38" fill="url(#i)"/>
 <ellipse cx="79" cy="92" rx="14" ry="9" fill="#fff" opacity=".22" transform="rotate(-32 79 92)"/>`)
 
-const youtube = svg(`<path d="${SQ}" fill="#fff"/>
-<rect x="30" y="60" width="132" height="80" rx="26" fill="#f00"/>
-<path d="M84 82 122 100 84 118Z" fill="#fff"/>`)
-
 // --- the iOS-only eight, drawn on the same superellipse -------------------
 // Each is the Apple mark reduced to what survives at 51 px on the home screen:
 // Fitness is three rings, Health a heart, Wallet three stacked cards.
@@ -232,13 +228,6 @@ const ring = (r: number, c: string) =>
 
 const fitness = svg(`<defs>${SHEEN}</defs>${body('#0b0b0d')}
 ${ring(63, '#fa114f')}${ring(41, '#a6f425')}${ring(19, '#22e0f5')}`)
-
-const watch = svg(`<defs>${SHEEN}
-<linearGradient id="wc" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#f2f2f5"/><stop offset="1" stop-color="#8e8e94"/></linearGradient>
-</defs>${body('#0b0b0d')}
-<rect x="120" y="72" width="13" height="30" rx="6" fill="url(#wc)"/>
-<rect x="47" y="26" width="98" height="140" rx="42" fill="none" stroke="url(#wc)" stroke-width="9"/>
-<rect x="56" y="35" width="80" height="122" rx="34" fill="#000"/>`)
 
 const files = svg(`<defs>${SHEEN}
 <linearGradient id="fo" x1="0" y1="0" x2=".2" y2="1"><stop offset="0" stop-color="#3fb9ff"/><stop offset="1" stop-color="#0a7cff"/></linearGradient>
@@ -289,7 +278,6 @@ export const ICONS: Record<string, string> = {
   Weather: weather,
   Calculator: calculator,
   Settings: settings,
-  YouTube: youtube,
   Books: books,
   Stocks: stocks,
   Home: home,
@@ -302,7 +290,6 @@ export const ICONS: Record<string, string> = {
   Tips: tips,
   Siri: siri,
   Fitness: fitness,
-  Watch: watch,
   Files: files,
   Health: health,
   Wallet: wallet,
