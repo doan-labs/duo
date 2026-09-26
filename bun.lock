@@ -183,6 +183,7 @@
       "name": "@doan-labs/duo-app-messages",
       "version": "0.0.0",
       "dependencies": {
+        "@doan-labs/duo-fixtures": "workspace:*",
         "@doan-labs/duo-sdk": "workspace:*",
         "@doan-labs/duo-uikit": "workspace:*",
         "@stylexjs/stylex": "0.19.0",

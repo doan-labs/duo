@@ -200,6 +200,33 @@ palette/ink state stays local. Crossing 600 px remounts the layout; selecting an
 resets the pen but retains wide-layout ink color. Folders, tags, compose, sharing, search
 and most toolbar icons are decorative; creation/deletion/filtering are not implemented.
 
+## Messages maintenance
+
+`store.ts` is a module-level cell store like phone/store.ts: one snapshot drives both
+display copies, so they never diverge. Durable cells use the `duo.messages.*` prefix
+(`duo.messages` conversations, `duo.messages.sel` the open pane, `duo.messages.compose`
+the unsent card's To field) so Erase wipes them; the seed lands only when no store exists.
+Session cells (search text, `scroll:<id>` spot) share for the session without persisting.
+
+The recipient model is a local copy of the shared cast in `data.ts` - baked apps cannot
+read Contacts, and the platform offers no cross-app data boundary, the same reason
+FaceTime carries its own PEOPLE list. A raw address typed into New Message gets a real
+local thread labelled with it, marked "Not in your contacts". `os.arg` from Phone
+(`os.open('Messages', name)`) resolves the name to a person on mount; like every baked
+app, the arg only arrives on a fresh mount - a deep link into a parked or already-open
+Messages is dropped by the shell, since `deliverArg` only reaches sandboxed apps.
+
+Replies are explicit demo behavior, never implied delivery: `replyFor` composes the line
+at send time from per-persona pools (deterministic per person, text and thread position),
+stores it on the conversation's `pending`, and module timers land it after the typing
+pause. `resume()` on the non-mirror copy re-arms after a reload; the mirror draws the
+same store - typing dots included - but arms nothing and plays no sound. An outgoing
+bubble reads "Sent" only; unknown recipients simply never answer.
+
+The thread's scroll spot is a session cell: `-1` pins to the newest message, a pixel
+value restores a paused position through the fold's remount. Selecting a conversation
+clears `unread`; a reply landing while it is open does not bump it.
+
 ## Weather maintenance
 
 Use Open-Meteo forecasts/geocoding. Keep metric source values, convert only temperature,
