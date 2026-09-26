@@ -40,6 +40,19 @@ agent-browser connect 9222
 - A live "before/after" comparison needs no second build: set `el.style.<prop>` to the pre-change value (e.g. `marginTop = '0px'`, `borderRadius = '12px'`), screenshot, then `removeProperty` to restore - the old rendering is reproduced exactly for pure-CSS changes.
 - `agent-browser scroll` does not reach an app's own scroll region: set `scrollTop` on the scrollable div via `eval` (find it with `scrollHeight > clientHeight`), or send a real wheel over that region.
 
+### Baked-app assertion gotchas
+
+- `document.body.dataset.ready` is set to `''` (empty string) when ready - polling for a truthy value waits forever; check `=== ''` or `in dataset`.
+- `[data-app="<name>"]` also matches the SpringBoard tile and both display copies. A robust pick: among `div[data-os]:not([style*="display: none"]) [data-app]`, take the element with the most descendants (`querySelectorAll('*').length`) - the mounted app view always beats the tile and the pushed-sheet fragments.
+- Nested Push sheets keep prior targets mounted while sliding out, so `aria-label="Back"` (and other per-page labels) can match several mounted copies; `querySelector` order is not topmost order. Pick the button whose ancestor subtree's `innerText` starts with the expected page title.
+- For the same reason, `innerText` probes include hidden/mounted pages - scope assertions to the intended subtree (e.g. the pane column vs a pushed sheet), not the whole `[data-app]` root.
+- Toasts render as `role="status"` and self-clear (~1.6 s). Screenshotting reliably misses them; assert via a DOM poll inside the same eval that triggers the action, or poll for ~2 s.
+- `el.click()` fires React handlers even on elements that are clipped off-display or behind a sheet (no hit-testing). It proves the handler works, NOT that the control is reachable on-glass - for reachability, compare `getBoundingClientRect` of the control against the `[data-os]` panel rect.
+- Controlled inputs ignore `.value` assignment alone: use the native setter (`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,v)`) then dispatch `input` (bubbling); same pattern for `HTMLSelectElement` + `change`.
+- Clipboard actions can trigger Chrome's "See text and images copied to the clipboard" permission prompt over the sim; dismiss it with a real-mouse click (Block) - the app's toast still fires.
+- Fold/unfold without reload: HUD buttons titled `Close` (to 0 deg) and `Open` (to 180) work via `el.click()`; the HUD deg readout is a bare `<div>`/`<span>` whose text matches `/^\d+°$/`.
+- `__duo.renderer.info.render.frame` resets to ~0 on a page reload - a lower frame count than before reveals a silent reload/SwiftShader tab crash even when the UI looks identical. Expando helpers on `window` vanish the same way; re-inject after any unexplained state change.
+
 ## Persistence surface
 
 Prefs live under `os.*` localStorage keys: `os.view` (deg/yaw/az/pol/dist/spin, gestures only - HUD slider/buttons, orbit 'change' debounced 300 ms past damping, spin checkbox), `os.toggles`, `os.level`, `os.bright`. `?deg=`/`?yaw=`/`?spin=` and postMessage poses win over saved values and never write. Erase All Content and Settings (Settings -> General -> Transfer or Reset iPhone -> Erase All Content and Settings -> Erase iPhone Duo) wipes `os.*`/`duo.*` keys + IndexedDB and reloads. Embed test: a parent on another localhost port passes the `local()` origin check - iframe `localhost:3000/?debug` from e.g. a `python3 -m http.server` page and `contentWindow.postMessage({deg, yaw}, 'http://localhost:3000')`.
