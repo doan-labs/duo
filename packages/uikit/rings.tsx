@@ -1,4 +1,4 @@
-// Activity rings and the weekly bar chart, shared by Fitness, Health and Watch.
+// Activity rings and the weekly bar chart, shared by Fitness and Health.
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
 import { app, appAppearance, easing, leading, radius, shadow, tracking, typeScale, weight } from './tokens.stylex.ts'

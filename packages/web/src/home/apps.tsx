@@ -60,8 +60,7 @@ const USES: Record<string, Perm[]> = {
     { name: 'network', label: 'Network' },
     { name: 'clipboard-write', label: 'Write clipboard' }
   ],
-  'Voice Memos': [{ name: 'microphone', label: 'Microphone' }],
-  YouTube: [{ name: 'network', label: 'Network' }]
+  'Voice Memos': [{ name: 'microphone', label: 'Microphone' }]
 }
 
 const slugOf = (key: string) =>

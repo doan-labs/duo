@@ -25,7 +25,7 @@ these renders work is a mesh. What is still genuinely different:
   (Blender bundles no PIL), Blender's `blf` + `gpu` offscreen for text, and the
   real app artwork out of `src/icons`, so the render and the site show the same
   icons in the same order (`APPS`/`DOCK` mirror `HOME_APPS`/`HOME_DOCK` in
-  `src/os.ts`). Camera and YouTube have no macOS app, so those two are drawn.
+  `src/os.ts`). Camera has no macOS app, so it is drawn.
 - `bridge.py` — sends Python to a running Blender over the MCP add-on's socket.
 
 ## Use
