@@ -138,7 +138,12 @@ export function Reader({ id }: { id: string }) {
       // A healed re-measure should re-restore to block precision.
       if (!bad) restored.current = 'paged'
     } else {
-      setAt((a) => Math.min(count - 1, a))
+      // Follow the shared position when it moved on the other display; the
+      // saved fraction round-trips to this spread, so a no-change comparison
+      // keeps normal measures stable while an external advance re-syncs.
+      const h = Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))
+      const want = bad ? null : (block[h] ?? 0)
+      setAt((a) => (want != null && want !== a ? want : Math.min(count - 1, a)))
     }
   }, [w, pw, cols, prefs.size, prefs.font, prefs.theme, vertical, blks, id, step, lib.progress, ui.seek, tick])
 
@@ -147,10 +152,17 @@ export function Reader({ id }: { id: string }) {
   useEffect(() => {
     const el = vert.current
     if (!vertical || !el) return
-    if (restored.current === 'vert' && ui.seek == null) return
+    const fracTo = Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))
+    if (restored.current === 'vert' && ui.seek == null) {
+      // Already restored: only follow an external move (other display) that
+      // lands more than a viewport away, so local scrolling isn't fought.
+      const t = el.querySelector(`[data-b="${fracTo}"]`) as HTMLElement | null
+      if (t && Math.abs(el.scrollTop - (t.offsetTop - 20)) > el.clientHeight) el.scrollTop = t.offsetTop - 20
+      return
+    }
     sought.current = true
     restored.current = 'vert'
-    const to = ui.seek ?? Math.round((lib.progress[id]?.frac ?? 0) * (blks.length - 1))
+    const to = ui.seek ?? fracTo
     const t = el.querySelector(`[data-b="${to}"]`) as HTMLElement | null
     if (t) el.scrollTop = t.offsetTop - 20
     clearSeek()
