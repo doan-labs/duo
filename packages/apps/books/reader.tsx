@@ -323,7 +323,7 @@ export function Reader({ id }: { id: string }) {
       <div {...stylex.props(styles.readTop, styles.mute(theme), !ui.chrome && styles.chromeOffTop)}>
         <button
           type="button"
-          aria-label="Back to library"
+          aria-label={ui.detail ? 'Back to book' : 'Back to library'}
           {...stylex.props(styles.readBtn, shared.press)}
           onClick={closeReader}
         >
