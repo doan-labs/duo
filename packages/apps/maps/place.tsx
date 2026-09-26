@@ -7,7 +7,7 @@ import { formatLength, formatMin } from './live.ts'
 import { styles } from './styles.ts'
 
 /** The drive-time estimate the card shows once the router has answered. */
-export type Estimate = { duration: number; distance: number }
+export type Estimate = { duration: number; distance: number; failed?: boolean }
 
 /** Apple's place card: a header, the directions button, the details it knows, and the tray. */
 export function PlaceCard({
@@ -35,7 +35,9 @@ export function PlaceCard({
         <div {...stylex.props(styles.kind)}>{place.kind}</div>
         <button type="button" onClick={onDirections} {...stylex.props(styles.go)}>
           <Glyph name="car" size={16} />
-          {estimate ? `${formatMin(estimate.duration)} · ${formatLength(estimate.distance)}` : 'Directions'}
+          {estimate && !estimate.failed
+            ? `${formatMin(estimate.duration)} · ${formatLength(estimate.distance)}`
+            : 'Directions'}
         </button>
         <div {...stylex.props(styles.hdr)}>Details</div>
         <Field label="Phone" value={place.phone} />

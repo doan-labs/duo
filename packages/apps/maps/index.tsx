@@ -71,11 +71,10 @@ export const Maps = ({ os }: { os: Os }) => {
 
   // Whatever rAF is moving the camera - flight or the pan's leftover speed - lives here.
   const motion = useRef<(() => void) | null>(null)
-  // The request in flight, the route already fitted, and the card estimate
-  // already attempted, so effects never ask twice.
+  // The routes request in flight and the route already fitted, so effects
+  // never ask twice.
   const fetching = useRef('')
   const fitted = useRef('')
-  const estTried = useRef('')
 
   useEffect(() => {
     const ro = new ResizeObserver(([e]) => (box.current = { w: e!.contentRect.width, h: e!.contentRect.height }))
@@ -172,9 +171,8 @@ export const Maps = ({ os }: { os: Os }) => {
   selRef.current = sel
   useEffect(() => {
     const p = selRef.current
-    if (!p || dir || !live || estTried.current === estKey) return
+    if (!p || dir || !live) return
     if (estimate && (!estimate.failed || (estimate.tries ?? 0) >= 2)) return
-    estTried.current = estKey
     const tries = estimate?.tries ?? 0
     const ctl = new AbortController()
     routes('drive', from, p, ctl.signal)
@@ -188,9 +186,6 @@ export const Maps = ({ os }: { os: Os }) => {
       .catch((e) => {
         if (!aborted(e))
           share.set({ estimate: { key: estKey, duration: 0, distance: 0, failed: true, tries: tries + 1 } })
-      })
-      .finally(() => {
-        if (estTried.current === estKey) estTried.current = ''
       })
     return () => ctl.abort()
   }, [dir, from, live, estKey, estimate])
