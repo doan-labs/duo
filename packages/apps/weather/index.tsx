@@ -421,9 +421,11 @@ function Sky({ sky, current }: { sky: Scene; current: Record<string, number> | u
   // Heavy means a violent code or a measured rate, so slight/moderate showers
   // (80-81) never take the downpour path; a storm always reads as one.
   const heavy = sky === 'storm' || code === 65 || code === 67 || code === 82 || (current?.precipitation ?? 0) >= 4
-  // Wind direction is where the wind comes from; rain tips toward where it blows.
-  const leeway = Math.sin(((current?.wind_direction_10m ?? 0) * Math.PI) / 180) < 0 ? 1 : -1
-  const slant = Math.round(5 + Math.min(current?.wind_speed_10m ?? 0, 45) * 0.3) * leeway
+  // Wind direction is where the wind blows from; rain tips toward where it
+  // blows to. rotate() positive tips the streak top right, sending the fall
+  // left, so an eastward-blowing wind takes a negative angle.
+  const eastward = Math.sin(((current?.wind_direction_10m ?? 0) * Math.PI) / 180) < 0
+  const slant = Math.round(5 + Math.min(current?.wind_speed_10m ?? 0, 45) * 0.3) * (eastward ? -1 : 1)
   const cover = Math.min(100, Math.max(0, current?.cloud_cover ?? 60))
   return (
     <>
