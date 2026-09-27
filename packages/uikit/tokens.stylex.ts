@@ -613,7 +613,7 @@ export const appAppearance = stylex.defineConsts({
   walletPlain: 'linear-gradient(150deg,#48484a,#1c1c1e)',
   // weather
   weatherStars:
-    'radial-gradient(1px 1px at 15% 12%,#fff,transparent),radial-gradient(1px 1px at 70% 20%,#fff,transparent),radial-gradient(1.5px 1.5px at 88% 30%,#fff,transparent),radial-gradient(1px 1px at 40% 30%,#fff,transparent),radial-gradient(1px 1px at 55% 8%,#fff,transparent),radial-gradient(1px 1px at 30% 42%,#fff,transparent)',
+    'radial-gradient(1.4px 1.4px at 15% 12%,#fff,transparent),radial-gradient(1px 1px at 70% 20%,#fff,transparent),radial-gradient(1.6px 1.6px at 88% 30%,#fff,transparent),radial-gradient(1px 1px at 40% 30%,#fff,transparent),radial-gradient(1px 1px at 55% 8%,#fff,transparent),radial-gradient(1px 1px at 30% 42%,rgba(255,255,255,.8),transparent),radial-gradient(1.2px 1.2px at 8% 55%,rgba(255,255,255,.85),transparent),radial-gradient(1px 1px at 62% 48%,rgba(255,255,255,.7),transparent),radial-gradient(1px 1px at 80% 58%,rgba(255,255,255,.75),transparent),radial-gradient(1.3px 1.3px at 48% 66%,rgba(255,255,255,.8),transparent),radial-gradient(1px 1px at 22% 74%,rgba(255,255,255,.6),transparent),radial-gradient(1px 1px at 92% 82%,rgba(255,255,255,.6),transparent)',
   /** The ring around a temperature-range marker, a border drawn as an outline. */
   weatherMarkerRing: 'rgba(0,0,0,.35)',
   weatherNight: '#172c47',
@@ -624,8 +624,13 @@ export const appAppearance = stylex.defineConsts({
   weatherScrollActive: 'rgba(255,255,255,.82)',
   weatherScrollTrack: 'rgba(10,30,50,.1)',
   weatherScrollRim: 'rgba(255,255,255,.28)',
-  weatherHaze:
-    'radial-gradient(ellipse 40% 13% at 16% 17%,rgba(227,236,246,.7),transparent),radial-gradient(ellipse 55% 18% at 90% 35%,rgba(227,236,246,.55),transparent)',
+  // Layered cloud banks: each layer groups a few ellipses into puffs so a cloud
+  // reads as a shape, not a wash. `weatherClouds` is the near bank,
+  // `weatherCloudsFar` the distant one a little lower and dimmer.
+  weatherClouds:
+    'radial-gradient(ellipse 24% 9% at 18% 20%,rgba(230,238,247,.7),transparent),radial-gradient(ellipse 13% 6.5% at 27% 16%,rgba(230,238,247,.55),transparent),radial-gradient(ellipse 30% 10% at 74% 34%,rgba(230,238,247,.6),transparent),radial-gradient(ellipse 16% 7% at 62% 30%,rgba(230,238,247,.45),transparent),radial-gradient(ellipse 20% 7% at 42% 58%,rgba(230,238,247,.42),transparent)',
+  weatherCloudsFar:
+    'radial-gradient(ellipse 20% 7% at 55% 30%,rgba(214,226,238,.5),transparent),radial-gradient(ellipse 14% 5% at 12% 55%,rgba(214,226,238,.4),transparent),radial-gradient(ellipse 26% 8% at 88% 70%,rgba(214,226,238,.42),transparent),radial-gradient(ellipse 11% 4.5% at 38% 78%,rgba(214,226,238,.3),transparent)',
   weatherChip: 'rgba(255,255,255,.32)',
   weatherOutline: 'rgba(255,255,255,.8)',
   weatherMuted: 'rgba(255,255,255,.62)',
@@ -643,9 +648,12 @@ export const appAppearance = stylex.defineConsts({
   weatherGlare:
     'radial-gradient(circle at 22% 6%,rgba(255,255,255,.95) 0,rgba(255,255,255,.75) 4%,rgba(255,255,255,.18) 11%,transparent 22%),radial-gradient(circle at 22% 6%,transparent 27%,rgba(255,255,255,.14) 28%,transparent 30%),radial-gradient(circle at 22% 6%,transparent 44%,rgba(255,255,255,.08) 45%,transparent 48%),radial-gradient(circle at 60% 40%,rgba(255,255,255,.10),transparent 10%)',
   weatherMoonGlow:
-    'radial-gradient(circle at 78% 10%,rgba(255,255,255,.55) 0,rgba(255,255,255,.12) 6%,transparent 18%)',
+    'radial-gradient(circle 9px at 78% 10%,rgba(255,255,248,.95) 0,rgba(255,255,248,.5) 55%,transparent 72%),radial-gradient(circle at 78% 10%,rgba(255,255,255,.4) 0,rgba(255,255,255,.1) 8%,transparent 20%)',
+  // Falling rain: one soft dash per background layer, each tiling at its own
+  // period so the field reads irregular. A `to bottom` linear-gradient would
+  // paint horizontal bands, which is what made rain look like diagonal stripes.
   weatherRainStreaks:
-    'linear-gradient(to bottom,transparent 0%,rgba(255,255,255,.32) 45%,transparent 100%),linear-gradient(to bottom,transparent 0%,rgba(255,255,255,.2) 45%,transparent 100%)',
+    'radial-gradient(ellipse 1.2px 14px at 50% 15%,rgba(255,255,255,.55),transparent),radial-gradient(ellipse 1px 11px at 50% 42%,rgba(255,255,255,.4),transparent),radial-gradient(ellipse 1.4px 18px at 50% 68%,rgba(255,255,255,.6),transparent),radial-gradient(ellipse 1px 12px at 50% 30%,rgba(255,255,255,.35),transparent),radial-gradient(ellipse 1.1px 15px at 50% 85%,rgba(255,255,255,.5),transparent),radial-gradient(ellipse .9px 10px at 50% 55%,rgba(255,255,255,.32),transparent)',
   weatherSnowFlakes:
     'radial-gradient(circle,rgba(255,255,255,.95) 1.4px,transparent 2.2px),radial-gradient(circle,rgba(255,255,255,.75) 1.1px,transparent 1.9px),radial-gradient(circle,rgba(255,255,255,.55) 0.9px,transparent 1.6px)',
   weatherFogBands:
