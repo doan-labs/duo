@@ -82,7 +82,8 @@ compatibility have already been verified.
   is written for developers in `packages/web/content/docs/`; only the SDK and kit
   references are generated from the source. This folder is the plan and record
   and is not rendered.
-- No blog, no accounts, no forum. GitHub Discussions link in the footer.
+- No accounts, no forum. GitHub Discussions link in the footer. The blog
+  came later (decision 107).
 - Ships after the kit exists. Building it earlier means writing it twice.
 
 ## Build record

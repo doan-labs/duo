@@ -1,0 +1,70 @@
+import { BreakIt } from '../../src/blog/break-it'
+import { HingeSweep } from '../../src/blog/hinge-sweep'
+import { Layers } from '../../src/blog/layers'
+import { Measured } from '../../src/blog/measured'
+import { TwinOS } from '../../src/blog/twin-os'
+import { TwoPaths } from '../../src/blog/two-paths'
+
+export const meta = {
+  title: 'Introducing Duo: a folding iPhone you can build for',
+  lead: 'A web page that folds, an OS that runs twice, and a sandbox for strangers’ code. Drag every figure.',
+  date: '2026-09-20',
+  author: ['Thanh Doan', 'Linh Doan'],
+  poster: '/blog/introducing-duo.jpg',
+  og: '/og/blog-introducing-duo.png'
+}
+
+<Film src="/blog/introducing-duo.mp4" poster="/blog/introducing-duo.jpg" caption="Duo at launch: the fold, Control Center and the shader behind it." />
+
+A folding phone lives between 0° and 180°. A mockup shows the two ends. So we built the phone.
+
+<HingeSweep />
+
+> Duo is an unofficial, experimental project by Doan Labs. It is not an Apple product and is not affiliated with Apple.
+
+## Two ways to draw a screen
+
+DOM can take typing but can't bend. A texture can bend but can't take typing. Duo uses both and swaps between them:
+
+<TwoPaths />
+
+## A fixed eye
+
+The bent glass shows whatever the flat panel showed along a ray from one eye, fixed at 40 cm:
+
+<FoldDiagram />
+
+## Run the OS twice
+
+One OS per display. The cover is the inner grid's left four columns, and both copies are always running:
+
+<TwinOS />
+
+The real shell, not a recording:
+
+<Live deg={150} caption="Drag the hinge slider, turn the phone, open an app and fold it closed." />
+
+## Measured, not eyeballed
+
+Every radius comes off Apple's mesh. Every swipe follows the finger through a paused animation:
+
+<Measured />
+
+## A sandbox for strangers' code
+
+Duo, taken apart. Tap a layer:
+
+<Layers />
+
+Below is a stranger's app, running for real in the same sandbox. Watch it try to get out:
+
+<BreakIt />
+
+Then the part developers touch:
+
+```ts
+// The hinge, live: 0 is closed, 180 flat. At most one event a frame.
+os.onView((v) => {
+  lid.style.transform = `rotateX(${180 - v.angle}deg)`
+})
+```

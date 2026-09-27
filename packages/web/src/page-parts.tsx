@@ -201,7 +201,18 @@ const LANG: Record<string, string> = {
  * keeps its line numbers pinned. `title` names the file, `lang` comes from a
  * Markdown fence; source gets numbers and colour, a shell transcript does not.
  */
-export function Pre({ children, title, lang }: { children: string; title?: string; lang?: string }) {
+export function Pre({
+  children,
+  title,
+  lang,
+  action
+}: {
+  children: string
+  title?: string
+  lang?: string
+  /** A control beside the copy button, such as a post's Run. */
+  action?: ReactNode
+}) {
   const label = title ?? (lang ? (LANG[lang] ?? lang) : undefined)
   const source = title !== undefined || COLOURED.has(lang ?? '')
   const lines = children.split('\n')
@@ -210,7 +221,10 @@ export function Pre({ children, title, lang }: { children: string; title?: strin
       {label ? (
         <div {...stylex.props(styles.codeTitle)}>
           <span {...stylex.props(styles.codeLabel)}>{label}</span>
-          <CopyButton text={children} />
+          <span {...stylex.props(styles.codeActions)}>
+            {action}
+            <CopyButton text={children} />
+          </span>
         </div>
       ) : (
         <div {...stylex.props(styles.float)}>
@@ -344,6 +358,7 @@ const styles = stylex.create({
     backgroundColor: color.surface,
     overflow: 'hidden'
   },
+  codeActions: { display: 'flex', alignItems: 'center', gap: '6px' },
   codeTitle: {
     display: 'flex',
     alignItems: 'center',

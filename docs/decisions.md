@@ -1815,3 +1815,41 @@ face-on panel that 2D matrix under a flat camera container, rounded so a settlin
 fold stops changing it, and gives the renderer's `matrix3d` back the frame the
 panel turns. Folding and orbiting still draw through the 3D chain. Chromium only;
 WKWebView parity is unmeasured.
+
+## 107. The blog is MDX on the site, and a post can place the real shell
+
+2026-09-27, accepted; supersedes "No blog" in platform/web.md. `/blog` lists the
+posts and `/blog/<name>` renders one, from `packages/web/content/blog/*.mdx`. A
+post is MDX rather than the docs' Markdown because the point of writing about a
+folding phone is to let the reader fold it: a post places `<Film>`, `<FoldDiagram>`,
+`<Live>` (the real shell, with `hear` for a live device-event panel) and
+`<Figures>` between paragraphs. Its prose renders through the docs' own `md`
+styles, so the two read as one site.
+
+A post leans on components over paragraphs, shown rather than told: `<Points>` for rules as short cards, each
+with an optional animated glyph in the text colour,
+`<Apps>` for the changelog's icon grid, and illustrations the reader drives.
+`<TileDiagram>` runs the Maps app's own projection and flight code over real
+tiles; `<StocksDiagram>` streams Binance's public market data (Apple as its
+tokenized stock AAPLB, which trades around the clock, and Bitcoin) into the
+Stocks app's own LiveLine canvas: five-minute klines, then every trade over
+the socket; `<NotifyRun>` plays `os.notify.post` on a still of the real lock
+screen, since the embed bridge carries no notify. `<MicWave>` meters the reader's
+own microphone in Voice Memos' red (`color.rec`, a graphic colour, never text) and
+keeps the take as a local Blob; nothing is uploaded. `<HomePlay>` is the arranging gesture on the shell's own rules
+(grid.ts's stack, dock, place and dissolve, re-run on local state, never the saved grid),
+in decision 18's glass. `<Live hear>` tours each event's
+cap with /sdk's own chapters and ring. From 1200px wide the post's `##` outline sits beside the
+column (`<Contents>`, after rare-ui's hook sidebar, ported to StyleX rather than
+installed, since the registry item is Tailwind and Next); it hides over any figure
+wider than the column, and the floating section pill is kept for narrower screens.
+
+Each file exports its own `meta`, so there is no frontmatter parser. The outline
+and the reading time come from a `?raw` import of the same file; `@mdx-js/rollup`
+drops the query before it filters, so vite.config.ts wraps its transform to let
+the raw copy pass. It is limited to `.mdx`, or it would compile the docs' `.md`.
+No GFM plugin: a post has no Markdown tables, and a table is a component.
+
+One `Live` per post, for decision 76's WebGL budget. Films are re-encoded
+under Cloudflare's 25 MiB asset limit into `public/blog/` next to a poster
+still, and play only when asked. Cost: a new dependency, `@mdx-js/rollup`.

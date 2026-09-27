@@ -10,6 +10,9 @@ import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import type { Point } from './data.ts'
 import { styles } from './styles.ts'
 
+/** The canvas itself, for the site's blog post that plays this chart live. */
+export { Liveline }
+
 const W = 720
 const H = 220
 const PAD = 8

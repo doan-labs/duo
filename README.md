@@ -109,10 +109,12 @@ packages/
     src/home/       the launch page, one section per file, plus parts.tsx (blocks, headlines, code)
     src/kit/        the /kit hero and showcase grid: scenes/ holds one small live app per tile
     src/kit-demos/  one live demo per UI kit component, rendered and shown as source on /kit/docs/<name>
+    src/blog/       the post loader, the MDX element map and what a post can place: the film, the live phone, interactive figures (fold, map tiles, stock chart, notify, mic, home-screen arranging), the side outline and short cards; posts are content/blog/*.mdx
     src/            nav, footer, layout, markdown renderer, docs loader, kit preview, tokens, theme, reset.css
     src/hardware/   the /sdk page: a live wire of every payload up top, each device event beside one live phone, drawn as keys, viewfinder, dial, tiles, the tour that rings each cap, and a closing board of what the page heard
     src/simulator.tsx  the real shell in a frame, driven over the postMessage bridge, and told its device events
     src/live-code.tsx  a code sample whose running line lights up, and its readout
+    src/app-grid.tsx  app names as linked icons, shared by the changelog and posts
     src/segmented.tsx  the sliding-thumb group button, shared by every filter and tab strip
     src/side-nav.tsx  the docs sidebar: sliding hover and active indicators, a disclosure when narrow
     src/motion.ts   the shared easing curve, springs and press scale

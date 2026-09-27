@@ -2,12 +2,14 @@
 // filling the rest at every width, phone included. The caption waits for the
 // shell to report a picture, so it never labels an empty stage.
 import * as stylex from '@stylexjs/stylex'
+import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useState } from 'react'
+import { posts } from '../blog/posts'
 import { Button } from '../layout'
 import { CURVE } from '../motion'
 import { Simulator } from '../simulator'
-import { color, font } from '../tokens.stylex'
+import { color, ease, font, radius } from '../tokens.stylex'
 
 const MID = '@media (max-width: 1068px)'
 const SMALL = '@media (max-width: 734px)'
@@ -17,6 +19,8 @@ const SMALL = '@media (max-width: 734px)'
 // renders opacity 0 into the HTML and opacity 1 into the hydration, which fails the
 // whole tree for exactly the readers least able to absorb a re-render.
 const NONE = { duration: 0 }
+
+const news = posts[0]
 
 export function Hero() {
   const still = useReducedMotion() ?? false
@@ -32,6 +36,25 @@ export function Hero() {
     <section {...stylex.props(styles.hero)} aria-labelledby="hero-title">
       <div {...stylex.props(styles.inner)}>
         <div {...stylex.props(styles.copy)}>
+          {news && (
+            // The newest post, announced above the headline; it moves on by itself when the next one lands.
+            <motion.div {...rise(0)}>
+              <Link to="/blog/$slug" params={{ slug: news.slug }} {...stylex.props(styles.news)}>
+                <span {...stylex.props(styles.newsTag)}>New</span>
+                <span {...stylex.props(styles.newsTitle)}>{news.title}</span>
+                <svg viewBox="0 0 16 16" aria-hidden="true" {...stylex.props(styles.newsArrow)}>
+                  <path
+                    d="M3 8h9.5M8.5 4l4 4-4 4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Link>
+            </motion.div>
+          )}
           <motion.h1 id="hero-title" {...stylex.props(styles.title)} {...rise(1)}>
             Apple’s folding iPhone, simulated.
             <br />
@@ -95,6 +118,53 @@ const styles = stylex.create({
   },
   inner: { maxWidth: '1280px', marginLeft: 'auto', marginRight: 'auto' },
   copy: { position: 'relative', zIndex: 1, maxWidth: '1100px' },
+  news: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '10px',
+    maxWidth: '100%',
+    marginBottom: { default: '28px', [SMALL]: '20px' },
+    paddingTop: '5px',
+    paddingBottom: '5px',
+    paddingLeft: '5px',
+    paddingRight: '14px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: { default: color.border, ':hover': color.borderStrong },
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+    color: color.text,
+    fontSize: '14px',
+    fontWeight: 500,
+    textDecoration: 'none',
+    transitionProperty: 'border-color, box-shadow',
+    transitionDuration: '0.2s',
+    transitionTimingFunction: ease.out,
+    boxShadow: { default: 'none', ':hover': color.shadow },
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
+  },
+  newsTag: {
+    flexShrink: 0,
+    paddingTop: '3px',
+    paddingBottom: '3px',
+    paddingLeft: '9px',
+    paddingRight: '9px',
+    borderRadius: radius.pill,
+    backgroundColor: color.accent,
+    color: color.onAccent,
+    fontSize: '12px',
+    fontWeight: 600
+  },
+  newsTitle: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  newsArrow: {
+    flexShrink: 0,
+    width: '14px',
+    height: '14px',
+    color: color.text3
+  },
   title: {
     marginTop: 0,
     marginBottom: 0,

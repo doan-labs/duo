@@ -21,6 +21,8 @@ import { Route as PublishRouteImport } from './routes/publish'
 import { Route as SdkRouteImport } from './routes/sdk'
 import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as AppsSlugRouteImport } from './routes/apps.$slug'
+import { Route as BlogIndexRouteImport } from './routes/blog.index'
+import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 import { Route as DocsSdkRouteImport } from './routes/docs.sdk'
@@ -89,6 +91,16 @@ const AppsSlugRoute = AppsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => AppsRoute,
 } as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogSlugRoute = BlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -138,9 +150,11 @@ export interface FileRoutesByFullPath {
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
   '/apps/$slug': typeof AppsSlugRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
   '/kit/docs': typeof KitDocsRouteWithChildren
+  '/blog/': typeof BlogIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/kit/': typeof KitIndexRoute
   '/kit/docs/$name': typeof KitDocsNameRoute
@@ -157,8 +171,10 @@ export interface FileRoutesByTo {
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
   '/apps/$slug': typeof AppsSlugRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
+  '/blog': typeof BlogIndexRoute
   '/docs': typeof DocsIndexRoute
   '/kit': typeof KitIndexRoute
   '/kit/docs/$name': typeof KitDocsNameRoute
@@ -178,9 +194,11 @@ export interface FileRoutesById {
   '/sdk': typeof SdkRoute
   '/simulator': typeof SimulatorRoute
   '/apps/$slug': typeof AppsSlugRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/sdk': typeof DocsSdkRoute
   '/kit/docs': typeof KitDocsRouteWithChildren
+  '/blog/': typeof BlogIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/kit/': typeof KitIndexRoute
   '/kit/docs/$name': typeof KitDocsNameRoute
@@ -201,9 +219,11 @@ export interface FileRouteTypes {
     | '/sdk'
     | '/simulator'
     | '/apps/$slug'
+    | '/blog/$slug'
     | '/docs/$'
     | '/docs/sdk'
     | '/kit/docs'
+    | '/blog/'
     | '/docs/'
     | '/kit/'
     | '/kit/docs/$name'
@@ -220,8 +240,10 @@ export interface FileRouteTypes {
     | '/sdk'
     | '/simulator'
     | '/apps/$slug'
+    | '/blog/$slug'
     | '/docs/$'
     | '/docs/sdk'
+    | '/blog'
     | '/docs'
     | '/kit'
     | '/kit/docs/$name'
@@ -240,9 +262,11 @@ export interface FileRouteTypes {
     | '/sdk'
     | '/simulator'
     | '/apps/$slug'
+    | '/blog/$slug'
     | '/docs/$'
     | '/docs/sdk'
     | '/kit/docs'
+    | '/blog/'
     | '/docs/'
     | '/kit/'
     | '/kit/docs/$name'
@@ -261,6 +285,8 @@ export interface RootRouteChildren {
   PublishRoute: typeof PublishRoute
   SdkRoute: typeof SdkRoute
   SimulatorRoute: typeof SimulatorRoute
+  BlogSlugRoute: typeof BlogSlugRoute
+  BlogIndexRoute: typeof BlogIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -348,6 +374,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/apps/$slug'
       preLoaderRoute: typeof AppsSlugRouteImport
       parentRoute: typeof AppsRoute
+    }
+    '/blog/': {
+      id: '/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/$slug': {
+      id: '/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof BlogSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/docs/': {
       id: '/docs/'
@@ -462,6 +502,8 @@ const rootRouteChildren: RootRouteChildren = {
   PublishRoute: PublishRoute,
   SdkRoute: SdkRoute,
   SimulatorRoute: SimulatorRoute,
+  BlogSlugRoute: BlogSlugRoute,
+  BlogIndexRoute: BlogIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

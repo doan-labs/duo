@@ -1,13 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import log from '../../../../CHANGELOG.md?raw'
+import { AppGrid, iconOf } from '../app-grid'
 import { known } from '../docs'
 import { Fold } from '../fold'
-import { appForName } from '../home/apps'
 import { Section } from '../layout'
 import { type Block, parse, render } from '../markdown'
 import { PageTop } from '../page-parts'
-import { color, ease, font, radius } from '../tokens.stylex'
+import { color, font } from '../tokens.stylex'
 
 export const Route = createFileRoute('/changelog')({
   head: () => ({ meta: [{ title: 'Changelog · Duo' }] }),
@@ -32,10 +32,6 @@ const VERSIONS = parse(log).reduce<Version[]>((vs, b) => {
   else (v.parts.at(-1)?.blocks ?? v.intro).push(b)
   return vs
 }, [])
-
-/** Settings is not on the home screen, so /apps has no entry for it: an icon, no page. */
-const SETTINGS = '/icons/settings.webp'
-const iconOf = (name: string) => appForName(name)?.icon ?? (name === 'Settings' ? SETTINGS : undefined)
 
 /**
  * "Rebuilt after Apple's: Camera, Notes and the App Store." as a lead and app names,
@@ -82,28 +78,7 @@ function Accordion({ part }: { part: Part }) {
           return (
             <div key={key} {...stylex.props(styles.apps)}>
               {apps.lead && <p {...stylex.props(styles.lead)}>{apps.lead}</p>}
-              <ul {...stylex.props(styles.grid)}>
-                {apps.names.map((n) => {
-                  const slug = appForName(n)?.slug
-                  const face = (
-                    <>
-                      <img src={iconOf(n)} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
-                      {n}
-                    </>
-                  )
-                  return (
-                    <li key={n}>
-                      {slug ? (
-                        <Link to="/apps/$slug" params={{ slug }} {...stylex.props(styles.app, styles.appLink)}>
-                          {face}
-                        </Link>
-                      ) : (
-                        <span {...stylex.props(styles.app)}>{face}</span>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
+              <AppGrid names={apps.names} />
             </div>
           )
         })
@@ -115,41 +90,5 @@ function Accordion({ part }: { part: Part }) {
 const styles = stylex.create({
   title: { fontFamily: font.sans, fontSize: '17px', fontWeight: 600 },
   apps: { marginBottom: '20px' },
-  lead: { marginTop: 0, marginBottom: '12px', fontFamily: font.sans, fontSize: '15px', color: color.text2 },
-  grid: {
-    listStyleType: 'none',
-    margin: 0,
-    padding: 0,
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-    gap: '12px'
-  },
-  app: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    minWidth: 0,
-    fontFamily: font.sans,
-    fontSize: '15px',
-    color: color.text,
-    // Every tile takes the hover pad, linked or not, so Settings lines up with its row.
-    marginLeft: '-6px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
-    paddingLeft: '6px',
-    paddingRight: '6px',
-    borderRadius: radius.md
-  },
-  appLink: {
-    textDecoration: 'none',
-    backgroundColor: { default: 'transparent', ':hover': color.well },
-    transitionProperty: 'background-color',
-    transitionDuration: '0.2s',
-    transitionTimingFunction: ease.out,
-    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
-    outlineStyle: 'solid',
-    outlineWidth: '2px',
-    outlineOffset: '2px'
-  },
-  icon: { width: '32px', height: '32px', flexShrink: 0, borderRadius: '7px' }
+  lead: { marginTop: 0, marginBottom: '12px', fontFamily: font.sans, fontSize: '15px', color: color.text2 }
 })

@@ -1,0 +1,127 @@
+export const meta = {
+  title: 'Duo 0.2.0 is out',
+  lead: 'Apps that hear the hardware, notifications, a microphone the sandbox never touches, a dock you arrange by hand, and twenty-five apps rebuilt after Apple’s.',
+  date: '2026-09-27',
+  author: 'Thanh Doan',
+  poster: '/blog/duo-0-2-0.jpg',
+  og: '/og/blog-duo-0-2-0.png'
+}
+
+<Film
+  src="/blog/duo-0-2-0.mp4"
+  poster="/blog/duo-0-2-0.jpg"
+  chapters={[
+    [0, 'Introducing 0.2.0'],
+    [11.4, 'Real apps'],
+    [27.4, 'The platform'],
+    [36.6, 'Notifications'],
+    [48, 'Community'],
+    [52.6, 'The wall'],
+    [59.4, 'Finale']
+  ]}
+  caption="Every shot on the glass is the running shell."
+/>
+
+0.1.0 was a folding phone you could build for. 0.2.0, one week later, is one that feels real under your finger.
+
+<Figures items={[['7', 'days since 0.1.0', 'dot'], ['25', 'apps rebuilt'], ['8', 'community apps redesigned', 'people'], ['5', 'device event types', 'pulse']]} />
+
+## Apps can hear the hardware
+
+Until now, apps saw the hinge and nothing else. Now one call hears any button or sensor:
+
+```ts
+const off = os.device.on('volume', (e) => {
+  if (e.action === 'press') zoom(e.button === 'up' ? 1 : -1)
+})
+```
+
+The hard part was deciding who wins a press:
+
+<Points
+  items={[
+    ['Taken', 'Volume and Camera Control go to a listening app, not the ringer or the Camera app.', 'taken'],
+    ['Heard, never taken', 'The side button: no app can stop you locking your phone.', 'heard'],
+    ['State', 'Orientation and the Control Center switches: the current value, then each change.', 'state']
+  ]}
+/>
+
+Press the volume keys, slide Camera Control, turn the phone, flip a switch:
+
+<Live deg={180} hear caption="Every payload comes from the shell's bridge, exactly as an app receives it." />
+
+## Notifications without a permission
+
+One call: a banner for four seconds, then a card on the lock screen. Tap either to open the app with `arg`.
+
+<NotifyRun />
+
+## A microphone the sandbox never touches
+
+`getUserMedia` cannot run in an opaque-origin frame, so the shell records and the app gets a blob.
+
+<MicWave />
+
+## The dock, arranged by hand
+
+Hold an icon for half a second and carry it. Every icon moves on transforms only, so a finger that changes its mind retargets smoothly. These are the shell's rules:
+
+<HomePlay />
+
+## Twenty-five apps, rebuilt
+
+<Apps
+  names={[
+    'Camera',
+    'Notes',
+    'Safari',
+    'Reminders',
+    'News',
+    'Wallet',
+    'Home',
+    'Health',
+    'Fitness',
+    'Weather',
+    'Contacts',
+    'Clock',
+    'Tips',
+    'Music',
+    'Phone',
+    'Calendar',
+    'App Store',
+    'Messages',
+    'Maps',
+    'Books',
+    'Calculator',
+    'Voice Memos',
+    'Shortcuts',
+    'Podcasts',
+    'Stocks'
+  ]}
+/>
+
+One rule for every one: **a row is real, or it is not there.** So the mocks we could not make honest (YouTube, Watch, the iTunes Store, Find My) are gone, and the rest talk to the real world through keyless services.
+
+### Maps is squares
+
+Maps draws real OpenStreetMap tiles. It only asks for the tiles under the glass, and a zoom between levels scales them instead of reloading. This runs the app's own code:
+
+<TileDiagram />
+
+Search is Photon and routes are FOSSGIS OSRM, one server per mode: the public demo quietly routes everything as driving.
+
+### Stocks invents nothing
+
+Quotes from CNBC, daily closes from stockanalysis.com, crypto candles from Coinbase. Where no free feed exists, the chart stays empty:
+
+<StocksDiagram />
+
+## Community apps
+
+<Apps names={['2048', 'Snake', 'Tic-Tac-Toe', 'Memory Match', 'Wordle Mini', 'Pomo Timer', 'Habit Streak', 'Fold Compass']} />
+
+All eight redesigned with fold sync. The UI kit reached 1.2 with `Menu`, `Sheet`, `Segmented`, `TextField` and more; the site gained [/apps](/apps) and [/kit](/kit).
+
+## Get it
+
+0.2.0 is live at [duo.doan-labs.com](https://duo.doan-labs.com/simulator). Everything else is in the [changelog](/changelog) and the [hardware docs](/docs/hardware).

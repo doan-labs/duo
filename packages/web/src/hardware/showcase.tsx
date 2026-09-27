@@ -103,7 +103,8 @@ const EDGE: Pose = { deg: 180, yaw: -0.5 }
 // Folded, the right edge is tall and near: the two long caps are easy to find.
 const SHUT: Pose = { deg: 0, yaw: -0.9 }
 
-const CHAPTERS: Chapter[] = [
+/** Exported for the blog's live phone, which tours the same caps in the same poses. */
+export const CHAPTERS: Chapter[] = [
   {
     type: 'volume',
     title: 'Volume, as a controller',

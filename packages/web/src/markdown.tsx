@@ -338,7 +338,7 @@ export const outline = (bs: Block[]) =>
 
 const SMALL = '@media (max-width: 734px)'
 
-const md = stylex.create({
+export const md = stylex.create({
   h: {
     fontFamily: font.display,
     color: color.text,

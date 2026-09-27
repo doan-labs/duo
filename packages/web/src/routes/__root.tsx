@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
-import { type ReactNode, useEffect } from 'react'
+import { lazy, type ReactNode, Suspense, useEffect } from 'react'
 import { Footer } from '../footer'
 import { Button, Eyebrow } from '../layout'
 import { CURVE } from '../motion'
@@ -14,6 +14,19 @@ import { color, font } from '../tokens.stylex'
 import 'lenis/dist/lenis.css'
 import '../reset.css'
 import 'virtual:stylex.css'
+
+// TanStack's devtools (router panel), dev only: the dead branch drops the import from the build.
+const Devtools = import.meta.env.DEV
+  ? lazy(async () => {
+      const [{ TanStackDevtools }, { TanStackRouterDevtoolsPanel }] = await Promise.all([
+        import('@tanstack/react-devtools'),
+        import('@tanstack/react-router-devtools')
+      ])
+      return {
+        default: () => <TanStackDevtools plugins={[{ name: 'Router', render: <TanStackRouterDevtoolsPanel /> }]} />
+      }
+    })
+  : null
 
 const OG_IMAGE = 'https://duo.doan-labs.com/og/duo-og-03.png'
 
@@ -146,6 +159,11 @@ function Document({ children }: { children: ReactNode }) {
       </head>
       <body {...stylex.props(styles.body)}>
         {children}
+        {Devtools && (
+          <Suspense>
+            <Devtools />
+          </Suspense>
+        )}
         <Scripts />
       </body>
     </html>

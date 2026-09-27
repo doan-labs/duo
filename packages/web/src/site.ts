@@ -28,6 +28,7 @@ export const NAV = [
     icon: 'M4.75 1.75h6.5a1 1 0 0 1 1 1v10.5a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1V2.75a1 1 0 0 1 1-1zM6.75 3.5h2.5',
     highlight: true
   },
+  { to: '/blog', label: 'Blog', icon: 'M3 2.75h10v10.5H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3' },
   {
     to: '/changelog',
     label: 'Changelog',

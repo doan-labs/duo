@@ -5,8 +5,11 @@
 // a search field, expandable lanes, and every app opening in a sheet with its facts,
 // version notes and a way into the simulator.
 import * as stylex from '@stylexjs/stylex'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { animate, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Roll } from '../blog/diagram'
+import { type Reading, readingOf } from '../blog/reading'
 import { known } from '../docs'
 import { Fold } from '../fold'
 import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
@@ -376,7 +379,7 @@ function List({ apps }: { apps: readonly Entry[] }) {
  *  CHANGELOG.md, the privacy card, and the source link at the bottom.
  *  A native dialog: Escape closes it, the backdrop is a click away, and the
  *  browser owns the scroll lock and the focus return. */
-function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
+function Sheet({ entry, onClose, back }: { entry: Entry; onClose: () => void; back?: string }) {
   const ref = useRef<HTMLDialogElement | null>(null)
   // `close()` removes a dialog at once, so every way out plays the exit first and
   // closes on its `animationend`. Reduced motion shortens it to nothing in reset.css.
@@ -401,9 +404,14 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
       d.removeEventListener('close', onClose)
     }
   }, [onClose])
+  // From a post, the tab's reading record names it and says how far in the reader is; read after mount, since the server has no sessionStorage.
+  const [read, setRead] = useState<Reading | null>(null)
+  useEffect(() => setRead(back ? readingOf(back) : null), [back])
   const backdrop = (e: React.MouseEvent<HTMLDialogElement>) => {
     const d = ref.current
     if (!d) return
+    // Framed, the dialog is a transparent column: a click on its own gaps is a click on the scrim.
+    if (back && e.target === e.currentTarget) return setLeaving(true)
     const r = d.getBoundingClientRect()
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) setLeaving(true)
   }
@@ -435,9 +443,24 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
       aria-labelledby="app-sheet-name"
       onClick={backdrop}
       onAnimationEnd={done}
-      {...stylex.props(styles.dialog, leaving && styles.dialogOut)}
+      {...stylex.props(styles.dialog, !!back && styles.framed, leaving && styles.dialogOut)}
     >
-      <div {...stylex.props(styles.sheet)}>
+      {back && (
+        <button type="button" onClick={() => setLeaving(true)} {...stylex.props(styles.float, styles.back)}>
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M13 8H3.5M7.5 4l-4 4 4 4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Back to {read?.title ? <span {...stylex.props(styles.backTitle)}>{read.title}</span> : 'the blog'}
+        </button>
+      )}
+      <div {...stylex.props(styles.sheet, !!back && styles.panel)}>
         <button type="button" aria-label="Close" onClick={() => setLeaving(true)} {...stylex.props(styles.close)}>
           <Glyph name="x" />
         </button>
@@ -500,7 +523,71 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
           )}
         </p>
       </div>
+      {back && read && read.ms > 0 && <Receipt read={read} onBack={() => setLeaving(true)} />}
     </dialog>
+  )
+}
+
+const clock = (sec: number) => {
+  const s = Math.round(sec)
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
+}
+
+const QUIPS: [number, string][] = [
+  [0.15, 'Barely started. The good part is further down.'],
+  [0.5, 'A fair way in. Plenty left to play with.'],
+  [0.9, 'Past halfway. The dock is still waiting for you.'],
+  [1.01, 'Read to the end. Thank you for that.']
+]
+
+/** The reader's place in the post they came from: a ring for how far, the time spent, and the way back. */
+function Receipt({ read, onBack }: { read: Reading; onBack: () => void }) {
+  const still = useReducedMotion()
+  const target = Math.round(read.pct * 100)
+  // The ring and its number fill up from zero as the card lands; the time here then ticks on.
+  const [pct, setPct] = useState(still ? target : 0)
+  const [here, setHere] = useState(0)
+  useEffect(() => {
+    if (still) return
+    const run = animate(0, target, {
+      duration: 0.9,
+      delay: 0.25,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setPct(Math.round(v))
+    })
+    return () => run.stop()
+  }, [target, still])
+  useEffect(() => {
+    const id = window.setInterval(() => setHere((h) => h + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const C = 2 * Math.PI * 15
+  return (
+    <div {...stylex.props(styles.float, styles.receipt)}>
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" {...stylex.props(styles.ring)}>
+        <circle cx="20" cy="20" r="15" fill="none" strokeWidth="4" {...stylex.props(styles.ringTrack)} />
+        <circle
+          cx="20"
+          cy="20"
+          r="15"
+          fill="none"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={`${(C * pct) / 100} ${C}`}
+          transform="rotate(-90 20 20)"
+          {...stylex.props(styles.ringFill)}
+        />
+      </svg>
+      <span {...stylex.props(styles.receiptText)}>
+        <strong {...stylex.props(styles.receiptHead)}>
+          {pct}% read · {clock(read.ms / 1000)} on the post · <Roll text={clock(here)} /> here
+        </strong>
+        <span>{QUIPS.find(([at]) => read.pct < at)?.[1]}</span>
+      </span>
+      <button type="button" onClick={onBack} {...stylex.props(styles.keep)}>
+        Keep reading
+      </button>
+    </div>
   )
 }
 
@@ -508,7 +595,6 @@ function Sheet({ entry, onClose }: { entry: Entry; onClose: () => void }) {
 function Release({ version, blocks, latest }: { version: string; blocks: MdBlock[]; latest: boolean }) {
   return (
     <Fold
-      open={latest}
       head={
         <>
           <span {...stylex.props(styles.releaseVersion)}>{version}</span>
@@ -522,14 +608,21 @@ function Release({ version, blocks, latest }: { version: string; blocks: MdBlock
 }
 
 /** The sheet behind /apps/<slug>: the route names the app, the dialog closes by navigating back to the catalog. */
-export function AppSheet({ slug }: { slug: string }) {
+export function AppSheet({ slug, from }: { slug: string; from?: string }) {
   const navigate = useNavigate()
+  const { history } = useRouter()
   const entry = appForSlug(slug)
-  const close = useCallback(() => navigate({ to: '/apps', resetScroll: false }), [navigate])
+  // From a post, closing goes back to it: through history when it is there, so
+  // the post keeps its scroll; by address when the link was opened cold.
+  const close = useCallback(() => {
+    if (!from) navigate({ to: '/apps', resetScroll: false })
+    else if (history.canGoBack()) history.back()
+    else navigate({ to: '/blog/$slug', params: { slug: from } })
+  }, [navigate, history, from])
   useEffect(() => {
     if (!entry) navigate({ to: '/apps', replace: true })
   }, [entry, navigate])
-  return entry ? <Sheet entry={entry} onClose={close} /> : null
+  return entry ? <Sheet entry={entry} onClose={close} back={from} /> : null
 }
 
 function StatusChip({ status }: { status: Status }) {
@@ -941,6 +1034,100 @@ const styles = stylex.create({
     borderRadius: radius.pill,
     backgroundColor: { default: color.well, ':hover': color.grayBg },
     color: color.text2,
+    cursor: 'pointer',
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px',
+    transitionProperty: 'background-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out
+  },
+  // Opened from a post, the dialog is a transparent column: the way back above
+  // the sheet, the reader's place below it, both floating on the scrim.
+  framed: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    maxHeight: '100dvh',
+    paddingTop: '20px',
+    paddingBottom: '20px',
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    boxShadow: 'none',
+    overflowY: 'hidden'
+  },
+  panel: {
+    alignSelf: 'stretch',
+    flexShrink: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    backgroundColor: color.surface,
+    borderRadius: radius.lg,
+    boxShadow: color.shadow
+  },
+  float: {
+    flexShrink: 0,
+    backgroundColor: color.navBg,
+    backdropFilter: 'blur(18px) saturate(1.6)',
+    WebkitBackdropFilter: 'blur(18px) saturate(1.6)',
+    boxShadow: color.thumbShadow,
+    borderRadius: radius.pill
+  },
+  backTitle: { fontWeight: 600, color: color.text },
+  receipt: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    maxWidth: '100%',
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    fontFamily: font.sans,
+    fontSize: '13px',
+    color: color.text2
+  },
+  ring: { flexShrink: 0 },
+  ringTrack: { stroke: color.grayBg },
+  ringFill: { stroke: color.accent },
+  receiptText: { display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.35 },
+  receiptHead: { fontWeight: 600, color: color.text, fontVariantNumeric: 'tabular-nums' },
+  keep: {
+    flexShrink: 0,
+    marginLeft: '4px',
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    borderWidth: 0,
+    borderRadius: radius.pill,
+    backgroundColor: { default: color.accent, ':hover': color.accentHover },
+    color: color.onAccent,
+    fontFamily: font.sans,
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
+  },
+  back: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    paddingTop: '9px',
+    paddingBottom: '9px',
+    paddingLeft: '14px',
+    paddingRight: '16px',
+    borderWidth: 0,
+    color: { default: color.text2, ':hover': color.text },
+    fontFamily: font.sans,
+    fontSize: '13px',
+    fontWeight: 500,
     cursor: 'pointer',
     outlineColor: { default: 'transparent', ':focus-visible': color.ring },
     outlineStyle: 'solid',

@@ -42,6 +42,8 @@ export const color = stylex.defineVars({
   orangeBg: { default: 'rgba(167,84,0,0.10)', [DARK]: 'rgba(255,178,102,0.12)' },
   red: { default: '#b3261e', [DARK]: '#ff8a80' },
   redBg: { default: 'rgba(179,38,30,0.10)', [DARK]: 'rgba(255,138,128,0.12)' },
+  /** Voice Memos' recording red, the film's: a graphic colour for waveforms, never text. */
+  rec: '#ff453a',
   gray: { default: '#5f5e58', [DARK]: '#a3a29a' },
   grayBg: { default: 'rgba(20,20,19,0.06)', [DARK]: 'rgba(242,241,236,0.08)' },
   /** Syntax colour for the code samples (`src/highlight.tsx`): keywords, strings, numbers, JSX tags, calls, properties, punctuation, comments. */
@@ -84,6 +86,7 @@ export const light = stylex.createTheme(color, {
   orangeBg: 'rgba(167,84,0,0.10)',
   red: '#b3261e',
   redBg: 'rgba(179,38,30,0.10)',
+  rec: '#ff453a',
   gray: '#5f5e58',
   grayBg: 'rgba(20,20,19,0.06)',
   synKw: '#7a3e9d',
@@ -121,6 +124,7 @@ export const dark = stylex.createTheme(color, {
   orangeBg: 'rgba(255,178,102,0.12)',
   red: '#ff8a80',
   redBg: 'rgba(255,138,128,0.12)',
+  rec: '#ff453a',
   gray: '#a3a29a',
   grayBg: 'rgba(242,241,236,0.08)',
   synKw: '#c792ea',
