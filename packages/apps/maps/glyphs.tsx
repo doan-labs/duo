@@ -19,6 +19,7 @@ export type GlyphName =
   | 'roundabout'
   | 'merge'
   | 'flag'
+  | 'locate'
 
 const FILLED: Partial<Record<GlyphName, string>> = {
   // A car, front view; the evenodd windshield stays glass.
@@ -48,7 +49,9 @@ const STROKED: Partial<Record<GlyphName, string[]>> = {
   // Merge: two stems into one upward arm.
   merge: ['M5.5 19.5v-3.5a4 4 0 0 1 4-4', 'M18.5 19.5v-3.5a4 4 0 0 0-4-4', 'M12 12V4.5', 'M8.5 8 12 4.5 15.5 8'],
   // Arrive: the flagpole and its pennant.
-  flag: ['M6.5 19.5V4.5', 'M6.5 5h10.5l-2.2 3.2 2.2 3.3H6.5']
+  flag: ['M6.5 19.5V4.5', 'M6.5 5h10.5l-2.2 3.2 2.2 3.3H6.5'],
+  // Locate, hollow: SF's location arrow at rest; the filled `Sym` means centred.
+  locate: ['M19.5 4.5 4.5 11l6.8 1.7 1.7 6.8z']
 }
 
 /** Right-hand marks mirror for their left-hand twins. */
