@@ -3,7 +3,7 @@ import { useInView } from 'motion/react'
 import { useRef, useState } from 'react'
 import { color, ease, font } from '../tokens.stylex'
 import { useAutoplay } from './autoplay'
-import { diagram, Stat } from './diagram'
+import { diagram, Stat, useNarrow } from './diagram'
 
 type Trust = 'host' | 'trusted' | 'sandboxed'
 type Layer = {
@@ -99,6 +99,8 @@ const BOTTOM = 372
 const GAP = 54
 const SHUT = 8
 const LENS = { x: 340, y: 24, w: 300, h: 350 }
+/** On a phone the lens drops under the stack, so neither has to share the width. */
+const LENS_UNDER = { x: 20, y: 404, w: 300, h: 290 }
 /** The brackets' spine, left of the stack, and the port's line across the boundary. */
 const BX = 34
 const PX = CX + 70
@@ -117,6 +119,8 @@ const TRUST: Record<Trust, string> = { host: 'host', trusted: 'trusted', sandbox
  */
 export function Layers() {
   const [pick, setPick] = useState(4)
+  const narrow = useNarrow()
+  const lens = narrow ? LENS_UNDER : LENS
   const svg = useRef<SVGSVGElement>(null)
   const seen = useInView(svg, { once: true, amount: 0.4 })
   const auto = useAutoplay<HTMLDivElement>((t) => setPick((Math.floor(t / 2.8) + 4) % LAYERS.length))
@@ -132,7 +136,12 @@ export function Layers() {
   return (
     <figure {...stylex.props(diagram.figure)}>
       <div ref={auto.ref}>
-        <svg ref={svg} viewBox="0 0 660 400" role="img" aria-label={`Duo's layers, ${l.name} opened`}>
+        <svg
+          ref={svg}
+          viewBox={narrow ? '0 0 340 700' : '0 0 660 400'}
+          role="img"
+          aria-label={`Duo's layers, ${l.name} opened`}
+        >
           <title>Duo, layer by layer</title>
           {LAYERS.map((layer, i) => {
             const on = i === pick
@@ -193,7 +202,7 @@ export function Layers() {
               </text>
             </g>
           )}
-          {seen && (
+          {seen && !narrow && (
             <line
               key={`lead-${pick}`}
               x1={CX + A}
@@ -203,14 +212,14 @@ export function Layers() {
               {...stylex.props(styles.leader, styles.fade)}
             />
           )}
-          <rect x={LENS.x} y={LENS.y} width={LENS.w} height={LENS.h} rx="16" {...stylex.props(styles.lens)} />
+          <rect x={lens.x} y={lens.y} width={lens.w} height={lens.h} rx="16" {...stylex.props(styles.lens)} />
           <g key={pick}>
-            <text x={LENS.x + 16} y={LENS.y + 38} {...stylex.props(styles.lensTitle)}>
+            <text x={lens.x + 16} y={lens.y + 38} {...stylex.props(styles.lensTitle)}>
               {l.name}
             </text>
             <text
-              x={LENS.x + LENS.w - 16}
-              y={LENS.y + 38}
+              x={lens.x + lens.w - 16}
+              y={lens.y + 38}
               textAnchor="end"
               {...stylex.props(
                 styles.chipTrust,
@@ -220,8 +229,8 @@ export function Layers() {
               {TRUST[l.trust]}
             </text>
             {l.parts.map(([label, note], i) => {
-              const cx = LENS.x + 12 + (i % 2) * (CHIP.w + CHIP.gap)
-              const cy = LENS.y + 62 + Math.floor(i / 2) * (CHIP.h + CHIP.gap)
+              const cx = lens.x + 12 + (i % 2) * (CHIP.w + CHIP.gap)
+              const cy = lens.y + 62 + Math.floor(i / 2) * (CHIP.h + CHIP.gap)
               return (
                 <g key={label} {...stylex.props(styles.chip, styles.wait(`${0.08 + i * 0.09}s`))}>
                   <rect x={cx} y={cy} width={CHIP.w} height={CHIP.h} rx="10" {...stylex.props(styles.chipBox)} />
@@ -234,7 +243,7 @@ export function Layers() {
                 </g>
               )
             })}
-            <text x={LENS.x + 16} y={LENS.y + LENS.h - 20} {...stylex.props(diagram.svgText, styles.fade)}>
+            <text x={lens.x + 16} y={lens.y + lens.h - 20} {...stylex.props(diagram.svgText, styles.fade)}>
               owner · {l.owner}
             </text>
           </g>
@@ -246,9 +255,6 @@ export function Layers() {
         <Stat label="Runs as" value={l.runs} />
         <Stat label="Below the line" value={pick < 4 ? 'Yes' : 'No'} />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        Green is Duo's own code. Blue is a stranger's app, which reaches down only through one port.
-      </figcaption>
     </figure>
   )
 }

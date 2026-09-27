@@ -35,8 +35,7 @@ const WINDOWS: [string, number][] = [
   ['1h', 3600],
   ['6h', 21600]
 ]
-// Apple's token trades a few times a minute, Bitcoin many times a second: each opens where it moves.
-const START: Record<Sym, number> = { AAPL: 3600, 'BTC-USD': 300 }
+const START: Record<Sym, number> = { AAPL: 3600, 'BTC-USD': 3600 }
 const EMPTY: Feed = { pts: [], value: 0, ticks: 0, candles: [] }
 
 const money = (v: number) => v.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -322,8 +321,8 @@ export function StocksDiagram() {
       </div>
       <dl {...stylex.props(diagram.stats)}>
         <Stat label="Socket lag" value={feed.ping != null ? <Roll text={`${feed.ping} ms`} /> : '-'} />
-        <Candles row={feed.candles} />
         <Stat label="Volume 24h" value={feed.vol != null ? <Roll text={usd(feed.vol)} /> : '-'} />
+        <Candles row={feed.candles} />
       </dl>
     </figure>
   )

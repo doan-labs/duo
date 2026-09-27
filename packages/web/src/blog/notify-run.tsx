@@ -42,6 +42,9 @@ export function NotifyRun() {
   const [log, setLog] = useState<string[]>([])
   const timer = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])
+  // The editor folds away on a phone, so Run and the Duo share one screen; it starts open where there is room.
+  const [editing, setEditing] = useState(false)
+  useEffect(() => setEditing(window.matchMedia('(min-width: 900px)').matches), [])
 
   const say = (line: string) => setLog((l) => [...l, line].slice(-4))
   const run = () => {
@@ -94,37 +97,51 @@ export function NotifyRun() {
             </button>
           ))}
         </fieldset>
-        <div {...stylex.props(styles.fields)}>
-          {(['title', 'body', 'arg'] as const).map((k) => (
-            <label key={k} {...stylex.props(styles.field, k === 'body' && styles.fieldWide)}>
-              <span {...stylex.props(styles.label)}>{k}</span>
-              <input value={fields[k]} onChange={edit(k)} spellCheck={false} {...stylex.props(styles.input)} />
-            </label>
-          ))}
-        </div>
-        <Pre
-          title="notify.ts"
-          action={
-            <button type="button" onClick={run} {...stylex.props(styles.run)}>
-              <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.play)}>
-                <path d="M2 1.2v7.6L8.6 5z" fill="currentColor" />
-              </svg>
-              Run
-            </button>
-          }
-        >
-          {code(fields)}
-        </Pre>
+        <details open={editing} onToggle={(e) => setEditing(e.currentTarget.open)} {...stylex.props(styles.editor)}>
+          <summary {...stylex.props(styles.summary)}>
+            <svg
+              viewBox="0 0 10 10"
+              aria-hidden="true"
+              {...stylex.props(styles.chevron, editing && styles.chevronOpen)}
+            >
+              <path d="M3.5 2 6.5 5l-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            Edit the notification
+          </summary>
+          <div {...stylex.props(styles.fields)}>
+            {(['title', 'body', 'arg'] as const).map((k) => (
+              <label key={k} {...stylex.props(styles.field, k === 'body' && styles.fieldWide)}>
+                <span {...stylex.props(styles.label)}>{k}</span>
+                <input value={fields[k]} onChange={edit(k)} spellCheck={false} {...stylex.props(styles.input)} />
+              </label>
+            ))}
+          </div>
+          <Pre
+            title="notify.ts"
+            action={
+              <button type="button" onClick={run} {...stylex.props(styles.run, styles.runInline)}>
+                <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.play)}>
+                  <path d="M2 1.2v7.6L8.6 5z" fill="currentColor" />
+                </svg>
+                Run
+              </button>
+            }
+          >
+            {code(fields)}
+          </Pre>
+        </details>
+        <button type="button" onClick={run} {...stylex.props(styles.run, styles.runBar)}>
+          <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.play)}>
+            <path d="M2 1.2v7.6L8.6 5z" fill="currentColor" />
+          </svg>
+          Run
+        </button>
         <ol {...stylex.props(styles.log)} aria-live="polite">
-          {log.length === 0 ? (
-            <li {...stylex.props(styles.hint)}>Edit anything, then press Run.</li>
-          ) : (
-            log.map((l) => (
-              <li key={l} {...stylex.props(styles.line)}>
-                <span {...stylex.props(styles.tick)}>✓</span> {l}
-              </li>
-            ))
-          )}
+          {log.map((l) => (
+            <li key={l} {...stylex.props(styles.line)}>
+              <span {...stylex.props(styles.tick)}>✓</span> {l}
+            </li>
+          ))}
         </ol>
       </div>
       <div {...stylex.props(styles.device)}>
@@ -201,8 +218,10 @@ const styles = stylex.create({
     textTransform: 'uppercase',
     color: color.text3
   },
+  // Two rows of four on a phone; one row where there is room.
   apps: {
-    display: 'flex',
+    display: { default: 'grid', [WIDE]: 'flex' },
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
     flexWrap: 'wrap',
     gap: '6px',
     marginTop: 0,
@@ -213,6 +232,7 @@ const styles = stylex.create({
     borderWidth: 0
   },
   pick: {
+    justifySelf: 'center',
     padding: '3px',
     borderWidth: '2px',
     borderStyle: 'solid',
@@ -230,6 +250,34 @@ const styles = stylex.create({
   },
   picked: { borderColor: color.accent, opacity: 1 },
   pickIcon: { display: 'block', width: '34px', height: '34px', borderRadius: '8px' },
+  editor: { marginBottom: '14px' },
+  summary: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    width: 'fit-content',
+    marginBottom: '12px',
+    fontFamily: font.mono,
+    fontSize: '11px',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: { default: color.text3, ':hover': color.text },
+    cursor: 'pointer',
+    listStyleType: 'none',
+    '::-webkit-details-marker': { display: 'none' },
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px'
+  },
+  chevron: {
+    width: '10px',
+    height: '10px',
+    transitionProperty: 'transform',
+    transitionDuration: '0.2s',
+    transitionTimingFunction: ease.out
+  },
+  chevronOpen: { transform: 'rotate(90deg)' },
   fields: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' },
   field: { display: 'block', minWidth: 0 },
   fieldWide: { gridColumnStart: 1, gridColumnEnd: 3, gridRowStart: 2 },
@@ -274,8 +322,19 @@ const styles = stylex.create({
     outlineWidth: '2px',
     outlineOffset: '2px'
   },
+  runInline: { display: { default: 'none', [WIDE]: 'inline-flex' } },
+  // Outside the folded editor on a phone, so it sits right above the Duo it drives.
+  runBar: {
+    display: { default: 'flex', [WIDE]: 'none' },
+    justifyContent: 'center',
+    width: '100%',
+    paddingTop: '12px',
+    paddingBottom: '12px',
+    fontSize: '15px'
+  },
   play: { width: '10px', height: '10px' },
   log: {
+    display: { default: 'none', [WIDE]: 'block' },
     listStyleType: 'none',
     minHeight: '70px',
     marginTop: '-12px',
@@ -291,7 +350,6 @@ const styles = stylex.create({
     lineHeight: 1.8,
     color: color.text2
   },
-  hint: { color: color.text3 },
   line: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   tick: { color: color.green },
   device: { position: 'relative', minWidth: 0, containerType: 'inline-size' },

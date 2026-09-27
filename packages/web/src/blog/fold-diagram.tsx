@@ -181,10 +181,6 @@ export function FoldDiagram() {
         <Stat label="Cover glass" value={`${Math.round(cover * 100)}%`} />
         <Stat label="Inner surface" value={deg >= 179 ? 'Live DOM' : 'Projected'} />
       </dl>
-      <figcaption {...stylex.props(styles.caption)}>
-        Drag the hinge. Each dot on the moving half shows what the flat panel showed where its ray lands; past the
-        panel's edge the glass goes black. Schematic side view, not to scale.
-      </figcaption>
     </figure>
   )
 }

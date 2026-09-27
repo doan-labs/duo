@@ -202,10 +202,6 @@ export function MicWave() {
           value={sec > 0.5 ? `${(((take?.size ?? bytes) * 8) / 1000 / sec).toFixed(0)} kbps` : '-'}
         />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        Record a take. Nothing leaves this page: here the page holds your microphone, in Duo the shell does, and the app
-        only ever gets the finished Blob.
-      </figcaption>
     </figure>
   )
 }

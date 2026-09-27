@@ -1,10 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useRef, useSyncExternalStore } from 'react'
 import { color, ease, font, radius } from '../tokens.stylex'
 
 // The frame every interactive figure in a post shares: an SVG on a card, a
-// control row under it, a row of readouts and a caption.
+// control row under it, a row of readouts.
 
 /**
  * A readout that rolls: each changed character slides out and its successor in,
@@ -130,6 +130,19 @@ export const diagram = stylex.create({
     fontSize: '16px',
     fontWeight: 600,
     color: color.text
-  },
-  caption: { marginTop: '14px', fontFamily: font.sans, fontSize: '14px', lineHeight: 1.5, color: color.text3 }
+  }
 })
+
+const PHONE = '(max-width: 734px)'
+const onPhone = (change: () => void) => {
+  const q = window.matchMedia(PHONE)
+  q.addEventListener('change', change)
+  return () => q.removeEventListener('change', change)
+}
+/** Phone-width screens, for figures that redraw rather than shrink. Prerendered wide, then corrected on hydration. */
+export const useNarrow = () =>
+  useSyncExternalStore(
+    onPhone,
+    () => window.matchMedia(PHONE).matches,
+    () => false
+  )

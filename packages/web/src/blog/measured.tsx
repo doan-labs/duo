@@ -195,10 +195,6 @@ export function Measured() {
         <Stat label="Cover hinge edge" value={`R ${HINGE} mm`} />
         <Stat label="Bezel" value={`${BEZEL} mm`} />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        The cover to scale and each corner up close, drawn from the shell's numbers. Below, drag the icon open: the
-        finger sets the time of a paused animation, and letting go plays it on or back.
-      </figcaption>
     </figure>
   )
 }

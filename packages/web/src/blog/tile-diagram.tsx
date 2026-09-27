@@ -241,11 +241,6 @@ export function TileDiagram() {
         <Stat label="Tile scale" value={`× ${k.toFixed(2)}`} />
         <Stat label="Tiles fetched" value={String(fetched.length)} />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        Drag the map, zoom it, or let it fly. The tiles under the glass are real OpenStreetMap tiles, requested by the
-        same code Maps runs; the dashed squares are the ones it never asks for. Watch the level jump as the zoom crosses
-        a half: that is the only moment new pixels are needed.
-      </figcaption>
     </figure>
   )
 }

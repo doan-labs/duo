@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useInView, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { color, ease, font } from '../tokens.stylex'
-import { diagram, Stat } from './diagram'
+import { diagram, Stat, useNarrow } from './diagram'
 
 // A hostile app, for real: this document runs in an actual
 // sandbox="allow-scripts" frame on this page (hidden; the figure draws what it
@@ -55,26 +55,49 @@ async function release() {
 
 // The drawing, in svg units: the app in the middle, the sandbox wall around
 // it, what it reaches for on either side and the one port down to the host.
-const APP = { x: 250, y: 158, w: 140, h: 92 }
-const WALL = { x: 196, y: 116, w: 248, h: 176 }
-const MID = { x: APP.x + APP.w / 2, y: APP.y + APP.h / 2 }
-const HOST = { x: MID.x, y: 392 }
-const PORT = { top: APP.y + APP.h, bottom: HOST.y - 15 }
-const TARGETS = [
-  { name: 'parent.document', guards: "the shell's DOM", x: 92, y: 138 },
-  { name: 'localStorage', guards: "the shell's storage", x: 92, y: 204 },
-  { name: 'document.cookie', guards: 'cookies', x: 92, y: 270 },
-  { name: 'indexedDB', guards: "another app's data", x: 548, y: 138 },
-  { name: 'fetch("/")', guards: 'the network', x: 548, y: 204 },
-  { name: 'window.open', guards: 'a new window', x: 548, y: 270 }
-]
-const CELLS = 32
+// On a phone the six targets stack in two rows above the wall instead, so the
+// drawing stays tall and legible rather than shrinking to a strip.
+type Geo = ReturnType<typeof geo>
+function geo(narrow: boolean) {
+  const APP = narrow ? { x: 110, y: 245, w: 140, h: 80 } : { x: 250, y: 158, w: 140, h: 92 }
+  const WALL = narrow ? { x: 60, y: 208, w: 240, h: 154 } : { x: 196, y: 116, w: 248, h: 176 }
+  const MID = { x: APP.x + APP.w / 2, y: APP.y + APP.h / 2 }
+  // The port keeps one length, the packets' keyframes travel it: 127.
+  const HOST = { x: MID.x, y: APP.y + APP.h + 142 }
+  const at = (i: number) =>
+    narrow ? { x: 62 + (i % 3) * 118, y: 98 + Math.floor(i / 3) * 62 } : { x: i < 3 ? 92 : 548, y: 138 + (i % 3) * 66 }
+  return {
+    narrow,
+    W: narrow ? 360 : 640,
+    H: narrow ? HOST.y + 58 : 450,
+    CELLS: narrow ? 17 : 32,
+    PILL: narrow ? 112 : 140,
+    APP,
+    WALL,
+    MID,
+    HOST,
+    PORT: { top: APP.y + APP.h, bottom: HOST.y - 15 },
+    TARGETS: GUARDS.map(([name, guards], i) => ({ name, guards, ...at(i) }))
+  }
+}
+const GUARDS = [
+  ['parent.document', "the shell's DOM"],
+  ['localStorage', "the shell's storage"],
+  ['document.cookie', 'cookies'],
+  ['indexedDB', "another app's data"],
+  ['fetch("/")', 'the network'],
+  ['window.open', 'a new window']
+] as const
 
-/** Where the straight line from the app's centre to a target crosses the wall, and leaves the app. */
-function ray(t: { x: number; y: number }) {
-  const left = t.x < MID.x
-  const at = (x: number) => ({ x, y: MID.y + ((x - MID.x) / (t.x - MID.x)) * (t.y - MID.y) })
-  return { from: at(left ? APP.x : APP.x + APP.w), hit: at(left ? WALL.x : WALL.x + WALL.w) }
+/** Where the straight line from the app's centre to a target leaves the app, and where it meets the wall. */
+function ray(g: Geo, t: { x: number; y: number }) {
+  const dx = t.x - g.MID.x
+  const dy = t.y - g.MID.y
+  const out = (box: { w: number; h: number }) => {
+    const s = Math.min(dx ? box.w / 2 / Math.abs(dx) : Infinity, dy ? box.h / 2 / Math.abs(dy) : Infinity)
+    return { x: g.MID.x + dx * s, y: g.MID.y + dy * s }
+  }
+  return { from: out(g.APP), hit: out(g.WALL) }
 }
 
 type State = 'idle' | 'running' | 'revoked' | 'refused'
@@ -106,6 +129,8 @@ export function BreakIt() {
   const still = useReducedMotion()
   const n = useRef(0)
   const auto = seen && !touched && !still
+  const g = geo(useNarrow())
+  const { APP, WALL, MID, HOST, PORT, TARGETS, CELLS } = g
 
   const send = useCallback((up: boolean, label: string, bad = false) => {
     n.current += 1
@@ -215,26 +240,40 @@ export function BreakIt() {
 
   return (
     <figure {...stylex.props(diagram.figure)}>
-      <svg ref={svg} viewBox="0 0 640 450" role="img" aria-label={`A sandboxed app: ${blocked} of 6 escapes blocked`}>
+      <svg
+        ref={svg}
+        viewBox={`0 0 ${g.W} ${g.H}`}
+        role="img"
+        aria-label={`A sandboxed app: ${blocked} of 6 escapes blocked`}
+      >
         <title>A stranger's app, sandboxed</title>
         {/* The release's bytes, and the hash the shell checks them against. */}
         <text x="20" y="26" {...stylex.props(diagram.svgText)}>
-          {flip ? `the release, byte ${flip.at}` : 'the release, first bytes'}
+          {flip
+            ? `${g.narrow ? '' : 'the release, '}byte ${flip.at}`
+            : g.narrow
+              ? 'the release'
+              : 'the release, first bytes'}
         </text>
-        <text x="620" y="26" textAnchor="end" {...stylex.props(diagram.svgText, flip ? styles.red : styles.green)}>
+        <text x={g.W - 20} y="26" textAnchor="end" {...stylex.props(diagram.svgText, flip ? styles.red : styles.green)}>
           {rel ? (flip ? `✕ sha-256 ${short(flip.got)}` : `✓ sha-256 ${short(rel.hash)}`) : 'hashing…'}
         </text>
         {cells.map((c, i) => (
           <g key={c.at}>
             <rect
-              x={20 + i * 19}
+              x={(g.W - CELLS * 19) / 2 + i * 19}
               y="36"
               width="18"
               height="20"
               rx="3"
               {...stylex.props(styles.cell, c.bad && styles.cellBad)}
             />
-            <text x={29 + i * 19} y="50" textAnchor="middle" {...stylex.props(styles.byte, c.bad && styles.byteBad)}>
+            <text
+              x={(g.W - CELLS * 19) / 2 + 9 + i * 19}
+              y="50"
+              textAnchor="middle"
+              {...stylex.props(styles.byte, c.bad && styles.byteBad)}
+            >
               {c.hex}
             </text>
           </g>
@@ -249,25 +288,35 @@ export function BreakIt() {
           rx="22"
           {...stylex.props(styles.wall, state === 'revoked' && styles.wallGone, state === 'refused' && styles.ghost)}
         />
-        <text x={WALL.x + 14} y={WALL.y + 20} {...stylex.props(diagram.svgText, styles.small)}>
+        {/* On a phone the probes hit the top edge, so the label moves to the bottom. */}
+        <text
+          x={WALL.x + 14}
+          y={g.narrow ? WALL.y + WALL.h - 12 : WALL.y + 20}
+          {...stylex.props(diagram.svgText, styles.small)}
+        >
           sandbox="allow-scripts"
         </text>
 
         {TARGETS.map((t) => {
           const p = probes[t.name]
-          const r = ray(t)
+          const r = ray(g, t)
           const left = t.x < MID.x
           return (
             <g key={t.name}>
               <rect
-                x={t.x - 70}
+                x={t.x - g.PILL / 2}
                 y={t.y - 15}
-                width="140"
+                width={g.PILL}
                 height="30"
                 rx="15"
                 {...stylex.props(styles.target, p && (p.ok ? styles.targetOpen : styles.targetSafe))}
               />
-              <text x={t.x} y={t.y + 4} textAnchor="middle" {...stylex.props(styles.targetName)}>
+              <text
+                x={t.x}
+                y={t.y + 4}
+                textAnchor="middle"
+                {...stylex.props(styles.targetName, g.narrow && styles.tight)}
+              >
                 {t.name}
               </text>
               <text x={t.x} y={t.y + 30} textAnchor="middle" {...stylex.props(diagram.svgText, styles.small)}>
@@ -283,14 +332,16 @@ export function BreakIt() {
                     pathLength={1}
                     {...stylex.props(styles.probe)}
                   />
-                  {/* The rest of the way it never went. */}
-                  <line
-                    x1={r.hit.x}
-                    y1={r.hit.y}
-                    x2={t.x + (left ? 70 : -70)}
-                    y2={t.y}
-                    {...stylex.props(styles.missed)}
-                  />
+                  {/* The rest of the way it never went; on a phone the rows would cross it. */}
+                  {!g.narrow && (
+                    <line
+                      x1={r.hit.x}
+                      y1={r.hit.y}
+                      x2={t.x + (left ? 70 : -70)}
+                      y2={t.y}
+                      {...stylex.props(styles.missed)}
+                    />
+                  )}
                   <g transform={`translate(${r.hit.x} ${r.hit.y})`}>
                     <g {...stylex.props(styles.hit)}>
                       <circle r="9" {...stylex.props(styles.hitRing)} />
@@ -362,12 +413,12 @@ export function BreakIt() {
 
         {/* What the browser just said, verbatim. */}
         <text
-          x="320"
-          y="438"
+          x={g.W / 2}
+          y={g.H - 12}
           textAnchor="middle"
           {...stylex.props(styles.said, last.startsWith('verified') ? styles.green : styles.red)}
         >
-          {last.length > 92 ? `${last.slice(0, 91)}…` : last}
+          {last.length > (g.narrow ? 50 : 92) ? `${last.slice(0, g.narrow ? 49 : 91)}…` : last}
         </text>
       </svg>
       {live && rel && (
@@ -404,9 +455,6 @@ export function BreakIt() {
           value={live ? 'Live' : state === 'revoked' ? 'Revoked' : state === 'refused' ? 'Refused' : '…'}
         />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        A real sandboxed frame runs on this page; the drawing is what it reports, and every error is your browser's.
-      </figcaption>
     </figure>
   )
 }
@@ -461,6 +509,7 @@ const styles = stylex.create({
   targetSafe: { stroke: color.green, fill: color.greenBg },
   targetOpen: { stroke: color.red, fill: color.redBg },
   targetName: { fontFamily: font.mono, fontSize: '12px', fontWeight: 500, fill: color.text },
+  tight: { fontSize: '11px' },
   probe: {
     stroke: color.orange,
     strokeWidth: 2,

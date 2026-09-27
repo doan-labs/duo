@@ -155,10 +155,6 @@ export function TwinOS() {
         <Stat label="Mirror copy" value={lead === 'inner' ? 'Cover' : 'Inner'} />
         <Stat label="Fetches from" value={lead === 'inner' ? 'Inner only' : 'Cover only'} />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        Both copies draw the same trip. Only the display in your hand fetches. Cross 40° and they swap roles; nothing on
-        screen moves.
-      </figcaption>
     </figure>
   )
 }

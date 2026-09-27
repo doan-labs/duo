@@ -34,17 +34,7 @@ function sayOf(e: Heard): string {
  * be an app's. Each row's play button tours its cap as /sdk does: the phone
  * takes that chapter's pose and a ring pulses on the real button.
  */
-export function Live({
-  deg = 150,
-  app,
-  hear = false,
-  caption
-}: {
-  deg?: number
-  app?: string
-  hear?: boolean
-  caption?: string
-}) {
+export function Live({ deg = 150, app, hear = false }: { deg?: number; app?: string; hear?: boolean }) {
   const [last, setLast] = useState<Partial<Record<DeviceEvent, { say: string; n: number; at: number }>>>({})
   const [touring, setTouring] = useState<{ step: number; since: number } | null>(null)
   const [spots, setSpots] = useState<Spots | null>(null)
@@ -92,8 +82,8 @@ export function Live({
               const on = touring?.step === i
               return (
                 <li key={t} {...stylex.props(styles.row, on && styles.rowOn)}>
-                  <span {...stylex.props(styles.words)}>
-                    <code {...stylex.props(styles.type)}>os.device.on('{t}')</code>
+                  <code {...stylex.props(styles.type)}>os.device.on('{t}')</code>
+                  <span {...stylex.props(styles.value)}>
                     {/* Re-keyed per event, so each arrival replays the flash. */}
                     {t === 'switches' && switches ? (
                       <SwitchTiles s={switches} />
@@ -120,7 +110,6 @@ export function Live({
           </ol>
         )}
       </div>
-      {caption && <figcaption {...stylex.props(styles.caption)}>{caption}</figcaption>}
     </figure>
   )
 }
@@ -170,10 +159,13 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: '8px'
   },
+  // On a phone the button rides beside the label, so the value gets the row's full width.
   row: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
     alignItems: 'center',
-    gap: '12px',
+    columnGap: '12px',
+    rowGap: '6px',
     paddingTop: '12px',
     paddingBottom: '12px',
     paddingLeft: '14px',
@@ -188,8 +180,17 @@ const styles = stylex.create({
     transitionTimingFunction: ease.out
   },
   rowOn: { borderColor: color.accent },
-  words: { display: 'flex', flexDirection: 'column', gap: '6px', flexGrow: 1, minWidth: 0 },
+  value: {
+    display: 'flex',
+    minWidth: 0,
+    gridColumnStart: 1,
+    gridColumnEnd: { default: 3, [WIDE]: 2 },
+    gridRowStart: 2
+  },
   play: {
+    gridColumnStart: 2,
+    gridRowStart: 1,
+    gridRowEnd: { default: 2, [WIDE]: 3 },
     display: 'grid',
     placeItems: 'center',
     flexShrink: 0,
@@ -225,15 +226,5 @@ const styles = stylex.create({
     color: color.text,
     whiteSpace: 'pre'
   },
-  flash: { animationName: flash, animationDuration: '0.9s', animationTimingFunction: 'ease-out' },
-  caption: {
-    maxWidth: '720px',
-    marginTop: '14px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-    fontFamily: font.sans,
-    fontSize: '14px',
-    lineHeight: 1.5,
-    color: color.text3
-  }
+  flash: { animationName: flash, animationDuration: '0.9s', animationTimingFunction: 'ease-out' }
 })

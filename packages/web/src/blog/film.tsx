@@ -12,17 +12,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
  * then the browser's own controls. Chapters under it seek, and the one playing
  * fills as it runs, so the row doubles as a table of contents for the film.
  */
-export function Film({
-  src,
-  poster,
-  caption,
-  chapters = []
-}: {
-  src: string
-  poster: string
-  caption?: string
-  chapters?: readonly Chapter[]
-}) {
+export function Film({ src, poster, chapters = [] }: { src: string; poster: string; chapters?: readonly Chapter[] }) {
   const video = useRef<HTMLVideoElement>(null)
   const [started, setStarted] = useState(false)
   const [t, setT] = useState(0)
@@ -43,6 +33,14 @@ export function Film({
   }
 
   const now = chapters.findLastIndex(([at]) => t >= at)
+  // On a phone the chapters are one swipeable strip; keep the playing one in view without moving the page.
+  const strip = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    const ol = strip.current
+    const li = ol?.children[now] as HTMLElement | undefined
+    if (!started || !ol || !li || ol.scrollWidth <= ol.clientWidth) return
+    ol.scrollTo({ left: li.offsetLeft - ol.offsetLeft - 24, behavior: 'smooth' })
+  }, [now, started])
   return (
     <figure {...stylex.props(styles.figure)}>
       <div {...stylex.props(styles.frame)}>
@@ -70,7 +68,7 @@ export function Film({
         )}
       </div>
       {chapters.length > 0 && (
-        <ol {...stylex.props(styles.chapters)}>
+        <ol ref={strip} {...stylex.props(styles.chapters)}>
           {chapters.map(([at, name], i) => {
             const end = chapters[i + 1]?.[0] ?? length
             const fill = started && i === now && end > at ? Math.min(1, (t - at) / (end - at)) : i < now ? 1 : 0
@@ -93,7 +91,6 @@ export function Film({
           })}
         </ol>
       )}
-      {caption && <figcaption {...stylex.props(styles.caption)}>{caption}</figcaption>}
     </figure>
   )
 }
@@ -164,11 +161,20 @@ const styles = stylex.create({
     margin: 0,
     marginTop: '16px',
     padding: 0,
-    display: 'grid',
-    gridTemplateColumns: { default: 'repeat(auto-fit, minmax(120px, 1fr))', [SMALL]: 'repeat(2, 1fr)' },
-    gap: '8px'
+    display: { default: 'grid', [SMALL]: 'flex' },
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: { default: '8px', [SMALL]: '2px' },
+    // Bleeds to the screen's edges so the strip scrolls under the page gutter.
+    marginLeft: { default: 0, [SMALL]: '-24px' },
+    marginRight: { default: 0, [SMALL]: '-24px' },
+    paddingLeft: { default: 0, [SMALL]: '14px' },
+    paddingRight: { default: 0, [SMALL]: '14px' },
+    overflowX: { default: 'visible', [SMALL]: 'auto' },
+    scrollSnapType: { default: 'none', [SMALL]: 'x mandatory' },
+    scrollPaddingLeft: '14px',
+    scrollbarWidth: 'none'
   },
-  chapterItem: { minWidth: 0 },
+  chapterItem: { minWidth: 0, flexShrink: 0, width: { default: 'auto', [SMALL]: '128px' }, scrollSnapAlign: 'start' },
   chapter: {
     display: 'flex',
     flexDirection: 'column',
@@ -213,15 +219,5 @@ const styles = stylex.create({
   },
   fill: (f: number) => ({ transform: `scaleX(${f})` }),
   at: { fontFamily: font.mono, fontSize: '11px', color: color.text3 },
-  name: { fontFamily: font.sans, fontSize: '14px', fontWeight: 500, lineHeight: 1.3 },
-  caption: {
-    maxWidth: '720px',
-    marginTop: '14px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-    fontFamily: font.sans,
-    fontSize: '14px',
-    lineHeight: 1.5,
-    color: color.text3
-  }
+  name: { fontFamily: font.sans, fontSize: '14px', fontWeight: 500, lineHeight: 1.3 }
 })

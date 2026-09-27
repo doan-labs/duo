@@ -263,6 +263,16 @@ export function HomePlay() {
 
   return (
     <figure {...stylex.props(diagram.figure)}>
+      <p role="note" {...stylex.props(styles.touch)}>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" {...stylex.props(styles.touchIcon)}>
+          <path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M8 6v3.6M8 11.6v.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+        <span>
+          You're on a phone. Safari claims a long press for its own menu, so holding an icon here won't pick it up. Try
+          this one on a computer.
+        </span>
+      </p>
       <div ref={stage} {...stylex.props(styles.stage)}>
         <div data-paper {...stylex.props(styles.paper)}>
           <div {...stylex.props(styles.grid)}>
@@ -399,10 +409,6 @@ export function HomePlay() {
           Reset
         </button>
       </div>
-      <figcaption {...stylex.props(diagram.caption)}>
-        Hold an icon, then drop it on another to make a folder, on a folder to add to it, in the dock, or on the
-        wallpaper. Tap a folder to open it and carry an app back out.
-      </figcaption>
     </figure>
   )
 }
@@ -414,6 +420,25 @@ const shake = stylex.keyframes({
 })
 
 const styles = stylex.create({
+  // Only where the pointer is a finger: the long press is the browser's there.
+  touch: {
+    display: { default: 'none', '@media (pointer: coarse)': 'flex' },
+    alignItems: 'flex-start',
+    gap: '8px',
+    marginTop: 0,
+    marginBottom: '12px',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    borderRadius: '10px',
+    backgroundColor: color.orangeBg,
+    color: color.orange,
+    fontFamily: font.sans,
+    fontSize: '14px',
+    lineHeight: 1.45
+  },
+  touchIcon: { flexShrink: 0, marginTop: '3px' },
   stage: {
     position: 'relative',
     height: '440px',

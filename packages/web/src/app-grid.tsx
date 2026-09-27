@@ -16,7 +16,7 @@ export function AppGrid({ names, from }: { names: readonly string[]; from?: stri
         const face = (
           <>
             <img src={iconOf(n)} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
-            {n}
+            <span {...stylex.props(styles.name)}>{n}</span>
           </>
         )
         return (
@@ -40,25 +40,30 @@ export function AppGrid({ names, from }: { names: readonly string[]; from?: stri
   )
 }
 
+// On a phone the grid turns into a home screen: icon over name, four across.
+const SMALL = '@media (max-width: 734px)'
+
 const styles = stylex.create({
   grid: {
     listStyleType: 'none',
     margin: 0,
     padding: 0,
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-    gap: '12px'
+    gridTemplateColumns: { default: 'repeat(auto-fill, minmax(150px, 1fr))', [SMALL]: 'repeat(4, minmax(0, 1fr))' },
+    columnGap: { default: '12px', [SMALL]: '4px' },
+    rowGap: { default: '12px', [SMALL]: '14px' }
   },
   app: {
     display: 'flex',
+    flexDirection: { default: 'row', [SMALL]: 'column' },
     alignItems: 'center',
-    gap: '10px',
+    gap: { default: '10px', [SMALL]: '6px' },
     minWidth: 0,
     fontFamily: font.sans,
-    fontSize: '15px',
+    fontSize: { default: '15px', [SMALL]: '12px' },
     color: color.text,
     // Every tile takes the hover pad, linked or not, so Settings lines up with its row.
-    marginLeft: '-6px',
+    marginLeft: { default: '-6px', [SMALL]: 0 },
     paddingTop: '4px',
     paddingBottom: '4px',
     paddingLeft: '6px',
@@ -76,5 +81,11 @@ const styles = stylex.create({
     outlineWidth: '2px',
     outlineOffset: '2px'
   },
-  icon: { width: '32px', height: '32px', flexShrink: 0, borderRadius: '7px' }
+  icon: {
+    width: { default: '32px', [SMALL]: '52px' },
+    height: { default: '32px', [SMALL]: '52px' },
+    flexShrink: 0,
+    borderRadius: { default: '7px', [SMALL]: '12px' }
+  },
+  name: { maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 })

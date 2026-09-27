@@ -77,11 +77,19 @@ const show = stylex.keyframes({
   to: { opacity: 1, transform: 'translate(-50%, 0)' }
 })
 
+// Narrow enough that both groups would wrap: smaller tiles keep them side by side.
+const NARROW = '@media (max-width: 480px)'
+const TILE = { default: '34px', [NARROW]: '30px' }
+
 const styles = stylex.create({
-  groups: { display: 'flex', flexWrap: 'wrap', gap: '20px' },
-  group: { display: 'grid', gridTemplateColumns: 'repeat(3, 34px)', gap: '8px' },
+  groups: { display: 'flex', flexWrap: 'wrap', gap: { default: '20px', [NARROW]: '12px' } },
+  group: {
+    display: 'grid',
+    gridTemplateColumns: { default: 'repeat(3, 34px)', [NARROW]: 'repeat(3, 30px)' },
+    gap: { default: '8px', [NARROW]: '6px' }
+  },
   rest: {
-    paddingLeft: '20px',
+    paddingLeft: { default: '20px', [NARROW]: '12px' },
     borderLeftWidth: '1px',
     borderLeftStyle: 'solid',
     borderLeftColor: color.border
@@ -91,16 +99,18 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '34px',
-    height: '34px',
+    width: TILE,
+    height: TILE,
     borderRadius: radius.pill,
     backgroundColor: color.well,
+    // A hairline so an off tile still reads as a tile on a well-coloured row.
+    boxShadow: `inset 0 0 0 1px ${color.border}`,
     color: color.text3,
     transitionProperty: 'background-color, color',
     transitionDuration: '0.3s',
     transitionTimingFunction: ease.out
   },
-  on: { backgroundColor: color.accent, color: color.onAccent },
+  on: { backgroundColor: color.accent, color: color.onAccent, boxShadow: 'none' },
   // Below the tile: the readout clips anything above its top row.
   tip: {
     position: 'absolute',

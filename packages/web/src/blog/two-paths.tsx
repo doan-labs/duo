@@ -154,9 +154,6 @@ export function TwoPaths() {
         <Stat label="Bends" value={live ? 'No' : 'Yes'} />
         <Stat label="Column" value={live ? `${CELL} px` : `${bake} px × 12/5`} />
       </dl>
-      <figcaption {...stylex.props(diagram.caption)}>
-        Type into the field while it is flat, then move the hinge. Tick Mismatch and watch the icons jump.
-      </figcaption>
     </figure>
   )
 }
