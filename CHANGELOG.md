@@ -1,11 +1,5 @@
 # Changelog
 
-## 0.2.1 (Unreleased)
-
-### Site
-
-- `/blog`: the introduction to Duo and the 0.2.0 release post, with the film and the live phone.
-
 ## 0.2.0 (2026-09-26)
 
 ### UI kit 1.1.0 → 1.2.0
@@ -42,6 +36,7 @@
 
 - `/apps` catalog and `/kit` showcase.
 - The changelog in the nav.
+- `/blog`: the introduction to Duo and the 0.2.0 release post, with the film and the live phone.
 
 ## 0.1.0 (2026-09-19)
 
