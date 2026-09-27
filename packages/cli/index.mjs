@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { deflateSync } from 'node:zlib'
 import { buildApp } from '../../scripts/build-app.ts'
 import { manifestValid } from '../sdk/manifest.ts'
 import { PERMISSIONS } from '../sdk/permissions.ts'
 import { PREVIEW_FEATURES } from '../sdk/preview-features.ts'
+import { fileDesignLiterals } from './design.mjs'
 import { serveDevelopment } from './development.mjs'
 import { typecheckApp, validateSources } from './validate.mjs'
 
@@ -68,6 +69,19 @@ async function check() {
     if (!official.split(/\s+/).includes(manifest.id)) throw new Error('Official lane requires OFFICIAL.txt membership')
   }
   const files = await validateSources(folder)
+  // DESIGN.md section 3. A new app starts at zero; the repository passes its own
+  // baseline so apps written before the rule can only get cleaner.
+  const literals = (await Promise.all(files.map(fileDesignLiterals))).flat()
+  const baselineFile = option('design-baseline')
+  const allowed = baselineFile
+    ? ((await Bun.file(baselineFile).json())[relative(dirname(resolve(baselineFile)), folder)] ?? 0)
+    : 0
+  if (literals.length > allowed)
+    throw new Error(
+      `${literals.length} hand-typed style values (allowed ${allowed}); take them from @doan-labs/duo-uikit/tokens.stylex.ts:\n${literals
+        .map((l) => `${relative(folder, l.file)}:${l.line}: ${l.kind === 'colour' ? 'fixed colour' : l.property}`)
+        .join('\n')}`
+    )
   await typecheckApp(folder, files)
   const output = temporary()
   let built

@@ -18,8 +18,10 @@ Typed `as` and StyleX `xstyle` support app composition; legacy Nav/Page/Sym/Num 
 subpaths remain. `Checkbox`, `IconButton`, `Segmented`, `TextField`, `Select` and `Sheet`
 are the desktop controls a tablet layout needs, drawn on native elements. `appAppearance` holds only an app's own colours, prefixed by its folder
 name. The AST token gate (`scripts/check-app-tokens.ts`) fails any literal size, weight,
-radius, shadow, tracking, leading, font, timing or colour in `packages/apps` and
-`packages/shell`, and any cross-app `appAppearance` read; it runs locally/in CI alongside
+radius, shadow, tracking, leading, font, timing, colour or spacing in `packages/apps`,
+`packages/shell`, `community-apps` and `examples` past that folder's count in
+`design-baseline.json`, and any cross-app `appAppearance` read. The rule itself is
+`packages/cli/design.mjs`, which `duo check` also runs; it runs locally/in CI alongside
 Biome, not as a new Biome plugin.
 
 `Screen` and `useDisplay` subscribe without opening a bridge, calling ready or owning

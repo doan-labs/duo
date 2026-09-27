@@ -156,7 +156,11 @@ async function check(folder: string, registry: Registry, evidence: string): Prom
   if (report.failures.length) return report
 
   // Source and release validity through the CLI and the real builder.
-  const cli = Bun.spawnSync(['bun', 'packages/cli/index.mjs', 'check', folder], { cwd: root })
+  // The baseline holds apps listed before the design gate; a new folder has no entry and must be clean.
+  const cli = Bun.spawnSync(
+    ['bun', 'packages/cli/index.mjs', 'check', folder, '--design-baseline', 'design-baseline.json'],
+    { cwd: root }
+  )
   if (cli.exitCode !== 0) {
     fail(`CLI check failed:\n${cli.stdout.toString()}${cli.stderr.toString()}`.trim())
     return report

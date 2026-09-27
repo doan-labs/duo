@@ -41,8 +41,13 @@ easing comes from `packages/uikit/tokens.stylex.ts`. No hex, no px font size, no
 shell tunes the palette for both; a literal looks wrong on one of them and
 inherits no fix.
 
-`bun scripts/check-app-tokens.ts` enforces this for `packages/apps` and
-`packages/shell`. Only the numbers `0` and `1` are allowed as literals. A
+`bun scripts/check-app-tokens.ts` enforces this for `packages/apps`,
+`packages/shell`, `community-apps` and `examples`, spacing included: a `gap`,
+padding, margin or inset inside `stylex.create` is a `space` step. `duo check`
+runs the same rule on any app. Only the numbers `0` and `1` are allowed as
+literals. Code from before a rule is held at its count in
+`design-baseline.json`; a count may fall, never rise, and a new app starts at
+zero (decision 108). A
 literal `'none'` is still a literal: restructure into an additive style instead
 of writing the off value.
 
