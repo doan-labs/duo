@@ -150,6 +150,15 @@ const RING: [number, number][] = (() => {
 })()
 /** Where the struts join the two outlines of a slab: the middle of each corner's arc. */
 const CORNERS = [3, 10, 17, 24]
+type Switch = 'airplane' | 'wifi' | 'bt' | 'moon'
+/** The payload's own keys: Focus is `focus` in Switches. */
+const SWITCH_NAMES: Record<Switch, string> = { airplane: 'airplane', wifi: 'wifi', bt: 'bt', moon: 'focus' }
+const TILES: [Switch, number, number][] = [
+  ['airplane', 48, 206],
+  ['wifi', 80, 206],
+  ['bt', 48, 236],
+  ['moon', 80, 236]
+]
 /** Control Center's glyphs, drawn on a 16 unit square. */
 const GLYPHS = {
   airplane: 'M8 2v12M8 6.5l5.5 3v1.2L8 9.4M8 6.5L2.5 9.5v1.2L8 9.4M6 13.5l2-.8 2 .8',
@@ -166,7 +175,8 @@ const GLYPHS = {
 export function Heard() {
   const [shot, setShot] = useState<{ k: Kind; n: number }>({ k: 'up', n: 0 })
   const [down, setDown] = useState<Kind | null>(null)
-  const [wifi, setWifi] = useState(true)
+  const [sw, setSw] = useState<Record<Switch, boolean>>({ airplane: false, wifi: true, bt: true, moon: false })
+  const [flipped, setFlipped] = useState<Switch>('wifi')
   const [slide, setSlide] = useState(0)
   // The turn: yaw about the long axis, the hinge opening, and a little pitch so the depth reads.
   // One clock for the whole turn; every angle is a smooth curve of it, so nothing stops and starts.
@@ -180,7 +190,7 @@ export function Heard() {
   const release = useRef(0)
   const beat = useRef({ i: 0, at: 0, last: 0 })
 
-  const fire = (k: Kind) => {
+  const fire = (k: Kind, which: Switch = 'wifi') => {
     setShot((s) => ({ k, n: s.n + 1 }))
     clearTimeout(release.current)
     if (k in CAPS) {
@@ -193,7 +203,10 @@ export function Heard() {
       clock.jump(0)
       animate(clock, 1, { duration: TURN, ease: 'linear' }).then(() => setTurning(false))
     }
-    if (k === 'switches') setWifi((w) => !w)
+    if (k === 'switches') {
+      setFlipped(which)
+      setSw((all) => ({ ...all, [which]: !all[which] }))
+    }
   }
   const auto = useAutoplay<HTMLDivElement>((t) => {
     // The clock restarts each time the figure comes back into view.
@@ -205,6 +218,11 @@ export function Heard() {
     // The turn takes longer than a press; it gets its whole run before the next beat.
     beat.current = { i: beat.current.i + 1, at: t + (k === 'orientation' ? TURN + 0.6 : BEAT), last: t }
   })
+  // A cap or a tile on the drawing fires exactly itself.
+  const press = (k: Kind, which?: Switch) => {
+    auto.stop()
+    fire(k, which)
+  }
   const tap = (k: Kind) => {
     auto.stop()
     fire(k === 'up' && shot.k === 'up' ? 'down' : k)
@@ -217,7 +235,7 @@ export function Heard() {
     side: 'press',
     camera: `slide ${slide.toFixed(2)} cm`,
     orientation: `yaw ${pose.yaw.toFixed(1)}°\nhinge ${pose.hinge.toFixed(1)}°`,
-    switches: `wifi: ${wifi}`
+    switches: `${SWITCH_NAMES[flipped]}: ${sw[flipped]}`
   }[shot.k]
   const live = shot.n > 0
   const wire = (k: Kind) => `M${EVENTS[k].wire.map(([x, y]) => `${x} ${y}`).join('L')}`
@@ -258,17 +276,37 @@ export function Heard() {
               const c = CAPS[k]
               const on = down === k
               return (
-                <motion.rect
+                // biome-ignore lint/a11y/useSemanticElements: an svg cap cannot be a <button>.
+                <g
                   key={k}
-                  x={c.x}
-                  y={c.y}
-                  width={c.w}
-                  height={c.h}
-                  rx="1.5"
-                  animate={{ x: on ? c.push.x : 0, y: on ? c.push.y : 0 }}
-                  transition={{ type: 'spring', stiffness: 900, damping: 30 }}
-                  {...stylex.props(styles.cap, hot(k) && styles.capOn, seen && styles.show, styles.wait('0.7s'))}
-                />
+                  role="button"
+                  tabIndex={0}
+                  aria-label={
+                    k === 'up'
+                      ? 'Volume up'
+                      : k === 'down'
+                        ? 'Volume down'
+                        : k === 'side'
+                          ? 'Side button'
+                          : 'Camera Control'
+                  }
+                  onClick={() => press(k)}
+                  onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && press(k)}
+                  {...stylex.props(styles.hit)}
+                >
+                  {/* The caps are 5 units thin: a padded, invisible target a finger can find. */}
+                  <rect x={c.x - 7} y={c.y - 7} width={c.w + 14} height={c.h + 14} {...stylex.props(styles.pad)} />
+                  <motion.rect
+                    x={c.x}
+                    y={c.y}
+                    width={c.w}
+                    height={c.h}
+                    rx="1.5"
+                    animate={{ x: on ? c.push.x : 0, y: on ? c.push.y : 0 }}
+                    transition={{ type: 'spring', stiffness: 900, damping: 30 }}
+                    {...stylex.props(styles.cap, hot(k) && styles.capOn, seen && styles.show, styles.wait('0.7s'))}
+                  />
+                </g>
               )
             })}
             {/* A fingertip sliding along Camera Control, toward the top of the phone. */}
@@ -338,10 +376,17 @@ export function Heard() {
           {/* The switches: Control Center's, not the frame's. */}
           <g {...stylex.props(seen && styles.show, styles.fadeIn, styles.wait('1s'))}>
             <rect x="30" y="190" width="68" height="62" rx="12" {...stylex.props(styles.faintBox)} />
-            <Tile x={48} y={206} on={false} glyph={GLYPHS.airplane} />
-            <Tile x={80} y={206} on={wifi} glyph={GLYPHS.wifi} />
-            <Tile x={48} y={236} on glyph={GLYPHS.bt} />
-            <Tile x={80} y={236} on={false} glyph={GLYPHS.moon} />
+            {TILES.map(([k, x, y]) => (
+              <Tile
+                key={k}
+                x={x}
+                y={y}
+                name={SWITCH_NAMES[k]}
+                on={sw[k]}
+                glyph={GLYPHS[k]}
+                onTap={() => press('switches', k)}
+              />
+            ))}
           </g>
 
           {/* The leaders, and the pulse that rides one when its event fires. */}
@@ -446,9 +491,32 @@ export function Heard() {
 }
 
 /** Control Center's round tile, drawn in the sheet's ink: filled when on. */
-function Tile({ x, y, on, glyph }: { x: number; y: number; on: boolean; glyph: string }) {
+function Tile({
+  x,
+  y,
+  name,
+  on,
+  glyph,
+  onTap
+}: {
+  x: number
+  y: number
+  name: string
+  on: boolean
+  glyph: string
+  onTap: () => void
+}) {
   return (
-    <g>
+    // biome-ignore lint/a11y/useSemanticElements: an svg tile cannot be a <button>.
+    <g
+      role="switch"
+      tabIndex={0}
+      aria-checked={on}
+      aria-label={name}
+      onClick={onTap}
+      onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onTap()}
+      {...stylex.props(styles.hit)}
+    >
       <circle cx={x} cy={y} r="12" {...stylex.props(styles.tile, on && styles.tileOn)} />
       <path
         d={glyph}
@@ -608,7 +676,7 @@ const styles = stylex.create({
   screenValue: { fontFamily: font.mono, fontSize: '14px', fontWeight: 400, fill: color.text },
   // A card under the readout so the wireframe's lines never run through the numbers.
   plate: { fill: color.surface, fillOpacity: 0.88, stroke: INK, strokeOpacity: 0.25, strokeWidth: 1 },
-  lead: { fill: 'none', strokeWidth: 1.3, strokeDasharray: 1, strokeDashoffset: 1 },
+  lead: { fill: 'none', pointerEvents: 'none', strokeWidth: 1.3, strokeDasharray: 1, strokeDashoffset: 1 },
   dashed: { strokeDasharray: '3 3', strokeDashoffset: 0, opacity: 0 },
   taken: { stroke: color.accent },
   heard: { stroke: color.orange },
@@ -642,6 +710,8 @@ const styles = stylex.create({
   wireFront: { strokeWidth: 1.6, fill: color.accentSoft },
   tiny: { fontFamily: font.mono, fontSize: '9px', fill: color.text3 },
   label: { cursor: 'pointer', outlineStyle: 'none' },
+  hit: { cursor: 'pointer', outlineStyle: 'none' },
+  pad: { fill: 'transparent' },
   tag: { fontFamily: font.mono, fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase' },
   name: {
     fontFamily: font.mono,
