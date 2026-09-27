@@ -13,10 +13,12 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
-const drift = stylex.keyframes({ from: { transform: 'translateX(-4%)' }, to: { transform: 'translateX(4%)' } })
+const drift = stylex.keyframes({ from: { transform: 'translateX(-5%)' }, to: { transform: 'translateX(5%)' } })
+// Each streak tile scrolls a multiple of its own height, so the loop is seamless
+// while the six layers fall at six different speeds.
 const fall = stylex.keyframes({
-  from: { backgroundPosition: '0 0, 0 0' },
-  to: { backgroundPosition: '0 240px, 0 300px' }
+  from: { backgroundPosition: '13px 0, 47px 0, 5px 0, 71px 0, 29px 0, 61px 0' },
+  to: { backgroundPosition: '13px 240px, 47px 340px, 5px 300px, 71px 210px, 29px 200px, 61px 260px' }
 })
 const snowfall = stylex.keyframes({
   from: { backgroundPosition: '0 0, 0 0, 0 0' },
@@ -97,30 +99,40 @@ export const styles = stylex.create({
   glare: { backgroundImage: appAppearance.weatherGlare },
   moon: { backgroundImage: appAppearance.weatherMoonGlow },
   stars: { backgroundImage: appAppearance.weatherStars },
-  clouds: {
+  clouds: (opacity: number) => ({
     inset: '-10%',
-    opacity: 0.35,
-    backgroundImage: appAppearance.weatherHaze,
+    opacity,
+    backgroundImage: appAppearance.weatherClouds,
     animationName: { default: drift, [reduce]: 'none' },
-    animationDuration: '28s',
+    animationDuration: '26s',
     animationDirection: 'alternate',
     animationIterationCount: 'infinite',
     animationTimingFunction: easing.inOut
-  },
-  cloudsBack: { animationDuration: '44s', animationDirection: 'alternate-reverse', opacity: 0.22, top: '18%' },
-  streaks: {
-    inset: '-20%',
-    opacity: 0.5,
-    transform: 'rotate(12deg)',
+  }),
+  cloudsFar: (opacity: number) => ({
+    inset: '-10%',
+    top: '18%',
+    opacity,
+    backgroundImage: appAppearance.weatherCloudsFar,
+    animationName: { default: drift, [reduce]: 'none' },
+    animationDuration: '42s',
+    animationDirection: 'alternate-reverse',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: easing.inOut
+  }),
+  // The whole layer rotates so streaks fall along the wind's slant, not just lean.
+  streaks: (slant: number, heavy: boolean) => ({
+    inset: '-30%',
+    opacity: heavy ? 0.8 : 0.55,
+    transform: `rotate(${slant}deg)`,
     backgroundImage: appAppearance.weatherRainStreaks,
-    backgroundSize: '3px 60px, 2px 75px',
-    backgroundPosition: '0 0, 17px 20px',
+    backgroundSize: '46px 120px, 78px 170px, 60px 150px, 98px 210px, 36px 100px, 64px 130px',
+    backgroundPosition: '13px 0, 47px 0, 5px 0, 71px 0, 29px 0, 61px 0',
     animationName: { default: fall, [reduce]: 'none' },
-    animationDuration: '.9s',
+    animationDuration: heavy ? '.7s' : '1.1s',
     animationTimingFunction: easing.linear,
     animationIterationCount: 'infinite'
-  },
-  heavy: { opacity: 0.7, animationDuration: '.6s' },
+  }),
   lightning: {
     backgroundColor: colors.white,
     animationName: { default: flash, [reduce]: 'none' },

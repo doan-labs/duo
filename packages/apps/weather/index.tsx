@@ -132,7 +132,7 @@ export function Weather(_: { os: Os }) {
   )
   return (
     <div data-weather ref={root} {...stylex.props(styles.root, styles[sky])}>
-      <Sky sky={sky} code={current?.weather_code} />
+      <Sky sky={sky} current={current} />
       {wide && aside && (
         <aside aria-label="Locations" inert={detail !== null} {...stylex.props(styles.side)}>
           <Locations wide temp={temp} />
@@ -416,12 +416,19 @@ export function Weather(_: { os: Os }) {
 }
 
 /** Sky layers behind everything: glare, stars, clouds, rain, snow or fog by scene. */
-function Sky({ sky, code }: { sky: Scene; code: number | undefined }) {
-  const heavy = code != null && code >= 65
+function Sky({ sky, current }: { sky: Scene; current: Record<string, number> | undefined }) {
+  const code = current?.weather_code
+  // Heavy means a violent code or a measured rate, so slight/moderate showers
+  // (80-81) never take the downpour path; a storm always reads as one.
+  const heavy = sky === 'storm' || code === 65 || code === 67 || code === 82 || (current?.precipitation ?? 0) >= 4
+  // Wind direction is where the wind comes from; rain tips toward where it blows.
+  const leeway = Math.sin(((current?.wind_direction_10m ?? 0) * Math.PI) / 180) < 0 ? 1 : -1
+  const slant = Math.round(5 + Math.min(current?.wind_speed_10m ?? 0, 45) * 0.3) * leeway
+  const cover = Math.min(100, Math.max(0, current?.cloud_cover ?? 60))
   return (
     <>
       {sky === 'clear' && <div aria-hidden="true" {...stylex.props(styles.layer, styles.glare)} />}
-      {sky === 'night' && (
+      {(sky === 'night' || sky === 'cloudyNight') && (
         <>
           <div aria-hidden="true" {...stylex.props(styles.layer, styles.stars)} />
           <div aria-hidden="true" {...stylex.props(styles.layer, styles.moon)} />
@@ -429,12 +436,12 @@ function Sky({ sky, code }: { sky: Scene; code: number | undefined }) {
       )}
       {sky !== 'clear' && sky !== 'night' && sky !== 'fog' && (
         <>
-          <div aria-hidden="true" {...stylex.props(styles.layer, styles.clouds, styles.cloudsBack)} />
-          <div aria-hidden="true" {...stylex.props(styles.layer, styles.clouds)} />
+          <div aria-hidden="true" {...stylex.props(styles.layer, styles.cloudsFar(0.16 + cover * 0.0028))} />
+          <div aria-hidden="true" {...stylex.props(styles.layer, styles.clouds(0.3 + cover * 0.004))} />
         </>
       )}
       {(sky === 'rain' || sky === 'storm') && (
-        <div aria-hidden="true" {...stylex.props(styles.layer, styles.streaks, heavy && styles.heavy)} />
+        <div aria-hidden="true" {...stylex.props(styles.layer, styles.streaks(slant, heavy))} />
       )}
       {sky === 'storm' && <div aria-hidden="true" {...stylex.props(styles.layer, styles.lightning)} />}
       {sky === 'snow' && <div aria-hidden="true" {...stylex.props(styles.layer, styles.flakes)} />}
