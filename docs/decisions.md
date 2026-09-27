@@ -1802,3 +1802,16 @@ adds the `appfiles` store (`[ns, name] -> { blob }`) and a `file.*` service -
 the recording deck, library, detail, edit and Recently Deleted screens, with
 synthesized demo takes always labeled Demo and transcripts kept honest to the
 Web Speech API's presence.
+
+## 106. Face-on displays draw through a 2D matrix
+
+2026-09-27, accepted. Every live display is CSS3DRenderer DOM, and inside its
+`perspective()` camera Chromium rasters the panel at a scale of its own and
+resamples it: measured on the same Maps sidebar at the same 0.76 scale, edge
+sharpness was 11.9 through the 3D chain against 14.4 through a plain `matrix()`,
+and the cover read softer still while its fold eased toward 0°. A plane parallel
+to the screen projects to scale and translate, so `shell/flat-panels.ts` hands a
+face-on panel that 2D matrix under a flat camera container, rounded so a settling
+fold stops changing it, and gives the renderer's `matrix3d` back the frame the
+panel turns. Folding and orbiting still draw through the 3D chain. Chromium only;
+WKWebView parity is unmeasured.

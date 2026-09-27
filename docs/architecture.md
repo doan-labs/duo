@@ -117,6 +117,10 @@ Both display roots attach to CSS3DRenderer's final camera container before apps 
 Reparenting would reload iframes. Ordinary folding must retain document/view identity;
 split collapse is an explicit view replacement within the same sandbox session.
 
+`flat-panels.ts` runs after every `css.render`: while each shown panel projects face-on, it
+swaps the renderer's `matrix3d` chain for the equivalent 2D `matrix()` under a flat camera
+container, so text rasters at the size it is seen; any turn restores the renderer's strings.
+
 ## Isolated runtime
 
 The [contract](platform/contract.md) owns SDK and lifecycle invariants; [security](platform/security.md)

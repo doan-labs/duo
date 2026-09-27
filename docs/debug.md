@@ -235,6 +235,7 @@ The full Linux build reproduces it; `BUN_JSC_useFTLJIT=false` fixes that reprodu
 | Desktop input misses / EADDRINUSE | Measure window origin / identify listener ownership before restarting |
 | Ramp missing or behind content | Wait for its first render; ramp z-index is 11, OS layers ≤10 |
 | Cover fully blurred under a fading mask | Chromium does not taper backdrop-filter output with mask-image; use clipped layers |
+| Display text soft at rest, face-on | `[data-os]`'s `style.transform` should be `matrix(...)` with its camera container at `none`; a `matrix3d` there means `flat-panels.ts` saw the panel as turned or it is still moving |
 | Cover looks sharp mid-fold | Check whether live DOM incorrectly overlays the bake; attached does not mean visible |
 | Control Center drag does nothing | Account for panel inset/projection; start near rect.top+10 |
 | Tiles appear washed out | Compare source pixels; wallpaper gradients affect perceived contrast |
