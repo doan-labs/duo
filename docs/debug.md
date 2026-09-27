@@ -5,6 +5,8 @@ for routine behavior and screenshots; use visible Tauri for native integration, 
 behavior, WebKit/GPU differences or an explicit request. No other browser driver without
 being asked for one. Assert state, then inspect pixels. Chromium results do not establish
 native parity.
+[Duo issue triage](../.agents/skills/duo-issue-triage/SKILL.md) covers evidence, reproduction
+steps and GitHub issue filing for user-visible failures.
 [The review guide](platform/review.md) owns platform commands and measured coverage.
 
 ## 0. Ground rules
