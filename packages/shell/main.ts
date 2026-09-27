@@ -9,6 +9,7 @@ import { type Cue, cancel, cue } from './cues.ts'
 import { booted, busy, device, follow, goHome, lockState, setPose, unlockAll } from './device.ts'
 import { press } from './device-buttons.ts'
 import { hear } from './embed-device.ts'
+import { flatPanels } from './flat-panels.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
 import { os } from './os.tsx'
@@ -425,6 +426,10 @@ const outerLive = live(px(7.73936), px(11.2513))
 outerLive.position.set(-0.23396 - 7.73936 / 2, 0.27173 - 5.8974 + 11.2513 / 2, OUTER_Z - HINGE_Z - 0.005)
 outerLive.rotation.y = Math.PI
 hinge.add(outerLive)
+const flatten = flatPanels(css, [
+  { o: innerLive, w: px(INNER.z), h: px(INNER.w) },
+  { o: outerLive, w: px(7.73936), h: px(11.2513) }
+])
 
 // The bands around the phone, in pixels: it hangs centred in what they leave.
 // Everything outside it is transparent desktop the window blocks for nothing, so
@@ -848,6 +853,7 @@ renderer.setAnimationLoop((now) => {
     outerLive.element.style.pointerEvents = touch ? 'auto' : 'none'
   }
   css.render(scene, camera)
+  flatten(camera)
   // The first frame that has the phone in it. Until here the page is a backdrop
   // and nothing else: the canvas and the live panels fade in together, and an
   // embedding page is told it finally has a picture to show (packages/web/src/simulator.tsx).

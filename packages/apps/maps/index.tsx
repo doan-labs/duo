@@ -8,6 +8,7 @@
 
 import type { Os } from '@doan-labs/duo-sdk'
 import { useWide } from '@doan-labs/duo-uikit'
+import { light } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -397,8 +398,10 @@ export const Maps = ({ os }: { os: Os }) => {
     />
   )
 
+  // The panels and tiles are light-only, so the app.* labels must be too: the
+  // shell hands every app the dark theme in Dark Mode, which blanked them.
   return (
-    <div ref={root} {...stylex.props(styles.root)}>
+    <div ref={root} {...stylex.props(light, styles.root)}>
       <MapCanvas
         view={view}
         onView={setView}

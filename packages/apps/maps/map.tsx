@@ -18,6 +18,7 @@ import {
   type View,
   zoomAt
 } from './data.ts'
+import { Glyph } from './glyphs.tsx'
 import type { Route } from './live.ts'
 import { styles } from './styles.ts'
 
@@ -192,6 +193,10 @@ export function MapCanvas({
   const zoom = (by: number) => flyTo({ ...view, z: clamp(view.z + by) })
   const stop = (e: PointerEvent) => e.stopPropagation()
   const dot = place(me.lat, me.lon)
+  // Centred on the dot, the arrow fills like iOS's; the first pan hollows it again.
+  const at = project(me.lat, me.lon, view.z)
+  const mid = project(view.lat, view.lon, view.z)
+  const centred = Math.hypot(at.x - mid.x, at.y - mid.y) < 1
   const ruler = scale(view.lat, view.z)
 
   // A route covers the canvas; while it is up the loose pins bow out.
@@ -377,10 +382,11 @@ export function MapCanvas({
           <button
             type="button"
             aria-label="Centre on my location"
+            aria-pressed={centred}
             onClick={onLocate}
-            {...stylex.props(styles.control, styles.alone)}
+            {...stylex.props(styles.control, styles.alone, styles.on)}
           >
-            <Sym name="location" size={14} />
+            {centred ? <Sym name="location" size={14} /> : <Glyph name="locate" size={16} />}
           </button>
           <div {...stylex.props(styles.stack)}>
             <button

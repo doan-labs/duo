@@ -150,6 +150,13 @@ ramp at 11. `getBoundingClientRect()` is screen space; use `spot()`'s offset cha
 panel coordinates, including home-page transforms. Chromium can lose rounded image clips
 inside CSS3D; existing widgets use text/gradients.
 
+A panel inside CSS3DRenderer's `perspective()` camera rasters at a scale of the browser's
+choosing and is resampled, so text looks like upscaled video. `flat-panels.ts` flattens
+face-on panels to a 2D `matrix()`; keep its values rounded (4 decimals, device-pixel
+offsets), because an eased fold or camera that changes the string every frame reads as
+animating and never re-rasters sharp. Nothing else may write the panel or camera-container
+`transform`: the flattener tells the renderer's writes from its own by the string.
+
 A bottom-anchored column (`justifyContent: 'flex-end'`) that outgrows its panel overflows
 off the top, where no scroll reaches it. Both displays are shorter than a phone keypad, so
 Calculator and Phone make the column a `containerType: 'size'` container and size their
