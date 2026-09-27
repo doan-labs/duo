@@ -29,6 +29,8 @@ export const meta = {
 
 Until now, apps saw the hinge and nothing else. Now one call hears any button or sensor:
 
+<Heard />
+
 ```ts
 const off = os.device.on('volume', (e) => {
   if (e.action === 'press') zoom(e.button === 'up' ? 1 : -1)

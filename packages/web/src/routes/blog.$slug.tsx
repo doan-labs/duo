@@ -7,6 +7,7 @@ import { Contents } from '../blog/contents'
 import { Figures } from '../blog/figures'
 import { Film } from '../blog/film'
 import { FoldDiagram } from '../blog/fold-diagram'
+import { Heard } from '../blog/heard'
 import { HomePlay } from '../blog/home-play'
 import { Live } from '../blog/live'
 import { MicWave } from '../blog/mic-wave'
@@ -62,6 +63,7 @@ const components = {
   FoldDiagram,
   Live,
   Figures,
+  Heard,
   NotifyRun,
   Points,
   Apps,
