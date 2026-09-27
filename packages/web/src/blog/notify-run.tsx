@@ -1,8 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
+import { Fold } from '../fold'
 import { appForName } from '../home/apps'
-import { SHEET } from '../motion'
+import { SHEET, SLIDE } from '../motion'
 import { Pre } from '../page-parts'
 import { color, ease, font, radius } from '../tokens.stylex'
 
@@ -10,8 +11,11 @@ const APPS = ['Pomo Timer', 'Messages', 'Calendar', 'Reminders', 'Clock', 'Fitne
 /** How long the shell holds a banner before filing it (packages/shell/springboard/notifications.tsx). */
 const BANNER_MS = 4400
 
-type Phase = 'idle' | 'banner' | 'filed' | 'open'
 type Fields = { title: string; body: string; arg: string }
+type Note = Fields & { app: string; id: number }
+type RunState = 'idle' | 'busy' | 'done'
+/** How many the lock screen keeps: the one on top and two edges under it. */
+const STACK = 3
 
 const quote = (s: string) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 const code = (f: Fields) => `import { os } from '@doan-labs/duo-sdk'
@@ -25,10 +29,10 @@ await os.notify.post({
 /**
  * `os.notify.post` played out on the Duo itself: a still of the real shell's
  * lock screen (public/blog/duo-lock.webp, captured flat and facing), with the
- * shell's banner drawn on its glass at the shell's sizes. Run drops the banner,
- * which files under the clock after the shell's 4.4 seconds; a tap on either
- * opens the app with `arg`. Banner and card share a layout id, so the filing is
- * one move. The fields and the app picker rewrite the code as you type.
+ * shell's banner drawn on its glass at the shell's sizes. Run drops a banner,
+ * which files under the clock after the shell's 4.4 seconds, or at once when
+ * the next one arrives; filed ones stack, newest on top. A tap opens the app
+ * with `arg`. Banner and card share a layout id, so the filing is one move.
  */
 export function NotifyRun() {
   const [app, setApp] = useState(APPS[0]!)
@@ -37,46 +41,56 @@ export function NotifyRun() {
     body: 'Twenty-five minutes, well spent. Take five.',
     arg: 'break'
   })
-  const [posted, setPosted] = useState<Fields & { app: string }>({ ...fields, app })
-  const [phase, setPhase] = useState<Phase>('idle')
+  const [notes, setNotes] = useState<Note[]>([])
+  const [banner, setBanner] = useState<number | null>(null)
+  const [opened, setOpened] = useState<Note | null>(null)
+  const [state, setState] = useState<RunState>('idle')
   const [log, setLog] = useState<string[]>([])
-  const timer = useRef(0)
-  useEffect(() => () => clearTimeout(timer.current), [])
-  // The editor folds away on a phone, so Run and the Duo share one screen; it starts open where there is room.
-  const [editing, setEditing] = useState(false)
-  useEffect(() => setEditing(window.matchMedia('(min-width: 900px)').matches), [])
+  const timers = useRef<number[]>([])
+  const filing = useRef(0)
+  const n = useRef(0)
+  useEffect(
+    () => () => {
+      for (const t of timers.current) clearTimeout(t)
+      clearTimeout(filing.current)
+    },
+    []
+  )
+  const later = (f: () => void, ms: number) => timers.current.push(window.setTimeout(f, ms))
 
   const say = (line: string) => setLog((l) => [...l, line].slice(-4))
   const run = () => {
-    clearTimeout(timer.current)
-    setPosted({ ...fields, app })
-    setPhase('banner')
-    setLog([`${app}: os.notify.post() resolved`, 'banner on screen'])
-    timer.current = window.setTimeout(() => {
-      setPhase('filed')
-      say('filed on the lock screen')
-    }, BANNER_MS)
+    if (state === 'busy') return
+    const note = { ...fields, app, id: ++n.current }
+    setState('busy')
+    // The post's round trip to the shell, slowed enough to see.
+    later(() => {
+      setOpened(null)
+      setNotes((all) => [...all, note].slice(-STACK))
+      setBanner(note.id)
+      setState('done')
+      say(`${app}: os.notify.post() resolved`)
+      clearTimeout(filing.current)
+      filing.current = window.setTimeout(() => {
+        setBanner(null)
+        say('filed on the lock screen')
+      }, BANNER_MS)
+      later(() => setState('idle'), 1400)
+    }, 520)
   }
-  const open = () => {
-    clearTimeout(timer.current)
-    setPhase('open')
-    say(`opened ${posted.app}, os.arg = ${quote(posted.arg)}`)
+  const open = (note: Note) => {
+    if (note.id === banner) clearTimeout(filing.current)
+    setBanner((b) => (b === note.id ? null : b))
+    setNotes((all) => all.filter((x) => x.id !== note.id))
+    setOpened(note)
+    say(`opened ${note.app}, os.arg = ${quote(note.arg)}`)
   }
   const edit = (k: keyof Fields) => (e: { target: { value: string } }) =>
     setFields((f) => ({ ...f, [k]: e.target.value }))
 
-  const icon = appForName(posted.app)?.icon
-  const notice = (
-    <motion.button type="button" layoutId="notice" onClick={open} transition={SHEET} {...stylex.props(styles.notice)}>
-      <span {...stylex.props(styles.head)}>
-        <img src={icon} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
-        <span {...stylex.props(styles.name)}>{posted.app}</span>
-        <span {...stylex.props(styles.time)}>now</span>
-      </span>
-      <span {...stylex.props(styles.title)}>{posted.title}</span>
-      {posted.body && <span {...stylex.props(styles.body)}>{posted.body}</span>}
-    </motion.button>
-  )
+  const shown = notes.find((x) => x.id === banner)
+  const filed = notes.filter((x) => x.id !== banner).reverse()
+  const [top, ...under] = filed
 
   return (
     <figure {...stylex.props(styles.figure)}>
@@ -93,21 +107,12 @@ export function NotifyRun() {
               onClick={() => setApp(a)}
               {...stylex.props(styles.pick, a === app && styles.picked)}
             >
+              {a === app && <motion.span layoutId="notify-pick" transition={SLIDE} {...stylex.props(styles.ring)} />}
               <img src={appForName(a)?.icon} alt="" width={1024} height={1024} {...stylex.props(styles.pickIcon)} />
             </button>
           ))}
         </fieldset>
-        <details open={editing} onToggle={(e) => setEditing(e.currentTarget.open)} {...stylex.props(styles.editor)}>
-          <summary {...stylex.props(styles.summary)}>
-            <svg
-              viewBox="0 0 10 10"
-              aria-hidden="true"
-              {...stylex.props(styles.chevron, editing && styles.chevronOpen)}
-            >
-              <path d="M3.5 2 6.5 5l-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            Edit the notification
-          </summary>
+        <Fold head={<span {...stylex.props(styles.foldHead)}>Edit the notification</span>}>
           <div {...stylex.props(styles.fields)}>
             {(['title', 'body', 'arg'] as const).map((k) => (
               <label key={k} {...stylex.props(styles.field, k === 'body' && styles.fieldWide)}>
@@ -116,26 +121,9 @@ export function NotifyRun() {
               </label>
             ))}
           </div>
-          <Pre
-            title="notify.ts"
-            action={
-              <button type="button" onClick={run} {...stylex.props(styles.run, styles.runInline)}>
-                <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.play)}>
-                  <path d="M2 1.2v7.6L8.6 5z" fill="currentColor" />
-                </svg>
-                Run
-              </button>
-            }
-          >
-            {code(fields)}
-          </Pre>
-        </details>
-        <button type="button" onClick={run} {...stylex.props(styles.run, styles.runBar)}>
-          <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.play)}>
-            <path d="M2 1.2v7.6L8.6 5z" fill="currentColor" />
-          </svg>
-          Run
-        </button>
+          <Pre title="notify.ts">{code(fields)}</Pre>
+        </Fold>
+        <Run state={state} onClick={run} />
         <ol {...stylex.props(styles.log)} aria-live="polite">
           {log.map((l) => (
             <li key={l} {...stylex.props(styles.line)}>
@@ -154,25 +142,47 @@ export function NotifyRun() {
         />
         {/* The glass, in the still's own proportions; 1cqw is a hundredth of the still's width. */}
         <div {...stylex.props(styles.screen)}>
-          {phase === 'banner' && (
-            <motion.div initial={{ y: '-130%' }} animate={{ y: 0 }} transition={SHEET} {...stylex.props(styles.banner)}>
-              {notice}
+          {shown && (
+            <motion.div
+              key={shown.id}
+              initial={{ y: '-130%' }}
+              animate={{ y: 0 }}
+              transition={SHEET}
+              {...stylex.props(styles.banner)}
+            >
+              <Notice note={shown} onOpen={open} />
             </motion.div>
           )}
           <div {...stylex.props(styles.list)}>
-            {phase === 'filed' && (
+            {top && (
               <>
                 <span {...stylex.props(styles.listTitle)}>Notification Center</span>
-                {notice}
+                <div {...stylex.props(styles.stack)}>
+                  {/* The ones underneath show only as edges, the way iOS stacks an app's notifications. */}
+                  <AnimatePresence>
+                    {under.slice(0, 2).map((x, i) => (
+                      <motion.span
+                        key={x.id}
+                        aria-hidden="true"
+                        initial={{ opacity: 0, y: 0, scale: 1 }}
+                        animate={{ opacity: 1, y: `${(i + 1) * 1.1}cqw`, scale: 1 - (i + 1) * 0.05 }}
+                        exit={{ opacity: 0, y: 0 }}
+                        transition={SHEET}
+                        {...stylex.props(styles.peek, styles.depth(-(i + 1)))}
+                      />
+                    ))}
+                  </AnimatePresence>
+                  <Notice note={top} onOpen={open} />
+                </div>
               </>
             )}
           </div>
           <AnimatePresence>
-            {phase === 'open' && (
+            {opened && (
               <motion.button
                 key="app"
                 type="button"
-                onClick={() => setPhase('idle')}
+                onClick={() => setOpened(null)}
                 initial={{ opacity: 0, scale: 0.6 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
@@ -180,9 +190,15 @@ export function NotifyRun() {
                 aria-label="Back to the lock screen"
                 {...stylex.props(styles.opened)}
               >
-                <img src={icon} alt="" width={1024} height={1024} {...stylex.props(styles.bigIcon)} />
-                <span {...stylex.props(styles.openedName)}>{posted.app}</span>
-                <code {...stylex.props(styles.arg)}>os.arg === {quote(posted.arg)}</code>
+                <img
+                  src={appForName(opened.app)?.icon}
+                  alt=""
+                  width={1024}
+                  height={1024}
+                  {...stylex.props(styles.bigIcon)}
+                />
+                <span {...stylex.props(styles.openedName)}>{opened.app}</span>
+                <code {...stylex.props(styles.arg)}>os.arg === {quote(opened.arg)}</code>
               </motion.button>
             )}
           </AnimatePresence>
@@ -192,6 +208,83 @@ export function NotifyRun() {
   )
 }
 
+function Notice({ note, onOpen }: { note: Note; onOpen: (n: Note) => void }) {
+  return (
+    <motion.button
+      type="button"
+      layoutId={`notice-${note.id}`}
+      onClick={() => onOpen(note)}
+      transition={SHEET}
+      {...stylex.props(styles.notice)}
+    >
+      <span {...stylex.props(styles.head)}>
+        <img src={appForName(note.app)?.icon} alt="" width={1024} height={1024} {...stylex.props(styles.icon)} />
+        <span {...stylex.props(styles.name)}>{note.app}</span>
+        <span {...stylex.props(styles.time)}>now</span>
+      </span>
+      <span {...stylex.props(styles.title)}>{note.title}</span>
+      {note.body && <span {...stylex.props(styles.body)}>{note.body}</span>}
+    </motion.button>
+  )
+}
+
+/** Run, then the post in flight, then its answer: one pill that changes its words and its width. */
+function Run({ state, onClick }: { state: RunState; onClick: () => void }) {
+  const still = useReducedMotion()
+  const words = { idle: 'Run', busy: 'Posting', done: 'Posted' }[state]
+  return (
+    <motion.button
+      type="button"
+      layout
+      onClick={onClick}
+      aria-busy={state === 'busy'}
+      transition={still ? { duration: 0 } : SLIDE}
+      {...stylex.props(styles.run, state === 'done' && styles.runDone)}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={state}
+          initial={{ opacity: 0, y: 8, filter: 'blur(3px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, y: -8, filter: 'blur(3px)' }}
+          transition={still ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          {...stylex.props(styles.runFace)}
+        >
+          {state === 'idle' && (
+            <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.play)}>
+              <path d="M2 1.2v7.6L8.6 5z" fill="currentColor" />
+            </svg>
+          )}
+          {state === 'busy' && (
+            <svg viewBox="0 0 16 16" aria-hidden="true" {...stylex.props(styles.spin)}>
+              <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+              <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          )}
+          {state === 'done' && (
+            <svg viewBox="0 0 16 16" aria-hidden="true" {...stylex.props(styles.check)}>
+              <motion.path
+                d="M3.5 8.5l3 3 6-7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: still ? 0 : 0.35, delay: still ? 0 : 0.08 }}
+              />
+            </svg>
+          )}
+          {words}
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
+  )
+}
+
+const spin = stylex.keyframes({ to: { transform: 'rotate(360deg)' } })
+
 const WIDE = '@media (min-width: 900px)'
 const GLASS = 'blur(24px) saturate(1.8)'
 
@@ -199,7 +292,7 @@ const styles = stylex.create({
   figure: {
     display: 'grid',
     gridTemplateColumns: { default: '1fr', [WIDE]: 'minmax(0, 1fr) minmax(0, 1.25fr)' },
-    alignItems: 'center',
+    alignItems: 'start',
     gap: '32px',
     marginTop: '12px',
     marginBottom: '40px',
@@ -232,52 +325,43 @@ const styles = stylex.create({
     borderWidth: 0
   },
   pick: {
+    position: 'relative',
     justifySelf: 'center',
-    padding: '3px',
-    borderWidth: '2px',
-    borderStyle: 'solid',
-    borderColor: 'transparent',
+    padding: '5px',
+    borderWidth: 0,
     borderRadius: '12px',
     backgroundColor: 'transparent',
     cursor: 'pointer',
     opacity: { default: 0.55, ':hover': 1 },
-    transitionProperty: 'opacity, border-color',
+    transitionProperty: 'opacity',
     transitionDuration: '0.2s',
     transitionTimingFunction: ease.out,
     outlineColor: { default: 'transparent', ':focus-visible': color.ring },
     outlineStyle: 'solid',
     outlineWidth: '2px'
   },
-  picked: { borderColor: color.accent, opacity: 1 },
-  pickIcon: { display: 'block', width: '34px', height: '34px', borderRadius: '8px' },
-  editor: { marginBottom: '14px' },
-  summary: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    width: 'fit-content',
-    marginBottom: '12px',
+  picked: { opacity: 1 },
+  // One ring for the whole row: it slides from the old pick to the new one.
+  ring: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderWidth: '2px',
+    borderStyle: 'solid',
+    borderColor: color.accent,
+    borderRadius: '12px',
+    pointerEvents: 'none'
+  },
+  pickIcon: { position: 'relative', display: 'block', width: '34px', height: '34px', borderRadius: '8px' },
+  foldHead: {
     fontFamily: font.mono,
     fontSize: '11px',
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: { default: color.text3, ':hover': color.text },
-    cursor: 'pointer',
-    listStyleType: 'none',
-    '::-webkit-details-marker': { display: 'none' },
-    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
-    outlineStyle: 'solid',
-    outlineWidth: '2px',
-    outlineOffset: '2px'
+    color: color.text3
   },
-  chevron: {
-    width: '10px',
-    height: '10px',
-    transitionProperty: 'transform',
-    transitionDuration: '0.2s',
-    transitionTimingFunction: ease.out
-  },
-  chevronOpen: { transform: 'rotate(90deg)' },
   fields: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' },
   field: { display: 'block', minWidth: 0 },
   fieldWide: { gridColumnStart: 1, gridColumnEnd: 3, gridRowStart: 2 },
@@ -299,45 +383,50 @@ const styles = stylex.create({
     outlineStyle: 'none'
   },
   run: {
-    display: 'inline-flex',
+    display: 'flex',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: '6px',
-    paddingTop: '5px',
-    paddingBottom: '5px',
-    paddingLeft: '12px',
-    paddingRight: '14px',
+    width: { default: '100%', [WIDE]: 'auto' },
+    minWidth: { default: 0, [WIDE]: '112px' },
+    marginTop: '16px',
+    paddingTop: '11px',
+    paddingBottom: '11px',
+    paddingLeft: '20px',
+    paddingRight: '22px',
+    overflow: 'hidden',
     borderWidth: 0,
     borderRadius: radius.pill,
     backgroundColor: { default: color.green, ':hover': color.text },
     color: color.surface,
     fontFamily: font.sans,
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 600,
     cursor: 'pointer',
     transitionProperty: 'background-color',
-    transitionDuration: '0.2s',
+    transitionDuration: '0.3s',
     transitionTimingFunction: ease.out,
     outlineColor: { default: 'transparent', ':focus-visible': color.ring },
     outlineStyle: 'solid',
     outlineWidth: '2px',
     outlineOffset: '2px'
   },
-  runInline: { display: { default: 'none', [WIDE]: 'inline-flex' } },
-  // Outside the folded editor on a phone, so it sits right above the Duo it drives.
-  runBar: {
-    display: { default: 'flex', [WIDE]: 'none' },
-    justifyContent: 'center',
-    width: '100%',
-    paddingTop: '12px',
-    paddingBottom: '12px',
-    fontSize: '15px'
+  runDone: { backgroundColor: { default: color.text, ':hover': color.text } },
+  runFace: { display: 'inline-flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' },
+  spin: {
+    width: '15px',
+    height: '15px',
+    animationName: spin,
+    animationDuration: '0.7s',
+    animationTimingFunction: 'linear',
+    animationIterationCount: 'infinite'
   },
-  play: { width: '10px', height: '10px' },
+  check: { width: '15px', height: '15px' },
+  play: { width: '11px', height: '11px' },
   log: {
     display: { default: 'none', [WIDE]: 'block' },
     listStyleType: 'none',
-    minHeight: '70px',
-    marginTop: '-12px',
+    minHeight: '96px',
+    marginTop: '14px',
     marginBottom: 0,
     marginLeft: 0,
     marginRight: 0,
@@ -384,6 +473,21 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: '1.04cqw'
   },
+  stack: { position: 'relative', isolation: 'isolate', display: 'flex' },
+  peek: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: '3.12cqw',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    backdropFilter: GLASS,
+    WebkitBackdropFilter: GLASS,
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)',
+    transformOrigin: 'center bottom'
+  },
+  depth: (z: number) => ({ zIndex: z }),
   listTitle: {
     width: '49.92cqw',
     fontFamily: font.sans,
