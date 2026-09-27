@@ -339,14 +339,14 @@ async function autoLocate() {
   }
 }
 export const temperature = (value: number | undefined, unit: 'C' | 'F') =>
-  value == null ? '—' : `${Math.round(unit === 'F' ? (value * 9) / 5 + 32 : value)}°`
+  value == null ? '-' : `${Math.round(unit === 'F' ? (value * 9) / 5 + 32 : value)}°`
 export const number = (value: number | undefined, suffix = '') =>
-  value == null ? '—' : `${Math.round(value)}${suffix}`
+  value == null ? '-' : `${Math.round(value)}${suffix}`
 export const clock = (
   time: number,
   timezone: string,
   options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
-) => (Number.isFinite(time) ? new Date(time * 1000).toLocaleString('en-US', { ...options, timeZone: timezone }) : '—')
+) => (Number.isFinite(time) ? new Date(time * 1000).toLocaleString('en-US', { ...options, timeZone: timezone }) : '-')
 export type SymName = keyof typeof SYM
 /** SF Symbol and label for a WMO weather code. */
 export function condition(code: number, isDay = 1): [SymName, string] {

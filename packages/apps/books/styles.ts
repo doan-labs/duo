@@ -116,14 +116,14 @@ export const styles = stylex.create({
   side: {
     position: 'absolute',
     zIndex: 2,
-    top: -32,
+    top: 8,
     bottom: 8,
     left: 8,
     width: 216,
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
-    paddingTop: 24,
+    paddingTop: 8,
     paddingRight: 8,
     paddingBottom: 12,
     paddingLeft: 8,
@@ -982,7 +982,6 @@ export const styles = stylex.create({
     position: 'absolute',
     top: 10,
     bottom: 14,
-    left: 44,
     columnFill: 'auto',
     textAlign: 'justify',
     hyphens: 'auto',
@@ -990,7 +989,8 @@ export const styles = stylex.create({
     transitionDuration: { default: '.34s', '@media (prefers-reduced-motion: reduce)': '0s' },
     transitionTimingFunction: easing.out
   },
-  flow: (pw: number, gap: number, cols: number) => ({
+  flow: (left: number, pw: number, gap: number, cols: number) => ({
+    left,
     width: pw * cols + gap * (cols - 1),
     columnWidth: pw,
     columnGap: gap
@@ -1166,10 +1166,18 @@ export const styles = stylex.create({
     borderRadius: radius.pill,
     borderWidth: 2,
     borderStyle: 'solid',
-    borderColor: 'transparent',
+    fontFamily: fonts.serif,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
     cursor: 'pointer'
   },
-  dotBg: (bg: string, ink: string) => ({ backgroundColor: bg, color: ink }),
+  // Each swatch is its theme in miniature, ringed in its own muted ink so it
+  // still reads on a card of the same colour.
+  dotBg: (t: { bg: string; ink: string; mute: string }) => ({
+    backgroundColor: t.bg,
+    color: t.ink,
+    borderColor: t.mute
+  }),
   dotOn: { borderColor: appAppearance.booksAccent },
   fontList: { display: 'flex', flexDirection: 'column', gap: 1 },
   fontRow: {

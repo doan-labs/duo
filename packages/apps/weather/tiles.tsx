@@ -186,7 +186,7 @@ function Compass({ direction, speed }: { direction: number; speed: number | unde
         <line x1="50" y1="70" x2="50" y2="82" strokeWidth="2" {...stylex.props(styles.stroke)} />
       </g>
       <text x="50" y="48" textAnchor="middle" {...stylex.props(styles.svgText, styles.compassValue)}>
-        {speed == null ? '—' : Math.round(speed)}
+        {speed == null ? '-' : Math.round(speed)}
       </text>
       <text x="50" y="60" textAnchor="middle" {...stylex.props(styles.svgText)}>
         km/h

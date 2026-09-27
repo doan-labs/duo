@@ -1,9 +1,8 @@
 // The keypad face: the shrinking readout with its expression trail and
 // annunciators, the basic 4x5 grid, and the scientific block that iOS shows in
-// landscape - here stacked over the pad on the cover, beside it on the inner
-// display (wide).
+// landscape - stacked over the pad on a narrow box, beside it on a wide one.
 
-import { Num, useWide } from '@doan-labs/duo-uikit'
+import { Num } from '@doan-labs/duo-uikit'
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef } from 'react'
 import { clearLabel, ERROR, SCI_LABEL, type SciFn } from './calc-state.ts'
@@ -74,13 +73,15 @@ const BigNum = ({ cur, fresh }: { cur: string; fresh: boolean }) => {
 export type PadProps = {
   s: CalcState
   sci: boolean
+  /** Measured on the app's root: the pad column shrink-wraps its keys, so it cannot measure itself. */
+  wide: boolean
   mem: number
   onKey: (k: string) => void
 }
 
 /** Readout plus the two grids; the layout the Basic and Scientific modes share. */
-export const Pad = ({ s, sci, mem, onKey }: PadProps) => {
-  const [keysBox, wide] = useWide()
+export const Pad = ({ s, sci, wide, mem, onKey }: PadProps) => {
+  const side = sci && wide
   return (
     <div {...stylex.props(styles.pad)}>
       <div {...stylex.props(styles.readout)}>
@@ -93,9 +94,9 @@ export const Pad = ({ s, sci, mem, onKey }: PadProps) => {
         </div>
         <BigNum cur={s.cur} fresh={s.fresh} />
       </div>
-      <div ref={keysBox} {...stylex.props(styles.keysRow, !wide && styles.keysCol)}>
-        {sci && <SciKeys s={s} onKey={onKey} />}
-        <BasicKeys s={s} onKey={onKey} sci={sci} />
+      <div {...stylex.props(styles.keysRow, !side && styles.keysCol)}>
+        {sci && <SciKeys s={s} onKey={onKey} side={side} />}
+        <BasicKeys s={s} onKey={onKey} sci={sci} side={side} />
       </div>
     </div>
   )
@@ -106,9 +107,15 @@ export const BasicKeys = ({
   onKey,
   sci,
   disabled,
-  bs
-}: Pick<PadProps, 's' | 'onKey'> & { sci?: boolean; disabled?: string[]; bs?: boolean }) => (
-  <div {...stylex.props(styles.keys, sci ? styles.keysBasicSci : bs ? styles.keysConv : styles.keysBasic)}>
+  bs,
+  side
+}: Pick<PadProps, 's' | 'onKey'> & { sci?: boolean; disabled?: string[]; bs?: boolean; side?: boolean }) => (
+  <div
+    {...stylex.props(
+      styles.keys,
+      side ? styles.keysBasicSide : sci ? styles.keysBasicSci : bs ? styles.keysConv : styles.keysBasic
+    )}
+  >
     <button type="button" {...stylex.props(styles.key, styles.g)} onClick={() => onKey(clearLabel(s))}>
       {clearLabel(s)}
     </button>
@@ -136,8 +143,8 @@ export const BasicKeys = ({
   </div>
 )
 
-const SciKeys = ({ s, onKey }: Pick<PadProps, 's' | 'onKey'>) => (
-  <div {...stylex.props(styles.keys, styles.keysSci)}>
+const SciKeys = ({ s, onKey, side }: Pick<PadProps, 's' | 'onKey'> & { side: boolean }) => (
+  <div {...stylex.props(styles.keys, side ? styles.keysSciSide : styles.keysSci)}>
     {SCI.flat().map((k) => (
       <button
         type="button"
@@ -145,6 +152,7 @@ const SciKeys = ({ s, onKey }: Pick<PadProps, 's' | 'onKey'>) => (
         {...stylex.props(
           styles.key,
           styles.keySci,
+          !side && styles.keySciStacked,
           (k === '2nd' && s.second) || (k === 'RadDeg' && s.deg) ? styles.on : undefined
         )}
         onClick={() => onKey(keyOp(k, s))}

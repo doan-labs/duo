@@ -59,7 +59,7 @@ export function NowPlaying({ open, onClose, wide }: { open: boolean; onClose: ()
                 {...stylex.props(styles.bare, styles.npSub, shared.press)}
                 onClick={() => setMode('credits')}
               >
-                {t.artist} — {t.album}
+                {t.artist} · {t.album}
               </button>
             </div>
             <div {...stylex.props(styles.npScrub)}>

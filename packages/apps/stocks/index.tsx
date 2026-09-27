@@ -35,6 +35,8 @@ import { styles } from './styles.ts'
 const two = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
 const signed = { ...two, signDisplay: 'exceptZero' as const }
 const compact = { notation: 'compact' as const, maximumFractionDigits: 1 }
+// A percent parsed from "-0.00%" is -0, which is not < 0; the absolute change still carries the sign.
+const down = (d?: { chg: number; chgPct: number }) => !!d && (d.chg < 0 || d.chgPct < 0)
 
 export function Stocks({ os }: { os: Os }) {
   const [root, wide] = useWide()
@@ -254,7 +256,7 @@ function SymbolRow({
   const quote = useQuote(item.sym)
   const spark = useSpark(item, !os.mirror)
   const q = quote.data
-  const dn = (q?.chgPct ?? 0) < 0
+  const dn = down(q)
   return (
     <button
       type="button"
@@ -268,13 +270,13 @@ function SymbolRow({
           {q?.name || item.name || ' '}
         </Text>
       </span>
-      {item.kind !== 'index' && <Spark pts={spark.data ?? []} w={56} ht={28} />}
+      {item.kind !== 'index' && <Spark pts={spark.data ?? []} dn={dn} w={56} ht={28} />}
       <span {...stylex.props(styles.right)}>
         <span {...stylex.props(typography.callout, styles.price)}>
           <Num value={q?.px} format={two} />
         </span>
         <span {...stylex.props(typography.footnote, styles.chip, dn && styles.dn)}>
-          {q ? <Num value={q.chgPct} format={signed} suffix="%" /> : '—'}
+          {q ? <Num value={q.chgPct} format={signed} suffix="%" /> : '-'}
         </span>
       </span>
     </button>
@@ -283,7 +285,7 @@ function SymbolRow({
 
 // -- the detail pane ----------------------------------------------------------------
 
-const extTone = (v: number) => (v < 0 ? styles.deltaDn : styles.delta)
+const extTone = (ext: NonNullable<Quote['ext']>) => (down(ext) ? styles.deltaDn : styles.delta)
 
 /** The quote block, range pills, chart, stats grid and follow toggle. */
 function Detail({ item, showNews, os }: { item: Item; showNews?: boolean; os: Os }) {
@@ -297,7 +299,7 @@ function Detail({ item, showNews, os }: { item: Item; showNews?: boolean; os: Os
   const live = !os.mirror
   const { entry, pts } = useHistory(item, range, live)
   const q = quote.data
-  const dn = (q?.chgPct ?? 0) < 0
+  const dn = down(q)
   // Scrubbing the live chart borrows Apple's gesture: the big price and the
   // line under it show the hovered point's close and time instead.
   const [hover, setHover] = useState<Point | null>(null)
@@ -400,7 +402,7 @@ function MarketLine({ q }: { q: Quote }) {
     return (
       <Text as="div" size="footnote" xstyle={styles.mktLine}>
         Extended Hours: <Num value={ext.px} format={two} />{' '}
-        <Text as="span" size="footnote" xstyle={extTone(ext.chgPct)}>
+        <Text as="span" size="footnote" xstyle={extTone(ext)}>
           <Num value={ext.chgPct} format={signed} suffix="%" />
         </Text>
         {ext.when ? ` · ${ext.when}` : ''}
@@ -410,7 +412,7 @@ function MarketLine({ q }: { q: Quote }) {
     return (
       <Text as="div" size="footnote" xstyle={styles.mktLine}>
         Pre-Market: <Num value={ext.px} format={two} />{' '}
-        <Text as="span" size="footnote" xstyle={extTone(ext.chgPct)}>
+        <Text as="span" size="footnote" xstyle={extTone(ext)}>
           <Num value={ext.chgPct} format={signed} suffix="%" />
         </Text>
         {ext.when ? ` · ${ext.when}` : ''}

@@ -12,7 +12,10 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 
-const RAIL = 156
+/** The landscape rail's footprint: zoom column 34, wheel 92, shutter 64, two 8 gaps, 16 to the edge. */
+const RAIL = 222
+/** Clear of the landscape left column (16 in, 36 wide) by a gap of 8: where the pano sweep starts. */
+const LEFT_COL = 60
 /** The portrait frame clears the top bar, the zoom chips, the dial and the shutter row. */
 const PORT_BOTTOM = 212
 /** Pixels of wheel travel per mode - the gap the drum keeps between items. */
@@ -153,12 +156,13 @@ export const styles = stylex.create({
     right: 0,
     bottom: 14,
     width: RAIL,
+    paddingRight: 16,
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between'
   },
-  railMid: { display: 'flex', alignItems: 'center', gap: 8, marginRight: 6 },
+  railMid: { display: 'flex', alignItems: 'center', gap: 8 },
 
   // Portrait: a top bar and the stack under the feed.
   topBar: {
@@ -218,6 +222,8 @@ export const styles = stylex.create({
     paddingRight: 12,
     backgroundColor: appAppearance.cameraScrimStrong
   },
+  // Held wide the strip stops short of the rail and rides above the thumbnail corner.
+  trayLand: { right: RAIL + 8, bottom: 64 },
   trayRow: {
     display: 'flex',
     gap: 10,
@@ -243,7 +249,21 @@ export const styles = stylex.create({
   },
   thumbNameOn: { color: colors.yellow },
 
-  dial: { display: 'flex', alignItems: 'center', gap: 4, touchAction: 'none' },
+  // Upright, the pick sits centred over the shutter the way Apple's strip does:
+  // six labels outrun a 387 pt cover, so the far ones run off the faded edges
+  // instead of wrapping. The side columns may be narrower than their modes.
+  dial: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+    alignItems: 'center',
+    columnGap: 4,
+    width: '100%',
+    touchAction: 'none',
+    WebkitMaskImage: 'linear-gradient(to right, transparent, black 16%, black 84%, transparent)',
+    maskImage: 'linear-gradient(to right, transparent, black 16%, black 84%, transparent)'
+  },
+  dialSide: { display: 'flex', gap: 4 },
+  dialBefore: { justifyContent: 'flex-end' },
   modeBtn: {
     paddingTop: 5,
     paddingRight: 10,
@@ -255,7 +275,8 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     fontWeight: weight.semibold,
     color: colors.white,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
   },
   modeOn: { color: colors.yellow, backgroundColor: appAppearance.cameraChip },
 
@@ -527,6 +548,8 @@ export const styles = stylex.create({
   // The pano sweep: a centre line the sweep runs along, an arrow in a frame,
   // the progress fill and Apple's instruction.
   panoWrap: { position: 'absolute', inset: 0, pointerEvents: 'none' },
+  // Held wide the sweep runs between the left column and the rail, over neither.
+  panoWrapLand: { left: LEFT_COL, right: RAIL + 8 },
   panoLine: {
     position: 'absolute',
     left: 0,
@@ -550,11 +573,13 @@ export const styles = stylex.create({
     placeItems: 'center',
     color: colors.white
   },
-  panoBoxAt: (p: number) => ({ left: `${8 + p * 84}%` }),
+  // The box's centre rides the fill's end, 16 in from each side so it never
+  // hangs off the sweep: 64 is that margin plus half the box.
+  panoBoxAt: (p: number) => ({ left: `calc(64px + ${p} * (100% - 128px))` }),
   panoFill: {
     position: 'absolute',
-    left: '8%',
-    right: '8%',
+    left: 64,
+    right: 64,
     top: '50%',
     height: 2,
     transform: 'translateY(-1px)',
@@ -564,9 +589,11 @@ export const styles = stylex.create({
   panoFillAt: (p: number) => ({
     backgroundImage: `linear-gradient(to right, white ${p * 100}%, transparent ${p * 100}%)`
   }),
+  // Tied to the box's lower edge rather than the frame's height, so a short
+  // cover frame doesn't drop it onto the zoom chips.
   panoHint: {
     position: 'absolute',
-    top: '62%',
+    top: 'calc(50% + 48px)',
     left: '50%',
     transform: 'translateX(-50%)',
     paddingTop: 4,
@@ -606,5 +633,6 @@ export const styles = stylex.create({
 
   // While recording, a white dot offers stills beside the shutter, Apple's spot.
   stillPort: { position: 'absolute', right: 30, bottom: 40 },
-  stillLand: { position: 'absolute', right: 62, bottom: 88 }
+  // On the shutter's axis: 16 in plus half the difference of their widths.
+  stillLand: { position: 'absolute', right: 26, bottom: 88 }
 })

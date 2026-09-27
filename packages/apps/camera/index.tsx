@@ -249,13 +249,15 @@ export const Camera = ({ os }: { os: Os }) => {
   }, [])
 
   // The scene's luminance, sampled slow and small: Night's badge appears when
-  // the room really is dark, the way Apple's auto mode does.
+  // the room really is dark, the way Apple's auto mode does. Only a playing feed
+  // speaks: the other display's copy is hidden, the browser pauses its muted
+  // video, and a paused frame reads black, which would call every room dark.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the interval polls the video ref, whose object is stable
   useEffect(() => {
     if (quiet) return
     const id = setInterval(() => {
       const v = video.current
-      if (v) cam.set({ dark: luminance(v) < 0.22 })
+      if (v && !v.paused) cam.set({ dark: luminance(v) < 0.22 })
     }, 900)
     return () => clearInterval(id)
   }, [quiet])
@@ -549,11 +551,18 @@ export const Camera = ({ os }: { os: Os }) => {
 
   // The zoom chips: tap picks a preset, a drag across the row scrubs
   // continuously like sliding along Camera Control.
+  /** Synthetic or assistive pointers can't be captured; the drag still works without. */
+  const capture = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
+  }
   const zoomDrag = useRef<{ pos: number; z: number; moved: boolean } | null>(null)
   const [scrub, setScrub] = useState(false)
+  // Captured only once the finger drags: a capture from the press retargets the
+  // release's click to the row, and a tap on a chip would never reach it.
   const zoomDown = (e: React.PointerEvent<HTMLDivElement>) => {
     zoomDrag.current = { pos: land ? e.clientY : e.clientX, z: cam.s.z, moved: false }
-    e.currentTarget.setPointerCapture(e.pointerId)
     setScrub(true)
   }
   const zoomMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -562,6 +571,7 @@ export const Camera = ({ os }: { os: Os }) => {
     // A scrub reads along the strip's axis: right on the row, up on the column.
     const d = land ? g.pos - e.clientY : e.clientX - g.pos
     if (Math.abs(d) < 6) return
+    if (!g.moved) capture(e)
     g.moved = true
     zoom(clamp(g.z * 2 ** (d / 110), 0.5, 5))
   }
@@ -580,12 +590,9 @@ export const Camera = ({ os }: { os: Os }) => {
   const dialDrag = useRef<{ at: number; from: number; moved: boolean } | null>(null)
   const [dPos, setDPos] = useState<number | null>(null)
   const wheelPos = dPos ?? MODES.indexOf(mode)
+  // As the zoom row: captured once it drags, so a tap still lands on its mode.
   const dialDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dialDrag.current = { at: land ? e.clientY : e.clientX, from: wheelPos, moved: false }
-    // Synthetic or assistive pointers can't be captured; the tap still works.
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {}
   }
   const dialMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const g = dialDrag.current
@@ -594,11 +601,13 @@ export const Camera = ({ os }: { os: Os }) => {
     const d = pos - g.at
     if (land) {
       if (Math.abs(d) < 4) return
+      if (!g.moved) capture(e)
       g.moved = true
       setDPos(clamp(g.from + d / WHEEL_STEP, 0, MODES.length - 1))
       return
     }
     if (Math.abs(d) < 34) return
+    if (!g.moved) capture(e)
     g.at = pos
     g.moved = true
     // Both axes run the same way: dragging against the order lands the next mode.
@@ -774,6 +783,18 @@ export const Camera = ({ os }: { os: Os }) => {
     </div>
   )
 
+  const modeTab = (m: Mode) => (
+    <button
+      type="button"
+      role="tab"
+      key={m}
+      aria-selected={m === mode}
+      {...stylex.props(styles.modeBtn, m === mode && styles.modeOn)}
+      onClick={() => pickMode(m)}
+    >
+      {m}
+    </button>
+  )
   const dial = land ? (
     // The wheel: modes ride a drum, the pick sits at its centre and the turn
     // eases to a stop rather than jumping.
@@ -814,18 +835,11 @@ export const Camera = ({ os }: { os: Os }) => {
       onPointerUp={dialUp}
       onPointerCancel={dialUp}
     >
-      {MODES.map((m) => (
-        <button
-          type="button"
-          role="tab"
-          key={m}
-          aria-selected={m === mode}
-          {...stylex.props(styles.modeBtn, m === mode && styles.modeOn)}
-          onClick={() => pickMode(m)}
-        >
-          {m}
-        </button>
-      ))}
+      <div {...stylex.props(styles.dialSide, styles.dialBefore)}>
+        {MODES.slice(0, MODES.indexOf(mode)).map(modeTab)}
+      </div>
+      {modeTab(mode)}
+      <div {...stylex.props(styles.dialSide)}>{MODES.slice(MODES.indexOf(mode) + 1).map(modeTab)}</div>
     </div>
   )
   const shutterBtn = (
@@ -871,7 +885,7 @@ export const Camera = ({ os }: { os: Os }) => {
   )
 
   const filterTray = tray && (
-    <div {...stylex.props(styles.tray)}>
+    <div {...stylex.props(styles.tray, land && styles.trayLand)}>
       <div ref={thumbRow} {...stylex.props(styles.trayRow)}>
         {LOOKS.map((l, i) => (
           <button
@@ -973,11 +987,9 @@ export const Camera = ({ os }: { os: Os }) => {
     </div>
   )
   const panoOverlay = panoMode && (
-    <div {...stylex.props(styles.panoWrap)}>
+    <div {...stylex.props(styles.panoWrap, land && styles.panoWrapLand)}>
       <div {...stylex.props(styles.panoLine)} />
-      <div {...stylex.props(styles.panoFill)}>
-        <div {...stylex.props(styles.panoFillAt(panoOn ? panoP : 0))} />
-      </div>
+      <div {...stylex.props(styles.panoFill, styles.panoFillAt(panoOn ? panoP : 0))} />
       <div {...stylex.props(styles.panoBox, styles.panoBoxAt(panoOn ? panoP : 0))}>
         <Sym name="forward" size={26} />
       </div>

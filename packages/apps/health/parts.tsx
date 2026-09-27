@@ -79,7 +79,7 @@ export function StatGrid({
         <div key={cap} {...stylex.props(styles.stat)}>
           <div {...stylex.props(styles.statCap)}>{cap}</div>
           <div {...stylex.props(styles.statVal)}>
-            {v ?? '—'}
+            {v ?? '-'}
             <span {...stylex.props(styles.unit)}>{unit}</span>
           </div>
         </div>

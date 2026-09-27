@@ -59,9 +59,9 @@ export function MetricPage({ m, wide }: { m: Metric; wide: boolean }) {
       <div {...stylex.props(styles.body, wide && styles.bodyWide)}>
         <div {...stylex.props(styles.col)}>
           <div {...stylex.props(styles.pageHead)}>
-            <div {...stylex.props(shared.sub)}>{range === 'D' ? 'Today' : `Daily average, ${range}`}</div>
+            <div {...stylex.props(shared.sub)}>{range === 'D' || !stats ? 'Today' : 'Daily average'}</div>
             <div {...stylex.props(styles.bigVal)}>
-              {m.id === 'distance' ? dec1(today ?? 0) : num(today ?? 0)}
+              {range === 'D' || !stats ? fmt(m, today ?? 0) : fmt(m, stats.avg)}
               <span {...stylex.props(styles.unit)}>{m.unit}</span>
             </div>
           </div>

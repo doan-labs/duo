@@ -148,9 +148,11 @@ export function NoticeList({ wide, onOpen }: { wide: boolean; onOpen: Open }) {
 }
 
 // The banner arrives off-screen and settles; the leave is a transition back out.
+// Transform only: an ancestor animating opacity is a backdrop root, so the
+// card's blur would see nothing behind it and slide in see-through.
 const dropIn = stylex.keyframes({
-  from: { transform: 'translateY(-120%)', opacity: 0.4 },
-  to: { transform: 'none', opacity: 1 }
+  from: { transform: 'translateY(-120%)' },
+  to: { transform: 'none' }
 })
 
 const styles = stylex.create({
@@ -247,11 +249,11 @@ const styles = stylex.create({
     animationName: dropIn,
     animationDuration: '.55s',
     animationTimingFunction: easing.spring,
-    transitionProperty: 'transform, opacity',
+    transitionProperty: 'transform',
     transitionDuration: `${FLY}ms`,
     transitionTimingFunction: easing.inOut
   },
-  bannerOut: { transform: 'translateY(-120%)', opacity: 0 },
+  bannerOut: { transform: 'translateY(-120%)' },
   // Under the clock, over the lock buttons: the dates above come to ~150 px on
   // both displays; the button row tops out at ~128 px on wide, ~90 on narrow.
   list: {

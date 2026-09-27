@@ -134,7 +134,7 @@ function PinBody({ m }: { m: NonNullable<ReturnType<typeof metric>> }) {
       </span>
       <span {...stylex.props(styles.val)}>
         {m.kind === 'rings' ? `${num(rings()[0].done)}` : valOf(m, v)}
-        <s {...stylex.props(styles.unit)}>{m.kind === 'rings' ? 'kcal' : m.unit}</s>
+        <span {...stylex.props(styles.unit)}>{m.kind === 'rings' ? 'kcal' : m.unit}</span>
       </span>
       <span {...stylex.props(shared.sub)}>{m.period}</span>
       <span {...stylex.props(styles.cardChart)}>

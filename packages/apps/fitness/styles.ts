@@ -101,21 +101,6 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     color: app.label2
   },
-  /** The streak chip under the destinations. */
-  sideFoot: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-    width: '100%',
-    paddingTop: 8,
-    paddingRight: 8,
-    paddingBottom: 8,
-    paddingLeft: 8,
-    borderRadius: layout.screenInnerPanel,
-    backgroundColor: app.fill3,
-    color: app.fg
-  },
 
   /** The cover's floating tab bar, dark glass. */
   tabs: {

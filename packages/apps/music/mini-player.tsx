@@ -1,5 +1,5 @@
 // The mini player: the floating capsule that keeps the live track one tap
-// away in every section. It is the Now Playing sheet collapsed — same deck,
+// away in every section. It is the Now Playing sheet collapsed - same deck,
 // same art, the progress hairline along its bottom edge; the capsule's face
 // is the button that opens the sheet, the buttons beside it skip and pause.
 

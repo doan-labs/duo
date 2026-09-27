@@ -40,7 +40,8 @@ export const MIXES: Collection[] = [
   collection('Favourites Mix', 'A couple off every release', firstOf(ALBUMS, 2)),
   collection('Chill Mix', 'The ambient and acoustic side', firstOf(byGenre('Ambient', 'Acoustic'), 3)),
   collection('New Music Mix', 'Off the newest releases', firstOf(newest(4), 4)),
-  collection('Get Up! Mix', 'The electronic shelf, turned up', firstOf(byGenre('Electronic'), 3))
+  // Dealt from the shelf's far end: from the front, its collage opens on the same covers as Favourites Mix.
+  collection('Get Up! Mix', 'The electronic shelf, turned up', firstOf(byGenre('Electronic').reverse(), 3))
 ]
 
 /** Radio: the whole library live, then a station per artist and per broad genre. */

@@ -3,10 +3,10 @@
 // SVG path is a Catmull-Rom curve through them, so nothing is invented, and
 // non-scaling strokes hold weight at any aspect ratio.
 
-import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, fonts } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { Liveline } from 'liveline'
-import { useMemo } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import type { Point } from './data.ts'
 import { styles } from './styles.ts'
 
@@ -35,13 +35,44 @@ export const tickFmt = (pts: Point[]) => {
 const fmtVal = (v: number) => v.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /**
- * StyleX tokens arrive as `var(--x)` strings, which canvas strokeStyle cannot
- * parse; the charts would fall back to grey. Read the token's hex off :root.
+ * StyleX tokens arrive as `var(--x)` strings, which canvas strokeStyle and font
+ * cannot parse; the charts would fall back to grey. Read the token off :root.
  */
-const canvasColor = (token: string) => {
+const canvasToken = (token: string) => {
   const name = token.match(/var\((--[\w-]+)/)?.[1]
   if (!name) return token
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || token
+}
+
+const MONO = /"SF Mono".*monospace/
+
+/**
+ * LiveLine hardcodes SF Mono for its axis, crosshair and badge; Apple sets them
+ * in SF. Re-point this chart's own canvas context and badge span only, so SF
+ * Mono elsewhere in the document is untouched. Canvas has no tabular-nums, so
+ * only the badge, the number that ticks live, gets tabular figures.
+ */
+function systemLabels(box: HTMLElement) {
+  const sys = canvasToken(fonts.system)
+  const ctx = box.querySelector('canvas')?.getContext('2d')
+  const font = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'font')
+  if (ctx && font?.get && font.set) {
+    const { get, set } = font
+    Object.defineProperty(ctx, 'font', {
+      configurable: true,
+      get: () => get.call(ctx),
+      set: (v: string) => set.call(ctx, v.replace(MONO, sys))
+    })
+  }
+  const badge = box.querySelector('span')?.style
+  if (badge)
+    Object.defineProperty(badge, 'font', {
+      configurable: true,
+      set: (v: string) => {
+        badge.setProperty('font', v.replace(MONO, sys))
+        badge.fontVariantNumeric = 'tabular-nums'
+      }
+    })
 }
 
 /**
@@ -68,12 +99,22 @@ export function Live({
   const first = data[0]
   const last = data[data.length - 1]
   const up = (last?.value ?? 0) >= (first?.value ?? 0)
-  const tone = useMemo(() => canvasColor(up ? colors.greenDark : colors.redDark), [up])
-  if (loading && !last) return <Liveline data={[]} value={0} theme="dark" loading emptyText="" />
-  if (!first || !last) return <Liveline data={[]} value={0} theme="dark" emptyText="Chart unavailable" />
+  const tone = useMemo(() => canvasToken(up ? colors.greenDark : colors.redDark), [up])
+  const box = useRef<HTMLDivElement>(null)
+  // Runs after LiveLine's own mount effect has created the badge span.
+  useEffect(() => {
+    if (box.current) systemLabels(box.current)
+  }, [])
+  const wrap = (chart: ReactNode) => (
+    <div ref={box} {...stylex.props(styles.chartFill)}>
+      {chart}
+    </div>
+  )
+  if (loading && !last) return wrap(<Liveline data={[]} value={0} theme="dark" loading emptyText="" />)
+  if (!first || !last) return wrap(<Liveline data={[]} value={0} theme="dark" emptyText="Chart unavailable" />)
   const lo = Math.min(...pts.map((p) => p.c))
   const hi = Math.max(...pts.map((p) => p.c))
-  return (
+  return wrap(
     <Liveline
       data={data}
       value={px ?? last.value}
@@ -84,7 +125,8 @@ export function Live({
       badgeVariant="minimal"
       momentum
       formatValue={fmtVal}
-      formatTime={(t) => fmt(t * 1000)}
+      // The axis runs past the live dot; a tick there would print a date that has not happened.
+      formatTime={(t) => (t * 1000 > Date.now() ? '' : fmt(t * 1000))}
       referenceLine={prev != null && prev >= lo && prev <= hi ? { value: prev } : undefined}
       onHover={(p) => onHover(p ? { t: p.time * 1000, c: p.value } : null)}
       emptyText="Chart unavailable"
@@ -114,8 +156,8 @@ const line = (pts: Point[], w: number, h: number, pad = PAD) => {
   return { d, x0: xs[0]!, x1: xs[xs.length - 1]!, up: pts[pts.length - 1]!.c >= pts[0]!.c }
 }
 
-/** The row's small preview: a bare stroke, green or red across the window. */
-export function Spark({ pts, w = 64, ht = 30 }: { pts: Point[]; w?: number; ht?: number }) {
+/** The row's small preview: a bare stroke, toned by the day's change like the badge beside it. */
+export function Spark({ pts, dn, w = 64, ht = 30 }: { pts: Point[]; dn: boolean; w?: number; ht?: number }) {
   const shape = line(pts, w, ht, 2)
   if (!shape)
     return (
@@ -133,7 +175,7 @@ export function Spark({ pts, w = 64, ht = 30 }: { pts: Point[]; w?: number; ht?:
         strokeLinejoin="round"
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
-        stroke={shape.up ? colors.greenDark : colors.redDark}
+        stroke={dn ? colors.redDark : colors.greenDark}
       />
     </svg>
   )
@@ -146,7 +188,7 @@ export function Chart({ pts }: { pts: Point[] }) {
   const tone = shape.up ? colors.greenDark : colors.redDark
   const id = `fill-${tone === colors.greenDark ? 'up' : 'down'}`
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" {...stylex.props(styles.chartSvg)}>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" {...stylex.props(styles.chartFill)}>
       <title>Price chart</title>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">

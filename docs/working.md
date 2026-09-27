@@ -139,6 +139,11 @@ Keyframes must be declared in the consuming file; reusable animations are whole 
 blocks. Identical declarations deduplicate. For sandbox gallery roots, apply the public
 app token theme, not only a background color.
 
+Never animate `opacity` on an ancestor of glass. While it runs, Chromium makes that ancestor
+the glass's backdrop root, so `backdrop-filter` sees nothing behind it and the glass draws
+see-through until the animation ends. Move glass with `transform` only, as the notification
+banner's drop-in and fly-out do; DESIGN.md lists it with the other glass traps.
+
 The bottom-centre home bar occupies 180×22 px at z-index 8. Keep controls outside that hit
 area; Notes' palette clears it by 26 px. OS layers stay at z-index ≤10 beneath the fold
 ramp at 11. `getBoundingClientRect()` is screen space; use `spot()`'s offset chain for

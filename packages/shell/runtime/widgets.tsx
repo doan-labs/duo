@@ -5,7 +5,7 @@ import { changes, read, type StoredWidget, transaction } from './database.ts'
 const empty: StoredWidget = {
   lines: [
     { role: 'label', text: 'Weather' },
-    { role: 'value', text: '—' },
+    { role: 'value', text: '-' },
     { role: 'caption', text: 'Open to refresh' }
   ],
   updatedAt: 0,

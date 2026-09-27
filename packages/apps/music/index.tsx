@@ -272,7 +272,7 @@ function Library({ onPick, open }: { onPick: (key: string) => void; open: Open }
   )
 }
 
-/** Home: the catalog's own shelves — its picks, its recents, its mixes, its stations. */
+/** Home: the catalog's own shelves - its picks, its recents, its mixes, its stations. */
 function Home({ open }: { open: Open }) {
   const d = useNowPlaying()
   const recent = [...new Map(d.history.map((t) => [t.album, albumOf(t)!])).values()]
@@ -309,7 +309,7 @@ function Home({ open }: { open: Open }) {
         {MIXES.map((c) => (
           <Tile
             key={c.name}
-            media={<Collage arts={c.arts} xstyle={styles.tileArt} />}
+            media={<Collage arts={c.arts} />}
             title={c.name}
             sub={c.blurb}
             onPress={() => open.mix(c)}
@@ -387,7 +387,7 @@ function New({ open }: { open: Open }) {
   )
 }
 
-/** Radio: the live card over the station list — every one plays the moment it is picked. */
+/** Radio: the live card over the station list - every one plays the moment it is picked. */
 function Radio({ onPlay }: { onPlay: (c: Collection) => void }) {
   const d = useNowPlaying()
   const live = STATIONS[0]!

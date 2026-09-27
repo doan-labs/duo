@@ -22,8 +22,9 @@ const PALETTE = [
   colors.yellowDark
 ]
 
-type Plotted = { eq: GraphEq; node: Node; vars: string[] }
-const plotted = (eq: GraphEq, axis: string[]): Plotted | null => {
+// Colour follows the equation's place in the legend, so a curve or surface always matches its dot.
+type Plotted = { eq: GraphEq; node: Node; vars: string[]; color: string }
+const plotted = (eq: GraphEq, axis: string[]): Omit<Plotted, 'color'> | null => {
   try {
     const node = parse(eq.expr)
     return { eq, node, vars: [...deps(node)].filter((d) => !axis.includes(d)) }
@@ -74,7 +75,7 @@ const Plot2D = ({ items, scope, sliders, rad }: { items: Plotted[]; scope: Scope
   const yLines = []
   for (let y = Math.ceil((view.cy - h / 2 / view.k) / step) * step; py(y) >= 0; y += step) yLines.push(y)
 
-  const paths = items.map((p, i) => {
+  const paths = items.map((p) => {
     const full: Scope = { ...scope, ...sliders }
     let d = ''
     let pen = false
@@ -90,7 +91,7 @@ const Plot2D = ({ items, scope, sliders, rad }: { items: Plotted[]; scope: Scope
       if (ok) d += `${pen ? 'L' : 'M'}${sx},${py(y).toFixed(1)}`
       pen = ok
     }
-    return { d, color: PALETTE[i % PALETTE.length]!, key: p.eq.id }
+    return { d, color: p.color, key: p.eq.id }
   })
 
   return (
@@ -171,7 +172,30 @@ const Plot3D = ({ items, scope, sliders, rad }: { items: Plotted[]; scope: Scope
     const black = resolveColor(w, colors.black) || 'black'
     ctx.clearRect(0, 0, size.w, size.h)
 
-    const S = Math.min(size.w, size.h) / (RANGE * 2.4)
+    // Sample every surface before sizing: a tall one is squashed into the axis box
+    // (zk), and the box is fitted at any orbit - a rotated square spans RANGE·√2
+    // across, the box RANGE·√3 up - so nothing clips the panel.
+    const full: Scope = { ...scope, ...sliders }
+    const grids = items.map((p) => {
+      const zs: number[][] = []
+      for (let i = 0; i <= GRID; i++) {
+        zs.push([])
+        for (let j = 0; j <= GRID; j++) {
+          const x = -RANGE + (i / GRID) * RANGE * 2
+          const y = -RANGE + (j / GRID) * RANGE * 2
+          let z: number
+          try {
+            z = evalNode(p.node, { ...full, x, y }, rad)
+          } catch {
+            z = NaN
+          }
+          zs[i]!.push(z)
+        }
+      }
+      return zs
+    })
+    const zk = RANGE / Math.max(RANGE, ...grids.flat(2).filter(Number.isFinite).map(Math.abs))
+    const S = Math.min(size.w / Math.SQRT2, size.h / Math.sqrt(3)) / (RANGE * 2.2)
     const ca = Math.cos(cam.a),
       sa = Math.sin(cam.a),
       ce = Math.cos(cam.e),
@@ -218,33 +242,13 @@ const Plot3D = ({ items, scope, sliders, rad }: { items: Plotted[]; scope: Scope
     label('z', 0, 0, RANGE)
 
     items.forEach((p, pi) => {
-      const base = resolveColor(w, PALETTE[pi % PALETTE.length]!) || 'white'
-      const full: Scope = { ...scope, ...sliders }
-      const at = (x: number, y: number) => {
-        try {
-          return evalNode(p.node, { ...full, x, y }, rad)
-        } catch {
-          return NaN
-        }
-      }
+      const base = resolveColor(w, p.color) || 'white'
       type Quad = { pts: { x: number; y: number }[]; d: number; z: number }
       const quads: Quad[] = []
-      let zMin = Infinity,
-        zMax = -Infinity
-      const zs: number[][] = []
-      for (let i = 0; i <= GRID; i++) {
-        zs.push([])
-        for (let j = 0; j <= GRID; j++) {
-          const x = -RANGE + (i / GRID) * RANGE * 2
-          const y = -RANGE + (j / GRID) * RANGE * 2
-          const z = at(x, y)
-          zs[i]!.push(z)
-          if (Number.isFinite(z)) {
-            zMin = Math.min(zMin, z)
-            zMax = Math.max(zMax, z)
-          }
-        }
-      }
+      const zs = grids[pi]!
+      const finite = zs.flat().filter(Number.isFinite)
+      const zMin = Math.min(...finite)
+      const zMax = Math.max(...finite)
       const zSpan = Math.max(zMax - zMin, 1e-9)
       for (let i = 0; i < GRID; i++) {
         for (let j = 0; j < GRID; j++) {
@@ -259,7 +263,7 @@ const Plot3D = ({ items, scope, sliders, rad }: { items: Plotted[]; scope: Scope
           const pts3 = corners.map(([a, b]) => {
             const x = -RANGE + (a / GRID) * RANGE * 2
             const y = -RANGE + (b / GRID) * RANGE * 2
-            return proj(x, y, zs[a]![b]!)
+            return proj(x, y, zs[a]![b]! * zk)
           })
           quads.push({
             pts: pts3.map(({ x, y }) => ({ x, y })),
@@ -324,7 +328,11 @@ export const Graphs = ({
 }) => {
   const [sliders, setSliders] = useState<Scope>({})
   const items = useMemo(
-    () => eqs.map((g) => plotted(g, g.lhs === 'z' ? ['x', 'y'] : ['x'])).filter(Boolean) as Plotted[],
+    () =>
+      eqs
+        .map((g) => plotted(g, g.lhs === 'z' ? ['x', 'y'] : ['x']))
+        .filter((p) => p !== null)
+        .map((p, i) => ({ ...p, color: PALETTE[i % PALETTE.length]! })),
     [eqs]
   )
   const ys = items.filter((p) => p.eq.lhs === 'y')
@@ -345,7 +353,7 @@ export const Graphs = ({
         </button>
       </div>
       {items.length === 0 && (
-        <div {...stylex.props(styles.empty)}>No equations yet - write `y = x²` or `z = x·y` in Math Notes.</div>
+        <div {...stylex.props(styles.empty)}>No equations yet - write “y = x²” or “z = x·y” in Math Notes.</div>
       )}
       {ys.length > 0 && (
         <div {...stylex.props(styles.graphPlot)}>
@@ -358,10 +366,10 @@ export const Graphs = ({
         </div>
       )}
       <div {...stylex.props(styles.graphList)}>
-        {items.map((p, i) => (
+        {items.map((p) => (
           <div key={p.eq.id}>
             <div {...stylex.props(styles.gEq)}>
-              <Dot i={i} />
+              <Dot color={p.color} />
               <span {...stylex.props(styles.gExpr)}>
                 {p.eq.lhs} = {p.eq.expr}
               </span>
@@ -403,10 +411,10 @@ export const Graphs = ({
   )
 }
 
-const Dot = ({ i }: { i: number }) => {
+const Dot = ({ color }: { color: string }) => {
   const ref = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
-    if (ref.current) ref.current.style.backgroundColor = resolveColor(ref.current, PALETTE[i % PALETTE.length]!) || ''
-  }, [i])
+    if (ref.current) ref.current.style.backgroundColor = resolveColor(ref.current, color) || ''
+  }, [color])
   return <span ref={ref} {...stylex.props(styles.gDot)} />
 }
