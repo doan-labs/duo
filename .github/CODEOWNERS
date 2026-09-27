@@ -1,5 +1,6 @@
 # Trust lists, release scripts and workflows need a maintainer's review.
 /OFFICIAL.txt @doan-labs
 /community-apps/registry.json @doan-labs
+/design-baseline.json @doan-labs
 /scripts/ @doan-labs
 /.github/ @doan-labs

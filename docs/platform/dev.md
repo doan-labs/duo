@@ -15,7 +15,7 @@ Use a new output directory when repacking unchanged private versions to avoid st
 | Command | Purpose |
 | --- | --- |
 | `create` | Manifest, React entry, changelog, placeholder icon and package dependencies |
-| `check` | Metadata, lane/import/type/token checks and bundle validation |
+| `check` | Metadata, lane/import/type/token checks (DESIGN.md section 3, spacing included) and bundle validation |
 | `build` | Immutable release and catalog in the output directory |
 | `serve` | Serve an existing catalog with CORS for Store installation |
 | `dev` / `preview` | Build and serve policy-bearing previews; dev also watches source |

@@ -26,6 +26,9 @@ reverse-DNS `id` is the durable identity and never changes after the first relea
 
 1. **Runs on both displays.** Usable controls and readable content on the cover too.
 2. **Uses the public platform.** No shell imports, no other app's source, no `__TAURI__`.
+   Colours, type, radii, shadows, easing and spacing come from the kit's tokens: `duo check`
+   fails a hand-typed value. Apps listed before this rule are held at their count in
+   `design-baseline.json` and may not add more; a new app has none.
 3. **Complete metadata.** Valid icon, both screenshots, changelog entry, license and accurate `network` origins.
 4. **Fits the limits.** 4 MiB document, single-file build, the sandbox rules in `docs/platform/`.
 5. **Community lane, empty permissions.** Approval grants no official status and no device permissions. Permission-bearing submissions are a separate, explicitly verified expansion.

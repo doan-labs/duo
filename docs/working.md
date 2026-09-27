@@ -133,7 +133,11 @@ step is snapped to the nearest one, not added. An app's own colours go under its
 line in `appAppearance`, named by role, and only that app reads them. The shell reads no
 `appAppearance`; its materials are `chrome`/`wallpaper` consts. `bun scripts/check-app-tokens.ts`
 is the gate; `screen.ts`, `main.ts`, `device.ts` and shaders are exempt because they paint
-canvas and WebGL, so a token change there is a second edit by hand.
+canvas and WebGL, so a token change there is a second edit by hand. The gate also fails when
+a folder drops below its `design-baseline.json` count: run it with `--update` to lower the
+count in the same change. `--update` refuses to raise one; raising a count is a hand edit a
+maintainer reviews. Spacing is only checked inside `stylex.create`, so a `{ top, left }` rect
+in app logic is not flagged, and a style table built outside `stylex.create` is not checked.
 
 Keyframes must be declared in the consuming file; reusable animations are whole style
 blocks. Identical declarations deduplicate. For sandbox gallery roots, apply the public

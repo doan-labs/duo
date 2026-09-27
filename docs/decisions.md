@@ -1853,3 +1853,25 @@ No GFM plugin: a post has no Markdown tables, and a table is a component.
 One `Live` per post, for decision 76's WebGL budget. Films are re-encoded
 under Cloudflare's 25 MiB asset limit into `public/blog/` next to a poster
 still, and play only when asked. Cost: a new dependency, `@mdx-js/rollup`.
+
+## 108. The token gate covers spacing and every app, with a ratchet
+
+DESIGN.md section 3 put gaps, padding and insets on the `space` scale, but the gate
+checked only colours, type, radii, shadows and easing, and only in `packages/apps`
+and `packages/shell`. About 1,200 typed spacing values passed CI, community apps
+and examples were never checked, and a sandboxed Reminders shipped a sidebar
+clipped by the offset it copied from a baked app.
+
+The rule now lives in `packages/cli/design.mjs`, so `scripts/check-app-tokens.ts`
+and `duo check` agree. Spacing counts only inside `stylex.create`, where a `{ top,
+left }` data object cannot be mistaken for style. Existing debt is recorded per
+folder in `design-baseline.json` rather than fixed in one sweep: a folder fails
+past its count, fails below it until the count is lowered with `--update`, and a
+new folder starts at zero. `duo check` outside this repository has no baseline, so
+an external app must be clean. The baseline is a CODEOWNERS file: raising a count
+is a maintainer's call, visible in review.
+
+Cost: large layout offsets (a sidebar's clearance, a scroll's end room) count as
+debt until `layout` names them; the gate reads source, not pixels, so a floating
+panel, the home bar's 22 px and the clip at a sandbox frame stay review checks.
+
