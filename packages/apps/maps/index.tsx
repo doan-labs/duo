@@ -218,14 +218,17 @@ export const Maps = ({ os }: { os: Os }) => {
   }, [dir, live, want, from, rec])
 
   // The live copy flies the shared camera to a route once the record lands;
-  // the mirror draws the same view without scheduling a frame of its own.
+  // the mirror draws the same view without scheduling a frame of its own. The
+  // fit key is mode and destination only: a drifting origin refetches the
+  // route but must not pull the camera back once the user has aimed it.
   useEffect(() => {
     if (!dir) {
       fitted.current = ''
       return
     }
-    if (!live || rec.key !== want || !rec.list?.length || fitted.current === want) return
-    fitted.current = want
+    const key = `${dir.mode}|${dir.to.id}`
+    if (!live || rec.key !== want || !rec.list?.length || fitted.current === key) return
+    fitted.current = key
     fitRoute(rec.list[0]!)
   }, [dir, live, want, rec, fitRoute])
 
@@ -313,18 +316,20 @@ export const Maps = ({ os }: { os: Os }) => {
   }
 
   const locate = () => {
-    if (!live || !('geolocation' in navigator)) {
-      flyTo({ ...viewRef.current, lat: me.lat, lon: me.lon })
-      return
-    }
+    // Answer the tap with the last known fix: a stalled or denied GPS read
+    // must not leave the control feeling dead. A fresh fix that lands inside
+    // the origin's rounding bucket is already covered by this fly.
+    flyTo({ lat: me.lat, lon: me.lon, z: Math.max(viewRef.current.z, 15.5) })
+    if (!live || !('geolocation' in navigator)) return
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: lat, longitude: lon } = pos.coords
         // Fresh coordinates re-key the route request, so an open panel refetches.
         share.set({ me: { lat, lon } })
+        if (lat.toFixed(4) === me.lat.toFixed(4) && lon.toFixed(4) === me.lon.toFixed(4)) return
         flyTo({ lat, lon, z: Math.max(viewRef.current.z, 15.5) })
       },
-      () => flyTo({ ...viewRef.current, lat: me.lat, lon: me.lon }),
+      () => {},
       { timeout: 9000, maximumAge: 60000 }
     )
   }
