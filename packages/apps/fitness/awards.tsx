@@ -7,7 +7,7 @@ import { RING_TINTS } from '@doan-labs/duo-uikit/rings.tsx'
 import { delay, shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { dec1, num } from './parts.tsx'
+import { num } from './parts.tsx'
 import { useBook } from './store.ts'
 import { styles } from './styles.ts'
 
@@ -38,7 +38,7 @@ export function AwardsPage({ wide }: { wide: boolean }) {
                     <div {...stylex.props(styles.progressFill(RING_TINTS.move, a.of ? a.progress / a.of : 0))} />
                   </div>
                   <div {...stylex.props(styles.awardSub)}>
-                    {dec1(a.progress)} of {num(a.of)}
+                    {a.progress.toLocaleString('en', { maximumFractionDigits: 1 })} of {num(a.of)}
                   </div>
                 </>
               )}

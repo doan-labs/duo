@@ -24,10 +24,12 @@ export function SummaryPage({ wide }: { wide: boolean }) {
       <div {...stylex.props(styles.head)}>
         <span {...stylex.props(typography.largeTitle)}>Summary</span>
         <span {...stylex.props(styles.headSide)}>
-          <span {...stylex.props(styles.chip)} title="Days in a row all three rings closed">
-            <Sym name="bolt" size={11} />
-            {days} day{days === 1 ? '' : 's'}
-          </span>
+          {days > 0 && (
+            <span {...stylex.props(styles.chip)} title="Days in a row all three rings closed">
+              <Sym name="bolt" size={11} />
+              {days} day{days === 1 ? '' : 's'}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => openSheet('goals')}

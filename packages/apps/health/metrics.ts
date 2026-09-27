@@ -33,7 +33,7 @@ export const METRICS: Metric[] = [
     sym: 'activity',
     tint: colors.pink,
     kind: 'rings',
-    about: 'Move, Exercise and Stand, the rings Fitness draws too — one set of totals, one store.'
+    about: 'Move, Exercise and Stand, the rings Fitness draws too - one set of totals, one store.'
   },
   {
     id: 'steps',
@@ -57,7 +57,7 @@ export const METRICS: Metric[] = [
     pick: (d) => d.km,
     write: { field: 'km', mode: 'add', step: 0.5 },
     period: 'today',
-    about: 'Steps on foot, wheeled or not — workouts land here too.'
+    about: 'Steps on foot, wheeled or not - workouts land here too.'
   },
   {
     id: 'flights',
@@ -93,7 +93,7 @@ export const METRICS: Metric[] = [
     pick: (d) => d.exercise,
     write: { field: 'exercise', mode: 'add', step: 10 },
     period: 'today',
-    about: 'Minutes at a brisk pace — the green ring counts them.'
+    about: 'Minutes at a brisk pace - the green ring counts them.'
   },
   {
     id: 'stand',
@@ -127,7 +127,7 @@ export const METRICS: Metric[] = [
     pick: (d) => d.restingHr,
     write: { field: 'restingHr', mode: 'set', step: 1 },
     period: 'today',
-    about: 'Your lowest rate at rest — a falling trend is the usual good news.'
+    about: 'Your lowest rate at rest - a falling trend is the usual good news.'
   },
   {
     id: 'hrv',
@@ -174,7 +174,7 @@ export const METRICS: Metric[] = [
     kind: 'sleep',
     pick: (d) => d.sleep.asleep / 60,
     period: 'last night',
-    about: 'Time asleep by stage — deep, core and REM — plus the window you kept.'
+    about: 'Time asleep by stage - deep, core and REM - plus the window you kept.'
   },
   {
     id: 'weight',
@@ -219,7 +219,7 @@ export const metric = (id: string) => METRICS.find((m) => m.id === id)
 export type Cat = { id: string; name: string; sym: SymProps['name']; tint: string; metrics: Metric[] }
 const of = (...ids: string[]) => ids.map((id) => metric(id)!)
 
-/** iPadOS's Browse groups. `workouts` holds no metric — its page is the log itself. */
+/** iPadOS's Browse groups. `workouts` holds no metric - its page is the log itself. */
 export const CATS: Cat[] = [
   {
     id: 'activity',
@@ -251,7 +251,7 @@ export const midDate = (key: string) =>
   new Date(`${key}T12:00:00`).toLocaleDateString('en', { weekday: 'short', day: 'numeric', month: 'short' })
 /** A value formatted the way its metric's card shows it. */
 export function valOf(m: Metric, v: number | undefined): string {
-  if (v == null) return '—'
+  if (v == null) return '-'
   if (m.id === 'distance') return dec2(v)
   if (m.id === 'weight') return dec1(v)
   if (m.id === 'sleep') return hm(v * 60)

@@ -13,15 +13,20 @@ import { styles } from './styles.ts'
 const W = 340
 const H = 140
 
-/** Catmull-Rom through the points, the way every soft chart in the kit curves. */
+/**
+ * Catmull-Rom through the points, the way every soft chart in the kit curves.
+ * Control heights are clamped to each segment's own span, so the line never
+ * swings past a reading into a value nobody measured.
+ */
 const smooth = (points: [number, number][]) =>
   points
     .map(([x, y], i) => {
       if (!i) return `M${x} ${y}`
       const [px, py] = points[i - 1]!
-      const ny = points[Math.min(points.length - 1, i + 1)]![1]
-      const dx = (x - px) / 6
-      return `C${px + dx} ${py} ${x - dx} ${ny} ${x} ${y}`
+      const [ax, ay] = points[i - 2] ?? points[i - 1]!
+      const [nx, ny] = points[i + 1] ?? points[i]!
+      const clamp = (v: number) => Math.min(Math.max(py, y), Math.max(Math.min(py, y), v))
+      return `C${px + (x - ax) / 6} ${clamp(py + (y - ay) / 6)} ${x - (nx - px) / 6} ${clamp(y - (ny - py) / 6)} ${x} ${y}`
     })
     .join(' ')
 
@@ -117,8 +122,16 @@ export function Line({ pts, tint, floor }: { pts: Point[]; tint: string; floor?:
       <circle cx={X(pts.length - 1)} cy={Y(last.value)} r={5.5} {...stylex.props(styles.lineDotRing(tint))} />
       <circle cx={X(pts.length - 1)} cy={Y(last.value)} r={3} {...stylex.props(styles.lineDot(tint))} />
       {pts.map((p, i) =>
-        i % Math.ceil(pts.length / 6) === 0 ? (
-          <text key={p.key} x={X(i)} y={H + 14} textAnchor="middle" {...stylex.props(styles.axis)}>
+        // Four labels: a day label ("Thu, Sep 24") is wide enough that six overlap on M.
+        i % Math.ceil(pts.length / 4) === 0 ? (
+          <text
+            key={p.key}
+            x={X(i)}
+            y={H + 14}
+            // The end labels sit on the chart's edges; centred there they clip.
+            textAnchor={i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}
+            {...stylex.props(styles.axis)}
+          >
             {p.label}
           </text>
         ) : null

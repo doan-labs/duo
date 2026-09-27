@@ -81,9 +81,12 @@ export const styles = stylex.create({
     color: app.label2,
     minHeight: leading.footnote
   },
+  // Num rolls its digits in 1.4em cells: a 1em box clipped their tops. The box is
+  // 1.4em tall and lifted by the extra 0.4em, so the layout is unchanged.
   numWrap: {
     width: '100%',
-    height: typeScale.displayLg,
+    height: `calc(${typeScale.displayLg} * 1.4)`,
+    marginTop: `calc(${typeScale.displayLg} * -0.4)`,
     lineHeight: 1,
     overflow: 'hidden',
     display: 'flex',
@@ -121,6 +124,14 @@ export const styles = stylex.create({
   keysSci: {
     gridTemplateColumns: 'repeat(6, min(52px, (100cqh - 210px) / 10, (100cqw - 76px) / 6))'
   },
+  // Side by side on a wide box: ten columns in one row of five, one key size, and
+  // the readout's trail kept clear of the top bar (190px).
+  keysBasicSide: {
+    gridTemplateColumns: 'repeat(4, min(64px, (100cqh - 190px) / 5, (100cqw - 136px) / 10))'
+  },
+  keysSciSide: {
+    gridTemplateColumns: 'repeat(6, min(64px, (100cqh - 190px) / 5, (100cqw - 136px) / 10))'
+  },
   key: {
     aspectRatio: 1,
     borderRadius: radius.circle,
@@ -135,13 +146,9 @@ export const styles = stylex.create({
     transform: { default: null, ':active': motion.press },
     filter: { default: null, ':active': 'brightness(1.5)' }
   },
-  keySci: {
-    aspectRatio: 'auto',
-    borderRadius: radius.pill,
-    fontSize: typeScale.body,
-    fontWeight: weight.regular,
-    height: 'min(52px, (100cqh - 210px) / 10)'
-  },
+  keySci: { borderRadius: radius.pill, fontSize: typeScale.body, fontWeight: weight.regular },
+  // Stacked over the pad the scientific rows are shorter than they are wide.
+  keySciStacked: { aspectRatio: 'auto', height: 'min(52px, (100cqh - 210px) / 10)' },
   g: { backgroundColor: appAppearance.calculatorKeyLight, color: colors.black },
   o: { backgroundColor: colors.orange },
   on: { backgroundColor: colors.white, color: colors.black },
@@ -350,7 +357,14 @@ export const styles = stylex.create({
     lineHeight: leading.title3,
     color: colors.white,
     backgroundColor: 'transparent',
+    // A line on the page, not a form field: no UA border or focus ring (a solid
+    // style, since Chrome draws an `auto` ring at any width), and the caret
+    // starts where the committed text does.
+    borderWidth: 0,
+    outlineStyle: 'solid',
+    outlineWidth: 0,
     paddingTop: space.xxs,
+    paddingInline: 0,
     paddingBottom: space.xxs
   },
   nText: {
@@ -359,7 +373,9 @@ export const styles = stylex.create({
     fontSize: typeScale.title3,
     lineHeight: leading.title3,
     color: colors.white,
+    textAlign: 'start',
     paddingTop: space.xxs,
+    paddingInline: 0,
     paddingBottom: space.xxs,
     overflowWrap: 'break-word',
     whiteSpace: 'pre-wrap'
@@ -422,12 +438,19 @@ export const styles = stylex.create({
     display: 'flex',
     gap: space.xs
   },
+  // Centred in the tool row, above the page, so it never sits on a note line.
   inkGhost: {
+    position: 'absolute',
+    top: space.sm,
+    left: 0,
+    right: 0,
+    height: 34,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: app.label3,
     fontSize: typeScale.callout,
     lineHeight: leading.callout,
-    textAlign: 'center',
-    paddingTop: space.xxl,
     pointerEvents: 'none'
   },
 

@@ -89,7 +89,8 @@ export const styles = stylex.create({
     '::placeholder': { color: app.label3 },
     '::-webkit-search-cancel-button': { display: 'none' }
   },
-  sideList: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
+  /** `xxs` between rows keeps every Browse row clear of the profile chip on the inner display. */
+  sideList: { display: 'flex', flexDirection: 'column', gap: space.xxs, flexGrow: 1, minHeight: 0, overflowY: 'auto' },
   sideSec: {
     paddingTop: 12,
     paddingRight: 10,
@@ -351,7 +352,8 @@ export const styles = stylex.create({
     backgroundColor: app.surface,
     boxShadow: shadow.card
   },
-  chartSvg: { width: '100%', height: 'auto', display: 'block' },
+  /** Visible overflow: the latest-point dot sits on the right edge and would be cut in half. */
+  chartSvg: { width: '100%', height: 'auto', display: 'block', overflow: 'visible' },
   axis: { fill: app.label3, fontSize: typeScale.caption2, fontFamily: fonts.system },
   gridLine: { stroke: app.fill3, strokeWidth: 1, strokeDasharray: '1 5', strokeLinecap: 'round' },
   baseline: { stroke: app.separator, strokeWidth: 1 },

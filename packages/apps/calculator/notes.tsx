@@ -53,7 +53,7 @@ export const Notes = ({
     <div ref={host} {...stylex.props(styles.notes)}>
       {lines.length === 1 && lines[0] === '' && (
         <div {...stylex.props(styles.nHint)}>
-          Type or write an equation. Try `price = 20` then `price × 4 =`, or `y = x²` for a graph.
+          Type or write an equation. Try “price = 20” then “price × 4 =”, or “y = x²” for a graph.
         </div>
       )}
       {lines.map((line, i) => {

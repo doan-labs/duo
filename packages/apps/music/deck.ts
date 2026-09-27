@@ -1,12 +1,12 @@
 // The device's music deck: one <audio>, the queue it is working through, and
-// the clock that keeps its displays honest. Module state on purpose — both
+// the clock that keeps its displays honest. Module state on purpose - both
 // copies of the app, the mini player and Control Center bind to the same deck,
 // so a fold or the app's own lifetime never interrupts a song.
 //
 // The queue is a list plus `order`, a permutation of indices into it. `i` is a
 // position in `order`, so shuffle is a reshuffled `order`, repeat-all is a
-// wrap, and repeat-one is staying put. Anything that replaces the list —
-// an album's Play, a row tap, a station — goes through `play`, and the Up
+// wrap, and repeat-one is staying put. Anything that replaces the list -
+// an album's Play, a row tap, a station - goes through `play`, and the Up
 // Next shelf reads `upcoming` back out.
 
 import { TRACKS, type Track } from '@doan-labs/duo-fixtures/tracks.ts'

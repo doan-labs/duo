@@ -112,12 +112,6 @@ function Sidebar({ sel }: { sel: string }) {
           </button>
         ))}
       </div>
-      <div {...stylex.props(styles.sideFoot)}>
-        <span {...stylex.props(styles.chip)}>
-          <Sym name="heartFill" size={11} />
-          Shares Health's book
-        </span>
-      </div>
     </nav>
   )
 }

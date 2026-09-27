@@ -143,7 +143,8 @@ export const Calculator = (_: { os: Os }) => {
               </button>
               <button
                 type="button"
-                {...stylex.props(styles.tool, graphOpen && styles.toolOn)}
+                // No on state: the glass sheet covers this button and blurs an orange one into a smudge.
+                {...stylex.props(styles.tool)}
                 aria-label="Graphs"
                 onClick={() => setGraphOpen((v) => !v)}
               >
@@ -156,7 +157,7 @@ export const Calculator = (_: { os: Os }) => {
           {mode !== 'notes' && (
             <button
               type="button"
-              {...stylex.props(styles.tool, histOpen && styles.toolOn)}
+              {...stylex.props(styles.tool)}
               aria-label="History"
               onClick={() => setHistOpen((v) => !v)}
             >
@@ -166,7 +167,9 @@ export const Calculator = (_: { os: Os }) => {
         </div>
       </div>
 
-      {(mode === 'basic' || mode === 'sci') && <Pad s={pad.value} sci={sci} mem={mem.value} onKey={onKey} />}
+      {(mode === 'basic' || mode === 'sci') && (
+        <Pad s={pad.value} sci={sci} wide={wide} mem={mem.value} onKey={onKey} />
+      )}
       {mode === 'convert' && <Convert c={conv.value} fx={fx.value} onChange={conv.set} />}
       {mode === 'notes' && (
         <Notes doc={notes.value} rad={rad} graphs={graphs.value} onDoc={notes.set} onGraph={addGraph} />

@@ -305,7 +305,7 @@ export function Weather(_: { os: Os }) {
                   Updated{' '}
                   {fetched
                     ? new Date(fetched).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-                    : '—'}{' '}
+                    : '-'}{' '}
                   · Forecast times are local to {place.name}.<br />
                   <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
                     Weather data by Open-Meteo

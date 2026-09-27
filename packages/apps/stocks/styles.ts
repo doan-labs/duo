@@ -210,7 +210,7 @@ export const styles = stylex.create({
     paddingTop: space.xs,
     paddingBottom: space.xs
   },
-  chartSvg: { display: 'block', width: '100%', height: '100%' },
+  chartFill: { display: 'block', width: '100%', height: '100%' },
   chartFoot: { color: app.label3, paddingBottom: space.md },
 
   /** The stats grid: label over value, the way iPadOS spreads it. */

@@ -45,6 +45,7 @@ export const closeBook = () => set({ detail: undefined })
 export const openReader = (id: string, seek?: number) => set({ reading: id, chrome: true, card: undefined, seek })
 export const clearSeek = () => set({ seek: undefined })
 export const closeReader = () => set({ reading: undefined, card: undefined })
-export const showChrome = (chrome: boolean) => set({ chrome })
+// The aA card hangs off the chrome, so it never outlives it.
+export const showChrome = (chrome: boolean) => set(chrome ? { chrome } : { chrome, card: undefined })
 export const openCard = (card: Ui['card']) => set({ card, chrome: true })
 export const setQuery = (q: string) => set({ q })

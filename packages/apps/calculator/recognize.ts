@@ -613,7 +613,7 @@ export function recognize(strokes: Stroke[]): string | null {
   }
 
   // Normal horizontal line: cluster glyphs (on every stroke, including any
-  // stroke that looked like a rule — for +, ÷, = the bar IS part of a glyph),
+  // stroke that looked like a rule - for +, ÷, = the bar IS part of a glyph),
   // order left to right.
   const cells = cluster(strokes)
     .map((strokes) => ({ strokes, x: midX(strokes) }))

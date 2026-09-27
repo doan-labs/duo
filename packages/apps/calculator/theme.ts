@@ -19,7 +19,7 @@ export function resolveColor(el: Element, token: string): string {
   return out
 }
 
-/** Mix two resolved `#rrggbb`/`rgb()` colours; `t` of 0 is `a`, 1 is `b`. */
+/** Mix two resolved `#rgb`/`#rrggbb`/`rgb()` colours; `t` of 0 is `a`, 1 is `b`. */
 export function mixColor(a: string, b: string, t: number, shade = 1): string {
   const pa = parseColor(a)
   const pb = parseColor(b)
@@ -33,6 +33,10 @@ export function mixColor(a: string, b: string, t: number, shade = 1): string {
 function parseColor(c: string): [number, number, number] {
   const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(c)
   if (hex) return [parseInt(hex[1]!, 16), parseInt(hex[2]!, 16), parseInt(hex[3]!, 16)]
+  // Tokens like `colors.black` are `#000`; missing them fell through to white.
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c)
+  if (short)
+    return [parseInt(short[1]!.repeat(2), 16), parseInt(short[2]!.repeat(2), 16), parseInt(short[3]!.repeat(2), 16)]
   const rgb = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(c)
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])]
   return [255, 255, 255]

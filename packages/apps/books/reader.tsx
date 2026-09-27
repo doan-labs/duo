@@ -18,6 +18,8 @@ import { styles } from './styles.ts'
 import { clearSeek, closeBook, closeReader, openCard, showChrome, useUi } from './ui.ts'
 
 const GAP = 64
+/** The page margin on both sides of the spread. */
+const MARGIN = 44
 
 /** Apple's six themes, keyed to the palette rows in appAppearance. */
 const THEMES: Record<ThemeId, { bg: string; ink: string; mute: string }> = {
@@ -80,14 +82,20 @@ export function Reader({ id }: { id: string }) {
   const restored = useRef<'paged' | 'vert' | null>(null)
   const [w, setW] = useState(0)
   const [tick, setTick] = useState(0)
-  const [map, setMap] = useState<{ spreads: number; block: number[]; bad?: boolean }>({ spreads: 1, block: [] })
+  const [map, setMap] = useState<{
+    spreads: number
+    block: number[]
+    /** Each block's page (column), finer than its spread. */
+    col: number[]
+    bad?: boolean
+  }>({ spreads: 1, block: [], col: [] })
   const [at, setAt] = useState(0)
   const [tocSeg, setTocSeg] = useState<'Contents' | 'Bookmarks'>('Contents')
   const [find, setFind] = useState('')
 
   const vertical = prefs.vertical
   const cols = w >= 640 ? 2 : 1
-  const pw = (w - GAP * (cols - 1)) / cols
+  const pw = (w - MARGIN * 2 - GAP * (cols - 1)) / cols
   const step = pw + GAP
   const spreads = map.spreads
 
@@ -110,12 +118,13 @@ export function Reader({ id }: { id: string }) {
     // Rects come back projected (the panel is CSS3D-scaled); bring them back to
     // layout px so they divide evenly into the column step.
     const k = fr.width ? f.offsetWidth / fr.width : 1
-    const block = blks.map((_, i) => {
+    const col = blks.map((_, i) => {
       const el = f.querySelector(`[data-b="${i}"]`)
       if (!el) return 0
-      const col = Math.round(((el.getBoundingClientRect().left - fr.left) * k) / step)
-      return Math.max(0, Math.min(count - 1, Math.floor(col / cols)))
+      const c = Math.round(((el.getBoundingClientRect().left - fr.left) * k) / step)
+      return Math.max(0, Math.min(count * cols - 1, c))
     })
+    const block = col.map((c) => Math.floor(c / cols))
     // Mid-fold the panel is edge-on and projected rects collapse: hinge-side
     // blocks can keep real columns while far-side blocks compress to 0, so a
     // healthy map is monotonic and its last block reaches the final spreads.
@@ -127,7 +136,7 @@ export function Reader({ id }: { id: string }) {
       const t = setTimeout(() => setTick((x) => x + 1), 250)
       return () => clearTimeout(t)
     }
-    setMap({ spreads: count, block, bad })
+    setMap({ spreads: count, block, col, bad })
     if (ui.seek != null) {
       sought.current = true
       restored.current = 'paged'
@@ -273,11 +282,12 @@ export function Reader({ id }: { id: string }) {
     return c
   }, [head, starts])
 
-  // Pages left in the chapter, in display pages (spreads times columns).
+  // Pages left in the chapter from the first visible page, counted in pages
+  // rather than spreads: the next chapter can open on this spread's right page.
   const pagesLeft = useMemo(() => {
-    const next = starts[Math.min(curChapter + 1, starts.length - 1)]
-    const end = curChapter + 1 >= starts.length ? spreads : (map.block[next!] ?? spreads)
-    return Math.max(0, (end - at) * cols)
+    const next = starts[curChapter + 1]
+    const end = next == null ? spreads * cols : (map.col[next] ?? spreads * cols)
+    return Math.max(0, end - at * cols)
   }, [at, curChapter, map, spreads, cols, starts])
 
   const sizeIdx = prefs.size
@@ -400,7 +410,7 @@ export function Reader({ id }: { id: string }) {
               {...stylex.props(
                 styles.readFlow,
                 styles.type(sizeKey(sizeIdx), font.family),
-                styles.flow(pw, GAP, cols),
+                styles.flow(MARGIN, pw, GAP, cols),
                 styles.shift(-at * cols * step)
               )}
             >
@@ -520,12 +530,13 @@ export function Reader({ id }: { id: string }) {
                 aria-label={THEME_NAME[t]}
                 {...stylex.props(
                   styles.dot,
-                  styles.dotBg(THEMES[t].bg, THEMES[t].ink),
+                  styles.dotBg(THEMES[t]),
+                  t === 'bold' && styles.paraBold,
                   prefs.theme === t && styles.dotOn
                 )}
                 onClick={() => setPrefs({ theme: t })}
               >
-                {prefs.theme === t && <Sym name="tick" size={10} />}
+                Aa
               </button>
             ))}
           </div>

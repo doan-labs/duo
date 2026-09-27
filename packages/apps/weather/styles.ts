@@ -161,8 +161,19 @@ export const styles = stylex.create({
   },
   topLeft: { display: 'flex', justifyContent: 'flex-start' },
   topRight: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
-  /** The detail column beside the floating sidebar; the pane pads clear of it. */
-  pane: { display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0, minHeight: 0 },
+  /**
+   * The detail column beside the floating sidebar; the pane pads clear of it. It is
+   * the container its layout measures: with the sidebar open it is far narrower
+   * than the display, too narrow for the four-column grid.
+   */
+  pane: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minWidth: 0,
+    minHeight: 0,
+    containerType: 'inline-size'
+  },
   paneSide: { paddingLeft: 310 },
   bottom: {
     position: 'relative',
@@ -261,8 +272,10 @@ export const styles = stylex.create({
   },
   hero: {
     textAlign: 'center',
-    paddingTop: { default: 22, [wide]: 12 },
-    paddingBottom: { default: 44, [wide]: 30 },
+    // Both displays are under 600 px tall; a tight hero keeps the whole hourly
+    // strip above the home bar before the page is scrolled.
+    paddingTop: 0,
+    paddingBottom: 12,
     fontWeight: weight.regular
   },
   eyebrow: {
@@ -287,6 +300,9 @@ export const styles = stylex.create({
     letterSpacing: -2,
     fontWeight: weight.thin,
     paddingLeft: 22,
+    // Num rolls each digit in a 1.4em cell; give back the 0.2em it adds above
+    // and below so the numeral sets solid, as the display sizes are meant to.
+    marginBlock: '-.2em',
     textShadow: shadow.text
   },
   condition: {
@@ -480,6 +496,10 @@ export const styles = stylex.create({
   tiles: { display: { default: 'grid', [wide]: 'contents' }, gridTemplateColumns: '1fr 1fr', gap: 10 },
   tile: {
     marginBottom: 0,
+    // A grid item with an aspect ratio takes its width from its stretched row
+    // height unless told to fill the column; the rows beside the ten-day card are
+    // taller than a column is wide, so the tiles overran their tracks.
+    justifySelf: 'stretch',
     aspectRatio: { default: 'auto', [wide]: '1 / 1' },
     minHeight: 150,
     display: 'flex',

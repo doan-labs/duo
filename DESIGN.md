@@ -84,11 +84,15 @@ rounded on all four corners, with the pane padding itself clear of it. It is not
 a full-height slab with a hairline down one side; a slab is flat chrome wearing
 a tint.
 
-Two traps:
+Three traps:
 
 - **`backdrop-filter` escapes a parent's rounded clip** in WebKit and Chromium.
   A filtered child inside a rounded card squares the card's corners. If the
   thing behind is already blurred, drop the filter; it buys nothing.
+- **Never animate `opacity` on an ancestor of glass.** While it runs, the
+  ancestor is the glass's backdrop root: the blur sees nothing behind it and the
+  glass draws see-through until the animation ends (the notification banner
+  did this for its whole 550 ms drop-in). Move glass in with `transform`.
 - **Do not hardcode a translucency to fake glass in light appearance.** Use
   `app.surface` and let the shell theme it, or the panel is right in one
   appearance and wrong in the other.

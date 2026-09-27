@@ -1,5 +1,5 @@
 // The floating chrome: a glass sidebar on the wide display and a glass tab
-// bar on the cover, plus the search capsule they share. Apple's Books splits
+// bar on the cover, plus the Search pane's capsule. Apple's Books splits
 // its sidebar into the app's sections up top and your collections underneath.
 
 import type { SYM } from '@doan-labs/duo-uikit/icons/index.ts'
@@ -91,7 +91,6 @@ export function Sidebar() {
   const lib = useLib()
   return (
     <nav aria-label="Books sections" {...stylex.props(styles.side)}>
-      <Field />
       <div {...stylex.props(styles.sideList)}>
         {SECTIONS.map((s) => (
           <Row key={s.key} label={s.label} glyph={s.glyph} on={ui.tab === s.key} pick={() => go(s.key)} />

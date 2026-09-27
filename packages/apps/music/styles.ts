@@ -15,7 +15,7 @@ import {
 import * as stylex from '@stylexjs/stylex'
 
 // The Now Playing sheet's ride: the app's bottom edge, up on open and back
-// down on close. App-scoped keyframes — a StyleX keyframe is resolved where it
+// down on close. App-scoped keyframes - a StyleX keyframe is resolved where it
 // is written, so it lives with the styles that animate it.
 const rise = stylex.keyframes({
   from: { transform: 'translateY(104%)' },
@@ -53,7 +53,7 @@ export const styles = stylex.create({
   /**
    * A pushed page fills the pane and slides under the floating sidebar, so its
    * header's left controls would land under the glass. On the wide box the
-   * page's body pads past the sidebar — the pane's own clearance — while the
+   * page's body pads past the sidebar - the pane's own clearance - while the
    * artwork still runs the full width behind it.
    */
   pgPush: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
@@ -132,6 +132,8 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     lineHeight: leading.subheadline,
     letterSpacing: tracking.subheadline,
+    // A button centres its text by default; Apple's sidebar reads from the icon.
+    textAlign: 'left',
     cursor: 'pointer'
   },
   /** The selected section marks itself in the app's accent, not the system link blue. */
@@ -199,7 +201,7 @@ export const styles = stylex.create({
 
   /**
    * The capsule floats over the pane's bottom edge on the cover, clearing the
-   * tab bar, and parks at the pane's bottom-right on the wide box — the top
+   * tab bar, and parks at the pane's bottom-right on the wide box - the top
    * corners there belong to the status stack and the sidebar.
    */
   mini: {
@@ -477,7 +479,8 @@ export const styles = stylex.create({
 
   // The Play / Shuffle pair.
 
-  pills: { display: 'flex', gap: 10, width: '100%', maxWidth: 340 },
+  /** Two equal columns: flex would size each pill to its label, and Shuffle is the longer word. */
+  pills: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, width: '100%', maxWidth: 340 },
   pill: {
     flexGrow: 1,
     display: 'flex',
@@ -615,7 +618,7 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     textTransform: 'uppercase'
   },
-  /** Radio's live card: a surface row — the station's collage, its name and a play circle. */
+  /** Radio's live card: a surface row - the station's collage, its name and a play circle. */
   liveCard: {
     display: 'flex',
     alignItems: 'center',
@@ -775,18 +778,23 @@ export const styles = stylex.create({
   // Now Playing.
 
   /**
-   * The sheet covers the app chrome and all — sidebar, tabs, mini player —
-   * the way iOS pulls Now Playing over the app that owns it. The dark tint is
-   * the glass recipe's own; the slide is the app's bottom edge.
+   * The sheet covers the app chrome and all - sidebar, tabs, mini player -
+   * the way iOS pulls Now Playing over the app that owns it. It runs up
+   * through the 40 px status reserve too, or the sidebar, which reaches into
+   * it, pokes out above. The dark tint is the glass recipe's own; the slide is
+   * the app's bottom edge.
    */
   np: {
     position: 'absolute',
-    inset: 0,
+    top: -40,
+    right: 0,
+    bottom: 0,
+    left: 0,
     zIndex: 4,
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
-    paddingTop: 44,
+    paddingTop: 84,
     paddingRight: 22,
     paddingBottom: 14,
     paddingLeft: 22,
@@ -800,7 +808,7 @@ export const styles = stylex.create({
   },
   npDown: { animationName: drop, animationTimingFunction: easing.inOut, animationFillMode: 'forwards' },
   npTop: { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, minHeight: 22 },
-  npClose: { position: 'absolute', left: 14, top: 44, color: app.label2, padding: 4 },
+  npClose: { position: 'absolute', left: 14, top: 84, color: app.label2, padding: 4 },
   npFrom: {
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
@@ -813,7 +821,7 @@ export const styles = stylex.create({
   },
   /**
    * The face's middle: stacked on the cover, split on the inner display, where
-   * the column cannot afford the art's height — iPad Now Playing puts the
+   * the column cannot afford the art's height - iPad Now Playing puts the
    * artwork beside the controls for the same reason.
    */
   npBody: {
