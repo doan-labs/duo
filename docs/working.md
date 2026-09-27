@@ -254,7 +254,11 @@ destination, mode or route remounts the scroller at the top. Results
 and routes are keyed by the request that asked for them - the search key carries a
 ~0.5-degree camera bucket so a query re-biases when the map crosses towns - and each
 record counts `tries`: a failure retries once, reopening directions clears the failed
-record to ask again, and no render can loop a fetch. `camera.ts` is the fly plan behind
+record to ask again, and no render can loop a fetch. Locate flies to the last known `me`
+on tap and flies again only when a fresh fix lands outside the origin's ~11 m bucket, so a
+stalled GPS read never leaves the control dead; the route fit keys on destination and
+mode, so a drifting origin refetches the route without pulling the camera back.
+`camera.ts` is the fly plan behind
 every jump: `flyTo` runs it through a rAF
 driver, drag and wheel interrupt it, a released drag coasts on its velocity, and zoom is
 fractional - tiles render at the nearest integer level scaled by `2 ** (z - tileZ)`.
