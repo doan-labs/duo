@@ -1,7 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
-import { motion, useMotionValueEvent, useScroll } from 'motion/react'
-import { useState } from 'react'
+import { motion, useScroll } from 'motion/react'
 import { Apps } from '../blog/apps'
 import { Contents } from '../blog/contents'
 import { Figures } from '../blog/figures'
@@ -13,9 +12,10 @@ import { Live } from '../blog/live'
 import { MicWave } from '../blog/mic-wave'
 import { NotifyRun } from '../blog/notify-run'
 import { Points } from '../blog/points'
-import { day, type Post, post, posts } from '../blog/posts'
+import { day, post, posts } from '../blog/posts'
 import { prose } from '../blog/prose'
 import { useReading } from '../blog/reading'
+import { SectionPill } from '../blog/section-pill'
 import { StocksDiagram } from '../blog/stocks-diagram'
 import { TileDiagram } from '../blog/tile-diagram'
 import { DoanMark } from '../footer'
@@ -80,8 +80,9 @@ function Page() {
   const next = posts.find((q) => q.slug !== p.slug)
   return (
     <>
-      <Progress post={p} />
+      <Progress />
       <Contents toc={p.toc} />
+      <SectionPill toc={p.toc} />
       <article {...stylex.props(styles.page)}>
         <Reveal>
           <header {...stylex.props(styles.head)}>
@@ -167,28 +168,12 @@ function Page() {
   )
 }
 
-/**
- * A hairline under the nav that fills as the post is read, and the section
- * in view beside it once the header has scrolled away. The section is the
- * last `h2` whose top has passed the bar.
- */
-function Progress({ post: p }: { post: Post }) {
+/** A hairline under the nav that fills as the post is read. */
+function Progress() {
   const { scrollYProgress } = useScroll()
-  const [here, setHere] = useState<string | null>(null)
-  const [shown, setShown] = useState(false)
-  useMotionValueEvent(scrollYProgress, 'change', () => {
-    setShown(window.scrollY > 420)
-    let now: string | null = null
-    for (const h of p.toc) {
-      const el = document.getElementById(h.id)
-      if (el && el.getBoundingClientRect().top < 140) now = h.text
-    }
-    setHere(now)
-  })
   return (
     <div {...stylex.props(styles.progress)} aria-hidden="true">
       <motion.span {...stylex.props(styles.fillBar)} style={{ scaleX: scrollYProgress }} />
-      <span {...stylex.props(styles.here, shown && here !== null && styles.hereOn)}>{here ?? ''}</span>
     </div>
   )
 }
@@ -211,35 +196,6 @@ const styles = stylex.create({
     backgroundColor: color.accent,
     transformOrigin: 'left'
   },
-  here: {
-    position: 'absolute',
-    top: '12px',
-    left: '50%',
-    maxWidth: 'calc(100vw - 48px)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    paddingTop: '7px',
-    paddingBottom: '7px',
-    paddingLeft: '14px',
-    paddingRight: '14px',
-    borderRadius: radius.pill,
-    backgroundColor: color.navBg,
-    backdropFilter: 'blur(18px) saturate(1.6)',
-    WebkitBackdropFilter: 'blur(18px) saturate(1.6)',
-    boxShadow: color.thumbShadow,
-    fontFamily: font.sans,
-    fontSize: '13px',
-    fontWeight: 500,
-    color: color.text,
-    opacity: 0,
-    transform: 'translate(-50%, -6px)',
-    transitionProperty: 'opacity, transform',
-    transitionDuration: '0.3s',
-    transitionTimingFunction: ease.out
-  },
-  // Wide screens show the outline beside the column instead.
-  hereOn: { opacity: { default: 1, '@media (min-width: 1200px)': 0 }, transform: 'translate(-50%, 0)' },
   page: {
     paddingTop: { default: '96px', [SMALL]: '56px' },
     paddingBottom: '48px',

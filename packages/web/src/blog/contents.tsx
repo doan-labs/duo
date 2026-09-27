@@ -52,11 +52,6 @@ export function Contents({ toc }: { toc: Post['toc'] }) {
     setClear(window.scrollY > 420 && !blocked)
   })
 
-  const go = (id: string) => {
-    const el = document.getElementById(id)
-    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - LINE + 20, behavior: 'smooth' })
-  }
-
   const activeY = active < 0 ? null : (centers[active] ?? null)
   const hoverY = hover === null ? null : (centers[hover] ?? null)
   // Above the active row its rail already covers the span, so the hover draws only the hook.
@@ -83,7 +78,7 @@ export function Contents({ toc }: { toc: Post['toc'] }) {
             onMouseEnter={() => setHover(i)}
             onFocus={() => setHover(i)}
             onBlur={() => setHover(null)}
-            onClick={() => go(h.id)}
+            onClick={() => goTo(h.id)}
             {...stylex.props(styles.row, i === active && styles.rowOn)}
           >
             {h.text}
@@ -92,6 +87,12 @@ export function Contents({ toc }: { toc: Post['toc'] }) {
       </div>
     </nav>
   )
+}
+
+/** Scrolls a heading to just under the bar, where it counts as read. */
+export function goTo(id: string) {
+  const el = document.getElementById(id)
+  if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - LINE + 20, behavior: 'smooth' })
 }
 
 function Rail({ from, y, on, tone }: { from: number; y: number | null; on: boolean; tone: stylex.StyleXStyles }) {
