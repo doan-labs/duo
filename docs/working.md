@@ -421,6 +421,13 @@ bun run api            # only the TSDoc reference
 - Check the production build too, with `dist/client` served on port 3011. Block
   frames for the page checks and load the hero shell once for the bridge check,
   so expect about two minutes.
+- Workers static assets ignore `Range` and always send the whole file, so a
+  video can't be seeked until it has downloaded. `packages/web/worker.ts` runs
+  first on `/blog/*` (wrangler.jsonc) and answers ranges for `.mp4`/`.webm`; a
+  film elsewhere needs its path added to `run_worker_first`.
+- A tab open across a deploy asks for chunk names the new build no longer has.
+  The root route reloads once on `vite:preloadError`, so the click lands on the
+  new build instead of the router's error screen.
 
 ## Community apps and the catalog branch
 

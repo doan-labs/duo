@@ -81,7 +81,28 @@ export const Route = createRootRoute({
   notFoundComponent: NotFound
 })
 
+/**
+ * A deploy replaces every hashed chunk. A tab opened before it still asks for
+ * the old names on its next route change, gets 404s, and the router falls over;
+ * reloading fetches the new HTML and lands on the address it was going to. Once
+ * per 10 s, so a chunk that is really missing can't loop the page.
+ */
+function useReloadOnStaleChunks() {
+  useEffect(() => {
+    const stale = (e: Event) => {
+      const last = Number(sessionStorage.getItem('duo-stale-reload') ?? 0)
+      if (Date.now() - last < 10_000) return
+      sessionStorage.setItem('duo-stale-reload', String(Date.now()))
+      e.preventDefault()
+      window.location.reload()
+    }
+    window.addEventListener('vite:preloadError', stale)
+    return () => window.removeEventListener('vite:preloadError', stale)
+  }, [])
+}
+
 function Root() {
+  useReloadOnStaleChunks()
   // The workspace is its own full-height layout: no page scroll, no footer.
   const workspace = useRouterState({
     select: (state) => state.location.pathname.replace(/\/+$/, '') === '/simulator'

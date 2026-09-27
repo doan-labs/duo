@@ -98,11 +98,11 @@ const B = 40
 const BOTTOM = 372
 const GAP = 54
 const SHUT = 8
-const LENS = { x: 340, y: 24, w: 280, h: 350 }
+const LENS = { x: 340, y: 24, w: 300, h: 350 }
 /** The brackets' spine, left of the stack, and the port's line across the boundary. */
 const BX = 34
 const PX = CX + 70
-const CHIP = { w: 122, h: 78, gap: 12 }
+const CHIP = { w: 134, h: 78, gap: 8 }
 
 const plate = (y: number) => `${CX},${y - B} ${CX + A},${y} ${CX},${y + B} ${CX - A},${y}`
 const side = (y: number) =>
@@ -132,7 +132,7 @@ export function Layers() {
   return (
     <figure {...stylex.props(diagram.figure)}>
       <div ref={auto.ref}>
-        <svg ref={svg} viewBox="0 0 640 400" role="img" aria-label={`Duo's layers, ${l.name} opened`}>
+        <svg ref={svg} viewBox="0 0 660 400" role="img" aria-label={`Duo's layers, ${l.name} opened`}>
           <title>Duo, layer by layer</title>
           {LAYERS.map((layer, i) => {
             const on = i === pick
@@ -320,7 +320,7 @@ const styles = stylex.create({
   wait: (delay: string) => ({ animationDelay: delay }),
   chipBox: { fill: color.surface, stroke: color.border, strokeWidth: 1 },
   chipLabel: { fontFamily: font.sans, fontSize: '14px', fontWeight: 600, fill: color.text },
-  chipNote: { fontSize: '10.5px' },
+  chipNote: { fontSize: '10px' },
   fade: {
     opacity: 0,
     animationName: fade,
