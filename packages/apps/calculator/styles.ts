@@ -81,9 +81,12 @@ export const styles = stylex.create({
     color: app.label2,
     minHeight: leading.footnote
   },
+  // Num rolls its digits in 1.4em cells: a 1em box clipped their tops. The box is
+  // 1.4em tall and lifted by the extra 0.4em, so the layout is unchanged.
   numWrap: {
     width: '100%',
-    height: typeScale.displayLg,
+    height: `calc(${typeScale.displayLg} * 1.4)`,
+    marginTop: `calc(${typeScale.displayLg} * -0.4)`,
     lineHeight: 1,
     overflow: 'hidden',
     display: 'flex',
