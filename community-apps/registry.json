@@ -37,6 +37,10 @@
     "com.mnismt.duo.flappyduo": {
       "folder": "flappy-duo",
       "maintainers": ["mnismt"]
+    },
+    "com.linhtinhvovan.duo.chess": {
+      "folder": "chess",
+      "maintainers": ["linhtinhvovan"]
     }
   }
 }

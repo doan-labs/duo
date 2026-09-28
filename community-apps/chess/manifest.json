@@ -1,0 +1,11 @@
+{
+  "id": "com.linhtinhvovan.duo.chess",
+  "name": "Chess",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "linhtinhvovan",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/chess",
+  "license": "MIT"
+}
