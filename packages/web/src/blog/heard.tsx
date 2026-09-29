@@ -101,7 +101,7 @@ const LOOP: Kind[] = ['up', 'down', 'camera', 'side', 'orientation', 'switches']
 const BEAT = 2.4
 
 /** A rounded rectangle with its own radius per corner: top-left, top-right, bottom-right, bottom-left. */
-const rr = (x: number, y: number, w: number, h: number, [a, b, c, d]: [number, number, number, number]) =>
+export const rr = (x: number, y: number, w: number, h: number, [a, b, c, d]: [number, number, number, number]) =>
   `M${x + a} ${y}H${x + w - b}A${b} ${b} 0 0 1 ${x + w} ${y + b}V${y + h - c}A${c} ${c} 0 0 1 ${x + w - c} ${y + h}H${x + d}A${d} ${d} 0 0 1 ${x} ${y + h - d}V${y + a}A${a} ${a} 0 0 1 ${x + a} ${y}Z`
 const COVER = rr(PH.x, PH.y, PH.w, PH.h, [HINGE, FREE, FREE, HINGE])
 const ACTIVE = rr(PH.x + 4, PH.y + 4, PH.w - 8, PH.h - 8, [1, FREE - 4, FREE - 4, 1])

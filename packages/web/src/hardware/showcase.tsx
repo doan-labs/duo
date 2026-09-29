@@ -1,4 +1,4 @@
-// The /sdk page: every `os.device.on` type as a chapter beside one real phone.
+// The SDK's section of /kit: every `os.device.on` type as a chapter beside one real phone.
 // The page hears the shell exactly as a listening app would (packages/shell/
 // embed-device.ts), so each readout is the payload itself, not a mock of it.
 // The chapter in the middle of the screen poses the phone to show its buttons.
@@ -108,7 +108,7 @@ export const CHAPTERS: Chapter[] = [
   {
     type: 'volume',
     title: 'Volume, as a controller',
-    text: 'While you listen, the press is yours: the ringer does not move and no HUD comes down. A score, a page turn, a shutter.',
+    text: 'The press is yours. No HUD, no ringer.',
     code: [
       'let score = 0',
       "os.device.on('volume', (e) => {",
@@ -126,15 +126,14 @@ export const CHAPTERS: Chapter[] = [
     },
     how: (
       <>
-        Click the two small caps on the top edge, near the right corner. With the phone focused, <Kbd>↑</Kbd> and{' '}
-        <Kbd>↓</Kbd> press them too.
+        Top edge caps, or <Kbd>↑</Kbd> <Kbd>↓</Kbd>
       </>
     )
   },
   {
     type: 'camera-control',
     title: 'Camera Control: press, slide, release',
-    text: 'The press is yours, so Camera neither opens nor shoots. Slide along the cap and you hear how far, in centimetres.',
+    text: 'Press, slide, release. Camera stays shut.',
     code: [
       "os.device.on('camera-control', (e) => {",
       "  if (e.action === 'press') focus()",
@@ -154,14 +153,14 @@ export const CHAPTERS: Chapter[] = [
     },
     how: (
       <>
-        Press the lower cap on the right edge and drag along it before you let go. <Kbd>C</Kbd> presses it.
+        Lower right cap, drag it, or <Kbd>C</Kbd>
       </>
     )
   },
   {
     type: 'side',
     title: 'The side button, heard',
-    text: 'Heard, never taken. The phone still sleeps, wakes, opens Wallet and calls Siri; no app can stop the person locking it.',
+    text: 'Heard, never taken. The phone still sleeps.',
     code: [
       "os.device.on('side', (e) => {",
       '  // the phone still sleeps and wakes',
@@ -177,15 +176,14 @@ export const CHAPTERS: Chapter[] = [
     },
     how: (
       <>
-        Click the upper cap on the right edge. The screen goes dark, as it should; click again to wake it. <Kbd>L</Kbd>{' '}
-        presses it.
+        Upper right cap, or <Kbd>L</Kbd>
       </>
     )
   },
   {
     type: 'orientation',
     title: 'The pose, every frame it changes',
-    text: 'How the phone is turned and how far it is open, in degrees. The first event is where it is now, then one per change, at most once a frame.',
+    text: 'Turn and hinge, in degrees, once a frame.',
     code: [
       "os.device.on('orientation', ({ yaw, hinge }) => {",
       '  compass.rotate = yaw',
@@ -194,12 +192,12 @@ export const CHAPTERS: Chapter[] = [
     ],
     runs: (l) => (l.last.orientation ? (l.last.orientation.hinge < 120 ? 2 : 1) : undefined),
     tour: { title: 'Turn it', text: 'Drag the phone left or right. Every step of the turn is an event.', at: 'drag' },
-    how: 'Drag the phone to turn it, or use the controls above. Every step of the ease is an event.'
+    how: 'Drag the phone, or use the controls'
   },
   {
     type: 'switches',
     title: 'The switches, read-only',
-    text: 'Everything in Control Center. You hear the current state first, then every flip. Only the person flips them.',
+    text: 'Control Center, read-only.',
     code: [
       "os.device.on('switches', (s) => {",
       '  switch (true) {',
@@ -213,7 +211,7 @@ export const CHAPTERS: Chapter[] = [
     runs: (l) => l.last.switches && network(l.last.switches)[0],
     pose: { deg: 180, yaw: 0 },
     tour: { title: 'Control Center', text: 'Tap Wi-Fi, Airplane Mode or the torch, right in the phone.', at: null },
-    how: 'Control Center comes down when you get here. Tap Wi-Fi, Airplane Mode or the torch.'
+    how: 'Tap Wi-Fi, Airplane Mode or the torch'
   }
 ]
 
@@ -290,11 +288,11 @@ export function Showcase() {
 
   return (
     <>
-      <Block labelledBy="sdk-title">
+      <Block id="sdk" labelledBy="sdk-title">
         <div {...stylex.props(styles.hero)}>
           <div>
             <Cap>SDK · Buttons and sensors</Cap>
-            <Headline as="h1" id="sdk-title" lines={['Every button', 'is an event.']} />
+            <Headline id="sdk-title" lines={['Every button', 'is an event.']} />
             <Lede>
               One call, <code {...stylex.props(styles.inline)}>os.device.on</code>. Press the phone; every number here
               is live.

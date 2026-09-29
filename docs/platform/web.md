@@ -336,8 +336,8 @@ published, no host is chosen, no CI deploys it.
 | Home | `/` | Apple-style hero, the live simulator, the three fold rules, tiles to every section, download notes | Installers marked not built; browser marked works |
 | Get started | `/get-started` | Clone, model fetch, `bun run dev`, `?app=`/`?deg=` poses, how a baked app is added; the CLI and `?dev=` path as a plan | First half works today; SDK path marked not built |
 | Docs | `/docs`, `/docs/<path>` | Every file under `docs/` rendered from source with a badge and a source link; sidebar grouped Platform plan, Progress, Repository | Planning document, Proposed, or Works today per file |
-| UI kit | `/kit`, `/kit/docs`, `/kit/docs/<export>` | `/kit` is the hero with the export counts and install line over a showcase grid of live scenes composed from the kit. Under it the reference is generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today |
-| SDK | `/sdk` | The hardware showcase (decision 96); out of the global bar and unlinked since decision 100, the route still builds | Hidden |
+| Platform | `/kit`, `/kit/docs`, `/kit/docs/<export>` | `/kit` ("Platform" in the bar, decision 109) is one page: the architecture hero (the six-layer stack beside the real phone split into the same six layers, stills from `scripts/capture-layers.sh` in `public/platform/`), four build rules, the kit section (export counts, install line, showcase grid of live scenes) and the SDK hardware showcase at `#sdk`. The reference under it is generated from `packages/uikit/index.ts` exports: TSDoc, declaration, props table, source line | Works today |
+| SDK | `/sdk` | Redirects to `/kit#sdk` (decision 109) | Redirect |
 | Publish | `/publish` | `publishing.md` rendered; PR template marked not built | Planning document |
 | Guidelines | `/guidelines` | The three fold rules and the iOS rules that still hold, with Notes on the cover to fold | Works today (describes current shell behaviour) |
 | Changelog | `/changelog` | The root `CHANGELOG.md`, one list per Duo version with package releases inside it; in the global bar since decision 100 | Works today |

@@ -5,8 +5,8 @@ import { color, ease, font } from '../tokens.stylex'
 import { useAutoplay } from './autoplay'
 import { diagram, Stat, useNarrow } from './diagram'
 
-type Trust = 'host' | 'trusted' | 'sandboxed'
-type Layer = {
+export type Trust = 'host' | 'trusted' | 'sandboxed'
+export type Layer = {
   name: string
   trust: Trust
   runs: string
@@ -16,7 +16,7 @@ type Layer = {
 
 // Bottom to top, the way a press travels up and a draw call comes down
 // (docs/architecture.md). The line between Runtime and App is the trust boundary.
-const LAYERS: Layer[] = [
+export const LAYERS: Layer[] = [
   {
     name: 'Window',
     trust: 'host',

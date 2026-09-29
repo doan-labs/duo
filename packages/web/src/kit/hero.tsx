@@ -1,5 +1,6 @@
-// The kit's page: what it is, one line to install it, and under that the
-// showcase grid, every tile a small app composed from the real package.
+// The kit's section of /kit: one row naming it with the install line beside,
+// and under that the showcase grid, every tile a small app composed from the
+// real package. The tiles say the rest.
 import * as stylex from '@stylexjs/stylex'
 import { motion, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
@@ -21,14 +22,6 @@ const INSTALL = 'bun add @doan-labs/duo-uikit'
 // whole tree for exactly the readers least able to absorb a re-render.
 const NONE = { duration: 0 }
 
-const STATS = [
-  `${counts.components} components`,
-  `${counts.hooks} hooks`,
-  `${counts.helpers} types and helpers`,
-  `${counts.live} live demos`,
-  '387 and 790 point displays'
-]
-
 export function KitHero() {
   const still = useReducedMotion() ?? false
   const rise = (i: number) => ({
@@ -37,45 +30,25 @@ export function KitHero() {
     transition: still ? NONE : { duration: 0.8, delay: 0.1 + i * 0.08, ease: CURVE }
   })
   return (
-    <section {...stylex.props(styles.hero)} aria-labelledby="kit-title">
-      <div {...stylex.props(styles.inner)}>
-        <motion.p {...stylex.props(styles.eyebrow)} {...rise(0)}>
-          @doan-labs/duo-uikit · v{versions.uikit?.version} · {kit.length} exports
-        </motion.p>
-        <motion.h1 id="kit-title" {...stylex.props(styles.title)} {...rise(1)}>
-          {counts.components} components that
-          <br />
-          already know the phone folds.
-        </motion.h1>
-        <motion.p {...stylex.props(styles.sub)} {...rise(2)}>
-          Buttons, rows, lists, navigation stacks and widgets, drawn the way iOS draws them. Everything below is the
-          real package running in your browser.
-        </motion.p>
-        <motion.div {...stylex.props(styles.actions)} {...rise(3)}>
+    <section id="kit" {...stylex.props(styles.hero)} aria-labelledby="kit-title">
+      <div {...stylex.props(styles.inner, styles.head)}>
+        <div>
+          <motion.p {...stylex.props(styles.eyebrow)} {...rise(0)}>
+            @doan-labs/duo-uikit · v{versions.uikit?.version} · {kit.length} exports
+          </motion.p>
+          <motion.h2 id="kit-title" {...stylex.props(styles.title)} {...rise(1)}>
+            {counts.components} components that
+            <br />
+            already know the phone folds.
+          </motion.h2>
+        </div>
+        <motion.div {...stylex.props(styles.actions)} {...rise(2)}>
           <Button to="/kit/docs">See all components</Button>
-          <Button to="/guidelines" outline>
-            Human Interface Guidelines
-          </Button>
           <Install />
         </motion.div>
       </div>
       <div {...stylex.props(styles.inner, styles.showcase)}>
         <Showcase />
-      </div>
-      <div {...stylex.props(styles.inner)}>
-        <ul {...stylex.props(styles.stats)}>
-          {STATS.map((s, i) => (
-            <motion.li
-              key={s}
-              {...stylex.props(styles.stat)}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={still ? NONE : { duration: 0.5, delay: 0.6 + i * 0.05, ease: CURVE }}
-            >
-              {s}
-            </motion.li>
-          ))}
-        </ul>
       </div>
     </section>
   )
@@ -121,7 +94,7 @@ function Install() {
 
 const styles = stylex.create({
   hero: {
-    paddingTop: { default: '104px', [MID]: '80px', [SMALL]: '56px' },
+    paddingTop: { default: '64px', [SMALL]: '40px' },
     paddingBottom: { default: '96px', [SMALL]: '64px' },
     backgroundColor: color.bg,
     color: color.text,
@@ -147,21 +120,20 @@ const styles = stylex.create({
   title: {
     margin: 0,
     fontFamily: font.display,
-    fontSize: { default: '76px', [MID]: '54px', [SMALL]: '38px' },
+    fontSize: { default: '44px', [MID]: '38px', [SMALL]: '30px' },
     lineHeight: 1.02,
     fontWeight: 600,
     letterSpacing: '-0.04em',
     textWrap: 'balance'
   },
-  sub: {
-    marginTop: '24px',
-    marginBottom: 0,
-    maxWidth: '58ch',
-    fontSize: { default: '22px', [SMALL]: '18px' },
-    lineHeight: 1.45,
-    color: color.text2
+  head: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: '24px'
   },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginTop: '36px' },
+  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' },
   install: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -207,30 +179,5 @@ const styles = stylex.create({
     transitionTimingFunction: ease.out
   },
   copyTagDone: { backgroundColor: color.greenBg, color: color.green },
-  showcase: { marginTop: { default: '72px', [SMALL]: '48px' } },
-  stats: {
-    listStyleType: 'none',
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
-    margin: 0,
-    marginTop: { default: '56px', [SMALL]: '40px' },
-    padding: 0,
-    paddingTop: '24px',
-    borderTopWidth: '1px',
-    borderTopStyle: 'solid',
-    borderTopColor: color.border
-  },
-  stat: {
-    fontFamily: font.mono,
-    fontSize: '12px',
-    letterSpacing: '0.04em',
-    color: color.text2,
-    paddingTop: '7px',
-    paddingBottom: '7px',
-    paddingLeft: '13px',
-    paddingRight: '13px',
-    borderRadius: radius.pill,
-    backgroundColor: color.well
-  }
+  showcase: { marginTop: { default: '40px', [SMALL]: '28px' } }
 })

@@ -54,10 +54,7 @@ export function Finale({ types, heard }: { types: DeviceEvent[]; heard: Record<D
           </ol>
         </Rise>
         <Rise>
-          <p {...stylex.props(styles.proof)}>
-            {total} real payloads reached this page, each one exactly what a listening app receives. Nothing crossed the
-            bridge until the page listened.
-          </p>
+          <p {...stylex.props(styles.proof)}>{total} real payloads, exactly what an app receives.</p>
         </Rise>
         <div {...stylex.props(styles.actions)}>
           <Rise move="in" styles={styles.action}>

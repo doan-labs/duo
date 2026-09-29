@@ -1875,3 +1875,43 @@ Cost: large layout offsets (a sidebar's clearance, a scroll's end room) count as
 debt until `layout` names them; the gate reads source, not pixels, so a floating
 panel, the home bar's 22 px and the clip at a sandbox frame stay review checks.
 
+## 109. `/kit` becomes the Platform page, and `/sdk` folds into it
+
+2026-09-29, accepted. Supersedes decision 100's hiding of `/sdk` and decision 97's
+single-hero `/kit`. The architecture, the UI kit and the SDK showcase are one page
+at `/kit`, labelled Platform in the global bar. It opens with Duo taken apart: the
+six layers from the blog's figure (`LAYERS` in `blog/layers.tsx`, the one source)
+as the stack of plates with the trust line drawn through it, beside the real
+phone split into the same six layers. The phone is six stills of the shell
+(`scripts/capture-layers.sh`): laid flat under one camera, the chassis with its
+glass dark, SpringBoard, and a running Clock are the scene's own pixels; the
+window, the sandbox frame and the kit are drawn onto the same live panel so they
+share its projection. Each is matted from a black and a white shot, so stacked
+flat they are the phone and pulled apart they are its parts. Picking a layer on
+either side picks both; hovering one highlights it on both and dims the rest.
+Clicking one opens it: the stack steps aside, the other layers scatter up and
+down as they fade, and the chosen one grows into the freed space while its
+plain facts (`FACTS`) come in on the right, with arrows or the arrow keys to
+the next layer; a click outside or Esc puts the phone back together. On a phone
+the stack stays as the way between layers and the facts come in under it.
+The labels say what each layer is for in plain words (`PLAIN` in
+`kit/architecture.tsx`), not what it is built with; the blog's figure keeps
+those names. No coloured side rails on rows. Under it are four build rules
+from DESIGN.md as one drawing sheet in the blueprint of the 0.2.0 post's
+hardware figure (`blog/heard.tsx`): grid, one ink drawn in, crop marks, mono
+notes, what the code sees on a plate (`kit/rules.tsx`). A pill per rule, each
+with one control to try it (a
+width slider past `useWide`'s 600, a hinge slider handing a running timer
+between displays, the document's own parts tapped in the drawing to fire their
+requests at the CSP wall, whose `<meta csp>` row pulls the wall so the request
+reaches the network, a light and dark flip of
+the kit's tokens) and readouts that roll, playing itself until touched. Then
+the kit section, its name and install line on one row over the tiles, and the
+hardware showcase at `#sdk`, whose chapters keep to one line of copy each; the
+code, the live values and the phone carry the rest. `/sdk`
+redirects there; `/kit/docs` keeps the reference.
+
+Cost: the page mounts the live simulator for the SDK chapters, so it is the
+heaviest route after `/simulator`. The layer stills do not follow the shell:
+re-run the capture after a visible SpringBoard, Clock or model change.
+

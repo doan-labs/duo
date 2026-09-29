@@ -1,16 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Showcase as Sdk } from '../hardware/showcase'
+import { Architecture } from '../kit/architecture'
 import { KitHero } from '../kit/hero'
+import { Principles } from '../kit/rules'
 
-// One hero and nothing else: the kit in a sentence, running, with the door to
-// the reference. Every export is documented under /kit/docs.
+// The platform in one page, top to bottom the way an app meets it: Duo taken
+// apart, the rules it is built by, the kit an app draws with, then the SDK's
+// buttons and sensors pressed live. Every export is documented under /kit/docs.
 export const Route = createFileRoute('/kit/')({
   head: () => ({
     meta: [
-      { title: 'UI kit · Duo' },
+      { title: 'Platform · Duo' },
       {
         name: 'description',
         content:
-          'The components every Duo app is built from: iOS controls, lists, navigation and widgets that already know about the cover display, the inner display and the fold between them.'
+          'How Duo is built, layer by layer: the native window, the Three.js shell, two operating systems, the sandbox runtime, and the SDK and UI kit every app is made from.'
       }
     ]
   }),
@@ -18,5 +22,12 @@ export const Route = createFileRoute('/kit/')({
 })
 
 function Index() {
-  return <KitHero />
+  return (
+    <>
+      <Architecture />
+      <Principles />
+      <KitHero />
+      <Sdk />
+    </>
+  )
 }
