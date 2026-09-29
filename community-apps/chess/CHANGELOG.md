@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Every colour, gap, padding and inset now comes from the kit tokens, so the
+  app passes the design gate and publishes. Translucent marks mix the kit
+  hues; the board well darkens through its own fill instead of a hand-typed
+  inset shadow, and the selection ring, capture rings and piece outlines are
+  borders and strokes rather than custom shadows. The look is unchanged.
+
 ## 1.0.0
 
 - Added a complete chess engine: legal move generation with castling, en
