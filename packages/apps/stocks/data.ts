@@ -1,12 +1,12 @@
-// Live market data. Stocks is a baked app, so the SDK client's storage is out
-// of reach; both displays' copies run in the same document, so a module store
-// plus localStorage is the shared state. Sources are the free, CORS-open
-// feeds verified for this app: CNBC quotes and RSS, stockanalysis.com daily
-// history and symbol search, Coinbase candles for crypto intraday. The mirror
-// copy starts nothing: the fetch hooks take a `live` flag and the pump only
-// the live copy starts, so the second document copy draws the same stores
-// without network or timers.
+// Live market data. The watchlist lives in os.storage so both displays'
+// copies and a reload read the same state; the fetch caches stay in the
+// document. Sources are the free, CORS-open feeds verified for this app: CNBC
+// quotes and RSS, stockanalysis.com daily history and symbol search, Coinbase
+// candles for crypto intraday. The parked copy starts nothing: the fetch
+// hooks take a `live` flag and the pump only the live copy starts, so the
+// second document copy draws the same stores without network or timers.
 
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useEffect, useSyncExternalStore } from 'react'
 
 export type Kind = 'equity' | 'etf' | 'index' | 'crypto'
@@ -118,7 +118,11 @@ function read(raw: string | null): Store {
   return { items: DEFAULTS, viewing: DEFAULTS[0]! }
 }
 
-let store = read(typeof localStorage === 'undefined' ? null : localStorage.getItem(KEY))
+const storeCell = cell<Store>('storage', KEY, read(null))
+const getStore = () => {
+  const s = storeCell.get()
+  return Array.isArray(s?.items) && s.items.every(isItem) ? s : read(null)
+}
 const listeners = new Set<() => void>()
 const emit = () => {
   for (const listener of listeners) listener()
@@ -129,36 +133,28 @@ const subscribe = (listener: () => void) => {
     listeners.delete(listener)
   }
 }
-const save = () => {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(store))
-  } catch {
-    /* Same tolerance as the initial read. */
-  }
-}
 const update = (patch: Partial<Store>) => {
-  store = { ...store, ...patch }
-  save()
+  storeCell.set({ ...getStore(), ...patch })
   emit()
 }
 
-export const useStore = () => useSyncExternalStore(subscribe, () => store)
+export const useStore = () => useSyncExternalStore(storeCell.subscribe, getStore)
 export function select(v: Item) {
-  if (store.viewing.sym !== v.sym) {
+  if (getStore().viewing.sym !== v.sym) {
     update({ viewing: v })
     void refreshQuotes()
   }
 }
 export function follow(candidate: Item) {
   update({
-    items: store.items.some((v) => v.sym === candidate.sym) ? store.items : [...store.items, candidate],
+    items: getStore().items.some((v) => v.sym === candidate.sym) ? getStore().items : [...getStore().items, candidate],
     viewing: candidate
   })
   void spark(candidate)
   void refreshQuotes()
 }
 export function unfollow(sym: string) {
-  update({ items: store.items.filter((v) => v.sym !== sym) })
+  update({ items: getStore().items.filter((v) => v.sym !== sym) })
 }
 
 // -- caches --------------------------------------------------------------------
@@ -239,7 +235,7 @@ const QUOTE_URL = (list: string[]) =>
 
 async function refreshQuotes() {
   const seen = new Map<string, Item>()
-  for (const v of [...store.items, store.viewing]) if (!seen.has(v.sym)) seen.set(v.sym, v)
+  for (const v of [...getStore().items, getStore().viewing]) if (!seen.has(v.sym)) seen.set(v.sym, v)
   const due = [...seen.values()].filter((v) => stale(quotes.get(v.sym) || empty, QUOTE_TTL))
   if (!due.length || pending.has('quotes')) return
   pending.add('quotes')
@@ -280,14 +276,16 @@ async function refreshQuotes() {
     // now rather than leave it blank until the next poll.
     const batched = new Set(due.map((v) => v.sym))
     if (
-      [...store.items, store.viewing].some((v) => !batched.has(v.sym) && stale(quotes.get(v.sym) || empty, QUOTE_TTL))
+      [...getStore().items, getStore().viewing].some(
+        (v) => !batched.has(v.sym) && stale(quotes.get(v.sym) || empty, QUOTE_TTL)
+      )
     )
       void refreshQuotes()
   }
 }
 
 function updateItem(sym: string, patch: Partial<Item>) {
-  update({ items: store.items.map((v) => (v.sym === sym ? { ...v, ...patch } : v)) })
+  update({ items: getStore().items.map((v) => (v.sym === sym ? { ...v, ...patch } : v)) })
 }
 
 // -- history -------------------------------------------------------------------
@@ -492,7 +490,7 @@ export function start() {
     if (document.visibilityState === 'hidden') return
     void refreshQuotes()
     const seen = new Set<string>()
-    for (const v of [...store.items, store.viewing]) {
+    for (const v of [...getStore().items, getStore().viewing]) {
       if (seen.has(v.sym)) continue
       seen.add(v.sym)
       void spark(v)

@@ -4,10 +4,11 @@
 // geolocation stands in for GPS when it grants it. Every camera jump flies;
 // the cover display's folded layout keeps it all in a bottom sheet. What the
 // user is doing - the query, the pin, the route, where "you" are - lives in
-// share.ts, so the fold hands the same map over whole (DESIGN.md §2).
+// share.ts's os.session/os.storage cells, so the fold hands the same map over
+// whole (DESIGN.md §2). The folded-away copy starts nothing: every fetch,
+// timer and GPS read gates on useDisplay().active, which follows the fold.
 
-import type { Os } from '@doan-labs/duo-sdk'
-import { useWide } from '@doan-labs/duo-uikit'
+import { useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { light } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
@@ -32,10 +33,10 @@ const remember = (p: Place) =>
     ].slice(0, 4)
   })
 
-export const Maps = ({ os }: { os: Os }) => {
+export const Maps = () => {
   const [root, wide] = useWide<HTMLDivElement>()
   // The folded-away copy draws but starts nothing - no search, no routes, no GPS.
-  const live = !os.mirror
+  const live = useDisplay().active
   const box = useRef({ w: 0, h: 0 })
   const [aside, setAside] = useState(true)
 

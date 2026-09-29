@@ -1,0 +1,18 @@
+{
+  "id": "labs.doan.ipduo.maps",
+  "name": "Maps",
+  "version": "1.0.0",
+  "lane": "official",
+  "entry": "./main.tsx",
+  "permissions": ["geolocation"],
+  "network": [
+    "https://photon.komoot.io",
+    "https://routing.openstreetmap.de",
+    "https://server.arcgisonline.com",
+    "https://tile.openstreetmap.jp"
+  ],
+  "icon": "./icon.png",
+  "author": "Doan Labs",
+  "repo": "https://github.com/doan-labs/duo",
+  "license": "MIT"
+}

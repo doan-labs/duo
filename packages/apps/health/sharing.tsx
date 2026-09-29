@@ -2,7 +2,7 @@
 // this same book, so its rings, workouts and streaks are these numbers. The
 // page states that plainly rather than faking an iCloud flow.
 
-import type { Os } from '@doan-labs/duo-sdk'
+import { os } from '@doan-labs/duo-sdk'
 import { Button, Row, Section } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
@@ -12,7 +12,7 @@ import { PageHead } from './parts.tsx'
 import { useBook } from './store.ts'
 import { styles } from './styles.ts'
 
-export function SharingPage({ os, wide }: { os: Os; wide: boolean }) {
+export function SharingPage({ wide }: { wide: boolean }) {
   const book = useBook()
   const rows: { sym: SymProps['name']; tint: string; label: string; detail: string }[] = [
     { sym: 'activity', tint: colors.pink, label: 'Activity Rings', detail: 'Live - same goals, same totals' },
@@ -54,7 +54,7 @@ export function SharingPage({ os, wide }: { os: Os; wide: boolean }) {
             ))}
           </Section>
           <div {...stylex.props(styles.btnRow)}>
-            <Button variant="filled" onClick={() => os.open('Fitness')}>
+            <Button variant="filled" onClick={() => void os.open('Fitness')}>
               Open Fitness
             </Button>
           </div>

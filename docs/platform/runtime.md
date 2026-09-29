@@ -16,13 +16,17 @@ Installed-app activation is unchanged.
 | Installed app | Verified immutable document from bundled assets or a selected catalog | SDK through an opaque sandbox; no shell DOM/storage or direct Tauri IPC |
 | Development app | Verified CLI document in a separate development namespace | Same sandbox and SDK; device permissions refused |
 
-Calculator, Calendar, Clock, Freeform, News, Notes, Photos, Reminders and Weather are separately built,
-preinstalled sandbox apps (`scripts/build-preinstalled.ts` builds every `packages/apps/*/manifest.json`).
-Camera, Voice Memos, Maps, Safari and App Store remain trusted baked components:
-the document policy allows no camera, microphone or frames. Voice Memos reaches the
-microphone the way sandboxed apps do - the host-mediated `mic` service and `appfiles`
-blob store, exposed to baked code as `os.mic`/`os.files` props - so the device's
-`getUserMedia` stays in one reviewed module (`runtime/mic.ts`). Lane does not grant privileges. Apps may bundle React
+Books, Calculator, Calendar, Clock, Contacts, Fitness, Freeform, Health, Home,
+Maps, News, Notes, Photos, Reminders, Stocks, Tips, Voice Memos, Wallet and
+Weather are separately built, preinstalled sandbox apps
+(`scripts/build-preinstalled.ts` builds every `packages/apps/*/manifest.json`).
+Voice Memos reaches the microphone the way sandboxed apps do - the host-mediated
+`mic` service and `appfiles` blob store - so the device's `getUserMedia` stays in
+one reviewed module (`runtime/mic.ts`); both are declared permissions in its
+manifest. App Store, Camera, Music and Safari remain trusted baked components:
+the Store needs the credentialed catalog/install API, the document policy allows
+no camera or frames, and Music's player is bound device-wide. Lane does not
+grant privileges. Apps may bundle React
 and the kit but never share the shell's JavaScript, stylesheet or import map.
 
 ## Responsibilities

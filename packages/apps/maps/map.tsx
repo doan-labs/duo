@@ -1,7 +1,7 @@
 import { Menu } from '@doan-labs/duo-uikit'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { type PointerEvent, useEffect, useRef, useState } from 'react'
+import { type PointerEvent, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   GLYPH,
   MAX_Z,
@@ -56,6 +56,69 @@ type Props = {
 }
 
 const clamp = (z: number) => Math.min(MAX_Z, Math.max(MIN_Z, z))
+
+// Sandboxed apps only paint data: images, so tiles are fetched over the
+// declared origins and swapped in as data URLs. The cache is per document,
+// so both displays share each tile's single fetch.
+const tileImgs = new Map<string, string>()
+const tileSubs = new Map<string, Set<() => void>>()
+const TILE_CAP = 320
+const loadTile = (url: string) => {
+  if (tileImgs.has(url)) return
+  tileImgs.set(url, '')
+  fetch(url, { credentials: 'omit' })
+    .then((r) => {
+      if (!r.ok) throw new Error(`${r.status}`)
+      return r.blob()
+    })
+    .then(
+      (b) =>
+        new Promise<string>((res, rej) => {
+          const f = new FileReader()
+          f.onload = () => res(f.result as string)
+          f.onerror = () => rej(f.error)
+          f.readAsDataURL(b)
+        })
+    )
+    .then((d) => {
+      if (tileImgs.size >= TILE_CAP) {
+        for (const k of tileImgs.keys()) {
+          if (!tileSubs.has(k)) tileImgs.delete(k)
+          if (tileImgs.size < TILE_CAP) break
+        }
+      }
+      tileImgs.set(url, d)
+      for (const f of tileSubs.get(url) ?? []) f()
+    })
+    .catch(() => tileImgs.delete(url))
+}
+const useTile = (url: string) => {
+  useEffect(() => loadTile(url), [url])
+  return useSyncExternalStore(
+    useCallback(
+      (f) => {
+        let set = tileSubs.get(url)
+        if (!set) {
+          set = new Set()
+          tileSubs.set(url, set)
+        }
+        set.add(f)
+        return () => {
+          set.delete(f)
+          if (!set.size) tileSubs.delete(url)
+        }
+      },
+      [url]
+    ),
+    () => tileImgs.get(url) ?? ''
+  )
+}
+
+const Tile = ({ url, x, y, size }: { url: string; x: number; y: number; size: number }) => {
+  const src = useTile(url)
+  if (!src) return null
+  return <img src={src} alt="" draggable={false} {...stylex.props(styles.tile, styles.tileAt(x, y, size))} />
+}
 
 export function MapCanvas({
   view,
@@ -306,13 +369,7 @@ export function MapCanvas({
       }}
     >
       {tiles.map((t) => (
-        <img
-          key={t.key}
-          src={t.url}
-          alt=""
-          draggable={false}
-          {...stylex.props(styles.tile, styles.tileAt(t.x, t.y, size))}
-        />
+        <Tile key={t.key} url={t.url} x={t.x} y={t.y} size={size} />
       ))}
 
       {routes && (

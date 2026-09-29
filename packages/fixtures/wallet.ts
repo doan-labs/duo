@@ -163,11 +163,61 @@ let book: Book = (() => {
   return fresh
 })()
 
+/** The part of os.storage the book needs when a sandboxed release hands it in. */
+export type BookStorage = {
+  get(k: string): Promise<string | null>
+  set(k: string, v: string): Promise<unknown>
+  snapshot(): Promise<{ rev: number; entries: [string, string][] }>
+  watch(since: number, fn: (e: { k: string; v: string | null }) => void): () => void
+}
+/** Set when the book is bound to app storage; baked callers keep localStorage. */
+let kv: BookStorage | undefined
+let lastWritten = ''
+
 const subs = new Set<() => void>()
 const persist = () => {
+  const raw = JSON.stringify(book)
+  lastWritten = raw
+  if (kv) return void kv.set(KEY, raw).catch(() => {})
   try {
-    localStorage.setItem(KEY, JSON.stringify(book))
+    localStorage.setItem(KEY, raw)
   } catch {}
+}
+
+const apply = (raw: string) => {
+  if (raw === lastWritten) return
+  try {
+    const v = JSON.parse(raw) as Book
+    if (v.schema === 1) {
+      lastWritten = raw
+      book = v
+      for (const fn of subs) fn()
+    }
+  } catch {}
+}
+
+/**
+ * Bind the book to the app's os.storage, awaited between os.connect() and the
+ * first render: the snapshot loads what is stored, the watch folds in writes
+ * the other display makes, and an empty store gets the seed written back so
+ * both copies start from the same book.
+ */
+export async function hydrateBook(storage: BookStorage) {
+  kv = storage
+  let found = false
+  try {
+    const snap = await storage.snapshot()
+    for (const [k, v] of snap.entries) {
+      if (k === KEY) {
+        apply(v)
+        found = true
+      }
+    }
+    storage.watch(snap.rev, (e) => {
+      if (e.k === KEY && e.v !== null) apply(e.v)
+    })
+  } catch {}
+  if (!found) persist()
 }
 const set = (next: Book) => {
   book = next

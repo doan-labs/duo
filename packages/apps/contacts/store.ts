@@ -1,38 +1,12 @@
+// Contacts' stores, on the kit's KV cells: the address book lives in
+// os.storage so it survives reloads and reaches both displays' copies, and
+// navigation state lives in os.session so the fold hands it over whole.
+
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useMemo, useSyncExternalStore } from 'react'
 import { type Book, byName, type Contact, type ContactList, SEED } from './data.ts'
 
-/**
- * A module store, the baked-app pattern: both displays render the same module, so one
- * snapshot keeps them in agreement, and the book survives reloads through localStorage.
- */
-function cell<T>(key: string | null, initial: T) {
-  let value = initial
-  if (key) {
-    try {
-      const raw = localStorage.getItem(key)
-      if (raw) value = JSON.parse(raw) as T
-    } catch {}
-  }
-  const subs = new Set<() => void>()
-  return {
-    subscribe: (fn: () => void) => {
-      subs.add(fn)
-      return () => subs.delete(fn)
-    },
-    get: () => value,
-    set: (v: T) => {
-      value = v
-      if (key) {
-        try {
-          localStorage.setItem(key, JSON.stringify(v))
-        } catch {}
-      }
-      for (const fn of subs) fn()
-    }
-  }
-}
-
-const bookCell = cell<Book>('contacts.book', SEED)
+const bookCell = cell<Book>('storage', 'contacts.book', SEED)
 const shared = new Map<string, ReturnType<typeof cell<string>>>()
 
 export function useBook() {
@@ -90,7 +64,7 @@ export const blank = (): Contact => ({
 export function useShared(key: string) {
   let c = shared.get(key)
   if (!c) {
-    c = cell<string>(null, '')
+    c = cell<string>('session', `contacts.${key}`, '')
     shared.set(key, c)
   }
   const value = useSyncExternalStore(c.subscribe, c.get)

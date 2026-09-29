@@ -137,15 +137,15 @@ export function AddPassSheet() {
  * runs the charge, writes its pending row to the ledger, and the done tick
  * springs in. Only the live display schedules the close.
  */
-export function PaySheet({ mirror }: { mirror?: boolean }) {
+export function PaySheet({ off }: { off?: boolean }) {
   const pay = usePay()
   const book = useBook()
   const pass = pay ? book.passes.find((p) => p.id === pay.id) : undefined
   useEffect(() => {
-    if (mirror || pay?.phase !== 'done') return
+    if (off || pay?.phase !== 'done') return
     const t = setTimeout(closePay, 900)
     return () => clearTimeout(t)
-  }, [mirror, pay?.phase])
+  }, [off, pay?.phase])
   if (!pay || !pass) return null
   const tap = () => {
     if (pay.phase !== 'armed') return

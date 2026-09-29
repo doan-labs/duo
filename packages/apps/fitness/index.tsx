@@ -3,8 +3,7 @@
 // stack on the cover - over the shared health book, so a workout logged here
 // is already on Health's charts.
 
-import type { Os } from '@doan-labs/duo-sdk'
-import { Nav, useNav, useWide } from '@doan-labs/duo-uikit'
+import { Nav, useDisplay, useNav, useWide } from '@doan-labs/duo-uikit'
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym, type SymProps } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
@@ -24,9 +23,9 @@ const TABS: { id: string; label: string; sym: SymProps['name'] }[] = [
   { id: 'awards', label: 'Awards', sym: 'starFill' }
 ]
 
-export function Fitness({ os }: { os: Os }) {
+export function Fitness() {
   const [box, wide] = useWide()
-  useTicker(os.mirror)
+  useTicker(!useDisplay().active)
   useBook()
   const path = usePath()
   const sel = path.at(-1)!

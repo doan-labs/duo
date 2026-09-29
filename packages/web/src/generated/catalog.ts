@@ -16,6 +16,20 @@ export type CatalogApp = {
 }
 export const CATALOG: CatalogApp[] = [
   {
+    "id": "com.linhtinhvovan.duo.chess",
+    "name": "Chess",
+    "author": "linhtinhvovan",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/chess",
+    "version": "1.0.1",
+    "releases": 1,
+    "created": "2026-09-29T00:49:16.149Z",
+    "updated": "2026-09-29T00:49:16.149Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.linhtinhvovan.duo.chess/1.0.1+507e9677/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.1\n\n- Every colour, gap, padding and inset now comes from the kit tokens, so the\n  app passes the design gate and publishes. Translucent marks mix the kit\n  hues; the board well darkens through its own fill instead of a hand-typed\n  inset shadow, and the selection ring, capture rings and piece outlines are\n  borders and strokes rather than custom shadows. The look is unchanged.\n\n## 1.0.0\n\n- Added a complete chess engine: legal move generation with castling, en\n  passant and promotion, plus checkmate, stalemate, the fifty-move rule,\n  insufficient material and threefold repetition detection. Verified against\n  the standard perft positions through depth 4.\n- Added a real bot: negamax alpha-beta search with quiescence, iterative\n  deepening, killer and history ordering, and a material plus piece-square\n  evaluation. Three levels - Casual (shallow, blunders like a human), Club\n  (~0.5 s a move) and Tournament (~1.4 s a move).\n- Dark arcade look: an inset ivory-and-slate board well, glowing selection\n  and last-move marks, legal-target dots and capture rings, a pulsing check\n  alarm, and glass score chips for the You/Draw/Bot tally.\n- Tap-to-play with a floating promotion picker, an Undo that rolls back to\n  your turn, a SAN scoresheet (a column on the inner display, a strip on the\n  cover), and Play-as-White-or-Black switching.\n- Game state syncs through session storage, so folding mid-think hands the\n  board to the other display and the bot picks up there. The tally stays in\n  persistent storage across launches.\n- Synth cues for quiet moves, captures, checks and results, with a rumble\n  and `navigator.vibrate` beat on a decisive finish.\n"
+  },
+  {
     "id": "com.mnismt.duo.2048",
     "name": "2048",
     "author": "mnismt",
@@ -142,18 +156,32 @@ export const CATALOG: CatalogApp[] = [
     "changelog": "# 1.1.0\n\nMoved the reference interface onto UI kit spacing, type, radius, glass, shadow and motion\ntokens. Added box-aware inner-display layout, a reduced-motion-safe card entrance and a\nsmooth live hinge-meter transition while preserving per-display hinge state and field-note\nstorage.\n\n# 1.0.1\n\nBuilt against UI kit 1.0.0 token names.\n\n# 1.0.0\n\nFirst community release. A hinge meter with distinct desk, folded and pocket layouts,\nlive display state and an app-private field note. No network, no device permissions.\n"
   },
   {
+    "id": "labs.doan.ipduo.books",
+    "name": "Books",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-27T09:47:04+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.books/1.0.0+64b3b175/icon-1024.png",
+    "changelog": "# 1.0.0\n\nThe library, store, reader and audiobook preview, kept in the app storage\nand shared by both displays.\n"
+  },
+  {
     "id": "labs.doan.ipduo.calculator",
     "name": "Calculator",
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.0.1",
-    "releases": 2,
+    "version": "1.1.0",
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00",
+    "updated": "2026-09-27T09:47:04+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.0.1+288d703d/icon-1024.png",
-    "changelog": "# 1.0.1\n\nThe keypad shrinks to the display height, so the readout is no longer clipped at the top.\n\n# 1.0.0\n\nThe iOS calculator: one pending operator, immediate evaluation on the next.\n"
+    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.1.0+e72e08b4/icon-1024.png",
+    "changelog": "# 1.1.0\n\nScientific keys, history, unit and currency conversion, Math Notes with variables, handwriting and graphs.\n\n# 1.0.1\n\nThe keypad shrinks to the display height, so the readout is no longer clipped at the top.\n\n# 1.0.0\n\nThe iOS calculator: one pending operator, immediate evaluation on the next.\n"
   },
   {
     "id": "labs.doan.ipduo.calendar",
@@ -162,11 +190,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-21T21:34:57+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+01f69dbf/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+9592d841/icon-1024.png",
     "changelog": "# 1.1.0\n\nThe tablet layout: sidebar with calendars and a mini month, Day, Week, Month and\nYear views, events that are created, edited, deleted and searched, and stored in\napp storage.\n\nMonth draws the sheet each display asks for. Inside, it is the Mac's: ruled both\nways in a hairline well under the UIKit separator, the weekend shaded, numbers\nhung on the right of their day, the picked day lifted whole. On the cover it is\nthe phone's: no rules, no shading, the number centred over its dots. Events pack\ninto lanes either way, so a multi-day event is a single bar across the days it\ncovers, and a week only draws the rows the month has instead of ruling an empty\nsixth. A day that runs out of lanes counts the rest and opens on Day.\n\nDay and Week are ruled to match, with the weekend shaded, the hours hung on\ntheir own lines, and now drawn the way Calendar draws it: pale across the week,\nsolid with a dot on today, and the time itself in the gutter. The sidebar lists\ncalendars as tinted checkboxes and its mini month follows the pane instead of\nstranding September under a February sheet. Paging slides the sheet the way the\narrow points; arriving at a view raises it.\n\nA fresh install opens on a working month around today, the keynote the\nhome-screen widget shows included.\n\n# 1.0.0\n\nMonth view with today marked, as an isolated release.\n"
   },
   {
@@ -176,12 +204,40 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-24T21:30:20+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+75a0ba61/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+44f78d0b/icon-1024.png",
     "changelog": "# 1.1.0\n\nThe Clock app rebuilt end to end as the iPadOS Clock: a sidebar on the wide\ndisplay, a floating tab bar on the cover, and four working tabs. World Clock\nlists cities with relative-day offsets and an add-city sheet with search.\nAlarms add, edit, toggle and delete, with an iOS wheel picker for the time,\nrepeat days, sounds, snooze, and a full-screen snooze/stop alert that only the\nowning display sounds. Stopwatch runs a digital and an analog face off one\nshared timer with laps, best and worst highlights. Timers pick hours, minutes\nand seconds on wheels, run as orange-ring cards that pause, resume and cancel,\nand remember recents. All state lives in app storage, so the two display\ncopies agree while only the owner fires sounds.\n\n# 1.0.0\n\nWorld clock: local time large, six cities below, ticking once a second.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.contacts",
+    "name": "Contacts",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-24T21:51:58+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.contacts/1.0.0+5bf5a89d/icon-1024.png",
+    "changelog": "# 1.0.0\n\nThe address book with favorites, blocked contacts and lists, kept in the app\nstorage and shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.fitness",
+    "name": "Fitness",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-27T09:47:04+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.fitness/1.0.0+85adef03/icon-1024.png",
+    "changelog": "# 1.0.0\n\nActivity rings, workouts and awards over the health book, kept in the app\nstorage and shared by both displays.\n"
   },
   {
     "id": "labs.doan.ipduo.freeform",
@@ -194,8 +250,78 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+7d7d0406/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+9015b41a/icon-1024.png",
     "changelog": "# 1.0.0\n\nFreehand ink on a canvas with a palette of inks.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.health",
+    "name": "Health",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-27T09:47:04+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.health/1.0.0+2bfb7588/icon-1024.png",
+    "changelog": "# 1.0.0\n\nThe health book with Summary, Browse and Sharing, kept in the app storage\nand shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.home",
+    "name": "Home",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-25T13:03:43+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.home/1.0.0+6f6d2cf6/icon-1024.png",
+    "changelog": "# 1.0.0\n\nRooms and accessories with scenes and status rows, kept in the app storage\nand shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.maps",
+    "name": "Maps",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-27T15:26:25+07:00",
+    "permissions": [
+      {
+        "name": "geolocation",
+        "label": "Location"
+      }
+    ],
+    "icon": "/catalog/apps/labs.doan.ipduo.maps/1.0.0+5abe14db/icon-1024.png",
+    "changelog": "# 1.0.0\n\nLive search, routing and the blue dot over the declared tile, geocoder and\nrouter origins, with the running map shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.memos",
+    "name": "Voice Memos",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-26T16:06:26+07:00",
+    "permissions": [
+      {
+        "name": "microphone",
+        "label": "Microphone"
+      },
+      {
+        "name": "files",
+        "label": "Files"
+      }
+    ],
+    "icon": "/catalog/apps/labs.doan.ipduo.memos/1.0.0+b17467f9/icon-1024.png",
+    "changelog": "# 1.0.0\n\nRecord, trim, replace, play and organize voice memos; capture and file writes\nrun on the session owner and the audio lives in the app's file store.\n"
   },
   {
     "id": "labs.doan.ipduo.news",
@@ -203,13 +329,13 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.1.0",
-    "releases": 2,
+    "version": "1.2.0",
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T12:38:04+07:00",
+    "updated": "2026-09-26T21:43:15+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.news/1.1.0+80333929/icon-1024.png",
-    "changelog": "# 1.1.0\n\nRebuilt as Apple News for the Duo: a floating glass sidebar (channels, followed topics, Saved Stories, History) on the inner display and a tab bar on the cover. Today opens with a Top Story hero over a Latest wire, articles push over the whole app in a serif column with the live discussion underneath, and every list animates in staggered. Feeds cache through storage so the mirror copy paints the same stories without fetching.\n\n# 1.0.0\n\nHacker News front page dressed as Apple News, opening stories in Safari.\n"
+    "icon": "/catalog/apps/labs.doan.ipduo.news/1.2.0+34dbfefc/icon-1024.png",
+    "changelog": "# 1.2.0\n\nFeeds move to DEV Community (dev.to): real articles with real cover photography instead of lettered tiles. Images are fetched through a resizer and painted as data URIs, so they work inside the app's document policy, and they fade in over each story's seeded gradient. Articles open with the cover art and the piece itself, and discussions come from the story's own comment thread. Search still reaches Hacker News via Algolia. The sidebar now clears the home-bar area, so its source card is no longer clipped.\n\n# 1.1.0\n\nRebuilt as Apple News for the Duo: a floating glass sidebar (channels, followed topics, Saved Stories, History) on the inner display and a tab bar on the cover. Today opens with a Top Story hero over a Latest wire, articles push over the whole app in a serif column with the live discussion underneath, and every list animates in staggered. Feeds cache through storage so the mirror copy paints the same stories without fetching.\n\n# 1.0.0\n\nHacker News front page dressed as Apple News, opening stories in Safari.\n"
   },
   {
     "id": "labs.doan.ipduo.notes",
@@ -218,7 +344,7 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-25T20:29:05+07:00",
     "permissions": [
@@ -231,7 +357,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Write clipboard"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.1.0+3297e7b9/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.1.0+d0b5e11c/icon-1024.png",
     "changelog": "# 1.1.0\n\nRebuild Notes to match Apple's: a rich-text document model behind a block\neditor (Title, Heading, Subheading, Body, Monostyled, Block Quote, bold,\nitalic, underline, strikethrough, bulleted, dashed and numbered lists with\nindent, tappable checklists, tables with growing rows and columns, inline\nphotos and auto-linked URLs), custom undo and redo, find-in-note with live\nhighlights, and a Markup canvas with inks, widths, eraser and undo kept beside\nthe document. Notes pin, lock behind the side button's double-press, move\nbetween folders and drop into Recently Deleted with a 30-day clock, a recover\npath and media cleanup on final delete. The folders rail gains iCloud,\nuser folders with rename and delete, the bin and a #tag strip mined from the\ndocuments; the list gains a Pinned section, date groups, a gallery view,\nsort orders, search and per-note menus; and the folded phone walks\nFolders, list, note.\n\n# 1.0.0\n\nRun Notes in an isolated document with persistent text, shared session navigation\nand explicit saving and failure states.\n"
   },
   {
@@ -250,7 +376,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Photos"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+184fc696/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+cd673a23/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe photos taken in Camera, read through the Photos service, with a full-bleed viewer.\n"
   },
   {
@@ -259,13 +385,55 @@ export const CATALOG: CatalogApp[] = [
     "author": "Doan Labs",
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
-    "version": "1.1.0",
-    "releases": 2,
+    "version": "1.1.1",
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T12:37:54+07:00",
+    "updated": "2026-09-26T00:19:40+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.0+ebb68b78/icon-1024.png",
-    "changelog": "# 1.1.0\n\nA full Reminders rebuild after the iPad app: a glass sidebar of Today,\nScheduled, All, Flagged and Completed tiles with My Lists and tags on the inner\ndisplay, push navigation on the cover, round tinted checkboxes, inline editing,\na details sheet with dates, flags, priorities, tags and subtasks, list editing,\nsearch and a legacy tasks migration - all in the app storage, shared by both\ndisplays.\n\n# 1.0.0\n\nA checklist kept in the app storage, shared by both displays.\n"
+    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.1+9e96943b/icon-1024.png",
+    "changelog": "# 1.1.1\n\nThe cover no longer shows a blurred sliver of a pushed page over the Lists\nedge: the kit's Push draws a sheet that mounts already-open at rest instead of\nreplaying its slide on the copy the fold brings up. The destination header's\nShare button works, writing the list's name and its reminders to the clipboard\nwhere no system share sheet can reach.\n\n# 1.1.0\n\nA full Reminders rebuild after the iPad app: a glass sidebar of Today,\nScheduled, All, Flagged and Completed tiles with My Lists and tags on the inner\ndisplay, push navigation on the cover, round tinted checkboxes, inline editing,\na details sheet with dates, flags, priorities, tags and subtasks, list editing,\nsearch and a legacy tasks migration - all in the app storage, shared by both\ndisplays.\n\n# 1.0.0\n\nA checklist kept in the app storage, shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.stocks",
+    "name": "Stocks",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-27T16:53:14+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.stocks/1.0.0+308bc8fc/icon-1024.png",
+    "changelog": "# 1.0.0\n\nLive quotes, charts and business headlines over the declared feeds, with the\nwatchlist kept in the app storage and shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.tips",
+    "name": "Tips",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-24T20:45:31+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.tips/1.0.0+561118b2/icon-1024.png",
+    "changelog": "# 1.0.0\n\nCollections, the tip of the day and saved bookmarks, kept in the app storage\nand shared by both displays.\n"
+  },
+  {
+    "id": "labs.doan.ipduo.wallet",
+    "name": "Wallet",
+    "author": "Doan Labs",
+    "lane": "official",
+    "repo": "https://github.com/doan-labs/duo",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-09-17T16:00:24+07:00",
+    "updated": "2026-09-25T13:03:43+07:00",
+    "permissions": [],
+    "icon": "/catalog/apps/labs.doan.ipduo.wallet/1.0.0+42e370d5/icon-1024.png",
+    "changelog": "# 1.0.0\n\nThe pass book with the card fan, double-click pay sheet and add-pass flow,\nkept in the app storage and shared by both displays.\n"
   },
   {
     "id": "labs.doan.ipduo.weather",
@@ -274,16 +442,16 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T10:02:40+07:00",
+    "updated": "2026-09-27T22:54:44+07:00",
     "permissions": [
       {
         "name": "geolocation",
         "label": "Location"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+67df7e45/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+5b28522f/icon-1024.png",
     "changelog": "# 1.1.0\n\nLaunch now asks for the device's place on its own: the geolocation prompt runs first\nand the public IP answers when the prompt is refused, unnamed or times out, named\nthrough a free reverse geocoder. My Location files itself first in the list, cannot\nbe removed, and refreshes quietly on later launches while permission holds.\n\nThe inner display becomes the iPad layout: a floating glass sidebar carries the\nsearch field, the units and location menu, and sky-tinted location cards beside the\ndetail pane, with a sidebar toggle in the top bar. The cover display keeps the\niPhone list and bottom bar.\n\n# 1.0.0\n\nIsolated Weather with owner-only forecast requests, shared persistent preferences,\nrefresh commands, delegated geolocation and declarative widget snapshots.\n\nRedesigned after the iOS Weather app: large hero temperature, condition-driven sky\nbackgrounds with moon, stars, clouds, rain, snow and fog layers, frosted glass cards,\nSF Symbol condition glyphs, an hourly strip with sunrise and sunset, ten-day rows with\ntemperature range bars and a today marker, visual detail tiles (UV, sunrise/sunset arc,\nwind compass, feels like, 24-hour precipitation bars, humidity, visibility, pressure\ngauge, air quality from Open-Meteo), sky-card locations list, and a page-dot toolbar\nwith a bottom bar on the outer display.\n"
   }
 ]
@@ -324,7 +492,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T22:18:27+07:00"
+    "updated": "2026-09-27T09:47:04+07:00"
   },
   {
     "name": "Mail",
@@ -350,9 +518,7 @@ export const SHELL: {
     "name": "Maps",
     "icon": "/icons/maps.webp",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-23T00:24:19+07:00"
+    "changelog": null
   },
   {
     "name": "TV",
@@ -372,17 +538,13 @@ export const SHELL: {
     "name": "Health",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22ht%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.3%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff375f%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23e4053c%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%23fdfdff%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Cpath%20d%3D%22M96%20156C60%20130%2034%20110%2034%2082a30%2030%200%200%201%2062-12%2030%2030%200%200%201%2062%2012c0%2028-26%2048-62%2074Z%22%20fill%3D%22url(%23ht)%22%2F%3E%3C%2Fsvg%3E",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T12:35:54+07:00"
+    "changelog": null
   },
   {
     "name": "Wallet",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22w1%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ffd60a%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ff9f0a%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22w2%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%235ac8fa%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230a84ff%22%2F%3E%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22w3%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff6482%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ff375f%22%2F%3E%3C%2FlinearGradient%3E%0A%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%230b0b0d%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%2252%22%20width%3D%22124%22%20height%3D%2246%22%20rx%3D%2211%22%20fill%3D%22url(%23w1)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%2276%22%20width%3D%22124%22%20height%3D%2246%22%20rx%3D%2211%22%20fill%3D%22url(%23w3)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%22100%22%20width%3D%22124%22%20height%3D%2246%22%20rx%3D%2211%22%20fill%3D%22url(%23w2)%22%2F%3E%0A%3Crect%20x%3D%2234%22%20y%3D%22110%22%20width%3D%22124%22%20height%3D%2210%22%20fill%3D%22%23f2f2f7%22%20fill-opacity%3D%22.92%22%2F%3E%3C%2Fsvg%3E",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T13:03:43+07:00"
+    "changelog": null
   },
   {
     "name": "Siri",
@@ -401,26 +563,20 @@ export const SHELL: {
   {
     "name": "Stocks",
     "icon": "/icons/stocks.webp",
-    "mock": true,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "mock": false,
+    "changelog": null
   },
   {
     "name": "Home",
     "icon": "/icons/home.webp",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T13:03:43+07:00"
+    "changelog": null
   },
   {
     "name": "Fitness",
     "icon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20192%20192%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22sheen%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%22.2%22%20y2%3D%221%22%3E%0A%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.16%22%2F%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22%230b0b0d%22%2F%3E%0A%20%20%20%3Cpath%20d%3D%22M192.0%2096.0L191.9%20128.2L191.7%20138.5L191.3%20145.9L190.7%20151.9L189.9%20157.0L189.0%20161.4L187.9%20165.3L186.6%20168.8L185.2%20171.9L183.5%20174.7L181.6%20177.3L179.6%20179.6L177.3%20181.6L174.7%20183.5L171.9%20185.2L168.8%20186.6L165.3%20187.9L161.4%20189.0L157.0%20189.9L151.9%20190.7L145.9%20191.3L138.5%20191.7L128.2%20191.9L96.0%20192.0L63.8%20191.9L53.5%20191.7L46.1%20191.3L40.1%20190.7L35.0%20189.9L30.6%20189.0L26.7%20187.9L23.2%20186.6L20.1%20185.2L17.3%20183.5L14.7%20181.6L12.4%20179.6L10.4%20177.3L8.5%20174.7L6.8%20171.9L5.4%20168.8L4.1%20165.3L3.0%20161.4L2.1%20157.0L1.3%20151.9L0.7%20145.9L0.3%20138.5L0.1%20128.2L0.0%2096.0L0.1%2063.8L0.3%2053.5L0.7%2046.1L1.3%2040.1L2.1%2035.0L3.0%2030.6L4.1%2026.7L5.4%2023.2L6.8%2020.1L8.5%2017.3L10.4%2014.7L12.4%2012.4L14.7%2010.4L17.3%208.5L20.1%206.8L23.2%205.4L26.7%204.1L30.6%203.0L35.0%202.1L40.1%201.3L46.1%200.7L53.5%200.3L63.8%200.1L96.0%200.0L128.2%200.1L138.5%200.3L145.9%200.7L151.9%201.3L157.0%202.1L161.4%203.0L165.3%204.1L168.8%205.4L171.9%206.8L174.7%208.5L177.3%2010.4L179.6%2012.4L181.6%2014.7L183.5%2017.3L185.2%2020.1L186.6%2023.2L187.9%2026.7L189.0%2030.6L189.9%2035.0L190.7%2040.1L191.3%2046.1L191.7%2053.5L191.9%2063.8L192.0%2096.0Z%22%20fill%3D%22url(%23sheen)%22%2F%3E%0A%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2263%22%20fill%3D%22none%22%20stroke%3D%22%23fa114f%22%20stroke-width%3D%2217%22%20stroke-opacity%3D%22.28%22%2F%3E%0A%20%20%20%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2263%22%20fill%3D%22none%22%20stroke%3D%22%23fa114f%22%20stroke-width%3D%2217%22%20stroke-linecap%3D%22round%22%0A%20%20%20%20%20stroke-dasharray%3D%22395.84067435231395%22%20stroke-dashoffset%3D%2255.41769440932396%22%20transform%3D%22rotate(-90%2096%2096)%22%2F%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%23a6f425%22%20stroke-width%3D%2217%22%20stroke-opacity%3D%22.28%22%2F%3E%0A%20%20%20%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%23a6f425%22%20stroke-width%3D%2217%22%20stroke-linecap%3D%22round%22%0A%20%20%20%20%20stroke-dasharray%3D%22257.610597594363%22%20stroke-dashoffset%3D%2236.06548366321083%22%20transform%3D%22rotate(-90%2096%2096)%22%2F%3E%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2219%22%20fill%3D%22none%22%20stroke%3D%22%2322e0f5%22%20stroke-width%3D%2217%22%20stroke-opacity%3D%22.28%22%2F%3E%0A%20%20%20%3Ccircle%20cx%3D%2296%22%20cy%3D%2296%22%20r%3D%2219%22%20fill%3D%22none%22%20stroke%3D%22%2322e0f5%22%20stroke-width%3D%2217%22%20stroke-linecap%3D%22round%22%0A%20%20%20%20%20stroke-dasharray%3D%22119.38052083641213%22%20stroke-dashoffset%3D%2216.7132729170977%22%20transform%3D%22rotate(-90%2096%2096)%22%2F%3E%3C%2Fsvg%3E",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T12:35:54+07:00"
+    "changelog": null
   },
   {
     "name": "Reminders",
@@ -448,9 +604,7 @@ export const SHELL: {
     "name": "Contacts",
     "icon": "/icons/contacts.webp",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-24T21:51:58+07:00"
+    "changelog": null
   },
   {
     "name": "Freeform",
@@ -462,9 +616,7 @@ export const SHELL: {
     "name": "Tips",
     "icon": "/icons/tips.webp",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-24T20:45:31+07:00"
+    "changelog": null
   },
   {
     "name": "Phone",
@@ -472,7 +624,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-23T23:45:33+07:00"
+    "updated": "2026-09-26T09:24:11+07:00"
   },
   {
     "name": "Safari",
@@ -488,7 +640,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-26T22:38:26+07:00"
   },
   {
     "name": "Music",
@@ -496,7 +648,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-24T21:30:50+07:00"
+    "updated": "2026-09-27T09:47:04+07:00"
   },
   {
     "name": "App Store",
@@ -516,9 +668,7 @@ export const SHELL: {
     "name": "Voice Memos",
     "icon": "/icons/voicememos.webp",
     "mock": false,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "changelog": null
   },
   {
     "name": "Shortcuts",
@@ -526,7 +676,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-26T21:11:16+07:00"
   },
   {
     "name": "Podcasts",
@@ -534,14 +684,12 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-09-26T20:46:16+07:00"
   },
   {
     "name": "Books",
     "icon": "/icons/books.webp",
-    "mock": true,
-    "changelog": null,
-    "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "mock": false,
+    "changelog": null
   }
 ]

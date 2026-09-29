@@ -1,32 +1,14 @@
-// Fitness's app state: the same module-cell pattern as Health (decision 59),
-// same `path` shape, so a selection survives the fold. The data is the shared
-// health book - a workout logged in Health is already here.
+// Fitness's app state: the kit's KV cells on os.session, same `path` shape as
+// Health, so a selection survives the fold. The data is the health book bound
+// to os.storage at boot - a workout logged in Health is already here.
 
 import { healthStore } from '@doan-labs/duo-fixtures/health.ts'
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useEffect, useSyncExternalStore } from 'react'
 
-function cell<T>(initial: T) {
-  let v = initial
-  const subs = new Set<() => void>()
-  return {
-    get: () => v,
-    set(n: T) {
-      if (Object.is(v, n)) return
-      v = n
-      for (const s of subs) s()
-    },
-    sub(cb: () => void) {
-      subs.add(cb)
-      return () => {
-        subs.delete(cb)
-      }
-    }
-  }
-}
-
 /** `summary` | `activity` | `workouts` | `awards` at root, `w:<id>` pushed. */
-const pathCell = cell<string[]>(['summary'])
-export const usePath = () => useSyncExternalStore(pathCell.sub, pathCell.get)
+const pathCell = cell<string[]>('session', 'fitness.path', ['summary'])
+export const usePath = () => useSyncExternalStore(pathCell.subscribe, pathCell.get)
 export const goRoot = (d: string) => pathCell.set([d])
 export const goTo = (d: string) => pathCell.set([...pathCell.get(), d])
 export const goBack = () => {
@@ -37,25 +19,25 @@ export const goBack = () => {
 export const pathNow = () => pathCell.get()
 
 /** The Activity tab's date scrubber: 0 is today, 1 yesterday, and so on. */
-const dayCell = cell(0)
-export const useDayOffset = () => useSyncExternalStore(dayCell.sub, dayCell.get)
+const dayCell = cell('session', 'fitness.day', 0)
+export const useDayOffset = () => useSyncExternalStore(dayCell.subscribe, dayCell.get)
 export const scrubDay = (d: -1 | 1) => dayCell.set(Math.max(0, dayCell.get() + d))
 export const setDayOffset = (n: number) => dayCell.set(Math.max(0, n))
 export const resetDay = () => dayCell.set(0)
 
 /** The sheets Fitness can raise: add-workout, change-goals, none. */
-const sheetCell = cell<'workout' | 'goals' | null>(null)
-export const useSheet = () => useSyncExternalStore(sheetCell.sub, sheetCell.get)
+const sheetCell = cell<'workout' | 'goals' | null>('session', 'fitness.sheet', null)
+export const useSheet = () => useSyncExternalStore(sheetCell.subscribe, sheetCell.get)
 export const openSheet = sheetCell.set
 export const closeSheet = () => sheetCell.set(null)
 
 export const useBook = () => useSyncExternalStore(healthStore.subscribe, healthStore.get)
 
-/** Same clock as Health: the live copy accrues, the mirror just draws. */
-export function useTicker(mirror?: boolean) {
+/** Same clock as Health: the active copy accrues, the parked one just draws. */
+export function useTicker(off?: boolean) {
   useEffect(() => {
-    if (mirror) return
+    if (off) return
     const t = setInterval(healthStore.poke, 30_000)
     return () => clearInterval(t)
-  }, [mirror])
+  }, [off])
 }

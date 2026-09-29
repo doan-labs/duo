@@ -8,12 +8,12 @@ import * as stylex from '@stylexjs/stylex'
 import { useSyncExternalStore } from 'react'
 import { eraseMemo } from './engine.ts'
 import { MemoRow, SelectionBar } from './list.tsx'
-import { type Memo, memoOps, memosCell, useShared } from './store.ts'
+import { type Memo, memoOps, memosCell, useSetShared } from './store.ts'
 
 export function Deleted({ back }: { back: () => void }) {
   const memos = useSyncExternalStore(memosCell.subscribe, memosCell.get)
   const deleted = memos.filter((m) => m.deletedAt).sort((a, b) => b.deletedAt! - a.deletedAt!)
-  const [selection, setSelection] = useShared<Set<string>>('trashsel', new Set())
+  const [selection, setSelection] = useSetShared('trashsel')
   const toggle = (id: string) => {
     const next = new Set(selection)
     if (next.has(id)) next.delete(id)

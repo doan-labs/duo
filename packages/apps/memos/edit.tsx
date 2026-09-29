@@ -1,7 +1,9 @@
 // The edit page: drag the crop marks to trim, or Replace to record over the
-// playhead. Both edits land on a decoded buffer and re-encode to WAV; 'Save as
-// New Recording' always preserves the original file. While replacing, the
-// recorder is the engine's - the same singleton the deck uses.
+// playhead. The decoded buffer draws the wave and sets the marks; the write
+// itself is an owner op carrying just the recipe (marks or the armed take),
+// and the owner re-derives and re-encodes the WAV. 'Save as New Recording'
+// always preserves the original file. While replacing, the recorder is the
+// engine's - the same singleton the deck uses.
 
 import { mmss } from '@doan-labs/duo-fixtures'
 import { Button, Page, Section, Sheet } from '@doan-labs/duo-uikit'
@@ -17,8 +19,9 @@ import {
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
-import { decode, splice, wav } from './audio.ts'
+import { decode } from './audio.ts'
 import {
+  applyReplace,
   hasMic,
   pausePlay,
   playMemo,
@@ -28,9 +31,9 @@ import {
   startRec,
   stopPlay,
   stopReplace,
+  trimTake,
   usePlay,
-  useRec,
-  writeTake
+  useRec
 } from './engine.ts'
 import { Glyph } from './glyphs.tsx'
 import type { Memo } from './store.ts'
@@ -60,7 +63,7 @@ export function EditMemo({ memo, back }: { memo: Memo; back: () => void }) {
     })
     return () => {
       live = false
-      stopPlay(memo.id)
+      void stopPlay(memo.id)
     }
   }, [memo.id, memo.file])
 
@@ -74,28 +77,18 @@ export function EditMemo({ memo, back }: { memo: Memo; back: () => void }) {
     if (!buf) return
     setBusy(true)
     try {
-      const blob = wav(buf, fromSec, toSec)
-      if (asNew) {
-        await saveAsNew(memo, blob)
-      } else {
-        await writeTake(memo, blob, 'audio/wav')
-      }
+      await trimTake(memo, fromSec, toSec, asNew)
       back()
     } finally {
       setBusy(false)
     }
   }
 
-  const applyReplace = async (asNew: boolean) => {
+  const finishReplace = async (asNew: boolean) => {
     if (!buf || replacedSec == null) return
     setBusy(true)
     try {
-      const take = replaceState.get().blob
-      if (!take) throw new Error('no take')
-      const insert = await decode(take)
-      const blob = splice(buf, replacedSec, insert)
-      if (asNew) await saveAsNew(memo, blob)
-      else await writeTake(memo, blob, 'audio/wav')
+      await applyReplace(memo, asNew)
       back()
     } finally {
       setBusy(false)
@@ -180,14 +173,14 @@ export function EditMemo({ memo, back }: { memo: Memo; back: () => void }) {
               <Button
                 variant="tinted"
                 disabled={busy}
-                onClick={() => void (confirm === 'trim' ? applyTrim(false) : applyReplace(false))}
+                onClick={() => void (confirm === 'trim' ? applyTrim(false) : finishReplace(false))}
               >
                 {confirm === 'trim' ? 'Trim Original' : 'Apply to Original'}
               </Button>
               <Button
                 variant="filled"
                 disabled={busy}
-                onClick={() => void (confirm === 'trim' ? applyTrim(true) : applyReplace(true))}
+                onClick={() => void (confirm === 'trim' ? applyTrim(true) : finishReplace(true))}
               >
                 Save as New Recording
               </Button>
@@ -200,12 +193,6 @@ export function EditMemo({ memo, back }: { memo: Memo; back: () => void }) {
       )}
     </Page>
   )
-}
-
-/** The safe path: the original file is untouched, a fresh memo appears. */
-async function saveAsNew(memo: Memo, blob: Blob) {
-  const { saveCopy } = await import('./engine.ts')
-  await saveCopy(memo, blob)
 }
 
 const styles = stylex.create({

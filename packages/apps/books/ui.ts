@@ -1,7 +1,9 @@
 // Which pane is up, which book is open, whether the reader is up and what its
-// chrome is doing. Shared across both displays, so it lives in a module like
-// the library - the app's two copies are separate React trees.
+// chrome is doing. Shared across both displays, so it lives in os.session:
+// the app's two copies are separate documents, and the fold hands the whole
+// session over in one state.
 
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useSyncExternalStore } from 'react'
 
 export type Section = 'home' | 'library' | 'store' | 'audio' | 'search' | `shelf:${string}`
@@ -22,22 +24,11 @@ export type Ui = {
   seek?: number
 }
 
-let ui: Ui = { tab: 'home', chrome: true, q: '' }
-const subs = new Set<() => void>()
+const uiCell = cell<Ui>('session', 'books.ui', { tab: 'home', chrome: true, q: '' })
 
-const set = (p: Partial<Ui>) => {
-  ui = { ...ui, ...p }
-  for (const f of subs) f()
-}
+const set = (p: Partial<Ui>) => uiCell.set({ ...uiCell.get(), ...p })
 
-export const useUi = () =>
-  useSyncExternalStore(
-    (f) => {
-      subs.add(f)
-      return () => subs.delete(f)
-    },
-    () => ui
-  )
+export const useUi = () => useSyncExternalStore(uiCell.subscribe, uiCell.get)
 
 export const go = (tab: Section) => set({ tab, detail: undefined })
 export const openBook = (id: string) => set({ detail: id })

@@ -2,9 +2,8 @@
 // a two-column grid of collections, and whatever you bookmarked, pushing
 // collection and tip pages. Unfolded, the collections are a sidebar and the
 // picked one fills the pane, as iPadOS splits it; folded, the same destinations
-// push. Saved ids live in a module store both displays' copies share (store.ts).
+// push. Saved ids live in os.storage, which both displays' copies share (store.ts).
 
-import type { Os } from '@doan-labs/duo-sdk'
 import { IconButton, LargeTitle, Nav, Screen, Sym, useNav, useWide } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -17,7 +16,7 @@ import { useSaved } from './store.ts'
 import { styles } from './styles.ts'
 import { TipPage } from './tip.tsx'
 
-export function Tips(_: { os: Os }) {
+export function Tips() {
   // The box decides, not the display: a split half of the inner panel is as
   // narrow as the cover and gets the same one-column Tips.
   const [root, wide] = useWide()

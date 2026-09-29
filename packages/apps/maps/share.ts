@@ -1,9 +1,14 @@
-// What both copies of Maps agree on, kept in module storage the way music's
-// deck is: the two displays run in one document, so a small store here is the
-// shared storage DESIGN.md asks for. Either copy writes intent - a query, a
-// pin, a destination - and the one allowed to fetch fills the rest in; the
-// folded copy never starts anything, it only draws what lands.
+// What both copies of Maps agree on. UI state - the query, the pin, the
+// destination, the camera, the folded pane - lives in os.session, so a fold
+// hands the same map over whole and closing the app clears it (DESIGN.md §2).
+// The fetch caches are the bulky part: a long route's decoded geometry would
+// not fit the session budget, so they sit in os.storage under 256KiB-per-key
+// headroom. Their keys pin them to the request that asked; a stale record is
+// only ever a cached answer, never a wrong one. Either copy writes intent and
+// the one allowed to fetch fills the rest in; the folded copy never starts
+// anything, it only draws what lands.
 
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useSyncExternalStore } from 'react'
 import { HOME, type MapKind, ME, type Place, type Recent, type View } from './data.ts'
 import type { Route, TravelMode } from './live.ts'
@@ -39,34 +44,57 @@ export type MapState = {
   scroll: number
 }
 
-let state: MapState = {
+type UiState = Omit<MapState, 'results' | 'routes' | 'estimate'>
+type NetState = Pick<MapState, 'results' | 'routes' | 'estimate'>
+const NET_KEYS: ReadonlySet<keyof NetState> = new Set(['results', 'routes', 'estimate'])
+
+const uiCell = cell<UiState>('session', 'maps.state', {
   query: '',
-  results: null,
   sel: null,
   dir: null,
-  routes: { key: '', list: null, failed: false, tries: 0 },
-  estimate: null,
   me: ME,
   recents: null,
   view: HOME,
   kind: 'explore',
   scroll: 0
-}
-const subs = new Set<() => void>()
+})
+const netCell = cell<NetState>('storage', 'maps.net', {
+  results: null,
+  routes: { key: '', list: null, failed: false, tries: 0 },
+  estimate: null
+})
 
-export const share = {
-  get: () => state,
-  set: (patch: Partial<MapState>) => {
-    state = { ...state, ...patch }
-    for (const f of subs) f()
-  },
-  sub: (f: () => void) => {
-    subs.add(f)
-    return () => {
-      subs.delete(f)
-    }
+let merged: MapState = { ...uiCell.get(), ...netCell.get() }
+const merge = () => {
+  merged = { ...uiCell.get(), ...netCell.get() }
+}
+const subscribe = (listener: () => void) => {
+  const notify = () => {
+    merge()
+    listener()
+  }
+  const ui = uiCell.subscribe(notify)
+  const net = netCell.subscribe(notify)
+  return () => {
+    ui()
+    net()
   }
 }
 
-/** Every write replaces the object, so a piece of state is a stable effect dep until it really changes. */
-export const useShared = () => useSyncExternalStore(share.sub, share.get)
+export const share = {
+  get: () => merged,
+  set: (patch: Partial<MapState>) => {
+    // Key routing is the only difference between the two cells, so callers
+    // can mix both in one patch.
+    const ui: Record<string, unknown> = {}
+    const net: Record<string, unknown> = {}
+    for (const key of Object.keys(patch) as (keyof MapState)[]) {
+      ;(NET_KEYS.has(key as keyof NetState) ? net : ui)[key] = patch[key]
+    }
+    if (Object.keys(ui).length) uiCell.set({ ...uiCell.get(), ...(ui as Partial<UiState>) })
+    if (Object.keys(net).length) netCell.set({ ...netCell.get(), ...(net as Partial<NetState>) })
+  }
+}
+
+/** Every write replaces the merged object, so a piece of state is a stable effect dep until it really changes. */
+export const useShared = () => useSyncExternalStore(subscribe, share.get)
