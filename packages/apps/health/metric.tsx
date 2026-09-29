@@ -13,6 +13,7 @@ import {
   todayKey,
   trend
 } from '@doan-labs/duo-fixtures/health.ts'
+import { os } from '@doan-labs/duo-sdk'
 import { Button, Segmented } from '@doan-labs/duo-uikit'
 import { RING_TINTS, Rings } from '@doan-labs/duo-uikit/rings.tsx'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
@@ -149,7 +150,7 @@ function axisLabels(range: Range) {
 }
 
 /** The Activity page: all three rings and the week they add up to. */
-export function ActivityPage({ os, wide }: { os: { open: (name: string) => void }; wide: boolean }) {
+export function ActivityPage({ wide }: { wide: boolean }) {
   const book = useBook()
   const vals = rings().map(
     (r) =>
@@ -211,7 +212,7 @@ export function ActivityPage({ os, wide }: { os: { open: (name: string) => void 
             </div>
           </div>
           <div {...stylex.props(styles.btnRow)}>
-            <Button variant="filled" onClick={() => os.open('Fitness')}>
+            <Button variant="filled" onClick={() => void os.open('Fitness')}>
               Open Fitness
             </Button>
           </div>

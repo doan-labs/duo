@@ -1,9 +1,10 @@
-// A module store, the baked-app pattern (apps/phone/store.ts): both displays
-// render this module, so one snapshot IS the shared app state keeping them in
-// agreement. Durable metadata sits in localStorage under `duo.` - the erased
-// prefix (runtime/erase.ts) - while the audio itself lives in the `appfiles`
-// store through os.files, never as a string here.
+// The library lives in os.storage under `duo.memos.*` - durable, and erased
+// with the rest of app data by the device wipe - while the audio itself lives
+// in the `appfiles` store through os.files, never as a string here. Session
+// cells carry the shared UI state so both displays draw the same sheet,
+// selection and deck.
 
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useMemo, useSyncExternalStore } from 'react'
 
 export type Memo = {
@@ -30,36 +31,9 @@ export type Sort = 'newest' | 'oldest' | 'title' | 'longest'
 /** Deleted memos auto-erase past this, the way iOS's Recently Deleted does. */
 export const RECENTLY_DELETED_DAYS = 30
 
-function cell<T>(key: string | null, initial: T) {
-  let value = initial
-  if (key) {
-    try {
-      const raw = localStorage.getItem(key)
-      if (raw) value = JSON.parse(raw) as T
-    } catch {}
-  }
-  const subs = new Set<() => void>()
-  return {
-    subscribe: (fn: () => void) => {
-      subs.add(fn)
-      return () => subs.delete(fn)
-    },
-    get: () => value,
-    set: (v: T) => {
-      value = v
-      if (key) {
-        try {
-          localStorage.setItem(key, JSON.stringify(v))
-        } catch {}
-      }
-      for (const fn of subs) fn()
-    }
-  }
-}
-
-export const memosCell = cell<Memo[]>('duo.memos.list', [])
-export const foldersCell = cell<Folder[]>('duo.memos.folders', [])
-const sortCell = cell<Sort>('duo.memos.sort', 'newest')
+export const memosCell = cell<Memo[]>('storage', 'duo.memos.list', [])
+export const foldersCell = cell<Folder[]>('storage', 'duo.memos.folders', [])
+const sortCell = cell<Sort>('storage', 'duo.memos.sort', 'newest')
 
 // ---------- session cells: shared by both displays, never persisted ----------
 
@@ -68,10 +42,16 @@ const shared = new Map<string, AnyCell>()
 export function useShared<T>(key: string, initial: T) {
   let c = shared.get(key)
   if (!c) {
-    c = cell<T>(null, initial) as unknown as AnyCell
+    c = cell<T>('session', `memos.${key}`, initial) as unknown as AnyCell
     shared.set(key, c)
   }
   return [useSyncExternalStore(c.subscribe, c.get as () => T), c.set as (v: T) => void] as const
+}
+
+/** A Set does not survive a cell's JSON trip; keep the id list in the cell and the Set in the view. */
+export function useSetShared(key: string) {
+  const [ids, setIds] = useShared<string[]>(key, [])
+  return [new Set(ids), (s: Set<string>) => setIds([...s])] as const
 }
 
 const patch = (id: string, p: Partial<Memo>) =>
@@ -92,7 +72,7 @@ export function useMemos() {
   const [query, setQuery] = useShared('query', '')
   const sort = useSyncExternalStore(sortCell.subscribe, sortCell.get)
   const [editing, setEditing] = useShared('editing', false)
-  const [selection, setSelection] = useShared<Set<string>>('selection', new Set())
+  const [selection, setSelection] = useSetShared('selection')
   const [deck, setDeck] = useShared<'closed' | 'open'>('deck', 'closed')
   const [folder, setFolder] = useShared<string | null>('folder', null)
   const visible = useMemo(() => {

@@ -6,8 +6,7 @@
 
 import type { Pass, PassGroup } from '@doan-labs/duo-fixtures/wallet.ts'
 import { groupName, removePass } from '@doan-labs/duo-fixtures/wallet.ts'
-import type { Os } from '@doan-labs/duo-sdk'
-import { Menu, Nav, Row, Section, Sym, type SymProps, useNav, useWide } from '@doan-labs/duo-uikit'
+import { Menu, Nav, Row, Section, Sym, type SymProps, useDisplay, useNav, useWide } from '@doan-labs/duo-uikit'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -52,11 +51,12 @@ const ACT: Record<PassGroup, { label: string; sym: SymProps['name'] }> = {
   passes: { label: 'Present', sym: 'star' }
 }
 
-export function Wallet({ os }: { os: Os }) {
+export function Wallet() {
   const [box, wide] = useWide()
   // The subscription lives at the root: any write re-renders both displays' copies.
   const book = useBook()
   const path = usePath()
+  const active = useDisplay().active
   const sel = path.at(-1)!
   return (
     <div ref={box} {...stylex.props(styles.split)}>
@@ -72,7 +72,7 @@ export function Wallet({ os }: { os: Os }) {
         )}
       </div>
       <AddPassSheet />
-      <PaySheet mirror={os.mirror} />
+      <PaySheet off={!active} />
     </div>
   )
 }

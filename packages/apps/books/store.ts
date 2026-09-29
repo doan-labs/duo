@@ -1,7 +1,8 @@
 // The library: what you own, what you want, where you stopped, your marks and
-// shelves, and the reader's look. Persisted under `duo.books.v1` so it survives
-// app swaps, and kept in a module store so both displays read the same copy.
+// shelves, and the reader's look. Persisted under `duo.books.v1` in os.storage
+// so it survives app swaps and reaches both displays' copies.
 
+import { cell } from '@doan-labs/duo-uikit/kv.ts'
 import { useSyncExternalStore } from 'react'
 import { byId } from './data.ts'
 
@@ -23,8 +24,6 @@ export type Lib = {
   last?: string
 }
 
-const KEY = 'duo.books.v1'
-
 const seed = (): Lib => ({
   owned: ['alice', 'moby', 'frankenstein', 'pride', 'dracula', 'time', 'sherlock', 'jane', 'treasure', 'peter'],
   want: ['gatsby', 'dorian'],
@@ -43,40 +42,14 @@ const seed = (): Lib => ({
   last: 'alice'
 })
 
-const load = (): Lib => {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return seed()
-    const s = { ...seed(), ...JSON.parse(raw) }
-    return { ...s, prefs: { ...seed().prefs, ...s.prefs } }
-  } catch {
-    return seed()
-  }
+const libCell = cell<Lib>('storage', 'duo.books.v1', seed())
+
+export const useLib = () => useSyncExternalStore(libCell.subscribe, libCell.get)
+
+const patch = (fn: (s: Lib) => Partial<Lib>) => {
+  const lib = libCell.get()
+  libCell.set({ ...lib, ...fn(lib) })
 }
-
-let lib = load()
-const subs = new Set<() => void>()
-
-const write = (next: Lib) => {
-  lib = next
-  try {
-    localStorage.setItem(KEY, JSON.stringify(lib))
-  } catch {
-    /* storage full or blocked: the session copy still works */
-  }
-  for (const f of subs) f()
-}
-
-export const useLib = () =>
-  useSyncExternalStore(
-    (f) => {
-      subs.add(f)
-      return () => subs.delete(f)
-    },
-    () => lib
-  )
-
-const patch = (fn: (s: Lib) => Partial<Lib>) => write({ ...lib, ...fn(lib) })
 
 /** Store it under the same rules a real purchase would follow. */
 export const own = (id: string) =>

@@ -8,13 +8,13 @@ import * as stylex from '@stylexjs/stylex'
 import { useState, useSyncExternalStore } from 'react'
 import { Detail } from './detail.tsx'
 import { MemoRow } from './list.tsx'
-import { type Folder, folderOps, memoOps, memosCell, useShared } from './store.ts'
+import { type Folder, folderOps, memoOps, memosCell, useSetShared, useShared } from './store.ts'
 
 export function FolderPage({ folder, back }: { folder: Folder; back: () => void }) {
   const memos = useSyncExternalStore(memosCell.subscribe, memosCell.get)
   const items = memos.filter((m) => !m.deletedAt && m.folder === folder.id).sort((a, b) => b.at - a.at)
   const [editing, setEditing] = useShared('fediting', false)
-  const [selection, setSelection] = useShared<Set<string>>('fsel', new Set())
+  const [selection, setSelection] = useSetShared('fsel')
   const [menu, setMenu] = useState(false)
   const [rename, setRename] = useState(false)
   const nav = useNav()

@@ -58,12 +58,10 @@ const ORDER: Status[] = ['published', 'working', 'mockup']
  *  this is what they actually use, not a grant the runtime enforces. */
 const USES: Record<string, Perm[]> = {
   Camera: [{ name: 'camera', label: 'Camera' }],
-  Maps: [{ name: 'network', label: 'Network' }],
   Safari: [
     { name: 'network', label: 'Network' },
     { name: 'clipboard-write', label: 'Write clipboard' }
-  ],
-  'Voice Memos': [{ name: 'microphone', label: 'Microphone' }]
+  ]
 }
 
 const slugOf = (key: string) =>

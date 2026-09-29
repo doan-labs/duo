@@ -2,16 +2,16 @@
 // symbols beside the detail pane - and the same destinations pushed folded.
 // Quotes and headlines come from CNBC, daily history and symbol search from
 // stockanalysis.com, crypto intraday from Coinbase; every number on screen is
-// fetched, nothing is walked. The mirror copy starts nothing: start() and the
-// fetch hooks all gate on the `os.mirror` getter, which follows the fold.
+// fetched, nothing is walked. The parked copy starts nothing: start() and the
+// fetch hooks all gate on useDisplay().active, which follows the fold.
 
-import type { Os } from '@doan-labs/duo-sdk'
-import { Button, Nav, Page, Text, Title, useNav, useWide } from '@doan-labs/duo-uikit'
+import { os } from '@doan-labs/duo-sdk'
+import { Button, Nav, Page, Text, Title, useDisplay, useNav, useWide } from '@doan-labs/duo-uikit'
 import { Num } from '@doan-labs/duo-uikit/num.tsx'
 import { shared, typography } from '@doan-labs/duo-uikit/styles.ts'
 import { Sym } from '@doan-labs/duo-uikit/sym.tsx'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Chart, Live, Spark, tickFmt } from './chart.tsx'
 import {
   follow,
@@ -38,32 +38,37 @@ const compact = { notation: 'compact' as const, maximumFractionDigits: 1 }
 // A percent parsed from "-0.00%" is -0, which is not < 0; the absolute change still carries the sign.
 const down = (d?: { chg: number; chgPct: number }) => !!d && (d.chg < 0 || d.chgPct < 0)
 
-export function Stocks({ os }: { os: Os }) {
+export function Stocks() {
   const [root, wide] = useWide()
   const { items, viewing } = useStore()
-  // `os.mirror` follows the pose, so the live copy starts polling when the fold
+  // active follows the pose, so the live copy starts polling when the fold
   // hands it the device, not only when the app was first opened.
+  const live = useDisplay().active
   useEffect(() => {
-    if (!os.mirror) start()
-  }, [os.mirror])
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the arg applies once at open; later picks are the user's
+    if (live) start()
+  }, [live])
+  // A deep link names a symbol: apply it, and keep listening while the app is up.
+  const itemsRef = useRef(items)
+  itemsRef.current = items
   useEffect(() => {
-    if (os.arg) {
-      const hit = items.find((v) => v.sym === os.arg)
+    const pick = (sym: string) => {
+      const hit = itemsRef.current.find((v) => v.sym === sym)
       if (hit) select(hit)
     }
+    if (os.session.arg) pick(os.session.arg)
+    return os.session.onArg(pick)
   }, [])
   return (
     <div ref={root} {...stylex.props(styles.split)}>
-      {wide && <Side os={os} />}
+      {wide && <Side />}
       <div {...stylex.props(styles.detail)}>
         {wide ? (
           <div {...stylex.props(styles.detailScroll)}>
-            <Detail key={viewing.sym} item={viewing} showNews os={os} />
+            <Detail key={viewing.sym} item={viewing} showNews />
           </div>
         ) : (
           <Nav>
-            <Home os={os} />
+            <Home />
           </Nav>
         )}
       </div>
@@ -73,7 +78,7 @@ export function Stocks({ os }: { os: Os }) {
 
 // -- the sidebar ----------------------------------------------------------------
 
-function Side({ os }: { os: Os }) {
+function Side() {
   const { items, viewing } = useStore()
   const [query, setQuery] = useState('')
   const searching = query.trim().length > 0
@@ -89,7 +94,7 @@ function Side({ os }: { os: Os }) {
               My Symbols
             </Text>
             {items.map((v) => (
-              <SymbolRow key={v.sym} item={v} os={os} side on={v.sym === viewing.sym} onPick={select} />
+              <SymbolRow key={v.sym} item={v} side on={v.sym === viewing.sym} onPick={select} />
             ))}
           </>
         )}
@@ -100,16 +105,14 @@ function Side({ os }: { os: Os }) {
 
 // -- the cover's list page --------------------------------------------------------
 
-function Home({ os }: { os: Os }) {
+function Home() {
   const { push } = useNav()
   const { items } = useStore()
   const [query, setQuery] = useState('')
   const searching = query.trim().length > 0
   const open = (v: Item) => {
     select(v)
-    // `os` is the same object on every copy, so a page pushed before a fold
-    // still reads the live `mirror` getter when it next renders.
-    push((back) => <DetailPage item={v} back={back} os={os} />)
+    push((back) => <DetailPage item={v} back={back} />)
   }
   return (
     <Page
@@ -128,7 +131,7 @@ function Home({ os }: { os: Os }) {
       ) : (
         <>
           {items.map((v) => (
-            <SymbolRow key={v.sym} item={v} os={os} onPick={open} />
+            <SymbolRow key={v.sym} item={v} onPick={open} />
           ))}
           <Business />
         </>
@@ -137,11 +140,11 @@ function Home({ os }: { os: Os }) {
   )
 }
 
-function DetailPage({ item, back, os }: { item: Item; back: () => void; os: Os }) {
+function DetailPage({ item, back }: { item: Item; back: () => void }) {
   return (
     <Page title={item.sym} back={back}>
       <div {...stylex.props(styles.detailPad)}>
-        <Detail item={item} os={os} />
+        <Detail item={item} />
       </div>
     </Page>
   )
@@ -242,19 +245,17 @@ function SearchResults({ query, onPick, side }: { query: string; onPick: (v: Ite
 
 function SymbolRow({
   item,
-  os,
   side,
   on,
   onPick
 }: {
   item: Item
-  os: Os
   side?: boolean
   on?: boolean
   onPick: (v: Item) => void
 }) {
   const quote = useQuote(item.sym)
-  const spark = useSpark(item, !os.mirror)
+  const spark = useSpark(item, useDisplay().active)
   const q = quote.data
   const dn = down(q)
   return (
@@ -288,15 +289,15 @@ function SymbolRow({
 const extTone = (ext: NonNullable<Quote['ext']>) => (down(ext) ? styles.deltaDn : styles.delta)
 
 /** The quote block, range pills, chart, stats grid and follow toggle. */
-function Detail({ item, showNews, os }: { item: Item; showNews?: boolean; os: Os }) {
+function Detail({ item, showNews }: { item: Item; showNews?: boolean }) {
   const { items } = useStore()
   const inList = items.some((v) => v.sym === item.sym)
   const quote = useQuote(item.sym)
   const ranges = RANGES[item.kind]
   const [range, setRange] = useState(item.kind === 'crypto' ? '1D' : '1M')
-  // Read at render: the getter follows the fold, and this component re-renders
-  // on every store emit even when it sits in a pushed Nav page.
-  const live = !os.mirror
+  // Subscribed to the pose: this component re-renders on the fold even when it
+  // sits in a pushed Nav page that nothing else touches.
+  const live = useDisplay().active
   const { entry, pts } = useHistory(item, range, live)
   const q = quote.data
   const dn = down(q)
