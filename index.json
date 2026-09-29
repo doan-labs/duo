@@ -1,5 +1,19 @@
 {
   "apps": {
+    "com.linhtinhvovan.duo.chess": {
+      "name": "Chess",
+      "lane": "community",
+      "author": "linhtinhvovan",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/chess",
+      "releases": [
+        {
+          "release": "1.0.1+507e9677",
+          "sdk": "0.0.0",
+          "bytes": 537642,
+          "sha256": "b1a5f7648b5b3ecb0e42d0d32e178db509d5034a1d38b0d8eef6740a20b1f31c"
+        }
+      ]
+    },
     "com.mnismt.duo.2048": {
       "name": "2048",
       "lane": "community",
