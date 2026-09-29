@@ -84,7 +84,9 @@ export function fitLayout(view: ViewDimensions, wide: boolean) {
   const bottom = wide ? 34 : 28
   const header = wide ? 56 : 48
   const status = 20
-  const railW = wide ? 216 : 0
+  // The rail is as wide as the level row needs (~250 px) plus the stage gap;
+  // reserving less would let it lap onto the board.
+  const railW = wide ? 280 : 0
   const railH = wide ? 0 : 138
   const gaps = wide ? 44 : 28
   const width = view.width || 740

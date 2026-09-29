@@ -70,7 +70,7 @@ function Seg<T extends string>({
           onClick={() => onChange(o)}
           {...stylex.props(styles.segBtn, o === value && styles.segOn)}
         >
-          {o}
+          <span {...stylex.props(styles.segLabel)}>{o}</span>
         </button>
       ))}
     </div>

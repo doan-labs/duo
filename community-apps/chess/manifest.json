@@ -1,7 +1,7 @@
 {
   "id": "com.linhtinhvovan.duo.chess",
   "name": "Chess",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "lane": "community",
   "entry": "./main.tsx",
   "icon": "./icon.png",
