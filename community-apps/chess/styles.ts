@@ -37,9 +37,9 @@ const sheetIn = stylex.keyframes({
 })
 // The check glow breathes twice, then holds: an alarm, not a siren.
 const checkPulse = stylex.keyframes({
-  '0%': { backgroundColor: 'rgba(255,69,58,.2)' },
-  '45%': { backgroundColor: 'rgba(255,69,58,.62)' },
-  '100%': { backgroundColor: 'rgba(255,69,58,.4)' }
+  '0%': { backgroundColor: `color-mix(in srgb, ${colors.redDark} 20%, transparent)` },
+  '45%': { backgroundColor: `color-mix(in srgb, ${colors.redDark} 62%, transparent)` },
+  '100%': { backgroundColor: `color-mix(in srgb, ${colors.redDark} 40%, transparent)` }
 })
 const thinkDot = stylex.keyframes({
   '0%,100%': { opacity: '.25' },
@@ -62,8 +62,7 @@ export const styles = stylex.create({
     color: colors.white,
     backgroundColor: colors.grey6Dark,
     // Felt-table light: a cool cyan pool up top, a warm amber one low.
-    backgroundImage:
-      'radial-gradient(80% 50% at 20% 0%,rgba(60,211,254,.09),transparent 62%),radial-gradient(75% 50% at 80% 108%,rgba(255,169,77,.08),transparent 60%)',
+    backgroundImage: `radial-gradient(80% 50% at 20% 0%,color-mix(in srgb, ${colors.cyanDark} 9%, transparent),transparent 62%),radial-gradient(75% 50% at 80% 108%,color-mix(in srgb, ${colors.orangeDark} 8%, transparent),transparent 60%)`,
     fontFamily: fonts.system,
     fontSize: typeScale.subheadline
   },
@@ -137,7 +136,7 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   statusCheck: { color: colors.redDark, fontWeight: weight.semibold },
-  thinkDots: { display: 'inline-flex', gap: 2, paddingInlineStart: 2 },
+  thinkDots: { display: 'inline-flex', gap: space.xxs, paddingInlineStart: space.xxs },
   thinkDot: {
     width: 4,
     height: 4,
@@ -166,10 +165,10 @@ export const styles = stylex.create({
     position: 'relative',
     padding: BOARD_PAD,
     borderRadius: radius.xxl,
-    backgroundColor: 'rgba(0,0,0,.34)',
-    backgroundImage: 'linear-gradient(180deg,rgba(0,0,0,.16),transparent 38%)',
-    boxShadow:
-      'inset 0 2px 14px rgba(0,0,0,.5),inset 0 0 0 .5px rgba(255,255,255,.08),inset 0 -1px 0 rgba(255,255,255,.04)',
+    backgroundColor: `color-mix(in srgb, ${colors.black} 34%, transparent)`,
+    // The kit has no inset shadow, so the well reads as punched in through a
+    // darker top edge in the fill itself.
+    backgroundImage: `linear-gradient(180deg,color-mix(in srgb, ${colors.black} 40%, transparent),transparent 38%)`,
     flexShrink: 0,
     animationName: { default: boardIn, [reduce]: 'none' },
     animationDuration: '.4s',
@@ -207,8 +206,11 @@ export const styles = stylex.create({
       content: '""',
       position: 'absolute',
       inset: 0,
-      backgroundColor: 'rgba(60,211,254,.3)',
-      boxShadow: 'inset 0 0 0 2.5px rgba(60,211,254,.9)'
+      boxSizing: 'border-box',
+      borderStyle: 'solid',
+      borderWidth: 2.5,
+      borderColor: `color-mix(in srgb, ${colors.cyanDark} 90%, transparent)`,
+      backgroundColor: `color-mix(in srgb, ${colors.cyanDark} 30%, transparent)`
     }
   },
   lastMove: {
@@ -216,7 +218,7 @@ export const styles = stylex.create({
       content: '""',
       position: 'absolute',
       inset: 0,
-      backgroundColor: 'rgba(60,211,254,.2)'
+      backgroundColor: `color-mix(in srgb, ${colors.cyanDark} 20%, transparent)`
     }
   },
   checked: {
@@ -230,14 +232,17 @@ export const styles = stylex.create({
     width: '26%',
     height: '26%',
     borderRadius: radius.circle,
-    backgroundColor: 'rgba(20,20,24,.3)',
+    backgroundColor: `color-mix(in srgb, ${colors.grey6Dark} 30%, transparent)`,
     pointerEvents: 'none'
   },
   ring: {
     position: 'absolute',
     inset: '4%',
     borderRadius: radius.circle,
-    boxShadow: 'inset 0 0 0 3px rgba(20,20,24,.3)',
+    boxSizing: 'border-box',
+    borderStyle: 'solid',
+    borderWidth: 3,
+    borderColor: `color-mix(in srgb, ${colors.grey6Dark} 30%, transparent)`,
     pointerEvents: 'none'
   },
   piece: {
@@ -252,11 +257,17 @@ export const styles = stylex.create({
   fitPiece: (size: number) => ({ fontSize: `${size}px` }),
   pieceW: {
     color: colors.white,
-    textShadow: '0 0 2px rgba(10,10,14,.85),0 2px 3px rgba(0,0,0,.45)'
+    // A dark outline keeps white men legible on the ivory squares. The stroke
+    // paints under the fill, so only its outer half shows and the glyph keeps
+    // its full weight.
+    WebkitTextStrokeWidth: 2,
+    WebkitTextStrokeColor: `color-mix(in srgb, ${colors.black} 85%, transparent)`,
+    paintOrder: 'stroke fill',
+    textShadow: shadow.text
   },
   pieceB: {
     color: colors.black,
-    textShadow: '0 0 2.5px rgba(235,235,240,.5),0 2px 3px rgba(0,0,0,.5)'
+    textShadow: shadow.text
   },
   coord: {
     position: 'absolute',
@@ -265,11 +276,11 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     pointerEvents: 'none'
   },
-  coordFile: { right: 3, bottom: 1 },
-  coordRank: { left: 3, top: 1 },
+  coordFile: { right: space.xxs, bottom: 1 },
+  coordRank: { left: space.xxs, top: 1 },
   // Coordinates print in the opposite square's ink, like a real board's edge.
-  coordOnLight: { color: 'rgba(28,28,32,.55)' },
-  coordOnDark: { color: 'rgba(235,235,240,.5)' },
+  coordOnLight: { color: `color-mix(in srgb, ${colors.grey6Dark} 55%, transparent)` },
+  coordOnDark: { color: `color-mix(in srgb, ${colors.grey5} 50%, transparent)` },
   rail: {
     display: 'flex',
     flexDirection: 'column',
@@ -295,8 +306,8 @@ export const styles = stylex.create({
   // label the field labels use.
   segTrack: {
     display: 'inline-flex',
-    gap: 2,
-    padding: 2,
+    gap: space.xxs,
+    padding: space.xxs,
     borderRadius: radius.pill,
     backgroundColor: app.fill,
     flexShrink: 0
@@ -320,7 +331,7 @@ export const styles = stylex.create({
   segOn: {
     backgroundColor: glass.tint,
     color: colors.white,
-    boxShadow: '0 1px 4px rgba(0,0,0,.35),inset 0 0 0 .5px rgba(255,255,255,.18)'
+    boxShadow: `${shadow.rim},${shadow.card}`
   },
   controls: { display: 'flex', gap: space.sm, flexShrink: 0 },
   controlsWide: { flexDirection: 'column', alignItems: 'stretch' },
