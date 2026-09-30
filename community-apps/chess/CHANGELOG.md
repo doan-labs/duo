@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2
+
+- Fixed the Level picker overflowing its track on the inner display. The
+  side rail now sizes to the segmented rows instead of squeezing them into
+  a fixed width, so "Tournament" keeps its whole label. Segments fill any
+  wider track and clip to an ellipsis only when space truly cannot hold
+  them, the New game/Undo pair wraps on narrow covers, and the result
+  card's copy can shrink under its button.
+
 ## 1.0.1
 
 - Every colour, gap, padding and inset now comes from the kit tokens, so the

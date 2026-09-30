@@ -281,18 +281,20 @@ export const styles = stylex.create({
   // Coordinates print in the opposite square's ink, like a real board's edge.
   coordOnLight: { color: `color-mix(in srgb, ${colors.grey6Dark} 55%, transparent)` },
   coordOnDark: { color: `color-mix(in srgb, ${colors.grey5} 50%, transparent)` },
+  // The rail sizes to its widest control - the level row - so segment labels
+  // never squeeze; 200 only keeps it from collapsing if controls shrink.
   rail: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'stretch',
     justifyContent: 'center',
     gap: space.md,
-    minWidth: 0,
-    width: 200,
+    minWidth: 200,
+    width: 'fit-content',
     flexShrink: 0
   },
   railCover: { flexDirection: 'row', flexWrap: 'wrap', width: '100%', alignItems: 'center', gap: space.sm },
-  field: { display: 'flex', flexDirection: 'column', gap: space.xs, minWidth: 0 },
+  field: { display: 'flex', flexDirection: 'column', gap: space.xs, minWidth: 0, maxWidth: '100%' },
   fieldCover: { flexShrink: 0 },
   fieldLabel: {
     color: app.label2,
@@ -313,6 +315,8 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   segBtn: {
+    flexGrow: 1,
+    minWidth: 0,
     height: 24,
     paddingInline: space.md,
     borderWidth: 0,
@@ -322,6 +326,7 @@ export const styles = stylex.create({
     fontFamily: fonts.system,
     fontSize: typeScale.footnote,
     fontWeight: weight.semibold,
+    overflow: 'hidden',
     cursor: 'pointer',
     transitionProperty: 'color,background-color',
     transitionDuration: '.18s',
@@ -333,7 +338,10 @@ export const styles = stylex.create({
     color: colors.white,
     boxShadow: `${shadow.rim},${shadow.card}`
   },
-  controls: { display: 'flex', gap: space.sm, flexShrink: 0 },
+  // The label that cannot fit clips to an ellipsis inside its pill rather
+  // than painting past the track.
+  segLabel: { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  controls: { display: 'flex', flexWrap: 'wrap', gap: space.sm, flexShrink: 0 },
   controlsWide: { flexDirection: 'column', alignItems: 'stretch' },
   primary: {
     display: 'flex',
@@ -478,7 +486,7 @@ export const styles = stylex.create({
     animationTimingFunction: easing.bounce,
     animationFillMode: 'both'
   },
-  resultCopy: { display: 'flex', flexDirection: 'column', gap: space.xxs },
+  resultCopy: { display: 'flex', flexDirection: 'column', gap: space.xxs, minWidth: 0 },
   resultKicker: {
     color: colors.orangeDark,
     fontSize: typeScale.caption2,
