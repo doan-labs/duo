@@ -7,6 +7,12 @@
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/chess",
       "releases": [
         {
+          "release": "1.0.2+3115a367",
+          "sdk": "0.0.0",
+          "bytes": 537906,
+          "sha256": "3d2f5005f29e8591847c29cc08e444e0c7790e3b4e53d3f18728056eb744cecd"
+        },
+        {
           "release": "1.0.1+507e9677",
           "sdk": "0.0.0",
           "bytes": 537642,

@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.linhtinhvovan.duo.chess",
+    "name": "Chess",
+    "version": "1.0.2",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "linhtinhvovan",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/chess",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-09-30T04:16:17.823Z",
+    "commit": "6b744632419302b5b7ff1bf579f614d3d64deaef",
+    "hash": "3115a367"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 537906,
+      "sha256": "f998c53b75ed7c2437cb637f694a2b1e70746001368cc1edb09dbabc8df1602b"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1015297,
+      "sha256": "7cdf2b453e928fbcf3e05c66fa71e1c20a15bc53230b31758964a9962a9bc929"
+    }
+  ]
+}
