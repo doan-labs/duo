@@ -3,6 +3,7 @@ import {
   colors,
   easing,
   fonts,
+  glass,
   leading,
   motion,
   radius,
@@ -38,21 +39,143 @@ export const styles = stylex.create({
     color: app.fg,
     backgroundColor: app.bg
   },
-  /** Wide layout: deck browser rail beside the live pane. */
+  /** Wide layout: the pane breathes around a floating deck rail and the live detail. */
   stage: {
     flexGrow: 1,
     minHeight: 0,
-    display: 'flex'
+    display: 'flex',
+    gap: space.md,
+    paddingTop: space.sm,
+    paddingRight: space.md,
+    paddingBottom: space.md,
+    paddingLeft: space.md
   },
+  /**
+   * Decision 18's sidebar: an inset floating panel, rounded on all corners and
+   * held off every edge - never a full-height slab with a hairline.
+   */
   rail: {
     width: 300,
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
-    borderRightWidth: 1,
-    borderRightStyle: 'solid',
-    borderRightColor: app.separator
+    overflow: 'hidden',
+    borderRadius: radius.xxl,
+    backgroundColor: app.glass,
+    backdropFilter: glass.blur,
+    WebkitBackdropFilter: glass.blur,
+    boxShadow: `${shadow.rim},${shadow.float}`
+  },
+  railHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    paddingTop: space.sm,
+    paddingRight: space.sm,
+    paddingBottom: space.xs,
+    paddingLeft: space.lg,
+    flexShrink: 0
+  },
+  railTitle: {
+    fontSize: typeScale.title2,
+    lineHeight: leading.title2,
+    letterSpacing: tracking.title2,
+    fontWeight: weight.semibold
+  },
+  railSummary: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingInline: space.lg,
+    paddingBottom: space.sm,
+    color: app.label2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    flexShrink: 0
+  },
+  railList: {
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.xxs,
+    listStyleType: 'none',
+    margin: 0,
+    paddingInline: space.sm,
+    paddingBottom: space.sm
+  },
+  /** A sidebar row: transparent at rest, a flat fill on hover, fill when selected. */
+  railRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.md,
+    width: '100%',
+    paddingTop: space.sm,
+    paddingRight: space.sm,
+    paddingBottom: space.sm,
+    paddingLeft: space.sm,
+    borderWidth: 0,
+    borderRadius: radius.md,
+    backgroundColor: { default: 'transparent', ':hover': app.fill3 },
+    color: app.fg,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.medium,
+    textAlign: 'left',
+    cursor: 'pointer',
+    flexShrink: 0,
+    transitionProperty: 'transform, background-color',
+    transitionDuration: `${motion.pressDuration}, .2s`,
+    transform: { default: null, ':active': motion.press }
+  },
+  railRowOn: {
+    backgroundColor: app.fill
+  },
+  railText: {
+    flexGrow: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.xxs
+  },
+  railLabel: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  railSub: {
+    color: app.label2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.regular
+  },
+  railDetail: {
+    flexShrink: 0,
+    color: app.label2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote
+  },
+  railChevron: {
+    display: 'flex',
+    flexShrink: 0,
+    color: app.label3
+  },
+  railEmpty: {
+    paddingTop: space.lg,
+    paddingInline: space.sm,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: space.md,
+    textAlign: 'center',
+    color: app.label2
   },
   detail: {
     flexGrow: 1,
@@ -259,16 +382,17 @@ export const styles = stylex.create({
     transitionDuration: `${motion.pressDuration}, .2s`,
     transform: { default: null, ':active': motion.press }
   },
+  /** The tone marks the fill only; the label and interval read in text greys. */
   gradeTone: (tone: string) => ({
     backgroundColor: `color-mix(in srgb, ${tone} 14%, ${app.surface})`,
-    color: tone
+    color: app.fg
   }),
   gradeHint: {
+    color: app.label2,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
     letterSpacing: tracking.caption2,
-    fontWeight: weight.regular,
-    opacity: 0.85
+    fontWeight: weight.regular
   },
   /** The caption under the grades explaining what the intervals mean. */
   gradeCaption: {
@@ -321,6 +445,69 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: space.xs
+  },
+  /**
+   * The kit's IconButton and Back affordance measure 30x24 and ~20x24: under the
+   * HIG's 44x44 target. These app-level patches grow their hit boxes - the kit
+   * itself stays untouched. Negative margins keep the header from stretching.
+   */
+  hit: {
+    minWidth: 44,
+    minHeight: 44
+  },
+  hitBtn: {
+    minHeight: 44
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    marginTop: -space.md,
+    marginRight: -space.xs,
+    marginBottom: -space.md,
+    marginLeft: -space.lg,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    color: app.link,
+    cursor: 'pointer',
+    flexShrink: 0,
+    borderRadius: radius.md,
+    transitionProperty: 'transform, background-color',
+    transitionDuration: `${motion.pressDuration}, .2s`,
+    transform: { default: null, ':active': motion.press }
+  },
+  /** Confirmation sheet body, reusing the editor's padded column. */
+  confirm: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.sm,
+    padding: space.lg
+  },
+  /** The same body inside the editor's own card, which carries the padding. */
+  confirmInner: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.sm
+  },
+  /** Everything but the sheets: what `inert` silences while a confirm is up. */
+  appBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minHeight: 0
+  },
+  confirmText: {
+    color: app.label2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline
+  },
+  /** Destructive confirm action: filled red like iOS's Delete button. */
+  dangerFill: {
+    backgroundColor: colors.red,
+    color: colors.white
   },
   danger: {
     color: colors.red

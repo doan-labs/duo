@@ -20,7 +20,7 @@ import {
 import { animations, dark, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   abandonReview,
@@ -94,6 +94,129 @@ function parseDraft(raw: string | null): Draft | null {
   }
 }
 
+// Registered before os.connect() so it fires ahead of the SDK's window-capture
+// Escape-to-home forward: while any app sheet is open, Escape cancels the top
+// layer inside the app; at all other times the event passes through and still
+// goes home. A stack (not a single callback) because a restored editor draft
+// can legitimately sit under the deck-confirm sheet, and Escape peels layers
+// top-down.
+const escapeStack: (() => void)[] = []
+const pushEscape = (cancel: () => void) => {
+  escapeStack.push(cancel)
+  return () => {
+    const i = escapeStack.indexOf(cancel)
+    if (i >= 0) escapeStack.splice(i, 1)
+  }
+}
+addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || escapeStack.length === 0) return
+    const top = escapeStack[escapeStack.length - 1]
+    if (!top) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    top()
+  },
+  true
+)
+
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+// offsetParent is null under a position:fixed ancestor in Blink, so a visible
+// check has to measure rects instead of trusting the layout parent.
+const focusablesIn = (box: HTMLElement) =>
+  [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0)
+
+/**
+ * The kit Sheet is deliberately non-modal: it focuses itself and swallows
+ * Escape but leaves the page behind it tabbable. A destructive choice needs
+ * real modality - while `active` this trap cycles Tab among the sheet's own
+ * controls and hands focus back to the element that opened it. The app puts
+ * `inert` on the remaining chrome alongside, so the sheet is the only live
+ * layer. Focus order starts on `first` or `last` (Cancel sits last).
+ */
+function useFocusTrap(
+  boxRef: RefObject<HTMLElement | null>,
+  active: boolean,
+  initial: 'first' | 'last' = 'first',
+  explicitTrigger?: HTMLElement | null
+) {
+  const trigger = useRef<HTMLElement | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ref contents are read live during the trap, not captured as deps
+  useEffect(() => {
+    if (!active) return
+    // Pointer taps do not move focus to a button, so the opener passes the
+    // element it was on; keyboard opens already sit on the trigger.
+    trigger.current = explicitTrigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const box = boxRef.current
+      if (!box) return
+      const els = focusablesIn(box)
+      const first = els[0]
+      const last = els[els.length - 1]
+      if (!first || !last) return
+      const at = document.activeElement
+      if (e.shiftKey ? at === first || !box.contains(at) : at === last || !box.contains(at)) {
+        e.preventDefault()
+        ;(e.shiftKey ? last : first).focus()
+      }
+    }
+    document.addEventListener('keydown', onKey, true)
+    const frame = requestAnimationFrame(() => {
+      const els = boxRef.current ? focusablesIn(boxRef.current) : []
+      ;(initial === 'last' ? els[els.length - 1] : els[0])?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', onKey, true)
+      const el = trigger.current
+      if (el?.isConnected) {
+        // The trigger sits inside the inert subtree until the close commits,
+        // so retry across frames until inert lifts and it takes focus again.
+        let tries = 0
+        const restore = () => {
+          if (!el.isConnected) return
+          el.focus()
+          if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
+        }
+        requestAnimationFrame(restore)
+      } else {
+        document.querySelector<HTMLElement>('main button:not([disabled])')?.focus()
+      }
+    }
+  }, [active, initial])
+}
+
+/** A destructive confirmation: the kit card plus the modality it leaves out. */
+function DestructiveSheet({
+  open,
+  label,
+  onClose,
+  restoreTo,
+  children
+}: {
+  open: boolean
+  label: string
+  onClose: () => void
+  restoreTo?: HTMLElement | null
+  children: React.ReactNode
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  useFocusTrap(box, open, 'last', restoreTo)
+  // While open this is the top escape layer: the pre-connect guard cancels it
+  // before the SDK can forward the key to the shell's go-home.
+  useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
+  return (
+    <Sheet open={open} onClose={onClose} aria-label={label}>
+      <div ref={box} {...stylex.props(styles.confirm)}>
+        {children}
+      </div>
+    </Sheet>
+  )
+}
+
 const DECK_HUES = [colors.indigo, colors.teal, colors.orange, colors.pink, colors.green, colors.purple]
 const deckHue = (index: number) => DECK_HUES[index % DECK_HUES.length] ?? colors.indigo
 
@@ -132,7 +255,7 @@ function DecksScreen({
       <Title as="h1">
         Flashcards
         <Title variant="accessory">
-          <IconButton name="plus" aria-label="New deck" onClick={onNew} />
+          <IconButton name="plus" aria-label="New deck" onClick={onNew} xstyle={styles.hit} />
         </Title>
       </Title>
       <div {...stylex.props(styles.summary)}>
@@ -200,6 +323,104 @@ function DecksScreen({
   )
 }
 
+/**
+ * The wide layout's deck rail: the same jobs as DecksScreen, dressed as a flat
+ * sidebar inside the floating glass panel instead of grouped cards.
+ */
+function RailScreen({
+  lib,
+  now,
+  resume,
+  selectedDeckId,
+  onNew,
+  onOpen,
+  onResume
+}: {
+  lib: Library
+  now: number
+  resume: { deck: Deck; left: number; done: boolean } | null
+  selectedDeckId: string | undefined
+  onNew: () => void
+  onOpen: (deck: Deck) => void
+  onResume: (deck: Deck) => void
+}) {
+  const totalDue = dueQueue(lib.cards, now).length
+  const todayCount = reviewsToday(lib.history, now)
+  return (
+    <nav aria-label="Decks" {...stylex.props(styles.rail)}>
+      <div {...stylex.props(styles.railHead)}>
+        <span {...stylex.props(styles.railTitle)}>Flashcards</span>
+        <IconButton name="plus" aria-label="New deck" onClick={onNew} xstyle={styles.hit} />
+      </div>
+      <div {...stylex.props(styles.railSummary)}>
+        <DueChip count={totalDue} />
+        <span>
+          {lib.cards.length} {lib.cards.length === 1 ? 'card' : 'cards'} · {todayCount} today
+        </span>
+      </div>
+      <ul {...stylex.props(styles.railList)}>
+        {resume && (
+          <li>
+            <button type="button" {...stylex.props(styles.railRow)} onClick={() => onResume(resume.deck)}>
+              <span aria-hidden="true" {...stylex.props(styles.deckIcon, styles.deckTint(colors.orange))}>
+                <Sym name="reload" size={15} />
+              </span>
+              <span {...stylex.props(styles.railText)}>
+                <span {...stylex.props(styles.railLabel)}>
+                  {resume.done ? 'Session complete' : 'Review in progress'}
+                </span>
+                <span {...stylex.props(styles.railSub)}>{resume.deck.name}</span>
+              </span>
+              <span {...stylex.props(styles.railDetail)}>{resume.done ? 'Done' : `${resume.left} left`}</span>
+              <span aria-hidden="true" {...stylex.props(styles.railChevron)}>
+                <Sym name="forward" size={12} />
+              </span>
+            </button>
+          </li>
+        )}
+        {lib.decks.length === 0 ? (
+          <div {...stylex.props(styles.railEmpty)}>
+            <Text size="subheadline" color="secondary">
+              No decks yet
+            </Text>
+            <Button variant="filled" onClick={onNew} xstyle={styles.hitBtn}>
+              New deck
+            </Button>
+          </div>
+        ) : (
+          lib.decks.map((deck, i) => {
+            const cards = deckCards(lib, deck.id)
+            const due = dueQueue(cards, now).length
+            const on = deck.id === selectedDeckId
+            return (
+              <li key={deck.id} {...stylex.props(animations.row, delay.ms(Math.min(i, 8) * 40))}>
+                <button
+                  type="button"
+                  aria-current={on ? 'page' : undefined}
+                  {...stylex.props(styles.railRow, on && styles.railRowOn)}
+                  onClick={() => onOpen(deck)}
+                >
+                  <DeckIcon index={i} />
+                  <span {...stylex.props(styles.railText)}>
+                    <span {...stylex.props(styles.railLabel)}>{deck.name}</span>
+                    <span {...stylex.props(styles.railSub)}>
+                      {cards.length} {cards.length === 1 ? 'card' : 'cards'}
+                    </span>
+                  </span>
+                  {due > 0 && <span {...stylex.props(styles.railDetail)}>{due} due</span>}
+                  <span aria-hidden="true" {...stylex.props(styles.railChevron)}>
+                    <Sym name="forward" size={12} />
+                  </span>
+                </button>
+              </li>
+            )
+          })
+        )}
+      </ul>
+    </nav>
+  )
+}
+
 function DeckScreen({
   lib,
   deck,
@@ -211,7 +432,7 @@ function DeckScreen({
   onNewCard,
   onEditCard,
   onStartReview,
-  onDelete
+  onAskDelete
 }: {
   lib: Library
   deck: Deck
@@ -223,23 +444,26 @@ function DeckScreen({
   onNewCard: () => void
   onEditCard: (cardId: string) => void
   onStartReview: () => void
-  onDelete: () => void
+  onAskDelete: (trigger: HTMLElement) => void
 }) {
   const cards = deckCards(lib, deck.id)
   const due = dueQueue(cards, now).length
-  const [confirming, setConfirming] = useState(false)
   const reviewing = review && review.deckId === deck.id && !review.finished
   return (
     <Page
       title={
         <>
+          {!wide && onBack && (
+            <button type="button" aria-label="Back" {...stylex.props(styles.backBtn)} onClick={onBack}>
+              <Sym name="back" size={20} />
+            </button>
+          )}
           <span {...stylex.props(styles.clamp)}>{deck.name}</span>
           <Title variant="accessory">
-            <IconButton name="compose" aria-label="Rename deck" onClick={onRename} />
+            <IconButton name="compose" aria-label="Rename deck" onClick={onRename} xstyle={styles.hit} />
           </Title>
         </>
       }
-      back={wide ? undefined : onBack}
     >
       <Section>
         <Row
@@ -296,10 +520,10 @@ function DeckScreen({
       <Section>
         <Row
           as="button"
-          label={confirming ? 'Tap again to delete deck' : 'Delete deck'}
-          subtitle={confirming ? 'This removes the deck, its cards and their history.' : undefined}
+          label="Delete deck"
+          subtitle={`Removes ${cards.length} ${cards.length === 1 ? 'card' : 'cards'} and their history`}
           xstyle={[styles.actionRow, styles.danger]}
-          onClick={() => (confirming ? onDelete() : setConfirming(true))}
+          onClick={(e) => onAskDelete(e.currentTarget)}
         />
       </Section>
     </Page>
@@ -341,13 +565,17 @@ function ReviewScreen({
     <Page
       title={
         <>
+          {!wide && (
+            <button type="button" aria-label="Leave review" {...stylex.props(styles.backBtn)} onClick={onLeave}>
+              <Sym name="back" size={20} />
+            </button>
+          )}
           <span {...stylex.props(styles.clamp)}>{deck.name}</span>
           <Title variant="accessory">
-            <IconButton name="close" aria-label="End session" onClick={onEnd} />
+            <IconButton name="close" aria-label="End session" onClick={onEnd} xstyle={styles.hit} />
           </Title>
         </>
       }
-      back={wide ? undefined : onLeave}
     >
       <div {...stylex.props(shared.column)}>
         <div role="status" {...stylex.props(styles.progress)}>
@@ -367,7 +595,7 @@ function ReviewScreen({
               <span {...stylex.props(styles.cardHint)}>reviewed this session</span>
             </div>
             <div {...stylex.props(styles.gradeRow)}>
-              <Button variant="filled" onClick={onFinish} xstyle={styles.finishBtn}>
+              <Button variant="filled" onClick={onFinish} xstyle={[styles.finishBtn, styles.hitBtn]}>
                 Done
               </Button>
             </div>
@@ -422,7 +650,7 @@ function ReviewScreen({
               </fieldset>
             ) : (
               <div {...stylex.props(styles.gradeRow)}>
-                <Button variant="filled" onClick={onReveal} xstyle={styles.finishBtn}>
+                <Button variant="filled" onClick={onReveal} xstyle={[styles.finishBtn, styles.hitBtn]}>
                   Show answer
                 </Button>
               </div>
@@ -477,7 +705,8 @@ function EditorSheet({
   onChange,
   onClose,
   onSave,
-  onDeleteCard
+  onDeleteCard,
+  onConfirming
 }: {
   draft: Draft
   lib: Library
@@ -485,8 +714,36 @@ function EditorSheet({
   onClose: () => void
   onSave: () => void
   onDeleteCard: () => void
+  onConfirming: (open: boolean) => void
 }) {
   const [confirming, setConfirming] = useState(false)
+  const confirmBox = useRef<HTMLDivElement>(null)
+  const deleteBtn = useRef<HTMLButtonElement>(null)
+  const wasConfirming = useRef(false)
+  useFocusTrap(confirmBox, confirming, 'last', deleteBtn.current)
+  // One escape layer for the whole sheet: on the confirm face it cancels the
+  // face, on the edit face it closes the editor - before the SDK's go-home.
+  const confirmingRef = useRef(confirming)
+  confirmingRef.current = confirming
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  useEffect(
+    () =>
+      pushEscape(() => {
+        if (confirmingRef.current) setConfirming(false)
+        else onCloseRef.current()
+      }),
+    []
+  )
+  // The app goes inert behind the destructive face; report both directions and
+  // release on unmount so a close can never strand the inert flag.
+  useEffect(() => onConfirming(confirming), [confirming, onConfirming])
+  useEffect(() => () => onConfirming(false), [onConfirming])
+  // Back on the edit face, focus lands on the same Delete button that was used.
+  useEffect(() => {
+    if (wasConfirming.current && !confirming) deleteBtn.current?.focus()
+    wasConfirming.current = confirming
+  }, [confirming])
   const isDeck = draft.kind === 'deck-new' || draft.kind === 'deck-rename'
   const title =
     draft.kind === 'deck-new'
@@ -495,16 +752,25 @@ function EditorSheet({
         ? 'Rename deck'
         : draft.kind === 'card-new'
           ? 'New card'
-          : 'Edit card'
+          : confirming
+            ? 'Delete card'
+            : 'Edit card'
   const canSave = isDeck ? draft.name.trim().length > 0 : draft.front.trim().length > 0 && draft.back.trim().length > 0
   const editingCard = draft.kind === 'card-edit' && draft.cardId ? lib.cards.find((c) => c.id === draft.cardId) : null
   return (
-    <Sheet open onClose={onClose} aria-label={title}>
-      <div {...stylex.props(styles.editor)}>
+    <Sheet
+      open
+      onClose={() => {
+        if (confirming) setConfirming(false)
+        else onClose()
+      }}
+      aria-label={title}
+    >
+      <div key={confirming ? 'confirm' : 'edit'} {...stylex.props(styles.editor, shared.swap)}>
         <Text as="h2" size="headline" weight="semibold">
           {title}
         </Text>
-        {isDeck ? (
+        {confirming && editingCard ? null : isDeck ? (
           <label htmlFor="deck-name" {...stylex.props(styles.field)}>
             Name
             <TextField
@@ -541,23 +807,40 @@ function EditorSheet({
             </label>
           </>
         )}
-        <div {...stylex.props(styles.editorActions)}>
-          <Button variant="filled" disabled={!canSave} onClick={onSave}>
-            Save
-          </Button>
-          <Button variant="plain" onClick={onClose}>
-            Cancel
-          </Button>
-          {editingCard && (
-            <Button
-              variant="plain"
-              xstyle={styles.danger}
-              onClick={() => (confirming ? onDeleteCard() : setConfirming(true))}
-            >
-              {confirming ? 'Tap again to delete card' : 'Delete card'}
+        {confirming && editingCard ? (
+          <div ref={confirmBox} {...stylex.props(styles.confirmInner)}>
+            <span {...stylex.props(styles.confirmText)}>
+              "{editingCard.front}" and its review history will be removed. This cannot be undone.
+            </span>
+            <div {...stylex.props(styles.editorActions)}>
+              <Button variant="filled" xstyle={[styles.hitBtn, styles.dangerFill]} onClick={onDeleteCard}>
+                Delete card
+              </Button>
+              <Button variant="plain" xstyle={styles.hitBtn} onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div {...stylex.props(styles.editorActions)}>
+            <Button variant="filled" disabled={!canSave} xstyle={styles.hitBtn} onClick={onSave}>
+              Save
             </Button>
-          )}
-        </div>
+            <Button variant="plain" xstyle={styles.hitBtn} onClick={onClose}>
+              Cancel
+            </Button>
+            {editingCard && (
+              <Button
+                ref={deleteBtn}
+                variant="plain"
+                xstyle={[styles.hitBtn, styles.danger]}
+                onClick={() => setConfirming(true)}
+              >
+                Delete card
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </Sheet>
   )
@@ -570,12 +853,14 @@ function Flashcards() {
   const ui = useKV(os.session, 'ui')
   const draft = useKV(os.session, 'draft')
   // A slow tick keeps "In 10m" captions and due chips honest while a page sits
-  // open; it only re-renders this display's copy and writes nothing.
+  // open; it only re-renders this display's copy and writes nothing. Rule 2:
+  // the hidden copy of the app rests - no interval lives there.
   const [, setBeat] = useState(0)
   useEffect(() => {
+    if (!view.visible) return
     const timer = setInterval(() => setBeat((n) => n + 1), 30_000)
     return () => clearInterval(timer)
-  }, [])
+  }, [view.visible])
   // Signal readiness after React has committed the app's first frame.
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -588,6 +873,11 @@ function Flashcards() {
   const lib = parseLibrary(stored.value)
   const draftState = parseDraft(draft.value)
   const now = Date.now()
+  // Root-held confirm flags: while either destructive layer is up the rest of
+  // the app renders inert, so neither pointer nor Tab can reach it.
+  const [deckConfirm, setDeckConfirm] = useState(false)
+  const [cardConfirm, setCardConfirm] = useState(false)
+  const deckTrigger = useRef<HTMLElement | null>(null)
 
   // The live session, only if its deck still exists on this copy.
   const review = lib.review && getDeck(lib, lib.review.deckId) ? lib.review : null
@@ -679,9 +969,9 @@ function Flashcards() {
           if (!(review && review.deckId === deck.id && !review.finished)) save(startReview(lib, deck.id, Date.now()))
           go({ v: 1, view: 'review', deckId: deck.id })
         }}
-        onDelete={() => {
-          save(removeDeck(lib, deck.id))
-          go({ v: 1, view: 'decks' })
+        onAskDelete={(el) => {
+          deckTrigger.current = el
+          setDeckConfirm(true)
         }}
       />
     )
@@ -705,6 +995,7 @@ function Flashcards() {
     (draftState.kind === 'deck-new' || (draftState.deckId ? !!getDeck(lib, draftState.deckId) : true)) &&
     (draftState.cardId ? lib.cards.some((c) => c.id === draftState.cardId) : true)
 
+  const modalOpen = deckConfirm || cardConfirm
   return (
     <main
       ref={rootRef}
@@ -713,24 +1004,43 @@ function Flashcards() {
       data-screen={screen}
       {...stylex.props(darkMode ? dark : light, styles.root)}
     >
-      {stored.status === 'hydrating' ? (
-        <Placeholder>
-          <Text color="secondary">Loading…</Text>
-        </Placeholder>
-      ) : wide ? (
-        <section {...stylex.props(styles.stage)}>
-          <aside {...stylex.props(styles.rail)}>{decksScreen}</aside>
-          <div key={`${screen}:${deck?.id ?? 'today'}`} {...stylex.props(styles.detail, shared.swap)}>
-            {detailScreen ?? (
-              <OverviewScreen lib={lib} now={now} onOpen={(d) => go({ v: 1, view: 'deck', deckId: d.id })} />
-            )}
-          </div>
-        </section>
-      ) : (
-        <Push open={screen !== 'decks'} sheet={detailScreen ?? <div />}>
-          {decksScreen}
-        </Push>
-      )}
+      <div {...stylex.props(styles.appBody)} inert={modalOpen}>
+        {stored.status === 'hydrating' ? (
+          <Placeholder>
+            <Text color="secondary">Loading…</Text>
+          </Placeholder>
+        ) : wide ? (
+          <section {...stylex.props(styles.stage)}>
+            <RailScreen
+              lib={lib}
+              now={now}
+              resume={resumeInfo}
+              selectedDeckId={deck?.id}
+              onNew={() => openDraft({ kind: 'deck-new' })}
+              onOpen={(d) => go({ v: 1, view: 'deck', deckId: d.id })}
+              onResume={(d) => go({ v: 1, view: 'review', deckId: d.id })}
+            />
+            <div key={`${screen}:${deck?.id ?? 'today'}`} {...stylex.props(styles.detail, shared.swap)}>
+              {detailScreen ?? (
+                <OverviewScreen lib={lib} now={now} onOpen={(d) => go({ v: 1, view: 'deck', deckId: d.id })} />
+              )}
+            </div>
+          </section>
+        ) : (
+          <Push open={screen !== 'decks'} sheet={detailScreen ?? <div />}>
+            {decksScreen}
+          </Push>
+        )}
+        <small role="status" {...stylex.props(styles.status)}>
+          {stored.status === 'saving'
+            ? 'Saving…'
+            : stored.status === 'error'
+              ? 'Changes may not have saved'
+              : stored.status === 'hydrating'
+                ? ''
+                : 'Saved on this device'}
+        </small>
+      </div>
       {draftValid && draftState && (
         <EditorSheet
           key={`${draftState.kind}:${draftState.cardId ?? draftState.deckId ?? ''}`}
@@ -739,21 +1049,47 @@ function Flashcards() {
           onChange={(patch) => draft.set(JSON.stringify({ ...draftState, ...patch }))}
           onClose={closeDraft}
           onSave={commitDraft}
+          onConfirming={setCardConfirm}
           onDeleteCard={() => {
             if (draftState.cardId) save(removeCard(lib, draftState.cardId))
             closeDraft()
           }}
         />
       )}
-      <small role="status" {...stylex.props(styles.status)}>
-        {stored.status === 'saving'
-          ? 'Saving…'
-          : stored.status === 'error'
-            ? 'Changes may not have saved'
-            : stored.status === 'hydrating'
-              ? ''
-              : 'Saved on this device'}
-      </small>
+      <DestructiveSheet
+        open={deckConfirm && !!deck}
+        label={deck ? `Delete ${deck.name}` : 'Delete deck'}
+        onClose={() => setDeckConfirm(false)}
+        restoreTo={deckTrigger.current}
+      >
+        {deck && (
+          <>
+            <Text as="h2" size="headline" weight="semibold">
+              Delete "{deck.name}"?
+            </Text>
+            <span {...stylex.props(styles.confirmText)}>
+              This removes the deck, its {deckCards(lib, deck.id).length}{' '}
+              {deckCards(lib, deck.id).length === 1 ? 'card' : 'cards'} and their review history.
+            </span>
+            <div {...stylex.props(styles.editorActions)}>
+              <Button
+                variant="filled"
+                xstyle={[styles.hitBtn, styles.dangerFill]}
+                onClick={() => {
+                  save(removeDeck(lib, deck.id))
+                  setDeckConfirm(false)
+                  go({ v: 1, view: 'decks' })
+                }}
+              >
+                Delete deck
+              </Button>
+              <Button variant="plain" xstyle={styles.hitBtn} onClick={() => setDeckConfirm(false)}>
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
+      </DestructiveSheet>
     </main>
   )
 }
