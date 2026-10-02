@@ -579,7 +579,7 @@ function App() {
                 ? `Solved${rec.solves > 1 ? ` x${rec.solves}` : ''}${rec.bestTime != null ? ` - best ${formatTime(rec.bestTime)}` : ''}`
                 : pg.inked
                   ? `${pg.inked}/${pg.total} inked`
-                  : `${g.cols} x ${g.rows}`
+                  : 'Fresh board'
               return (
                 <button key={p.id} type="button" onClick={() => choose(p.id)} {...stylex.props(styles.pickRow)}>
                   <div
