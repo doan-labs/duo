@@ -588,13 +588,11 @@ function PixelStudio() {
       </header>
       {wide ? (
         <section {...stylex.props(styles.stage, styles.stageWide)}>
-          <div {...stylex.props(styles.canvasCol)}>
-            {board}
-            {preview}
-          </div>
+          <div {...stylex.props(styles.canvasCol)}>{board}</div>
           <div {...stylex.props(styles.rail)}>
             {toolbar}
             {paletteSection}
+            {preview}
             {status}
           </div>
         </section>
