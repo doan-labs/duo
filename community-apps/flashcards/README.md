@@ -14,13 +14,17 @@ and no network use.
 - **Review**: tap the card to reveal the answer, then grade yourself Again,
   Good or Easy. Each button shows the exact interval it will schedule, so the
   choice is never a surprise. `Again` sends the card out for its 10 minute
-  relearn delay: it leaves the session and comes back when it is actually
-  due, including to a session that is still open.
+  relearn delay: it leaves the session and becomes available for a subsequent
+  review once it is actually due. A session serves the queue captured when it
+  started; cards that become due while it is open wait for the next review.
 - **Scheduling**: a deterministic SM-2 variant (see below). Due times are
   absolute instants, so a timezone change can shift the "reviewed today"
   counter's window but can never make a graded card come back early or late.
-- **Counts**: "N due", "N reviewed today" and per-deck due badges are all
-  computed from the same queue the reviewer serves; nothing is a projection.
+- **Counts**: "N due" and per-deck due badges are computed live from card due
+  times, and "N reviewed today" is a stored per-day grade counter, so a capped
+  history can never shrink it. An open review works through the queue it
+  captured at start, which is why its remaining count can differ from the
+  live due number.
 - **Pause anywhere**: each deck keeps its own review session - how far
   through its queue you are persists across folding the phone or closing and
   relaunching the app, and starting another deck's review never erases it.
