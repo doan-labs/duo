@@ -16,10 +16,11 @@ import * as stylex from '@stylexjs/stylex'
 
 const reduce = '@media (prefers-reduced-motion: reduce)'
 
-/** The card arriving face-up: a small flip, not a pop. */
-const flipIn = stylex.keyframes({
-  from: { opacity: 0, transform: 'perspective(700px) rotateX(9deg) translateY(10px)' },
-  to: { opacity: 1, transform: 'perspective(700px) rotateX(0deg) translateY(0)' }
+/** The answer face turning over like the card was flipped on the table. */
+const turn = stylex.keyframes({
+  from: { opacity: 0.35, transform: 'perspective(700px) rotateY(-68deg)' },
+  '55%': { opacity: 1 },
+  to: { opacity: 1, transform: 'perspective(700px) rotateY(0deg)' }
 })
 
 export const styles = stylex.create({
@@ -105,6 +106,14 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   deckTint: (hue: string) => ({ backgroundColor: hue }),
+  /**
+   * Buttons sized to their box. Blink keeps <button> shrink-to-fit even under
+   * display:flex, so an actionable row must claim the full track itself or it
+   * renders as a detached mini card.
+   */
+  actionRow: {
+    width: '100%'
+  },
   /** One-line clamp for card fronts and deck names inside rows. */
   clamp: {
     overflow: 'hidden',
@@ -118,13 +127,31 @@ export const styles = stylex.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingInline: space.lg,
-    paddingBottom: space.sm,
+    paddingBottom: space.xs,
     color: app.label2,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
     fontWeight: weight.medium
   },
+  /** The honest fraction of the session already graded. */
+  progressTrack: {
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: app.fill2,
+    overflow: 'hidden',
+    marginInline: space.lg,
+    marginBottom: space.sm
+  },
+  progressFill: (part: number) => ({
+    height: '100%',
+    width: `${Math.round(part * 100)}%`,
+    borderRadius: radius.pill,
+    backgroundColor: colors.blue,
+    transitionProperty: 'width',
+    transitionDuration: '.3s',
+    transitionTimingFunction: easing.out
+  }),
   /** The flashcard itself: a tall surface that reads as paper. */
   cardFace: {
     flexGrow: 1,
@@ -132,7 +159,7 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'safe center',
     gap: space.md,
     marginInline: space.lg,
     marginBottom: space.md,
@@ -146,10 +173,6 @@ export const styles = stylex.create({
     textAlign: 'center',
     cursor: 'pointer',
     overflowY: 'auto',
-    animationName: { default: flipIn, [reduce]: 'none' },
-    animationDuration: '.38s',
-    animationTimingFunction: easing.pop,
-    animationFillMode: 'backwards',
     transitionProperty: 'transform',
     transitionDuration: motion.pressDuration,
     transform: { default: null, ':active': motion.press }
@@ -159,11 +182,28 @@ export const styles = stylex.create({
     cursor: 'default',
     transform: 'none'
   },
+  /** The reveal and the completion face enter by turning the card over. */
+  cardReveal: {
+    animationName: { default: turn, [reduce]: 'none' },
+    animationDuration: '.38s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'backwards'
+  },
   cardFront: {
     fontSize: typeScale.title3,
     lineHeight: leading.title3,
     letterSpacing: tracking.title3,
     fontWeight: weight.semibold,
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere'
+  },
+  /** After the flip the question shrinks to a recap; the answer owns the face. */
+  cardRecap: {
+    color: app.label2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.medium,
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere'
   },
@@ -188,11 +228,15 @@ export const styles = stylex.create({
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1
   },
-  /** The three grade buttons: equal thirds, tinted by verdict. */
+  /** The three grade buttons: equal thirds, tinted by verdict. Rendered as a fieldset. */
   gradeRow: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: space.sm,
+    minWidth: 0,
+    margin: 0,
+    padding: 0,
+    borderWidth: 0,
     paddingInline: space.lg,
     paddingBottom: space.sm
   },
@@ -226,6 +270,15 @@ export const styles = stylex.create({
     fontWeight: weight.regular,
     opacity: 0.85
   },
+  /** The caption under the grades explaining what the intervals mean. */
+  gradeCaption: {
+    gridColumn: '1 / -1',
+    textAlign: 'center',
+    color: app.label3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2
+  },
   /** Single CTA under the card, spanning the grade grid's full width. */
   finishBtn: {
     gridColumn: '1 / -1'
@@ -234,6 +287,11 @@ export const styles = stylex.create({
   overviewCard: {
     flexGrow: 0,
     minHeight: 140
+  },
+  /** The completion check pops once the card settles. */
+  finishCheck: {
+    display: 'inline-flex',
+    color: colors.green
   },
   /** Review's finish sheet: the card flips to a summary. */
   doneCount: {
@@ -267,11 +325,12 @@ export const styles = stylex.create({
   danger: {
     color: colors.red
   },
-  /** Footer status line: visible storage state, never fake chrome. */
+  /** Footer status line: visible storage state, lifted clear of the home bar. */
   status: {
     flexShrink: 0,
     textAlign: 'center',
-    paddingBlock: space.xs,
+    paddingTop: space.xs,
+    paddingBottom: space.xxl,
     color: app.label3,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,

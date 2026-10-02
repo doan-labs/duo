@@ -17,7 +17,7 @@ import {
   useDisplay,
   useWide
 } from '@doan-labs/duo-uikit'
-import { light, shared } from '@doan-labs/duo-uikit/styles.ts'
+import { animations, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
@@ -143,7 +143,7 @@ function DecksScreen({
       </div>
       <Screen>
         {resume && (
-          <Section>
+          <Section animate="rise">
             <Row
               as="button"
               icon={
@@ -155,6 +155,7 @@ function DecksScreen({
               subtitle={resume.deck.name}
               detail={resume.done ? 'Done' : `${resume.left} left`}
               chevron
+              xstyle={styles.actionRow}
               onClick={() => onResume(resume.deck)}
             />
           </Section>
@@ -180,12 +181,14 @@ function DecksScreen({
               return (
                 <Row
                   as="button"
+                  animate="row"
                   key={deck.id}
                   icon={<DeckIcon index={i} />}
                   label={<span {...stylex.props(styles.clamp)}>{deck.name}</span>}
                   subtitle={`${cards.length} ${cards.length === 1 ? 'card' : 'cards'}`}
                   detail={due > 0 ? `${due} due` : undefined}
                   chevron
+                  xstyle={[styles.actionRow, delay.ms(Math.min(i, 8) * 40)]}
                   onClick={() => onOpen(deck)}
                 />
               )
@@ -260,6 +263,7 @@ function DeckScreen({
           subtitle={reviewing ? 'Pick up where you left off' : due ? 'Study the due queue' : 'Nothing is due'}
           chevron
           disabled={!reviewing && due === 0}
+          xstyle={styles.actionRow}
           onClick={onStartReview}
         />
       </Section>
@@ -272,15 +276,18 @@ function DeckScreen({
             </span>
           }
           label="New card"
+          xstyle={styles.actionRow}
           onClick={onNewCard}
         />
-        {cards.map((card) => (
+        {cards.map((card, i) => (
           <Row
             as="button"
+            animate="row"
             key={card.id}
             label={<span {...stylex.props(styles.clamp)}>{card.front}</span>}
             subtitle={`${dueLabel(card, now)} · ${card.reviews} ${card.reviews === 1 ? 'review' : 'reviews'}`}
             chevron
+            xstyle={[styles.actionRow, delay.ms(Math.min(i + 1, 8) * 40)]}
             onClick={() => onEditCard(card.id)}
           />
         ))}
@@ -291,7 +298,7 @@ function DeckScreen({
           as="button"
           label={confirming ? 'Tap again to delete deck' : 'Delete deck'}
           subtitle={confirming ? 'This removes the deck, its cards and their history.' : undefined}
-          xstyle={styles.danger}
+          xstyle={[styles.actionRow, styles.danger]}
           onClick={() => (confirming ? onDelete() : setConfirming(true))}
         />
       </Section>
@@ -310,6 +317,7 @@ function ReviewScreen({
   deck,
   review,
   wide,
+  onLeave,
   onEnd,
   onReveal,
   onGrade,
@@ -319,6 +327,7 @@ function ReviewScreen({
   deck: Deck
   review: ReviewSession
   wide: boolean
+  onLeave: () => void
   onEnd: () => void
   onReveal: () => void
   onGrade: (grade: Grade) => void
@@ -326,6 +335,8 @@ function ReviewScreen({
 }) {
   const card = currentCard(lib)
   const left = review.queue.length
+  const total = review.done + left
+  const part = total === 0 ? 1 : review.done / total
   return (
     <Page
       title={
@@ -336,17 +347,22 @@ function ReviewScreen({
           </Title>
         </>
       }
-      back={wide ? undefined : onEnd}
+      back={wide ? undefined : onLeave}
     >
       <div {...stylex.props(shared.column)}>
         <div role="status" {...stylex.props(styles.progress)}>
           <span>{review.finished ? 'Session complete' : `${left} ${left === 1 ? 'card' : 'cards'} left`}</span>
           <span>{review.done} graded</span>
         </div>
+        <div {...stylex.props(styles.progressTrack)} aria-hidden="true">
+          <div {...stylex.props(styles.progressFill(part))} />
+        </div>
         {review.finished ? (
           <>
-            <div {...stylex.props(styles.cardFace, styles.cardStill)}>
-              <Sym name="check" size={28} />
+            <div {...stylex.props(styles.cardFace, styles.cardStill, styles.cardReveal)}>
+              <span aria-hidden="true" {...stylex.props(animations.pop, styles.finishCheck)}>
+                <Sym name="check" size={28} />
+              </span>
               <span {...stylex.props(styles.doneCount)}>{review.finished.graded}</span>
               <span {...stylex.props(styles.cardHint)}>reviewed this session</span>
             </div>
@@ -364,37 +380,46 @@ function ReviewScreen({
         ) : (
           <>
             {review.revealed ? (
-              <div key="back" {...stylex.props(styles.cardFace, styles.cardStill)} aria-live="polite">
-                <span {...stylex.props(styles.cardFront)}>{card.front}</span>
+              <div
+                key={`${card.id}:answer`}
+                {...stylex.props(styles.cardFace, styles.cardStill, styles.cardReveal)}
+                aria-live="polite"
+              >
+                <span {...stylex.props(styles.cardRecap)}>{card.front}</span>
                 <hr {...stylex.props(styles.cardDivider)} />
                 <span {...stylex.props(styles.cardBack)}>{card.back}</span>
               </div>
             ) : (
               <button
-                key="front"
+                key={card.id}
                 type="button"
-                {...stylex.props(styles.cardFace)}
+                {...stylex.props(styles.cardFace, animations.rise)}
                 onClick={onReveal}
-                aria-label="Show answer"
+                aria-label={`Show answer for ${card.front}`}
               >
                 <span {...stylex.props(styles.cardFront)}>{card.front}</span>
                 <span {...stylex.props(styles.cardHint)}>Tap to reveal</span>
               </button>
             )}
             {review.revealed ? (
-              <div {...stylex.props(styles.gradeRow)}>
-                {GRADES.map(({ grade, label, tone }) => (
-                  <button
-                    key={grade}
-                    type="button"
-                    {...stylex.props(styles.gradeBtn, styles.gradeTone(tone))}
-                    onClick={() => onGrade(grade)}
-                  >
-                    <span>{label}</span>
-                    <span {...stylex.props(styles.gradeHint)}>{formatInterval(nextInterval(card, grade))}</span>
-                  </button>
-                ))}
-              </div>
+              <fieldset aria-label="Grade this card" {...stylex.props(styles.gradeRow)}>
+                {GRADES.map(({ grade, label, tone }) => {
+                  const interval = formatInterval(nextInterval(card, grade))
+                  return (
+                    <button
+                      key={grade}
+                      type="button"
+                      aria-label={`${label}, next review in ${interval}`}
+                      {...stylex.props(styles.gradeBtn, styles.gradeTone(tone))}
+                      onClick={() => onGrade(grade)}
+                    >
+                      <span>{label}</span>
+                      <span {...stylex.props(styles.gradeHint)}>{interval}</span>
+                    </button>
+                  )
+                })}
+                <span {...stylex.props(styles.gradeCaption)}>Grades set when this card returns.</span>
+              </fieldset>
             ) : (
               <div {...stylex.props(styles.gradeRow)}>
                 <Button variant="filled" onClick={onReveal} xstyle={styles.finishBtn}>
@@ -429,12 +454,14 @@ function OverviewScreen({ lib, now, onOpen }: { lib: Library; now: number; onOpe
           {due.map(({ deck, i, cards, due: d }) => (
             <Row
               as="button"
+              animate="row"
               key={deck.id}
               icon={<DeckIcon index={i} />}
               label={<span {...stylex.props(styles.clamp)}>{deck.name}</span>}
               subtitle={`${cards.length} ${cards.length === 1 ? 'card' : 'cards'}`}
               detail={d > 0 ? `${d} due` : 'All caught up'}
               chevron
+              xstyle={[styles.actionRow, delay.ms(Math.min(i, 8) * 40)]}
               onClick={() => onOpen(deck)}
             />
           ))}
@@ -510,12 +537,16 @@ function EditorSheet({
                 placeholder="Answer"
                 onChange={(e) => onChange({ back: e.target.value })}
               />
+              <span {...stylex.props(styles.cardHint)}>Revealed when the card flips.</span>
             </label>
           </>
         )}
         <div {...stylex.props(styles.editorActions)}>
           <Button variant="filled" disabled={!canSave} onClick={onSave}>
             Save
+          </Button>
+          <Button variant="plain" onClick={onClose}>
+            Cancel
           </Button>
           {editingCard && (
             <Button
@@ -556,6 +587,15 @@ function Flashcards() {
 
   // The live session, only if its deck still exists on this copy.
   const review = lib.review && getDeck(lib, lib.review.deckId) ? lib.review : null
+
+  // A fresh launch that lands on a waiting review commits that view so later
+  // renders keep honouring it; without the write the session sentinel would
+  // re-derive 'decks' the moment the session finishes and skip the recap.
+  const waiting = review && !review.finished ? review.deckId : null
+  useEffect(() => {
+    if (ui.status === 'ready' && ui.value === null && waiting)
+      ui.set(JSON.stringify({ v: 1, view: 'review', deckId: waiting }))
+  }, [ui, waiting])
 
   // Fresh launches (nothing written to the session key yet) land on a waiting
   // review instead of the deck list; once the user navigates, the written value
@@ -605,6 +645,7 @@ function Flashcards() {
         deck={deck}
         review={review}
         wide={wide}
+        onLeave={() => go({ v: 1, view: 'deck', deckId: deck.id })}
         onEnd={() => {
           save(abandonReview(lib))
           go({ v: 1, view: 'deck', deckId: deck.id })
@@ -675,7 +716,7 @@ function Flashcards() {
       ) : wide ? (
         <section {...stylex.props(styles.stage)}>
           <aside {...stylex.props(styles.rail)}>{decksScreen}</aside>
-          <div {...stylex.props(styles.detail)}>
+          <div key={`${screen}:${deck?.id ?? 'today'}`} {...stylex.props(styles.detail, shared.swap)}>
             {detailScreen ?? (
               <OverviewScreen lib={lib} now={now} onOpen={(d) => go({ v: 1, view: 'deck', deckId: d.id })} />
             )}
