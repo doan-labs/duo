@@ -182,8 +182,8 @@ export const styles = stylex.create({
   segBtn: {
     flexGrow: 1,
     minWidth: 0,
-    // Fills its track: inside the 44 pt controls row the segments grow with it.
-    minHeight: 30,
+    // The HIG's finger target applies to segments too: every option is 44 pt.
+    minHeight: 44,
     height: '100%',
     paddingInline: space.sm,
     borderWidth: 0,
@@ -203,7 +203,8 @@ export const styles = stylex.create({
   },
   segOn: {
     backgroundColor: glass.tint,
-    color: colors.white,
+    // Selected reads as the interaction colour on the raised light pill.
+    color: app.link,
     boxShadow: `${shadow.rim},${shadow.card}`
   },
   segFill: { flexGrow: 1 },
@@ -416,6 +417,7 @@ export const styles = stylex.create({
     textTransform: 'uppercase'
   },
   resultKickerWin: { color: colors.greenDark },
+  resultKickerConfirm: { color: colors.orangeDark },
   // The card's lines land one after another so the verdict reads in order.
   resultLine: {
     animationName: { default: lineIn, [reduce]: 'none' },
@@ -451,20 +453,23 @@ export const styles = stylex.create({
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1
   },
+  // The one filled action per surface carries app.link, the interaction
+  // colour; the warm yellow stays with brand and stats content.
   primary: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.xs,
+    minHeight: 44,
     borderWidth: 0,
     borderRadius: radius.lg,
     paddingBlock: space.sm,
     paddingInline: space.md,
     backgroundColor: {
-      default: colors.yellowDark,
-      ':hover': `color-mix(in srgb, ${colors.yellowDark} 86%, ${colors.white})`
+      default: app.link,
+      ':hover': `color-mix(in srgb, ${app.link} 86%, ${colors.white})`
     },
-    color: colors.black,
+    color: colors.white,
     fontFamily: fonts.system,
     fontSize: typeScale.footnote,
     fontWeight: weight.bold,
@@ -476,5 +481,8 @@ export const styles = stylex.create({
     transitionTimingFunction: easing.pop,
     transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
-  }
+  },
+  // The discard confirmation sits where the result card lands: a bottom
+  // action card with explicit Cancel and a labelled primary, iOS-style.
+  confirmActions: { display: 'flex', gap: space.sm, flexShrink: 0, flexWrap: 'wrap' }
 })

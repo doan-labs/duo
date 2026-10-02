@@ -66,7 +66,7 @@ function Seg({
           role="radio"
           aria-checked={o === value}
           onClick={() => onChange(o)}
-          {...stylex.props(styles.segBtn, o === value && styles.segOn)}
+          {...stylex.props(styles.segBtn, o === value && styles.segOn, shared.press)}
         >
           <span {...stylex.props(styles.segLabel)}>{o}</span>
         </button>
@@ -87,6 +87,9 @@ function Minesweeper() {
   // The last reveal tap, for the board's staggered flood: this display's own
   // motion cue, never persisted, so the mirror copy never replays it.
   const [wave, setWave] = useState<{ index: number; stamp: number } | null>(null)
+  // A queued discard: the board in front of the player is about to be thrown
+  // away for another game, so it asks first. Null means play normally.
+  const [pending, setPending] = useState<{ preset: PresetId; label: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
@@ -129,6 +132,9 @@ function Minesweeper() {
     const next = adoptGame(raw)
     if (!next || next.by === ME) return
     setGame(next.game)
+    // A board swapped in from the other display settles any open question
+    // about discarding the one it replaced.
+    setPending(null)
     setFocus((current) => Math.min(current, next.game.cells.length - 1))
   }, [saved.value, saved.status, saved, publish])
 
@@ -180,9 +186,33 @@ function Minesweeper() {
     (presetId: PresetId = game.preset) => {
       const next = newGame(presetById(presetId))
       setFocus(0)
+      setPending(null)
       publish(next)
     },
     [game.preset, publish]
+  )
+
+  // Any opened or flagged cell is entered progress worth a confirm; a fresh
+  // or finished board can be replaced directly.
+  const hasProgress = game.cells.some((cell) => cell.state !== 'hidden')
+  const ended = game.status === 'won' || game.status === 'lost'
+  const requestRestart = useCallback(
+    (presetId: PresetId = game.preset) => {
+      if (ended || !hasProgress) {
+        restart(presetId)
+        return
+      }
+      setPending({ preset: presetId, label: presetById(presetId).label })
+    },
+    [ended, hasProgress, game.preset, restart]
+  )
+  // Re-selecting the running preset is a no-op, never a silent board wipe.
+  const requestDifficulty = useCallback(
+    (presetId: PresetId) => {
+      if (presetId === game.preset) return
+      requestRestart(presetId)
+    },
+    [game.preset, requestRestart]
   )
 
   const toggleFlagMode = useCallback(() => flag.set(flagMode ? '0' : '1'), [flag, flagMode])
@@ -208,15 +238,18 @@ function Minesweeper() {
         }
         return
       }
+      if (event.key === 'Escape' && pending) {
+        setPending(null)
+        return
+      }
       if (event.key === 'f' || event.key === 'F') flagAt(focusRef.current)
       else if (event.key === 'g' || event.key === 'G') toggleFlagMode()
-      else if (event.key === 'r' || event.key === 'R' || event.key === 'n' || event.key === 'N') restart()
+      else if (event.key === 'r' || event.key === 'R' || event.key === 'n' || event.key === 'N') requestRestart()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [game, flagAt, toggleFlagMode, restart, rootRef])
+  }, [game, flagAt, toggleFlagMode, requestRestart, pending, rootRef])
 
-  const ended = game.status === 'won' || game.status === 'lost'
   const seconds = elapsedSeconds(game, now)
   const preset = presetById(game.preset)
   const board = game.preset
@@ -251,7 +284,7 @@ function Minesweeper() {
         aria="Difficulty"
         options={PRESETS.map((p) => p.label)}
         value={preset.label}
-        onChange={(label) => restart(PRESETS.find((p) => p.label === label)!.id)}
+        onChange={(label) => requestDifficulty(PRESETS.find((p) => p.label === label)!.id)}
         stacked={wide}
       />
       <div {...stylex.props(styles.controls, wide ? styles.controlsWide : styles.controlsCover)}>
@@ -264,7 +297,7 @@ function Minesweeper() {
           }}
           fill={!wide}
         />
-        <button type="button" onClick={() => restart()} {...stylex.props(styles.action)}>
+        <button type="button" onClick={() => requestRestart()} {...stylex.props(styles.action, shared.press)}>
           <Sym name="reload" size={13} />
           New game
         </button>
@@ -332,7 +365,7 @@ function Minesweeper() {
             {preset.label} board - {formatClock(seconds)} in
           </span>
         </div>
-        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary)}>
+        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press)}>
           <Sym name="reload" size={13} />
           Try again
         </button>
@@ -352,12 +385,42 @@ function Minesweeper() {
             {newBest ? '' : best === null ? '' : ` - best ${formatClock(best)}`}
           </span>
         </div>
-        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary)}>
+        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press)}>
           <Sym name="reload" size={13} />
           New game
         </button>
       </div>
     ) : null
+
+  // Discard a board with entered progress only through an explicit answer.
+  // Cancelling leaves the board, flags and running timer exactly as they are.
+  const confirm = pending ? (
+    <div
+      role="alertdialog"
+      aria-label="Discard this game?"
+      {...stylex.props(styles.result, !wide && styles.resultCover)}
+    >
+      <div {...stylex.props(styles.resultCopy)}>
+        <span {...stylex.props(styles.resultKicker, styles.resultKickerConfirm, styles.resultLine)}>New game</span>
+        <strong {...stylex.props(styles.resultTitle, styles.resultLine, styles.resultDelay(60))}>
+          Discard this board?
+        </strong>
+        <span {...stylex.props(styles.resultSub, styles.resultLine, styles.resultDelay(120))}>
+          {pending.preset === game.preset
+            ? 'Your progress and flags will be lost.'
+            : `Switch to ${pending.label}? Your progress and flags will be lost.`}
+        </span>
+      </div>
+      <div {...stylex.props(styles.confirmActions)}>
+        <button type="button" onClick={() => setPending(null)} {...stylex.props(styles.action, shared.press)}>
+          Cancel
+        </button>
+        <button type="button" onClick={() => restart(pending.preset)} {...stylex.props(styles.primary, shared.press)}>
+          {pending.preset === game.preset ? 'New game' : `Start ${pending.label}`}
+        </button>
+      </div>
+    </div>
+  ) : null
 
   return (
     <main ref={rootRef} {...stylex.props(dark, styles.root, !wide && styles.rootCover)}>
@@ -384,7 +447,7 @@ function Minesweeper() {
           <p {...stylex.props(styles.hint, styles.hintCover, flagMode && styles.hintOn)}>{hintText}</p>
         </section>
       )}
-      {result}
+      {result ?? confirm}
     </main>
   )
 }

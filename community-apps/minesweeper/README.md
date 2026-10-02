@@ -19,7 +19,11 @@ claims: later guesses are part of the game.
   hidden toggle. On a mouse, right-click flags directly; on touch, a 400 ms
   long-press flags too.
 - Keyboard: arrows move the focus, Enter/Space opens, F flags the focused
-  cell, G toggles flag mode, R/N starts a new game.
+  cell, G toggles flag mode, R/N asks for a new game.
+- A board with opened or flagged cells is never silently discarded: New game,
+  a different difficulty or R/N first asks "Discard this board?" with explicit
+  Cancel and labelled start actions; Escape also cancels. Re-picking the
+  current difficulty is a no-op, and after a win or loss replay is direct.
 - The counter shows mines minus flags and the clock starts on the first
   reveal. Winning auto-flags every remaining mine; losing reveals the field
   and slashes the flags that were wrong.

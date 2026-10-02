@@ -17,8 +17,12 @@ export function fitLayout(view: ViewDimensions, wide: boolean) {
   // Cover header wraps the score chips onto a second line; rail stacks the
   // segments over the buttons, and the hint row sits under it.
   const header = wide ? 56 : 112
-  const gaps = wide ? 24 : 48
+  // Cover stage gaps measured ~24 between header, board, rail and hint; the
+  // extra is dead space the centred stage would only split around the board.
+  const gaps = wide ? 24 : 28
   const railWide = 200
+  // 44 pt segments, the 44 pt action row and the hint under the rail -
+  // measured together at 117, rounded up with margin.
   const railCover = 124
   const width = view.width || 790
   const height = view.height || 555
