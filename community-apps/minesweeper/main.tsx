@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
+import { Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -34,6 +34,28 @@ import { styles } from './styles.ts'
 // displays, including the race where both seed a fresh board at once.
 const ME = crypto.randomUUID()
 
+// APG radiogroup keyboard contract shared by both pickers: one tab stop on
+// the checked option, and arrows (Home/End too) move the check and focus
+// together, wrapping at the ends.
+function useRadioNav(count: number, current: number, pick: (index: number) => void) {
+  const refs = useRef<Array<HTMLElement | null>>([])
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    let next = current
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % count
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (current + count - 1) % count
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = count - 1
+    else return
+    event.preventDefault()
+    pick(next)
+    refs.current[next]?.focus()
+  }
+  const refAt = (index: number) => (el: HTMLElement | null) => {
+    refs.current[index] = el
+  }
+  return { onKeyDown, refAt }
+}
+
 // The kit Segmented is a light-surface control; this is the same radiogroup
 // contract drawn for a dark well (as the other arcade apps do).
 function Seg({
@@ -41,30 +63,31 @@ function Seg({
   options,
   value,
   onChange,
-  stacked,
   fill
 }: {
   aria: string
   options: readonly string[]
   value: string
   onChange: (value: string) => void
-  /** Stack segments vertically; the rail is too narrow for a three-wide row. */
-  stacked?: boolean
   /** Grow the track to share a row's width with its sibling control. */
   fill?: boolean
 }) {
+  const nav = useRadioNav(options.length, options.indexOf(value), (index) => onChange(options[index]!))
   return (
     <div
       role="radiogroup"
       aria-label={aria}
-      {...stylex.props(styles.segTrack, stacked && styles.segRail, fill && styles.segFill)}
+      onKeyDown={nav.onKeyDown}
+      {...stylex.props(styles.segTrack, fill && styles.segFill)}
     >
-      {options.map((o) => (
+      {options.map((o, i) => (
         <button
           key={o}
+          ref={nav.refAt(i)}
           type="button"
           role="radio"
           aria-checked={o === value}
+          tabIndex={o === value ? 0 : -1}
           onClick={() => onChange(o)}
           {...stylex.props(styles.segBtn, o === value && styles.segOn, shared.press)}
         >
@@ -90,6 +113,8 @@ function Minesweeper() {
   // A queued discard: the board in front of the player is about to be thrown
   // away for another game, so it asks first. Null means play normally.
   const [pending, setPending] = useState<{ preset: PresetId; label: string } | null>(null)
+  // Whatever had focus when the question opened gets it back on close.
+  const returnFocus = useRef<Element | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
@@ -202,6 +227,7 @@ function Minesweeper() {
         restart(presetId)
         return
       }
+      returnFocus.current = document.activeElement
       setPending({ preset: presetId, label: presetById(presetId).label })
     },
     [ended, hasProgress, game.preset, restart]
@@ -217,11 +243,39 @@ function Minesweeper() {
 
   const toggleFlagMode = useCallback(() => flag.set(flagMode ? '0' : '1'), [flag, flagMode])
 
+  // The Sheet closes for a cancel (scrim, Escape, Cancel button) and for the
+  // confirmed start; either way the control or cell that had focus resumes it.
+  const closeConfirm = useCallback(() => {
+    setPending(null)
+    const el = returnFocus.current
+    returnFocus.current = null
+    // The trigger sits inside the inert subtree until the close commits, so
+    // retry across frames until inert lifts and it takes focus again.
+    if (el instanceof HTMLElement) {
+      let tries = 0
+      const restore = () => {
+        if (!el.isConnected) return
+        el.focus()
+        if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
+      }
+      requestAnimationFrame(restore)
+    }
+  }, [])
+
+  // Hands the pre-connect Escape guard the live cancel callback only while a
+  // confirmation is actually open.
+  useEffect(() => {
+    confirmClose = pending ? closeConfirm : null
+  }, [pending, closeConfirm])
+
   // Arrow keys drive a roving focus over the cells; F flags it, G toggles flag
   // mode, Enter/Space activate the focused cell natively, R/N restart.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
+      // While the discard sheet is up the board is inert: the sheet owns
+      // focus and captures Escape itself, so no shortcut may act behind it.
+      if (pending) return
       const { cols, rows } = game
       if (event.key.startsWith('Arrow')) {
         const current = focusRef.current
@@ -236,10 +290,6 @@ function Minesweeper() {
           const el = rootRef.current?.querySelector(`[data-index="${next}"]`)
           if (el instanceof HTMLElement) el.focus()
         }
-        return
-      }
-      if (event.key === 'Escape' && pending) {
-        setPending(null)
         return
       }
       if (event.key === 'f' || event.key === 'F') flagAt(focusRef.current)
@@ -278,15 +328,52 @@ function Minesweeper() {
     </div>
   )
 
+  const pickNav = useRadioNav(
+    PRESETS.length,
+    PRESETS.findIndex((p) => p.id === game.preset),
+    (index) => requestDifficulty(PRESETS[index]!.id)
+  )
+
   const controls = (
     <>
-      <Seg
-        aria="Difficulty"
-        options={PRESETS.map((p) => p.label)}
-        value={preset.label}
-        onChange={(label) => requestDifficulty(PRESETS.find((p) => p.label === label)!.id)}
-        stacked={wide}
-      />
+      {wide ? (
+        // The 176 pt rail cannot hold three footnote labels side by side, so
+        // wide gets the other familiar iOS picker: a grouped checkmark list.
+        <div
+          role="radiogroup"
+          aria-label="Difficulty"
+          onKeyDown={pickNav.onKeyDown}
+          {...stylex.props(styles.pickPanel)}
+        >
+          {PRESETS.map((p, i) => (
+            <button
+              key={p.id}
+              ref={pickNav.refAt(i)}
+              type="button"
+              role="radio"
+              aria-checked={p.id === game.preset}
+              tabIndex={p.id === game.preset ? 0 : -1}
+              onClick={() => requestDifficulty(p.id)}
+              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep, shared.press)}
+            >
+              <span {...stylex.props(styles.pickLabel)}>{p.label}</span>
+              <span {...stylex.props(styles.pickMeta)}>
+                {p.cols}x{p.rows}
+              </span>
+              <span {...stylex.props(styles.pickCheck)}>
+                {p.id === game.preset ? <Sym name="tick" size={11} /> : null}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <Seg
+          aria="Difficulty"
+          options={PRESETS.map((p) => p.label)}
+          value={preset.label}
+          onChange={(label) => requestDifficulty(PRESETS.find((p) => p.label === label)!.id)}
+        />
+      )}
       <div {...stylex.props(styles.controls, wide ? styles.controlsWide : styles.controlsCover)}>
         <Seg
           aria="Tap mode"
@@ -393,64 +480,115 @@ function Minesweeper() {
     ) : null
 
   // Discard a board with entered progress only through an explicit answer.
-  // Cancelling leaves the board, flags and running timer exactly as they are.
-  const confirm = pending ? (
-    <div
-      role="alertdialog"
+  // The kit Sheet owns focus, the scrim and a captured Escape, so the board
+  // and the shell's go-home shortcut stay inert behind the question; the app
+  // marks its content inert and loops Tab inside the card while it is open.
+  const trapTab = (event: React.KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key !== 'Tab') return
+    const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button, [href], [tabindex]')].filter(
+      (el) => el.tabIndex >= 0
+    )
+    if (!items.length) return
+    const first = items[0]!
+    const last = items[items.length - 1]!
+    const active = document.activeElement
+    if (
+      event.shiftKey
+        ? active === event.currentTarget || active === first
+        : active === event.currentTarget || active === last
+    ) {
+      event.preventDefault()
+      ;(event.shiftKey ? last : first).focus()
+    }
+  }
+  const confirm = (
+    <Sheet
+      open={pending !== null}
+      onClose={closeConfirm}
       aria-label="Discard this game?"
-      {...stylex.props(styles.result, !wide && styles.resultCover)}
+      aria-modal="true"
+      onKeyDown={trapTab}
     >
-      <div {...stylex.props(styles.resultCopy)}>
-        <span {...stylex.props(styles.resultKicker, styles.resultKickerConfirm, styles.resultLine)}>New game</span>
-        <strong {...stylex.props(styles.resultTitle, styles.resultLine, styles.resultDelay(60))}>
-          Discard this board?
-        </strong>
-        <span {...stylex.props(styles.resultSub, styles.resultLine, styles.resultDelay(120))}>
-          {pending.preset === game.preset
-            ? 'Your progress and flags will be lost.'
-            : `Switch to ${pending.label}? Your progress and flags will be lost.`}
-        </span>
-      </div>
-      <div {...stylex.props(styles.confirmActions)}>
-        <button type="button" onClick={() => setPending(null)} {...stylex.props(styles.action, shared.press)}>
-          Cancel
-        </button>
-        <button type="button" onClick={() => restart(pending.preset)} {...stylex.props(styles.primary, shared.press)}>
-          {pending.preset === game.preset ? 'New game' : `Start ${pending.label}`}
-        </button>
-      </div>
-    </div>
-  ) : null
+      {pending ? (
+        <div {...stylex.props(styles.confirmCard)}>
+          <div {...stylex.props(styles.resultCopy)}>
+            <span {...stylex.props(styles.resultKicker, styles.resultKickerConfirm)}>New game</span>
+            <strong {...stylex.props(styles.resultTitle)}>Discard this board?</strong>
+            <span {...stylex.props(styles.resultSub)}>
+              {pending.preset === game.preset
+                ? 'Your progress and flags will be lost.'
+                : `Switch to ${pending.label}? Your progress and flags will be lost.`}
+            </span>
+          </div>
+          <div {...stylex.props(styles.confirmActions)}>
+            <button type="button" onClick={closeConfirm} {...stylex.props(styles.action, shared.press)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                restart(pending.preset)
+                closeConfirm()
+              }}
+              {...stylex.props(styles.primary, shared.press)}
+            >
+              {pending.preset === game.preset ? 'New game' : `Start ${pending.label}`}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </Sheet>
+  )
 
   return (
     <main ref={rootRef} {...stylex.props(dark, styles.root, !wide && styles.rootCover)}>
-      <header {...stylex.props(styles.header, !wide && styles.headerCover)}>
-        <div {...stylex.props(styles.brand)}>
-          <span {...stylex.props(styles.kicker)}>Duo Arcade</span>
-          <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>Minesweeper</h1>
-        </div>
-        {chips}
-      </header>
-      {wide ? (
-        <section {...stylex.props(styles.stage)}>
-          {boardEl}
-          <div {...stylex.props(styles.rail)}>
-            {controls}
-            {statsCard}
-            <p {...stylex.props(styles.hint, flagMode && styles.hintOn)}>{hintText}</p>
+      {/* inert lifts the whole play surface out of focus and hit-testing while
+          the discard Sheet is open; the Sheet stays outside this subtree. */}
+      <div inert={pending !== null} {...stylex.props(styles.shell)}>
+        <header {...stylex.props(styles.header, !wide && styles.headerCover)}>
+          <div {...stylex.props(styles.brand)}>
+            <span {...stylex.props(styles.kicker)}>Duo Arcade</span>
+            <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>Minesweeper</h1>
           </div>
-        </section>
-      ) : (
-        <section {...stylex.props(styles.stage, styles.stageCover)}>
-          {boardEl}
-          <div {...stylex.props(styles.rail, styles.railCover)}>{controls}</div>
-          <p {...stylex.props(styles.hint, styles.hintCover, flagMode && styles.hintOn)}>{hintText}</p>
-        </section>
-      )}
-      {result ?? confirm}
+          {chips}
+        </header>
+        {wide ? (
+          <section {...stylex.props(styles.stage)}>
+            {boardEl}
+            <div {...stylex.props(styles.rail)}>
+              {controls}
+              {statsCard}
+              <p {...stylex.props(styles.hint, flagMode && styles.hintOn)}>{hintText}</p>
+            </div>
+          </section>
+        ) : (
+          <section {...stylex.props(styles.stage, styles.stageCover)}>
+            {boardEl}
+            <div {...stylex.props(styles.rail, styles.railCover)}>{controls}</div>
+            <p {...stylex.props(styles.hint, styles.hintCover, flagMode && styles.hintOn)}>{hintText}</p>
+          </section>
+        )}
+        {result}
+      </div>
+      {confirm}
     </main>
   )
 }
+
+// Registered before os.connect() so it fires ahead of the SDK's Escape-to-home
+// forward: while a destructive Sheet is open, Escape cancels it inside the
+// app; at all other times the event passes through and still goes home.
+let confirmClose: (() => void) | null = null
+addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || !confirmClose) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    confirmClose()
+  },
+  true
+)
 
 await os.connect()
 createRoot(document.body).render(<Minesweeper />)

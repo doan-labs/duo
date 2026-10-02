@@ -160,8 +160,9 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   railCover: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', width: '100%', gap: space.sm },
-  // The narrow rail cannot hold three segments side by side; they stack.
-  segRail: { flexDirection: 'column', alignItems: 'stretch' },
+  // The inert boundary while the discard Sheet is up: mirrors the column of
+  // the root so the play surface lays out identically inside it.
+  shell: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, position: 'relative' },
   fieldLabel: {
     color: app.label2,
     fontSize: typeScale.caption2,
@@ -209,6 +210,41 @@ export const styles = stylex.create({
   },
   segFill: { flexGrow: 1 },
   segLabel: { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  // Wide rail's difficulty picker: the grouped checkmark list iOS uses when a
+  // horizontal segment would not fit the words. Rows keep the 44 pt target.
+  pickPanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    borderRadius: radius.lg,
+    backgroundColor: app.fill,
+    overflow: 'hidden',
+    flexShrink: 0
+  },
+  pickRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 44,
+    paddingInline: space.md,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    color: app.fg,
+    fontFamily: fonts.system,
+    fontSize: typeScale.footnote,
+    fontWeight: weight.regular,
+    textAlign: 'start',
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    transitionProperty: 'color,background-color',
+    transitionDuration: '.18s',
+    transitionTimingFunction: easing.inOut,
+    ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: -2 }
+  },
+  pickRowSep: { borderTopWidth: 1, borderTopStyle: 'solid', borderTopColor: app.separator },
+  pickLabel: { fontWeight: weight.semibold },
+  pickMeta: { marginLeft: 'auto', color: app.label2, fontSize: typeScale.caption2 },
+  // The check slot stays reserved so the trailing meta does not jump rows.
+  pickCheck: { color: app.link, width: '13px', flexShrink: 0, textAlign: 'center' },
   controls: { display: 'flex', gap: space.sm, flexShrink: 0, alignItems: 'stretch' },
   controlsWide: { flexDirection: 'column' },
   controlsCover: { width: '100%' },
@@ -482,7 +518,14 @@ export const styles = stylex.create({
     transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
-  // The discard confirmation sits where the result card lands: a bottom
-  // action card with explicit Cancel and a labelled primary, iOS-style.
+  // The discard question lives in the kit Sheet; this lays out its contents:
+  // copy on top, explicit Cancel and the labelled primary along the bottom.
+  confirmCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.md,
+    paddingBlock: space.lg,
+    paddingInline: space.lg
+  },
   confirmActions: { display: 'flex', gap: space.sm, flexShrink: 0, flexWrap: 'wrap' }
 })
