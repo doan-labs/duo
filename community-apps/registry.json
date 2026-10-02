@@ -6,6 +6,10 @@
       "folder": "habit-streaks",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.sudoku": {
+      "folder": "sudoku",
+      "maintainers": ["mnismt"]
+    },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
