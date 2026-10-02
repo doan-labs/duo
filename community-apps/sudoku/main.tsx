@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Button, Sheet, Sym, type SymProps, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
-import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -98,7 +98,7 @@ function ModeGroup({ mode, onPick }: { mode: Mode; onPick: (m: Mode) => void }) 
               segs.current[j]?.focus()
               onPick(MODES[j]!)
             }}
-            {...stylex.props(styles.modeSeg, sel && styles.modeSegOn)}
+            {...stylex.props(shared.press, styles.modeSeg, sel && styles.modeSegOn)}
           >
             {MODE_LABEL[m]}
           </button>

@@ -319,10 +319,7 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     letterSpacing: tracking.footnote,
     fontWeight: weight.semibold,
-    cursor: 'pointer',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: `${motion.pressDuration}, .2s`,
-    transform: { default: 'scale(1)', ':active': motion.press }
+    cursor: 'pointer'
   },
   modeSegOn: { backgroundColor: app.control, boxShadow: shadow.card },
   dangerBtn: { color: colors.red },
