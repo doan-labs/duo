@@ -240,7 +240,9 @@ function App() {
       const cur = gameRef.current
       if (!cur || !grid) return
       const done = isComplete(nextCells, grid)
-      if (done && !cur.done) navigator.vibrate?.([40, 60, 40])
+      // The fold flush commits through this same path while hidden; a haptic
+      // belongs only to a finishing stroke the player is actually touching.
+      if (done && !cur.done && view.active && view.visible) navigator.vibrate?.([40, 60, 40])
       publish({
         ...cur,
         by: ME,
@@ -254,7 +256,7 @@ function App() {
         scored: done && (cur.scored || !cur.done)
       })
     },
-    [grid, publish]
+    [grid, publish, view.active, view.visible]
   )
 
   function cellFromEvent(e: React.PointerEvent): number {
@@ -390,23 +392,15 @@ function App() {
     requestAnimationFrame(() => target?.focus())
   }, [])
 
-  // Escape is pop-to-library on the board page and cancel while the confirm
-  // sheet is open; the callback itself sits on the pre-connect window guard
-  // so it fires ahead of the SDK's go-home forward. Anywhere else the key
-  // passes through untouched.
+  // The pre-connect window guard only needs a live callback while the
+  // confirm sheet is open; elsewhere Escape falls through to the shell's
+  // go-home, so library and board leave the key alone.
   useEffect(() => {
-    escapeBack = confirming
-      ? () => closeSheet('trigger')
-      : game?.screen === 'play'
-        ? () => {
-            const cur = gameRef.current
-            if (cur) publish({ ...cur, by: ME, at: Date.now(), screen: 'pick' })
-          }
-        : null
+    escapeBack = confirming ? () => closeSheet('trigger') : null
     return () => {
       escapeBack = null
     }
-  }, [confirming, game?.screen, publish, closeSheet])
+  }, [confirming, closeSheet])
 
   // Tab stays inside the sheet's own controls; the inert background is the
   // second line of defence behind this wrap.
@@ -892,9 +886,8 @@ function App() {
 }
 
 // Registered before os.connect() so it fires ahead of the SDK's Escape-to-home
-// forward: while the confirm sheet is open, Escape cancels it inside the app,
-// and on the board page it pops to the library. Everywhere else the event
-// passes through and still goes home.
+// forward: while the confirm sheet is open, Escape cancels it inside the app.
+// Everywhere else the event passes through and still goes home.
 let escapeBack: (() => void) | null = null
 addEventListener(
   'keydown',

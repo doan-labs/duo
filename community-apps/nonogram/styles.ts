@@ -208,7 +208,7 @@ export const styles = stylex.create({
     animationTimingFunction: easing.spring,
     animationFillMode: 'both'
   },
-  cellFocus: { outlineStyle: 'solid', outlineWidth: 2, outlineColor: app.link, outlineOffset: -2, zIndex: 1 },
+  cellFocus: { outlineStyle: 'solid', outlineWidth: 2, outlineColor: app.link, outlineOffset: -2 },
   mark: {
     display: 'block',
     color: app.label3,
