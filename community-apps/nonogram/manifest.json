@@ -7,7 +7,7 @@
   "icon": "./icon.png",
   "light": true,
   "permissions": [],
-  "author": "mnismt",
+  "author": "devin",
   "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/nonogram",
   "license": "MIT"
 }
