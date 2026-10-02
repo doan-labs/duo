@@ -1,0 +1,186 @@
+import * as stylex from '@stylexjs/stylex'
+import { type ReactNode, useRef } from 'react'
+import type { Cell, Game } from './game.ts'
+import { styles } from './styles.ts'
+
+export type ViewDimensions = { display: 'inner' | 'cover'; width: number; height: number }
+
+/**
+ * The square the board gets, from the view's real size. On the wide stage the
+ * rail sits beside the board and costs width; on the cover it stacks under it
+ * and costs height.
+ */
+export function fitLayout(view: ViewDimensions, wide: boolean) {
+  const padX = wide ? 40 : 24
+  const top = wide ? 16 : 12
+  const bottom = wide ? 32 : 24
+  const header = wide ? 56 : 54
+  const gaps = wide ? 24 : 32
+  const railWide = 200
+  const railCover = 96
+  const width = view.width || 790
+  const height = view.height || 555
+  const freeH = height - top - header - bottom - gaps
+  const board = wide ? Math.min(freeH, width - padX * 2 - railWide) : Math.min(freeH - railCover, width - padX * 2)
+  return { board: Math.max(96, Math.floor(board)) }
+}
+
+const LONG_PRESS_MS = 400
+/** Drag distance that cancels a long-press: the finger was scrolling the field. */
+const DRAG_PX = 12
+
+/** Classic number colours, tuned for the dark field. */
+const NUMBER_STYLES = [styles.n1, styles.n2, styles.n3, styles.n4, styles.n5, styles.n6, styles.n7, styles.n8] as const
+
+export function FlagGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...stylex.props(styles.glyph)}>
+      <path d="M7 21V3.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M7 4h10.5L14 8.5 17.5 13H7z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function MineGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...stylex.props(styles.glyph)}>
+      <path
+        d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="4.6" fill="currentColor" />
+      <circle cx="10.4" cy="10.4" r="1.15" fill="white" opacity="0.75" />
+    </svg>
+  )
+}
+
+function labelFor(cell: Cell, index: number, cols: number): string {
+  const row = Math.floor(index / cols) + 1
+  const column = (index % cols) + 1
+  const place = `Row ${row} column ${column}`
+  if (cell.state === 'flagged') return `${place}, flagged`
+  if (cell.state === 'hidden') return `${place}, hidden`
+  if (cell.mine) return cell.exploded ? `${place}, exploded mine` : `${place}, mine`
+  return cell.n === 0 ? `${place}, clear` : `${place}, ${cell.n} mines nearby`
+}
+
+export function Board({
+  game,
+  size,
+  focus,
+  ended,
+  onTap,
+  onFlag,
+  onFocus,
+  overlay
+}: {
+  game: Game
+  size: number
+  focus: number
+  /** Game over: cells stay visible but stop accepting input. */
+  ended: boolean
+  onTap: (index: number) => void
+  onFlag: (index: number) => void
+  onFocus: (index: number) => void
+  overlay?: ReactNode
+}) {
+  const pressTimer = useRef<number | null>(null)
+  const pressStart = useRef<{ x: number; y: number } | null>(null)
+  const suppressTap = useRef(false)
+  // Recent long-presses also produce a contextmenu event on release; the stamp
+  // tells that handler the flag already toggled so it does not toggle back.
+  const longPressedAt = useRef(0)
+  // These mirror the well's `space.xs` padding and `space.xxs` grid gap; they
+  // are runtime geometry, not styles, so the token literals are mirrored here.
+  const pad = 4
+  const gap = 2
+  const digitPx = Math.max(8, Math.floor(((size - pad * 2 - gap * (game.cols - 1)) / game.cols) * 0.5))
+
+  const disarm = () => {
+    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current)
+    pressTimer.current = null
+    pressStart.current = null
+  }
+
+  return (
+    <div
+      role="grid"
+      aria-label="Minefield"
+      aria-rowcount={game.rows}
+      aria-colcount={game.cols}
+      {...stylex.props(styles.well, styles.fitBoard(size), styles.fitGrid(game.cols, game.rows))}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      {game.cells.map((cell, index) => {
+        const open = cell.state === 'open'
+        const flagged = cell.state === 'flagged'
+        const wrongFlag = game.status === 'lost' && flagged && !cell.mine
+        const digit = open && !cell.mine && cell.n > 0 ? cell.n : 0
+        return (
+          <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: the grid never reorders
+            key={`cell-${index}`}
+            type="button"
+            role="gridcell"
+            aria-label={labelFor(cell, index, game.cols)}
+            data-index={index}
+            tabIndex={index === focus ? 0 : -1}
+            onFocus={() => onFocus(index)}
+            onClick={() => {
+              if (suppressTap.current) {
+                suppressTap.current = false
+                return
+              }
+              onTap(index)
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              if (Date.now() - longPressedAt.current < 600) return
+              onFlag(index)
+            }}
+            onPointerDown={(event) => {
+              if (event.pointerType === 'mouse') return
+              pressStart.current = { x: event.clientX, y: event.clientY }
+              pressTimer.current = window.setTimeout(() => {
+                suppressTap.current = true
+                longPressedAt.current = Date.now()
+                onFlag(index)
+              }, LONG_PRESS_MS)
+            }}
+            onPointerUp={() => disarm()}
+            onPointerCancel={() => disarm()}
+            onPointerLeave={() => disarm()}
+            onPointerMove={(event) => {
+              const start = pressStart.current
+              if (!start) return
+              if (Math.abs(event.clientX - start.x) > DRAG_PX || Math.abs(event.clientY - start.y) > DRAG_PX) disarm()
+            }}
+            {...stylex.props(
+              styles.cell,
+              styles.fitDigits(digitPx),
+              open ? styles.cellOpen : styles.cellHidden,
+              ended && styles.cellLocked,
+              cell.exploded && styles.cellExploded,
+              wrongFlag && styles.wrongFlag
+            )}
+          >
+            {flagged ? (
+              <span {...stylex.props(styles.flagInk, styles.flagOnCell)}>
+                <FlagGlyph />
+              </span>
+            ) : open && cell.mine ? (
+              <span {...stylex.props(cell.exploded ? styles.mineInkExploded : styles.mineInk)}>
+                <MineGlyph />
+              </span>
+            ) : digit ? (
+              <span {...stylex.props(styles.digit, NUMBER_STYLES[digit - 1]!)}>{digit}</span>
+            ) : null}
+          </button>
+        )
+      })}
+      {overlay}
+    </div>
+  )
+}
