@@ -115,6 +115,12 @@ function Minesweeper() {
   const [pending, setPending] = useState<{ preset: PresetId; label: string } | null>(null)
   // Whatever had focus when the question opened gets it back on close.
   const returnFocus = useRef<Element | null>(null)
+  // The Sheet stays mounted for its close animation after pending clears, so
+  // the last question keeps rendering (inert, so its buttons cannot act) until
+  // it unmounts rather than the card emptying mid-fade.
+  const lastPending = useRef<{ preset: PresetId; label: string } | null>(null)
+  if (pending) lastPending.current = pending
+  const shown = pending ?? lastPending.current
   const [now, setNow] = useState(() => Date.now())
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
@@ -272,7 +278,7 @@ function Minesweeper() {
   // mode, Enter/Space activate the focused cell natively, R/N restart.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return
       // While the discard sheet is up the board is inert: the sheet owns
       // focus and captures Escape itself, so no shortcut may act behind it.
       if (pending) return
@@ -509,15 +515,15 @@ function Minesweeper() {
       aria-modal="true"
       onKeyDown={trapTab}
     >
-      {pending ? (
-        <div {...stylex.props(styles.confirmCard)}>
+      {shown ? (
+        <div inert={pending === null} {...stylex.props(styles.confirmCard)}>
           <div {...stylex.props(styles.resultCopy)}>
             <span {...stylex.props(styles.resultKicker, styles.resultKickerConfirm)}>New game</span>
             <strong {...stylex.props(styles.resultTitle)}>Discard this board?</strong>
             <span {...stylex.props(styles.resultSub)}>
-              {pending.preset === game.preset
+              {shown.preset === game.preset
                 ? 'Your progress and flags will be lost.'
-                : `Switch to ${pending.label}? Your progress and flags will be lost.`}
+                : `Switch to ${shown.label}? Your progress and flags will be lost.`}
             </span>
           </div>
           <div {...stylex.props(styles.confirmActions)}>
@@ -527,12 +533,12 @@ function Minesweeper() {
             <button
               type="button"
               onClick={() => {
-                restart(pending.preset)
+                restart(shown.preset)
                 closeConfirm()
               }}
               {...stylex.props(styles.primary, shared.press)}
             >
-              {pending.preset === game.preset ? 'New game' : `Start ${pending.label}`}
+              {shown.preset === game.preset ? 'New game' : `Start ${shown.label}`}
             </button>
           </div>
         </div>
