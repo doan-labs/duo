@@ -558,7 +558,7 @@ function Sudoku() {
           <div {...stylex.props(styles.sheetBtns)}>
             <Button
               variant="tinted"
-              xstyle={styles.dangerBtn}
+              xstyle={[styles.sheetBtn, styles.dangerBtn]}
               onClick={() => {
                 if (confirmKind.current === 'restart') commit(restart(game))
                 else commit(newGame(ME, game.mode), true)
@@ -566,7 +566,7 @@ function Sudoku() {
             >
               {confirmKind.current === 'restart' ? 'Restart' : 'New game'}
             </Button>
-            <Button variant="plain" onClick={() => setConfirm(null)}>
+            <Button variant="plain" xstyle={styles.sheetBtn} onClick={() => setConfirm(null)}>
               Cancel
             </Button>
           </div>

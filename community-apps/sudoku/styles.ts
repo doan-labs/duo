@@ -287,6 +287,7 @@ export const styles = stylex.create({
   sheetTitle: { fontSize: typeScale.headline, fontWeight: weight.semibold },
   sheetText: { fontSize: typeScale.footnote, color: app.label2, lineHeight: leading.body },
   sheetBtns: { display: 'flex', flexDirection: 'column', gap: space.sm },
+  sheetBtn: { minHeight: 44 },
   dangerBtn: { color: colors.red },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: space.xs },
   statRow: {
