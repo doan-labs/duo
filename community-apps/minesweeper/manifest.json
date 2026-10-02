@@ -6,7 +6,7 @@
   "entry": "./main.tsx",
   "icon": "./icon.png",
   "permissions": [],
-  "author": "mnismt",
+  "author": "devin",
   "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/minesweeper",
   "license": "MIT"
 }
