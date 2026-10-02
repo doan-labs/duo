@@ -17,7 +17,7 @@ import {
   useDisplay,
   useWide
 } from '@doan-labs/duo-uikit'
-import { animations, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
+import { animations, dark, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useState } from 'react'
@@ -580,6 +580,10 @@ function Flashcards() {
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
+  // Dark Mode flips this light app into the kit's dark theme; the switch arrives
+  // as a device event the way Settings reads it.
+  const [darkMode, setDarkMode] = useState(false)
+  useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
 
   const lib = parseLibrary(stored.value)
   const draftState = parseDraft(draft.value)
@@ -707,7 +711,7 @@ function Flashcards() {
       data-app="flashcards"
       data-display={view.display}
       data-screen={screen}
-      {...stylex.props(light, styles.root)}
+      {...stylex.props(darkMode ? dark : light, styles.root)}
     >
       {stored.status === 'hydrating' ? (
         <Placeholder>
