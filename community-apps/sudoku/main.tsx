@@ -208,13 +208,14 @@ function Sudoku() {
   )
 
   // Why the interval only re-renders: the clock derives from timestamps on the
-  // shared state, so the running second copy never owns a countdown (same
-  // reasoning as pomodoro-timer).
+  // shared state, and only the visible copy re-renders it, so the hidden copy
+  // starts no timer (same reasoning as pomodoro-timer).
   useEffect(() => {
-    if (!game || game.endedAt !== null) return
+    if (!game || game.endedAt !== null || !view.visible) return
+    setNow(Date.now())
     const tick = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(tick)
-  }, [game])
+  }, [game, view.visible])
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
   useEffect(() => {
