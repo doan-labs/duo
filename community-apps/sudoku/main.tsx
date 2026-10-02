@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, Segmented, Sym, type SymProps, useDisplay, useWide } from '@doan-labs/duo-uikit'
+import { Button, Segmented, Sym, type SymProps, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
 import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -70,6 +70,10 @@ function Sudoku() {
   const [darkMode, setDarkMode] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  // Armed is the two-tap confirmation for destructive tools: the first tap
+  // turns the button red and asks again; the second runs it.
+  const [armed, setArmed] = useState<string | null>(null)
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const lastSeen = useRef<string | null>(null)
   const storageLanded = useRef(false)
@@ -89,16 +93,16 @@ function Sudoku() {
     const top = wide ? 16 : 8
     const header = wide ? 58 : 78 // the cover keeps its own mode row under the title
     const status = wide ? 22 : 18
-    const bottom = wide ? 20 : 16
+    const bottom = 24 // the home bar owns the bottom edge on both displays
     const gaps = 24
     const railW = wide ? 324 : 0 // rail width plus the stage gap
-    const railH = wide ? 0 : 102 // cover pad row plus tools row plus stage gap
+    const railH = wide ? 0 : 106 // cover pad row plus tools row plus stage gap
     const w = view.width || (wide ? 778 : 387)
     const h = view.height || (wide ? 503 : 563)
     const free = h - top - header - status - bottom - gaps - railH
     const board = Math.max(190, Math.floor(Math.min(free, w - padX - railW)))
     const cell = board / 9
-    return { board, digit: Math.round(cell * 0.55), note: Math.max(8, Math.round(cell * 0.27)) }
+    return { board, digit: Math.round(cell * 0.55), note: Math.max(10, Math.round(cell * 0.32)) }
   }, [view.width, view.height, wide])
 
   // Why storage seeds once: the durable slots are the record of earlier games,
@@ -168,6 +172,9 @@ function Sudoku() {
     setSlots(slotsNext)
     liveRef.current.set(JSON.stringify(wire))
     savedRef.current.set(packSaved(slotsNext, statsNext, wire.mode))
+    // Any real move disarms a pending destructive confirm.
+    if (armTimer.current) window.clearTimeout(armTimer.current)
+    setArmed(null)
   }, [])
 
   /**
@@ -180,7 +187,9 @@ function Sudoku() {
       const cur = latest.current
       const stash = cur.game ? { ...cur.slots, [cur.game.mode]: cur.game } : { ...cur.slots }
       const slot = mode === 'daily' ? (stash.daily?.day === DAY ? stash.daily : undefined) : stash[mode]
-      if (slot) {
+      // Only a live slot is worth resuming: a finished board in the slot would
+      // just reappear already solved, so it falls through to a fresh deal.
+      if (slot && !slot.endedAt) {
         setSlots(stash)
         commit(slot)
       } else {
@@ -223,6 +232,10 @@ function Sudoku() {
     [commit]
   )
 
+  // Keeps the solved card mounted through its short exit animation. The hook
+  // stays above the loading early-return like every other hook.
+  const solvedCard = usePresence(!!game && isSolved(game), 200)
+
   // Why keys move the selection instead of typing blind: hardware arrow keys
   // navigate the board, digits play or jot against the selected cell.
   const pressRef = useRef(press)
@@ -255,11 +268,9 @@ function Sudoku() {
 
   if (!game) {
     return (
-      <main
-        ref={rootRef}
-        {...stylex.props(darkMode ? dark : light, styles.root, !wide && styles.rootCover)}
-        aria-busy="true"
-      />
+      <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)} aria-busy="true">
+        <div {...stylex.props(styles.loading)}>Sudoku</div>
+      </main>
     )
   }
 
@@ -290,9 +301,24 @@ function Sudoku() {
       ? 'Loading saved progress...'
       : saved.status === 'error'
         ? 'Progress may not save offline'
-        : solved
-          ? `Solved in ${formatTime(elapsedMs(game, now))}${game.hints ? `, ${game.hints} hints` : ''}`
-          : `${left} to go${game.pencil ? ' - pencil on' : ''}${clashes.size ? ' - conflict' : ''}`
+        : armed
+          ? 'Tap again to confirm'
+          : solved
+            ? `Solved in ${formatTime(elapsedMs(game, now))}${game.hints ? `, ${game.hints} hints` : ''}`
+            : `${left} to go${game.pencil ? ' - pencil on' : ''}${clashes.size ? ' - conflict' : ''}`
+
+  /** First tap arms a destructive tool; the second within a few seconds runs it. */
+  const arm = (key: string, run: () => void) => {
+    if (armed === key) {
+      if (armTimer.current) window.clearTimeout(armTimer.current)
+      setArmed(null)
+      run()
+      return
+    }
+    if (armTimer.current) window.clearTimeout(armTimer.current)
+    setArmed(key)
+    armTimer.current = window.setTimeout(() => setArmed(null), 3000)
+  }
 
   type Tool = {
     key: string
@@ -301,17 +327,34 @@ function Sudoku() {
     disabled: boolean
     on: () => void
     active?: boolean
+    danger?: boolean
   }
   const tools: Tool[] = [
     { key: 'notes', label: 'Notes', icon: 'compose', disabled: solved, on: () => press('PENCIL'), active: game.pencil },
     { key: 'erase', label: 'Erase', icon: 'trash', disabled: solved, on: () => press('ERASE') },
     { key: 'undo', label: 'Undo', icon: 'undo', disabled: !game.undo.length, on: () => press('UNDO') },
     { key: 'hint', label: 'Hint', icon: 'bolt', disabled: solved, on: hint },
-    { key: 'restart', label: 'Restart', icon: 'reload', disabled: false, on: () => commit(restart(game)) },
+    {
+      key: 'restart',
+      label: 'Restart',
+      icon: 'reload',
+      disabled: false,
+      danger: true,
+      on: () => arm('restart', () => commit(restart(game)))
+    },
     // Daily is one fixed puzzle a day: "new" there is restart, so it drops out.
     ...(game.mode === 'daily'
       ? []
-      : [{ key: 'new', label: 'New', icon: 'plus' as const, disabled: false, on: () => deal(game.mode) }])
+      : [
+          {
+            key: 'new',
+            label: 'New',
+            icon: 'plus' as const,
+            disabled: false,
+            danger: true,
+            on: () => arm('new', () => commit(newGame(ME, game.mode), true))
+          }
+        ])
   ]
 
   return (
@@ -408,8 +451,8 @@ function Sudoku() {
               </div>
             ))}
           </fieldset>
-          {solved && (
-            <div {...stylex.props(styles.solvedCard)} role="status">
+          {solvedCard.mounted && (
+            <div {...stylex.props(styles.solvedCard, solvedCard.closing && styles.solvedCardOut)} role="status">
               <div {...stylex.props(styles.solvedInner)}>
                 <span {...stylex.props(styles.solvedBadge)}>
                   <Sym name="check" size={26} />
@@ -426,7 +469,7 @@ function Sudoku() {
                       Play an easy game
                     </Button>
                   ) : (
-                    <Button variant="tinted" onClick={() => deal(game.mode)}>
+                    <Button variant="tinted" onClick={() => commit(newGame(ME, game.mode), true)}>
                       New {MODE_LABEL[game.mode]} game
                     </Button>
                   )}
@@ -447,7 +490,7 @@ function Sudoku() {
                   disabled={!leftD || solved}
                   aria-label={`Digit ${d}${leftD ? `, ${leftD} left` : ', complete'}`}
                   onClick={() => padTap(d)}
-                  {...stylex.props(styles.padKey, !wide && styles.padKeyCover)}
+                  {...stylex.props(styles.padKey, !wide && styles.padKeyCover, game.pencil && styles.padKeyPencil)}
                 >
                   {d}
                   <span {...stylex.props(styles.padLeft, !wide && styles.padKeyCoverLeft)}>{leftD}</span>
@@ -461,14 +504,19 @@ function Sudoku() {
               <button
                 key={t.key}
                 type="button"
-                aria-label={t.label}
-                aria-pressed={t.key === 'notes' ? game.pencil : undefined}
+                aria-label={armed === t.key ? `${t.label}? Tap again to confirm` : t.label}
+                aria-pressed={t.key === 'notes' ? game.pencil : armed === t.key ? true : undefined}
                 disabled={t.disabled}
                 onClick={t.on}
-                {...stylex.props(styles.tool, wide ? styles.toolWide : styles.toolCover, t.active && styles.toolActive)}
+                {...stylex.props(
+                  styles.tool,
+                  wide ? styles.toolWide : styles.toolCover,
+                  t.active && styles.toolActive,
+                  armed === t.key && styles.toolArmed
+                )}
               >
                 <Sym name={t.icon} size={15} />
-                {t.label}
+                {armed === t.key ? 'Sure?' : t.label}
               </button>
             ))}
           </div>

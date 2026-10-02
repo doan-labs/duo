@@ -25,9 +25,29 @@ const cellIn = stylex.keyframes({
   to: { transform: 'scale(1)', opacity: 1 }
 })
 
-const bannerIn = stylex.keyframes({
-  from: { transform: 'translateY(-6px)', opacity: 0 },
-  to: { transform: 'translateY(0)', opacity: 1 }
+// Transform-only on the solved card: animating opacity over the glass blur
+// makes the card draw see-through while the animation runs (decision 18 trap).
+const cardIn = stylex.keyframes({
+  from: { transform: 'scale(.94) translateY(10px)' },
+  to: { transform: 'scale(1) translateY(0)' }
+})
+
+const cardOut = stylex.keyframes({
+  to: { transform: 'scale(.96) translateY(6px)', opacity: 0 }
+})
+
+const badgeIn = stylex.keyframes({
+  from: { transform: 'scale(.3)' },
+  to: { transform: 'scale(1)' }
+})
+
+// A wrong entry gets one small shake: feedback that the digit is illegal,
+// without looping or stealing focus.
+const cellShake = stylex.keyframes({
+  '0%, 100%': { transform: 'translateX(0)' },
+  '25%': { transform: 'translateX(-2px)' },
+  '50%': { transform: 'translateX(2px)' },
+  '75%': { transform: 'translateX(-1px)' }
 })
 
 export const styles = stylex.create({
@@ -37,7 +57,7 @@ export const styles = stylex.create({
     flexDirection: 'column',
     gap: space.md,
     paddingTop: space.lg,
-    paddingBottom: space.xl,
+    paddingBottom: space.xxl,
     paddingInline: space.xl,
     color: app.fg,
     backgroundColor: app.bg,
@@ -46,7 +66,8 @@ export const styles = stylex.create({
     overflow: 'hidden',
     userSelect: 'none'
   },
-  rootCover: { gap: space.sm, paddingTop: space.sm, paddingBottom: space.lg, paddingInline: space.sm },
+  // The home bar owns the bottom 22 px; cover content clears it entirely.
+  rootCover: { gap: space.sm, paddingTop: space.sm, paddingBottom: space.xxl, paddingInline: space.sm },
   header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md, flexShrink: 0 },
   brand: { display: 'flex', flexDirection: 'column', gap: space.xxs },
   kicker: {
@@ -136,21 +157,26 @@ export const styles = stylex.create({
     fontFamily: fonts.rounded,
     fontWeight: weight.regular,
     cursor: 'pointer',
-    transitionProperty: 'background-color',
-    transitionDuration: motion.pressDuration,
+    // shared.select's rhythm: state colours ease instead of snapping.
+    transitionProperty: 'background-color, box-shadow',
+    transitionDuration: '.22s',
     transitionTimingFunction: easing.out
   },
   cellRelated: { backgroundColor: `color-mix(in srgb, ${app.surface} 82%, ${app.link})` },
   cellSame: { backgroundColor: `color-mix(in srgb, ${app.surface} 72%, ${app.link})` },
   cellSelected: {
     backgroundColor: `color-mix(in srgb, ${app.surface} 55%, ${app.link})`,
+    boxShadow: `inset 0 0 0 2px ${app.link}`,
     zIndex: 1
   },
   cellGiven: { color: app.fg, fontWeight: weight.semibold },
   cellEntry: { color: app.link },
   cellWrong: {
     color: colors.red,
-    backgroundColor: `color-mix(in srgb, ${app.surface} 80%, ${colors.red})`
+    backgroundColor: `color-mix(in srgb, ${app.surface} 80%, ${colors.red})`,
+    animationName: { default: cellShake, [reduce]: 'none' },
+    animationDuration: '.3s',
+    animationTimingFunction: easing.out
   },
   cellGivenWrong: { color: colors.red },
   digit: {
@@ -202,7 +228,7 @@ export const styles = stylex.create({
     backgroundColor: app.surface,
     color: app.link,
     fontFamily: fonts.rounded,
-    fontSize: typeScale.headline,
+    fontSize: typeScale.title3,
     fontWeight: weight.semibold,
     cursor: 'pointer',
     boxShadow: shadow.rim,
@@ -212,7 +238,12 @@ export const styles = stylex.create({
     transform: { default: 'none', ':active': motion.press },
     opacity: { default: 1, ':disabled': 0.32 }
   },
-  padKeyCover: { height: 40, fontSize: typeScale.headline },
+  padKeyCover: { height: 44 },
+  padKeyPencil: {
+    // Pencil mode must be obvious on the pad itself, not just on the toggle:
+    // the next tap jots a note instead of committing a digit.
+    backgroundColor: `color-mix(in srgb, ${app.surface} 70%, ${app.link})`
+  },
   padLeft: { fontSize: typeScale.caption2, fontFamily: fonts.system, fontWeight: weight.medium, color: app.label2 },
   padKeyCoverLeft: { display: 'none' },
   tools: { display: 'flex', flexWrap: 'wrap', gap: space.xs },
@@ -236,14 +267,20 @@ export const styles = stylex.create({
     boxShadow: shadow.rim,
     flex: '1 1 0',
     minWidth: 0,
-    transitionProperty: 'transform',
-    transitionDuration: motion.pressDuration,
+    transitionProperty: 'transform, color, background-color, box-shadow',
+    transitionDuration: `${motion.pressDuration}, .2s, .2s, .2s`,
     transitionTimingFunction: easing.out,
     transform: { default: 'none', ':active': motion.press },
     opacity: { default: 1, ':disabled': 0.35 }
   },
   toolCover: { height: 46 },
   toolActive: { color: app.link, boxShadow: `${shadow.rim},inset 0 0 0 1.5px ${app.link}` },
+  // An armed destructive action asks once more, in red like iOS destructive
+  // controls, before it runs.
+  toolArmed: {
+    color: colors.red,
+    boxShadow: `${shadow.rim},inset 0 0 0 1.5px ${colors.red}`
+  },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: space.xs },
   statRow: {
     display: 'flex',
@@ -276,20 +313,29 @@ export const styles = stylex.create({
     minHeight: leading.footnote
   },
   statusCover: { fontSize: typeScale.caption1 },
+  // Decision 18's glass recipe: blur + tint + rim + float, xl corner on the
+  // card floating over the board, motion on transform only.
   solvedCard: {
     position: 'absolute',
     inset: space.xxs,
     display: 'grid',
     placeItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     backgroundColor: `color-mix(in srgb, ${app.surface} 72%, transparent)`,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
+    boxShadow: `${shadow.rim},${shadow.float}`,
     zIndex: 2,
-    animationName: { default: bannerIn, [reduce]: 'none' },
-    animationDuration: '.3s',
+    animationName: { default: cardIn, [reduce]: 'none' },
+    animationDuration: '.34s',
     animationTimingFunction: easing.pop,
     animationFillMode: 'both'
+  },
+  solvedCardOut: {
+    animationName: { default: cardOut, [reduce]: 'none' },
+    animationDuration: '.2s',
+    animationTimingFunction: easing.out,
+    animationFillMode: 'forwards'
   },
   solvedInner: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: space.sm, padding: space.lg },
   solvedBadge: {
@@ -299,19 +345,23 @@ export const styles = stylex.create({
     height: 52,
     borderRadius: radius.circle,
     backgroundColor: `color-mix(in srgb, ${colors.green} 22%, transparent)`,
-    color: colors.green
+    color: colors.green,
+    animationName: { default: badgeIn, [reduce]: 'none' },
+    animationDuration: '.4s',
+    animationDelay: '.12s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'backwards'
   },
   solvedTitle: { marginBlock: 0, fontFamily: fonts.rounded, fontSize: typeScale.title2, fontWeight: weight.bold },
   solvedSub: { color: app.label2, fontSize: typeScale.footnote },
   solvedActions: { display: 'flex', gap: space.sm },
-  hint: {
-    marginBlock: 0,
-    color: app.label2,
-    fontSize: typeScale.caption1,
-    textAlign: 'center',
-    animationName: { default: bannerIn, [reduce]: 'none' },
-    animationDuration: '.3s',
-    animationTimingFunction: easing.pop,
-    animationFillMode: 'both'
+  loading: {
+    height: '100%',
+    display: 'grid',
+    placeItems: 'center',
+    color: app.label3,
+    fontFamily: fonts.rounded,
+    fontSize: typeScale.title3,
+    fontWeight: weight.semibold
   }
 })
