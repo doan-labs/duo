@@ -278,6 +278,13 @@ function Sudoku() {
     requestAnimationFrame(() => os.ready())
   }, [])
 
+  // Hands the pre-connect Escape guard the live cancel callback only while a
+  // destructive Sheet is actually open.
+  const closeSheet = useCallback(() => setConfirm(null), [])
+  useEffect(() => {
+    sheetClose = confirm ? closeSheet : null
+  }, [confirm, closeSheet])
+
   // While the sheet is up the rest of the app is inert and the scrim stays
   // out of the tab order; on any close the trigger gets its focus back.
   const wasConfirming = useRef(false)
@@ -651,6 +658,21 @@ function Sudoku() {
     </main>
   )
 }
+
+// Registered before os.connect() so it fires ahead of the SDK's Escape-to-home
+// forward: while a destructive Sheet is open, Escape cancels it inside the
+// app; at all other times the event passes through and still goes home.
+let sheetClose: (() => void) | null = null
+addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || !sheetClose) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    sheetClose()
+  },
+  true
+)
 
 await os.connect()
 createRoot(document.body).render(<Sudoku />)
