@@ -288,6 +288,43 @@ export const styles = stylex.create({
   sheetText: { fontSize: typeScale.footnote, color: app.label2, lineHeight: leading.body },
   sheetBtns: { display: 'flex', flexDirection: 'column', gap: space.sm },
   sheetBtn: { minHeight: 44 },
+  // Local radiogroup for the mode picker: the kit Segmented pins choices at
+  // 22 pt, so this one gives every segment a 44x44 pt region and the shared
+  // press state.
+  modeTrack: {
+    display: 'flex',
+    width: '100%',
+    maxWidth: 384,
+    gap: space.xxs,
+    paddingTop: space.xxs,
+    paddingRight: space.xxs,
+    paddingBottom: space.xxs,
+    paddingLeft: space.xxs,
+    borderRadius: radius.md,
+    backgroundColor: app.fill
+  },
+  modeSeg: {
+    height: 44,
+    minWidth: 44,
+    flex: '1 1 0',
+    paddingTop: 0,
+    paddingRight: space.md,
+    paddingBottom: 0,
+    paddingLeft: space.md,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    fontFamily: fonts.system,
+    fontSize: typeScale.footnote,
+    letterSpacing: tracking.footnote,
+    fontWeight: weight.semibold,
+    cursor: 'pointer',
+    transitionProperty: 'transform, background-color',
+    transitionDuration: `${motion.pressDuration}, .2s`,
+    transform: { default: 'scale(1)', ':active': motion.press }
+  },
+  modeSegOn: { backgroundColor: app.control, boxShadow: shadow.card },
   dangerBtn: { color: colors.red },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: space.xs },
   statRow: {

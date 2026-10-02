@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, Segmented, Sheet, Sym, type SymProps, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
+import { Button, Sheet, Sym, type SymProps, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
 import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -58,6 +58,56 @@ const firstOpen = (board: Grid) => {
   return i < 0 ? 0 : i
 }
 
+// The kit Segmented fixes its choices at 22 pt, which the 44 pt hit target
+// rules out, so the mode picker is a local radiogroup instead: a roving tab
+// stop, arrows and Home/End that move and focus the selection, and segments
+// sized by the control, not shrunk to their labels.
+function ModeGroup({ mode, onPick }: { mode: Mode; onPick: (m: Mode) => void }) {
+  const segs = useRef<(HTMLButtonElement | null)[]>([])
+  return (
+    <div role="radiogroup" aria-label="Game mode" {...stylex.props(styles.modeTrack)}>
+      {MODES.map((m, i) => {
+        const sel = m === mode
+        return (
+          <button
+            key={m}
+            ref={(el) => {
+              segs.current[i] = el
+            }}
+            type="button"
+            role="radio"
+            aria-checked={sel}
+            tabIndex={sel ? 0 : -1}
+            onClick={() => {
+              if (m !== mode) onPick(m)
+            }}
+            onKeyDown={(e) => {
+              const n = MODES.length
+              const j =
+                e.key === 'ArrowRight' || e.key === 'ArrowDown'
+                  ? (i + 1) % n
+                  : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+                    ? (i + n - 1) % n
+                    : e.key === 'Home'
+                      ? 0
+                      : e.key === 'End'
+                        ? n - 1
+                        : -1
+              if (j < 0 || j === i) return
+              e.preventDefault()
+              segs.current[j]?.focus()
+              onPick(MODES[j]!)
+            }}
+            {...stylex.props(styles.modeSeg, sel && styles.modeSegOn)}
+          >
+            {MODE_LABEL[m]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function Sudoku() {
   const view = useDisplay()
   const [rootRef, wide] = useWide<HTMLElement>()
@@ -80,6 +130,12 @@ function Sudoku() {
   // nulling state.
   const confirmKind = useRef<'restart' | 'new'>('restart')
   if (confirm) confirmKind.current = confirm
+  // Focus returns to whichever control opened the sheet, on every exit path.
+  const triggerRef = useRef<HTMLElement | null>(null)
+  const ask = (kind: 'restart' | 'new') => {
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setConfirm(kind)
+  }
 
   const lastSeen = useRef<string | null>(null)
   const storageLanded = useRef(false)
@@ -222,6 +278,22 @@ function Sudoku() {
     requestAnimationFrame(() => os.ready())
   }, [])
 
+  // While the sheet is up the rest of the app is inert and the scrim stays
+  // out of the tab order; on any close the trigger gets its focus back.
+  const wasConfirming = useRef(false)
+  useEffect(() => {
+    if (confirm !== null) {
+      wasConfirming.current = true
+      const scrim = rootRef.current?.querySelector('button[aria-label="Close"]')
+      if (scrim instanceof HTMLElement) scrim.tabIndex = -1
+    } else if (wasConfirming.current) {
+      wasConfirming.current = false
+      const t = triggerRef.current
+      triggerRef.current = null
+      t?.focus()
+    }
+  }, [confirm, rootRef])
+
   const press = useCallback(
     (key: string) => {
       const g = latest.current.game
@@ -347,7 +419,7 @@ function Sudoku() {
       label: 'Restart',
       icon: 'reload',
       disabled: false,
-      on: () => setConfirm('restart')
+      on: () => ask('restart')
     },
     // Daily is one fixed puzzle a day: "new" there is restart, so it drops out.
     ...(game.mode === 'daily'
@@ -358,29 +430,21 @@ function Sudoku() {
             label: 'New',
             icon: 'plus' as const,
             disabled: false,
-            on: () => setConfirm('new')
+            on: () => ask('new')
           }
         ])
   ]
 
   return (
     <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root, !wide && styles.rootCover)}>
-      <header {...stylex.props(styles.header)}>
+      <header {...stylex.props(styles.header)} inert={confirm !== null}>
         <div {...stylex.props(styles.brand)}>
           <span {...stylex.props(styles.kicker)}>{MODE_NAME[game.mode]}</span>
           <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>Sudoku</h1>
         </div>
         {wide && (
           <div {...stylex.props(styles.headerMode)}>
-            <Segmented
-              options={MODES.map((m) => MODE_LABEL[m])}
-              value={MODE_LABEL[game.mode]}
-              onChange={(label) => {
-                const next = MODES.find((m) => MODE_LABEL[m] === label)
-                if (next && next !== game.mode) deal(next)
-              }}
-              aria-label="Game mode"
-            />
+            <ModeGroup mode={game.mode} onPick={deal} />
           </div>
         )}
         <div {...stylex.props(styles.chip)} aria-live="off">
@@ -390,20 +454,12 @@ function Sudoku() {
       </header>
 
       {!wide && (
-        <div {...stylex.props(styles.bar)}>
-          <Segmented
-            options={MODES.map((m) => MODE_LABEL[m])}
-            value={MODE_LABEL[game.mode]}
-            onChange={(label) => {
-              const next = MODES.find((m) => MODE_LABEL[m] === label)
-              if (next && next !== game.mode) deal(next)
-            }}
-            aria-label="Game mode"
-          />
+        <div {...stylex.props(styles.bar)} inert={confirm !== null}>
+          <ModeGroup mode={game.mode} onPick={deal} />
         </div>
       )}
 
-      <section {...stylex.props(styles.stage, !wide && styles.stageCover)}>
+      <section {...stylex.props(styles.stage, !wide && styles.stageCover)} inert={confirm !== null}>
         <div {...stylex.props(styles.boardWrap)}>
           <fieldset aria-label="Sudoku board" {...stylex.props(styles.board, styles.boardSize(fit.board))}>
             {INDEXES.map((box) => (
@@ -540,11 +596,30 @@ function Sudoku() {
         </div>
       </section>
 
-      <p {...stylex.props(styles.status, !wide && styles.statusCover)} aria-live="polite">
+      <p {...stylex.props(styles.status, !wide && styles.statusCover)} aria-live="polite" inert={confirm !== null}>
         {note ?? statusText}
       </p>
 
-      <Sheet open={confirm !== null} onClose={() => setConfirm(null)} aria-label="Confirm">
+      <Sheet
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        aria-label="Confirm"
+        // The kit sheet is a non-modal dialog by design, so Tab containment
+        // is the app's job: wrap between its two action buttons.
+        onKeyDown={(e) => {
+          if (e.key !== 'Tab') return
+          const d = e.currentTarget
+          const f = d.querySelectorAll('button')
+          if (!f.length) return
+          const a = document.activeElement
+          const first = f[0]!
+          const last = f[f.length - 1]!
+          if (e.shiftKey ? a === first || a === d : a === last || a === d) {
+            e.preventDefault()
+            ;(e.shiftKey ? last : first).focus()
+          }
+        }}
+      >
         <div {...stylex.props(styles.sheet)}>
           <div {...stylex.props(styles.sheetTitle)}>
             {confirmKind.current === 'restart'
