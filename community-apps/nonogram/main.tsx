@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, Num, Segmented, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
-import { dark, delay, light } from '@doan-labs/duo-uikit/styles.ts'
+import { Button, IconButton, Num, Segmented, Sym, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
+import { animations, dark, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -69,12 +69,16 @@ function seedGame(d: Durable): SavedGame {
   const rec = d.puzzles[id]
   const cells = rec && rec.cells.length === grid.cells.length ? [...rec.cells] : freshCells(grid)
   const done = isComplete(cells, grid) && !!rec?.done
-  return liveGame(Date.now(), id, cells, done, 'play')
+  const seeded = liveGame(Date.now(), id, cells, done, 'play')
+  // A relaunched solved board reuses the recorded run so the durable writer
+  // sees it as already counted instead of scoring a fresh solve.
+  if (done && rec?.run) seeded.run = rec.run
+  return seeded
 }
 
-function XMark() {
+function XMark({ done }: { done: boolean }) {
   return (
-    <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.mark)}>
+    <svg viewBox="0 0 10 10" aria-hidden="true" {...stylex.props(styles.mark, done && styles.markDone)}>
       <path
         d="M1.8 1.8 L8.2 8.2 M8.2 1.8 L1.8 8.2"
         stroke="currentColor"
@@ -97,7 +101,12 @@ function App() {
   const [hot, setHot] = useState<number | null>(null)
   const [focus, setFocus] = useState<number | null>(null)
   const [armClear, setArmClear] = useState(false)
+  const [cheered, setCheered] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  // The tray yields to the board once dismissed; a new run celebrates again.
+  const presence = usePresence(
+    !!game?.done && game.finishedAt != null && game.screen === 'play' && cheered !== game.run
+  )
   const boardRef = useRef<HTMLDivElement | null>(null)
   const strokeRef = useRef<{ target: Cell; cells: Cell[]; edits: Map<number, Cell> } | null>(null)
   const seeded = useRef(false)
@@ -172,13 +181,14 @@ function App() {
   }, [saved.value, saved.status, stored.status, durable, publish])
 
   // The active view alone owns the durable write: per-puzzle marks, ever-solved,
-  // solve count and best time. A solve counts once per run, so replaying a
-  // cleared board increments honestly.
+  // solve count and best time. A solve counts once per run, and only a live
+  // finish on the owning copy counts it - a reseeded board has no finishedAt
+  // and an adopted game has a foreign by, so neither can score extra solves.
   useEffect(() => {
     if (!game || !view.active || stored.status === 'hydrating') return
     const prev = durable.puzzles[game.puzzleId]
     const counted = prev?.done === true && prev.run === game.run
-    const won = game.done && !counted
+    const won = game.done && game.finishedAt != null && game.by === ME && !counted
     const elapsed = game.startedAt != null && game.finishedAt != null ? game.finishedAt - game.startedAt : null
     const rec: PuzzleRecord = {
       cells: game.cells,
@@ -433,7 +443,11 @@ function App() {
             {d.nums.map((item) => (
               <span
                 key={item.id}
-                {...stylex.props(styles.clue, colDone(c) && styles.clueDim, c === hotCol && styles.clueHot)}
+                {...stylex.props(
+                  styles.clue,
+                  (colDone(c) || game.done) && styles.clueDim,
+                  c === hotCol && styles.clueHot
+                )}
               >
                 {item.n}
               </span>
@@ -453,7 +467,11 @@ function App() {
               {d.nums.map((item) => (
                 <span
                   key={item.id}
-                  {...stylex.props(styles.clue, rowDone(r) && styles.clueDim, r === hotRow && styles.clueHot)}
+                  {...stylex.props(
+                    styles.clue,
+                    (rowDone(r) || game.done) && styles.clueDim,
+                    r === hotRow && styles.clueHot
+                  )}
                 >
                   {item.n}
                 </span>
@@ -484,13 +502,14 @@ function App() {
                       ? styles.cellFilled
                       : i === hot
                         ? styles.cellLive
-                        : (r === hotRow || c === hotCol) && styles.cellHot,
-                    i === focus && styles.cellFocus,
+                        : (r === hotRow || c === hotCol) && !game.done && styles.cellHot,
+                    i === focus && !game.done && styles.cellFocus,
+                    game.done && styles.cellDone,
                     game.done && v === FILLED && styles.cellSolved,
                     game.done && v === FILLED && delay.ms((r + c) * 30)
                   )}
                 >
-                  {v === MARKED && <XMark />}
+                  {v === MARKED && <XMark done={game.done} />}
                 </button>
               )
             })}
@@ -502,34 +521,52 @@ function App() {
 
   const rail = (
     <div {...stylex.props(styles.rail, !wide && styles.railCover)}>
-      <div {...stylex.props(styles.tools)}>
-        <Segmented
-          options={TOOL_LABELS}
-          value={TOOL_LABEL_OF[game.tool]}
-          onChange={(v) => {
-            if (game) publish({ ...game, by: ME, at: Date.now(), tool: TOOL_OF[v] })
-          }}
-          aria-label="Tool"
+      {wide && <div {...stylex.props(styles.railLabel)}>Editing</div>}
+      <div {...stylex.props(styles.toolBar)}>
+        <div key={game.tool} {...stylex.props(styles.tools, styles.toolBump)}>
+          <Segmented
+            options={TOOL_LABELS}
+            value={TOOL_LABEL_OF[game.tool]}
+            onChange={(v) => {
+              if (game) publish({ ...game, by: ME, at: Date.now(), tool: TOOL_OF[v] })
+            }}
+            aria-label="Tool"
+          />
+        </div>
+        <IconButton
+          name="undo"
+          variant="tinted"
+          aria-label="Undo last move"
+          onClick={undo}
+          disabled={!game.undo.length || game.screen !== 'play'}
+          xstyle={styles.undoBtn}
         />
       </div>
+      {wide && <div {...stylex.props(styles.railLabel)}>Board</div>}
       <div {...stylex.props(styles.actions, wide && styles.actionsWide)}>
-        <Button variant="tinted" onClick={undo} disabled={!game.undo.length || game.screen !== 'play'}>
-          <Sym name="undo" /> Undo
-        </Button>
         <Button
           variant="tinted"
           onClick={() => clearBoard()}
           disabled={game.screen !== 'play' || !cells.some((c) => c !== UNKNOWN)}
-          xstyle={armClear ? (darkMode ? styles.dangerDarkSafe : styles.danger) : undefined}
+          xstyle={[!wide && styles.actBtn, armClear && styles.armed]}
         >
-          <Sym name="trash" /> {armClear ? 'Sure?' : 'Clear'}
+          <Sym name="trash" /> {armClear ? 'Confirm' : 'Clear'}
         </Button>
-        <Button variant="tinted" onClick={() => publish({ ...game, by: ME, at: Date.now(), screen: 'pick' })}>
+        <Button
+          variant="tinted"
+          onClick={() => publish({ ...game, by: ME, at: Date.now(), screen: 'pick' })}
+          xstyle={!wide && styles.actBtn}
+        >
           <Sym name="grid" /> Puzzles
         </Button>
       </div>
+      {wide && <div {...stylex.props(styles.railLabel)}>Progress</div>}
       {wide && (
         <div {...stylex.props(styles.meta)}>
+          <div {...stylex.props(styles.metaRow)}>
+            <span {...stylex.props(styles.metaKey)}>Time</span>
+            <span {...stylex.props(styles.metaVal)}>{elapsedMs != null ? formatTime(elapsedMs) : '-'}</span>
+          </div>
           <div {...stylex.props(styles.metaRow)}>
             <span {...stylex.props(styles.metaKey)}>Inked</span>
             <span {...stylex.props(styles.metaVal)}>
@@ -561,6 +598,9 @@ function App() {
     </div>
   )
 
+  // List rows settle down in a short stagger; the counter walks across tiers
+  // so the whole list reads as one entrance, not three.
+  let rowStagger = 0
   const picker = (
     <div {...stylex.props(styles.listScroll)}>
       {(['Easy', 'Medium', 'Tricky'] as const).map((tier) => {
@@ -569,48 +609,58 @@ function App() {
         return (
           <div key={tier}>
             <div {...stylex.props(styles.tierLabel)}>{tier}</div>
-            {list.map((p) => {
-              const g = gridFor(p)
-              const rec = durable.puzzles[p.id]
-              const live = p.id === game.puzzleId ? game : null
-              const board = live ? live.cells : (rec?.cells ?? freshCells(g))
-              const pg = progress(board, g)
-              const meta = rec?.done
-                ? `Solved${rec.solves > 1 ? ` x${rec.solves}` : ''}${rec.bestTime != null ? ` - best ${formatTime(rec.bestTime)}` : ''}`
-                : pg.inked
-                  ? `${pg.inked}/${pg.total} inked`
-                  : 'Fresh board'
-              return (
-                <button key={p.id} type="button" onClick={() => choose(p.id)} {...stylex.props(styles.pickRow)}>
-                  <div
-                    {...stylex.props(
-                      styles.preview,
-                      styles.gridTemplate(`repeat(${g.cols}, 1fr)`, `repeat(${g.rows}, 1fr)`),
-                      styles.cellSize(34)
-                    )}
+            <div {...stylex.props(styles.pickGroup)}>
+              {list.map((p) => {
+                const g = gridFor(p)
+                const rec = durable.puzzles[p.id]
+                const live = p.id === game.puzzleId ? game : null
+                const board = live ? live.cells : (rec?.cells ?? freshCells(g))
+                const pg = progress(board, g)
+                const meta = rec?.done
+                  ? `Solved${rec.solves > 1 ? ` x${rec.solves}` : ''}${rec.bestTime != null ? ` - best ${formatTime(rec.bestTime)}` : ''}`
+                  : pg.inked
+                    ? `${pg.inked}/${pg.total} inked`
+                    : 'Fresh board'
+                const stagger = rowStagger++
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => choose(p.id)}
+                    {...stylex.props(styles.pickRow, shared.select, animations.row, delay.ms(stagger * 30))}
                   >
-                    {g.cells.map((w, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: a preview cell's index is its identity
-                      <div key={i} {...stylex.props(w ? styles.previewCell : styles.previewGap)} />
-                    ))}
-                  </div>
-                  <div {...stylex.props(styles.pickBody)}>
-                    <span {...stylex.props(styles.pickName)}>{p.name}</span>
-                    <span {...stylex.props(styles.pickMeta)}>
-                      {g.cols} x {g.rows} - {meta}
+                    <div
+                      {...stylex.props(
+                        styles.preview,
+                        styles.gridTemplate(`repeat(${g.cols}, 1fr)`, `repeat(${g.rows}, 1fr)`),
+                        styles.cellSize(34)
+                      )}
+                    >
+                      {g.cells.map((w, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: a preview cell's index is its identity
+                        <div key={i} {...stylex.props(w ? styles.previewCell : styles.previewGap)} />
+                      ))}
+                    </div>
+                    <div {...stylex.props(styles.pickBody)}>
+                      <span {...stylex.props(styles.pickName)}>{p.name}</span>
+                      <span {...stylex.props(styles.pickMeta)}>
+                        {g.cols} x {g.rows} - {meta}
+                      </span>
+                    </div>
+                    {rec?.done === true ? (
+                      <span {...stylex.props(check)}>
+                        <Sym name="check" />
+                      </span>
+                    ) : (
+                      !rec?.done && pg.inked > 0 && <span {...stylex.props(styles.statusDimAccent)}>Resume</span>
+                    )}
+                    <span {...stylex.props(styles.pickChev)}>
+                      <Sym name="forward" size={13} />
                     </span>
-                  </div>
-                  {rec?.done === true && (
-                    <span {...stylex.props(check)}>
-                      <Sym name="check" />
-                    </span>
-                  )}
-                  {p.id === game.puzzleId && !rec?.done && (
-                    <span {...stylex.props(styles.statusDimAccent)}>Resume</span>
-                  )}
-                </button>
-              )
-            })}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )
       })}
@@ -630,27 +680,41 @@ function App() {
       </div>
       <div {...stylex.props(styles.status)}>
         <span {...stylex.props(styles.statusName)}>
-          {puzzle.name}
-          <span {...stylex.props(styles.statusDim)}>
-            {' '}
-            - {grid.cols} x {grid.rows}
-          </span>
+          {playing ? (
+            <>
+              {puzzle.name}
+              <span {...stylex.props(styles.statusDim)}>
+                {' '}
+                - {grid.cols} x {grid.rows}
+              </span>
+            </>
+          ) : (
+            'Puzzle library'
+          )}
         </span>
-        <span {...stylex.props(styles.statusDim)}>
-          {game.done ? 'Solved' : elapsedMs != null ? formatTime(elapsedMs) : 'Pick a tool'}
-        </span>
+        {playing ? (
+          game.done ? (
+            <span {...stylex.props(styles.statusTime)}>Solved</span>
+          ) : elapsedMs != null ? (
+            <span {...stylex.props(styles.statusTime)}>{formatTime(elapsedMs)}</span>
+          ) : (
+            <span {...stylex.props(styles.statusDim)}>Pick a tool</span>
+          )
+        ) : (
+          <span {...stylex.props(styles.statusDim)}>Tap a board to play</span>
+        )}
       </div>
       {playing ? (
-        <div {...stylex.props(styles.stage, wide && styles.stageWide)}>
+        <div {...stylex.props(styles.stage, wide && styles.stageWide, animations.sheet)}>
           {board}
           {rail}
         </div>
       ) : (
         picker
       )}
-      {game.done && game.finishedAt != null && playing && (
+      {presence.mounted && (
         <div {...stylex.props(styles.banner)}>
-          <div {...stylex.props(styles.bannerCard)}>
+          <div {...stylex.props(styles.bannerCard, presence.closing ? animations.floatOut : animations.float)}>
             <div {...stylex.props(styles.bannerText)}>
               <span {...stylex.props(styles.kicker)}>Solved</span>
               <span {...stylex.props(styles.bannerTitle)}>{puzzle.name}</span>
@@ -666,6 +730,13 @@ function App() {
               <Button variant="filled" onClick={nextPuzzle}>
                 Next
               </Button>
+              <IconButton
+                name="xmark"
+                variant="plain"
+                aria-label="Dismiss celebration"
+                onClick={() => setCheered(game.run)}
+                xstyle={styles.undoBtn}
+              />
             </div>
           </div>
         </div>
