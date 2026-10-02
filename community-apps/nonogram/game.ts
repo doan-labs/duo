@@ -179,6 +179,13 @@ export type SavedGame = {
   startedAt: number | null
   finishedAt: number | null
   done: boolean
+  /**
+   * Set by the copy that turned this run done, inside the same publish that
+   * carried the last cell. Travels with the shared game so whichever display
+   * owns the durable write can count the solve once even if the finisher
+   * folded before its own write ran.
+   */
+  scored: boolean
 }
 
 // What relaunch keeps through os.storage: per-puzzle marks and truthful stats.
@@ -204,7 +211,7 @@ export function adoptGame(value: unknown, me: string): SavedGame | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as SavedGame
   if (!Array.isArray(v.cells) || typeof v.puzzleId !== 'string') return null
-  return { ...v, by: typeof v.by === 'string' ? v.by : me }
+  return { ...v, scored: v.scored === true, by: typeof v.by === 'string' ? v.by : me }
 }
 
 export function formatTime(ms: number): string {

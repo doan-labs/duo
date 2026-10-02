@@ -25,17 +25,6 @@ const cellPop = stylex.keyframes({
   '40%': { transform: 'scale(1.18)' },
   '100%': { transform: 'scale(1)' }
 })
-// Popping back to the picker comes in from the left, mirroring sheet's
-// right-side push so navigation reads as a stack either way.
-const backIn = stylex.keyframes({
-  from: { opacity: 0, transform: 'translateX(-30%)' },
-  to: { opacity: 1, transform: 'translateX(0)' }
-})
-const toolIn = stylex.keyframes({
-  '0%': { transform: 'scale(1)' },
-  '50%': { transform: 'scale(1.06)' },
-  '100%': { transform: 'scale(1)' }
-})
 
 export const styles = stylex.create({
   root: {
@@ -49,12 +38,23 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     lineHeight: leading.subheadline,
     overflow: 'hidden',
-    paddingTop: space.xl,
-    paddingBottom: space.xxxl,
-    paddingInline: space.xl,
     userSelect: 'none'
   },
-  rootCover: {
+  // Carries `inert` while the confirm sheet is up so the whole nav subtree
+  // leaves both the tab order and the hit test.
+  navWrap: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 },
+  // Each Push page carries its own padding; the nav host itself is unpadded.
+  page: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minHeight: 0,
+    paddingTop: space.xl,
+    paddingBottom: space.xxxl,
+    paddingInline: space.xl
+  },
+  pageCover: {
     gap: space.xs,
     paddingTop: space.md,
     paddingBottom: space.xxl,
@@ -100,6 +100,7 @@ export const styles = stylex.create({
   statusName: { fontSize: typeScale.footnote, fontWeight: weight.semibold, whiteSpace: 'nowrap' },
   statusDim: { color: app.label2, fontSize: typeScale.footnote, fontWeight: weight.regular },
   statusDimAccent: { color: app.link, fontSize: typeScale.footnote, fontWeight: weight.semibold },
+  statusRight: { marginLeft: 'auto', whiteSpace: 'nowrap' },
   statusTime: {
     color: app.fg,
     fontSize: typeScale.footnote,
@@ -238,16 +239,33 @@ export const styles = stylex.create({
     paddingBlock: space.xs,
     paddingInline: space.xs
   },
-  tools: { flexGrow: 1, display: 'flex', justifyContent: 'center' },
-  toolBump: {
-    animationName: { default: toolIn, [reduce]: 'none' },
-    animationDuration: '.3s',
-    animationTimingFunction: easing.spring
+  // App-local segmented control: the kit's segments are 22 px tall, under the
+  // 44 pt hit target a touch-first tool switch needs. Buttons stay mounted so
+  // selection is a state change, not a remount that drops focus.
+  segTrack: { display: 'flex', flexGrow: 1, gap: space.xxs },
+  segBtn: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    color: app.label2,
+    fontSize: typeScale.subheadline,
+    fontWeight: weight.semibold,
+    cursor: 'pointer',
+    transitionProperty: 'background-color, color, transform',
+    transitionDuration: '.22s',
+    outlineStyle: 'solid',
+    outlineWidth: { default: 0, ':focus-visible': 2 },
+    outlineColor: app.link,
+    outlineOffset: -2
   },
+  segOn: { backgroundColor: app.control, color: app.fg, boxShadow: shadow.card },
   undoBtn: { width: 44, height: 44 },
   actions: { display: 'flex', gap: space.sm, justifyContent: 'center' },
   actionsWide: { flexDirection: 'column', alignItems: 'stretch' },
   actBtn: { flex: 1 },
+  bigBtn: { minHeight: 44 },
   meta: {
     display: 'flex',
     flexDirection: 'column',
@@ -260,7 +278,39 @@ export const styles = stylex.create({
   metaRow: { display: 'flex', justifyContent: 'space-between', gap: space.md, fontSize: typeScale.caption1 },
   metaKey: { color: app.label2 },
   metaVal: { color: app.fg, fontWeight: weight.semibold, fontVariantNumeric: 'tabular-nums' },
-  armed: { backgroundColor: colors.red, color: colors.white },
+  danger: { backgroundColor: colors.red, color: colors.white },
+  // iOS nav bar on the pushed board page: leading back chevron, puzzle name.
+  backRow: { display: 'flex', alignItems: 'center', gap: space.xxs, minHeight: 44 },
+  bkBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: radius.pill,
+    backgroundColor: 'transparent',
+    color: app.link,
+    cursor: 'pointer',
+    flexShrink: 0
+  },
+  backTitle: { display: 'flex', alignItems: 'baseline', gap: space.xs, minWidth: 0 },
+  sheetPad: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.md,
+    paddingBlock: space.xl,
+    paddingInline: space.xl
+  },
+  sheetTitle: {
+    fontSize: typeScale.headline,
+    lineHeight: leading.headline,
+    fontWeight: weight.semibold,
+    textAlign: 'center'
+  },
+  sheetMsg: { color: app.label2, fontSize: typeScale.subheadline, textAlign: 'center' },
+  sheetActs: { display: 'flex', flexDirection: 'column', gap: space.sm, paddingTop: space.xs },
   banner: {
     position: 'absolute',
     bottom: space.xxl,
@@ -278,7 +328,7 @@ export const styles = stylex.create({
     gap: space.lg,
     paddingBlock: space.md,
     paddingInline: space.lg,
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     backgroundColor: app.glass,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
@@ -302,11 +352,7 @@ export const styles = stylex.create({
     flexDirection: 'column',
     gap: space.xs,
     paddingTop: space.sm,
-    paddingBottom: space.sm,
-    animationName: { default: backIn, [reduce]: 'none' },
-    animationDuration: '.38s',
-    animationTimingFunction: easing.push,
-    animationFillMode: 'backwards'
+    paddingBottom: space.sm
   },
   tierLabel: {
     color: app.label2,

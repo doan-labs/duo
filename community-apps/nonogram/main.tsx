@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, IconButton, Num, Segmented, Sym, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
+import { Button, IconButton, Num, Push, Sheet, Sym, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
 import { animations, dark, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -40,7 +40,6 @@ import { styles } from './styles.ts'
 const ME = crypto.randomUUID()
 const TOOL_LABELS = ['Fill', 'Mark', 'Erase'] as const
 const TOOL_OF: Record<(typeof TOOL_LABELS)[number], Tool> = { Fill: 'fill', Mark: 'mark', Erase: 'erase' }
-const TOOL_LABEL_OF: Record<Tool, (typeof TOOL_LABELS)[number]> = { fill: 'Fill', mark: 'Mark', erase: 'Erase' }
 const UNDO_CAP = 400
 
 function liveGame(at: number, puzzleId: string, cells: Cell[], done: boolean, screen: SavedGame['screen']): SavedGame {
@@ -56,7 +55,8 @@ function liveGame(at: number, puzzleId: string, cells: Cell[], done: boolean, sc
     moves: 0,
     startedAt: null,
     finishedAt: null,
-    done
+    done,
+    scored: false
   }
 }
 
@@ -96,11 +96,16 @@ function App() {
   const saved = useKV(os.session, 'nonogram-game')
   const stored = useKV(os.storage, 'nonogram-progress')
   const [game, setGame] = useState<SavedGame | null>(null)
+  // publish mirrors every write here before React re-renders, so a stroke or
+  // commit landing while the previous publish is still mid-render extends the
+  // newest board rather than resurrecting stale cells.
+  const gameRef = useRef<SavedGame | null>(null)
+  gameRef.current = game
   const [darkMode, setDarkMode] = useState(false)
   const [draft, setDraft] = useState<Cell[] | null>(null)
   const [hot, setHot] = useState<number | null>(null)
   const [focus, setFocus] = useState<number | null>(null)
-  const [armClear, setArmClear] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [cheered, setCheered] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
   // The tray yields to the board once dismissed; a new run celebrates again.
@@ -108,11 +113,12 @@ function App() {
     !!game?.done && game.finishedAt != null && game.screen === 'play' && cheered !== game.run
   )
   const boardRef = useRef<HTMLDivElement | null>(null)
-  const strokeRef = useRef<{ target: Cell; cells: Cell[]; edits: Map<number, Cell> } | null>(null)
+  const clearBtnRef = useRef<HTMLButtonElement | null>(null)
+  const sheetBodyRef = useRef<HTMLDivElement | null>(null)
+  const segRefs = useRef(new Map<Tool, HTMLButtonElement>())
+  const strokeRef = useRef<{ pid: number; target: Cell; cells: Cell[]; edits: Map<number, Cell> } | null>(null)
   const seeded = useRef(false)
   const lastSeen = useRef<string | null>(null)
-  const celebrated = useRef<string | null>(null)
-  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const durable = useMemo(() => {
     try {
@@ -146,6 +152,7 @@ function App() {
   const solved = Object.values(durable.puzzles).filter((r) => r.done).length
 
   const publish = useCallback((next: SavedGame) => {
+    gameRef.current = next
     setGame(next)
     void os.session.set('nonogram-game', JSON.stringify(next))
   }, [])
@@ -176,19 +183,20 @@ function App() {
     setDraft(null)
     setHot(null)
     setFocus(null)
-    setArmClear(false)
+    setConfirming(false)
+    gameRef.current = next
     setGame(next)
   }, [saved.value, saved.status, stored.status, durable, publish])
 
   // The active view alone owns the durable write: per-puzzle marks, ever-solved,
-  // solve count and best time. A solve counts once per run, and only a live
-  // finish on the owning copy counts it - a reseeded board has no finishedAt
-  // and an adopted game has a foreign by, so neither can score extra solves.
+  // solve count and best time. A solve counts once per run: `scored` is set by
+  // the copy that finished the board inside the same publish, so the count is
+  // decided at commit time and never depends on which display is active when
+  // the write lands - folding mid-celebration cannot lose or double a solve.
   useEffect(() => {
     if (!game || !view.active || stored.status === 'hydrating') return
     const prev = durable.puzzles[game.puzzleId]
-    const counted = prev?.done === true && prev.run === game.run
-    const won = game.done && game.finishedAt != null && game.by === ME && !counted
+    const won = game.done && game.scored === true && prev?.run !== game.run
     const elapsed = game.startedAt != null && game.finishedAt != null ? game.finishedAt - game.startedAt : null
     const rec: PuzzleRecord = {
       cells: game.cells,
@@ -204,20 +212,15 @@ function App() {
     if (JSON.stringify(next) !== stored.value) void stored.set(JSON.stringify(next))
   }, [game, view.active, stored, durable])
 
-  // The finish moment celebrates once per run, on the glass being looked at.
+  // The clock belongs to the view that is both active and visible: a folded
+  // away copy stays `active` by angle but paints nothing, so the interval
+  // sleeps with it and snaps the displayed elapsed the moment it is reshown.
   useEffect(() => {
-    if (!game?.done || game.finishedAt == null || !view.active || celebrated.current === game.run) return
-    celebrated.current = game.run
-    navigator.vibrate?.([40, 60, 40])
-  }, [game, view.active])
-
-  // The clock belongs to the active view; the second copy draws the last
-  // published timestamp and starts nothing.
-  useEffect(() => {
-    if (game?.startedAt == null || game.done || !view.active) return
+    if (game?.startedAt == null || game.done || !view.active || !view.visible) return
+    setNow(Date.now())
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
-  }, [game?.startedAt, game?.done, view.active])
+  }, [game?.startedAt, game?.done, view.active, view.visible])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -234,21 +237,24 @@ function App() {
 
   const commit = useCallback(
     (nextCells: Cell[], entry: UndoEntry | null) => {
-      if (!game || !grid) return
+      const cur = gameRef.current
+      if (!cur || !grid) return
       const done = isComplete(nextCells, grid)
+      if (done && !cur.done) navigator.vibrate?.([40, 60, 40])
       publish({
-        ...game,
+        ...cur,
         by: ME,
         at: Date.now(),
         cells: nextCells,
-        undo: entry ? [...game.undo, entry].slice(-UNDO_CAP) : game.undo,
-        moves: game.moves + (entry ? 1 : 0),
-        startedAt: game.startedAt ?? (entry ? Date.now() : null),
-        finishedAt: done ? (game.done ? game.finishedAt : Date.now()) : null,
-        done
+        undo: entry ? [...cur.undo, entry].slice(-UNDO_CAP) : cur.undo,
+        moves: cur.moves + (entry ? 1 : 0),
+        startedAt: cur.startedAt ?? (entry ? Date.now() : null),
+        finishedAt: done ? (cur.done ? cur.finishedAt : Date.now()) : null,
+        done,
+        scored: done && (cur.scored || !cur.done)
       })
     },
-    [game, grid, publish]
+    [grid, publish]
   )
 
   function cellFromEvent(e: React.PointerEvent): number {
@@ -260,13 +266,18 @@ function App() {
   // React applies the draft state, so every edit must go through the ref, not
   // the last rendered cells array.
   function beginStroke(e: React.PointerEvent, i: number) {
-    if (!game || game.done || game.screen !== 'play') return
+    const cur = gameRef.current
+    if (!cur || cur.done || cur.screen !== 'play' || confirming) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     e.preventDefault()
-    boardRef.current?.setPointerCapture(e.pointerId)
+    // Untrusted pointer events (automation, pen hover with no active pointer)
+    // throw on setPointerCapture; the stroke still works without capture.
+    try {
+      boardRef.current?.setPointerCapture(e.pointerId)
+    } catch {}
     boardRef.current?.focus()
-    const target = targetFor(game.tool, cells[i]!)
-    const st = { target, cells: cells.slice(), edits: new Map<number, Cell>() }
+    const target = targetFor(cur.tool, cur.cells[i]!)
+    const st = { pid: e.pointerId, target, cells: cur.cells.slice(), edits: new Map<number, Cell>() }
     strokeRef.current = st
     for (const ed of applyCell(st.cells, i, target)) st.edits.set(ed.i, ed.prev)
     setDraft([...st.cells])
@@ -276,7 +287,7 @@ function App() {
 
   function moveStroke(e: React.PointerEvent) {
     const st = strokeRef.current
-    if (!st || !game) return
+    if (!st || !gameRef.current) return
     const i = cellFromEvent(e)
     if (!Number.isInteger(i) || i < 0 || i >= st.cells.length) return
     setHot(i)
@@ -286,74 +297,160 @@ function App() {
     setFocus(i)
   }
 
-  function endStroke() {
+  // endStroke doubles as the flush a fold or window blur calls: the drag's
+  // cells are committed rather than dropped, and the pointer capture is
+  // released so it cannot strand the copy that is about to sleep.
+  const endStroke = useCallback(() => {
     const st = strokeRef.current
     strokeRef.current = null
     setDraft(null)
-    if (!st || !game) return
+    if (st && boardRef.current?.hasPointerCapture(st.pid)) boardRef.current.releasePointerCapture(st.pid)
+    if (!st || !gameRef.current) return
     if (!st.edits.size) return
     const edits: Edit = [...st.edits].map(([i, prev]) => ({ i, prev }))
     commit([...st.cells], { applied: st.target, edits })
-  }
+  }, [commit])
+
+  // Flush on hide and on window blur; the peer adopts the committed cells.
+  useEffect(() => {
+    if (!view.visible) endStroke()
+  }, [view.visible, endStroke])
+  useEffect(() => {
+    const flush = () => endStroke()
+    window.addEventListener('blur', flush)
+    return () => window.removeEventListener('blur', flush)
+  }, [endStroke])
 
   function applyFocused(i: number) {
-    if (!game || game.done || strokeRef.current) return
-    const target = targetFor(game.tool, cells[i]!)
-    const next = cells.slice()
+    const cur = gameRef.current
+    if (!cur || cur.done || strokeRef.current || confirming) return
+    const target = targetFor(cur.tool, cur.cells[i]!)
+    const next = cur.cells.slice()
     const edits = applyCell(next, i, target)
     if (edits.length) commit(next, { applied: target, edits })
   }
 
   function undo() {
-    if (!game || !grid || !game.undo.length || strokeRef.current) return
-    const entry = game.undo.at(-1)!
-    const next = game.cells.slice()
+    const cur = gameRef.current
+    if (!cur || !grid || !cur.undo.length || strokeRef.current || confirming) return
+    const entry = cur.undo.at(-1)!
+    const next = cur.cells.slice()
     undoOnce(next, entry)
     const done = isComplete(next, grid)
     publish({
-      ...game,
+      ...cur,
       by: ME,
       at: Date.now(),
       cells: next,
-      undo: game.undo.slice(0, -1),
-      moves: game.moves + 1,
-      finishedAt: done ? (game.done ? game.finishedAt : Date.now()) : null,
-      done
+      undo: cur.undo.slice(0, -1),
+      moves: cur.moves + 1,
+      finishedAt: done ? (cur.done ? cur.finishedAt : Date.now()) : null,
+      done,
+      scored: done && (cur.scored || !cur.done)
     })
   }
 
-  // Clear is a two-tap gesture and one undoable edit, never a silent wipe.
-  function clearBoard(force = false) {
-    if (!game || !grid) return
-    if (!force && !armClear) {
-      setArmClear(true)
-      if (clearTimer.current) clearTimeout(clearTimer.current)
-      clearTimer.current = setTimeout(() => setArmClear(false), 2500)
-      return
-    }
-    setArmClear(false)
+  // The Sheet owns the confirmation; Clear itself is one undoable edit,
+  // never a silent wipe.
+  function clearBoard() {
+    const cur = gameRef.current
+    if (!cur || !grid) return
     const edits: Edit = []
-    game.cells.forEach((c, i) => {
+    cur.cells.forEach((c, i) => {
       if (c !== UNKNOWN) edits.push({ i, prev: c })
     })
     publish({
-      ...game,
+      ...cur,
       by: ME,
       at: Date.now(),
       run: crypto.randomUUID(),
       cells: freshCells(grid),
-      undo: edits.length ? [...game.undo, { applied: UNKNOWN as Cell, edits }].slice(-UNDO_CAP) : game.undo,
-      moves: game.moves + (edits.length ? 1 : 0),
+      undo: edits.length ? [...cur.undo, { applied: UNKNOWN as Cell, edits }].slice(-UNDO_CAP) : cur.undo,
+      moves: cur.moves + (edits.length ? 1 : 0),
       startedAt: null,
       finishedAt: null,
-      done: false
+      done: false,
+      scored: false
     })
   }
 
+  // Opening the confirm sheet flushes any in-flight drag first: pointer
+  // capture routes moves to the board even under the scrim.
+  function askClear() {
+    endStroke()
+    setConfirming(true)
+  }
+
+  // Cancel, Escape and the scrim hand focus back to the Clear that opened
+  // the sheet; confirming it moves focus to the board, since a wiped board
+  // disables the trigger.
+  const closeSheet = useCallback((dest: 'trigger' | 'board') => {
+    setConfirming(false)
+    const target = dest === 'trigger' ? clearBtnRef.current : boardRef.current
+    requestAnimationFrame(() => target?.focus())
+  }, [])
+
+  // Escape is pop-to-library on the board page and cancel while the confirm
+  // sheet is open; the callback itself sits on the pre-connect window guard
+  // so it fires ahead of the SDK's go-home forward. Anywhere else the key
+  // passes through untouched.
+  useEffect(() => {
+    escapeBack = confirming
+      ? () => closeSheet('trigger')
+      : game?.screen === 'play'
+        ? () => {
+            const cur = gameRef.current
+            if (cur) publish({ ...cur, by: ME, at: Date.now(), screen: 'pick' })
+          }
+        : null
+    return () => {
+      escapeBack = null
+    }
+  }, [confirming, game?.screen, publish, closeSheet])
+
+  // Tab stays inside the sheet's own controls; the inert background is the
+  // second line of defence behind this wrap.
+  function sheetKeys(e: React.KeyboardEvent) {
+    if (e.key !== 'Tab' || !sheetBodyRef.current) return
+    const items = [...sheetBodyRef.current.querySelectorAll<HTMLElement>('button:not(:disabled)')]
+    if (!items.length) return
+    const at = items.indexOf(document.activeElement as HTMLElement)
+    if (at === -1) {
+      e.preventDefault()
+      ;(e.shiftKey ? items.at(-1)! : items[0]!).focus()
+    } else if (e.shiftKey && at === 0) {
+      e.preventDefault()
+      items.at(-1)!.focus()
+    } else if (!e.shiftKey && at === items.length - 1) {
+      e.preventDefault()
+      items[0]!.focus()
+    }
+  }
+
+  // One tab stop for the tool group: arrows and Home/End rove selection and
+  // focus together, the native segmented-control contract.
+  function segKeys(e: React.KeyboardEvent) {
+    const cur = gameRef.current
+    if (!cur) return
+    const tools = TOOL_LABELS.map((l) => TOOL_OF[l])
+    const at = tools.indexOf(cur.tool)
+    let next = -1
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (at + 1) % tools.length
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (at - 1 + tools.length) % tools.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = tools.length - 1
+    if (next < 0) return
+    e.preventDefault()
+    const tool = tools[next]!
+    publish({ ...cur, by: ME, at: Date.now(), tool })
+    segRefs.current.get(tool)?.focus()
+  }
+
   function choose(id: string) {
-    if (!game) return
-    if (id === game.puzzleId) {
-      publish({ ...game, by: ME, at: Date.now(), screen: 'play' })
+    const cur = gameRef.current
+    if (!cur) return
+    if (id === cur.puzzleId) {
+      publish({ ...cur, by: ME, at: Date.now(), screen: 'play' })
       return
     }
     const p = BY_ID.get(id)
@@ -362,7 +459,7 @@ function App() {
     const rec = durable.puzzles[id]
     const nextCells = rec && rec.cells.length === g.cells.length ? [...rec.cells] : freshCells(g)
     const done = isComplete(nextCells, g) && rec?.done === true
-    publish({ ...liveGame(Date.now(), id, nextCells, done, 'play'), tool: game.tool })
+    publish({ ...liveGame(Date.now(), id, nextCells, done, 'play'), tool: cur.tool })
   }
 
   function nextPuzzle() {
@@ -374,7 +471,7 @@ function App() {
   }
 
   function onBoardKey(e: React.KeyboardEvent) {
-    if (!game || !grid || game.screen !== 'play') return
+    if (!game || !grid || game.screen !== 'play' || confirming) return
     const i = focus ?? 0
     let next = i
     if (e.key === 'ArrowLeft') next = Math.max(0, i - 1)
@@ -385,7 +482,7 @@ function App() {
     else if (e.key === 'z' && (e.metaKey || e.ctrlKey)) undo()
     else if (e.key === '1' || e.key === '2' || e.key === '3') {
       const label = TOOL_LABELS[Number(e.key) - 1]
-      if (label) publish({ ...game, by: ME, at: Date.now(), tool: TOOL_OF[label] })
+      if (label) publish({ ...(gameRef.current ?? game), by: ME, at: Date.now(), tool: TOOL_OF[label] })
     } else return
     e.preventDefault()
     if (next !== i) {
@@ -395,9 +492,10 @@ function App() {
   }
 
   if (!game || !grid || !clueSet || !fit || !puzzle)
-    return <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root, !wide && styles.rootCover)} />
+    return <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)} />
 
   const playing = game.screen === 'play'
+  const marks = cells.filter((c) => c !== UNKNOWN).length
   const elapsedMs = game.startedAt != null ? (game.finishedAt ?? now) - game.startedAt : null
   const hotRow = hot != null ? Math.floor(hot / grid.cols) : -1
   const hotCol = hot != null ? hot % grid.cols : -1
@@ -523,15 +621,27 @@ function App() {
     <div {...stylex.props(styles.rail, !wide && styles.railCover)}>
       {wide && <div {...stylex.props(styles.railLabel)}>Editing</div>}
       <div {...stylex.props(styles.toolBar)}>
-        <div key={game.tool} {...stylex.props(styles.tools, styles.toolBump)}>
-          <Segmented
-            options={TOOL_LABELS}
-            value={TOOL_LABEL_OF[game.tool]}
-            onChange={(v) => {
-              if (game) publish({ ...game, by: ME, at: Date.now(), tool: TOOL_OF[v] })
-            }}
-            aria-label="Tool"
-          />
+        <div role="radiogroup" aria-label="Tool" onKeyDown={segKeys} {...stylex.props(styles.segTrack)}>
+          {TOOL_LABELS.map((label) => {
+            const tool = TOOL_OF[label]
+            return (
+              <button
+                key={tool}
+                ref={(el) => {
+                  if (el) segRefs.current.set(tool, el)
+                  else segRefs.current.delete(tool)
+                }}
+                type="button"
+                role="radio"
+                aria-checked={game.tool === tool}
+                tabIndex={game.tool === tool ? 0 : -1}
+                onClick={() => publish({ ...(gameRef.current ?? game), by: ME, at: Date.now(), tool })}
+                {...stylex.props(styles.segBtn, shared.press, game.tool === tool && styles.segOn)}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
         <IconButton
           name="undo"
@@ -545,19 +655,13 @@ function App() {
       {wide && <div {...stylex.props(styles.railLabel)}>Board</div>}
       <div {...stylex.props(styles.actions, wide && styles.actionsWide)}>
         <Button
+          ref={clearBtnRef}
           variant="tinted"
-          onClick={() => clearBoard()}
+          onClick={askClear}
           disabled={game.screen !== 'play' || !cells.some((c) => c !== UNKNOWN)}
-          xstyle={[!wide && styles.actBtn, armClear && styles.armed]}
+          xstyle={[!wide && styles.actBtn, styles.bigBtn]}
         >
-          <Sym name="trash" /> {armClear ? 'Confirm' : 'Clear'}
-        </Button>
-        <Button
-          variant="tinted"
-          onClick={() => publish({ ...game, by: ME, at: Date.now(), screen: 'pick' })}
-          xstyle={!wide && styles.actBtn}
-        >
-          <Sym name="grid" /> Puzzles
+          <Sym name="trash" /> Clear
         </Button>
       </div>
       {wide && <div {...stylex.props(styles.railLabel)}>Progress</div>}
@@ -667,8 +771,10 @@ function App() {
     </div>
   )
 
-  return (
-    <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root, !wide && styles.rootCover)}>
+  // The library is the root page; a board pushes over it through the kit's
+  // stack transition, and pops back out on the leading chevron or Escape.
+  const pickerPage = (
+    <div {...stylex.props(styles.page, !wide && styles.pageCover)}>
       <div {...stylex.props(styles.head)}>
         <div>
           <div {...stylex.props(styles.kicker)}>Duo Arcade</div>
@@ -679,39 +785,41 @@ function App() {
         </div>
       </div>
       <div {...stylex.props(styles.status)}>
-        <span {...stylex.props(styles.statusName)}>
-          {playing ? (
-            <>
-              {puzzle.name}
-              <span {...stylex.props(styles.statusDim)}>
-                {' '}
-                - {grid.cols} x {grid.rows}
-              </span>
-            </>
-          ) : (
-            'Puzzle library'
-          )}
-        </span>
-        {playing ? (
-          game.done ? (
-            <span {...stylex.props(styles.statusTime)}>Solved</span>
-          ) : elapsedMs != null ? (
-            <span {...stylex.props(styles.statusTime)}>{formatTime(elapsedMs)}</span>
-          ) : (
-            <span {...stylex.props(styles.statusDim)}>Pick a tool</span>
-          )
-        ) : (
-          <span {...stylex.props(styles.statusDim)}>Tap a board to play</span>
-        )}
+        <span {...stylex.props(styles.statusName)}>Puzzle library</span>
+        <span {...stylex.props(styles.statusDim)}>Tap a board to play</span>
       </div>
-      {playing ? (
-        <div {...stylex.props(styles.stage, wide && styles.stageWide, animations.sheet)}>
-          {board}
-          {rail}
-        </div>
-      ) : (
-        picker
-      )}
+      {picker}
+    </div>
+  )
+
+  const boardPage = (
+    <div {...stylex.props(styles.page, !wide && styles.pageCover)}>
+      <div {...stylex.props(styles.backRow)}>
+        <button
+          type="button"
+          aria-label="Back to library"
+          onClick={() => publish({ ...(gameRef.current ?? game), by: ME, at: Date.now(), screen: 'pick' })}
+          {...stylex.props(styles.bkBtn, shared.press)}
+        >
+          <Sym name="back" size={20} />
+        </button>
+        <span {...stylex.props(styles.statusName)}>
+          {puzzle.name}
+          <span {...stylex.props(styles.statusDim)}>
+            {' '}
+            - {grid.cols} x {grid.rows}
+          </span>
+        </span>
+        <span
+          {...stylex.props(styles.statusRight, game.done || elapsedMs != null ? styles.statusTime : styles.statusDim)}
+        >
+          {game.done ? 'Solved' : elapsedMs != null ? formatTime(elapsedMs) : 'Pick a tool'}
+        </span>
+      </div>
+      <div {...stylex.props(styles.stage, wide && styles.stageWide)}>
+        {board}
+        {rail}
+      </div>
       {presence.mounted && (
         <div {...stylex.props(styles.banner)}>
           <div {...stylex.props(styles.bannerCard, presence.closing ? animations.floatOut : animations.float)}>
@@ -724,10 +832,10 @@ function App() {
               </span>
             </div>
             <div {...stylex.props(styles.bannerActions)}>
-              <Button variant="tinted" onClick={() => clearBoard(true)}>
+              <Button variant="tinted" onClick={clearBoard} xstyle={styles.bigBtn}>
                 Replay
               </Button>
-              <Button variant="filled" onClick={nextPuzzle}>
+              <Button variant="filled" onClick={nextPuzzle} xstyle={styles.bigBtn}>
                 Next
               </Button>
               <IconButton
@@ -741,9 +849,63 @@ function App() {
           </div>
         </div>
       )}
+    </div>
+  )
+
+  return (
+    <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)}>
+      <div {...stylex.props(styles.navWrap)} inert={confirming}>
+        <Push open={playing} sheet={boardPage}>
+          {pickerPage}
+        </Push>
+      </div>
+      <Sheet
+        open={confirming}
+        onClose={() => closeSheet('trigger')}
+        onKeyDown={sheetKeys}
+        aria-label="Clear board confirmation"
+      >
+        <div ref={sheetBodyRef} {...stylex.props(styles.sheetPad)}>
+          <div {...stylex.props(styles.sheetTitle)}>Clear board?</div>
+          <div {...stylex.props(styles.sheetMsg)}>
+            Erases {marks} {marks === 1 ? 'mark' : 'marks'} on {puzzle.name}. Undo can bring them back.
+          </div>
+          <div {...stylex.props(styles.sheetActs)}>
+            <Button variant="tinted" xstyle={styles.bigBtn} onClick={() => closeSheet('trigger')}>
+              Cancel
+            </Button>
+            <Button
+              variant="tinted"
+              xstyle={[styles.bigBtn, styles.danger]}
+              onClick={() => {
+                closeSheet('board')
+                clearBoard()
+              }}
+            >
+              Clear board
+            </Button>
+          </div>
+        </div>
+      </Sheet>
     </main>
   )
 }
+
+// Registered before os.connect() so it fires ahead of the SDK's Escape-to-home
+// forward: while the confirm sheet is open, Escape cancels it inside the app,
+// and on the board page it pops to the library. Everywhere else the event
+// passes through and still goes home.
+let escapeBack: (() => void) | null = null
+addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || !escapeBack) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    escapeBack()
+  },
+  true
+)
 
 await os.connect()
 createRoot(document.body).render(<App />)
