@@ -82,13 +82,21 @@ function Sudoku() {
   const savedRef = useRef(saved)
   savedRef.current = saved
 
+  // Every chrome row is measured, not guessed: underestimating one lets the
+  // centered board lap onto the segmented control and clip the status line.
   const fit = useMemo(() => {
-    const padX = wide ? 48 : 16
-    const head = wide ? 118 : 190
-    const rail = wide ? 300 : 0
-    const w = view.width || (wide ? 740 : 355)
-    const h = view.height || (wide ? 500 : 520)
-    const board = Math.max(190, Math.floor(Math.min(h - head, w - padX - rail)))
+    const padX = wide ? 40 : 16
+    const top = wide ? 16 : 8
+    const header = wide ? 58 : 78 // the cover keeps its own mode row under the title
+    const status = wide ? 22 : 18
+    const bottom = wide ? 20 : 16
+    const gaps = 24
+    const railW = wide ? 324 : 0 // rail width plus the stage gap
+    const railH = wide ? 0 : 102 // cover pad row plus tools row plus stage gap
+    const w = view.width || (wide ? 778 : 387)
+    const h = view.height || (wide ? 503 : 563)
+    const free = h - top - header - status - bottom - gaps - railH
+    const board = Math.max(190, Math.floor(Math.min(free, w - padX - railW)))
     const cell = board / 9
     return { board, digit: Math.round(cell * 0.55), note: Math.max(8, Math.round(cell * 0.27)) }
   }, [view.width, view.height, wide])
@@ -313,23 +321,38 @@ function Sudoku() {
           <span {...stylex.props(styles.kicker)}>{MODE_NAME[game.mode]}</span>
           <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>Sudoku</h1>
         </div>
+        {wide && (
+          <div {...stylex.props(styles.headerMode)}>
+            <Segmented
+              options={MODES.map((m) => MODE_LABEL[m])}
+              value={MODE_LABEL[game.mode]}
+              onChange={(label) => {
+                const next = MODES.find((m) => MODE_LABEL[m] === label)
+                if (next && next !== game.mode) deal(next)
+              }}
+              aria-label="Game mode"
+            />
+          </div>
+        )}
         <div {...stylex.props(styles.chip)} aria-live="off">
           <span {...stylex.props(styles.chipLabel)}>{solved ? 'Solved' : 'Time'}</span>
           <span {...stylex.props(styles.chipValue)}>{formatTime(elapsedMs(game, now))}</span>
         </div>
       </header>
 
-      <div {...stylex.props(styles.bar)}>
-        <Segmented
-          options={MODES.map((m) => MODE_LABEL[m])}
-          value={MODE_LABEL[game.mode]}
-          onChange={(label) => {
-            const next = MODES.find((m) => MODE_LABEL[m] === label)
-            if (next && next !== game.mode) deal(next)
-          }}
-          aria-label="Game mode"
-        />
-      </div>
+      {!wide && (
+        <div {...stylex.props(styles.bar)}>
+          <Segmented
+            options={MODES.map((m) => MODE_LABEL[m])}
+            value={MODE_LABEL[game.mode]}
+            onChange={(label) => {
+              const next = MODES.find((m) => MODE_LABEL[m] === label)
+              if (next && next !== game.mode) deal(next)
+            }}
+            aria-label="Game mode"
+          />
+        </div>
+      )}
 
       <section {...stylex.props(styles.stage, !wide && styles.stageCover)}>
         <div {...stylex.props(styles.boardWrap)}>

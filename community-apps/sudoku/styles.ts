@@ -93,7 +93,7 @@ export const styles = stylex.create({
     textAlign: 'center'
   },
   bar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.sm, flexShrink: 0 },
-  barActions: { display: 'flex', gap: space.xs, flexShrink: 0 },
+  headerMode: { display: 'flex', flexGrow: 1, justifyContent: 'center', minWidth: 0 },
   stage: {
     flexGrow: 1,
     minHeight: 0,
@@ -174,8 +174,8 @@ export const styles = stylex.create({
   rail: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.lg,
-    width: 264,
+    gap: space.md,
+    width: 300,
     flexShrink: 0,
     alignSelf: 'center'
   },
@@ -196,13 +196,13 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.xxs,
-    height: 56,
+    height: 46,
     borderWidth: 0,
     borderRadius: radius.md,
     backgroundColor: app.surface,
     color: app.link,
     fontFamily: fonts.rounded,
-    fontSize: typeScale.title3,
+    fontSize: typeScale.headline,
     fontWeight: weight.semibold,
     cursor: 'pointer',
     boxShadow: shadow.rim,
@@ -224,7 +224,7 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.xxs,
-    height: 52,
+    height: 48,
     borderWidth: 0,
     borderRadius: radius.md,
     backgroundColor: app.surface,
@@ -244,23 +244,28 @@ export const styles = stylex.create({
   },
   toolCover: { height: 46 },
   toolActive: { color: app.link, boxShadow: `${shadow.rim},inset 0 0 0 1.5px ${app.link}` },
-  stats: { display: 'flex', flexDirection: 'column', gap: space.xxs },
+  stats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: space.xs },
   statRow: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: space.xxs,
     paddingBlock: space.sm,
-    paddingInline: space.md,
+    paddingInline: space.xs,
     borderRadius: radius.md,
     backgroundColor: app.surface,
-    boxShadow: shadow.rim
+    boxShadow: shadow.rim,
+    minWidth: 0
   },
-  statLabel: { color: app.label2, fontSize: typeScale.footnote },
+  statLabel: { color: app.label2, fontSize: typeScale.caption2 },
   statValue: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.footnote,
     fontWeight: weight.semibold,
-    fontVariantNumeric: 'tabular-nums'
+    fontVariantNumeric: 'tabular-nums',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
   },
   status: {
     marginBlock: 0,
