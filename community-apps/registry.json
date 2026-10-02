@@ -14,6 +14,10 @@
       "folder": "pomodoro-timer",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.flashcards": {
+      "folder": "flashcards",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.2048": {
       "folder": "2048",
       "maintainers": ["mnismt"]
