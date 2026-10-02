@@ -6,7 +6,7 @@
   "entry": "./main.tsx",
   "icon": "./icon.png",
   "light": true,
-  "author": "mnismt",
+  "author": "devin",
   "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/sudoku",
   "license": "MIT",
   "permissions": []
