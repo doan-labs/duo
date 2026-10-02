@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, Segmented, Sym, type SymProps, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
+import { Button, Segmented, Sheet, Sym, type SymProps, useDisplay, usePresence, useWide } from '@doan-labs/duo-uikit'
 import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -70,10 +70,16 @@ function Sudoku() {
   const [darkMode, setDarkMode] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
-  // Armed is the two-tap confirmation for destructive tools: the first tap
-  // turns the button red and asks again; the second runs it.
-  const [armed, setArmed] = useState<string | null>(null)
-  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Destructive tools open a named confirmation sheet instead of running on a
+  // timer: the dialog spells out what is lost and survives a stray double tap.
+  const [confirm, setConfirm] = useState<'restart' | 'new' | null>(null)
+  const confirmRef = useRef(confirm)
+  confirmRef.current = confirm
+  // The sheet stays mounted through its exit animation after confirm clears,
+  // so its copy and action must read the kind it was opened with, not the
+  // nulling state.
+  const confirmKind = useRef<'restart' | 'new'>('restart')
+  if (confirm) confirmKind.current = confirm
 
   const lastSeen = useRef<string | null>(null)
   const storageLanded = useRef(false)
@@ -96,7 +102,7 @@ function Sudoku() {
     const bottom = 24 // the home bar owns the bottom edge on both displays
     const gaps = 24
     const railW = wide ? 324 : 0 // rail width plus the stage gap
-    const railH = wide ? 0 : 106 // cover pad row plus tools row plus stage gap
+    const railH = wide ? 0 : 160 // two cover pad rows, the tools row and the stage gap
     const w = view.width || (wide ? 778 : 387)
     const h = view.height || (wide ? 503 : 563)
     const free = h - top - header - status - bottom - gaps - railH
@@ -172,9 +178,8 @@ function Sudoku() {
     setSlots(slotsNext)
     liveRef.current.set(JSON.stringify(wire))
     savedRef.current.set(packSaved(slotsNext, statsNext, wire.mode))
-    // Any real move disarms a pending destructive confirm.
-    if (armTimer.current) window.clearTimeout(armTimer.current)
-    setArmed(null)
+    // A committed move also closes any pending confirmation sheet.
+    setConfirm(null)
   }, [])
 
   /**
@@ -187,9 +192,10 @@ function Sudoku() {
       const cur = latest.current
       const stash = cur.game ? { ...cur.slots, [cur.game.mode]: cur.game } : { ...cur.slots }
       const slot = mode === 'daily' ? (stash.daily?.day === DAY ? stash.daily : undefined) : stash[mode]
-      // Only a live slot is worth resuming: a finished board in the slot would
-      // just reappear already solved, so it falls through to a fresh deal.
-      if (slot && !slot.endedAt) {
+      // Switching modes preserves a finished slot too: coming back to a solved
+      // board shows the solved state and keeps completion stats honest. The
+      // explicit New-game controls are what deal a fresh puzzle.
+      if (slot) {
         setSlots(stash)
         commit(slot)
       } else {
@@ -244,7 +250,7 @@ function Sudoku() {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const g = latest.current.game
-      if (!g) return
+      if (!g || confirmRef.current) return
       const k = event.key
       if (/^[1-9]$/.test(k)) pressRef.current(k)
       else if (k === 'Backspace' || k === 'Delete') {
@@ -296,29 +302,31 @@ function Sudoku() {
     commit(g.pencil ? jot(g, g.sel, d) : play(g, g.sel, d))
   }
 
+  const padKey = (d: number) => {
+    const leftD = 9 - digitCount(game, d)
+    return (
+      <button
+        key={d}
+        type="button"
+        disabled={!leftD || solved}
+        aria-label={`Digit ${d}${leftD ? `, ${leftD} left` : ', complete'}`}
+        onClick={() => padTap(d)}
+        {...stylex.props(styles.padKey, !wide && styles.padKeyCover, game.pencil && styles.padKeyPencil)}
+      >
+        {d}
+        <span {...stylex.props(styles.padLeft, !wide && styles.padKeyCoverLeft)}>{leftD}</span>
+      </button>
+    )
+  }
+
   const statusText =
     saved.status === 'hydrating'
       ? 'Loading saved progress...'
       : saved.status === 'error'
         ? 'Progress may not save offline'
-        : armed
-          ? 'Tap again to confirm'
-          : solved
-            ? `Solved in ${formatTime(elapsedMs(game, now))}${game.hints ? `, ${game.hints} hints` : ''}`
-            : `${left} to go${game.pencil ? ' - pencil on' : ''}${clashes.size ? ' - conflict' : ''}`
-
-  /** First tap arms a destructive tool; the second within a few seconds runs it. */
-  const arm = (key: string, run: () => void) => {
-    if (armed === key) {
-      if (armTimer.current) window.clearTimeout(armTimer.current)
-      setArmed(null)
-      run()
-      return
-    }
-    if (armTimer.current) window.clearTimeout(armTimer.current)
-    setArmed(key)
-    armTimer.current = window.setTimeout(() => setArmed(null), 3000)
-  }
+        : solved
+          ? `Solved in ${formatTime(elapsedMs(game, now))}${game.hints ? `, ${game.hints} hints` : ''}`
+          : `${left} to go${game.pencil ? ' - pencil on' : ''}${clashes.size ? ' - conflict' : ''}`
 
   type Tool = {
     key: string
@@ -327,7 +335,6 @@ function Sudoku() {
     disabled: boolean
     on: () => void
     active?: boolean
-    danger?: boolean
   }
   const tools: Tool[] = [
     { key: 'notes', label: 'Notes', icon: 'compose', disabled: solved, on: () => press('PENCIL'), active: game.pencil },
@@ -339,8 +346,7 @@ function Sudoku() {
       label: 'Restart',
       icon: 'reload',
       disabled: false,
-      danger: true,
-      on: () => arm('restart', () => commit(restart(game)))
+      on: () => setConfirm('restart')
     },
     // Daily is one fixed puzzle a day: "new" there is restart, so it drops out.
     ...(game.mode === 'daily'
@@ -351,8 +357,7 @@ function Sudoku() {
             label: 'New',
             icon: 'plus' as const,
             disabled: false,
-            danger: true,
-            on: () => arm('new', () => commit(newGame(ME, game.mode), true))
+            on: () => setConfirm('new')
           }
         ])
   ]
@@ -481,22 +486,17 @@ function Sudoku() {
 
         <div {...stylex.props(wide ? styles.rail : styles.railCover)}>
           <div {...stylex.props(styles.pad, !wide && styles.padCover)}>
-            {DIGITS.map((d) => {
-              const leftD = 9 - digitCount(game, d)
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  disabled={!leftD || solved}
-                  aria-label={`Digit ${d}${leftD ? `, ${leftD} left` : ', complete'}`}
-                  onClick={() => padTap(d)}
-                  {...stylex.props(styles.padKey, !wide && styles.padKeyCover, game.pencil && styles.padKeyPencil)}
-                >
-                  {d}
-                  <span {...stylex.props(styles.padLeft, !wide && styles.padKeyCoverLeft)}>{leftD}</span>
-                </button>
-              )
-            })}
+            {/* On the cover a single row of nine keys would sit far under the
+                44 pt hit region, so the pad stacks into two rows of five and
+                four; the wide rail keeps its keypad grid. */}
+            {wide ? (
+              DIGITS.map(padKey)
+            ) : (
+              <>
+                <div {...stylex.props(styles.padRow)}>{DIGITS.slice(0, 5).map(padKey)}</div>
+                <div {...stylex.props(styles.padRow)}>{DIGITS.slice(5).map(padKey)}</div>
+              </>
+            )}
           </div>
 
           <div {...stylex.props(styles.tools, !wide && styles.toolsCover)}>
@@ -504,19 +504,14 @@ function Sudoku() {
               <button
                 key={t.key}
                 type="button"
-                aria-label={armed === t.key ? `${t.label}? Tap again to confirm` : t.label}
-                aria-pressed={t.key === 'notes' ? game.pencil : armed === t.key ? true : undefined}
+                aria-label={t.label}
+                aria-pressed={t.key === 'notes' ? game.pencil : undefined}
                 disabled={t.disabled}
                 onClick={t.on}
-                {...stylex.props(
-                  styles.tool,
-                  wide ? styles.toolWide : styles.toolCover,
-                  t.active && styles.toolActive,
-                  armed === t.key && styles.toolArmed
-                )}
+                {...stylex.props(styles.tool, wide ? styles.toolWide : styles.toolCover, t.active && styles.toolActive)}
               >
                 <Sym name={t.icon} size={15} />
-                {armed === t.key ? 'Sure?' : t.label}
+                {t.label}
               </button>
             ))}
           </div>
@@ -547,6 +542,36 @@ function Sudoku() {
       <p {...stylex.props(styles.status, !wide && styles.statusCover)} aria-live="polite">
         {note ?? statusText}
       </p>
+
+      <Sheet open={confirm !== null} onClose={() => setConfirm(null)} aria-label="Confirm">
+        <div {...stylex.props(styles.sheet)}>
+          <div {...stylex.props(styles.sheetTitle)}>
+            {confirmKind.current === 'restart'
+              ? 'Restart this puzzle?'
+              : `Start a new ${MODE_LABEL[game.mode].toLowerCase()} game?`}
+          </div>
+          <div {...stylex.props(styles.sheetText)}>
+            {confirmKind.current === 'restart'
+              ? `Clears your entries, notes, hints and undo history, and resets the clock. The same ${MODE_LABEL[game.mode].toLowerCase()} puzzle deals again.`
+              : `Deals a fresh ${MODE_LABEL[game.mode].toLowerCase()} puzzle and replaces this board. Unfinished progress on it is lost.`}
+          </div>
+          <div {...stylex.props(styles.sheetBtns)}>
+            <Button
+              variant="tinted"
+              xstyle={styles.dangerBtn}
+              onClick={() => {
+                if (confirmKind.current === 'restart') commit(restart(game))
+                else commit(newGame(ME, game.mode), true)
+              }}
+            >
+              {confirmKind.current === 'restart' ? 'Restart' : 'New game'}
+            </Button>
+            <Button variant="plain" onClick={() => setConfirm(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Sheet>
     </main>
   )
 }

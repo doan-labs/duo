@@ -212,8 +212,14 @@ export const styles = stylex.create({
     gap: space.sm
   },
   padCover: {
-    gridTemplateColumns: 'repeat(9, 1fr)',
-    gap: space.xxs,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.xs,
+    width: '100%'
+  },
+  padRow: {
+    display: 'flex',
+    gap: space.xs,
     width: '100%'
   },
   padKey: {
@@ -238,7 +244,7 @@ export const styles = stylex.create({
     transform: { default: 'none', ':active': motion.press },
     opacity: { default: 1, ':disabled': 0.32 }
   },
-  padKeyCover: { height: 44 },
+  padKeyCover: { height: 44, flex: '1 1 0', minWidth: 0 },
   padKeyPencil: {
     // Pencil mode must be obvious on the pad itself, not just on the toggle:
     // the next tap jots a note instead of committing a digit.
@@ -275,12 +281,13 @@ export const styles = stylex.create({
   },
   toolCover: { height: 46 },
   toolActive: { color: app.link, boxShadow: `${shadow.rim},inset 0 0 0 1.5px ${app.link}` },
-  // An armed destructive action asks once more, in red like iOS destructive
-  // controls, before it runs.
-  toolArmed: {
-    color: colors.red,
-    boxShadow: `${shadow.rim},inset 0 0 0 1.5px ${colors.red}`
-  },
+  // The confirmation sheet reuses the app-wide dialog idiom from the kit's
+  // own apps: padded column, headline title, footnote body, stacked actions.
+  sheet: { padding: space.lg, display: 'flex', flexDirection: 'column', gap: space.md },
+  sheetTitle: { fontSize: typeScale.headline, fontWeight: weight.semibold },
+  sheetText: { fontSize: typeScale.footnote, color: app.label2, lineHeight: leading.body },
+  sheetBtns: { display: 'flex', flexDirection: 'column', gap: space.sm },
+  dangerBtn: { color: colors.red },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: space.xs },
   statRow: {
     display: 'flex',
