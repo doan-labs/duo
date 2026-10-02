@@ -22,12 +22,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
@@ -50,13 +50,13 @@ jobs:
           if-no-files-found: ignore
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
+      - uses: useblacksmith/checkout@v1
         with:
           ref: catalog
           path: catalog-tree

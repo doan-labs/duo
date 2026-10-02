@@ -7,13 +7,13 @@ permissions:
   contents: read
 jobs:
   platform:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
     env:
       # Bun's FTL optimizer miscompiles StyleX's media-query parser: oven-sh/bun#41609.
       BUN_JSC_useFTLJIT: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
