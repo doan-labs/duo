@@ -41,6 +41,10 @@
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
+    },
+    "com.lucpastc.lbpr.app": {
+      "folder": "lbpr",
+      "maintainers": ["lucazinho1002"]
     }
   }
 }
