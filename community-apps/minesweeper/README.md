@@ -15,14 +15,17 @@ claims: later guesses are part of the game.
   floods open until numbers stop it.
 - Tap an open number whose neighbours are already flagged (a chord) to open
   the rest at once.
-- Flag mode: press the Flag button, then taps mark cells instead of opening
-  them. On a mouse, right-click flags directly; on touch, a 400 ms long-press
-  flags too.
+- Tap mode is a segmented control: Reveal or Flag is always visible, never a
+  hidden toggle. On a mouse, right-click flags directly; on touch, a 400 ms
+  long-press flags too.
 - Keyboard: arrows move the focus, Enter/Space opens, F flags the focused
   cell, G toggles flag mode, R/N starts a new game.
 - The counter shows mines minus flags and the clock starts on the first
   reveal. Winning auto-flags every remaining mine; losing reveals the field
   and slashes the flags that were wrong.
+- Cell size is a grid constraint, not a choice: a 16x16 board cannot give each
+  cell the 44 pt touch target the surrounding buttons keep, so precision comes
+  from the roving arrow-key focus, F/G/R/N shortcuts and the long-press.
 
 ## Persistence
 
@@ -43,5 +46,6 @@ the shared timestamps, so the hidden copy runs no timer of its own.
 - `bun packages/cli/index.mjs build community-apps/minesweeper` - bundle well
   under the 4 MiB cap.
 - `bun scripts/check-app-tokens.ts` - zero design literals.
+- `bun scripts/check-platform.ts` - platform contract checks.
 - `bun scripts/check-submissions.ts community-apps/minesweeper` - required
   files, registry entry and screenshots.

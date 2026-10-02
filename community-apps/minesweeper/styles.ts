@@ -35,6 +35,10 @@ const cardIn = stylex.keyframes({
   '0%': { opacity: 0, translate: '0 10px', scale: '.94' },
   '100%': { opacity: 1, translate: '0 0', scale: '1' }
 })
+const lineIn = stylex.keyframes({
+  '0%': { opacity: 0, translate: '0 6px' },
+  '100%': { opacity: 1, translate: '0 0' }
+})
 
 export const styles = stylex.create({
   root: {
@@ -151,7 +155,7 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
-    gap: space.md,
+    gap: space.sm,
     width: '176px',
     flexShrink: 0
   },
@@ -178,7 +182,9 @@ export const styles = stylex.create({
   segBtn: {
     flexGrow: 1,
     minWidth: 0,
-    height: 24,
+    // Fills its track: inside the 44 pt controls row the segments grow with it.
+    minHeight: 30,
+    height: '100%',
     paddingInline: space.sm,
     borderWidth: 0,
     borderRadius: radius.pill,
@@ -200,9 +206,10 @@ export const styles = stylex.create({
     color: colors.white,
     boxShadow: `${shadow.rim},${shadow.card}`
   },
+  segFill: { flexGrow: 1 },
   segLabel: { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  controls: { display: 'flex', gap: space.sm, flexShrink: 0 },
-  controlsWide: { flexDirection: 'column', alignItems: 'stretch' },
+  controls: { display: 'flex', gap: space.sm, flexShrink: 0, alignItems: 'stretch' },
+  controlsWide: { flexDirection: 'column' },
   controlsCover: { width: '100%' },
   action: {
     display: 'flex',
@@ -210,6 +217,8 @@ export const styles = stylex.create({
     justifyContent: 'center',
     gap: space.xs,
     flexGrow: 1,
+    // The HIG's finger target: 44 pt on the long edge.
+    height: 44,
     borderWidth: 0,
     borderRadius: radius.lg,
     paddingBlock: space.sm,
@@ -226,13 +235,6 @@ export const styles = stylex.create({
     transitionTimingFunction: easing.pop,
     transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
-  },
-  actionOn: {
-    backgroundColor: {
-      default: `color-mix(in srgb, ${colors.redDark} 26%, transparent)`,
-      ':hover': `color-mix(in srgb, ${colors.redDark} 34%, transparent)`
-    },
-    color: colors.redDark
   },
   cell: {
     display: 'grid',
@@ -257,7 +259,22 @@ export const styles = stylex.create({
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 1, zIndex: 1 }
   },
   cellHidden: {
-    backgroundColor: { default: colors.grey4Dark, ':hover': colors.grey3Dark }
+    // Concealed cells read as raised tiles: a top-lit sheen that brightens
+    // under the pointer and a quick shrink under the finger.
+    backgroundColor: colors.grey4Dark,
+    backgroundImage: {
+      default: `linear-gradient(180deg,color-mix(in srgb, ${colors.white} 8%, transparent),transparent 55%)`,
+      ':hover': `linear-gradient(180deg,color-mix(in srgb, ${colors.white} 15%, transparent),transparent 65%)`
+    },
+    transitionProperty: 'transform,background-color',
+    transitionDuration: `${motion.pressDuration},.18s`,
+    transitionTimingFunction: easing.pop,
+    transform: { default: 'scale(1)', ':active': motion.press }
+  },
+  // A flag is unmistakable: the tile takes the flag's colour with it.
+  cellFlagged: {
+    backgroundColor: `color-mix(in srgb, ${colors.redDark} 22%, ${colors.grey4Dark})`,
+    backgroundImage: `linear-gradient(180deg,color-mix(in srgb, ${colors.white} 9%, transparent),transparent 55%)`
   },
   cellOpen: {
     backgroundColor: `color-mix(in srgb, ${colors.black} 34%, transparent)`,
@@ -271,6 +288,9 @@ export const styles = stylex.create({
     backgroundColor: `color-mix(in srgb, ${colors.redDark} 55%, ${colors.grey6Dark})`
   },
   cellLocked: { cursor: 'default' },
+  // The flood staggers by BFS depth from the tap and mines scatter on a loss;
+  // both ride the same cellIn curve, so it is one delayed animation.
+  waveDelay: (ms: number) => ({ animationDelay: `${ms}ms` }),
   digit: { display: 'block', pointerEvents: 'none' },
   glyph: { display: 'block', width: '72%', height: '72%', pointerEvents: 'none' },
   // Inside a button the glyph tracks the label size instead of the button's.
@@ -325,12 +345,13 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   hintCover: { fontSize: typeScale.caption2, lineHeight: leading.caption2, letterSpacing: tracking.caption2 },
+  hintOn: { color: colors.orangeDark, fontWeight: weight.semibold },
   statsCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.sm,
-    paddingBlock: space.md,
-    paddingInline: space.md,
+    gap: space.xs,
+    paddingBlock: space.sm,
+    paddingInline: space.sm,
     borderRadius: radius.xl,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
@@ -341,13 +362,16 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-    gap: space.md
+    gap: space.sm
   },
   statsName: {
     color: app.label2,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
-    letterSpacing: tracking.caption1
+    letterSpacing: tracking.caption1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
   },
   statsNameOn: { color: colors.yellowDark },
   statsValue: {
@@ -355,7 +379,9 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     fontWeight: weight.semibold,
     fontVariantNumeric: 'tabular-nums',
-    textAlign: 'right'
+    textAlign: 'right',
+    whiteSpace: 'nowrap',
+    flexShrink: 0
   },
   statsMeta: { color: app.label2, fontSize: typeScale.caption2, fontWeight: weight.medium },
   result: {
@@ -390,6 +416,28 @@ export const styles = stylex.create({
     textTransform: 'uppercase'
   },
   resultKickerWin: { color: colors.greenDark },
+  // The card's lines land one after another so the verdict reads in order.
+  resultLine: {
+    animationName: { default: lineIn, [reduce]: 'none' },
+    animationDuration: '.28s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'both'
+  },
+  resultDelay: (ms: number) => ({ animationDelay: `${ms}ms` }),
+  bestBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    paddingBlock: space.xxs,
+    paddingInline: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: `color-mix(in srgb, ${colors.yellowDark} 22%, transparent)`,
+    color: colors.yellowDark,
+    fontSize: typeScale.caption2,
+    fontWeight: weight.bold,
+    letterSpacing: tracking.caption2,
+    textTransform: 'uppercase',
+    alignSelf: 'flex-start'
+  },
   resultTitle: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.title3,

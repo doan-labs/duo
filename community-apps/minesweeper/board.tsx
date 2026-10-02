@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useRef } from 'react'
-import type { Cell, Game } from './game.ts'
+import { type ReactNode, useMemo, useRef } from 'react'
+import { type Cell, type Game, neighbors } from './game.ts'
 import { styles } from './styles.ts'
 
 export type ViewDimensions = { display: 'inner' | 'cover'; width: number; height: number }
@@ -68,11 +68,17 @@ function labelFor(cell: Cell, index: number, cols: number): string {
   return cell.n === 0 ? `${place}, clear` : `${place}, ${cell.n} mines nearby`
 }
 
+// Board cells are inherently small: the HIG's 44 pt target cannot coexist with
+// an interactive grid on the cover (a 16x16 hard board gives each cell ~12 pt).
+// Precise selection comes instead from tap-anywhere hit rect per cell, the
+// roving arrow-key focus, F/G/R/N keys and long-press / right-click flagging -
+// the controls around the board keep the full-size touch targets.
 export function Board({
   game,
   size,
   focus,
   ended,
+  wave,
   onTap,
   onFlag,
   onFocus,
@@ -83,6 +89,9 @@ export function Board({
   focus: number
   /** Game over: cells stay visible but stop accepting input. */
   ended: boolean
+  /** Last reveal tap on this display: the flood ripples out from it. The
+   * mirrored copy never receives it and simply settles its adopted board. */
+  wave?: { index: number; stamp: number } | null
   onTap: (index: number) => void
   onFlag: (index: number) => void
   onFocus: (index: number) => void
@@ -94,6 +103,35 @@ export function Board({
   // Recent long-presses also produce a contextmenu event on release; the stamp
   // tells that handler the flag already toggled so it does not toggle back.
   const longPressedAt = useRef(0)
+  // Cells already drawn open; only cells opening since then earn a stagger.
+  const seenOpen = useRef<Set<number>>(new Set())
+  // The delay a cell was assigned at open time. It must outlive later renders:
+  // storage echoes re-render this board before the flood finishes, and a
+  // stripped delay would rush the stagger. Assigned once, kept until cleared.
+  const delays = useRef(new Map<number, number>())
+  // The flood breathes out one ring at a time: clear cells carry the wave
+  // forward, numbered edge cells land one step past their neighbour.
+  const depths = useMemo(() => {
+    const map = new Map<number, number>()
+    if (wave == null || game.cells[wave.index]?.state !== 'open') return map
+    const queue: Array<[number, number]> = [[wave.index, 0]]
+    map.set(wave.index, 0)
+    while (queue.length > 0) {
+      const [cellIndex, depth] = queue.shift()!
+      for (const next of neighbors(cellIndex, game.cols, game.rows)) {
+        if (map.has(next) || game.cells[next]?.state !== 'open') continue
+        map.set(next, depth + 1)
+        if (game.cells[next]?.n === 0) queue.push([next, depth + 1])
+      }
+    }
+    return map
+  }, [wave, game])
+  // A fresh board holds no open cells; clear the seen set so the next game's
+  // flood staggers again instead of skipping every cell.
+  if (!game.cells.some((cell) => cell.state === 'open')) {
+    seenOpen.current.clear()
+    delays.current.clear()
+  }
   // These mirror the well's `space.xs` padding and `space.xxs` grid gap; they
   // are runtime geometry, not styles, so the token literals are mirrored here.
   const pad = 4
@@ -120,6 +158,19 @@ export function Board({
         const flagged = cell.state === 'flagged'
         const wrongFlag = game.status === 'lost' && flagged && !cell.mine
         const digit = open && !cell.mine && cell.n > 0 ? cell.n : 0
+        const newlyOpen = open && !seenOpen.current.has(index)
+        if (newlyOpen) {
+          seenOpen.current.add(index)
+          // Flood cells stagger by ring; mines revealed on a loss scatter in a
+          // stable pseudo-random order; the exploded cell shows instantly.
+          const stagger = cell.exploded
+            ? 0
+            : cell.mine
+              ? Math.round((((index * 37) % 97) / 97) * 380)
+              : Math.min((depths.get(index) ?? 0) * 34, 420)
+          delays.current.set(index, stagger)
+        }
+        const delay = delays.current.get(index) ?? 0
         return (
           <button
             // biome-ignore lint/suspicious/noArrayIndexKey: the grid never reorders
@@ -163,6 +214,8 @@ export function Board({
               styles.cell,
               styles.fitDigits(digitPx),
               open ? styles.cellOpen : styles.cellHidden,
+              flagged && styles.cellFlagged,
+              delay > 0 && styles.waveDelay(delay),
               ended && styles.cellLocked,
               cell.exploded && styles.cellExploded,
               wrongFlag && styles.wrongFlag

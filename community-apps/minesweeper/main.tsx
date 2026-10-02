@@ -1,11 +1,11 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useJSON, useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
-import { dark } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Board, FlagGlyph, fitLayout } from './board.tsx'
+import { Board, fitLayout } from './board.tsx'
 import {
   adoptGame,
   chord,
@@ -37,19 +37,28 @@ const ME = crypto.randomUUID()
 // The kit Segmented is a light-surface control; this is the same radiogroup
 // contract drawn for a dark well (as the other arcade apps do).
 function Seg({
+  aria,
   options,
   value,
   onChange,
-  stacked
+  stacked,
+  fill
 }: {
+  aria: string
   options: readonly string[]
   value: string
   onChange: (value: string) => void
   /** Stack segments vertically; the rail is too narrow for a three-wide row. */
   stacked?: boolean
+  /** Grow the track to share a row's width with its sibling control. */
+  fill?: boolean
 }) {
   return (
-    <div role="radiogroup" aria-label="Difficulty" {...stylex.props(styles.segTrack, stacked && styles.segRail)}>
+    <div
+      role="radiogroup"
+      aria-label={aria}
+      {...stylex.props(styles.segTrack, stacked && styles.segRail, fill && styles.segFill)}
+    >
       {options.map((o) => (
         <button
           key={o}
@@ -75,6 +84,9 @@ function Minesweeper() {
   const [focus, setFocus] = useState(0)
   const focusRef = useRef(0)
   focusRef.current = focus
+  // The last reveal tap, for the board's staggered flood: this display's own
+  // motion cue, never persisted, so the mirror copy never replays it.
+  const [wave, setWave] = useState<{ index: number; stamp: number } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
@@ -159,6 +171,7 @@ function Minesweeper() {
       }
       const cell = game.cells[index]!
       commit(cell.state === 'open' ? chord(game, index, Date.now()) : reveal(game, index, Date.now()))
+      setWave({ index, stamp: Date.now() })
     },
     [commit, flagMode, flagAt, game]
   )
@@ -215,7 +228,9 @@ function Minesweeper() {
     <div {...stylex.props(styles.scores)}>
       <div {...stylex.props(styles.chip, !wide && styles.chipCover)}>
         <span {...stylex.props(styles.chipLabel)}>MINES</span>
-        <strong {...stylex.props(styles.chipValue, !wide && styles.chipValueCover)}>{minesLeft(game)}</strong>
+        <strong key={minesLeft(game)} {...stylex.props(styles.chipValue, !wide && styles.chipValueCover, shared.swap)}>
+          {minesLeft(game)}
+        </strong>
       </div>
       <div {...stylex.props(styles.chip, !wide && styles.chipCover)}>
         <span {...stylex.props(styles.chipLabel)}>TIME</span>
@@ -223,7 +238,7 @@ function Minesweeper() {
       </div>
       <div {...stylex.props(styles.chip, !wide && styles.chipCover)}>
         <span {...stylex.props(styles.chipLabel, styles.chipLabelBest)}>BEST</span>
-        <strong {...stylex.props(styles.chipValue, !wide && styles.chipValueCover)}>
+        <strong key={best ?? 'none'} {...stylex.props(styles.chipValue, !wide && styles.chipValueCover, shared.swap)}>
           {best === null ? '-' : formatClock(best)}
         </strong>
       </div>
@@ -233,22 +248,22 @@ function Minesweeper() {
   const controls = (
     <>
       <Seg
+        aria="Difficulty"
         options={PRESETS.map((p) => p.label)}
         value={preset.label}
         onChange={(label) => restart(PRESETS.find((p) => p.label === label)!.id)}
         stacked={wide}
       />
       <div {...stylex.props(styles.controls, wide ? styles.controlsWide : styles.controlsCover)}>
-        <button
-          type="button"
-          aria-pressed={flagMode}
-          aria-label="Flag mode: tap cells to mark mines instead of opening them"
-          onClick={toggleFlagMode}
-          {...stylex.props(styles.action, flagMode && styles.actionOn)}
-        >
-          <FlagGlyph button />
-          Flag
-        </button>
+        <Seg
+          aria="Tap mode"
+          options={['Reveal', 'Flag']}
+          value={flagMode ? 'Flag' : 'Reveal'}
+          onChange={(mode) => {
+            if ((mode === 'Flag') !== flagMode) toggleFlagMode()
+          }}
+          fill={!wide}
+        />
         <button type="button" onClick={() => restart()} {...stylex.props(styles.action)}>
           <Sym name="reload" size={13} />
           New game
@@ -259,6 +274,7 @@ function Minesweeper() {
 
   const statsCard = (
     <div {...stylex.props(styles.statsCard)}>
+      <span {...stylex.props(styles.fieldLabel)}>Personal bests</span>
       {PRESETS.map((p) => {
         const s = statsValue[p.id]
         return (
@@ -269,7 +285,7 @@ function Minesweeper() {
             <span {...stylex.props(styles.statsValue)}>
               {s.best === null ? '-' : formatClock(s.best)}{' '}
               <span {...stylex.props(styles.statsMeta)}>
-                {s.wins}/{s.plays}
+                {s.wins} of {s.plays}
               </span>
             </span>
           </div>
@@ -284,11 +300,20 @@ function Minesweeper() {
       : saved.status === 'saving' || stats.status === 'saving'
         ? 'Saving...'
         : flagMode
-          ? 'Flag mode on: taps mark mines'
-          : 'Tap a square to open it - long-press or right-click to flag'
+          ? 'Flag mode: every tap marks a mine'
+          : 'Tap to reveal. Long-press or right-click to flag.'
 
   const boardEl = hydrated ? (
-    <Board game={game} size={fit.board} focus={focus} ended={ended} onTap={tap} onFlag={flagAt} onFocus={setFocus} />
+    <Board
+      game={game}
+      size={fit.board}
+      focus={focus}
+      ended={ended}
+      wave={wave}
+      onTap={tap}
+      onFlag={flagAt}
+      onFocus={setFocus}
+    />
   ) : (
     <div {...stylex.props(styles.well, styles.fitBoard(fit.board))}>
       <span {...stylex.props(styles.hint)}>Resuming board...</span>
@@ -299,9 +324,11 @@ function Minesweeper() {
     game.status === 'lost' ? (
       <div role="status" {...stylex.props(styles.result, !wide && styles.resultCover)}>
         <div {...stylex.props(styles.resultCopy)}>
-          <span {...stylex.props(styles.resultKicker)}>Mine hit</span>
-          <strong {...stylex.props(styles.resultTitle)}>Boom. Game over.</strong>
-          <span {...stylex.props(styles.resultSub)}>
+          <span {...stylex.props(styles.resultKicker, styles.resultLine)}>Mine hit</span>
+          <strong {...stylex.props(styles.resultTitle, styles.resultLine, styles.resultDelay(60))}>
+            Boom. Game over.
+          </strong>
+          <span {...stylex.props(styles.resultSub, styles.resultLine, styles.resultDelay(120))}>
             {preset.label} board - {formatClock(seconds)} in
           </span>
         </div>
@@ -313,11 +340,16 @@ function Minesweeper() {
     ) : game.status === 'won' ? (
       <div role="status" {...stylex.props(styles.result, !wide && styles.resultCover)}>
         <div {...stylex.props(styles.resultCopy)}>
-          <span {...stylex.props(styles.resultKicker, styles.resultKickerWin)}>Cleared</span>
-          <strong {...stylex.props(styles.resultTitle)}>Board cleared.</strong>
-          <span {...stylex.props(styles.resultSub)}>
+          <span {...stylex.props(styles.resultKicker, styles.resultKickerWin, styles.resultLine)}>Cleared</span>
+          <strong {...stylex.props(styles.resultTitle, styles.resultLine, styles.resultDelay(60))}>
+            Board cleared.
+          </strong>
+          {newBest ? (
+            <span {...stylex.props(styles.bestBadge, styles.resultLine, styles.resultDelay(120))}>New best</span>
+          ) : null}
+          <span {...stylex.props(styles.resultSub, styles.resultLine, styles.resultDelay(160))}>
             {preset.label} in {formatClock(seconds)}
-            {newBest ? ' - new best' : best === null ? '' : ` - best ${formatClock(best)}`}
+            {newBest ? '' : best === null ? '' : ` - best ${formatClock(best)}`}
           </span>
         </div>
         <button type="button" onClick={() => restart()} {...stylex.props(styles.primary)}>
@@ -340,17 +372,16 @@ function Minesweeper() {
         <section {...stylex.props(styles.stage)}>
           {boardEl}
           <div {...stylex.props(styles.rail)}>
-            <span {...stylex.props(styles.fieldLabel)}>Difficulty</span>
             {controls}
             {statsCard}
-            <p {...stylex.props(styles.hint)}>{hintText}</p>
+            <p {...stylex.props(styles.hint, flagMode && styles.hintOn)}>{hintText}</p>
           </div>
         </section>
       ) : (
         <section {...stylex.props(styles.stage, styles.stageCover)}>
           {boardEl}
           <div {...stylex.props(styles.rail, styles.railCover)}>{controls}</div>
-          <p {...stylex.props(styles.hint, styles.hintCover)}>{hintText}</p>
+          <p {...stylex.props(styles.hint, styles.hintCover, flagMode && styles.hintOn)}>{hintText}</p>
         </section>
       )}
       {result}
