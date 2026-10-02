@@ -154,39 +154,69 @@ function libWithCards(fronts: string[], when = T0) {
 {
   let { lib, deck } = libWithCards(['a', 'b'])
   lib = startReview(lib, deck.id, T0)
-  eq('review starts with the due queue', lib.review!.queue.length, 2)
-  eq('review starts concealed', lib.review!.revealed, false)
-  const first = currentCard(lib)!.id
+  eq('review starts with the due queue', lib.reviews[deck.id]!.queue.length, 2)
+  eq('review starts concealed', lib.reviews[deck.id]!.revealed, false)
+  const first = currentCard(lib, deck.id)!.id
 
-  lib = revealReview(lib)
-  eq('reveal flips the flag', lib.review!.revealed, true)
+  lib = revealReview(lib, deck.id)
+  eq('reveal flips the flag', lib.reviews[deck.id]!.revealed, true)
 
-  lib = gradeReview(lib, 'good', T0 + 1000)
-  eq('grading advances the queue', lib.review!.queue.length, 1)
-  eq('grading counts', lib.review!.done, 1)
-  eq('grading re-conceals the next card', lib.review!.revealed, false)
+  lib = gradeReview(lib, deck.id, 'good', T0 + 1000)
+  eq('grading advances the queue', lib.reviews[deck.id]!.queue.length, 1)
+  eq('grading counts', lib.reviews[deck.id]!.done, 1)
+  eq('grading re-conceals the next card', lib.reviews[deck.id]!.revealed, false)
   eq('history records the grade', lib.history.length, 1)
   eq('history records the deck', lib.history[0]!.deckId, deck.id)
-  eq('graded card left the queue', lib.review!.queue.includes(first), false)
+  eq('graded card left the queue', lib.reviews[deck.id]!.queue.includes(first), false)
 
-  lib = gradeReview(lib, 'again', T0 + 2000)
-  eq('again re-queues the card at the end', lib.review!.queue.at(-1), lib.review!.queue[0])
-  eq('again keeps the session open', lib.review!.queue.length, 1)
-  eq('again still counts as graded', lib.review!.done, 2)
+  lib = gradeReview(lib, deck.id, 'again', T0 + 2000)
+  // 'Again' reschedules +10m and drops the card from the session: the printed
+  // interval is the real wait, so a last-card lapse finishes the session
+  // instead of instantly re-asking the same card.
+  eq('again drops the card from the queue', lib.reviews[deck.id]!.queue.includes(lib.cards[1]!.id), false)
+  eq('again on the last card finishes', lib.reviews[deck.id]!.finished !== null, true)
+  eq('again still counts as graded', lib.reviews[deck.id]!.finished!.graded, 2)
+  eq('finished sessions hold the queue empty', lib.reviews[deck.id]!.queue.length, 0)
+  const relearned = lib.cards.find((c) => c.front === 'b')!
+  eq('again reschedules for +10m', relearned.due, T0 + 2000 + RELEARN_MS)
+  eq('again card is due again after the wait', dueCount(lib, deck.id, T0 + 2000 + RELEARN_MS), 1)
 
-  lib = gradeReview(lib, 'easy', T0 + 3000)
-  eq('draining the queue finishes the session', lib.review!.finished !== null, true)
-  eq('finish records the graded count', lib.review!.finished!.graded, 3)
-  eq('finished sessions hold the queue empty', lib.review!.queue.length, 0)
+  // 'Again' mid-queue keeps the session open on the remaining cards.
+  const mid = libWithCards(['m1', 'm2', 'm3'])
+  let midLib = startReview(mid.lib, mid.deck.id, T0)
+  midLib = gradeReview(midLib, mid.deck.id, 'again', T0 + 500)
+  eq('again mid-queue keeps the session open', midLib.reviews[mid.deck.id]!.finished, null)
+  eq('again mid-queue advances to the next card', midLib.reviews[mid.deck.id]!.queue.length, 2)
+
+  // One-card lapse: the session completes and the card returns when due.
+  const single = libWithCards(['only'])
+  const oneDone = gradeReview(startReview(single.lib, single.deck.id, T0), single.deck.id, 'again', T0)
+  eq('lone again finishes the session', oneDone.reviews[single.deck.id]!.finished !== null, true)
+  eq('lone again counted the grade', oneDone.reviews[single.deck.id]!.finished!.graded, 1)
+  eq('lone again card sits 10m out', oneDone.cards[0]!.due, T0 + RELEARN_MS)
+
+  // A paused session belongs to its deck: starting another keeps it parked.
+  const two = libWithCards(['x'])
+  const other = addDeck(two.lib, 'Deck B', T0)
+  const deckB = other.decks[1]!
+  const withB = addCard(other, deckB.id, 'y', 'back of y', T0)
+  let both = startReview(withB, two.deck.id, T0)
+  both = gradeReview(both, two.deck.id, 'good', T0 + 1000)
+  both = startReview(both, deckB.id, T0 + 2000)
+  eq('starting deck B keeps deck A parked', both.reviews[two.deck.id]!.done, 1)
+  eq('deck B opens its own session', both.reviews[deckB.id]!.queue.length, 1)
+  both = abandonReview(both, deckB.id)
+  eq('abandoning B leaves A untouched', both.reviews[two.deck.id]!.done, 1)
+  eq('abandoned deck B session is gone', both.reviews[deckB.id], undefined)
 }
 
 {
   let { lib, deck } = libWithCards(['a'])
   lib = startReview(lib, deck.id, T0)
-  check('session opens on a due deck', lib.review !== null)
-  lib = abandonReview(lib)
-  eq('abandon clears the session', lib.review, null)
-  lib = gradeReview(startReview(lib, deck.id, T0), 'good', T0)
+  check('session opens on a due deck', lib.reviews[deck.id] !== undefined)
+  lib = abandonReview(lib, deck.id)
+  eq('abandon clears the session', lib.reviews[deck.id], undefined)
+  lib = gradeReview(startReview(lib, deck.id, T0), deck.id, 'good', T0)
   eq('graded card leaves the due queue', dueCount(lib, deck.id, T0 + 1000), 0)
   check('startReview on an empty queue changes nothing', startReview(lib, deck.id, T0 + 1000) === lib)
 }
@@ -197,7 +227,28 @@ function libWithCards(fronts: string[], when = T0) {
     ...lib,
     cards: lib.cards.map((c) => ({ ...c, due: T0 + 10 * DAY_MS }))
   }
-  eq('startReview refuses an empty due queue', startReview(futureLib, deck.id, T0).review, null)
+  eq('startReview refuses an empty due queue', startReview(futureLib, deck.id, T0).reviews[deck.id], undefined)
+}
+
+{
+  let { lib, deck } = libWithCards(['a', 'b'])
+  lib = startReview(lib, deck.id, T0)
+  const doomed = lib.cards[0]!
+  lib = removeCard(lib, doomed.id)
+  eq('delete removes the card', lib.cards.length, 1)
+  eq('delete drops it from a live queue', lib.reviews[deck.id]!.queue.includes(doomed.id), false)
+  const alsoGone = removeCard(lib, lib.cards[0]!.id)
+  eq('deleting the last queued card clears the session', alsoGone.reviews[deck.id], undefined)
+}
+
+{
+  let { lib, deck } = libWithCards(['a'])
+  lib = startReview(lib, deck.id, T0)
+  lib = gradeReview(lib, deck.id, 'good', T0)
+  const wiped = removeDeck(lib, deck.id)
+  eq('delete deck removes cards', wiped.cards.length, 0)
+  eq('delete deck removes history', wiped.history.length, 0)
+  eq('delete deck clears its review', wiped.reviews[deck.id], undefined)
 }
 
 // --- editing ----------------------------------------------------------------
@@ -214,24 +265,34 @@ function libWithCards(fronts: string[], when = T0) {
 }
 
 {
-  let { lib, deck } = libWithCards(['a', 'b'])
-  lib = startReview(lib, deck.id, T0)
-  const doomed = lib.cards[0]!
-  lib = removeCard(lib, doomed.id)
-  eq('delete removes the card', lib.cards.length, 1)
-  eq('delete drops it from a live queue', lib.review!.queue.includes(doomed.id), false)
-  const alsoGone = removeCard(lib, lib.cards[0]!.id)
-  eq('deleting the last queued card clears the session', alsoGone.review === null, true)
+  // Round trip covers the new maps too: a parked session and a day count.
+  const { lib, deck } = libWithCards(['a', 'b'])
+  const graded = gradeReview(startReview(lib, deck.id, T0), deck.id, 'good', T0)
+  const round = parseLibrary(serializeLibrary(graded))
+  eq('roundtrip session survives', round.reviews[deck.id]!.done, 1)
+  eq('roundtrip day counts survive', reviewsToday(round, T0 + 1000), 1)
+  // Legacy single-session payloads migrate into the per-deck map.
+  const legacy = JSON.parse(serializeLibrary(graded)) as Record<string, unknown>
+  legacy.review = (legacy.reviews as Record<string, unknown>)[deck.id]
+  delete legacy.reviews
+  eq('legacy review migrates', parseLibrary(JSON.stringify(legacy)).reviews[deck.id]!.done, 1)
+  // Legacy rows without dayCounts derive them from the retained history.
+  delete legacy.review
+  const noCounts = JSON.parse(serializeLibrary(graded)) as Record<string, unknown>
+  delete noCounts.dayCounts
+  eq('dayCounts derived from history', reviewsToday(parseLibrary(JSON.stringify(noCounts)), T0 + 1000), 1)
 }
 
 {
-  let { lib, deck } = libWithCards(['a'])
-  lib = startReview(lib, deck.id, T0)
-  lib = gradeReview(lib, 'good', T0)
-  const wiped = removeDeck(lib, deck.id)
-  eq('delete deck removes cards', wiped.cards.length, 0)
-  eq('delete deck removes history', wiped.history.length, 0)
-  eq('delete deck clears its review', wiped.review, null)
+  // Counts are per local day, not per retained event: the capped history can
+  // never shrink today's truth.
+  const { lib, deck } = libWithCards(['a'])
+  const graded = gradeReview(startReview(lib, deck.id, T0), deck.id, 'good', T0)
+  eq('review counts today', reviewsToday(graded, T0 + 1000), 1)
+  eq('startOfDay floors to midnight', startOfDay(T0), startOfDay(T0 + 1))
+  eq('reviews before today do not count', reviewsToday(graded, T0 - 2 * DAY_MS), 0)
+  const packed = { ...graded, history: graded.history.slice(-0) }
+  eq('empty history still counts today', reviewsToday(packed, T0 + 1000), 1)
 }
 
 // --- serialization -----------------------------------------------------------
@@ -248,15 +309,6 @@ function libWithCards(fronts: string[], when = T0) {
   const limp = parseLibrary(JSON.stringify({ decks: [{ id: 'd1' }], cards: [{ id: 'c1', deckId: 'd1' }] }))
   eq('deck without a name is dropped', limp.decks.length, 0)
   eq('card for a dropped deck is dropped', limp.cards.length, 0)
-}
-
-{
-  // "reviewed today" respects the local-day boundary; scheduling never does.
-  const { lib } = libWithCards(['a'])
-  const graded = gradeReview(startReview(lib, lib.decks[0]!.id, T0), 'good', T0)
-  eq('review counts today', reviewsToday(graded.history, T0 + 1000), 1)
-  eq('startOfDay floors to midnight', startOfDay(T0), startOfDay(T0 + 1))
-  eq('reviews before today do not count', reviewsToday(graded.history, T0 - 2 * DAY_MS), 0)
 }
 
 // --- labels -------------------------------------------------------------------

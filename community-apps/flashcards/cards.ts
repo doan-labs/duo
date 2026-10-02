@@ -53,7 +53,10 @@ export type Library = {
   decks: Deck[]
   cards: Card[]
   history: ReviewEvent[]
-  review: ReviewSession | null
+  /** Grades per local day, so 'reviewed today' stays truthful past the history cap. */
+  dayCounts: Record<string, number>
+  /** One session per deck: starting another deck never erases a paused review. */
+  reviews: Record<string, ReviewSession>
 }
 
 export const DAY_MS = 86_400_000
@@ -70,7 +73,7 @@ export const HISTORY_LIMIT = 500
 const id = () => crypto.randomUUID()
 
 export function newLibrary(): Library {
-  return { schema: 1, decks: [], cards: [], history: [], review: null }
+  return { schema: 1, decks: [], cards: [], history: [], dayCounts: {}, reviews: {} }
 }
 
 const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback)
@@ -125,25 +128,49 @@ export function parseLibrary(raw: string | null): Library {
           interval: num(e.interval, 0)
         }))
         .slice(-HISTORY_LIMIT)
-    if (rec(parsed.review)) {
-      const r = parsed.review
-      const queue = Array.isArray(r.queue) ? r.queue.filter((q): q is string => typeof q === 'string') : []
+    const readSession = (r: Record<string, unknown>): ReviewSession | null => {
+      const queue = (Array.isArray(r.queue) ? r.queue.filter((q): q is string => typeof q === 'string') : []).filter(
+        (q) => cardIds.has(q)
+      )
       const deckId = str(r.deckId)
-      if (deckId && deckIds.has(deckId)) {
-        lib.review = {
-          deckId,
-          queue: queue.filter((q) => cardIds.has(q)),
-          done: Math.max(0, Math.round(num(r.done, 0))),
-          revealed: r.revealed === true,
-          startedAt: num(r.startedAt, 0),
-          finished:
-            rec(r.finished) && typeof r.finished.graded === 'number' && typeof r.finished.at === 'number'
-              ? { graded: r.finished.graded, at: r.finished.at }
-              : null
-        }
-        if (!lib.review.queue.length && !lib.review.finished) lib.review = null
+      if (!deckId || !deckIds.has(deckId)) return null
+      const finished =
+        rec(r.finished) && typeof r.finished.graded === 'number' && typeof r.finished.at === 'number'
+          ? { graded: r.finished.graded, at: r.finished.at }
+          : null
+      if (!queue.length && !finished) return null
+      return {
+        deckId,
+        queue,
+        done: Math.max(0, Math.round(num(r.done, 0))),
+        revealed: r.revealed === true,
+        startedAt: num(r.startedAt, 0),
+        finished
       }
     }
+    // Current shape: one session per deck. Legacy rows carried a single
+    // `review`; fold it into the map so a paused session survives the upgrade.
+    if (rec(parsed.reviews))
+      for (const [key, r] of Object.entries(parsed.reviews)) {
+        if (!rec(r)) continue
+        const s = readSession(r)
+        if (s && s.deckId === key) lib.reviews[key] = s
+      }
+    if (rec(parsed.review) && !lib.reviews[str(parsed.review.deckId)]) {
+      const s = readSession(parsed.review)
+      if (s) lib.reviews[s.deckId] = s
+    }
+    if (rec(parsed.dayCounts))
+      for (const [day, count] of Object.entries(parsed.dayCounts)) {
+        const n = num(count, NaN)
+        if (Number.isFinite(n) && n > 0) lib.dayCounts[day] = Math.round(n)
+      }
+    // Migrated rows derive per-day counts from the retained history window.
+    else
+      for (const e of lib.history) {
+        const key = dayKey(e.at)
+        lib.dayCounts[key] = (lib.dayCounts[key] ?? 0) + 1
+      }
   } catch {
     return lib
   }
@@ -182,9 +209,15 @@ export function startOfDay(now: number): number {
   return d.getTime()
 }
 
-export function reviewsToday(history: ReviewEvent[], now: number): number {
-  const day = startOfDay(now)
-  return history.filter((e) => e.at >= day && e.at <= now).length
+/** Zero-padded local-day key: lexicographic order is chronological. */
+const dayKey = (now: number) => {
+  const d = new Date(now)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Honest 'reviewed today': the per-day counter outlives the capped history. */
+export function reviewsToday(lib: Library, now: number): number {
+  return lib.dayCounts[dayKey(now)] ?? 0
 }
 
 export function addDeck(lib: Library, name: string, now: number): Library {
@@ -198,12 +231,14 @@ export function renameDeck(lib: Library, deckId: string, name: string): Library 
 
 export function removeDeck(lib: Library, deckId: string): Library {
   const dead = new Set(lib.cards.filter((c) => c.deckId === deckId).map((c) => c.id))
+  const reviews = { ...lib.reviews }
+  delete reviews[deckId]
   return {
     ...lib,
     decks: lib.decks.filter((d) => d.id !== deckId),
     cards: lib.cards.filter((c) => c.deckId !== deckId),
     history: lib.history.filter((e) => e.deckId !== deckId && !dead.has(e.cardId)),
-    review: lib.review?.deckId === deckId ? null : lib.review
+    reviews
   }
 }
 
@@ -232,14 +267,19 @@ export function updateCard(lib: Library, cardId: string, front: string, back: st
   }
 }
 
-/** Drop a card everywhere: list, history and any review queue it sits in. */
+/** Drop a card everywhere: list, history and every review queue it sits in. */
 export function removeCard(lib: Library, cardId: string): Library {
-  const review = lib.review ? { ...lib.review, queue: lib.review.queue.filter((q) => q !== cardId) } : null
+  const reviews = { ...lib.reviews }
+  for (const [deckId, session] of Object.entries(reviews)) {
+    const queue = session.queue.filter((q) => q !== cardId)
+    if (queue.length || session.finished) reviews[deckId] = { ...session, queue }
+    else delete reviews[deckId]
+  }
   return {
     ...lib,
     cards: lib.cards.filter((c) => c.id !== cardId),
     history: lib.history.filter((e) => e.cardId !== cardId),
-    review: review && (review.queue.length || review.finished) ? review : null
+    reviews
   }
 }
 
@@ -279,50 +319,71 @@ export function gradeCard(card: Card, grade: Grade, now: number): Card {
 export function startReview(lib: Library, deckId: string, now: number): Library {
   const queue = dueQueue(deckCards(lib, deckId), now).map((c) => c.id)
   if (!queue.length) return lib
-  return { ...lib, review: { deckId, queue, done: 0, revealed: false, startedAt: now, finished: null } }
+  return {
+    ...lib,
+    reviews: {
+      ...lib.reviews,
+      [deckId]: { deckId, queue, done: 0, revealed: false, startedAt: now, finished: null }
+    }
+  }
 }
 
-export function revealReview(lib: Library): Library {
-  if (!lib.review || lib.review.finished) return lib
-  return { ...lib, review: { ...lib.review, revealed: true } }
+export function revealReview(lib: Library, deckId: string): Library {
+  const review = lib.reviews[deckId]
+  if (!review || review.finished) return lib
+  return { ...lib, reviews: { ...lib.reviews, [deckId]: { ...review, revealed: true } } }
 }
 
-export function abandonReview(lib: Library): Library {
-  return { ...lib, review: null }
+export function abandonReview(lib: Library, deckId: string): Library {
+  const reviews = { ...lib.reviews }
+  delete reviews[deckId]
+  return { ...lib, reviews }
 }
 
-/** Grade the head card: reschedule it, log history, re-queue on Again, finish when the queue drains. */
-export function gradeReview(lib: Library, grade: Grade, now: number): Library {
-  const review = lib.review
+/**
+ * Grade the head card: reschedule it, log history, bump today's count and
+ * advance the queue. An 'again' card leaves the session for its 10 minute
+ * relearn delay instead of cycling straight back - the printed interval is
+ * the actual wait.
+ */
+export function gradeReview(lib: Library, deckId: string, grade: Grade, now: number): Library {
+  const review = lib.reviews[deckId]
   if (!review || review.finished) return lib
   const head = review.queue[0]
   if (!head) return lib
   const card = lib.cards.find((c) => c.id === head)
+  const bump = (session: ReviewSession) => {
+    const reviews = { ...lib.reviews }
+    if (session.queue.length || session.finished) reviews[deckId] = session
+    else delete reviews[deckId]
+    return reviews
+  }
   if (!card) {
     const queue = review.queue.slice(1)
-    const review2: ReviewSession = queue.length
+    const next: ReviewSession = queue.length
       ? { ...review, queue, revealed: false }
       : { ...review, queue, revealed: false, finished: { graded: review.done, at: now } }
-    return { ...lib, review: review2.queue.length || review2.finished ? review2 : null }
+    return { ...lib, reviews: bump(next) }
   }
   const graded = gradeCard(card, grade, now)
   const event: ReviewEvent = { cardId: card.id, deckId: card.deckId, at: now, grade, interval: graded.interval }
-  const rest = review.queue.slice(1)
-  const queue = grade === 'again' ? [...rest, card.id] : rest
+  const queue = review.queue.slice(1)
   const done = review.done + 1
   const next: ReviewSession = queue.length
     ? { ...review, queue, done, revealed: false }
     : { ...review, queue, done, revealed: false, finished: { graded: done, at: now } }
+  const key = dayKey(now)
   return {
     ...lib,
     cards: lib.cards.map((c) => (c.id === card.id ? graded : c)),
     history: [...lib.history, event].slice(-HISTORY_LIMIT),
-    review: next
+    dayCounts: { ...lib.dayCounts, [key]: (lib.dayCounts[key] ?? 0) + 1 },
+    reviews: bump(next)
   }
 }
 
-export function currentCard(lib: Library): Card | undefined {
-  const head = lib.review?.queue[0]
+export function currentCard(lib: Library, deckId: string): Card | undefined {
+  const head = lib.reviews[deckId]?.queue[0]
   return head ? lib.cards.find((c) => c.id === head) : undefined
 }
 

@@ -195,12 +195,15 @@ function DestructiveSheet({
   label,
   onClose,
   restoreTo,
+  busy,
   children
 }: {
   open: boolean
   label: string
   onClose: () => void
   restoreTo?: HTMLElement | null
+  /** Freeze the actions during the presence-out exit: dead buttons, live card. */
+  busy?: boolean
   children: React.ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
@@ -210,7 +213,7 @@ function DestructiveSheet({
   useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
   return (
     <Sheet open={open} onClose={onClose} aria-label={label}>
-      <div ref={box} {...stylex.props(styles.confirm)}>
+      <div ref={box} inert={busy} {...stylex.props(styles.confirm)}>
         {children}
       </div>
     </Sheet>
@@ -244,18 +247,18 @@ function DecksScreen({
   lib: Library
   now: number
   resume: { deck: Deck; left: number; done: boolean } | null
-  onNew: () => void
+  onNew: (trigger: HTMLElement) => void
   onOpen: (deck: Deck) => void
   onResume: (deck: Deck) => void
 }) {
   const totalDue = dueQueue(lib.cards, now).length
-  const todayCount = reviewsToday(lib.history, now)
+  const todayCount = reviewsToday(lib, now)
   return (
     <div {...stylex.props(shared.column)}>
       <Title as="h1">
         Flashcards
         <Title variant="accessory">
-          <IconButton name="plus" aria-label="New deck" onClick={onNew} xstyle={styles.hit} />
+          <IconButton name="plus" aria-label="New deck" onClick={(e) => onNew(e.currentTarget)} xstyle={styles.hit} />
         </Title>
       </Title>
       <div {...stylex.props(styles.summary)}>
@@ -292,7 +295,7 @@ function DecksScreen({
             <Text size="subheadline" color="secondary">
               Create a deck, then add cards to start reviewing.
             </Text>
-            <Button variant="filled" onClick={onNew}>
+            <Button variant="filled" onClick={(e) => onNew(e.currentTarget)}>
               New deck
             </Button>
           </Placeholder>
@@ -340,17 +343,17 @@ function RailScreen({
   now: number
   resume: { deck: Deck; left: number; done: boolean } | null
   selectedDeckId: string | undefined
-  onNew: () => void
+  onNew: (trigger: HTMLElement) => void
   onOpen: (deck: Deck) => void
   onResume: (deck: Deck) => void
 }) {
   const totalDue = dueQueue(lib.cards, now).length
-  const todayCount = reviewsToday(lib.history, now)
+  const todayCount = reviewsToday(lib, now)
   return (
     <nav aria-label="Decks" {...stylex.props(styles.rail)}>
       <div {...stylex.props(styles.railHead)}>
         <span {...stylex.props(styles.railTitle)}>Flashcards</span>
-        <IconButton name="plus" aria-label="New deck" onClick={onNew} xstyle={styles.hit} />
+        <IconButton name="plus" aria-label="New deck" onClick={(e) => onNew(e.currentTarget)} xstyle={styles.hit} />
       </div>
       <div {...stylex.props(styles.railSummary)}>
         <DueChip count={totalDue} />
@@ -383,7 +386,7 @@ function RailScreen({
             <Text size="subheadline" color="secondary">
               No decks yet
             </Text>
-            <Button variant="filled" onClick={onNew} xstyle={styles.hitBtn}>
+            <Button variant="filled" onClick={(e) => onNew(e.currentTarget)} xstyle={styles.hitBtn}>
               New deck
             </Button>
           </div>
@@ -440,9 +443,9 @@ function DeckScreen({
   now: number
   wide: boolean
   onBack?: () => void
-  onRename: () => void
-  onNewCard: () => void
-  onEditCard: (cardId: string) => void
+  onRename: (trigger: HTMLElement) => void
+  onNewCard: (trigger: HTMLElement) => void
+  onEditCard: (cardId: string, trigger: HTMLElement) => void
   onStartReview: () => void
   onAskDelete: (trigger: HTMLElement) => void
 }) {
@@ -460,7 +463,12 @@ function DeckScreen({
           )}
           <span {...stylex.props(styles.clamp)}>{deck.name}</span>
           <Title variant="accessory">
-            <IconButton name="compose" aria-label="Rename deck" onClick={onRename} xstyle={styles.hit} />
+            <IconButton
+              name="compose"
+              aria-label="Rename deck"
+              onClick={(e) => onRename(e.currentTarget)}
+              xstyle={styles.hit}
+            />
           </Title>
         </>
       }
@@ -501,7 +509,7 @@ function DeckScreen({
           }
           label="New card"
           xstyle={styles.actionRow}
-          onClick={onNewCard}
+          onClick={(e) => onNewCard(e.currentTarget)}
         />
         {cards.map((card, i) => (
           <Row
@@ -512,7 +520,7 @@ function DeckScreen({
             subtitle={`${dueLabel(card, now)} · ${card.reviews} ${card.reviews === 1 ? 'review' : 'reviews'}`}
             chevron
             xstyle={[styles.actionRow, delay.ms(Math.min(i + 1, 8) * 40)]}
-            onClick={() => onEditCard(card.id)}
+            onClick={(e) => onEditCard(card.id, e.currentTarget)}
           />
         ))}
         {cards.length === 0 && <Row label="No cards yet" subtitle="Add the first card to start reviewing this deck." />}
@@ -557,7 +565,7 @@ function ReviewScreen({
   onGrade: (grade: Grade) => void
   onFinish: () => void
 }) {
-  const card = currentCard(lib)
+  const card = currentCard(lib, review.deckId)
   const left = review.queue.length
   const total = review.done + left
   const part = total === 0 ? 1 : review.done / total
@@ -668,7 +676,7 @@ function OverviewScreen({ lib, now, onOpen }: { lib: Library; now: number; onOpe
     .map((deck, i) => ({ deck, i, cards: deckCards(lib, deck.id) }))
     .map((e) => ({ ...e, due: dueQueue(e.cards, now).length }))
   const total = due.reduce((n, e) => n + e.due, 0)
-  const todayCount = reviewsToday(lib.history, now)
+  const todayCount = reviewsToday(lib, now)
   return (
     <Page title="Today">
       <div {...stylex.props(styles.cardFace, styles.overviewCard)}>
@@ -706,7 +714,8 @@ function EditorSheet({
   onClose,
   onSave,
   onDeleteCard,
-  onConfirming
+  dimmed,
+  opener
 }: {
   draft: Draft
   lib: Library
@@ -714,33 +723,42 @@ function EditorSheet({
   onClose: () => void
   onSave: () => void
   onDeleteCard: () => void
-  onConfirming: (open: boolean) => void
+  /** True while a deck confirmation sits above this sheet: trap off, content inert. */
+  dimmed: boolean
+  /** The element that published the draft; focus returns to it on close. */
+  opener: HTMLElement | null
 }) {
   const [confirming, setConfirming] = useState(false)
-  const confirmBox = useRef<HTMLDivElement>(null)
+  const editBox = useRef<HTMLDivElement>(null)
   const deleteBtn = useRef<HTMLButtonElement>(null)
+  const confirmCancel = useRef<HTMLButtonElement>(null)
   const wasConfirming = useRef(false)
-  useFocusTrap(confirmBox, confirming, 'last', deleteBtn.current)
+  // One trap for the whole sheet: the confirm face swaps the box's children,
+  // so the same trap contains whichever face is showing. While a deck
+  // confirmation sits above, this layer sleeps instead of sharing the keydown.
+  useFocusTrap(editBox, !dimmed, 'first', opener)
   // One escape layer for the whole sheet: on the confirm face it cancels the
   // face, on the edit face it closes the editor - before the SDK's go-home.
+  // While dimmed (a deck confirmation above) this entry sleeps so Escape
+  // peels the top visual layer first.
   const confirmingRef = useRef(confirming)
   confirmingRef.current = confirming
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   useEffect(
     () =>
-      pushEscape(() => {
-        if (confirmingRef.current) setConfirming(false)
-        else onCloseRef.current()
-      }),
-    []
+      dimmed
+        ? undefined
+        : pushEscape(() => {
+            if (confirmingRef.current) setConfirming(false)
+            else onCloseRef.current()
+          }),
+    [dimmed]
   )
-  // The app goes inert behind the destructive face; report both directions and
-  // release on unmount so a close can never strand the inert flag.
-  useEffect(() => onConfirming(confirming), [confirming, onConfirming])
-  useEffect(() => () => onConfirming(false), [onConfirming])
-  // Back on the edit face, focus lands on the same Delete button that was used.
+  // The destructive face opens on Cancel - the safe default - and cancelling
+  // it lands focus back on the same Delete button that was used.
   useEffect(() => {
+    if (confirming) confirmCancel.current?.focus()
     if (wasConfirming.current && !confirming) deleteBtn.current?.focus()
     wasConfirming.current = confirming
   }, [confirming])
@@ -766,7 +784,12 @@ function EditorSheet({
       }}
       aria-label={title}
     >
-      <div key={confirming ? 'confirm' : 'edit'} {...stylex.props(styles.editor, shared.swap)}>
+      <div
+        ref={editBox}
+        key={confirming ? 'confirm' : 'edit'}
+        inert={dimmed}
+        {...stylex.props(styles.editor, shared.swap)}
+      >
         <Text as="h2" size="headline" weight="semibold">
           {title}
         </Text>
@@ -808,7 +831,7 @@ function EditorSheet({
           </>
         )}
         {confirming && editingCard ? (
-          <div ref={confirmBox} {...stylex.props(styles.confirmInner)}>
+          <div {...stylex.props(styles.confirmInner)}>
             <span {...stylex.props(styles.confirmText)}>
               "{editingCard.front}" and its review history will be removed. This cannot be undone.
             </span>
@@ -816,7 +839,7 @@ function EditorSheet({
               <Button variant="filled" xstyle={[styles.hitBtn, styles.dangerFill]} onClick={onDeleteCard}>
                 Delete card
               </Button>
-              <Button variant="plain" xstyle={styles.hitBtn} onClick={() => setConfirming(false)}>
+              <Button ref={confirmCancel} variant="plain" xstyle={styles.hitBtn} onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
             </div>
@@ -873,19 +896,24 @@ function Flashcards() {
   const lib = parseLibrary(stored.value)
   const draftState = parseDraft(draft.value)
   const now = Date.now()
-  // Root-held confirm flags: while either destructive layer is up the rest of
-  // the app renders inert, so neither pointer nor Tab can reach it.
-  const [deckConfirm, setDeckConfirm] = useState(false)
-  const [cardConfirm, setCardConfirm] = useState(false)
+  // Root-held confirm state. The deck confirmation pins its target as a
+  // snapshot: the content and the Delete button act on the captured deck, so
+  // a peer navigation update can never retitle a live prompt against another
+  // deck, and the snapshot keeps the named card readable through the Sheet's
+  // 200ms exit after the deck is gone. `done` marks the closing animation so
+  // the outgoing actions stay inert while the card fades.
+  const [deckConfirm, setDeckConfirm] = useState<{ deckId: string; name: string; count: number } | null>(null)
+  const [deckConfirmDone, setDeckConfirmDone] = useState(false)
   const deckTrigger = useRef<HTMLElement | null>(null)
+  const editorTrigger = useRef<HTMLElement | null>(null)
 
-  // The live session, only if its deck still exists on this copy.
-  const review = lib.review && getDeck(lib, lib.review.deckId) ? lib.review : null
+  // Any live session drives the resume row and the cold-launch landing.
+  const live = Object.values(lib.reviews).find((r) => !r.finished && getDeck(lib, r.deckId)) ?? null
 
   // A fresh launch that lands on a waiting review commits that view so later
   // renders keep honouring it; without the write the session sentinel would
   // re-derive 'decks' the moment the session finishes and skip the recap.
-  const waiting = review && !review.finished ? review.deckId : null
+  const waiting = live ? live.deckId : null
   useEffect(() => {
     if (ui.status === 'ready' && ui.value === null && waiting)
       ui.set(JSON.stringify({ v: 1, view: 'review', deckId: waiting }))
@@ -896,15 +924,17 @@ function Flashcards() {
   // is honoured as-is.
   const requested =
     ui.value === null
-      ? review && !review.finished
-        ? ({ v: 1, view: 'review', deckId: review.deckId } as const)
+      ? live
+        ? ({ v: 1, view: 'review', deckId: live.deckId } as const)
         : ({ v: 1, view: 'decks' } as const)
       : parseUi(ui.value)
   const deck = requested.deckId ? getDeck(lib, requested.deckId) : undefined
+  // The session for the deck on screen, if one was ever started for it.
+  const review = deck ? (lib.reviews[deck.id] ?? null) : null
   const screen: View = !deck
     ? 'decks'
     : requested.view === 'review'
-      ? review && review.deckId === deck.id
+      ? review
         ? 'review'
         : 'deck'
       : requested.view === 'deck'
@@ -913,20 +943,23 @@ function Flashcards() {
 
   const save = (next: Library) => void stored.set(serializeLibrary(next))
   const go = (next: UiState) => ui.set(JSON.stringify(next))
-  const openDraft = (next: Omit<Draft, 'v' | 'name' | 'front' | 'back'> & Partial<Draft>) =>
+  const openDraft = (next: Omit<Draft, 'v' | 'name' | 'front' | 'back'> & Partial<Draft>, el?: HTMLElement) => {
+    // The opener's element is remembered before the draft commits so the
+    // editor trap can hand focus back when the sheet closes.
+    editorTrigger.current = el ?? null
     draft.set(JSON.stringify({ v: 1, name: '', front: '', back: '', ...next }))
+  }
   const closeDraft = () => draft.del()
 
-  const resumeDeck = review ? getDeck(lib, review.deckId) : undefined
-  const resumeInfo =
-    resumeDeck && review ? { deck: resumeDeck, left: review.queue.length, done: !!review.finished } : null
+  const resumeDeck = live ? getDeck(lib, live.deckId) : undefined
+  const resumeInfo = resumeDeck && live ? { deck: resumeDeck, left: live.queue.length, done: false } : null
 
   const decksScreen = (
     <DecksScreen
       lib={lib}
       now={now}
       resume={resumeInfo}
-      onNew={() => openDraft({ kind: 'deck-new' })}
+      onNew={(el) => openDraft({ kind: 'deck-new' }, el)}
       onOpen={(d) => go({ v: 1, view: 'deck', deckId: d.id })}
       onResume={(d) => go({ v: 1, view: 'review', deckId: d.id })}
     />
@@ -941,13 +974,13 @@ function Flashcards() {
         wide={wide}
         onLeave={() => go({ v: 1, view: 'deck', deckId: deck.id })}
         onEnd={() => {
-          save(abandonReview(lib))
+          save(abandonReview(lib, deck.id))
           go({ v: 1, view: 'deck', deckId: deck.id })
         }}
-        onReveal={() => save(revealReview(lib))}
-        onGrade={(g) => save(gradeReview(lib, g, Date.now()))}
+        onReveal={() => save(revealReview(lib, deck.id))}
+        onGrade={(g) => save(gradeReview(lib, deck.id, g, Date.now()))}
         onFinish={() => {
-          save(abandonReview(lib))
+          save(abandonReview(lib, deck.id))
           go({ v: 1, view: 'deck', deckId: deck.id })
         }}
       />
@@ -959,19 +992,22 @@ function Flashcards() {
         now={now}
         wide={wide}
         onBack={() => go({ v: 1, view: 'decks' })}
-        onRename={() => openDraft({ kind: 'deck-rename', deckId: deck.id, name: deck.name })}
-        onNewCard={() => openDraft({ kind: 'card-new', deckId: deck.id })}
-        onEditCard={(cardId) => {
+        onRename={(el) => openDraft({ kind: 'deck-rename', deckId: deck.id, name: deck.name }, el)}
+        onNewCard={(el) => openDraft({ kind: 'card-new', deckId: deck.id }, el)}
+        onEditCard={(cardId, el) => {
           const card = lib.cards.find((c) => c.id === cardId)
-          if (card) openDraft({ kind: 'card-edit', cardId, front: card.front, back: card.back })
+          if (card) openDraft({ kind: 'card-edit', cardId, front: card.front, back: card.back }, el)
         }}
         onStartReview={() => {
-          if (!(review && review.deckId === deck.id && !review.finished)) save(startReview(lib, deck.id, Date.now()))
+          if (!(review && !review.finished)) save(startReview(lib, deck.id, Date.now()))
           go({ v: 1, view: 'review', deckId: deck.id })
         }}
         onAskDelete={(el) => {
           deckTrigger.current = el
-          setDeckConfirm(true)
+          // The target is pinned now: a shared-navigation update can retitle
+          // the deck under the sheet, but only this deck is ever deleted.
+          setDeckConfirm({ deckId: deck.id, name: deck.name, count: deckCards(lib, deck.id).length })
+          setDeckConfirmDone(false)
         }}
       />
     )
@@ -995,7 +1031,9 @@ function Flashcards() {
     (draftState.kind === 'deck-new' || (draftState.deckId ? !!getDeck(lib, draftState.deckId) : true)) &&
     (draftState.cardId ? lib.cards.some((c) => c.id === draftState.cardId) : true)
 
-  const modalOpen = deckConfirm || cardConfirm
+  const deckSheetOpen = deckConfirm !== null && !deckConfirmDone
+  const editorOpen = !!(draftValid && draftState)
+  const modalOpen = deckSheetOpen || editorOpen
   return (
     <main
       ref={rootRef}
@@ -1016,7 +1054,7 @@ function Flashcards() {
               now={now}
               resume={resumeInfo}
               selectedDeckId={deck?.id}
-              onNew={() => openDraft({ kind: 'deck-new' })}
+              onNew={(el) => openDraft({ kind: 'deck-new' }, el)}
               onOpen={(d) => go({ v: 1, view: 'deck', deckId: d.id })}
               onResume={(d) => go({ v: 1, view: 'review', deckId: d.id })}
             />
@@ -1049,7 +1087,8 @@ function Flashcards() {
           onChange={(patch) => draft.set(JSON.stringify({ ...draftState, ...patch }))}
           onClose={closeDraft}
           onSave={commitDraft}
-          onConfirming={setCardConfirm}
+          dimmed={deckSheetOpen}
+          opener={editorTrigger.current}
           onDeleteCard={() => {
             if (draftState.cardId) save(removeCard(lib, draftState.cardId))
             closeDraft()
@@ -1057,33 +1096,34 @@ function Flashcards() {
         />
       )}
       <DestructiveSheet
-        open={deckConfirm && !!deck}
-        label={deck ? `Delete ${deck.name}` : 'Delete deck'}
-        onClose={() => setDeckConfirm(false)}
+        open={deckSheetOpen}
+        busy={deckConfirmDone}
+        label={deckConfirm ? `Delete ${deckConfirm.name}` : 'Delete deck'}
+        onClose={() => setDeckConfirmDone(true)}
         restoreTo={deckTrigger.current}
       >
-        {deck && (
+        {deckConfirm && (
           <>
             <Text as="h2" size="headline" weight="semibold">
-              Delete "{deck.name}"?
+              Delete "{deckConfirm.name}"?
             </Text>
             <span {...stylex.props(styles.confirmText)}>
-              This removes the deck, its {deckCards(lib, deck.id).length}{' '}
-              {deckCards(lib, deck.id).length === 1 ? 'card' : 'cards'} and their review history.
+              This removes the deck, its {deckConfirm.count} {deckConfirm.count === 1 ? 'card' : 'cards'} and their
+              review history.
             </span>
             <div {...stylex.props(styles.editorActions)}>
               <Button
                 variant="filled"
                 xstyle={[styles.hitBtn, styles.dangerFill]}
                 onClick={() => {
-                  save(removeDeck(lib, deck.id))
-                  setDeckConfirm(false)
+                  save(removeDeck(lib, deckConfirm.deckId))
+                  setDeckConfirmDone(true)
                   go({ v: 1, view: 'decks' })
                 }}
               >
                 Delete deck
               </Button>
-              <Button variant="plain" xstyle={styles.hitBtn} onClick={() => setDeckConfirm(false)}>
+              <Button variant="plain" xstyle={styles.hitBtn} onClick={() => setDeckConfirmDone(true)}>
                 Cancel
               </Button>
             </div>

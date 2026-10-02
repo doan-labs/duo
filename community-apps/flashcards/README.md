@@ -13,15 +13,17 @@ and no network use.
   and keeps your line breaks.
 - **Review**: tap the card to reveal the answer, then grade yourself Again,
   Good or Easy. Each button shows the exact interval it will schedule, so the
-  choice is never a surprise. `Again` puts the card back at the end of the
-  queue for another look this session.
+  choice is never a surprise. `Again` sends the card out for its 10 minute
+  relearn delay: it leaves the session and comes back when it is actually
+  due, including to a session that is still open.
 - **Scheduling**: a deterministic SM-2 variant (see below). Due times are
   absolute instants, so a timezone change can shift the "reviewed today"
   counter's window but can never make a graded card come back early or late.
 - **Counts**: "N due", "N reviewed today" and per-deck due badges are all
   computed from the same queue the reviewer serves; nothing is a projection.
-- **Pause anywhere**: the open review, including how far through the queue you
-  are, persists across folding the phone or closing and relaunching the app.
+- **Pause anywhere**: each deck keeps its own review session - how far
+  through its queue you are persists across folding the phone or closing and
+  relaunching the app, and starting another deck's review never erases it.
   A deck that gains a paused review shows a resume row on the decks list.
 
 ## Scheduling
@@ -40,11 +42,13 @@ grade, instant, resulting interval) to a bounded history (newest 500).
 
 ## Persistence
 
-The whole library (decks, cards, history, the open review session) is one JSON
-document in `os.storage`, so a fold or relaunch restores everything, including
-mid-card reveal state. Pane navigation and the open editor draft live in
-`os.session`: they follow the fold but reset on a cold launch, at which point a
-paused review re-opens automatically.
+The whole library (decks, cards, history, per-deck review sessions and daily
+grade counts) is one JSON document in `os.storage`, so a fold or relaunch
+restores everything, including mid-card reveal state. Pane navigation and the
+open editor draft live in `os.session`: they follow the fold but reset on a
+cold launch, at which point a paused review re-opens automatically. Daily
+counts are stored per day rather than read back from history, so the capped
+history can never shrink what "reviewed today" reports.
 
 ## Layout
 
