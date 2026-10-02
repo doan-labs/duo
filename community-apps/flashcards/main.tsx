@@ -545,6 +545,10 @@ function Flashcards() {
     const timer = setInterval(() => setBeat((n) => n + 1), 30_000)
     return () => clearInterval(timer)
   }, [])
+  // Signal readiness after React has committed the app's first frame.
+  useEffect(() => {
+    requestAnimationFrame(() => os.ready())
+  }, [])
 
   const lib = parseLibrary(stored.value)
   const draftState = parseDraft(draft.value)
