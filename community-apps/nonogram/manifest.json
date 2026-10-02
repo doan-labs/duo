@@ -1,0 +1,13 @@
+{
+  "id": "com.mnismt.duo.nonogram",
+  "name": "Nonogram",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "light": true,
+  "permissions": [],
+  "author": "mnismt",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/nonogram",
+  "license": "MIT"
+}
