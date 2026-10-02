@@ -25,6 +25,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState
@@ -226,8 +227,9 @@ function Choices<T extends string>({
 
 /**
  * The kit Sheet is a non-modal dialog on purpose, so the app makes the chrome
- * behind it inert, keeps Tab cycling through the dialog's controls and hands
- * focus back to the control that opened it.
+ * behind it inert and keeps Tab cycling through this sheet's own controls. The
+ * query is scoped to this instance's dialog: an outgoing Sheet stays mounted
+ * for its close animation, so a bare dialog[open] query can grab the wrong one.
  */
 function GuardedSheet({
   open,
@@ -240,30 +242,17 @@ function GuardedSheet({
   label: string
   children: ReactNode
 }) {
-  const trigger = useRef<HTMLElement | null>(null)
-  const wasOpen = useRef(false)
-  useEffect(() => {
-    if (open && !wasOpen.current) {
-      trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      wasOpen.current = true
-      return
-    }
-    if (!open && wasOpen.current) {
-      wasOpen.current = false
-      if (trigger.current?.isConnected) trigger.current.focus()
-      trigger.current = null
-    }
-  }, [open])
+  const dialogId = useId()
   useEffect(() => {
     if (!open) return
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return
-      const dialog = document.querySelector('dialog[open]')
+      event.preventDefault()
+      const dialog = document.getElementById(dialogId)
       if (!dialog) return
       const controls = [...dialog.querySelectorAll<HTMLElement>('button, input, [tabindex]')].filter(
         (el) => !el.hasAttribute('disabled') && el.tabIndex >= 0
       )
-      event.preventDefault()
       if (!controls.length) {
         ;(dialog as HTMLElement).focus()
         return
@@ -274,9 +263,9 @@ function GuardedSheet({
     }
     document.addEventListener('keydown', trap, true)
     return () => document.removeEventListener('keydown', trap, true)
-  }, [open])
+  }, [open, dialogId])
   return (
-    <Sheet open={open} onClose={onClose} aria-label={label}>
+    <Sheet open={open} onClose={onClose} aria-label={label} id={dialogId}>
       {children}
     </Sheet>
   )
@@ -344,6 +333,9 @@ function PixelStudio() {
   const [ui, setUi] = useState<UiState>(DEFAULT_UI)
   const uiRef = useRef(ui)
   uiRef.current = ui
+  // The control that opened the current sheet sequence, captured at scheduling
+  // time before the kit Sheet can focus its own dialog.
+  const sheetTrigger = useRef<HTMLElement | null>(null)
 
   const writeShared = useCallback((st: DocState) => {
     const {
@@ -377,40 +369,56 @@ function PixelStudio() {
     sessionRef.current.set(serializeShared({ by: ME, ...st, view }))
   }, [])
 
+  // The opener is captured on the closed-to-open edge, not in a passive effect:
+  // by effect time the kit Sheet may already hold focus. Sheet-to-sheet hops
+  // keep the first opener, so the final close lands back where the flow began.
+  const captureSheetTrigger = useCallback((prev: SheetKind | null, next: SheetKind | null) => {
+    if (prev !== null || next === null || sheetTrigger.current !== null) return
+    sheetTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }, [])
+
   const patchUi = useCallback(
     (patch: Partial<UiState>) => {
       const next = { ...uiRef.current, ...patch }
+      captureSheetTrigger(uiRef.current.sheet, next.sheet)
       uiRef.current = next
       setUi(next)
       const st = stateRef.current
       if (st) writeShared(st)
     },
-    [writeShared]
+    [writeShared, captureSheetTrigger]
   )
 
-  const applyUi = useCallback((v: SharedView, paletteLen: number) => {
-    const ui: UiState = {
-      tool: (TOOLS as readonly string[]).includes(v.tool) ? (v.tool as Tool) : 'Paint',
-      color: Math.max(0, Math.min(v.color, Math.max(0, paletteLen - 1))),
-      page: v.page,
-      sheet: (SHEET_KINDS as readonly string[]).includes(v.sheet ?? '') ? (v.sheet as SheetKind) : null,
-      actionId: v.actionId,
-      renameTarget: v.renameTarget,
-      nameInput: v.nameInput,
-      deleteId: v.deleteId,
-      editSlot: v.editSlot,
-      newName: v.newName,
-      newSize: (SIZE_LABELS as readonly string[]).includes(v.newSize) ? (v.newSize as SizeLabel) : '16 x 16',
-      pending: v.pending
-    }
-    uiRef.current = ui
-    setUi(ui)
-  }, [])
+  const applyUi = useCallback(
+    (v: SharedView, paletteLen: number) => {
+      const ui: UiState = {
+        tool: (TOOLS as readonly string[]).includes(v.tool) ? (v.tool as Tool) : 'Paint',
+        color: Math.max(0, Math.min(v.color, Math.max(0, paletteLen - 1))),
+        page: v.page,
+        sheet: (SHEET_KINDS as readonly string[]).includes(v.sheet ?? '') ? (v.sheet as SheetKind) : null,
+        actionId: v.actionId,
+        renameTarget: v.renameTarget,
+        nameInput: v.nameInput,
+        deleteId: v.deleteId,
+        editSlot: v.editSlot,
+        newName: v.newName,
+        newSize: (SIZE_LABELS as readonly string[]).includes(v.newSize) ? (v.newSize as SizeLabel) : '16 x 16',
+        pending: v.pending
+      }
+      captureSheetTrigger(uiRef.current.sheet, ui.sheet)
+      uiRef.current = ui
+      setUi(ui)
+    },
+    [captureSheetTrigger]
+  )
 
   // One commit path for every local change: state, the session mirror for the
-  // other display and the durable draft, in that order.
+  // other display and the durable draft, in that order. The ref moves ahead of
+  // the render so a UI patch fired on the same tick publishes the committed
+  // state instead of rewinding the peer to the pre-commit document.
   const commit = useCallback(
     (next: DocState) => {
+      stateRef.current = next
       setState(next)
       writeShared(next)
       void draftRef.current.set(serializeDocState(next))
@@ -451,6 +459,7 @@ function PixelStudio() {
       if (next.by === ME) return
       sessionAdopted.current = true
       const { by: _by, view: nextView, ...rest } = next
+      stateRef.current = rest
       setState(rest)
       setLiveCells(null)
       if (nextView) applyUi(nextView, rest.work.doc.palette.length)
@@ -470,7 +479,9 @@ function PixelStudio() {
     if (draft.status === 'hydrating' || storageSeeded.current) return
     storageSeeded.current = true
     if (sessionAdopted.current) return
-    setState(parseDocState(draft.value) ?? newDocState(16, 'Untitled'))
+    const initial = parseDocState(draft.value) ?? newDocState(16, 'Untitled')
+    stateRef.current = initial
+    setState(initial)
   }, [draft.status, draft.value])
 
   const flushStroke = useCallback(() => {
@@ -632,7 +643,47 @@ function PixelStudio() {
     setFocus(-1)
   }
 
-  const cancelPending = () => patchUi({ sheet: uiRef.current.pending?.type === 'new' ? 'new' : null, pending: null })
+  const cancelPending = useCallback(
+    () => patchUi({ sheet: uiRef.current.pending?.type === 'new' ? 'new' : null, pending: null }),
+    [patchUi]
+  )
+
+  // One close path per open sheet kind, matching each GuardedSheet's onClose,
+  // so the pre-connect Escape guard cancels exactly like the sheet's own.
+  const closeOpenSheet = useCallback(() => {
+    const kind = uiRef.current.sheet
+    if (kind === null) return
+    if (kind === 'discard') cancelPending()
+    else if (kind === 'item') patchUi({ sheet: null, actionId: null })
+    else patchUi({ sheet: null })
+  }, [patchUi, cancelPending])
+
+  // Hands the pre-connect Escape guard the live cancel callback only while a
+  // sheet is open; without one, Escape still reaches the shell's go-home.
+  useEffect(() => {
+    sheetCancel = ui.sheet !== null ? closeOpenSheet : null
+    return () => {
+      sheetCancel = null
+    }
+  }, [ui.sheet, closeOpenSheet])
+
+  // The kit Sheet is non-modal, so the app owns the restore: when the last
+  // sheet closes, focus returns to the control that opened the sequence. The
+  // control sits inside the inert subtree until the close commits, so retry
+  // across frames until it can take focus again.
+  useEffect(() => {
+    if (ui.sheet !== null) return
+    const el = sheetTrigger.current
+    sheetTrigger.current = null
+    if (!el) return
+    let tries = 0
+    const restore = () => {
+      if (!el.isConnected) return
+      el.focus()
+      if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
+    }
+    requestAnimationFrame(restore)
+  }, [ui.sheet])
 
   const confirmPending = (saveFirst: boolean) => {
     const p = uiRef.current.pending
@@ -1215,6 +1266,21 @@ function PixelStudio() {
     </main>
   )
 }
+
+// Registered before os.connect() so it fires ahead of the SDK's Escape-to-home
+// forward: while a sheet is open, Escape cancels it inside the app; at all
+// other times the event passes through and still goes home.
+let sheetCancel: (() => void) | null = null
+addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || !sheetCancel) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    sheetCancel()
+  },
+  true
+)
 
 await os.connect()
 createRoot(document.body).render(<PixelStudio />)

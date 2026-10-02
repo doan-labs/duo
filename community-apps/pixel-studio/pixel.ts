@@ -295,7 +295,7 @@ export interface SharedView {
   editSlot: number
   newName: string
   newSize: string
-  pending: { type: string; id: string | null } | null
+  pending: { type: 'open' | 'new'; id: string | null } | null
 }
 
 const strOrNull = (v: unknown) => v === null || typeof v === 'string'

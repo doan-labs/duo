@@ -270,6 +270,48 @@ describe('schema validation', () => {
     }
   })
 
+  test('a UI publication after a commit carries the committed document, not the stale one', () => {
+    // Regression check for the publish ordering bug: commit() must move the
+    // state ref ahead before returning, so a UI patch fired on the same tick
+    // publishes the committed document instead of rewinding the peer's
+    // pixels, dirty flag and undo stack to the pre-commit state.
+    const base = newDocState(16, 'x')
+    const view = {
+      tool: 'Paint',
+      color: 1,
+      page: false,
+      sheet: null,
+      actionId: null,
+      renameTarget: null,
+      nameInput: '',
+      deleteId: null,
+      editSlot: 0,
+      newName: '',
+      newSize: '16 x 16',
+      pending: null
+    }
+    const stateRef = { current: base }
+    const writes: string[] = []
+    const publish = (st: typeof base, v: typeof view) => writes.push(serializeShared({ by: 'me', ...st, view: v }))
+    const commit = (next: typeof base, v: typeof view) => {
+      stateRef.current = next
+      publish(next, v)
+    }
+    const patchUi = (v: typeof view) => publish(stateRef.current, v)
+    const committed = { ...base, work: withEdit(base.work, [{ i: 0, from: EMPTY, to: 2 }]), dirty: true }
+    commit(committed, view)
+    patchUi({ ...view, tool: 'Erase' })
+    const last = parseShared(writes.at(-1)!)
+    expect(last?.work.doc.cells[0]).toBe(2)
+    expect(last?.work.undo.length).toBe(1)
+    expect(last?.dirty).toBe(true)
+    expect(last?.view?.tool).toBe('Erase')
+    // The rewinding shape this guard exists to catch: publishing the pre-commit
+    // state after the edit would drop the painted cell for the other display.
+    const rewound = parseShared(serializeShared({ by: 'me', ...base, view: { ...view, tool: 'Erase' } }))
+    expect(rewound?.work.doc.cells[0]).toBe(EMPTY)
+  })
+
   test('parseGallery drops corrupt items but keeps good ones', () => {
     const good = { id: 'g', updatedAt: 3, doc: doc() }
     const wire = JSON.stringify({
