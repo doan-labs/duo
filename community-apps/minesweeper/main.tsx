@@ -39,14 +39,17 @@ const ME = crypto.randomUUID()
 function Seg({
   options,
   value,
-  onChange
+  onChange,
+  stacked
 }: {
   options: readonly string[]
   value: string
   onChange: (value: string) => void
+  /** Stack segments vertically; the rail is too narrow for a three-wide row. */
+  stacked?: boolean
 }) {
   return (
-    <div role="radiogroup" aria-label="Difficulty" {...stylex.props(styles.segTrack)}>
+    <div role="radiogroup" aria-label="Difficulty" {...stylex.props(styles.segTrack, stacked && styles.segRail)}>
       {options.map((o) => (
         <button
           key={o}
@@ -231,8 +234,9 @@ function Minesweeper() {
         options={PRESETS.map((p) => p.label)}
         value={preset.label}
         onChange={(label) => restart(PRESETS.find((p) => p.label === label)!.id)}
+        stacked={wide}
       />
-      <div {...stylex.props(styles.controls, wide && styles.controlsWide)}>
+      <div {...stylex.props(styles.controls, wide ? styles.controlsWide : styles.controlsCover)}>
         <button
           type="button"
           aria-pressed={flagMode}
@@ -240,7 +244,7 @@ function Minesweeper() {
           onClick={toggleFlagMode}
           {...stylex.props(styles.action, flagMode && styles.actionOn)}
         >
-          <FlagGlyph />
+          <FlagGlyph button />
           Flag
         </button>
         <button type="button" onClick={() => restart()} {...stylex.props(styles.action)}>
@@ -323,7 +327,7 @@ function Minesweeper() {
 
   return (
     <main ref={rootRef} {...stylex.props(dark, styles.root, !wide && styles.rootCover)}>
-      <header {...stylex.props(styles.header)}>
+      <header {...stylex.props(styles.header, !wide && styles.headerCover)}>
         <div {...stylex.props(styles.brand)}>
           <span {...stylex.props(styles.kicker)}>Duo Arcade</span>
           <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>Minesweeper</h1>

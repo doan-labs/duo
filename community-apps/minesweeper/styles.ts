@@ -64,6 +64,8 @@ export const styles = stylex.create({
     gap: space.md,
     flexShrink: 0
   },
+  // Cover: the scores drop under the wordmark instead of crowding it out.
+  headerCover: { flexWrap: 'wrap', rowGap: space.xs },
   brand: { display: 'flex', flexDirection: 'column', gap: space.xxs, minWidth: 0 },
   kicker: {
     color: colors.yellowDark,
@@ -150,6 +152,8 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   railCover: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', width: '100%', gap: space.sm },
+  // The narrow rail cannot hold three segments side by side; they stack.
+  segRail: { flexDirection: 'column', alignItems: 'stretch' },
   fieldLabel: {
     color: app.label2,
     fontSize: typeScale.caption2,
@@ -195,6 +199,7 @@ export const styles = stylex.create({
   segLabel: { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   controls: { display: 'flex', gap: space.sm, flexShrink: 0 },
   controlsWide: { flexDirection: 'column', alignItems: 'stretch' },
+  controlsCover: { width: '100%' },
   action: {
     display: 'flex',
     alignItems: 'center',
@@ -264,6 +269,8 @@ export const styles = stylex.create({
   cellLocked: { cursor: 'default' },
   digit: { display: 'block', pointerEvents: 'none' },
   glyph: { display: 'block', width: '72%', height: '72%', pointerEvents: 'none' },
+  // Inside a button the glyph tracks the label size instead of the button's.
+  glyphBtn: { width: '1.1em', height: '1.1em' },
   flagInk: { color: colors.redDark },
   flagOnCell: {
     animationName: { default: flagIn, [reduce]: 'none' },
