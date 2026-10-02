@@ -109,6 +109,10 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2
   },
   chipLabelBest: { color: colors.yellowDark },
+  // Cover chips share the header's second line; keep them short so the
+  // wordmark, chips, board and controls all fit the cover height.
+  chipCover: { minWidth: 44, paddingBlock: space.xxs, paddingInline: space.xs },
+  chipValueCover: { fontSize: typeScale.headline, lineHeight: leading.headline },
   chipValue: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.title3,

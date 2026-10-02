@@ -14,10 +14,12 @@ export function fitLayout(view: ViewDimensions, wide: boolean) {
   const padX = wide ? 40 : 24
   const top = wide ? 16 : 12
   const bottom = wide ? 32 : 24
-  const header = wide ? 56 : 54
-  const gaps = wide ? 24 : 32
+  // Cover header wraps the score chips onto a second line; rail stacks the
+  // segments over the buttons, and the hint row sits under it.
+  const header = wide ? 56 : 112
+  const gaps = wide ? 24 : 48
   const railWide = 200
-  const railCover = 96
+  const railCover = 124
   const width = view.width || 790
   const height = view.height || 555
   const freeH = height - top - header - bottom - gaps

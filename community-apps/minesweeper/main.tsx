@@ -213,17 +213,19 @@ function Minesweeper() {
 
   const chips = (
     <div {...stylex.props(styles.scores)}>
-      <div {...stylex.props(styles.chip)}>
+      <div {...stylex.props(styles.chip, !wide && styles.chipCover)}>
         <span {...stylex.props(styles.chipLabel)}>MINES</span>
-        <strong {...stylex.props(styles.chipValue)}>{minesLeft(game)}</strong>
+        <strong {...stylex.props(styles.chipValue, !wide && styles.chipValueCover)}>{minesLeft(game)}</strong>
       </div>
-      <div {...stylex.props(styles.chip)}>
+      <div {...stylex.props(styles.chip, !wide && styles.chipCover)}>
         <span {...stylex.props(styles.chipLabel)}>TIME</span>
-        <strong {...stylex.props(styles.chipValue)}>{formatClock(seconds)}</strong>
+        <strong {...stylex.props(styles.chipValue, !wide && styles.chipValueCover)}>{formatClock(seconds)}</strong>
       </div>
-      <div {...stylex.props(styles.chip)}>
+      <div {...stylex.props(styles.chip, !wide && styles.chipCover)}>
         <span {...stylex.props(styles.chipLabel, styles.chipLabelBest)}>BEST</span>
-        <strong {...stylex.props(styles.chipValue)}>{best === null ? '-' : formatClock(best)}</strong>
+        <strong {...stylex.props(styles.chipValue, !wide && styles.chipValueCover)}>
+          {best === null ? '-' : formatClock(best)}
+        </strong>
       </div>
     </div>
   )
