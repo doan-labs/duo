@@ -1,7 +1,23 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, HStack, IconButton, Segmented, Sheet, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
-import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
+import {
+  animations,
+  Button,
+  HStack,
+  IconButton,
+  List,
+  Page,
+  Push,
+  Row,
+  Section,
+  Segmented,
+  Sheet,
+  Sym,
+  TextField,
+  useDisplay,
+  useWide
+} from '@doan-labs/duo-uikit'
+import { dark, delay, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import {
@@ -57,7 +73,7 @@ const ME = crypto.randomUUID()
 
 type Tool = 'Paint' | 'Fill' | 'Erase' | 'Pick'
 const TOOLS: readonly Tool[] = ['Paint', 'Fill', 'Erase', 'Pick']
-type SheetKind = 'gallery' | 'new' | 'rename' | 'clear' | 'palette'
+type SheetKind = 'new' | 'rename' | 'clear' | 'palette' | 'item'
 type SizeLabel = '16 x 16' | '32 x 32'
 const SIZE_LABELS: readonly SizeLabel[] = ['16 x 16', '32 x 32']
 const SIZE_BY_LABEL: Record<SizeLabel, CanvasSize> = { '16 x 16': 16, '32 x 32': 32 }
@@ -147,6 +163,8 @@ function PixelStudio() {
   const [color, setColor] = useState(1)
   const [focus, setFocus] = useState(-1)
   const [sheet, setSheet] = useState<SheetKind | null>(null)
+  const [page, setPage] = useState(false)
+  const [actionId, setActionId] = useState<string | null>(null)
   const [renameTarget, setRenameTarget] = useState<string | null>(null)
   const [nameInput, setNameInput] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -362,7 +380,7 @@ function PixelStudio() {
 
   const openItem = (item: GalleryItem) => {
     commit({ work: newWork(item.doc), galleryId: item.id, dirty: false })
-    setSheet(null)
+    setPage(false)
     setDeleteId(null)
     setFocus(-1)
   }
@@ -370,6 +388,7 @@ function PixelStudio() {
   const createDoc = () => {
     const name = (newName.trim() || 'Untitled').slice(0, MAX_NAME)
     commit({ work: newWork(newDoc(SIZE_BY_LABEL[newSize], name)), galleryId: null, dirty: false })
+    setPage(false)
     setSheet(null)
     setNewName('')
     setFocus(-1)
@@ -429,8 +448,19 @@ function PixelStudio() {
     setSheet('rename')
   }
 
+  const emptyBoard = !!doc && doc.cells.every((value) => value === EMPTY)
+
   const board = doc && (
     <div {...stylex.props(styles.boardWrap)}>
+      {emptyBoard && (
+        <div aria-hidden="true" {...stylex.props(styles.boardEmpty)}>
+          <div {...stylex.props(styles.boardEmptyCard)}>
+            <Sym name="handwriting" size={22} />
+            <span {...stylex.props(styles.boardEmptyTitle)}>Tap or drag to paint</span>
+            <span {...stylex.props(styles.boardEmptyHint)}>Pick a colour, then draw. Arrows and Space work too.</span>
+          </div>
+        </div>
+      )}
       <div
         ref={boardRef}
         role="grid"
@@ -467,10 +497,10 @@ function PixelStudio() {
   const toolbar = (
     <div {...stylex.props(styles.toolbar)}>
       <Segmented options={TOOLS} value={tool} onChange={setTool} aria-label="Drawing tool" />
-      <div {...stylex.props(styles.toolActions)}>
+      <div {...stylex.props(styles.toolCluster)}>
         <IconButton
           name="undo"
-          variant="tinted"
+          variant="plain"
           aria-label="Undo"
           disabled={!state?.work.undo.length}
           onClick={() => {
@@ -479,7 +509,7 @@ function PixelStudio() {
         />
         <IconButton
           name="undo"
-          variant="tinted"
+          variant="plain"
           aria-label="Redo"
           xstyle={styles.redoFlip}
           disabled={!state?.work.redo.length}
@@ -487,7 +517,7 @@ function PixelStudio() {
             if (state) commit({ ...state, work: redoWork(state.work), dirty: true })
           }}
         />
-        <IconButton name="trashOutline" variant="tinted" aria-label="Clear canvas" onClick={() => setSheet('clear')} />
+        <IconButton name="trashOutline" variant="plain" aria-label="Clear canvas" onClick={() => setSheet('clear')} />
       </div>
     </div>
   )
@@ -496,7 +526,14 @@ function PixelStudio() {
     <section {...stylex.props(styles.section)} aria-label="Palette">
       <div {...stylex.props(styles.sectionHead)}>
         <span>PALETTE</span>
-        <IconButton name="compose" aria-label="Edit palette" onClick={() => setSheet('palette')} />
+        <button
+          type="button"
+          aria-label="Edit palette"
+          onClick={() => setSheet('palette')}
+          {...stylex.props(styles.sectionEdit)}
+        >
+          Edit
+        </button>
       </div>
       <div {...stylex.props(styles.palette)}>
         {doc.palette.map((swatch, i) => (
@@ -520,11 +557,11 @@ function PixelStudio() {
         {doc.palette.length < TOKEN_SWATCHES.length && (
           <button
             type="button"
-            aria-label="Edit palette"
+            aria-label="Add a colour to the palette"
             onClick={() => setSheet('palette')}
             {...stylex.props(shared.press, styles.swatch, styles.swatchAdd)}
           >
-            +
+            <Sym name="plus" size={16} />
           </button>
         )}
       </div>
@@ -536,10 +573,12 @@ function PixelStudio() {
       <Mosaic doc={doc} liveCells={liveCells ?? undefined} />
       <div {...stylex.props(styles.previewMeta)}>
         <span {...stylex.props(styles.previewLabel)}>PREVIEW</span>
-        <span {...stylex.props(styles.previewDetail)}>{doc.name}</span>
-        <span {...stylex.props(styles.previewSub)}>
-          {doc.size} x {doc.size} - {tool}
-          {tool === 'Paint' || tool === 'Fill' ? `, ${swatchLabel(doc.palette[color] ?? 'black')}` : ''}
+        <span key={`${doc.id}:${tool}:${color}`} {...stylex.props(styles.previewDetailWrap)}>
+          <span {...stylex.props(shared.swap, styles.previewDetail)}>{doc.name}</span>
+          <span {...stylex.props(shared.swap, styles.previewSub)}>
+            {doc.size} x {doc.size} - {tool}
+            {tool === 'Paint' || tool === 'Fill' ? `, ${swatchLabel(doc.palette[color] ?? 'black')}` : ''}
+          </span>
         </span>
       </div>
     </div>
@@ -547,64 +586,138 @@ function PixelStudio() {
 
   const status = (
     <small role="status" {...stylex.props(styles.status)}>
-      {statusText}
+      <span key={statusText} {...stylex.props(shared.swap)}>
+        {statusText}
+      </span>
     </small>
+  )
+
+  const newCanvas = () => {
+    setNewName('')
+    setNewSize('16 x 16')
+    setSheet('new')
+  }
+
+  const galleryPage = (
+    <Page title="Gallery" back={() => setPage(false)}>
+      {gallery.length ? (
+        <Section>
+          <List>
+            {gallery.map((item, i) => (
+              <div key={item.id} {...stylex.props(styles.galleryItem, animations.row, delay.ms(i * 40))}>
+                {deleteId === item.id ? (
+                  <Row
+                    as="div"
+                    icon={<Mosaic doc={item.doc} thumb />}
+                    label={`Delete "${item.doc.name}"?`}
+                    detail={
+                      <HStack gap={4}>
+                        <Button variant="plain" onClick={() => setDeleteId(null)}>
+                          Cancel
+                        </Button>
+                        <Button variant="filled" onClick={() => removeItem(item.id)}>
+                          Delete
+                        </Button>
+                      </HStack>
+                    }
+                  />
+                ) : (
+                  <>
+                    <Row
+                      as="button"
+                      xstyle={styles.galleryOpenRow}
+                      onClick={() => openItem(item)}
+                      icon={<Mosaic doc={item.doc} thumb />}
+                      label={item.doc.name}
+                      subtitle={
+                        <span>
+                          {item.doc.size} x {item.doc.size} - {new Date(item.updatedAt).toLocaleDateString()}
+                        </span>
+                      }
+                      detail={state?.galleryId === item.id ? 'Open' : undefined}
+                    />
+                    <IconButton
+                      name="ellipsis"
+                      aria-label={`Actions for ${item.doc.name}`}
+                      aria-expanded={sheet === 'item' && actionId === item.id}
+                      onClick={() => {
+                        setActionId(item.id)
+                        setSheet('item')
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+            ))}
+          </List>
+        </Section>
+      ) : (
+        <div {...stylex.props(styles.galleryEmpty)}>
+          <span {...stylex.props(styles.galleryEmptyIcon)}>
+            <Sym name="grid" size={28} />
+          </span>
+          <span>No saved creations yet</span>
+          <span>Draw something, then save it here to keep it on this device.</span>
+        </div>
+      )}
+      <div {...stylex.props(styles.galleryFoot)}>
+        <Button variant="tinted" onClick={newCanvas}>
+          New canvas
+        </Button>
+        <Button variant="filled" disabled={!state} onClick={saveDoc}>
+          Save current
+        </Button>
+      </div>
+    </Page>
   )
 
   return (
     <main ref={rootRef} {...stylex.props(dark, styles.root)}>
       <header {...stylex.props(styles.header)}>
-        <div {...stylex.props(styles.brand)}>
-          <span {...stylex.props(styles.kicker)}>DUO ATELIER</span>
-          <button
-            type="button"
-            aria-label="Rename this canvas"
-            onClick={() => openRename(null)}
-            {...stylex.props(styles.docName)}
-          >
-            <span {...stylex.props(styles.docNameText)}>{doc?.name ?? 'Pixel Studio'}</span>
-            {state?.dirty ? <span role="img" aria-label="Unsaved changes" {...stylex.props(styles.dirty)} /> : null}
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-label="Rename this canvas"
+          onClick={() => openRename(null)}
+          {...stylex.props(styles.docName)}
+        >
+          <span {...stylex.props(styles.docNameText)}>{doc?.name ?? 'Pixel Studio'}</span>
+          <span {...stylex.props(styles.docCaret)}>
+            <Sym name="down" size={10} />
+          </span>
+          {state?.dirty ? <span role="img" aria-label="Unsaved changes" {...stylex.props(styles.dirty)} /> : null}
+        </button>
         <div {...stylex.props(styles.headerActions)}>
           <IconButton
             name="collections"
             variant="tinted"
             aria-label="Gallery"
-            aria-expanded={sheet === 'gallery'}
-            onClick={() => setSheet('gallery')}
+            aria-expanded={page}
+            onClick={() => setPage(true)}
           />
-          <IconButton
-            name="plus"
-            variant="tinted"
-            aria-label="New canvas"
-            onClick={() => {
-              setNewName('')
-              setNewSize('16 x 16')
-              setSheet('new')
-            }}
-          />
+          <IconButton name="plus" variant="tinted" aria-label="New canvas" onClick={newCanvas} />
         </div>
       </header>
-      {wide ? (
-        <section {...stylex.props(styles.stage, styles.stageWide)}>
-          <div {...stylex.props(styles.canvasCol)}>{board}</div>
-          <div {...stylex.props(styles.rail)}>
+      <Push open={page} sheet={galleryPage}>
+        {wide ? (
+          <section {...stylex.props(styles.stage, styles.stageWide)}>
+            <div {...stylex.props(styles.canvasCol)}>{board}</div>
+            <div {...stylex.props(styles.rail)}>
+              {toolbar}
+              {paletteSection}
+              {preview}
+              {status}
+            </div>
+          </section>
+        ) : (
+          <section {...stylex.props(styles.stage)}>
+            {board}
             {toolbar}
             {paletteSection}
             {preview}
             {status}
-          </div>
-        </section>
-      ) : (
-        <section {...stylex.props(styles.stage)}>
-          {board}
-          {toolbar}
-          {paletteSection}
-          {preview}
-          {status}
-        </section>
-      )}
+          </section>
+        )}
+      </Push>
 
       <Sheet open={sheet === 'clear'} onClose={() => setSheet(null)} aria-label="Clear canvas">
         <div {...stylex.props(styles.sheetBody)}>
@@ -744,72 +857,45 @@ function PixelStudio() {
         </div>
       </Sheet>
 
-      <Sheet open={sheet === 'gallery'} onClose={() => setSheet(null)} aria-label="Saved creations">
+      <Sheet
+        open={sheet === 'item'}
+        onClose={() => {
+          setSheet(null)
+          setActionId(null)
+        }}
+        aria-label="Creation actions"
+      >
         <div {...stylex.props(styles.sheetBody)}>
-          <h2 {...stylex.props(styles.sheetTitle)}>Gallery</h2>
-          {gallery.length ? (
-            <div {...stylex.props(styles.galleryList)}>
-              {gallery.map((item) =>
-                deleteId === item.id ? (
-                  <div key={item.id} {...stylex.props(styles.galleryRow)}>
-                    <span {...stylex.props(styles.galleryMeta)}>
-                      <span {...stylex.props(styles.galleryName)}>Delete "{item.doc.name}"?</span>
-                    </span>
-                    <Button variant="plain" onClick={() => setDeleteId(null)}>
-                      Cancel
-                    </Button>
-                    <Button variant="filled" onClick={() => removeItem(item.id)}>
-                      Delete
-                    </Button>
-                  </div>
-                ) : (
-                  <div key={item.id} {...stylex.props(styles.galleryRow)}>
-                    <button
-                      type="button"
-                      onClick={() => openItem(item)}
-                      {...stylex.props(shared.press, styles.galleryOpen)}
-                    >
-                      <Mosaic doc={item.doc} thumb />
-                      <span {...stylex.props(styles.galleryMeta)}>
-                        <span {...stylex.props(styles.galleryName)}>
-                          {item.doc.name}
-                          {state?.galleryId === item.id ? ' - open' : ''}
-                        </span>
-                        <span {...stylex.props(styles.galleryDetail)}>
-                          {item.doc.size} x {item.doc.size} - {new Date(item.updatedAt).toLocaleDateString()}
-                        </span>
-                      </span>
-                    </button>
-                    <IconButton
-                      name="compose"
-                      aria-label={`Rename ${item.doc.name}`}
-                      onClick={() => openRename(item.id)}
-                    />
-                    <IconButton
-                      name="trashOutline"
-                      aria-label={`Delete ${item.doc.name}`}
-                      onClick={() => setDeleteId(item.id)}
-                    />
-                  </div>
-                )
-              )}
-            </div>
-          ) : (
-            <p {...stylex.props(styles.galleryEmpty)}>No saved creations yet. Save the current canvas to keep it.</p>
-          )}
-          <div {...stylex.props(styles.sheetActions)}>
+          <h2 {...stylex.props(styles.sheetTitle)}>{gallery.find((i) => i.id === actionId)?.doc.name ?? 'Creation'}</h2>
+          <div {...stylex.props(styles.actionStack)}>
             <Button
               variant="tinted"
               onClick={() => {
-                setNewName('')
-                setNewSize('16 x 16')
-                setSheet('new')
+                setSheet(null)
+                openRename(actionId)
               }}
             >
-              New canvas
+              Rename
             </Button>
-            <Button variant="filled" disabled={!state} onClick={saveDoc}>
-              Save current
+            <Button
+              variant="plain"
+              xstyle={styles.actionDanger}
+              onClick={() => {
+                setDeleteId(actionId)
+                setSheet(null)
+                setActionId(null)
+              }}
+            >
+              Delete
+            </Button>
+            <Button
+              variant="plain"
+              onClick={() => {
+                setSheet(null)
+                setActionId(null)
+              }}
+            >
+              Cancel
             </Button>
           </div>
         </div>

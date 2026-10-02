@@ -26,14 +26,9 @@ export const styles = stylex.create({
     position: 'absolute',
     inset: 0,
     boxSizing: 'border-box',
-    overflowY: 'auto',
+    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    gap: space.md,
-    paddingTop: space.xl,
-    paddingRight: space.xl,
-    paddingBottom: `calc(${space.xxxl} + ${space.xl})`,
-    paddingLeft: space.xl,
     fontFamily: fonts.system,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
@@ -47,20 +42,11 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.sm,
-    flexShrink: 0
-  },
-  brand: {
-    minWidth: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: space.xxs
-  },
-  kicker: {
-    color: colors.cyanDark,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
-    fontWeight: weight.semibold
+    flexShrink: 0,
+    paddingTop: space.xl,
+    paddingRight: space.xl,
+    paddingBottom: space.sm,
+    paddingLeft: space.xl
   },
   docName: {
     minWidth: 0,
@@ -69,6 +55,7 @@ export const styles = stylex.create({
     gap: space.xs,
     padding: 0,
     borderWidth: 0,
+    borderRadius: radius.sm,
     backgroundColor: 'transparent',
     color: 'inherit',
     fontFamily: fonts.rounded,
@@ -77,12 +64,21 @@ export const styles = stylex.create({
     letterSpacing: tracking.title2,
     fontWeight: weight.semibold,
     cursor: 'pointer',
-    textAlign: 'start'
+    textAlign: 'start',
+    transitionProperty: 'transform, color',
+    transitionDuration: motion.pressDuration,
+    transform: { default: 'scale(1)', ':active': motion.press }
   },
   docNameText: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap'
+  },
+  docCaret: {
+    flexShrink: 0,
+    color: app.label3,
+    display: 'grid',
+    placeItems: 'center'
   },
   dirty: {
     flexShrink: 0,
@@ -99,10 +95,16 @@ export const styles = stylex.create({
   },
   stage: {
     minWidth: 0,
+    minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: space.md,
-    flexGrow: 1
+    flexGrow: 1,
+    overflowY: 'auto',
+    paddingTop: space.xs,
+    paddingRight: space.xl,
+    paddingBottom: `calc(${space.xxxl} + ${space.xl})`,
+    paddingLeft: space.xl
   },
   stageWide: {
     display: 'grid',
@@ -117,6 +119,7 @@ export const styles = stylex.create({
     gap: space.md
   },
   boardWrap: {
+    position: 'relative',
     padding: space.sm,
     borderRadius: radius.xl,
     backgroundColor: app.surface,
@@ -139,7 +142,7 @@ export const styles = stylex.create({
     cursor: 'crosshair',
     outlineWidth: { default: 0, ':focus-visible': 2 },
     outlineStyle: 'solid',
-    outlineColor: colors.cyanDark,
+    outlineColor: app.link,
     outlineOffset: 2
   },
   boardGrid: (size: number) => ({
@@ -147,12 +150,46 @@ export const styles = stylex.create({
     gridTemplateRows: `repeat(${size}, minmax(0, 1fr))`,
     gap: space.xxs
   }),
+  boardEmpty: {
+    position: 'absolute',
+    inset: 0,
+    display: 'grid',
+    placeItems: 'center',
+    pointerEvents: 'none',
+    color: app.label3
+  },
+  boardEmptyCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingBlock: space.lg,
+    paddingInline: space.xl,
+    borderRadius: radius.lg,
+    backgroundColor: app.surface
+  },
+  boardEmptyTitle: {
+    color: app.label2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.medium
+  },
+  boardEmptyHint: {
+    color: app.label3,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1
+  },
   cell: {
     minWidth: 0,
     minHeight: 0,
     padding: 0,
     borderWidth: 0,
-    backgroundColor: app.fill3
+    backgroundColor: app.fill3,
+    transitionProperty: 'background-color',
+    transitionDuration: motion.pressDuration,
+    transitionTimingFunction: easing.pop
   },
   cellPaint: (color: string) => ({
     backgroundColor: color
@@ -160,7 +197,7 @@ export const styles = stylex.create({
   cellFocus: {
     outlineWidth: 2,
     outlineStyle: 'solid',
-    outlineColor: colors.cyanDark,
+    outlineColor: app.link,
     outlineOffset: -2
   },
   toolbar: {
@@ -170,10 +207,13 @@ export const styles = stylex.create({
     gap: space.sm,
     flexWrap: 'wrap'
   },
-  toolActions: {
+  toolCluster: {
     display: 'flex',
     alignItems: 'center',
-    gap: space.xs
+    gap: space.xxs,
+    padding: space.xxs,
+    borderRadius: radius.md,
+    backgroundColor: app.fill
   },
   redoFlip: {
     transform: 'scaleX(-1)'
@@ -195,27 +235,47 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption1,
     fontWeight: weight.medium
   },
+  sectionEdit: {
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    color: app.link,
+    fontFamily: fonts.system,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
+    fontWeight: weight.medium,
+    cursor: 'pointer',
+    transitionProperty: 'transform',
+    transitionDuration: motion.pressDuration,
+    transform: { default: 'scale(1)', ':active': motion.press }
+  },
   palette: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: space.sm
   },
   swatch: {
-    width: 28,
-    height: 28,
+    width: 44,
+    height: 44,
     padding: 0,
     borderWidth: 1,
     borderStyle: 'solid',
     borderColor: app.separator,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     cursor: 'pointer',
-    flexShrink: 0
+    flexShrink: 0,
+    transitionProperty: 'transform, outline-color',
+    transitionDuration: { default: motion.pressDuration, [reduce]: '0s' },
+    transitionTimingFunction: easing.pop
   },
   swatchOn: {
     outlineWidth: 2,
     outlineStyle: 'solid',
-    outlineColor: colors.cyanDark,
-    outlineOffset: 1
+    outlineColor: app.link,
+    outlineOffset: 2,
+    transform: 'scale(1.1)'
   },
   swatchAdd: {
     display: 'grid',
@@ -270,6 +330,13 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     fontWeight: weight.semibold
   },
+  previewDetailWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+    minWidth: 0,
+    overflow: 'hidden'
+  },
   previewDetail: {
     color: app.fg,
     fontSize: typeScale.subheadline,
@@ -317,37 +384,56 @@ export const styles = stylex.create({
     justifyContent: 'flex-end',
     gap: space.sm
   },
+  actionStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.xs
+  },
+  actionDanger: {
+    color: colors.redDark
+  },
   sheetField: {
     width: '100%'
   },
-  galleryList: {
+  galleryEmpty: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.xs,
-    maxHeight: 320,
-    overflowY: 'auto'
-  },
-  galleryRow: {
-    display: 'flex',
     alignItems: 'center',
     gap: space.sm,
-    padding: space.xs,
-    borderRadius: radius.md
+    paddingBlock: space.xxl,
+    paddingInline: space.lg,
+    textAlign: 'center',
+    color: app.label2,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline
   },
-  galleryOpen: {
-    minWidth: 0,
+  galleryEmptyIcon: {
+    color: app.label3
+  },
+  galleryItem: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: app.surface,
+    borderBottomWidth: { default: 1, ':last-child': 0 },
+    borderBottomStyle: 'solid',
+    borderBottomColor: app.separator
+  },
+  galleryOpenRow: {
     flexGrow: 1,
+    minWidth: 0,
+    borderBottomWidth: 0
+  },
+  galleryFoot: {
+    flexShrink: 0,
     display: 'flex',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: space.sm,
-    padding: space.xs,
-    borderWidth: 0,
-    borderRadius: radius.md,
-    backgroundColor: 'transparent',
-    color: 'inherit',
-    fontFamily: fonts.system,
-    textAlign: 'start',
-    cursor: 'pointer'
+    paddingTop: space.sm,
+    paddingRight: space.lg,
+    paddingBottom: space.lg,
+    paddingLeft: space.lg
   },
   galleryThumb: {
     flexShrink: 0,
@@ -357,36 +443,6 @@ export const styles = stylex.create({
     borderRadius: radius.xs,
     overflow: 'hidden',
     backgroundColor: app.fill2
-  },
-  galleryMeta: {
-    minWidth: 0,
-    flexGrow: 1,
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  galleryName: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    fontSize: typeScale.subheadline,
-    lineHeight: leading.subheadline,
-    letterSpacing: tracking.subheadline,
-    fontWeight: weight.medium
-  },
-  galleryDetail: {
-    color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2
-  },
-  galleryEmpty: {
-    marginBlock: 0,
-    color: app.label2,
-    fontSize: typeScale.subheadline,
-    lineHeight: leading.subheadline,
-    letterSpacing: tracking.subheadline,
-    textAlign: 'center',
-    paddingBlock: space.md
   },
   catalogGrid: {
     display: 'grid',
@@ -421,7 +477,7 @@ export const styles = stylex.create({
   catalogOn: {
     outlineWidth: 2,
     outlineStyle: 'solid',
-    outlineColor: colors.cyanDark,
+    outlineColor: app.link,
     outlineOffset: 1
   },
   slotRow: {
@@ -430,13 +486,16 @@ export const styles = stylex.create({
     gap: space.sm
   },
   slotChip: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     padding: 0,
     borderWidth: 1,
     borderStyle: 'solid',
     borderColor: app.separator,
     borderRadius: radius.sm,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transitionProperty: 'transform, outline-color',
+    transitionDuration: { default: motion.pressDuration, [reduce]: '0s' },
+    transitionTimingFunction: easing.pop
   }
 })
