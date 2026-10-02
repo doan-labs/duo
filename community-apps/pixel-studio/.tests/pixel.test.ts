@@ -236,6 +236,40 @@ describe('schema validation', () => {
     expect(parseShared(JSON.stringify({ ...state, by: 4 }))).toBeNull()
   })
 
+  test('parseShared keeps a good view payload and drops a malformed one', () => {
+    const state = newDocState(16, 'x')
+    const view = {
+      tool: 'Erase',
+      color: 3,
+      page: true,
+      sheet: 'rename',
+      actionId: 'a',
+      renameTarget: 'g',
+      nameInput: 'draft',
+      deleteId: null,
+      editSlot: 2,
+      newName: 'next',
+      newSize: '32 x 32',
+      pending: { type: 'open', id: 'g' }
+    }
+    const withView = parseShared(serializeShared({ by: 'w', ...state, view }))
+    expect(withView?.view?.tool).toBe('Erase')
+    expect(withView?.view?.pending?.id).toBe('g')
+    // Bad view fields invalidate only the view, never the draft beside it.
+    const wire = (v: unknown) => JSON.stringify({ by: 'w', ...state, view: v })
+    const dropped = parseShared(wire({ ...view, color: -1 }))
+    expect(dropped).not.toBeNull()
+    expect(dropped?.view).toBeUndefined()
+    expect(dropped?.work.doc.name).toBe('x')
+    for (const v of [
+      { ...view, tool: '' },
+      { ...view, page: 'yes' },
+      { ...view, pending: { type: 'wild', id: null } }
+    ]) {
+      expect(parseShared(wire(v))?.view).toBeUndefined()
+    }
+  })
+
   test('parseGallery drops corrupt items but keeps good ones', () => {
     const good = { id: 'g', updatedAt: 3, doc: doc() }
     const wire = JSON.stringify({

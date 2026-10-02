@@ -37,6 +37,13 @@ export const styles = stylex.create({
     color: app.fg,
     backgroundColor: app.bg
   },
+  /** App chrome below the header-level sheets; goes inert while one is open. */
+  appShell: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minHeight: 0
+  },
   header: {
     display: 'flex',
     alignItems: 'center',
@@ -50,10 +57,12 @@ export const styles = stylex.create({
   },
   docName: {
     minWidth: 0,
+    minHeight: 44,
     display: 'flex',
     alignItems: 'center',
     gap: space.xs,
     padding: 0,
+    paddingRight: space.sm,
     borderWidth: 0,
     borderRadius: radius.sm,
     backgroundColor: 'transparent',
@@ -202,18 +211,73 @@ export const styles = stylex.create({
   },
   toolbar: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.sm,
-    flexWrap: 'wrap'
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: space.sm
+  },
+  toolGroup: {
+    display: 'flex',
+    padding: space.xxs,
+    borderRadius: radius.md,
+    backgroundColor: app.fill
+  },
+  toolSeg: {
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    height: 44,
+    padding: 0,
+    paddingInline: space.xs,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    fontFamily: fonts.system,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    cursor: 'pointer',
+    transitionProperty: 'background-color',
+    transitionDuration: motion.pressDuration
+  },
+  toolSegOn: {
+    backgroundColor: app.control,
+    boxShadow: shadow.card
   },
   toolCluster: {
+    alignSelf: 'flex-end',
     display: 'flex',
     alignItems: 'center',
     gap: space.xxs,
     padding: space.xxs,
     borderRadius: radius.md,
     backgroundColor: app.fill
+  },
+  hit44: {
+    minHeight: 44,
+    paddingInline: space.lg
+  },
+  icon44: {
+    width: 44,
+    height: 44
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: `calc(-1 * ${space.sm})`,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    color: app.link,
+    fontFamily: fonts.system,
+    cursor: 'pointer'
+  },
+  btnDanger: {
+    backgroundColor: colors.redDark,
+    color: colors.white
   },
   redoFlip: {
     transform: 'scaleX(-1)'
@@ -236,7 +300,11 @@ export const styles = stylex.create({
     fontWeight: weight.medium
   },
   sectionEdit: {
+    minWidth: 44,
+    minHeight: 44,
     padding: 0,
+    paddingInline: space.sm,
+    marginRight: `calc(-1 * ${space.sm})`,
     borderWidth: 0,
     borderRadius: radius.sm,
     backgroundColor: 'transparent',
@@ -349,6 +417,15 @@ export const styles = stylex.create({
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
     letterSpacing: tracking.caption2
+  },
+  statusBar: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    paddingTop: 0,
+    paddingRight: space.xl,
+    paddingBottom: `calc(${space.xxl} + ${space.sm})`,
+    paddingLeft: space.xl
   },
   status: {
     color: app.label2,

@@ -6,11 +6,9 @@ import {
   HStack,
   IconButton,
   List,
-  Page,
   Push,
   Row,
   Section,
-  Segmented,
   Sheet,
   Sym,
   TextField,
@@ -23,6 +21,7 @@ import * as stylex from '@stylexjs/stylex'
 import {
   memo,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -52,6 +51,7 @@ import {
   recordStroke,
   redoWork,
   removePaletteSlot,
+  type SharedView,
   type SwatchName,
   serializeDocState,
   serializeGallery,
@@ -73,10 +73,12 @@ const ME = crypto.randomUUID()
 
 type Tool = 'Paint' | 'Fill' | 'Erase' | 'Pick'
 const TOOLS: readonly Tool[] = ['Paint', 'Fill', 'Erase', 'Pick']
-type SheetKind = 'new' | 'rename' | 'clear' | 'palette' | 'item'
+type SheetKind = 'new' | 'rename' | 'clear' | 'palette' | 'item' | 'discard'
+const SHEET_KINDS: readonly SheetKind[] = ['new', 'rename', 'clear', 'palette', 'item', 'discard']
 type SizeLabel = '16 x 16' | '32 x 32'
 const SIZE_LABELS: readonly SizeLabel[] = ['16 x 16', '32 x 32']
 const SIZE_BY_LABEL: Record<SizeLabel, CanvasSize> = { '16 x 16': 16, '32 x 32': 32 }
+type PendingSwap = { type: 'open' | 'new'; id: string | null }
 
 /** Palette slots are token names; this app is themed dark, so slots resolve to the dark hues. */
 const SWATCH_COLOR: Record<SwatchName, string> = {
@@ -152,6 +154,134 @@ const Mosaic = memo(function Mosaic({
   )
 })
 
+/** Native radio-group contract: selection follows the arrow keys, one tab stop lands on the checked option. */
+const useRadioKeys = (count: number) => {
+  const refs = useRef<(HTMLElement | null)[]>([])
+  const move = (next: number, select: (i: number) => void) => {
+    if (next < 0 || next >= count) return
+    select(next)
+    refs.current[next]?.focus()
+  }
+  const onKeyDown = (i: number, select: (i: number) => void) => (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      move((i + 1) % count, select)
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      move((i - 1 + count) % count, select)
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      move(0, select)
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      move(count - 1, select)
+    }
+  }
+  const slot = (i: number, selected: boolean) => ({
+    role: 'radio' as const,
+    'aria-checked': selected,
+    tabIndex: selected ? 0 : -1,
+    ref: (el: HTMLElement | null) => {
+      refs.current[i] = el
+    }
+  })
+  return { onKeyDown, slot }
+}
+
+/**
+ * 44-point labelled radio group standing in for the kit Segmented, whose fixed
+ * 22-point options cannot be sized by an app. shared.press keeps the press
+ * feedback; selection and focus move together on the arrow keys.
+ */
+function Choices<T extends string>({
+  options,
+  value,
+  onChange,
+  label
+}: {
+  options: readonly T[]
+  value: T
+  onChange: (next: T) => void
+  label: string
+}) {
+  const keys = useRadioKeys(options.length)
+  return (
+    <div role="radiogroup" aria-label={label} {...stylex.props(styles.toolGroup)}>
+      {options.map((opt, i) => (
+        <button
+          type="button"
+          key={opt}
+          aria-label={opt}
+          onClick={() => onChange(opt)}
+          onKeyDown={keys.onKeyDown(i, (next) => onChange(options[next]!))}
+          {...keys.slot(i, opt === value)}
+          {...stylex.props(shared.press, styles.toolSeg, opt === value && styles.toolSegOn)}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The kit Sheet is a non-modal dialog on purpose, so the app makes the chrome
+ * behind it inert, keeps Tab cycling through the dialog's controls and hands
+ * focus back to the control that opened it.
+ */
+function GuardedSheet({
+  open,
+  onClose,
+  label,
+  children
+}: {
+  open: boolean
+  onClose: () => void
+  label: string
+  children: ReactNode
+}) {
+  const trigger = useRef<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      wasOpen.current = true
+      return
+    }
+    if (!open && wasOpen.current) {
+      wasOpen.current = false
+      if (trigger.current?.isConnected) trigger.current.focus()
+      trigger.current = null
+    }
+  }, [open])
+  useEffect(() => {
+    if (!open) return
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const dialog = document.querySelector('dialog[open]')
+      if (!dialog) return
+      const controls = [...dialog.querySelectorAll<HTMLElement>('button, input, [tabindex]')].filter(
+        (el) => !el.hasAttribute('disabled') && el.tabIndex >= 0
+      )
+      event.preventDefault()
+      if (!controls.length) {
+        ;(dialog as HTMLElement).focus()
+        return
+      }
+      const at = controls.indexOf(document.activeElement as HTMLElement)
+      const next = event.shiftKey ? (at <= 0 ? controls.length - 1 : at - 1) : at === controls.length - 1 ? 0 : at + 1
+      controls[next]!.focus()
+    }
+    document.addEventListener('keydown', trap, true)
+    return () => document.removeEventListener('keydown', trap, true)
+  }, [open])
+  return (
+    <Sheet open={open} onClose={onClose} aria-label={label}>
+      {children}
+    </Sheet>
+  )
+}
+
 function PixelStudio() {
   const [rootRef, wide] = useWide<HTMLElement>()
   const view = useDisplay()
@@ -159,18 +289,7 @@ function PixelStudio() {
   const saved = useKV(os.storage, 'gallery')
   const sharedWork = useKV(os.session, 'work')
   const [state, setState] = useState<DocState | null>(null)
-  const [tool, setTool] = useState<Tool>('Paint')
-  const [color, setColor] = useState(1)
   const [focus, setFocus] = useState(-1)
-  const [sheet, setSheet] = useState<SheetKind | null>(null)
-  const [page, setPage] = useState(false)
-  const [actionId, setActionId] = useState<string | null>(null)
-  const [renameTarget, setRenameTarget] = useState<string | null>(null)
-  const [nameInput, setNameInput] = useState('')
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [editSlot, setEditSlot] = useState(0)
-  const [newName, setNewName] = useState('')
-  const [newSize, setNewSize] = useState<SizeLabel>('16 x 16')
   const [liveCells, setLiveCells] = useState<number[] | null>(null)
 
   const gallery = useMemo(() => parseGallery(saved.value), [saved.value])
@@ -182,10 +301,6 @@ function PixelStudio() {
   const sessionAdopted = useRef(false)
   const stateRef = useRef(state)
   stateRef.current = state
-  const toolRef = useRef(tool)
-  toolRef.current = tool
-  const colorRef = useRef(color)
-  colorRef.current = color
   const sessionRef = useRef(sharedWork)
   sessionRef.current = sharedWork
   const draftRef = useRef(draft)
@@ -194,13 +309,114 @@ function PixelStudio() {
   const doc = state?.work.doc ?? null
   const cells = liveCells ?? doc?.cells ?? []
 
+  // View context - tool, palette slot, open page/sheet and editing drafts - is
+  // mirrored through os.session on every write, so a fold lands the other
+  // display mid-workflow instead of on default controls. Pointer capture and a
+  // live stroke stay per-view: both displays never fight over one stroke.
+  interface UiState {
+    tool: Tool
+    color: number
+    page: boolean
+    sheet: SheetKind | null
+    actionId: string | null
+    renameTarget: string | null
+    nameInput: string
+    deleteId: string | null
+    editSlot: number
+    newName: string
+    newSize: SizeLabel
+    pending: PendingSwap | null
+  }
+  const DEFAULT_UI: UiState = {
+    tool: 'Paint',
+    color: 1,
+    page: false,
+    sheet: null,
+    actionId: null,
+    renameTarget: null,
+    nameInput: '',
+    deleteId: null,
+    editSlot: 0,
+    newName: '',
+    newSize: '16 x 16',
+    pending: null
+  }
+  const [ui, setUi] = useState<UiState>(DEFAULT_UI)
+  const uiRef = useRef(ui)
+  uiRef.current = ui
+
+  const writeShared = useCallback((st: DocState) => {
+    const {
+      tool,
+      color,
+      page,
+      sheet,
+      actionId,
+      renameTarget,
+      nameInput,
+      deleteId,
+      editSlot,
+      newName,
+      newSize,
+      pending
+    } = uiRef.current
+    const view: SharedView = {
+      tool,
+      color,
+      page,
+      sheet,
+      actionId,
+      renameTarget,
+      nameInput,
+      deleteId,
+      editSlot,
+      newName,
+      newSize,
+      pending
+    }
+    sessionRef.current.set(serializeShared({ by: ME, ...st, view }))
+  }, [])
+
+  const patchUi = useCallback(
+    (patch: Partial<UiState>) => {
+      const next = { ...uiRef.current, ...patch }
+      uiRef.current = next
+      setUi(next)
+      const st = stateRef.current
+      if (st) writeShared(st)
+    },
+    [writeShared]
+  )
+
+  const applyUi = useCallback((v: SharedView, paletteLen: number) => {
+    const ui: UiState = {
+      tool: (TOOLS as readonly string[]).includes(v.tool) ? (v.tool as Tool) : 'Paint',
+      color: Math.max(0, Math.min(v.color, Math.max(0, paletteLen - 1))),
+      page: v.page,
+      sheet: (SHEET_KINDS as readonly string[]).includes(v.sheet ?? '') ? (v.sheet as SheetKind) : null,
+      actionId: v.actionId,
+      renameTarget: v.renameTarget,
+      nameInput: v.nameInput,
+      deleteId: v.deleteId,
+      editSlot: v.editSlot,
+      newName: v.newName,
+      newSize: (SIZE_LABELS as readonly string[]).includes(v.newSize) ? (v.newSize as SizeLabel) : '16 x 16',
+      pending: v.pending
+    }
+    uiRef.current = ui
+    setUi(ui)
+  }, [])
+
   // One commit path for every local change: state, the session mirror for the
   // other display and the durable draft, in that order.
-  const commit = useCallback((next: DocState) => {
-    setState(next)
-    sessionRef.current.set(serializeShared({ by: ME, ...next }))
-    void draftRef.current.set(serializeDocState(next))
-  }, [])
+  const commit = useCallback(
+    (next: DocState) => {
+      setState(next)
+      writeShared(next)
+      void draftRef.current.set(serializeDocState(next))
+    },
+    [writeShared]
+  )
 
   const commitEdit = useCallback(
     (edit: CellEdit[]) => {
@@ -223,6 +439,8 @@ function PixelStudio() {
   // Why adopt on the session key: the fold carries the working draft to the
   // other display. A write this copy did not make is the newer state; own
   // writes are already on screen and are ignored. The raw string is the guard.
+  // The doc and view halves always travel together: adopting one without the
+  // other would roll an untouched half backwards.
   useEffect(() => {
     if (sharedWork.status === 'hydrating' || sharedWork.status === 'saving') return
     const raw = sharedWork.value
@@ -232,17 +450,18 @@ function PixelStudio() {
     if (next) {
       if (next.by === ME) return
       sessionAdopted.current = true
-      const { by: _by, ...rest } = next
+      const { by: _by, view: nextView, ...rest } = next
       setState(rest)
       setLiveCells(null)
+      if (nextView) applyUi(nextView, rest.work.doc.palette.length)
       return
     }
     // Empty or malformed session: seed this copy's state once storage has landed.
     if (seeded.current || draft.status === 'hydrating' || !storageSeeded.current) return
     seeded.current = true
     const st = stateRef.current
-    if (st) sessionRef.current.set(serializeShared({ by: ME, ...st }))
-  }, [sharedWork.value, sharedWork.status, draft.status])
+    if (st) writeShared(st)
+  }, [sharedWork.value, sharedWork.status, draft.status, writeShared, applyUi])
 
   // Why once: the durable draft is the record of last session's work, read at
   // mount. After that the session is the live source, so a late storage refresh
@@ -293,19 +512,19 @@ function PixelStudio() {
     const i = cellIndex(event)
     if (i < 0) return
     setFocus(i)
-    const active = toolRef.current
+    const active = uiRef.current.tool
     if (active === 'Pick') {
       const value = s.cells[i]!
-      if (value !== EMPTY) setColor(value)
+      if (value !== EMPTY) patchUi({ color: value })
       return
     }
     if (active === 'Fill') {
-      for (const c of floodFill(s.cells, st.work.doc.size, i, colorRef.current)) {
+      for (const c of floodFill(s.cells, st.work.doc.size, i, uiRef.current.color)) {
         s.edits.set(c.i, c)
         s.cells[c.i] = c.to
       }
     } else {
-      const next = active === 'Erase' ? EMPTY : colorRef.current
+      const next = active === 'Erase' ? EMPTY : uiRef.current.color
       recordStroke(s.edits, s.cells, i, next)
       s.cells[i] = next
     }
@@ -329,9 +548,10 @@ function PixelStudio() {
   const applyAt = (i: number) => {
     const st = stateRef.current
     if (!st || i < 0) return
+    const { tool, color } = uiRef.current
     const value = st.work.doc.cells[i]!
     if (tool === 'Pick') {
-      if (value !== EMPTY) setColor(value)
+      if (value !== EMPTY) patchUi({ color: value })
       return
     }
     if (tool === 'Fill') {
@@ -378,45 +598,82 @@ function PixelStudio() {
     commit({ ...st, galleryId: st.work.doc.id, dirty: false })
   }
 
+  // Opening a saved creation or starting a new canvas with unsaved edits detours
+  // through the discard sheet first; a confirmed swap runs the operation that was
+  // asked for, and Cancel keeps the dirty draft, its pixels and its undo stack.
   const openItem = (item: GalleryItem) => {
+    const st = stateRef.current
+    if (st?.dirty) {
+      patchUi({ sheet: 'discard', pending: { type: 'open', id: item.id } })
+      return
+    }
+    forceOpen(item)
+  }
+
+  const forceOpen = (item: GalleryItem) => {
     commit({ work: newWork(item.doc), galleryId: item.id, dirty: false })
-    setPage(false)
-    setDeleteId(null)
+    patchUi({ page: false, deleteId: null, sheet: null, pending: null })
     setFocus(-1)
   }
 
   const createDoc = () => {
-    const name = (newName.trim() || 'Untitled').slice(0, MAX_NAME)
-    commit({ work: newWork(newDoc(SIZE_BY_LABEL[newSize], name)), galleryId: null, dirty: false })
-    setPage(false)
-    setSheet(null)
-    setNewName('')
+    const st = stateRef.current
+    if (st?.dirty) {
+      patchUi({ sheet: 'discard', pending: { type: 'new', id: null } })
+      return
+    }
+    forceCreate()
+  }
+
+  const forceCreate = () => {
+    const name = (uiRef.current.newName.trim() || 'Untitled').slice(0, MAX_NAME)
+    commit({ work: newWork(newDoc(SIZE_BY_LABEL[uiRef.current.newSize], name)), galleryId: null, dirty: false })
+    patchUi({ page: false, sheet: null, pending: null, newName: '', newSize: '16 x 16' })
     setFocus(-1)
   }
 
+  const cancelPending = () => patchUi({ sheet: uiRef.current.pending?.type === 'new' ? 'new' : null, pending: null })
+
+  const confirmPending = (saveFirst: boolean) => {
+    const p = uiRef.current.pending
+    if (!p) {
+      patchUi({ sheet: null })
+      return
+    }
+    if (saveFirst) saveDoc()
+    if (p.type === 'open') {
+      const item = gallery.find((i) => i.id === p.id)
+      if (item) {
+        forceOpen(item)
+        return
+      }
+    }
+    forceCreate()
+  }
+
   const renameDoc = () => {
-    const name = nameInput.trim().slice(0, MAX_NAME)
+    const name = uiRef.current.nameInput.trim().slice(0, MAX_NAME)
     if (!name) return
     const st = stateRef.current
-    if (renameTarget === null) {
+    const target = uiRef.current.renameTarget
+    if (target === null) {
       if (st) commitDoc({ ...st.work.doc, name })
     } else {
       saved.set(
         serializeGallery(
           gallery.map((item) =>
-            item.id === renameTarget ? { ...item, updatedAt: Date.now(), doc: { ...item.doc, name } } : item
+            item.id === target ? { ...item, updatedAt: Date.now(), doc: { ...item.doc, name } } : item
           )
         )
       )
-      if (st?.galleryId === renameTarget) commitDoc({ ...st.work.doc, name }, st.dirty)
+      if (st?.galleryId === target) commitDoc({ ...st.work.doc, name }, st.dirty)
     }
-    setSheet(null)
-    setRenameTarget(null)
+    patchUi({ sheet: null, renameTarget: null })
   }
 
   const removeItem = (id: string) => {
     saved.set(serializeGallery(gallery.filter((item) => item.id !== id)))
-    setDeleteId(null)
+    patchUi({ deleteId: null })
     const st = stateRef.current
     if (st?.galleryId === id) commit({ ...st, galleryId: null, dirty: true })
   }
@@ -424,7 +681,7 @@ function PixelStudio() {
   const editSlotColor = (swatch: SwatchName) => {
     const st = stateRef.current
     if (!st || st.work.doc.palette.includes(swatch)) return
-    commitDoc(setPaletteSlot(st.work.doc, editSlot, swatch))
+    commitDoc(setPaletteSlot(st.work.doc, uiRef.current.editSlot, swatch))
   }
 
   useEffect(() => {
@@ -443,10 +700,15 @@ function PixelStudio() {
             : 'Saved on this device'
 
   const openRename = (target: string | null) => {
-    setRenameTarget(target)
-    setNameInput(target === null ? (doc?.name ?? '') : (gallery.find((i) => i.id === target)?.doc.name ?? ''))
-    setSheet('rename')
+    patchUi({
+      renameTarget: target,
+      nameInput: target === null ? (doc?.name ?? '') : (gallery.find((i) => i.id === target)?.doc.name ?? ''),
+      sheet: 'rename'
+    })
   }
+
+  // One roving tab stop for the slot strip, shared by every chip in the sheet.
+  const slotKeys = useRadioKeys(doc?.palette.length ?? 0)
 
   const emptyBoard = !!doc && doc.cells.every((value) => value === EMPTY)
 
@@ -496,12 +758,13 @@ function PixelStudio() {
 
   const toolbar = (
     <div {...stylex.props(styles.toolbar)}>
-      <Segmented options={TOOLS} value={tool} onChange={setTool} aria-label="Drawing tool" />
+      <Choices options={TOOLS} value={ui.tool} onChange={(tool) => patchUi({ tool })} label="Drawing tool" />
       <div {...stylex.props(styles.toolCluster)}>
         <IconButton
           name="undo"
           variant="plain"
           aria-label="Undo"
+          xstyle={styles.icon44}
           disabled={!state?.work.undo.length}
           onClick={() => {
             if (state) commit({ ...state, work: undoWork(state.work), dirty: true })
@@ -511,13 +774,19 @@ function PixelStudio() {
           name="undo"
           variant="plain"
           aria-label="Redo"
-          xstyle={styles.redoFlip}
+          xstyle={[styles.icon44, styles.redoFlip]}
           disabled={!state?.work.redo.length}
           onClick={() => {
             if (state) commit({ ...state, work: redoWork(state.work), dirty: true })
           }}
         />
-        <IconButton name="trashOutline" variant="plain" aria-label="Clear canvas" onClick={() => setSheet('clear')} />
+        <IconButton
+          name="trashOutline"
+          variant="plain"
+          aria-label="Clear canvas"
+          xstyle={styles.icon44}
+          onClick={() => patchUi({ sheet: 'clear' })}
+        />
       </div>
     </div>
   )
@@ -529,8 +798,8 @@ function PixelStudio() {
         <button
           type="button"
           aria-label="Edit palette"
-          onClick={() => setSheet('palette')}
-          {...stylex.props(styles.sectionEdit)}
+          onClick={() => patchUi({ sheet: 'palette' })}
+          {...stylex.props(shared.press, styles.sectionEdit)}
         >
           Edit
         </button>
@@ -541,16 +810,13 @@ function PixelStudio() {
             type="button"
             key={swatch}
             aria-label={`Colour ${i + 1}: ${swatchLabel(swatch)}`}
-            aria-pressed={i === color}
-            onClick={() => {
-              setColor(i)
-              if (tool === 'Erase') setTool('Paint')
-            }}
+            aria-pressed={i === ui.color}
+            onClick={() => patchUi(ui.tool === 'Erase' ? { color: i, tool: 'Paint' } : { color: i })}
             {...stylex.props(
               shared.press,
               styles.swatch,
               styles.cellPaint(SWATCH_COLOR[swatch]),
-              i === color && styles.swatchOn
+              i === ui.color && styles.swatchOn
             )}
           />
         ))}
@@ -558,7 +824,7 @@ function PixelStudio() {
           <button
             type="button"
             aria-label="Add a colour to the palette"
-            onClick={() => setSheet('palette')}
+            onClick={() => patchUi({ sheet: 'palette' })}
             {...stylex.props(shared.press, styles.swatch, styles.swatchAdd)}
           >
             <Sym name="plus" size={16} />
@@ -573,11 +839,11 @@ function PixelStudio() {
       <Mosaic doc={doc} liveCells={liveCells ?? undefined} />
       <div {...stylex.props(styles.previewMeta)}>
         <span {...stylex.props(styles.previewLabel)}>PREVIEW</span>
-        <span key={`${doc.id}:${tool}:${color}`} {...stylex.props(styles.previewDetailWrap)}>
+        <span key={`${doc.id}:${ui.tool}:${ui.color}`} {...stylex.props(styles.previewDetailWrap)}>
           <span {...stylex.props(shared.swap, styles.previewDetail)}>{doc.name}</span>
           <span {...stylex.props(shared.swap, styles.previewSub)}>
-            {doc.size} x {doc.size} - {tool}
-            {tool === 'Paint' || tool === 'Fill' ? `, ${swatchLabel(doc.palette[color] ?? 'black')}` : ''}
+            {doc.size} x {doc.size} - {ui.tool}
+            {ui.tool === 'Paint' || ui.tool === 'Fill' ? `, ${swatchLabel(doc.palette[ui.color] ?? 'black')}` : ''}
           </span>
         </span>
       </div>
@@ -593,201 +859,238 @@ function PixelStudio() {
   )
 
   const newCanvas = () => {
-    setNewName('')
-    setNewSize('16 x 16')
-    setSheet('new')
+    patchUi({ sheet: 'new' })
   }
 
+  // The kit Page's own back chevron tops out at a 22-point hit box; this page
+  // header matches its chrome so Back is a full 44-point target.
   const galleryPage = (
-    <Page title="Gallery" back={() => setPage(false)}>
-      {gallery.length ? (
-        <Section>
-          <List>
-            {gallery.map((item, i) => (
-              <div key={item.id} {...stylex.props(styles.galleryItem, animations.row, delay.ms(i * 40))}>
-                {deleteId === item.id ? (
-                  <Row
-                    as="div"
-                    icon={<Mosaic doc={item.doc} thumb />}
-                    label={`Delete "${item.doc.name}"?`}
-                    detail={
-                      <HStack gap={4}>
-                        <Button variant="plain" onClick={() => setDeleteId(null)}>
-                          Cancel
-                        </Button>
-                        <Button variant="filled" onClick={() => removeItem(item.id)}>
-                          Delete
-                        </Button>
-                      </HStack>
-                    }
-                  />
-                ) : (
-                  <>
-                    <Row
-                      as="button"
-                      xstyle={styles.galleryOpenRow}
-                      onClick={() => openItem(item)}
-                      icon={<Mosaic doc={item.doc} thumb />}
-                      label={item.doc.name}
-                      subtitle={
-                        <span>
-                          {item.doc.size} x {item.doc.size} - {new Date(item.updatedAt).toLocaleDateString()}
-                        </span>
-                      }
-                      detail={state?.galleryId === item.id ? 'Open' : undefined}
-                    />
-                    <IconButton
-                      name="ellipsis"
-                      aria-label={`Actions for ${item.doc.name}`}
-                      aria-expanded={sheet === 'item' && actionId === item.id}
-                      onClick={() => {
-                        setActionId(item.id)
-                        setSheet('item')
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-            ))}
-          </List>
-        </Section>
-      ) : (
-        <div {...stylex.props(styles.galleryEmpty)}>
-          <span {...stylex.props(styles.galleryEmptyIcon)}>
-            <Sym name="grid" size={28} />
-          </span>
-          <span>No saved creations yet</span>
-          <span>Draw something, then save it here to keep it on this device.</span>
-        </div>
-      )}
-      <div {...stylex.props(styles.galleryFoot)}>
-        <Button variant="tinted" onClick={newCanvas}>
-          New canvas
-        </Button>
-        <Button variant="filled" disabled={!state} onClick={saveDoc}>
-          Save current
-        </Button>
+    <div {...stylex.props(shared.column)}>
+      <div {...stylex.props(shared.hdr)}>
+        <button
+          type="button"
+          aria-label="Back"
+          {...stylex.props(shared.press, styles.backBtn)}
+          onClick={() => patchUi({ page: false })}
+        >
+          <Sym name="back" size={20} />
+        </button>
+        Gallery
       </div>
-    </Page>
+      <div {...stylex.props(shared.body)}>
+        {gallery.length ? (
+          <Section>
+            <List>
+              {gallery.map((item, i) => (
+                <div key={item.id} {...stylex.props(styles.galleryItem, animations.row, delay.ms(i * 40))}>
+                  {ui.deleteId === item.id ? (
+                    <Row
+                      as="div"
+                      icon={<Mosaic doc={item.doc} thumb />}
+                      label={`Delete "${item.doc.name}"?`}
+                      detail={
+                        <HStack gap={4}>
+                          <Button variant="plain" xstyle={styles.hit44} onClick={() => patchUi({ deleteId: null })}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="filled"
+                            xstyle={[styles.hit44, styles.btnDanger]}
+                            onClick={() => removeItem(item.id)}
+                          >
+                            Delete
+                          </Button>
+                        </HStack>
+                      }
+                    />
+                  ) : (
+                    <>
+                      <Row
+                        as="button"
+                        xstyle={styles.galleryOpenRow}
+                        onClick={() => openItem(item)}
+                        icon={<Mosaic doc={item.doc} thumb />}
+                        label={item.doc.name}
+                        subtitle={
+                          <span>
+                            {item.doc.size} x {item.doc.size} - {new Date(item.updatedAt).toLocaleDateString()}
+                          </span>
+                        }
+                        detail={state?.galleryId === item.id ? 'Open' : undefined}
+                      />
+                      <IconButton
+                        name="ellipsis"
+                        aria-label={`Actions for ${item.doc.name}`}
+                        aria-expanded={ui.sheet === 'item' && ui.actionId === item.id}
+                        xstyle={styles.icon44}
+                        onClick={() => patchUi({ actionId: item.id, sheet: 'item' })}
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+            </List>
+          </Section>
+        ) : (
+          <div {...stylex.props(styles.galleryEmpty)}>
+            <span {...stylex.props(styles.galleryEmptyIcon)}>
+              <Sym name="grid" size={28} />
+            </span>
+            <span>No saved creations yet</span>
+            <span>Draw something, then save it here to keep it on this device.</span>
+          </div>
+        )}
+        <div {...stylex.props(styles.galleryFoot)}>
+          <Button variant="tinted" xstyle={styles.hit44} onClick={newCanvas}>
+            New canvas
+          </Button>
+          <Button variant="filled" xstyle={styles.hit44} disabled={!state} onClick={saveDoc}>
+            Save current
+          </Button>
+        </div>
+      </div>
+    </div>
   )
+
+  const discardHint =
+    ui.pending?.type === 'new'
+      ? 'The new canvas replaces this one. Saving first keeps your work in the gallery.'
+      : 'Opening a saved creation replaces this canvas. Saving first keeps it in your gallery.'
 
   return (
     <main ref={rootRef} {...stylex.props(dark, styles.root)}>
-      <header {...stylex.props(styles.header)}>
-        <button
-          type="button"
-          aria-label="Rename this canvas"
-          onClick={() => openRename(null)}
-          {...stylex.props(styles.docName)}
-        >
-          <span {...stylex.props(styles.docNameText)}>{doc?.name ?? 'Pixel Studio'}</span>
-          <span {...stylex.props(styles.docCaret)}>
-            <Sym name="down" size={10} />
-          </span>
-          {state?.dirty ? <span role="img" aria-label="Unsaved changes" {...stylex.props(styles.dirty)} /> : null}
-        </button>
-        <div {...stylex.props(styles.headerActions)}>
-          <IconButton
-            name="collections"
-            variant="tinted"
-            aria-label="Gallery"
-            aria-expanded={page}
-            onClick={() => setPage(true)}
-          />
-          <IconButton name="plus" variant="tinted" aria-label="New canvas" onClick={newCanvas} />
-        </div>
-      </header>
-      <Push open={page} sheet={galleryPage}>
-        {wide ? (
-          <section {...stylex.props(styles.stage, styles.stageWide)}>
-            <div {...stylex.props(styles.canvasCol)}>{board}</div>
-            <div {...stylex.props(styles.rail)}>
+      <div inert={ui.sheet !== null} {...stylex.props(styles.appShell)}>
+        <header {...stylex.props(styles.header)}>
+          <button
+            type="button"
+            aria-label="Rename this canvas"
+            onClick={() => openRename(null)}
+            {...stylex.props(shared.press, styles.docName)}
+          >
+            <span {...stylex.props(styles.docNameText)}>{doc?.name ?? 'Pixel Studio'}</span>
+            <span {...stylex.props(styles.docCaret)}>
+              <Sym name="down" size={10} />
+            </span>
+            {state?.dirty ? <span role="img" aria-label="Unsaved changes" {...stylex.props(styles.dirty)} /> : null}
+          </button>
+          <div {...stylex.props(styles.headerActions)}>
+            <IconButton
+              name="collections"
+              variant="tinted"
+              aria-label="Gallery"
+              aria-expanded={ui.page}
+              xstyle={styles.icon44}
+              onClick={() => patchUi({ page: true })}
+            />
+            <IconButton
+              name="plus"
+              variant="tinted"
+              aria-label="New canvas"
+              xstyle={styles.icon44}
+              onClick={newCanvas}
+            />
+          </div>
+        </header>
+        <Push open={ui.page} sheet={galleryPage}>
+          {wide ? (
+            <section {...stylex.props(styles.stage, styles.stageWide)}>
+              <div {...stylex.props(styles.canvasCol)}>{board}</div>
+              <div {...stylex.props(styles.rail)}>
+                {toolbar}
+                {paletteSection}
+                {preview}
+              </div>
+            </section>
+          ) : (
+            <section {...stylex.props(styles.stage)}>
+              {board}
               {toolbar}
               {paletteSection}
               {preview}
-              {status}
-            </div>
-          </section>
-        ) : (
-          <section {...stylex.props(styles.stage)}>
-            {board}
-            {toolbar}
-            {paletteSection}
-            {preview}
-            {status}
-          </section>
-        )}
-      </Push>
+            </section>
+          )}
+        </Push>
+        <footer {...stylex.props(styles.statusBar)}>{status}</footer>
+      </div>
 
-      <Sheet open={sheet === 'clear'} onClose={() => setSheet(null)} aria-label="Clear canvas">
+      <GuardedSheet open={ui.sheet === 'clear'} onClose={() => patchUi({ sheet: null })} label="Clear canvas">
         <div {...stylex.props(styles.sheetBody)}>
           <h2 {...stylex.props(styles.sheetTitle)}>Clear canvas?</h2>
           <p {...stylex.props(styles.sheetHint)}>Every pixel is removed. Undo brings it back.</p>
-          <div {...stylex.props(styles.sheetActions)}>
-            <Button variant="plain" onClick={() => setSheet(null)}>
-              Cancel
-            </Button>
+          <div {...stylex.props(styles.actionStack)}>
             <Button
               variant="filled"
+              xstyle={[styles.hit44, styles.btnDanger]}
               onClick={() => {
                 commitEdit(clearEdit(cells))
-                setSheet(null)
+                patchUi({ sheet: null })
               }}
             >
               Clear
             </Button>
+            <Button variant="plain" xstyle={styles.hit44} onClick={() => patchUi({ sheet: null })}>
+              Cancel
+            </Button>
           </div>
         </div>
-      </Sheet>
+      </GuardedSheet>
 
-      <Sheet open={sheet === 'rename'} onClose={() => setSheet(null)} aria-label="Rename">
+      <GuardedSheet open={ui.sheet === 'rename'} onClose={() => patchUi({ sheet: null })} label="Rename">
         <div {...stylex.props(styles.sheetBody)}>
           <h2 {...stylex.props(styles.sheetTitle)}>Rename</h2>
           <TextField
             aria-label="Name"
-            value={nameInput}
+            value={ui.nameInput}
             maxLength={MAX_NAME}
-            onChange={(event) => setNameInput(event.target.value)}
+            onChange={(event) => patchUi({ nameInput: event.target.value })}
             onKeyDown={(event) => {
               if (event.key === 'Enter') renameDoc()
             }}
             xstyle={styles.sheetField}
           />
-          <div {...stylex.props(styles.sheetActions)}>
-            <Button variant="plain" onClick={() => setSheet(null)}>
-              Cancel
-            </Button>
-            <Button variant="filled" onClick={renameDoc}>
+          <div {...stylex.props(styles.actionStack)}>
+            <Button variant="filled" xstyle={styles.hit44} onClick={renameDoc}>
               Save
+            </Button>
+            <Button variant="plain" xstyle={styles.hit44} onClick={() => patchUi({ sheet: null })}>
+              Cancel
             </Button>
           </div>
         </div>
-      </Sheet>
+      </GuardedSheet>
 
-      <Sheet open={sheet === 'new'} onClose={() => setSheet(null)} aria-label="New canvas">
+      <GuardedSheet open={ui.sheet === 'new'} onClose={() => patchUi({ sheet: null })} label="New canvas">
         <div {...stylex.props(styles.sheetBody)}>
           <h2 {...stylex.props(styles.sheetTitle)}>New canvas</h2>
           <TextField
             aria-label="Canvas name"
             placeholder="Untitled"
-            value={newName}
+            value={ui.newName}
             maxLength={MAX_NAME}
-            onChange={(event) => setNewName(event.target.value)}
+            onChange={(event) => patchUi({ newName: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') createDoc()
+            }}
             xstyle={styles.sheetField}
           />
-          <Segmented options={SIZE_LABELS} value={newSize} onChange={setNewSize} aria-label="Canvas size" />
-          <div {...stylex.props(styles.sheetActions)}>
-            <Button variant="plain" onClick={() => setSheet(null)}>
-              Cancel
-            </Button>
-            <Button variant="filled" onClick={createDoc}>
+          <Choices
+            options={SIZE_LABELS}
+            value={ui.newSize}
+            onChange={(newSize) => patchUi({ newSize })}
+            label="Canvas size"
+          />
+          <div {...stylex.props(styles.actionStack)}>
+            <Button variant="filled" xstyle={styles.hit44} onClick={createDoc}>
               Create
+            </Button>
+            <Button variant="plain" xstyle={styles.hit44} onClick={() => patchUi({ sheet: null })}>
+              Cancel
             </Button>
           </div>
         </div>
-      </Sheet>
+      </GuardedSheet>
 
-      <Sheet open={sheet === 'palette'} onClose={() => setSheet(null)} aria-label="Edit palette">
+      <GuardedSheet open={ui.sheet === 'palette'} onClose={() => patchUi({ sheet: null })} label="Edit palette">
         <div {...stylex.props(styles.sheetBody)}>
           <h2 {...stylex.props(styles.sheetTitle)}>Edit palette</h2>
           <p {...stylex.props(styles.sheetHint)}>Pick a slot, then tap a colour to assign it.</p>
@@ -797,14 +1100,15 @@ function PixelStudio() {
                 <button
                   type="button"
                   key={swatch}
-                  role="radio"
-                  aria-checked={i === editSlot}
                   aria-label={`Slot ${i + 1}: ${swatchLabel(swatch)}`}
-                  onClick={() => setEditSlot(i)}
+                  onClick={() => patchUi({ editSlot: i })}
+                  onKeyDown={slotKeys.onKeyDown(i, (n) => patchUi({ editSlot: n }))}
+                  {...slotKeys.slot(i, i === ui.editSlot)}
                   {...stylex.props(
+                    shared.press,
                     styles.slotChip,
                     styles.cellPaint(SWATCH_COLOR[swatch]),
-                    i === editSlot && styles.swatchOn
+                    i === ui.editSlot && styles.swatchOn
                   )}
                 />
               ))}
@@ -824,82 +1128,90 @@ function PixelStudio() {
               </button>
             ))}
           </div>
-          <HStack gap={8} justify="between">
-            <HStack gap={8}>
-              <Button
-                variant="tinted"
-                disabled={!doc || doc.palette.length <= 1}
-                onClick={() => {
-                  if (!doc) return
-                  commitDoc(removePaletteSlot(doc, editSlot))
-                  setEditSlot(0)
-                  setColor((c) => Math.max(0, Math.min(c, doc.palette.length - 2)))
-                }}
-              >
-                Remove slot
-              </Button>
-              <Button
-                variant="tinted"
-                disabled={!doc || doc.palette.length >= TOKEN_SWATCHES.length}
-                onClick={() => {
-                  if (!doc) return
-                  const spare = TOKEN_SWATCHES.find((s) => !doc.palette.includes(s))
-                  if (spare) commitDoc(addPaletteSlot(doc, spare))
-                }}
-              >
-                Add slot
-              </Button>
-            </HStack>
-            <Button variant="filled" onClick={() => setSheet(null)}>
-              Done
-            </Button>
-          </HStack>
-        </div>
-      </Sheet>
-
-      <Sheet
-        open={sheet === 'item'}
-        onClose={() => {
-          setSheet(null)
-          setActionId(null)
-        }}
-        aria-label="Creation actions"
-      >
-        <div {...stylex.props(styles.sheetBody)}>
-          <h2 {...stylex.props(styles.sheetTitle)}>{gallery.find((i) => i.id === actionId)?.doc.name ?? 'Creation'}</h2>
           <div {...stylex.props(styles.actionStack)}>
             <Button
               variant="tinted"
+              xstyle={styles.hit44}
+              disabled={!doc || doc.palette.length <= 1}
               onClick={() => {
-                setSheet(null)
-                openRename(actionId)
+                if (!doc) return
+                commitDoc(removePaletteSlot(doc, ui.editSlot))
+                patchUi({ editSlot: 0, color: Math.max(0, Math.min(ui.color, doc.palette.length - 2)) })
+              }}
+            >
+              Remove slot
+            </Button>
+            <Button
+              variant="tinted"
+              xstyle={styles.hit44}
+              disabled={!doc || doc.palette.length >= TOKEN_SWATCHES.length}
+              onClick={() => {
+                if (!doc) return
+                const spare = TOKEN_SWATCHES.find((s) => !doc.palette.includes(s))
+                if (spare) commitDoc(addPaletteSlot(doc, spare))
+              }}
+            >
+              Add slot
+            </Button>
+            <Button variant="filled" xstyle={styles.hit44} onClick={() => patchUi({ sheet: null })}>
+              Done
+            </Button>
+          </div>
+        </div>
+      </GuardedSheet>
+
+      <GuardedSheet
+        open={ui.sheet === 'item'}
+        onClose={() => patchUi({ sheet: null, actionId: null })}
+        label="Creation actions"
+      >
+        <div {...stylex.props(styles.sheetBody)}>
+          <h2 {...stylex.props(styles.sheetTitle)}>
+            {gallery.find((i) => i.id === ui.actionId)?.doc.name ?? 'Creation'}
+          </h2>
+          <div {...stylex.props(styles.actionStack)}>
+            <Button
+              variant="tinted"
+              xstyle={styles.hit44}
+              onClick={() => {
+                const target = ui.actionId
+                patchUi({ sheet: null })
+                openRename(target)
               }}
             >
               Rename
             </Button>
             <Button
               variant="plain"
-              xstyle={styles.actionDanger}
-              onClick={() => {
-                setDeleteId(actionId)
-                setSheet(null)
-                setActionId(null)
-              }}
+              xstyle={[styles.hit44, styles.actionDanger]}
+              onClick={() => patchUi({ deleteId: ui.actionId, sheet: null, actionId: null })}
             >
               Delete
             </Button>
-            <Button
-              variant="plain"
-              onClick={() => {
-                setSheet(null)
-                setActionId(null)
-              }}
-            >
+            <Button variant="plain" xstyle={styles.hit44} onClick={() => patchUi({ sheet: null, actionId: null })}>
               Cancel
             </Button>
           </div>
         </div>
-      </Sheet>
+      </GuardedSheet>
+
+      <GuardedSheet open={ui.sheet === 'discard'} onClose={cancelPending} label="Unsaved changes">
+        <div {...stylex.props(styles.sheetBody)}>
+          <h2 {...stylex.props(styles.sheetTitle)}>Discard unsaved changes?</h2>
+          <p {...stylex.props(styles.sheetHint)}>{discardHint}</p>
+          <div {...stylex.props(styles.actionStack)}>
+            <Button variant="filled" xstyle={styles.hit44} onClick={() => confirmPending(true)}>
+              Save & continue
+            </Button>
+            <Button variant="filled" xstyle={[styles.hit44, styles.btnDanger]} onClick={() => confirmPending(false)}>
+              Discard changes
+            </Button>
+            <Button variant="plain" xstyle={styles.hit44} onClick={cancelPending}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </GuardedSheet>
     </main>
   )
 }

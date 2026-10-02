@@ -282,17 +282,60 @@ export function parseDocState(raw: unknown): DocState | null {
 
 export const serializeDocState = (state: DocState) => JSON.stringify(state)
 
-/** The session mirror payload: the draft plus which display copy wrote it. */
+/** What the two displays share about the view, so a fold keeps the ongoing workflow. */
+export interface SharedView {
+  tool: string
+  color: number
+  page: boolean
+  sheet: string | null
+  actionId: string | null
+  renameTarget: string | null
+  nameInput: string
+  deleteId: string | null
+  editSlot: number
+  newName: string
+  newSize: string
+  pending: { type: string; id: string | null } | null
+}
+
+const strOrNull = (v: unknown) => v === null || typeof v === 'string'
+
+export function parseSharedView(raw: unknown): SharedView | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const v = raw as SharedView
+  if (typeof v.tool !== 'string' || !v.tool.length) return null
+  if (!Number.isInteger(v.color) || v.color < 0) return null
+  if (typeof v.page !== 'boolean') return null
+  if (!strOrNull(v.sheet) || !strOrNull(v.actionId) || !strOrNull(v.renameTarget)) return null
+  if (typeof v.nameInput !== 'string' || typeof v.newName !== 'string' || typeof v.newSize !== 'string') return null
+  if (!strOrNull(v.deleteId)) return null
+  if (!Number.isInteger(v.editSlot) || v.editSlot < 0) return null
+  if (v.pending !== null) {
+    if (typeof v.pending !== 'object') return null
+    if (v.pending.type !== 'open' && v.pending.type !== 'new') return null
+    if (!strOrNull(v.pending.id)) return null
+  }
+  return v
+}
+
+/** The session mirror payload: the draft, the view context and which display copy wrote it. */
 export interface SharedState extends DocState {
   by: string
+  view?: SharedView
 }
 
 export function parseShared(raw: unknown): SharedState | null {
   const shared = typeof raw === 'string' ? safeParse(raw) : raw
   if (typeof shared !== 'object' || shared === null) return null
-  const { by, ...state } = shared as SharedState
+  const { by, view, ...state } = shared as SharedState
   if (typeof by !== 'string' || !by.length) return null
-  return parseDocState(state) ? (shared as SharedState) : null
+  if (!parseDocState(state)) return null
+  // A malformed view block must not reject the draft it rode in on.
+  if (view !== undefined && !parseSharedView(view)) {
+    const { view: _dropped, ...rest } = shared as SharedState
+    return rest as SharedState
+  }
+  return shared as SharedState
 }
 
 export const serializeShared = (state: SharedState) => JSON.stringify(state)
