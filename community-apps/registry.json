@@ -58,6 +58,10 @@
       "folder": "flappy-duo",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.recipebox": {
+      "folder": "recipe-box",
+      "maintainers": ["mnismt"]
+    },
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
