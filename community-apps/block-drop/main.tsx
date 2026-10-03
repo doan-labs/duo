@@ -130,7 +130,7 @@ function BlockDrop() {
     if (!playing || !view.active) return
     const timer = setInterval(() => {
       const g = gameRef.current
-      if (!g || g.status !== 'playing' || !activeRef.current) return
+      if (g?.status !== 'playing' || !activeRef.current) return
       const next = gravity(g)
       if (next !== g) commit(g, next)
     }, intervalFor(level))
