@@ -1,0 +1,12 @@
+{
+  "id": "com.mnismt.duo.recipebox",
+  "name": "Recipe Box",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "mnismt",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/recipe-box",
+  "license": "MIT",
+  "permissions": []
+}
