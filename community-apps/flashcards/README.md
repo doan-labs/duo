@@ -46,13 +46,39 @@ grade, instant, resulting interval) to a bounded history (newest 500).
 
 ## Persistence
 
-The whole library (decks, cards, history, per-deck review sessions and daily
-grade counts) is one JSON document in `os.storage`, so a fold or relaunch
-restores everything, including mid-card reveal state. Pane navigation and the
-open editor draft live in `os.session`: they follow the fold but reset on a
-cold launch, at which point a paused review re-opens automatically. Daily
-counts are stored per day rather than read back from history, so the capped
-history can never shrink what "reviewed today" reports.
+The library lives in bounded records under the platform's per-key limit, not
+one big document: a `meta` index lists each deck with its chunk count,
+`deck.<id>.<i>` records hold cards in shards that each stay under the limit,
+`review.<id>` heads plus `queue.<id>.<i>` shards keep paused reviews,
+and `activity` holds the bounded history (newest 500) and per-day grade
+counters. Every record is measured in UTF-8 bytes of the exact string written,
+so a collection that outgrew the old single 256 KiB document keeps saving.
+Writes run content-first, index-last, deletes-last inside one serialized
+batch, so an interrupted save can leave an orphaned shard or a stale index
+but never an index pointing at a chunk that was not committed; the next save
+or launch reconciles and sweeps. Saves report honestly (hydrating, saving,
+ready, error in the footer), a rejected write keeps the editor open with the
+draft intact, and a queued older value can never overwrite a newer edit.
+
+The previous single `library` document migrates on first launch: its cards,
+scheduling, history, daily counters and every paused review are rewritten
+into the shard layout, and the old document is deleted only after the new
+index commits, so a failed migration simply retries next launch instead of
+dropping data. If the committed index ever references a missing shard the
+app surfaces an error rather than sealing the loss behind a fresh index.
+
+Remaining honest limits: one card still must fit a single record (~256 KiB of
+text), the deck index itself caps around two thousand decks, the review
+history keeps the newest 500 grades, and everything lives under the
+platform's 5 MiB total app storage quota. Hitting any of them reports the
+failure instead of silently dropping content.
+
+Pane navigation and the open editor draft live in `os.session`: they follow
+the fold but reset on a cold launch, at which point a paused review re-opens
+automatically. Daily counts are stored per day rather than read back from
+history, so the capped history can never shrink what "reviewed today"
+reports. Both display copies watch the same records and converge on writes
+from either side.
 
 ## Layout
 
@@ -67,9 +93,14 @@ nothing is selected. Reduced-motion is honoured for every animation.
 bun ../../packages/cli/index.mjs check .   # manifest, imports, typecheck, tokens
 bun ../../packages/cli/index.mjs build .   # dist bundle, <4 MiB
 bun cards.test.ts                          # scheduler/state tests
+bun storage.test.ts                        # sharded-storage tests
 ```
 
 Verified: `bun check`, `bun build`, `bun cards.test.ts` (scheduler math, due
-queue ordering, review flow, deletes, serialization round-trip), and manual
-exercise of the full create/edit/review/delete loop in the simulator on the
-cover display and the wide inner layout.
+queue ordering, review flow, deletes, serialization round-trip),
+`bun storage.test.ts` (a >256 KiB library with multibyte text, a deck split
+across shards, index and record bounds, save + grade + relaunch equivalence,
+legacy migration, injected write failures with safe retry, stale-write
+ordering and two live display copies), and manual exercise of the full
+create/edit/review/delete loop in the simulator on the cover display and
+the wide inner layout.

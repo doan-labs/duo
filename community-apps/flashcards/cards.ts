@@ -80,6 +80,64 @@ const str = (v: unknown, fallback = '') => (typeof v === 'string' ? v : fallback
 const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
 const rec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
+/** Field-checked record readers shared by the legacy parser and the shard decoder. */
+export function readDeck(v: unknown): Deck | null {
+  if (!rec(v) || typeof v.id !== 'string' || typeof v.name !== 'string') return null
+  return { id: v.id, name: v.name, createdAt: num(v.createdAt, 0) }
+}
+
+export function readCard(v: unknown, deckIds: Set<string>): Card | null {
+  if (!rec(v) || typeof v.id !== 'string' || typeof v.deckId !== 'string' || !deckIds.has(v.deckId)) return null
+  return {
+    id: v.id,
+    deckId: v.deckId,
+    front: str(v.front),
+    back: str(v.back),
+    createdAt: num(v.createdAt, 0),
+    due: num(v.due, 0),
+    interval: num(v.interval, 0),
+    ease: Math.max(MIN_EASE, num(v.ease, START_EASE)),
+    reps: Math.max(0, Math.round(num(v.reps, 0))),
+    reviews: Math.max(0, Math.round(num(v.reviews, 0))),
+    lastReview: typeof v.lastReview === 'number' && Number.isFinite(v.lastReview) ? v.lastReview : null
+  }
+}
+
+export function readEvent(v: unknown): ReviewEvent | null {
+  if (!rec(v)) return null
+  if (typeof v.cardId !== 'string' || typeof v.deckId !== 'string' || typeof v.at !== 'number') return null
+  if (v.grade !== 'again' && v.grade !== 'good' && v.grade !== 'easy') return null
+  return { cardId: v.cardId, deckId: v.deckId, at: v.at, grade: v.grade, interval: num(v.interval, 0) }
+}
+
+/** The non-queue fields a session record carries; the shard layout stores the same base plus a chunk count. */
+export function readSessionBase(v: unknown): Omit<ReviewSession, 'queue'> | null {
+  if (!rec(v)) return null
+  const deckId = str(v.deckId)
+  if (!deckId) return null
+  const finished =
+    rec(v.finished) && typeof v.finished.graded === 'number' && typeof v.finished.at === 'number'
+      ? { graded: v.finished.graded, at: v.finished.at }
+      : null
+  return {
+    deckId,
+    done: Math.max(0, Math.round(num(v.done, 0))),
+    revealed: v.revealed === true,
+    startedAt: num(v.startedAt, 0),
+    finished
+  }
+}
+
+export function readDayCounts(v: unknown): Record<string, number> {
+  const counts: Record<string, number> = {}
+  if (rec(v))
+    for (const [day, count] of Object.entries(v)) {
+      const n = num(count, NaN)
+      if (Number.isFinite(n) && n > 0) counts[day] = Math.round(n)
+    }
+  return counts
+}
+
 export function parseLibrary(raw: string | null): Library {
   const lib = newLibrary()
   if (!raw) return lib
@@ -87,66 +145,31 @@ export function parseLibrary(raw: string | null): Library {
     const parsed = JSON.parse(raw) as unknown
     if (!rec(parsed)) return lib
     if (Array.isArray(parsed.decks))
-      lib.decks = parsed.decks
-        .filter(rec)
-        .filter((d) => typeof d.id === 'string' && typeof d.name === 'string')
-        .map((d) => ({ id: d.id as string, name: d.name as string, createdAt: num(d.createdAt, 0) }))
+      for (const d of parsed.decks) {
+        const deck = readDeck(d)
+        if (deck) lib.decks.push(deck)
+      }
     const deckIds = new Set(lib.decks.map((d) => d.id))
     if (Array.isArray(parsed.cards))
-      lib.cards = parsed.cards
-        .filter(rec)
-        .filter((c) => typeof c.id === 'string' && typeof c.deckId === 'string' && deckIds.has(c.deckId as string))
-        .map((c) => ({
-          id: c.id as string,
-          deckId: c.deckId as string,
-          front: str(c.front),
-          back: str(c.back),
-          createdAt: num(c.createdAt, 0),
-          due: num(c.due, 0),
-          interval: num(c.interval, 0),
-          ease: Math.max(MIN_EASE, num(c.ease, START_EASE)),
-          reps: Math.max(0, Math.round(num(c.reps, 0))),
-          reviews: Math.max(0, Math.round(num(c.reviews, 0))),
-          lastReview: typeof c.lastReview === 'number' && Number.isFinite(c.lastReview) ? c.lastReview : null
-        }))
+      for (const c of parsed.cards) {
+        const card = readCard(c, deckIds)
+        if (card) lib.cards.push(card)
+      }
     const cardIds = new Set(lib.cards.map((c) => c.id))
     if (Array.isArray(parsed.history))
-      lib.history = parsed.history
-        .filter(rec)
-        .filter(
-          (e) =>
-            typeof e.cardId === 'string' &&
-            typeof e.deckId === 'string' &&
-            typeof e.at === 'number' &&
-            (e.grade === 'again' || e.grade === 'good' || e.grade === 'easy')
-        )
-        .map((e) => ({
-          cardId: e.cardId as string,
-          deckId: e.deckId as string,
-          at: e.at as number,
-          grade: e.grade as Grade,
-          interval: num(e.interval, 0)
-        }))
-        .slice(-HISTORY_LIMIT)
+      for (const e of parsed.history) {
+        const event = readEvent(e)
+        if (event) lib.history.push(event)
+      }
+    lib.history = lib.history.slice(-HISTORY_LIMIT)
     const readSession = (r: Record<string, unknown>): ReviewSession | null => {
+      const base = readSessionBase(r)
+      if (!base || !deckIds.has(base.deckId)) return null
       const queue = (Array.isArray(r.queue) ? r.queue.filter((q): q is string => typeof q === 'string') : []).filter(
         (q) => cardIds.has(q)
       )
-      const deckId = str(r.deckId)
-      if (!deckId || !deckIds.has(deckId)) return null
-      const finished =
-        rec(r.finished) && typeof r.finished.graded === 'number' && typeof r.finished.at === 'number'
-          ? { graded: r.finished.graded, at: r.finished.at }
-          : null
-      if (!queue.length && !finished) return null
-      return {
-        deckId,
-        queue,
-        done: Math.max(0, Math.round(num(r.done, 0))),
-        revealed: r.revealed === true,
-        startedAt: num(r.startedAt, 0),
-        finished
-      }
+      if (!queue.length && !base.finished) return null
+      return { ...base, queue }
     }
     // Current shape: one session per deck. Legacy rows carried a single
     // `review`; fold it into the map so a paused session survives the upgrade.
@@ -160,11 +183,7 @@ export function parseLibrary(raw: string | null): Library {
       const s = readSession(parsed.review)
       if (s) lib.reviews[s.deckId] = s
     }
-    if (rec(parsed.dayCounts))
-      for (const [day, count] of Object.entries(parsed.dayCounts)) {
-        const n = num(count, NaN)
-        if (Number.isFinite(n) && n > 0) lib.dayCounts[day] = Math.round(n)
-      }
+    if (rec(parsed.dayCounts)) lib.dayCounts = readDayCounts(parsed.dayCounts)
     // Migrated rows derive per-day counts from the retained history window.
     else
       for (const e of lib.history) {
@@ -210,7 +229,7 @@ export function startOfDay(now: number): number {
 }
 
 /** Zero-padded local-day key: lexicographic order is chronological. */
-const dayKey = (now: number) => {
+export const dayKey = (now: number) => {
   const d = new Date(now)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

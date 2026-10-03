@@ -20,7 +20,7 @@ import {
 import { animations, dark, delay, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type RefObject, useEffect, useRef, useState } from 'react'
+import { type RefObject, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   abandonReview,
@@ -37,22 +37,21 @@ import {
   gradeReview,
   type Library,
   nextInterval,
-  parseLibrary,
   type ReviewSession,
   removeCard,
   removeDeck,
   renameDeck,
   revealReview,
   reviewsToday,
-  serializeLibrary,
   startReview,
   updateCard
 } from './cards.ts'
+import { LibraryStore } from './storage.ts'
 import { styles } from './styles.ts'
 
 /** Session-only UI state: the pane stack and the open editor draft. Decks, cards,
- * due state and the in-progress review live in the single 'library' storage
- * document instead, so the fold and a relaunch both land on the same truth. */
+ * due state and the in-progress review live in bounded storage records instead,
+ * so the fold and a relaunch both land on the same truth. */
 type View = 'decks' | 'deck' | 'review'
 type UiState = { v: 1; view: View; deckId?: string }
 
@@ -872,7 +871,11 @@ function EditorSheet({
 function Flashcards() {
   const [rootRef, wide] = useWide<HTMLElement>()
   const view = useDisplay()
-  const stored = useKV(os.storage, 'library')
+  // The library lives in bounded records under the per-key limit; the store
+  // owns migration from the legacy single document, write ordering, retries
+  // and the watch that keeps both display copies in sync.
+  const store = useMemo(() => new LibraryStore(os.storage, os.storage.limits), [])
+  const stored = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const ui = useKV(os.session, 'ui')
   const draft = useKV(os.session, 'draft')
   // A slow tick keeps "In 10m" captions and due chips honest while a page sits
@@ -893,7 +896,7 @@ function Flashcards() {
   const [darkMode, setDarkMode] = useState(false)
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
 
-  const lib = parseLibrary(stored.value)
+  const lib = stored.lib
   const draftState = parseDraft(draft.value)
   const now = Date.now()
   // Root-held confirm state. The deck confirmation pins its target as a
@@ -941,7 +944,7 @@ function Flashcards() {
         ? 'deck'
         : 'decks'
 
-  const save = (next: Library) => void stored.set(serializeLibrary(next))
+  const save = (next: Library) => store.save(next)
   const go = (next: UiState) => ui.set(JSON.stringify(next))
   const openDraft = (next: Omit<Draft, 'v' | 'name' | 'front' | 'back'> & Partial<Draft>, el?: HTMLElement) => {
     // The opener's element is remembered before the draft commits so the
@@ -1016,14 +1019,18 @@ function Flashcards() {
   const commitDraft = () => {
     if (!draftState) return
     const at = Date.now()
-    if (draftState.kind === 'deck-new' && draftState.name.trim()) save(addDeck(lib, draftState.name, at))
+    let next: Library | null = null
+    if (draftState.kind === 'deck-new' && draftState.name.trim()) next = addDeck(lib, draftState.name, at)
     else if (draftState.kind === 'deck-rename' && draftState.deckId && draftState.name.trim())
-      save(renameDeck(lib, draftState.deckId, draftState.name))
+      next = renameDeck(lib, draftState.deckId, draftState.name)
     else if (draftState.kind === 'card-new' && draftState.deckId && draftState.front.trim() && draftState.back.trim())
-      save(addCard(lib, draftState.deckId, draftState.front, draftState.back, at))
+      next = addCard(lib, draftState.deckId, draftState.front, draftState.back, at)
     else if (draftState.kind === 'card-edit' && draftState.cardId && draftState.front.trim() && draftState.back.trim())
-      save(updateCard(lib, draftState.cardId, draftState.front, draftState.back))
-    closeDraft()
+      next = updateCard(lib, draftState.cardId, draftState.front, draftState.back)
+    if (!next) return
+    // A rejected save keeps the sheet open: the draft lives in session state
+    // and the status line reports the failure, so nothing typed is lost.
+    if (save(next)) closeDraft()
   }
 
   const draftValid =
