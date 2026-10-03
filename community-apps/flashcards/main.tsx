@@ -713,6 +713,7 @@ function EditorSheet({
   onChange,
   onClose,
   onSave,
+  saving,
   onDeleteCard,
   dimmed,
   opener
@@ -722,6 +723,8 @@ function EditorSheet({
   onChange: (patch: Partial<Draft>) => void
   onClose: () => void
   onSave: () => void
+  /** True while the store is persisting this draft's commit: Save stays disabled. */
+  saving: boolean
   onDeleteCard: () => void
   /** True while a deck confirmation sits above this sheet: trap off, content inert. */
   dimmed: boolean
@@ -846,7 +849,7 @@ function EditorSheet({
           </div>
         ) : (
           <div {...stylex.props(styles.editorActions)}>
-            <Button variant="filled" disabled={!canSave} xstyle={styles.hitBtn} onClick={onSave}>
+            <Button variant="filled" disabled={!canSave || saving} xstyle={styles.hitBtn} onClick={onSave}>
               Save
             </Button>
             <Button variant="plain" xstyle={styles.hitBtn} onClick={onClose}>
@@ -893,7 +896,7 @@ function Flashcards() {
   // library. An error still reports ready: the app renders and explains it.
   const readySent = useRef(false)
   useEffect(() => {
-    if (readySent.current || stored.status === 'hydrating') return
+    if (readySent.current || stored.status === 'hydrating' || stored.status === 'saving') return
     readySent.current = true
     requestAnimationFrame(() => os.ready())
   }, [stored.status])
@@ -956,6 +959,7 @@ function Flashcards() {
     // The opener's element is remembered before the draft commits so the
     // editor trap can hand focus back when the sheet closes.
     editorTrigger.current = el ?? null
+    commitItemRef.current = null
     draft.set(JSON.stringify({ v: 1, name: '', front: '', back: '', ...next }))
   }
   const closeDraft = () => draft.del()
@@ -1023,31 +1027,55 @@ function Flashcards() {
   ) : null
 
   const commitDraft = () => {
-    if (!draftState) return
+    if (!draftState || pendingCommit) return
     const at = Date.now()
     let next: Library | null = null
-    if (draftState.kind === 'deck-new' && draftState.name.trim()) next = addDeck(lib, draftState.name, at)
-    else if (draftState.kind === 'deck-rename' && draftState.deckId && draftState.name.trim())
+    // Created items keep a stable id across retries: an acknowledged-or-
+    // still-optimistic creation is updated, never re-added, so a failed save
+    // retried from the same draft cannot duplicate the card or deck.
+    const created = commitItemRef.current
+    if (draftState.kind === 'deck-new' && draftState.name.trim()) {
+      const existing = created?.kind === 'deck-new' && lib.decks.find((d) => d.id === created.id)
+      next = existing ? renameDeck(lib, existing.id, draftState.name) : addDeck(lib, draftState.name, at)
+      if (!existing) {
+        const deck = next.decks.find((d) => !lib.decks.some((o) => o.id === d.id))
+        if (deck) commitItemRef.current = { kind: 'deck-new', id: deck.id }
+      }
+    } else if (draftState.kind === 'deck-rename' && draftState.deckId && draftState.name.trim())
       next = renameDeck(lib, draftState.deckId, draftState.name)
-    else if (draftState.kind === 'card-new' && draftState.deckId && draftState.front.trim() && draftState.back.trim())
-      next = addCard(lib, draftState.deckId, draftState.front, draftState.back, at)
-    else if (draftState.kind === 'card-edit' && draftState.cardId && draftState.front.trim() && draftState.back.trim())
+    else if (draftState.kind === 'card-new' && draftState.deckId && draftState.front.trim() && draftState.back.trim()) {
+      const existing = created?.kind === 'card-new' && lib.cards.find((c) => c.id === created.id)
+      next = existing
+        ? updateCard(lib, existing.id, draftState.front, draftState.back)
+        : addCard(lib, draftState.deckId, draftState.front, draftState.back, at)
+      if (!existing) {
+        const card = next.cards.find((c) => !lib.cards.some((o) => o.id === c.id))
+        if (card) commitItemRef.current = { kind: 'card-new', id: card.id }
+      }
+    } else if (
+      draftState.kind === 'card-edit' &&
+      draftState.cardId &&
+      draftState.front.trim() &&
+      draftState.back.trim()
+    )
       next = updateCard(lib, draftState.cardId, draftState.front, draftState.back)
     if (!next) return
     // The draft outlives the save: it clears only after the write is
-    // acknowledged AND the committed view carries exactly this library, so a
-    // rejected or superseded persistence leaves the editor open on the
-    // typed content instead of implying it saved.
-    if (save(next)) setPendingCommit(next)
+    // acknowledged AND the committed view carries exactly this library AND the
+    // draft still holds the acknowledged text - so a rejected, superseded or
+    // re-typed draft stays open on its content instead of implying it saved.
+    if (save(next)) setPendingCommit({ next, draftText: draft.value ?? '' })
   }
 
-  const [pendingCommit, setPendingCommit] = useState<Library | null>(null)
+  const [pendingCommit, setPendingCommit] = useState<{ next: Library; draftText: string } | null>(null)
+  const commitItemRef = useRef<{ kind: DraftKind; id: string } | null>(null)
   useEffect(() => {
     if (!pendingCommit) return
     if (stored.status === 'ready') {
-      const committed = serializeLibrary(stored.lib) === serializeLibrary(pendingCommit)
+      const committed = serializeLibrary(stored.lib) === serializeLibrary(pendingCommit.next)
+      const sameDraft = draft.value === pendingCommit.draftText
       setPendingCommit(null)
-      if (committed) draft.del()
+      if (committed && sameDraft) draft.del()
     } else if (stored.status === 'error') {
       setPendingCommit(null)
     }
@@ -1114,6 +1142,7 @@ function Flashcards() {
           onChange={(patch) => draft.set(JSON.stringify({ ...draftState, ...patch }))}
           onClose={closeDraft}
           onSave={commitDraft}
+          saving={!!pendingCommit}
           dimmed={deckSheetOpen}
           opener={editorTrigger.current}
           onDeleteCard={() => {

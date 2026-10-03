@@ -17,6 +17,11 @@
 //
 // Commit protocol: all generation content and index keys land first, 'meta'
 // lands last, and collects (deletes) run after the commit is acknowledged.
+// Deletes are never queued inside a write batch: each save carries a gc plan
+// computed at enqueue time that fires only when ITS meta op settles. A batch
+// whose meta is superseded or fails loses its plan with it, so the still-
+// committed predecessor generation is never deleted early, and a batch that
+// dies mid-write joins the dead-generation set the next commit collects.
 // An interrupted save leaves unreferenced generation keys behind but never
 // touches the committed generation, so the last committed library is always
 // decodable in full. Readers decode exactly the keys the committed index
@@ -491,14 +496,15 @@ export function decodeLibrary(remote: Map<string, string | null>): Decoded {
 
 /**
  * Order one save's ops: generation content first, the `meta` commit pointer
- * last, collects at the very end. An interrupted batch can leave orphan
- * generation keys but never an index pointing at uncommitted content.
+ * last. An interrupted batch can leave orphan generation keys but never an
+ * index pointing at uncommitted content. Deletes are NEVER part of a batch:
+ * collection runs only after this batch's commit pointer is acknowledged -
+ * see collectKeys and LibraryStore's per-batch gc plan.
  */
 export function diffOps(
   desired: Map<string, string>,
   remote: Map<string, string | null>,
-  pending: Map<string, Pending>,
-  collectable: (k: string) => boolean
+  pending: Map<string, Pending>
 ): { k: string; v: string | null }[] {
   const ops: { k: string; v: string | null }[] = []
   const meta = desired.get(META_KEY)
@@ -514,13 +520,28 @@ export function diffOps(
     const p = pending.get(META_KEY)
     if (!p || p.failed || p.v !== meta) ops.push({ k: META_KEY, v: meta })
   }
+  return ops
+}
+
+/**
+ * The keys a commit may collect once acknowledged: records the replaced index
+ * named plus anything `collectable` accepts (own dead generations, or flat
+ * legacy/v2 keys during migration). Computed at save time, fired at commit
+ * time - between those points the committed predecessor must stay whole, so
+ * nothing in this set may be deleted before the new pointer lands.
+ */
+export function collectKeys(
+  desired: Map<string, string>,
+  remote: Map<string, string | null>,
+  pending: Map<string, Pending>,
+  collectable: (k: string) => boolean
+): string[] {
+  const keys: string[] = []
   for (const k of new Set([...remote.keys(), ...pending.keys()])) {
     if (k === META_KEY || !collectable(k) || desired.has(k)) continue
-    const p = pending.get(k)
-    if (p && p.v === null && !p.failed) continue // delete already issued
-    ops.push({ k, v: null })
+    keys.push(k)
   }
-  return ops
+  return keys
 }
 
 export class LibraryStore {
@@ -548,6 +569,11 @@ export class LibraryStore {
   // beyond the previous committed index's.
   private myGens = new Set<string>()
   private deadGens = new Set<string>()
+  // Per-save cleanup plan: the keys a batch may delete once ITS commit
+  // pointer is acknowledged. A batch that never commits leaves its plan
+  // unfired, which is what keeps the still-committed predecessor whole when a
+  // superseded or failed save would otherwise have deleted it early.
+  private gcPlan = new Map<number, { gen: string; keys: string[] }>()
 
   constructor(
     private space: Space,
@@ -583,10 +609,13 @@ export class LibraryStore {
       this.pending.delete(k)
       const g = genOf(k)
       if (g && this.myGens.has(g)) this.deadGens.add(g)
-      if (p.v === null) this.enqueue([{ k, v: null }])
+      if (p.v === null) this.enqueue([{ k, v: null }], { supersede: false })
     }
-    // Nothing to write when the committed view already equals the target.
-    if (serializeLibrary(this.libView().lib) === serializeLibrary(next)) {
+    // Nothing to write when a committed v3 index already equals the target.
+    // A library still on legacy/v2 flat records is not deduped: a retry after
+    // a failed migration must rewrite the generation + pointer.
+    const decoded = this.libView()
+    if (decoded.index !== null && serializeLibrary(decoded.lib) === serializeLibrary(next)) {
       this.emit()
       return true
     }
@@ -600,10 +629,6 @@ export class LibraryStore {
       return false
     }
     this.myGens.add(gen)
-    // Failed or superseded pending ops belong to generations that can never
-    // commit now - drop them so the optimistic view stops implying they saved,
-    // and remember them for the post-commit collect.
-    const decoded = this.libView()
     const replacedIndex = decoded.index
     const collectable = (k: string) => {
       const g = genOf(k)
@@ -612,30 +637,38 @@ export class LibraryStore {
       // non-v3 index - never mid-flight for a peer's own write.
       return decoded.index === null && flatOurs(k)
     }
-    // A superseded queued save's generation is dead before it ever lands.
-    for (const o of this.ops) {
-      if (o.live || o.del) continue
-      const g = genOf(o.k)
-      if (g && g !== gen && this.myGens.has(g)) this.deadGens.add(g)
-    }
-    this.enqueue(diffOps(desired, this.remote, this.pending, collectable))
+    const b = ++this.batch
+    this.gcPlan.set(b, { gen, keys: collectKeys(desired, this.remote, this.pending, collectable) })
+    this.enqueue(diffOps(desired, this.remote, this.pending), { supersede: true, batchId: b })
     return true
   }
 
-  private enqueue(ops: { k: string; v: string | null }[]) {
+  private enqueue(ops: { k: string; v: string | null }[], opts: { supersede?: boolean; batchId?: number } = {}) {
     if (!ops.length) {
       this.emit()
       return
     }
-    const b = ++this.batch
-    // Queued (not yet in-flight) ops from earlier saves are superseded whole:
-    // their generation can never commit now that a newer save exists. Deletes
-    // only target collectable keys and stay - they are idempotent cleanup.
-    const dropped = this.ops.filter((o) => !o.live && !o.del)
-    this.ops = this.ops.filter((o) => o.live || o.del)
-    for (const o of dropped) {
-      const p = this.pending.get(o.k)
-      if (p && p.serial === o.serial) this.pending.delete(o.k)
+    const b = opts.batchId ?? ++this.batch
+    if (opts.supersede) {
+      // A newer save supersedes every generation that cannot commit anymore:
+      // queued content/index/pointer writes of earlier batches are dropped and
+      // their generations become dead (collectable by this batch's plan).
+      // Deletes are never queued inside a batch, so nothing here can run
+      // ahead of the replacement commit - a live op that already started
+      // lands as an orphan under its now-dead generation.
+      const dropped = this.ops.filter((o) => !o.live && !o.del)
+      this.ops = this.ops.filter((o) => o.live || o.del)
+      for (const o of this.ops) {
+        const g = genOf(o.k)
+        if (!o.del && g && this.myGens.has(g)) this.deadGens.add(g)
+      }
+      for (const o of dropped) {
+        const p = this.pending.get(o.k)
+        if (p && p.serial === o.serial) this.pending.delete(o.k)
+        const g = genOf(o.k)
+        if (g && this.myGens.has(g)) this.deadGens.add(g)
+        if (o.k === META_KEY) this.gcPlan.delete(o.b) // its plan can never fire
+      }
     }
     for (const op of ops) {
       const serial = ++this.serial
@@ -678,6 +711,16 @@ export class LibraryStore {
     this.remote.set(op.k, deferred && deferred.rev > ackRev ? deferred.v : op.v)
     this.pending.delete(op.k)
     this.deferred.delete(op.k)
+    if (op.k === META_KEY) {
+      // The commit pointer is acknowledged: only now may this batch collect
+      // the generation it replaced and its own dead generations.
+      const plan = this.gcPlan.get(op.b)
+      if (plan) {
+        this.gcPlan.delete(op.b)
+        const dels = plan.keys.filter((k) => this.remote.has(k) || this.pending.has(k)).map((k) => ({ k, v: null }))
+        if (dels.length) this.enqueue(dels, { supersede: false })
+      }
+    }
     this.emit()
   }
 
@@ -685,6 +728,13 @@ export class LibraryStore {
     const code = e instanceof Error && 'code' in e ? String((e as { code: unknown }).code) : 'E_STORAGE'
     const permanent = code === 'E_ARGS' || code === 'E_QUOTA'
     if (permanent) this.saveFailed = true
+    // A failed batch's generation can never commit; remember it so a later
+    // commit can collect its already-written keys instead of leaking them.
+    const plan = this.gcPlan.get(op.b)
+    if (plan) {
+      this.gcPlan.delete(op.b)
+      if (this.myGens.has(plan.gen)) this.deadGens.add(plan.gen)
+    }
     const p = this.pending.get(op.k)
     if (p && p.serial === op.serial) {
       if (permanent) this.pending.delete(op.k)
@@ -762,8 +812,11 @@ export class LibraryStore {
         try {
           const gen = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
           this.myGens.add(gen)
+          const desired = encodeLibrary(decoded.lib, this.limits, gen)
           const collectable = (k: string) => flatOurs(k)
-          this.enqueue(diffOps(encodeLibrary(decoded.lib, this.limits, gen), this.remote, this.pending, collectable))
+          const b = ++this.batch
+          this.gcPlan.set(b, { gen, keys: collectKeys(desired, this.remote, this.pending, collectable) })
+          this.enqueue(diffOps(desired, this.remote, this.pending), { supersede: true, batchId: b })
         } catch {
           this.encodeFailed = true
         }

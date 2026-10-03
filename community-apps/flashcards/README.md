@@ -77,8 +77,12 @@ loss behind a fresh index.
 Remaining honest limits: one card still must fit a single record (~256 KiB
 raw, less after envelope escaping), the review history keeps the newest 500
 grades, and everything lives under the platform's 5 MiB total app storage
-quota. The chunked index removed the earlier deck-count ceiling. Hitting any
-of them reports the failure instead of silently dropping content.
+quota. Because a save stages a whole new generation before the pointer
+moves, peak usage during a write can approach twice the live library (the
+committed generation plus the staged one count toward the quota until the
+acknowledged collect deletes the replaced copy). The chunked index removed
+the earlier deck-count ceiling. Hitting any of them reports the failure
+instead of silently dropping content.
 
 Pane navigation and the open editor draft live in `os.session`: they follow
 the fold but reset on a cold launch, at which point a paused review re-opens

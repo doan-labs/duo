@@ -679,6 +679,165 @@ function envelopesOk(kv: FakeKV) {
   eq('library still decoded', canonical(snap.lib), canonical(lib))
 }
 
+// --- a superseded save can never delete the still-committed generation -------
+
+{
+  // The exact blocking repro: save A parked on its first write, save B
+  // supersedes it, B fails - the committed g0 must stay whole throughout.
+  const runOnce = async (failAt: number) => {
+    const kv = new FakeKV()
+    const { store } = await bootStore(kv)
+    let lib = newLibrary()
+    lib = addDeck(lib, 'Sup', T0)
+    const deck = lib.decks[0]!
+    lib = addCard(lib, deck.id, 'c0', 'a0', T0)
+    check(`seed ${failAt}`, store.save(lib))
+    await drain(store)
+    const committedIdx = decodeLibrary(kv.map).index
+    const committedKeys = new Set(committedIdx ? committedIdx.keys : [])
+    const metaBefore = kv.map.get('meta')
+
+    const editedA = { ...lib, cards: lib.cards.map((c) => ({ ...c, front: 'first edit' })) }
+    const editedB = { ...lib, cards: lib.cards.map((c) => ({ ...c, front: 'second edit' })) }
+    // Park the whole pump: A's first content write is in-flight when B lands.
+    kv.hold = true
+    check(`save A starts ${failAt}`, store.save(editedA))
+    await tick()
+    check(`save B supersedes A ${failAt}`, store.save(editedB))
+    let seen = 0
+    let skippedA = false
+    // A's live op resumes first; only B's sets are counted for the failure.
+    kv.failOn = (_k, v) => {
+      if (v === null) return null
+      if (!skippedA) {
+        skippedA = true
+        return null
+      }
+      return seen++ === failAt ? 'E_STORAGE' : null
+    }
+    kv.resume()
+    const mid = await drain(store)
+    eq(`superseded save failing at op ${failAt} surfaces`, mid.status, 'error')
+    eq(`commit pointer unchanged at op ${failAt}`, kv.map.get('meta'), metaBefore)
+    const cold = decodeLibrary(kv.map)
+    eq(`committed library survives at op ${failAt}`, cold.torn, false)
+    eq(`committed content intact at op ${failAt}`, canonical(cold.lib), canonical(lib))
+    check(
+      `no committed-generation key deleted at op ${failAt}`,
+      kv.log.filter((e) => e.op === 'del').every((e) => !committedKeys.has(e.k))
+    )
+    // Relaunch decodes the same committed library - nothing was sealed away.
+    const { snap: relaunch } = await bootStore(kv)
+    eq(`relaunch keeps committed lib at op ${failAt}`, canonical(relaunch.lib), canonical(lib))
+    // The follow-up save commits B's intent AND collects the dead generations.
+    kv.failOn = null
+    check(`retry after supersede ${failAt}`, store.save(editedB))
+    const settled = await drain(store)
+    eq(`retry ready at op ${failAt}`, settled.status, 'ready')
+    const after = decodeLibrary(kv.map)
+    eq(`retry commits the newer edit at op ${failAt}`, canonical(after.lib), canonical(editedB))
+    check(
+      `dead generations collected after retry ${failAt}`,
+      [...kv.map.keys()].filter((k) => k.startsWith('g')).every((k) => after.index!.keys.has(k))
+    )
+  }
+  // B's op list: deck chunk, activity, index chunk, meta - fail each position.
+  for (let failAt = 0; failAt < 4; failAt++) await runOnce(failAt)
+}
+
+// --- cleanup-only failure after a real commit stays durable -------------------
+
+{
+  const kv = new FakeKV()
+  const { store } = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'Sweep', T0)
+  const deck = lib.decks[0]!
+  lib = addCard(lib, deck.id, 'c', 'a', T0)
+  check('seed save', store.save(lib))
+  await drain(store)
+  const oldKeys = new Set(decodeLibrary(kv.map).index!.keys)
+  const edited = { ...lib, cards: lib.cards.map((c) => ({ ...c, front: 'v2' })) }
+  kv.failOn = (_k, v) => (v === null ? 'E_STORAGE' : null) // deletes only
+  check('edit save accepted', store.save(edited))
+  const mid = await drain(store)
+  eq('failed cleanup surfaces error', mid.status, 'error')
+  // The commit itself is durable: the new generation is what readers see.
+  const cold = decodeLibrary(kv.map)
+  eq('commit durable despite failed cleanup', cold.torn, false)
+  eq('committed content is the new revision', canonical(cold.lib), canonical(edited))
+  check(
+    'replaced generation not partially deleted',
+    [...oldKeys].every((k) => kv.map.has(k))
+  )
+  // Cleanup retries on the next save and converges to ready.
+  kv.failOn = null
+  check('re-save accepted', store.save(edited))
+  const settled = await drain(store)
+  eq('cleanup retry settles ready', settled.status, 'ready')
+  const after = decodeLibrary(kv.map)
+  check(
+    'replaced generation collected after ack',
+    [...kv.map.keys()].filter((k) => k.startsWith('g')).every((k) => after.index!.keys.has(k))
+  )
+}
+
+// --- a permanently refused generation is collected by the next commit ----------
+
+{
+  const kv = new FakeKV()
+  const { store } = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'Quota', T0)
+  const deck = lib.decks[0]!
+  for (let i = 0; i < 60; i++) lib = addCard(lib, deck.id, `q${i} ${'x'.repeat(2000)}`, `a${i}`, T0 + i)
+  // Refuse a mid-save write with the permanent code: the deck chunks already
+  // landed, so part of this generation is on disk and collectable later.
+  let refused = 0
+  kv.failOn = (k, v) => (v !== null && k.includes('.idx.') && refused++ === 0 ? 'E_QUOTA' : null)
+  check('save into nearly-full space', store.save(lib))
+  const snap = await drain(store)
+  eq('quota failure reported', snap.status, 'error')
+  eq('view reverts to committed truth', snap.lib.cards.length, 0)
+  const failedGenKeys = [...kv.map.keys()].filter((k) => k.startsWith('g'))
+  check('partial generation keys leaked by refusal', failedGenKeys.length > 0)
+  kv.failOn = null
+  check('retry after freeing space', store.save(lib))
+  const settled = await drain(store)
+  eq('recovers to ready', settled.status, 'ready')
+  const after = decodeLibrary(kv.map)
+  check(
+    'refused generation collected after the next commit',
+    failedGenKeys.every((k) => !kv.map.has(k)) && after.index !== null
+  )
+  const { snap: relaunch } = await bootStore(kv)
+  eq('relaunch matches', canonical(relaunch.lib), canonical(lib))
+}
+
+// --- a retried save commits a created item exactly once ------------------------
+
+{
+  const kv = new FakeKV()
+  const { store } = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'Once', T0)
+  const deck = lib.decks[0]!
+  lib = addCard(lib, deck.id, 'seed', 'seed', T0)
+  check('seed', store.save(lib))
+  await drain(store)
+  const withNew = addCard(lib, deck.id, 'typed card', 'typed back', T0 + 1)
+  kv.failOn = (k) => (k === 'meta' ? 'E_STORAGE' : null)
+  check('creation save accepted', store.save(withNew))
+  const mid = await drain(store)
+  eq('creation save fails at the pointer', mid.status, 'error')
+  kv.failOn = null
+  check('same library retried', store.save(withNew))
+  const settled = await drain(store)
+  eq('retry ready', settled.status, 'ready')
+  const cold = decodeLibrary(kv.map)
+  eq('created card committed exactly once', cold.lib.cards.filter((c) => c.front === 'typed card').length, 1)
+}
+
 // --- decode-level regressions --------------------------------------------------
 
 {
