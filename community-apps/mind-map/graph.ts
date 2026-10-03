@@ -201,7 +201,9 @@ export function welcomeDoc(): MindDoc {
   const extra = node('Children fan out', -220, 120, edit.id, 4)
   const deep = node('Folds keep state', 40, -220, move.id, 5)
   return {
-    id: spawn(),
+    // A fixed id: both display copies can race to seed an empty library, and
+    // identical ids keep the winner's write a single map instead of two.
+    id: 'welcome',
     name: 'Welcome',
     root: root.id,
     nodes: { [root.id]: root, [move.id]: move, [edit.id]: edit, [nav.id]: nav, [extra.id]: extra, [deep.id]: deep },
