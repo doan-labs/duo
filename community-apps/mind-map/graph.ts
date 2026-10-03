@@ -195,11 +195,11 @@ export function newDoc(name: string): MindDoc {
 /** First-run map: enough structure to show edges, curves and colour at a glance. */
 export function welcomeDoc(): MindDoc {
   const root = node('Mind Map', 0, 0, null, 0)
-  const move = node('Drag to move', 280, -120, root.id, 1)
-  const edit = node('Tap to edit', -280, -60, root.id, 2)
-  const nav = node('Pan and zoom', 260, 140, root.id, 3)
-  const extra = node('Children fan out', -220, 120, edit.id, 4)
-  const deep = node('Folds keep state', 40, -220, move.id, 5)
+  const move = node('Drag to move', 235, -100, root.id, 1)
+  const edit = node('Tap to edit', -235, -50, root.id, 2)
+  const nav = node('Pan and zoom', 215, 115, root.id, 3)
+  const extra = node('Children fan out', -185, 95, edit.id, 4)
+  const deep = node('Folds keep state', 25, -175, move.id, 5)
   return {
     // A fixed id: both display copies can race to seed an empty library, and
     // identical ids keep the winner's write a single map instead of two.
@@ -283,9 +283,12 @@ export function docBounds(doc: MindDoc): { cx: number; cy: number; w: number; h:
   const all = Object.values(doc.nodes)
   const xs = all.map((n) => n.x)
   const ys = all.map((n) => n.y)
-  const minX = Math.min(...xs) - 120
-  const maxX = Math.max(...xs) + 120
-  const minY = Math.min(...ys) - 60
-  const maxY = Math.max(...ys) + 60
+  // Padded past the node pills' visual extent: a pill can run 110 px either
+  // side of its anchor, and edges overshoot a little more. Fitting raw node
+  // centres clips pills at the canvas rim.
+  const minX = Math.min(...xs) - 140
+  const maxX = Math.max(...xs) + 140
+  const minY = Math.min(...ys) - 80
+  const maxY = Math.max(...ys) + 80
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: maxX - minX, h: maxY - minY }
 }

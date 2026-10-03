@@ -80,6 +80,10 @@ function MindMap() {
   const suppressClick = useRef(false)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
+  // Maps this copy has already fitted to its own canvas: one shared view
+  // cannot serve a 387pt cover and a 790pt inner, so each display computes
+  // its own framing on first sight of a doc.
+  const framedMine = useRef(new Set<string>())
   const docRef = useRef(doc)
   docRef.current = doc
   const selRef = useRef(sel)
@@ -175,7 +179,10 @@ function MindMap() {
     }
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
-    setDoc(next.doc)
+    // Keep this copy's own view for a doc it already fitted: a remote fit was
+    // computed for a different canvas and must not replace the local one.
+    const keep = docRef.current?.id === next.doc.id && framedMine.current.has(next.doc.id)
+    setDoc(keep && docRef.current ? { ...next.doc, view: docRef.current.view } : next.doc)
     setSel(next.sel)
     setArming(null)
     enqueue(async () => {
@@ -187,13 +194,18 @@ function MindMap() {
     })
   }, [live, stored.status, stored.set])
 
-  // A map asking to be framed waits for a copy with a real viewport: a hidden
-  // copy's canvas measures 0x0, so the first visible one wins the publish.
+  // First sight of a doc gets a fit computed for this display's own canvas.
+  // A hidden copy's canvas measures 0x0, so the observer retries once the
+  // fold gives the element a real box; the fitted view is published back so
+  // it also serves as the stored starting view.
   useEffect(() => {
-    if (doc?.view.framed !== false) return
-    const f = requestAnimationFrame(() => {
-      const box = canvasRef.current?.getBoundingClientRect()
-      if (!box?.width) return
+    if (!doc || framedMine.current.has(doc.id)) return
+    const el = canvasRef.current
+    if (!el) return
+    const fitLocal = () => {
+      const box = el.getBoundingClientRect()
+      if (!box.width) return
+      framedMine.current.add(doc.id)
       const b = docBounds(doc)
       const zoom = Math.min(1, Math.min((box.width - 96) / b.w, (box.height - 96) / b.h))
       const next = setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom, framed: true })
@@ -203,8 +215,16 @@ function MindMap() {
         stored.set(serializeLibrary(withDoc(lib, next)))
       })
       void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
+    }
+    const f = requestAnimationFrame(fitLocal)
+    const ro = new ResizeObserver(() => {
+      if (!framedMine.current.has(doc.id)) fitLocal()
     })
-    return () => cancelAnimationFrame(f)
+    ro.observe(el)
+    return () => {
+      cancelAnimationFrame(f)
+      ro.disconnect()
+    }
   }, [doc, stored.set])
 
   useEffect(() => {
@@ -537,7 +557,11 @@ function MindMap() {
           {canvas}
           <div {...stylex.props(styles.tray)}>
             <div {...stylex.props(styles.trayRow)}>
-              <button type="button" onClick={spawn} {...stylex.props(styles.iconBtn, styles.iconBtnTint)}>
+              <button
+                type="button"
+                onClick={spawn}
+                {...stylex.props(styles.iconBtn, styles.iconBtnTint, styles.iconBtnLgH)}
+              >
                 <Sym name="plus" size={13} />
                 Idea
               </button>
@@ -545,7 +569,7 @@ function MindMap() {
                 type="button"
                 aria-label="Maps"
                 onClick={() => setSheet(true)}
-                {...stylex.props(styles.iconBtn, styles.iconBtnTint)}
+                {...stylex.props(styles.iconBtn, styles.iconBtnTint, styles.iconBtnLgH)}
               >
                 <Sym name="stack" size={13} />
                 Maps

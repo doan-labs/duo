@@ -159,13 +159,9 @@ export const styles = stylex.create({
     animationTimingFunction: easing.out
   },
   edgeTone: (i: number) => ({ stroke: `color-mix(in srgb, ${HUES[i % HUES.length]} 84%, transparent)` }),
-  // The branch feeding the selected node: thicker, full strength, and glowing
-  // in its own hue so the selection reads structurally, not only as a ring.
-  edgeSel: (i: number) => ({
-    strokeWidth: 3.5,
-    stroke: HUES[i % HUES.length],
-    filter: `drop-shadow(0 0 4px color-mix(in srgb, ${HUES[i % HUES.length]} 60%, transparent))`
-  }),
+  // The branch feeding the selected node: thicker and at full hue strength so
+  // the selection reads structurally, not only as a ring on the pill.
+  edgeSel: (i: number) => ({ strokeWidth: 3.5, stroke: HUES[i % HUES.length] }),
   node: {
     position: 'absolute',
     display: 'flex',
@@ -203,16 +199,20 @@ export const styles = stylex.create({
   nodeDrag: { transitionDuration: '0s' },
   nodeCover: { maxWidth: '150px', paddingBlock: space.xs, paddingInline: space.sm, fontSize: typeScale.caption1 },
   nodeRoot: {
-    boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${colors.indigoDark} 70%, transparent),${shadow.rim},${shadow.float}`
+    // Outlines are used for rings here, not box-shadow: section 3 allows only
+    // the four shadow tokens, and an outline is the legal way to add a frame
+    // that does not cost the glass rim or the float lift.
+    outline: `1.5px solid color-mix(in srgb, ${colors.indigoDark} 70%, transparent)`
   },
   nodeSel: {
     backgroundColor: {
       default: `color-mix(in srgb, ${colors.cyanDark} 18%, transparent)`,
       ':hover': `color-mix(in srgb, ${colors.cyanDark} 24%, transparent)`
     },
-    // An inner ring for shape plus a soft halo outside it: the selection must
-    // read at a glance even over the glowing edge it sits on.
-    boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${colors.cyanDark} 90%, transparent),0 0 0 3px color-mix(in srgb, ${colors.cyanDark} 26%, transparent),${shadow.float}`
+    // A lifted cyan ring: the offset parks it just off the pill so the
+    // selection reads at a glance even beside the full-strength parent edge.
+    outline: `2px solid color-mix(in srgb, ${colors.cyanDark} 85%, transparent)`,
+    outlineOffset: 1.5
   },
   nodeAt: (x: number, y: number) => ({ transform: `translate(${x}px,${y}px) translate(-50%,-50%)` }),
   // A plain block: -webkit-box's min-content collapses to one character inside
@@ -223,11 +223,8 @@ export const styles = stylex.create({
     overflow: 'hidden',
     overflowWrap: 'break-word'
   },
-  dot: { width: 10, height: 10, borderRadius: radius.circle, flexShrink: 0 },
-  dotTone: (i: number) => ({
-    backgroundColor: HUES[i % HUES.length],
-    boxShadow: `0 0 7px color-mix(in srgb, ${HUES[i % HUES.length]} 55%, transparent),${shadow.rim}`
-  }),
+  dot: { width: 10, height: 10, borderRadius: radius.circle, flexShrink: 0, boxShadow: shadow.rim },
+  dotTone: (i: number) => ({ backgroundColor: HUES[i % HUES.length] }),
   zoomDock: {
     position: 'absolute',
     top: space.sm,
@@ -288,8 +285,10 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold
   },
-  // The cover tray's icon-only button gets a roomier target than the dock's.
-  iconBtnLg: { width: 36, height: 36 },
+  // The cover tray's buttons get HIG-comfortable targets, roomier than the
+  // dock's: 44pt square icons, same height on the labelled pills.
+  iconBtnLg: { width: 44, height: 44, flexShrink: 0 },
+  iconBtnLgH: { height: 44 },
   hint: {
     position: 'absolute',
     left: space.sm,
