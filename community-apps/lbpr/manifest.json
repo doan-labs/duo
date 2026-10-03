@@ -1,0 +1,15 @@
+{
+  "id": "com.lucpastc.lbpr.app",
+  "name": "LBP:R",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "lucpastc",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/lbpr",
+  "license": "MIT",
+  "permissions": [],
+  "network": [
+    "https://lucazinho1002.github.io"
+  ]
+}
