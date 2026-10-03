@@ -72,6 +72,9 @@ function MindMap() {
   const [sheet, setSheet] = useState(false)
   const [arming, setArming] = useState<string | null>(null)
   const [gesturing, setGesturing] = useState(false)
+  // The node this copy is dragging, so its move transition can switch off:
+  // a transitioning transform would trail the pointer instead of tracking it.
+  const [dragId, setDragId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const suppressClick = useRef(false)
@@ -296,7 +299,10 @@ function MindMap() {
     const dx = e.clientX - d.px
     const dy = e.clientY - d.py
     if (!d.moved && Math.hypot(dx, dy) < 5) return
-    if (!d.moved) setGesturing(true)
+    if (!d.moved) {
+      setGesturing(true)
+      if (d.kind === 'node') setDragId(d.id)
+    }
     d.moved = true
     if (d.kind === 'pan') setDoc({ ...now, view: { ...now.view, x: d.ox + dx, y: d.oy + dy } })
     else if (d.id) setDoc(moveNode(now, d.id, d.ox + dx / now.view.zoom, d.oy + dy / now.view.zoom))
@@ -306,6 +312,7 @@ function MindMap() {
     if (!d || e.pointerId !== d.pointerId) return
     dragRef.current = null
     setGesturing(false)
+    setDragId(null)
     if (d.moved) {
       suppressClick.current = true
       if (docRef.current) publish(docRef.current)
@@ -445,7 +452,8 @@ function MindMap() {
                 key={n.id}
                 d={edgePath(doc.nodes[n.parent!]!, n)}
                 fill="none"
-                {...stylex.props(styles.edge, styles.edgeTone(n.color))}
+                pathLength={1}
+                {...stylex.props(styles.edge, sel === n.id ? styles.edgeSel(n.color) : styles.edgeTone(n.color))}
               />
             ))}
         </svg>
@@ -469,7 +477,8 @@ function MindMap() {
               !wide && styles.nodeCover,
               styles.nodeAt(n.x, n.y),
               n.id === doc.root && styles.nodeRoot,
-              sel === n.id && styles.nodeSel
+              sel === n.id && styles.nodeSel,
+              dragId === n.id && styles.nodeDrag
             )}
           >
             <i aria-hidden="true" {...stylex.props(styles.dot, styles.dotTone(n.color))} />
@@ -478,7 +487,9 @@ function MindMap() {
         ))}
       </div>
       {zoomDock}
-      {wide && <span {...stylex.props(styles.hint)}>Drag the canvas to pan, drag a node to move it</span>}
+      <span {...stylex.props(styles.hint)}>
+        {wide ? 'Drag the canvas to pan, drag a node to move it' : 'Drag to pan, tap a node'}
+      </span>
     </div>
   )
 
@@ -507,7 +518,9 @@ function MindMap() {
                   {saving ? 'Saving...' : 'Synced across both displays'}
                 </small>
               </div>
+              <span {...stylex.props(styles.sepH)} />
               {nodeTools}
+              <span {...stylex.props(styles.sepH)} />
               {mapsSection}
             </aside>
           </section>
@@ -543,11 +556,12 @@ function MindMap() {
                 disabled={!selected || selected.id === doc.root}
                 aria-label={arming === selected?.id ? 'Confirm delete node' : 'Delete node'}
                 onClick={() => selected && (arming === selected.id ? dropNode(selected.id) : setArming(selected.id))}
-                {...stylex.props(styles.iconBtn, arming === selected?.id && styles.btnWarn)}
+                {...stylex.props(styles.iconBtn, styles.iconBtnLg, arming === selected?.id && styles.btnWarn)}
               >
                 <Sym name="trash" size={13} />
               </button>
               <span role="status" {...stylex.props(styles.saved)}>
+                {!saving && <Sym name="check" size={10} />}
                 {saving ? 'Saving' : 'Saved'}
               </span>
             </div>

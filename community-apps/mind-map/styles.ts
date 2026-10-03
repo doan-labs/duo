@@ -46,6 +46,13 @@ const fadeIn = stylex.keyframes({
   '0%': { opacity: 0 },
   '100%': { opacity: 1 }
 })
+// A new branch traces itself in: pathLength is set to 1 in markup so the
+// dash math is trivial, and the static style is visible so nothing vanishes
+// when the draw ends.
+const edgeIn = stylex.keyframes({
+  '0%': { strokeDashoffset: 1 },
+  '100%': { strokeDashoffset: 0 }
+})
 
 export const styles = stylex.create({
   root: {
@@ -143,8 +150,22 @@ export const styles = stylex.create({
   edges: { position: 'absolute', width: 1, height: 1, overflow: 'visible', pointerEvents: 'none' },
   // StyleX drops `fill` (not a styleable property), so paths carry fill="none"
   // as an attribute: without it the open curves fill black into the dark canvas.
-  edge: { strokeWidth: 2.5, strokeLinecap: 'round' },
-  edgeTone: (i: number) => ({ stroke: `color-mix(in srgb, ${HUES[i % HUES.length]} 78%, transparent)` }),
+  edge: {
+    strokeWidth: 3,
+    strokeLinecap: 'round',
+    strokeDasharray: 1,
+    animationName: { default: edgeIn, [reduce]: 'none' },
+    animationDuration: '.5s',
+    animationTimingFunction: easing.out
+  },
+  edgeTone: (i: number) => ({ stroke: `color-mix(in srgb, ${HUES[i % HUES.length]} 84%, transparent)` }),
+  // The branch feeding the selected node: thicker, full strength, and glowing
+  // in its own hue so the selection reads structurally, not only as a ring.
+  edgeSel: (i: number) => ({
+    strokeWidth: 3.5,
+    stroke: HUES[i % HUES.length],
+    filter: `drop-shadow(0 0 4px color-mix(in srgb, ${HUES[i % HUES.length]} 60%, transparent))`
+  }),
   node: {
     position: 'absolute',
     display: 'flex',
@@ -163,7 +184,7 @@ export const styles = stylex.create({
     fontFamily: fonts.system,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
-    fontWeight: weight.medium,
+    fontWeight: weight.semibold,
     textAlign: 'start',
     cursor: 'grab',
     touchAction: 'none',
@@ -172,20 +193,26 @@ export const styles = stylex.create({
     animationDuration: '.24s',
     animationTimingFunction: easing.pop,
     animationFillMode: 'both',
-    transitionProperty: 'box-shadow,background-color',
-    transitionDuration: '.18s',
+    // A node moved by the other display glides to its spot; the transform is
+    // suppressed on the locally dragged node or it would trail the finger.
+    transitionProperty: 'transform,box-shadow,background-color',
+    transitionDuration: '.22s,.18s,.18s',
+    transitionTimingFunction: easing.spring,
     ':focus-visible': { outline: `2px solid ${colors.cyanDark}`, outlineOffset: 2 }
   },
+  nodeDrag: { transitionDuration: '0s' },
   nodeCover: { maxWidth: '150px', paddingBlock: space.xs, paddingInline: space.sm, fontSize: typeScale.caption1 },
   nodeRoot: {
     boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${colors.indigoDark} 70%, transparent),${shadow.rim},${shadow.float}`
   },
   nodeSel: {
     backgroundColor: {
-      default: `color-mix(in srgb, ${colors.cyanDark} 16%, transparent)`,
-      ':hover': `color-mix(in srgb, ${colors.cyanDark} 22%, transparent)`
+      default: `color-mix(in srgb, ${colors.cyanDark} 18%, transparent)`,
+      ':hover': `color-mix(in srgb, ${colors.cyanDark} 24%, transparent)`
     },
-    boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${colors.cyanDark} 85%, transparent),${shadow.float}`
+    // An inner ring for shape plus a soft halo outside it: the selection must
+    // read at a glance even over the glowing edge it sits on.
+    boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${colors.cyanDark} 90%, transparent),0 0 0 3px color-mix(in srgb, ${colors.cyanDark} 26%, transparent),${shadow.float}`
   },
   nodeAt: (x: number, y: number) => ({ transform: `translate(${x}px,${y}px) translate(-50%,-50%)` }),
   // A plain block: -webkit-box's min-content collapses to one character inside
@@ -196,8 +223,11 @@ export const styles = stylex.create({
     overflow: 'hidden',
     overflowWrap: 'break-word'
   },
-  dot: { width: 10, height: 10, borderRadius: radius.circle, flexShrink: 0, boxShadow: shadow.rim },
-  dotTone: (i: number) => ({ backgroundColor: HUES[i % HUES.length] }),
+  dot: { width: 10, height: 10, borderRadius: radius.circle, flexShrink: 0 },
+  dotTone: (i: number) => ({
+    backgroundColor: HUES[i % HUES.length],
+    boxShadow: `0 0 7px color-mix(in srgb, ${HUES[i % HUES.length]} 55%, transparent),${shadow.rim}`
+  }),
   zoomDock: {
     position: 'absolute',
     top: space.sm,
@@ -258,6 +288,8 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold
   },
+  // The cover tray's icon-only button gets a roomier target than the dock's.
+  iconBtnLg: { width: 36, height: 36 },
   hint: {
     position: 'absolute',
     left: space.sm,
@@ -399,6 +431,8 @@ export const styles = stylex.create({
   trayRow: { display: 'flex', alignItems: 'center', gap: space.xs, minWidth: 0 },
   trayField: { flex: 1, minWidth: 0 },
   sep: { width: 1, alignSelf: 'stretch', backgroundColor: app.separator, marginBlock: space.xxs },
+  // A hairline between the panel's sections so the tools read as groups.
+  sepH: { height: 1, alignSelf: 'stretch', backgroundColor: app.separator, marginBlock: space.xxs },
   grow: { flex: 1, minWidth: 0 },
   // The maps sheet on the cover: a scrim and a card, same list as the panel.
   scrim: {
@@ -447,6 +481,9 @@ export const styles = stylex.create({
   },
   sheetHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   saved: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.xxs,
     color: app.label2,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
