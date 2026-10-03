@@ -77,11 +77,15 @@ type OceanProps = {
   onHover?: (at: number | null) => void
   overlay?: ReactNode
   pulse?: 'win' | 'lose' | null
+  /** Enemy water runs warm so the two seas read apart at a glance. */
+  enemy?: boolean
+  /** Staggered entrance: the second well follows the first by a beat. */
+  delay?: boolean
 }
 
 /** One 10x10 sea. Cells stay buttons for focus and hit-testing even when the
  * board is only a readout. */
-function Ocean({ board, mode, onPick, onHover, overlay, pulse }: OceanProps) {
+function Ocean({ board, mode, onPick, onHover, overlay, pulse, enemy, delay }: OceanProps) {
   const cells = []
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
@@ -96,19 +100,38 @@ function Ocean({ board, mode, onPick, onHover, overlay, pulse }: OceanProps) {
           onPointerEnter={() => onHover?.(at)}
           {...stylex.props(
             styles.sea,
-            (r + c) % 2 === 1 && styles.seaAlt,
-            mode === 'fire' && styles.seaLive,
+            enemy && styles.seaEnemy,
+            (r + c) % 2 === 1 && (enemy ? styles.seaAltEnemy : styles.seaAlt),
+            mode === 'fire' && styles.seaFire,
             mode === 'place' && styles.seaPlace
           )}
         >
-          {r === 0 && <i {...stylex.props(styles.coord, styles.coordFile, styles.coordInk)}>{'ABCDEFGHIJ'[c]}</i>}
-          {c === 0 && <i {...stylex.props(styles.coord, styles.coordRank, styles.coordInk)}>{r + 1}</i>}
+          {r === 0 && (
+            <i {...stylex.props(styles.coord, styles.coordFile, enemy ? styles.coordInkEnemy : styles.coordInk)}>
+              {'ABCDEFGHIJ'[c]}
+            </i>
+          )}
+          {c === 0 && (
+            <i {...stylex.props(styles.coord, styles.coordRank, enemy ? styles.coordInkEnemy : styles.coordInk)}>
+              {r + 1}
+            </i>
+          )}
         </button>
       )
     }
   }
   return (
-    <div {...stylex.props(styles.board, pulse === 'win' && styles.celebrate, pulse === 'lose' && styles.sink)}>
+    <div
+      {...stylex.props(
+        styles.board,
+        // The actionable well glows in its side's hue; the other's stays quiet.
+        mode === 'place' && styles.boardPlace,
+        mode === 'fire' && styles.boardFire,
+        pulse === 'win' && styles.celebrate,
+        pulse === 'lose' && styles.sink,
+        delay && styles.boardDelay
+      )}
+    >
       <div {...stylex.props(styles.grid, styles.fitBoard(board))} onPointerLeave={() => onHover?.(null)}>
         {cells}
         <div {...stylex.props(styles.overlay)}>{overlay}</div>
@@ -191,7 +214,11 @@ function Seg({
           role="radio"
           aria-checked={value === v}
           onClick={() => onChange(v)}
-          {...stylex.props(styles.segBtn, value === v && styles.segOn)}
+          {...stylex.props(
+            styles.segBtn,
+            value === v && styles.segOn,
+            value === v && (v === 'target' ? styles.segOnEnemy : styles.segOnYou)
+          )}
         >
           <span {...stylex.props(styles.segLabel)}>{label}</span>
         </button>
@@ -267,7 +294,13 @@ function Log({ d, cover }: { d: Derived; cover: boolean }) {
       {[...d.log].reverse().map((entry) => (
         <span key={entry.n} {...stylex.props(styles.logRow, entry.n === d.log.length && styles.logNew)}>
           <span {...stylex.props(styles.logNum)}>{entry.n}</span>
-          <span {...stylex.props(styles.logText, entry.by === 'you' ? styles.logYou : styles.logBot)}>
+          <span
+            {...stylex.props(
+              styles.logText,
+              entry.by === 'you' ? styles.logYou : styles.logBot,
+              entry.result === 'sunk' && styles.logSunk
+            )}
+          >
             {entry.by === 'you' ? 'You' : 'Bot'} {cellName(entry.at)} {entry.result}
             {entry.ship ? ` ${entry.ship}` : ''}
           </span>
@@ -288,7 +321,7 @@ function statusFor(d: Derived, game: SavedGame, dir: Orientation) {
   }
   if (d.phase === 'battle') {
     return d.turn === 'you'
-      ? { text: 'Your shot - pick open water on the enemy grid', kind: 'live' as const }
+      ? { text: 'Your shot - pick open water', kind: 'live' as const }
       : { text: 'Enemy is ranging on your fleet', kind: 'bot' as const }
   }
   return d.phase === 'won'
@@ -531,6 +564,8 @@ function Game() {
       mode={d.turn === 'you' ? 'fire' : 'off'}
       onPick={fire}
       pulse={d.winner === 'you' ? 'win' : null}
+      enemy
+      delay
       overlay={
         <>
           {SHIPS.map(
@@ -597,7 +632,9 @@ function Game() {
           status.kind === 'live' && styles.statusLive
         )}
       >
-        {status.text}
+        <span key={status.text} {...stylex.props(styles.statusSwap)}>
+          {status.text}
+        </span>
         {status.kind === 'bot' && (
           <span {...stylex.props(styles.thinkDots)}>
             <i {...stylex.props(styles.thinkDot)} />
@@ -611,14 +648,14 @@ function Game() {
         <section {...stylex.props(styles.stage)}>
           <div {...stylex.props(styles.panel)}>
             <div {...stylex.props(styles.panelHead)}>
-              <span {...stylex.props(styles.panelTitle)}>Your fleet</span>
+              <span {...stylex.props(styles.panelTitle, styles.panelTitleYou)}>Your fleet</span>
               <span {...stylex.props(styles.panelMeta)}>{SHIPS.length - d.sunkYou.size} afloat</span>
             </div>
             {fleetBoard}
           </div>
           <div {...stylex.props(styles.panel)}>
             <div {...stylex.props(styles.panelHead)}>
-              <span {...stylex.props(styles.panelTitle)}>Enemy waters</span>
+              <span {...stylex.props(styles.panelTitle, styles.panelTitleEnemy)}>Enemy waters</span>
               <span {...stylex.props(styles.panelMeta)}>{d.yourShots.size} shots</span>
             </div>
             {targetBoard}

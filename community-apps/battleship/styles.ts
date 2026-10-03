@@ -65,6 +65,12 @@ const thinkDot = stylex.keyframes({
   '0%,100%': { opacity: '.25' },
   '40%': { opacity: '1' }
 })
+// Turn hand-off: the status line slides in on each change, cueing whose move
+// it is without blocking the grid.
+const statusIn = stylex.keyframes({
+  '0%': { opacity: 0, translate: '0 4px' },
+  '100%': { opacity: 1, translate: '0 0' }
+})
 
 export const styles = stylex.create({
   root: {
@@ -159,6 +165,16 @@ export const styles = stylex.create({
   statusBad: { color: colors.orangeDark },
   statusWin: { color: colors.cyanDark, fontWeight: weight.semibold },
   statusLose: { color: colors.redDark, fontWeight: weight.semibold },
+  // The status text itself swaps on every turn/phase change, keyed in markup.
+  statusSwap: {
+    display: 'inline-block',
+    minWidth: 0,
+    flexShrink: 1,
+    animationName: { default: statusIn, [reduce]: 'none' },
+    animationDuration: '.26s',
+    animationTimingFunction: easing.spring,
+    animationFillMode: 'both'
+  },
   thinkDots: { display: 'inline-flex', gap: space.xxs, paddingInlineStart: space.xxs },
   thinkDot: {
     width: 4,
@@ -203,6 +219,8 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     textTransform: 'uppercase'
   },
+  panelTitleYou: { color: colors.cyanDark },
+  panelTitleEnemy: { color: colors.orangeDark },
   panelMeta: {
     color: app.label3,
     fontSize: typeScale.caption2,
@@ -219,11 +237,23 @@ export const styles = stylex.create({
     backgroundColor: `color-mix(in srgb, ${colors.black} 36%, transparent)`,
     backgroundImage: `linear-gradient(180deg,color-mix(in srgb, ${colors.black} 42%, transparent),transparent 38%)`,
     flexShrink: 0,
+    transitionProperty: 'box-shadow',
+    transitionDuration: '.28s',
+    transitionTimingFunction: easing.inOut,
     animationName: { default: boardIn, [reduce]: 'none' },
     animationDuration: '.4s',
     animationTimingFunction: easing.spring,
     animationFillMode: 'both'
   },
+  // The actionable well glows in its side's hue: where your next move belongs.
+  boardPlace: {
+    boxShadow: `0 0 0 1.5px color-mix(in srgb, ${colors.cyanDark} 55%, transparent),0 0 26px color-mix(in srgb, ${colors.cyanDark} 20%, transparent)`
+  },
+  boardFire: {
+    boxShadow: `0 0 0 1.5px color-mix(in srgb, ${colors.orangeDark} 60%, transparent),0 0 26px color-mix(in srgb, ${colors.orangeDark} 22%, transparent)`
+  },
+  // Stagger the second well's entrance so the two boards cascade, not pop.
+  boardDelay: { animationDelay: '.06s' },
   grid: {
     position: 'relative',
     display: 'grid',
@@ -259,9 +289,12 @@ export const styles = stylex.create({
   },
   // Two quiet tones break the ocean into a grid without a literal line.
   seaAlt: { backgroundColor: `color-mix(in srgb, ${colors.cyanDark} 9%, transparent)` },
-  seaLive: {
+  // Enemy water runs warm: the two boards read apart before a label is read.
+  seaEnemy: { backgroundColor: `color-mix(in srgb, ${colors.orangeDark} 5%, transparent)` },
+  seaAltEnemy: { backgroundColor: `color-mix(in srgb, ${colors.orangeDark} 9%, transparent)` },
+  seaFire: {
     cursor: 'crosshair',
-    ':hover': { backgroundColor: `color-mix(in srgb, ${colors.cyanDark} 22%, transparent)` }
+    ':hover': { backgroundColor: `color-mix(in srgb, ${colors.orangeDark} 24%, transparent)` }
   },
   seaPlace: {
     cursor: 'pointer',
@@ -279,7 +312,8 @@ export const styles = stylex.create({
   // two-glyph "10" gets A10 to itself.
   coordFile: { right: space.xxs, top: 0 },
   coordRank: { left: space.xxs, top: 0 },
-  coordInk: { color: `color-mix(in srgb, ${colors.cyanDark} 45%, transparent)` },
+  coordInk: { color: `color-mix(in srgb, ${colors.cyanDark} 58%, transparent)` },
+  coordInkEnemy: { color: `color-mix(in srgb, ${colors.orangeDark} 62%, transparent)` },
   // Overlay layer: hulls, pegs, the last-shot ring and the placing ghost all
   // paint above the sea cells and never intercept a tap.
   overlay: {
@@ -335,7 +369,7 @@ export const styles = stylex.create({
   },
   pegMiss: {
     backgroundColor: `color-mix(in srgb, ${colors.grey3} 88%, transparent)`,
-    boxShadow: `0 1px 2px color-mix(in srgb, ${colors.black} 40%, transparent)`
+    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 30%, transparent),0 1px 2px color-mix(in srgb, ${colors.black} 40%, transparent)`
   },
   pegHit: {
     backgroundColor: colors.orangeDark,
@@ -467,7 +501,7 @@ export const styles = stylex.create({
   segBtn: {
     flexGrow: 1,
     minWidth: 0,
-    height: 24,
+    height: space.xxxl,
     paddingInline: space.md,
     borderWidth: 0,
     borderRadius: radius.pill,
@@ -488,6 +522,10 @@ export const styles = stylex.create({
     color: colors.white,
     boxShadow: `${shadow.rim},${shadow.card}`
   },
+  // The selected segment keeps the owning side's hue so the cover switch reads
+  // at a glance.
+  segOnYou: { color: colors.cyanDark },
+  segOnEnemy: { color: colors.orangeDark },
   segLabel: { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   segGrow: { flexGrow: 1 },
   field: { display: 'flex', flexDirection: 'column', gap: space.xs, minWidth: 0 },
@@ -590,6 +628,7 @@ export const styles = stylex.create({
   },
   logYou: { color: colors.cyanDark },
   logBot: { color: colors.orangeDark },
+  logSunk: { color: colors.redDark },
   logNew: { fontWeight: weight.bold },
   logEmpty: {
     color: app.label3,
