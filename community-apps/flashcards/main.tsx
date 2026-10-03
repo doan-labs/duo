@@ -43,6 +43,7 @@ import {
   renameDeck,
   revealReview,
   reviewsToday,
+  serializeLibrary,
   startReview,
   updateCard
 } from './cards.ts'
@@ -887,10 +888,15 @@ function Flashcards() {
     const timer = setInterval(() => setBeat((n) => n + 1), 30_000)
     return () => clearInterval(timer)
   }, [view.visible])
-  // Signal readiness after React has committed the app's first frame.
+  // Signal readiness once hydration or migration resolves - either to a ready
+  // view or an error state - so the shell never launches into an unsynced
+  // library. An error still reports ready: the app renders and explains it.
+  const readySent = useRef(false)
   useEffect(() => {
+    if (readySent.current || stored.status === 'hydrating') return
+    readySent.current = true
     requestAnimationFrame(() => os.ready())
-  }, [])
+  }, [stored.status])
   // Dark Mode flips this light app into the kit's dark theme; the switch arrives
   // as a device event the way Settings reads it.
   const [darkMode, setDarkMode] = useState(false)
@@ -1028,10 +1034,24 @@ function Flashcards() {
     else if (draftState.kind === 'card-edit' && draftState.cardId && draftState.front.trim() && draftState.back.trim())
       next = updateCard(lib, draftState.cardId, draftState.front, draftState.back)
     if (!next) return
-    // A rejected save keeps the sheet open: the draft lives in session state
-    // and the status line reports the failure, so nothing typed is lost.
-    if (save(next)) closeDraft()
+    // The draft outlives the save: it clears only after the write is
+    // acknowledged AND the committed view carries exactly this library, so a
+    // rejected or superseded persistence leaves the editor open on the
+    // typed content instead of implying it saved.
+    if (save(next)) setPendingCommit(next)
   }
+
+  const [pendingCommit, setPendingCommit] = useState<Library | null>(null)
+  useEffect(() => {
+    if (!pendingCommit) return
+    if (stored.status === 'ready') {
+      const committed = serializeLibrary(stored.lib) === serializeLibrary(pendingCommit)
+      setPendingCommit(null)
+      if (committed) draft.del()
+    } else if (stored.status === 'error') {
+      setPendingCommit(null)
+    }
+  }, [pendingCommit, stored, draft])
 
   const draftValid =
     draftState &&

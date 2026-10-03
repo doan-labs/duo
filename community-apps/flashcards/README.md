@@ -46,32 +46,39 @@ grade, instant, resulting interval) to a bounded history (newest 500).
 
 ## Persistence
 
-The library lives in bounded records under the platform's per-key limit, not
-one big document: a `meta` index lists each deck with its chunk count,
-`deck.<id>.<i>` records hold cards in shards that each stay under the limit,
-`review.<id>` heads plus `queue.<id>.<i>` shards keep paused reviews,
-and `activity` holds the bounded history (newest 500) and per-day grade
-counters. Every record is measured in UTF-8 bytes of the exact string written,
-so a collection that outgrew the old single 256 KiB document keeps saving.
-Writes run content-first, index-last, deletes-last inside one serialized
-batch, so an interrupted save can leave an orphaned shard or a stale index
-but never an index pointing at a chunk that was not committed; the next save
-or launch reconciles and sweeps. Saves report honestly (hydrating, saving,
-ready, error in the footer), a rejected write keeps the editor open with the
-draft intact, and a queued older value can never overwrite a newer edit.
+The library lives in bounded records under the platform's limits, written as
+immutable generations behind a commit pointer, never overwritten in place:
+each save writes card chunks `g<gen>.deck.<id>.<i>`, paused-review heads
+`g<gen>.review.<id>` plus `g<gen>.queue.<id>.<i>` shards, and `g<gen>.activity`
+for the bounded history (newest 500) and per-day grade counters, all under a
+fresh generation token. A chunked index `g<gen>.idx.<i>` names every content
+key of that generation, and `meta` - the only record ever rewritten - is a
+commit pointer `{ v: 3, g, n }` that lands last. An interrupted save leaves
+unreferenced generation keys behind but never touches the committed
+generation, so the last committed library is always decodable in full; the
+next commit collects the replaced generation. Readers decode exactly the keys
+the committed index names, so a peer's in-flight save is invisible until its
+pointer lands and hydration never deletes anything. Both records and the
+serialized request envelope are measured in UTF-8 bytes: a value must fit
+~256 KiB raw AND escape to under the ~300 KiB request limit, so escape-heavy
+text gets smaller chunks rather than a client-side rejection. Saves report
+honestly (hydrating, saving, ready, error in the footer), a rejected write
+keeps the editor open with the draft intact until the write is acknowledged,
+and a queued older generation can never overwrite a newer commit.
 
-The previous single `library` document migrates on first launch: its cards,
-scheduling, history, daily counters and every paused review are rewritten
-into the shard layout, and the old document is deleted only after the new
-index commits, so a failed migration simply retries next launch instead of
-dropping data. If the committed index ever references a missing shard the
-app surfaces an error rather than sealing the loss behind a fresh index.
+The previous single `library` document and the earlier flat shard layout both
+migrate on first launch: cards, scheduling, history, daily counters and every
+paused review are rewritten into a committed generation, and the old records
+are deleted only after the new index commits, so a failed migration simply
+retries next launch instead of dropping data. If the committed index ever
+references a missing record the app surfaces an error rather than sealing the
+loss behind a fresh index.
 
-Remaining honest limits: one card still must fit a single record (~256 KiB of
-text), the deck index itself caps around two thousand decks, the review
-history keeps the newest 500 grades, and everything lives under the
-platform's 5 MiB total app storage quota. Hitting any of them reports the
-failure instead of silently dropping content.
+Remaining honest limits: one card still must fit a single record (~256 KiB
+raw, less after envelope escaping), the review history keeps the newest 500
+grades, and everything lives under the platform's 5 MiB total app storage
+quota. The chunked index removed the earlier deck-count ceiling. Hitting any
+of them reports the failure instead of silently dropping content.
 
 Pane navigation and the open editor draft live in `os.session`: they follow
 the fold but reset on a cold launch, at which point a paused review re-opens
@@ -99,8 +106,14 @@ bun storage.test.ts                        # sharded-storage tests
 Verified: `bun check`, `bun build`, `bun cards.test.ts` (scheduler math, due
 queue ordering, review flow, deletes, serialization round-trip),
 `bun storage.test.ts` (a >256 KiB library with multibyte text, a deck split
-across shards, index and record bounds, save + grade + relaunch equivalence,
-legacy migration, injected write failures with safe retry, stale-write
-ordering and two live display copies), and manual exercise of the full
-create/edit/review/delete loop in the simulator on the cover display and
-the wide inner layout.
+across shards, record and request-envelope bounds, save + grade + relaunch
+equivalence, legacy migration, injected failures at every commit step with
+the committed library retained each time, a second copy booting mid-save
+without garbage-collecting it, stale-write ordering and two live display
+copies), and manual exercise of the full create/edit/review/delete loop in
+the simulator on the cover display and the wide inner layout.
+
+Evidence note: interactive screenshots in this PR were captured in Chromium
+against a protocol-faithful replica of the storage host (same guards,
+revisions and pagination), not the native WKWebView shell; native runtime
+verification remains open.

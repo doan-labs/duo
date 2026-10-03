@@ -1,9 +1,9 @@
-// Sharded-storage tests. Plain Bun script like cards.test.ts - `bun:test` is not
-// importable inside a community app - run `bun storage.test.ts`. The fake space
-// below enforces the same guards the shell applies (per-value and key byte
-// limits, key count and total quota), so a record the store writes here would
-// also be accepted for real, and a record it must refuse fails here the way the
-// real shell would refuse it.
+// Generationed-storage tests. Plain Bun script like cards.test.ts - `bun:test`
+// is not importable inside a community app - run `bun storage.test.ts`. The
+// fake space below enforces the same guards the shell and SDK apply (per-value
+// and key byte limits, the serialized request envelope, key count and total
+// quota), so a record the store writes here would also be accepted for real,
+// and a record it must refuse fails here the way the real client would.
 import {
   addCard,
   addDeck,
@@ -16,7 +16,7 @@ import {
   serializeLibrary,
   startReview
 } from './cards.ts'
-import { decodeLibrary, encodeLibrary, LibraryStore, OversizeError, type Space, utf8 } from './storage.ts'
+import { decodeLibrary, encodeLibrary, LibraryStore, type Space, utf8 } from './storage.ts'
 
 // The real protocol limits, read from the SDK source rather than copied - a
 // changed contract fails these tests instead of silently drifting. The app's
@@ -27,6 +27,7 @@ const proto = await Bun.file(new URL('../../packages/sdk/protocol.ts', import.me
 const limitsSrc = proto.match(/export const LIMITS = \{[\s\S]*?\n\}/)?.[0]
 if (!limitsSrc) throw new Error('could not read LIMITS from packages/sdk/protocol.ts')
 const LIMITS = new Function(`${limitsSrc.replace('export const LIMITS =', 'return')}`)() as {
+  envelope: number
   key: number
   value: number
   keys: number
@@ -49,6 +50,10 @@ function eq<T>(name: string, got: T, want: T) {
 
 const err = (code: string, msg: string) => Object.assign(new Error(msg), { code })
 
+/** The request the client would send for a set - same shape as packages/sdk/client.ts. */
+const requestBytes = (k: string, v: string) =>
+  utf8(JSON.stringify({ id: 9007199254740991, m: 'storage.set', p: { k, v }, epoch: 9007199254740991 }))
+
 /** In-memory KV with the shell's guards, change feed, rev bumps and failure injection. */
 class FakeKV implements Space {
   rev = 0
@@ -56,11 +61,13 @@ class FakeKV implements Space {
   used = 0
   watchers = new Map<number, (e: { rev: number; k: string; v: string | null }) => void>()
   private nextWatcher = 0
-  /** Write-order log: {op, k, rev}. */
-  log: { op: 'set' | 'del'; k: string; rev: number }[] = []
-  /** When set, any op where this returns true fails with the given code. */
+  /** Write-order log: {op, k, v, rev}. */
+  log: { op: 'set' | 'del'; k: string; v: string | null; rev: number }[] = []
+  /** When set, any op where this returns a code fails with it. */
   failOn: ((k: string, v: string | null) => string | null) | null = null
-  /** When true, ops park until resume() - an in-flight window. */
+  /** When this matches, the op parks until resume() - a per-key barrier. */
+  holdOn: ((k: string, v: string | null) => boolean) | null = null
+  /** When true, every op parks until resume(). */
   hold = false
   private waiters: (() => void)[] = []
   /** Mutator applied between snapshot pages to force E_STALE once. */
@@ -68,13 +75,14 @@ class FakeKV implements Space {
 
   resume() {
     this.hold = false
+    this.holdOn = null
     const waiters = this.waiters
     this.waiters = []
     for (const resolve of waiters) resolve()
   }
 
   private async gate(k: string, v: string | null) {
-    if (this.hold) await new Promise<void>((resolve) => this.waiters.push(resolve))
+    while (this.hold || this.holdOn?.(k, v)) await new Promise<void>((resolve) => this.waiters.push(resolve))
     const code = this.failOn?.(k, v)
     if (code) throw err(code, `injected ${code} on ${k}`)
   }
@@ -82,6 +90,7 @@ class FakeKV implements Space {
   private touch(k: string, v: string | null) {
     if (utf8(k) > LIMITS.key) throw err('E_ARGS', 'key too long')
     if (v !== null && utf8(v) > LIMITS.value) throw err('E_ARGS', 'value too large')
+    if (v !== null && requestBytes(k, v) > LIMITS.envelope) throw err('E_ARGS', 'envelope too large')
     const old = this.map.get(k)
     const delta = utf8(k) + (v === null ? 0 : utf8(v)) - (old === undefined ? 0 : utf8(k) + utf8(old))
     if (v !== null && !this.map.has(k) && this.map.size >= LIMITS.keys) throw err('E_ARGS', 'key count')
@@ -103,7 +112,7 @@ class FakeKV implements Space {
     this.used += delta
     this.rev += 1
     this.map.set(k, v)
-    this.log.push({ op: 'set', k, rev: this.rev })
+    this.log.push({ op: 'set', k, v, rev: this.rev })
     this.emit(k, v)
     return { rev: this.rev }
   }
@@ -114,7 +123,7 @@ class FakeKV implements Space {
     this.used += delta
     this.rev += 1
     this.map.delete(k)
-    this.log.push({ op: 'del', k, rev: this.rev })
+    this.log.push({ op: 'del', k, v: null, rev: this.rev })
     this.emit(k, null)
     return { rev: this.rev }
   }
@@ -190,18 +199,23 @@ const T0 = 1_700_000_000_000
 function cardText(i: number, extra = '') {
   return {
     front: `front ${i} ¿qué?  front カード ${extra}`,
-    back: `back ${i} réponse  \u{1F4DA} ${extra}`
+    back: `back ${i} réponse  📚 ${extra}`
   }
 }
 
-// --- chunkJson-level bounds ------------------------------------------------
+/** Every set the store issued respected the serialized request envelope, not just the value cap. */
+function envelopesOk(kv: FakeKV) {
+  return kv.log.filter((e) => e.op === 'set').every((e) => requestBytes(e.k, e.v as string) <= LIMITS.envelope)
+}
+
+// --- packing-level bounds ------------------------------------------------
 
 {
   let lib = newLibrary()
   lib = addDeck(lib, 'A', T0)
   const deck = lib.decks[0]!
   for (let i = 0; i < 1200; i++) lib = addCard(lib, deck.id, `q${i} ${'x'.repeat(180)}`, `a${i}`, T0 + i)
-  const desired = encodeLibrary(lib, LIMITS.value)
+  const desired = encodeLibrary(lib, LIMITS, 'pack1')
   check(
     'every record under the per-key limit',
     [...desired.values()].every((v) => utf8(v) <= LIMITS.value)
@@ -211,9 +225,33 @@ function cardText(i: number, extra = '') {
     [...desired.keys()].every((k) => utf8(k) <= LIMITS.key)
   )
   check(
-    'single deck shards into chunks',
-    [...desired.keys()].filter((k) => k.startsWith(`deck.${deck.id}.`)).length > 1
+    'every record fits its request envelope',
+    [...desired].every(([k, v]) => requestBytes(k, v) <= LIMITS.envelope)
   )
+  check(
+    'single deck shards into generationed chunks',
+    [...desired.keys()].filter((k) => k.includes(`deck.${deck.id}.`)).length > 1
+  )
+  check('commit pointer present', desired.has('meta'))
+}
+
+// --- envelope regression: escape-heavy text stays sendable -----------------
+
+{
+  const kv = new FakeKV()
+  const { store } = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'Quotes', T0)
+  const deck = lib.decks[0]!
+  // 10k double-quote fronts: 242 KiB of raw shard escapes to ~483 KiB inside a
+  // request if packing ignored the envelope - the exact rejection the SDK applies.
+  for (let i = 0; i < 20; i++) lib = addCard(lib, deck.id, `${'"'.repeat(10000)}\\${i}\n\t`, 'answer', T0 + i)
+  check('escape-heavy library save accepted', store.save(lib))
+  const snap = await drain(store)
+  eq('escape-heavy save reaches ready', snap.status, 'ready')
+  check('every committed set respected the envelope', envelopesOk(kv))
+  const { snap: relaunch } = await bootStore(kv)
+  eq('escape-heavy relaunch matches', canonical(relaunch.lib), canonical(lib))
 }
 
 // --- >256KiB library round trip, including multibyte strings ---------------
@@ -241,8 +279,8 @@ function cardText(i: number, extra = '') {
     'every committed value bounded',
     [...kv.map.values()].every((v) => utf8(v) <= LIMITS.value)
   )
-  check('meta index committed', kv.map.has('meta'))
-  check('legacy key unused by v2 writer', !kv.map.has('library'))
+  check('meta committed', kv.map.has('meta'))
+  check('legacy key unused by v3 writer', !kv.map.has('library'))
   // Relaunch equivalence on the same space.
   const { snap: relaunch } = await bootStore(kv)
   eq('relaunch status', relaunch.status, 'ready')
@@ -292,15 +330,16 @@ function cardText(i: number, extra = '') {
   const { store, snap } = await bootStore(kv)
   eq('legacy lib decoded before migration settles', canonical(snap.lib), canonical(legacy))
   eq('migration completes ready', snap.status, 'ready')
-  // Migration writes committed: meta now exists and the legacy document is gone.
+  // Migration writes committed: meta now points at a generation and the legacy
+  // document is gone - and only after it.
   check('meta committed', kv.map.has('meta'))
   check('legacy document deleted after meta', !kv.map.has('library'))
   const metaIdx = kv.log.findIndex((e) => e.op === 'set' && e.k === 'meta')
   const legacyIdx = kv.log.findIndex((e) => e.op === 'del' && e.k === 'library')
   check('legacy delete ordered after meta commit', metaIdx >= 0 && legacyIdx > metaIdx)
-  // Relaunch sees the same library through the v2 path only.
+  // Relaunch sees the same library through the v3 path only.
   const { snap: relaunch } = await bootStore(kv)
-  eq('v2 relaunch matches migrated lib', canonical(relaunch.lib), canonical(legacy))
+  eq('v3 relaunch matches migrated lib', canonical(relaunch.lib), canonical(legacy))
   await drain(store)
 }
 
@@ -314,7 +353,7 @@ function cardText(i: number, extra = '') {
   legacy = addCard(legacy, deck.id, 'H2O', 'water', T0)
   kv.map.set('library', serializeLibrary(legacy))
   kv.used += utf8('library') + utf8(serializeLibrary(legacy))
-  // Refuse the index write on the first boot: content shards commit, meta never does.
+  // Refuse the commit pointer on the first boot: generation shards land, meta never does.
   let refusedMeta = false
   kv.failOn = (k) => {
     if (k !== 'meta') return null
@@ -328,9 +367,10 @@ function cardText(i: number, extra = '') {
   check('no meta committed', !kv.map.has('meta'))
   // The live view still shows the user's library - via the pending overlay.
   check('view still shows legacy data', snap.lib.decks.length === 1 && snap.lib.cards.length === 1)
-  // A second store over the same space falls back to the legacy document too.
+  // A second store over the same space falls back to the legacy document too:
+  // the uncommitted generation is invisible to readers.
   const kvCheck = decodeLibrary(kv.map)
-  eq('cold decode still reads legacy', kvCheck.hasMeta, false)
+  eq('cold decode still reads legacy', kvCheck.format, 'legacy')
   eq('cold decode library intact', canonical(kvCheck.lib), canonical(legacy))
   // Clear the fault and let the same store retry the write.
   kv.failOn = null
@@ -338,39 +378,147 @@ function cardText(i: number, extra = '') {
   const settled = await drain(store)
   eq('retry converges to ready', settled.status, 'ready')
   check('meta committed on retry', kv.map.has('meta'))
-  check('legacy deleted once v2 stands', !kv.map.has('library'))
+  check('legacy deleted once v3 stands', !kv.map.has('library'))
 }
 
-// --- mid-save failure: batch abort, honest status, retry ---------------------
+// --- interrupted update of EXISTING chunks loses nothing ---------------------
 
 {
   const kv = new FakeKV()
   let lib = newLibrary()
-  lib = addDeck(lib, 'Base', T0)
+  lib = addDeck(lib, 'Repro', T0)
   const deck = lib.decks[0]!
-  lib = addCard(lib, deck.id, 'old', 'old', T0)
+  // Three 90KB cards pack as [c0,c1] + [c2] under the raw cap alone.
+  for (let i = 0; i < 3; i++) lib = addCard(lib, deck.id, 'x'.repeat(90_000), `answer ${i}`, T0 + i)
   const { store } = await bootStore(kv)
-  check('initial save', store.save(lib))
+  check('seed save', store.save(lib))
   await drain(store)
+  const committedBefore = decodeLibrary(kv.map)
+  eq('committed index before fault', canonical(committedBefore.lib), canonical(lib))
   const metaBefore = kv.map.get('meta')
 
-  // Fail exactly one content write: the rest of that batch must not commit.
-  kv.failOn = (k) => (k === `deck.${deck.id}.0` ? 'E_STORAGE' : null)
-  const next = addCard(lib, deck.id, 'new card', 'new back', T0 + 5)
-  check('save call accepted', store.save(next))
+  // Growing card 0 to 180KB repacks the deck: [c0] + [c1,c2]. Failing the
+  // second content write must leave the previously committed library whole.
+  const edited = { ...lib, cards: lib.cards.map((c, i) => (i === 0 ? { ...c, front: 'x'.repeat(180_000) } : c)) }
+  let writes = 0
+  kv.failOn = (k) => (k === 'meta' ? null : ++writes === 2 ? 'E_STORAGE' : null)
+  check('edit save accepted', store.save(edited))
   const mid = await drain(store)
-  eq('failed write surfaces error', mid.status, 'error')
-  eq('index untouched by torn batch', kv.map.get('meta'), metaBefore)
-  check('live view keeps the new card pending', mid.lib.cards.length === 2)
+  eq('interrupted save surfaces error', mid.status, 'error')
+  eq('commit pointer untouched', kv.map.get('meta'), metaBefore)
+  const cold = decodeLibrary(kv.map)
+  eq('cold decode still commits the whole library', cold.torn, false)
+  eq('previously committed card retained', cold.lib.cards.length, 3)
+  eq('committed content is the pre-edit library', canonical(cold.lib), canonical(lib))
   kv.failOn = null
-  check('retry accepted', store.save(next))
+  check('retry accepted', store.save(edited))
   const settled = await drain(store)
   eq('retry ready', settled.status, 'ready')
-  const { snap: relaunch } = await bootStore(kv)
-  eq('relaunch sees both cards', relaunch.lib.cards.length, 2)
+  const relaunchCold = decodeLibrary(kv.map)
+  eq('post-retry committed library', canonical(relaunchCold.lib), canonical(edited))
 }
 
-// --- stale queued write never overwrites a newer one -------------------------
+// --- failure at every commit step is recoverable ------------------------------
+
+{
+  // First, count the ops a real save issues so every position can be failed.
+  const probe = new FakeKV()
+  const seeded = await bootStore(probe)
+  let base = newLibrary()
+  base = addDeck(base, 'Probe', T0)
+  const pDeck = base.decks[0]!
+  for (const q of ['a', 'b', 'c']) base = addCard(base, pDeck.id, q, `a ${q}`, T0)
+  check('probe save', seeded.store.save(base))
+  await drain(seeded.store)
+  const edited = {
+    ...base,
+    cards: [...base.cards, { ...base.cards[0]!, id: 'probe-extra', front: 'new', back: 'new', due: T0 }]
+  }
+  probe.log.length = 0
+  check('probe edit save', seeded.store.save(edited))
+  await drain(seeded.store)
+  // Content/index/commit sets are the steps that can tear a commit; a failed
+  // trailing delete is retryable cleanup, exercised separately.
+  const opCount = probe.log.filter((e) => e.op === 'set').length
+  check('save issues a bounded op list', opCount > 2)
+
+  for (let failAt = 0; failAt < opCount; failAt++) {
+    const kv = new FakeKV()
+    const { store } = await bootStore(kv)
+    check(`seed ${failAt}`, store.save(base))
+    await drain(store)
+    const committed = decodeLibrary(kv.map)
+    let seen = 0
+    kv.failOn = (_k, v) => (v !== null && seen++ === failAt ? 'E_STORAGE' : null)
+    store.save(edited)
+    const mid = await drain(store)
+    eq(`failure at op ${failAt} surfaces`, mid.status, 'error')
+    const cold = decodeLibrary(kv.map)
+    eq(`committed library survives failure at op ${failAt}`, cold.torn, false)
+    eq(`committed content intact at op ${failAt}`, canonical(cold.lib), canonical(committed.lib))
+    kv.failOn = null
+    store.save(edited)
+    const settled = await drain(store)
+    eq(`retry after op ${failAt} converges`, settled.status, 'ready')
+    const after = decodeLibrary(kv.map)
+    eq(`retry commits the edit at op ${failAt}`, canonical(after.lib), canonical(edited))
+  }
+}
+
+// --- peer boot during a held save never destroys the writer ------------------
+
+{
+  const kv = new FakeKV()
+  const a = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'One', T0)
+  const deck1 = lib.decks[0]!
+  lib = addCard(lib, deck1.id, 'c1', 'a1', T0)
+  check('A seeds committed lib', a.store.save(lib))
+  await drain(a.store)
+
+  // A's second save parks on the commit pointer after every generation key landed.
+  let next = addDeck(lib, 'Two', T0 + 10)
+  const deck2 = next.decks[1]!
+  next = addCard(next, deck2.id, 'c2', 'a2', T0 + 10)
+  const metaBefore = kv.map.get('meta')
+  kv.holdOn = (k) => k === 'meta'
+  check('A second save starts', a.store.save(next))
+  // Wait for the generation writes to land while the commit pointer is held.
+  for (let i = 0; i < 4000; i++) {
+    if (kv.log.some((e) => e.op === 'set' && e.k.startsWith('g') && e.k.includes(`deck.${deck2.id}.`))) break
+    await tick()
+  }
+  check(
+    'new generation keys landed',
+    kv.log.some((e) => e.k.includes(`deck.${deck2.id}.`))
+  )
+  eq('commit pointer still the old generation', kv.map.get('meta'), metaBefore)
+
+  // B boots mid-commit: hydration is read-only, so nothing of A's in-flight
+  // generation may be collected.
+  const keysBefore = new Set(kv.map.keys())
+  const b = await bootStore(kv)
+  eq('B decodes the last committed library', canonical(b.snap.lib), canonical(lib))
+  check(
+    'B deleted nothing',
+    [...keysBefore].every((k) => kv.map.has(k))
+  )
+  check('B issued no deletes', !kv.log.some((e) => e.op === 'del'))
+
+  kv.resume()
+  const settled = await drain(a.store)
+  eq('A commit lands after resume', settled.status, 'ready')
+  await drain(b.store)
+  await tick()
+  const cold = decodeLibrary(kv.map)
+  eq('final committed library has both decks', cold.torn, false)
+  eq('both decks committed', cold.lib.decks.length, 2)
+  await tick()
+  eq('B converges to the committed lib', canonical(b.store.getSnapshot().lib), canonical(next))
+}
+
+// --- stale queued generation never overwrites a newer one ---------------------
 
 {
   const kv = new FakeKV()
@@ -391,12 +539,12 @@ function cardText(i: number, extra = '') {
   kv.resume()
   const settled = await drain(store)
   eq('settles ready', settled.status, 'ready')
-  // Every meta value that ever committed names either state, never a stale
-  // re-landing of 'first' after 'second'.
   const metas = kv.log.filter((e) => e.op === 'set' && e.k === 'meta')
   check('meta writes strictly ordered', metas.length >= 1)
-  const finalMeta = JSON.parse(kv.map.get('meta')!) as { decks: { name: string }[] }
-  eq('final deck name is the newest edit', finalMeta.decks[0]!.name, 'second')
+  const finalMeta = JSON.parse(kv.map.get('meta')!) as { g: string }
+  check('final pointer names a generation', !!finalMeta.g)
+  const decoded = decodeLibrary(kv.map)
+  eq('final deck name is the newest edit', decoded.lib.decks[0]!.name, 'second')
   const { snap: relaunch } = await bootStore(kv)
   eq('relaunch agrees', relaunch.lib.decks[0]!.name, 'second')
 }
@@ -424,6 +572,35 @@ function cardText(i: number, extra = '') {
   eq('copy A follows back', canonical(a.store.getSnapshot().lib), canonical(renamed))
 }
 
+// --- racing writers publish a coherent revision -------------------------------
+
+{
+  const kv = new FakeKV()
+  const a = await bootStore(kv)
+  const b = await bootStore(kv)
+  let libA = addDeck(newLibrary(), 'From A', T0)
+  libA = addCard(libA, libA.decks[0]!.id, 'qa', 'aa', T0)
+  let libB = addDeck(newLibrary(), 'From B', T0)
+  libB = addCard(libB, libB.decks[0]!.id, 'qb', 'ab', T0)
+  kv.holdOn = (k) => k === 'meta'
+  a.store.save(libA)
+  b.store.save(libB)
+  for (let i = 0; i < 4000; i++) {
+    const gens = new Set([...kv.map.keys()].filter((k) => k.startsWith('g')))
+    if (gens.size >= 2) break
+    await tick()
+  }
+  kv.resume()
+  await drain(a.store)
+  await drain(b.store)
+  const cold = decodeLibrary(kv.map)
+  eq('racing writers leave a coherent committed revision', cold.torn, false)
+  check(
+    'winner is one complete library',
+    canonical(cold.lib) === canonical(libA) || canonical(cold.lib) === canonical(libB)
+  )
+}
+
 // --- quota failure is honest and recoverable ---------------------------------
 
 {
@@ -437,7 +614,10 @@ function cardText(i: number, extra = '') {
   check('save accepted into a nearly-full space', store.save(lib))
   const snap = await drain(store)
   eq('quota failure reported', snap.status, 'error')
-  check('view still renders the intended library', snap.lib.cards.length === 80)
+  // A permanently refused batch rolls the view back to the last committed
+  // library instead of implying the edit saved.
+  eq('view reverts to committed truth', snap.lib.cards.length, 0)
+  check('committed state still empty', decodeLibrary(kv.map).lib.cards.length === 0)
   kv.used = 0
   // The user frees space elsewhere; the same save now converges cleanly.
   check('retry after freeing space', store.save(lib))
@@ -459,26 +639,27 @@ function cardText(i: number, extra = '') {
   eq('oversize card rejected', store.save(lib), false)
   const snap = store.getSnapshot()
   eq('status reports the failure', snap.status, 'error')
-  check('no deck records written', ![...kv.map.keys()].some((k) => k.startsWith('deck.')))
+  check('no generation keys written', ![...kv.map.keys()].some((k) => k.startsWith('g')))
   check('draft would stay open: lib untouched', snap.lib.cards.length === 0)
 }
 
-// --- index ceiling is bounded too ---------------------------------------------
+// --- the index itself shards under the limits ---------------------------------
 
 {
-  let lib = newLibrary()
-  for (let i = 0; i < 2200; i++) lib = addDeck(lib, `deck number ${i} with a reasonably long name`, T0 + i)
-  try {
-    encodeLibrary(lib, LIMITS.value)
-    check('index bound throws OversizeError', false)
-  } catch (e) {
-    check('index bound throws OversizeError', e instanceof OversizeError)
-  }
   const kv = new FakeKV()
   const { store } = await bootStore(kv)
-  eq('oversize index refused by save', store.save(lib), false)
-  eq('oversize index surfaces error status', store.getSnapshot().status, 'error')
-  check('no deck chunks committed', ![...kv.map.keys()].some((k) => k.startsWith('deck.')))
+  let lib = newLibrary()
+  for (let i = 0; i < 2200; i++) lib = addDeck(lib, `deck number ${i} with a reasonably long name`, T0 + i)
+  check('2200-deck save accepted', store.save(lib))
+  const snap = await drain(store)
+  eq('2200-deck save completes', snap.status, 'ready')
+  check(
+    'index itself sharded',
+    [...kv.map.keys()].some((k) => /\.idx\.\d+$/.test(k) && k.endsWith('idx.0')) &&
+      kv.log.some((e) => /\.idx\.[1-9]/.test(e.k))
+  )
+  const { snap: relaunch } = await bootStore(kv)
+  eq('2200-deck relaunch matches', canonical(relaunch.lib), canonical(lib))
 }
 
 // --- E_STALE during hydrate re-pulls ------------------------------------------
@@ -504,30 +685,33 @@ function cardText(i: number, extra = '') {
   // Foreign keys never leak into the decoded library.
   let lib = addDeck(newLibrary(), 'D', T0)
   lib = addCard(lib, lib.decks[0]!.id, 'f', 'b', T0)
-  const desired = encodeLibrary(lib, LIMITS.value)
+  const desired = encodeLibrary(lib, LIMITS, 'dec1')
   const remote = new Map<string, string | null>([...desired])
-  remote.set('unrelated-app-key', JSON.stringify({ v: 2, decks: [{ id: 'x' }] }))
-  remote.set('review.', '"junk"')
+  remote.set('unrelated-app-key', JSON.stringify({ v: 3, g: 'x' }))
+  remote.set('gdead.deck.x.0', '"junk"')
   const decoded = decodeLibrary(remote)
   eq('foreign keys ignored', canonical(decoded.lib), canonical(lib))
   eq('foreign junk is not torn', decoded.torn, false)
 
   // A committed index pointing at a missing chunk is torn, not silently empty.
-  remote.delete(`deck.${lib.decks[0]!.id}.0`)
+  const idxKey = [...desired.keys()].find((k) => k.includes('.idx.'))!
+  const cardKey = [...desired.keys()].find((k) => k.includes('deck.'))!
+  remote.delete(cardKey)
   const torn = decodeLibrary(remote)
   eq('missing referenced chunk is torn', torn.torn, true)
   check('torn decode still shows the deck', torn.lib.decks.length === 1)
+  remote.delete(idxKey)
+  const tornIdx = decodeLibrary(remote)
+  eq('missing index chunk is torn', tornIdx.torn, true)
 
-  // An orphaned chunk (index references only 1 chunk, extra chunk present)
-  // heals through reconcile: the diff's delete sweeps it.
-  remote.set(`deck.${lib.decks[0]!.id}.0`, desired.get(`deck.${lib.decks[0]!.id}.0`)!)
-  remote.set(`deck.${lib.decks[0]!.id}.99`, '["orphan"]')
-  const kv2 = new FakeKV()
-  for (const [k, v] of remote) if (v !== null) kv2.map.set(k, v)
-  const { snap: healed } = await bootStore(kv2)
-  eq('orphaned chunk heals to ready', healed.status, 'ready')
-  check('orphan chunk swept', !kv2.map.has(`deck.${lib.decks[0]!.id}.99`))
+  // An uncommitted generation beside a committed one is invisible.
+  const remote2 = new Map<string, string | null>([...desired])
+  const other = encodeLibrary(addDeck(lib, 'Ghost', T0 + 5), LIMITS, 'dead99')
+  for (const [k, v] of other) if (k !== 'meta') remote2.set(k, v)
+  const coherent = decodeLibrary(remote2)
+  eq('uncommitted generation invisible to readers', coherent.lib.decks.length, 1)
+  eq('uncommitted generation is not torn', coherent.torn, false)
 }
 
 console.log(`${passes} passed, ${failures} failed`)
-if (failures) throw new Error(`${failures} check(s) failed`)
+if (failures > 0) throw new Error(`${failures} check(s) failed`)
