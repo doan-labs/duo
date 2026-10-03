@@ -41,6 +41,10 @@
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
+    },
+    "com.mnismt.duo.mindmap": {
+      "folder": "mind-map",
+      "maintainers": ["mnismt"]
     }
   }
 }
