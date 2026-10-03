@@ -745,6 +745,40 @@ function envelopesOk(kv: FakeKV) {
   for (let failAt = 0; failAt < 4; failAt++) await runOnce(failAt)
 }
 
+// --- successful supersessions still collect the committed predecessor ---------
+
+{
+  // The burst repro: held first write of A, superseding B, all ops succeed.
+  // Each burst must still collect the generation it actually replaced.
+  const kv = new FakeKV()
+  const { store } = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'Sup', T0)
+  const deck = lib.decks[0]!
+  lib = addCard(lib, deck.id, 'c0', 'a0', T0)
+  check('seed', store.save(lib))
+  await drain(store)
+  for (let burst = 0; burst < 5; burst++) {
+    const editedA = { ...lib, cards: lib.cards.map((c) => ({ ...c, front: `edit a${burst}` })) }
+    const editedB = { ...lib, cards: lib.cards.map((c) => ({ ...c, front: `edit b${burst}` })) }
+    kv.hold = true
+    check(`burst ${burst} save A`, store.save(editedA))
+    await tick()
+    check(`burst ${burst} save B supersedes`, store.save(editedB))
+    kv.resume()
+    const snap = await drain(store)
+    eq(`burst ${burst} reaches ready`, snap.status, 'ready')
+    lib = editedB
+  }
+  const cold = decodeLibrary(kv.map)
+  eq('coherent after successful bursts', cold.torn, false)
+  eq('final burst committed', canonical(cold.lib), canonical(lib))
+  check(
+    'no unreferenced generation keys after supersessions',
+    [...kv.map.keys()].filter((k) => k.startsWith('g')).every((k) => cold.index!.keys.has(k))
+  )
+}
+
 // --- cleanup-only failure after a real commit stays durable -------------------
 
 {
@@ -870,6 +904,30 @@ function envelopesOk(kv: FakeKV) {
   const coherent = decodeLibrary(remote2)
   eq('uncommitted generation invisible to readers', coherent.lib.decks.length, 1)
   eq('uncommitted generation is not torn', coherent.torn, false)
+}
+
+// --- every record a committed index names must exist to decode clean ----------
+
+{
+  // An in-progress review makes the index name activity + head + queue
+  // records; removing ANY named key must tear the committed decode.
+  const kv = new FakeKV()
+  const { store } = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'Torn', T0)
+  const deck = lib.decks[0]!
+  lib = addCard(lib, deck.id, 'q', 'a', T0)
+  lib = startReview(lib, deck.id, T0)
+  check('seed with session', store.save(lib))
+  const snap = await drain(store)
+  eq('seeded ready', snap.status, 'ready')
+  const committed = decodeLibrary(kv.map)
+  eq('seeded index present', committed.index !== null, true)
+  for (const victim of committed.index!.keys) {
+    const probe = new Map<string, string | null>(kv.map)
+    probe.delete(victim)
+    eq(`missing named record tears: ${victim.split('.').slice(-2).join('.')}`, decodeLibrary(probe).torn, true)
+  }
 }
 
 console.log(`${passes} passed, ${failures} failed`)

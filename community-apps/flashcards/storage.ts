@@ -329,6 +329,7 @@ function decodeV3(
   const cardIds = new Set(lib.cards.map((c) => c.id))
   if (activityKey !== null) {
     const raw = remote.get(activityKey)
+    if (raw == null) torn = true
     try {
       const activity = raw == null ? null : (JSON.parse(raw) as unknown)
       if (isRec(activity)) {
@@ -352,8 +353,14 @@ function decodeV3(
   }
   for (const [deckId, headKey] of headKeys) {
     const raw = remote.get(headKey)
+    if (raw == null) {
+      // A named review head that is absent tears the committed index like any
+      // other missing record.
+      torn = true
+      continue
+    }
     try {
-      const head = raw == null ? null : (JSON.parse(raw) as unknown)
+      const head = JSON.parse(raw) as unknown
       const base = readSessionBase(head)
       const q = isRec(head) ? recNum(head.q) : null
       if (!base || base.deckId !== deckId || q === null || q < 0 || !deckIds.has(deckId)) {
@@ -629,13 +636,24 @@ export class LibraryStore {
       return false
     }
     this.myGens.add(gen)
-    const replacedIndex = decoded.index
+    // Every generation an earlier queued-or-live batch can no longer commit is
+    // dead now; mark before computing the plan so its keys are collectable.
+    for (const o of this.ops) {
+      if (o.del) continue
+      const g = genOf(o.k)
+      if (g && this.myGens.has(g)) this.deadGens.add(g)
+    }
+    // The plan replaces the DURABLE committed index - remote records only. The
+    // optimistic overlay can show a superseded batch's pending pointer, and
+    // collecting against that leaves the actually-committed predecessor behind.
+    const durable = decodeLibrary(this.remote)
+    const replacedIndex = durable.index
     const collectable = (k: string) => {
       const g = genOf(k)
       if (g !== null) return this.deadGens.has(g) || replacedIndex?.keys.has(k) === true
       // Flat legacy/v2 keys are collectable only while we are replacing a
       // non-v3 index - never mid-flight for a peer's own write.
-      return decoded.index === null && flatOurs(k)
+      return durable.index === null && flatOurs(k)
     }
     const b = ++this.batch
     this.gcPlan.set(b, { gen, keys: collectKeys(desired, this.remote, this.pending, collectable) })

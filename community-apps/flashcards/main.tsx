@@ -57,9 +57,27 @@ type View = 'decks' | 'deck' | 'review'
 type UiState = { v: 1; view: View; deckId?: string }
 
 type DraftKind = 'deck-new' | 'deck-rename' | 'card-new' | 'card-edit'
-type Draft = { v: 1; kind: DraftKind; deckId?: string; cardId?: string; name: string; front: string; back: string }
+// createdId pins a created item's identity across copies and retries; saving
+// is the timestamp a copy published its commit under - both ride inside the
+// shared session draft so folding mid-edit keeps one item, one submission.
+type Draft = {
+  v: 1
+  kind: DraftKind
+  deckId?: string
+  cardId?: string
+  name: string
+  front: string
+  back: string
+  createdId?: string
+  saving?: number
+}
 
 const rec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+// How long a `saving` flag inside the shared draft blocks a second submission
+// from the other display copy. A real commit settles far sooner; the expiry
+// exists so a flag orphaned by a crashed copy cannot lock the draft forever.
+const SAVE_LOCK_MS = 30_000
 
 function parseUi(raw: string | null): UiState {
   if (!raw) return { v: 1, view: 'decks' }
@@ -87,7 +105,9 @@ function parseDraft(raw: string | null): Draft | null {
       cardId: typeof parsed.cardId === 'string' ? parsed.cardId : undefined,
       name: typeof parsed.name === 'string' ? parsed.name : '',
       front: typeof parsed.front === 'string' ? parsed.front : '',
-      back: typeof parsed.back === 'string' ? parsed.back : ''
+      back: typeof parsed.back === 'string' ? parsed.back : '',
+      createdId: typeof parsed.createdId === 'string' ? parsed.createdId : undefined,
+      saving: typeof parsed.saving === 'number' ? parsed.saving : undefined
     }
   } catch {
     return null
@@ -959,7 +979,6 @@ function Flashcards() {
     // The opener's element is remembered before the draft commits so the
     // editor trap can hand focus back when the sheet closes.
     editorTrigger.current = el ?? null
-    commitItemRef.current = null
     draft.set(JSON.stringify({ v: 1, name: '', front: '', back: '', ...next }))
   }
   const closeDraft = () => draft.del()
@@ -1029,28 +1048,42 @@ function Flashcards() {
   const commitDraft = () => {
     if (!draftState || pendingCommit) return
     const at = Date.now()
+    // A commit published by either display copy rides in the shared draft as a
+    // timestamped flag: the other copy never double-submits, and a flag left
+    // behind by a gone copy expires instead of locking the draft forever. The
+    // idempotent upsert below makes even a raced second submit converge on the
+    // same item.
+    if (draftState.saving && at - draftState.saving < SAVE_LOCK_MS) return
     let next: Library | null = null
-    // Created items keep a stable id across retries: an acknowledged-or-
-    // still-optimistic creation is updated, never re-added, so a failed save
-    // retried from the same draft cannot duplicate the card or deck.
-    const created = commitItemRef.current
+    // Created items keep a stable id across retries AND copies: the id rides
+    // inside the shared draft, so a save retried from either side upserts that
+    // item - existing row -> update, absent row -> new record under the pinned
+    // id (the peer may not have observed the first optimistic write).
+    const keepId = draftState.createdId ?? null
+    let createdId = keepId
     if (draftState.kind === 'deck-new' && draftState.name.trim()) {
-      const existing = created?.kind === 'deck-new' && lib.decks.find((d) => d.id === created.id)
+      const existing = keepId && lib.decks.find((d) => d.id === keepId)
       next = existing ? renameDeck(lib, existing.id, draftState.name) : addDeck(lib, draftState.name, at)
       if (!existing) {
-        const deck = next.decks.find((d) => !lib.decks.some((o) => o.id === d.id))
-        if (deck) commitItemRef.current = { kind: 'deck-new', id: deck.id }
+        const added = next.decks.find((d) => !lib.decks.some((o) => o.id === d.id))
+        if (added) {
+          if (keepId) next = { ...next, decks: next.decks.map((d) => (d.id === added.id ? { ...d, id: keepId } : d)) }
+          else createdId = added.id
+        }
       }
     } else if (draftState.kind === 'deck-rename' && draftState.deckId && draftState.name.trim())
       next = renameDeck(lib, draftState.deckId, draftState.name)
     else if (draftState.kind === 'card-new' && draftState.deckId && draftState.front.trim() && draftState.back.trim()) {
-      const existing = created?.kind === 'card-new' && lib.cards.find((c) => c.id === created.id)
+      const existing = keepId && lib.cards.find((c) => c.id === keepId)
       next = existing
         ? updateCard(lib, existing.id, draftState.front, draftState.back)
         : addCard(lib, draftState.deckId, draftState.front, draftState.back, at)
       if (!existing) {
-        const card = next.cards.find((c) => !lib.cards.some((o) => o.id === c.id))
-        if (card) commitItemRef.current = { kind: 'card-new', id: card.id }
+        const added = next.cards.find((c) => !lib.cards.some((o) => o.id === c.id))
+        if (added) {
+          if (keepId) next = { ...next, cards: next.cards.map((c) => (c.id === added.id ? { ...c, id: keepId } : c)) }
+          else createdId = added.id
+        }
       }
     } else if (
       draftState.kind === 'card-edit' &&
@@ -1064,20 +1097,32 @@ function Flashcards() {
     // acknowledged AND the committed view carries exactly this library AND the
     // draft still holds the acknowledged text - so a rejected, superseded or
     // re-typed draft stays open on its content instead of implying it saved.
-    if (save(next)) setPendingCommit({ next, draftText: draft.value ?? '' })
+    if (save(next)) {
+      const ack = JSON.stringify({ ...draftState, createdId, saving: at })
+      draft.set(ack)
+      setPendingCommit({ next, draftText: ack })
+    }
   }
 
   const [pendingCommit, setPendingCommit] = useState<{ next: Library; draftText: string } | null>(null)
-  const commitItemRef = useRef<{ kind: DraftKind; id: string } | null>(null)
   useEffect(() => {
     if (!pendingCommit) return
     if (stored.status === 'ready') {
       const committed = serializeLibrary(stored.lib) === serializeLibrary(pendingCommit.next)
       const sameDraft = draft.value === pendingCommit.draftText
       setPendingCommit(null)
-      if (committed && sameDraft) draft.del()
+      if (committed && sameDraft) {
+        draft.del()
+        return
+      }
+      // Superseded or edited-while-saving: keep the draft (and its created
+      // identity) but lift the in-flight flag so a retry can proceed.
+      const current = parseDraft(draft.value)
+      if (current?.saving) draft.set(JSON.stringify({ ...current, saving: undefined }))
     } else if (stored.status === 'error') {
       setPendingCommit(null)
+      const current = parseDraft(draft.value)
+      if (current?.saving) draft.set(JSON.stringify({ ...current, saving: undefined }))
     }
   }, [pendingCommit, stored, draft])
 
@@ -1142,7 +1187,7 @@ function Flashcards() {
           onChange={(patch) => draft.set(JSON.stringify({ ...draftState, ...patch }))}
           onClose={closeDraft}
           onSave={commitDraft}
-          saving={!!pendingCommit}
+          saving={!!pendingCommit || !!(draftState.saving && Date.now() - draftState.saving < SAVE_LOCK_MS)}
           dimmed={deckSheetOpen}
           opener={editorTrigger.current}
           onDeleteCard={() => {
