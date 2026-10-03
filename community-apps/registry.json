@@ -41,6 +41,10 @@
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
+    },
+    "com.mnismt.duo.musicsketchpad": {
+      "folder": "music-sketchpad",
+      "maintainers": ["mnismt"]
     }
   }
 }
