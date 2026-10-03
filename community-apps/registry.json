@@ -14,6 +14,10 @@
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
     },
+    "com.mnismt.duo.pixelstudio": {
+      "folder": "pixel-studio",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.pomodoro": {
       "folder": "pomodoro-timer",
       "maintainers": ["mnismt"]
