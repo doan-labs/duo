@@ -237,7 +237,13 @@ export const styles = stylex.create({
     backgroundColor: `color-mix(in srgb, ${colors.black} 36%, transparent)`,
     backgroundImage: `linear-gradient(180deg,color-mix(in srgb, ${colors.black} 42%, transparent),transparent 38%)`,
     flexShrink: 0,
-    transitionProperty: 'box-shadow',
+    // The actionable well strokes in its side's hue: where your next move
+    // belongs. Always-on transparent outline so the cue fades, not pops.
+    outlineStyle: 'solid',
+    outlineWidth: space.xxs,
+    outlineOffset: space.xxs,
+    outlineColor: 'transparent',
+    transitionProperty: 'outline-color',
     transitionDuration: '.28s',
     transitionTimingFunction: easing.inOut,
     animationName: { default: boardIn, [reduce]: 'none' },
@@ -245,13 +251,8 @@ export const styles = stylex.create({
     animationTimingFunction: easing.spring,
     animationFillMode: 'both'
   },
-  // The actionable well glows in its side's hue: where your next move belongs.
-  boardPlace: {
-    boxShadow: `0 0 0 1.5px color-mix(in srgb, ${colors.cyanDark} 55%, transparent),0 0 26px color-mix(in srgb, ${colors.cyanDark} 20%, transparent)`
-  },
-  boardFire: {
-    boxShadow: `0 0 0 1.5px color-mix(in srgb, ${colors.orangeDark} 60%, transparent),0 0 26px color-mix(in srgb, ${colors.orangeDark} 22%, transparent)`
-  },
+  boardPlace: { outlineColor: `color-mix(in srgb, ${colors.cyanDark} 60%, transparent)` },
+  boardFire: { outlineColor: `color-mix(in srgb, ${colors.orangeDark} 65%, transparent)` },
   // Stagger the second well's entrance so the two boards cascade, not pop.
   boardDelay: { animationDelay: '.06s' },
   grid: {
@@ -369,7 +370,8 @@ export const styles = stylex.create({
   },
   pegMiss: {
     backgroundColor: `color-mix(in srgb, ${colors.grey3} 88%, transparent)`,
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 30%, transparent),0 1px 2px color-mix(in srgb, ${colors.black} 40%, transparent)`
+    // The one hairline the design allows: rim, not a custom shadow.
+    boxShadow: shadow.rim
   },
   pegHit: {
     backgroundColor: colors.orangeDark,
@@ -501,7 +503,9 @@ export const styles = stylex.create({
   segBtn: {
     flexGrow: 1,
     minWidth: 0,
-    height: space.xxxl,
+    // 44 pt: the cover's board switch is a primary control, so it gets the
+    // full-comfort tap target, not the denser desktop segment height.
+    height: 44,
     paddingInline: space.md,
     borderWidth: 0,
     borderRadius: radius.pill,

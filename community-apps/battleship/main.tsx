@@ -656,7 +656,9 @@ function Game() {
           <div {...stylex.props(styles.panel)}>
             <div {...stylex.props(styles.panelHead)}>
               <span {...stylex.props(styles.panelTitle, styles.panelTitleEnemy)}>Enemy waters</span>
-              <span {...stylex.props(styles.panelMeta)}>{d.yourShots.size} shots</span>
+              <span {...stylex.props(styles.panelMeta)}>
+                {d.yourShots.size} shot{d.yourShots.size === 1 ? '' : 's'}
+              </span>
             </div>
             {targetBoard}
           </div>
@@ -703,7 +705,7 @@ function Game() {
               {d.phase === 'won' ? 'Enemy fleet destroyed' : 'Fleet sunk'}
             </span>
             <span {...stylex.props(styles.resultSub)}>
-              {d.yourShots.size} shots fired, {d.yourHits.size} hits
+              {d.yourShots.size} shot{d.yourShots.size === 1 ? '' : 's'} fired, {d.yourHits.size} hits
             </span>
           </div>
           {wide && (
