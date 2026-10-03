@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, Checkbox, IconButton, Push, Sym, useWide } from '@doan-labs/duo-uikit'
-import { dark } from '@doan-labs/duo-uikit/styles.ts'
+import { animations, Button, Checkbox, IconButton, Push, Sym, useWide } from '@doan-labs/duo-uikit'
+import { dark, delay, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -158,16 +158,20 @@ function RecipeBox() {
           {rowKeys(recipe.ingredients).map((rowKey, index) => {
             const line = recipe.ingredients[index]!
             const checked = state.checked.includes(index)
+            const boxId = `ing-${recipe.id}-${index}`
             return (
-              <li key={rowKey} {...stylex.props(styles.row)}>
-                <Checkbox
-                  tint={colors.orangeDark}
-                  checked={checked}
-                  onChange={() => toggleCheck(recipe.id, index)}
-                  aria-label={line}
-                  xstyle={checked ? styles.tickDone : undefined}
-                />
-                <span {...stylex.props(styles.checkText, checked && styles.checkDone)}>{line}</span>
+              <li key={rowKey} {...stylex.props(styles.row, shared.select)}>
+                <label htmlFor={boxId} {...stylex.props(styles.rowLabel)}>
+                  <Checkbox
+                    id={boxId}
+                    tint={colors.orangeDark}
+                    checked={checked}
+                    onChange={() => toggleCheck(recipe.id, index)}
+                    aria-label={line}
+                    xstyle={checked ? styles.tickDone : undefined}
+                  />
+                  <span {...stylex.props(styles.checkText, checked && styles.checkDone)}>{line}</span>
+                </label>
               </li>
             )
           })}
@@ -187,17 +191,23 @@ function RecipeBox() {
         <ol {...stylex.props(styles.rows)}>
           {rowKeys(recipe.steps).map((rowKey, index) => {
             const line = recipe.steps[index]!
+            const here = index === current
             const row = (
               <>
-                <span {...stylex.props(styles.stepNum)}>{index + 1}</span>
-                <span {...stylex.props(styles.stepText, current !== null && index < current && styles.stepPast)}>
+                <span {...stylex.props(styles.stepNum, here && styles.stepNumNow)}>{index + 1}</span>
+                <span
+                  {...stylex.props(
+                    styles.stepText,
+                    here && styles.stepTextNow,
+                    current !== null && index < current && styles.stepPast
+                  )}
+                >
                   {line}
                 </span>
               </>
             )
-            const here = index === current
             return (
-              <li key={rowKey} {...stylex.props(styles.row, here && styles.stepNow)}>
+              <li key={rowKey} {...stylex.props(styles.row, interactive && shared.select, here && styles.stepNow)}>
                 {interactive ? (
                   <button
                     type="button"
@@ -241,12 +251,16 @@ function RecipeBox() {
           </div>
         ) : (
           <ul {...stylex.props(styles.rows, styles.grid, wide && styles.gridWide)}>
-            {recipes.map((recipe) => {
+            {recipes.map((recipe, index) => {
               const state = progressFor(progress, recipe.id)
               const cooking = state.step > 0 && recipe.steps.length > 0
               return (
-                <li key={recipe.id} {...stylex.props(styles.cardCell)}>
-                  <button type="button" onClick={() => openRecipe(recipe.id)} {...stylex.props(styles.card)}>
+                <li key={recipe.id} {...stylex.props(styles.cardCell, animations.rise, delay.ms(index * 40))}>
+                  <button
+                    type="button"
+                    onClick={() => openRecipe(recipe.id)}
+                    {...stylex.props(styles.card, shared.press)}
+                  >
                     <Tile id={recipe.id} />
                     <span {...stylex.props(styles.cardCopy)}>
                       <strong {...stylex.props(styles.cardName)}>{recipe.name}</strong>
@@ -278,7 +292,7 @@ function RecipeBox() {
     const state = progressFor(progress, recipe.id)
     const cooking = state.step > 0
     return (
-      <div {...stylex.props(styles.page, styles.swap)} key={`detail-${recipe.id}`}>
+      <div {...stylex.props(styles.page, shared.swap)} key={`detail-${recipe.id}`}>
         <header {...stylex.props(styles.hdr)}>
           <IconButton name="back" variant="plain" aria-label="Back" onClick={openList} />
           <h1 {...stylex.props(styles.pageTitle)}>{recipe.name}</h1>
@@ -317,7 +331,7 @@ function RecipeBox() {
               </div>
             </section>
           )}
-          <section {...stylex.props(styles.hero)}>
+          <section {...stylex.props(styles.hero, animations.rise)}>
             <div {...stylex.props(styles.heroTop)}>
               <Tile id={recipe.id} big />
               <div {...stylex.props(styles.cardCopy)}>
@@ -351,7 +365,7 @@ function RecipeBox() {
     const total = recipe.steps.length
     if (total === 0) {
       return (
-        <div {...stylex.props(styles.page, styles.swap)}>
+        <div {...stylex.props(styles.page, shared.swap)}>
           <header {...stylex.props(styles.hdr)}>
             <IconButton name="back" variant="plain" aria-label="Back" onClick={() => openRecipe(recipe.id)} />
             <h1 {...stylex.props(styles.pageTitle)}>Cooking</h1>
@@ -371,7 +385,7 @@ function RecipeBox() {
       openRecipe(recipe.id)
     }
     return (
-      <div {...stylex.props(styles.page, styles.swap)} key={`cook-${recipe.id}`}>
+      <div {...stylex.props(styles.page, shared.swap)} key={`cook-${recipe.id}`}>
         <header {...stylex.props(styles.hdr)}>
           <IconButton name="back" variant="plain" aria-label="Back" onClick={() => openRecipe(recipe.id)} />
           <h1 {...stylex.props(styles.pageTitle)}>Cooking</h1>

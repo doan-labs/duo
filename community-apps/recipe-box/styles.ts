@@ -4,7 +4,6 @@ import {
   easing,
   fonts,
   leading,
-  motion,
   radius,
   shadow,
   space,
@@ -17,14 +16,6 @@ import * as stylex from '@stylexjs/stylex'
 const reduce = '@media (prefers-reduced-motion: reduce)'
 
 // One-shot entrances may only touch transform and opacity.
-const cardIn = stylex.keyframes({
-  '0%': { opacity: 0, transform: 'translateY(10px) scale(.98)' },
-  '100%': { opacity: 1, transform: 'translateY(0) scale(1)' }
-})
-const swapIn = stylex.keyframes({
-  '0%': { opacity: 0 },
-  '100%': { opacity: 1 }
-})
 const tickPop = stylex.keyframes({
   '0%': { transform: 'scale(.8)' },
   '60%': { transform: 'scale(1.12)' },
@@ -119,16 +110,10 @@ export const styles = stylex.create({
     borderRadius: radius.xl,
     color: app.fg,
     backgroundColor: { default: app.surface, ':hover': app.elevated },
+    boxShadow: shadow.card,
     textAlign: 'start',
     cursor: 'pointer',
-    touchAction: 'manipulation',
-    transitionProperty: 'transform, background-color',
-    transitionDuration: `${motion.pressDuration}, .2s`,
-    transitionTimingFunction: easing.push,
-    transform: { default: 'scale(1)', ':active': motion.press },
-    animationName: { default: cardIn, [reduce]: 'none' },
-    animationDuration: '.34s',
-    animationFillMode: 'both'
+    touchAction: 'manipulation'
   },
   tile: {
     width: 44,
@@ -281,13 +266,23 @@ export const styles = stylex.create({
   row: {
     display: 'flex',
     alignItems: 'center',
-    gap: space.md,
     paddingBlock: space.sm,
     paddingInline: space.xs,
     borderBottomWidth: { default: 1, ':last-child': 0 },
     borderBottomStyle: 'solid',
     borderBottomColor: app.separator,
-    minWidth: 0
+    minWidth: 0,
+    borderRadius: radius.md
+  },
+  // The whole ingredient row is the label: one tap anywhere toggles the box.
+  rowLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.md,
+    width: '100%',
+    borderRadius: radius.md,
+    cursor: 'pointer',
+    touchAction: 'manipulation'
   },
   // A tappable step row: the li owns the hairline and padding, the button only
   // fills it, so :last-child keeps meaning the last row.
@@ -334,7 +329,11 @@ export const styles = stylex.create({
     lineHeight: leading.subheadline,
     letterSpacing: tracking.subheadline
   },
-  stepNow: { backgroundColor: app.fill3, borderRadius: radius.md },
+  // The live step row: filled number badge plus a tinted lift so the eye lands
+  // on it without scanning the list.
+  stepNow: { backgroundColor: app.fill2, borderRadius: radius.md },
+  stepNumNow: { backgroundColor: colors.orangeDark, color: colors.white, borderRadius: radius.pill },
+  stepTextNow: { fontWeight: weight.semibold },
   stepPast: { color: app.label3 },
   // Cook mode
   cookCard: {
@@ -408,11 +407,6 @@ export const styles = stylex.create({
   actionGrow: { flexGrow: 1, minWidth: 0 },
   saveButton: { width: '100%' },
   danger: { color: colors.redDark },
-  swap: {
-    animationName: { default: swapIn, [reduce]: 'none' },
-    animationDuration: '.22s',
-    animationFillMode: 'both'
-  },
   tickDone: {
     animationName: { default: tickPop, [reduce]: 'none' },
     animationDuration: '.25s',

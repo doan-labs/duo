@@ -1,4 +1,5 @@
 import { Button, IconButton, TextField } from '@doan-labs/duo-uikit'
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { Draft } from './recipes.ts'
@@ -100,7 +101,7 @@ export function Editor({ draft, recipeId, wide, onDraft, onSave, onCancel, onDel
   )
 
   return (
-    <div {...stylex.props(styles.page, styles.swap)}>
+    <div {...stylex.props(styles.page, shared.swap)}>
       <header {...stylex.props(styles.hdr)}>
         <IconButton name="back" variant="plain" aria-label="Back" onClick={onCancel} />
         <h1 {...stylex.props(styles.pageTitle)}>{recipeId ? 'Edit recipe' : 'New recipe'}</h1>
