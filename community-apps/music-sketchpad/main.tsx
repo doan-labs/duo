@@ -62,12 +62,16 @@ const PauseGlyph = () => (
 
 const labelStyles = [styles.labelKeys, styles.labelHat, styles.labelSnare, styles.labelKick]
 const litStyles = [styles.litKeys, styles.litHat, styles.litSnare, styles.litKick]
+const edgeStyles = [styles.edgeKeys, styles.edgeHat, styles.edgeSnare, styles.edgeKick]
+const accentStyles = [styles.accentKeys, styles.accentHat, styles.accentSnare, styles.accentKick]
+const dotStyles = [styles.dotKeys, styles.dotHat, styles.dotSnare, styles.dotKick]
 
 function Sketchpad() {
   const [rootRef, wide] = useWide<HTMLElement>()
   const view = useSyncExternalStore(os.onView, () => os.view)
   const isOwner = useSyncExternalStore(os.onOwner, () => os.owner) !== null
   const [now, setNow] = useState(() => Date.now())
+  const [dragging, setDragging] = useState(false)
 
   const liveKv = useKV(os.session, 'live')
   const engineKv = useKV(os.session, 'engine')
@@ -231,7 +235,7 @@ function Sketchpad() {
         onClick={togglePlay}
         aria-label={on ? 'Pause loop' : 'Play loop'}
         aria-pressed={on}
-        {...stylex.props(styles.playButton)}
+        {...stylex.props(styles.playButton, on && styles.playButtonOn)}
       >
         {on ? <PauseGlyph /> : <PlayGlyph />}
       </button>
@@ -248,11 +252,15 @@ function Sketchpad() {
           aria-valuenow={doc.tempo}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId)
+            setDragging(true)
             slideTempo(e)
           }}
           onPointerMove={(e) => {
             if (e.buttons & 1) slideTempo(e)
           }}
+          onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
+          onLostPointerCapture={() => setDragging(false)}
           onKeyDown={(e) => {
             const step = e.shiftKey ? 8 : 1
             if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') setTempo(doc.tempo - step)
@@ -266,7 +274,7 @@ function Sketchpad() {
           <div {...stylex.props(styles.sliderTrack)}>
             <div {...stylex.props(styles.sliderFill(ratio))} />
           </div>
-          <div {...stylex.props(styles.sliderThumb(ratio))} />
+          <div {...stylex.props(styles.sliderThumb(ratio), dragging && styles.sliderThumbHot)} />
         </div>
       </div>
       <div {...stylex.props(styles.utilRow)}>
@@ -305,6 +313,7 @@ function Sketchpad() {
           litPad && litStyles[track]!,
           !litPad && on && pos === step && styles.padPlay,
           litPad && on && pos === step && styles.padPlayLit,
+          on && pos === step && edgeStyles[track]!,
           doc.mutes[track]! && styles.padMuted
         )}
       />
@@ -323,7 +332,13 @@ function Sketchpad() {
             onClick={() => toggleMute(t)}
             aria-pressed={doc.mutes[t]!}
             aria-label={`${track.name}${doc.mutes[t]! ? ' muted' : ''}`}
-            {...stylex.props(styles.padLabelCol, labelStyles[t]!, doc.mutes[t]! && styles.padMuted)}
+            {...stylex.props(
+              styles.padLabelCol,
+              labelStyles[t]!,
+              accentStyles[t]!,
+              doc.mutes[t]! && styles.padMuted,
+              doc.mutes[t]! && styles.labelMuted
+            )}
           >
             {track.name}
           </button>
@@ -359,8 +374,14 @@ function Sketchpad() {
             onClick={() => toggleMute(t)}
             aria-pressed={doc.mutes[t]!}
             aria-label={`${track.name}${doc.mutes[t]! ? ' muted' : ''}`}
-            {...stylex.props(styles.padLabelRow, labelStyles[t]!, doc.mutes[t]! && styles.padMuted)}
+            {...stylex.props(
+              styles.padLabelRow,
+              labelStyles[t]!,
+              doc.mutes[t]! && styles.padMuted,
+              doc.mutes[t]! && styles.labelMuted
+            )}
           >
+            <span {...stylex.props(styles.labelDot, dotStyles[t]!)} />
             {track.name}
           </button>
           <div {...stylex.props(styles.padCellsWide)}>

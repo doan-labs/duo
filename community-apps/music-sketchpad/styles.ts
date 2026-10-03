@@ -142,6 +142,8 @@ export const styles = stylex.create({
     transitionTimingFunction: easing.pop,
     transform: { default: 'scale(1)', ':active': motion.press }
   },
+  // The orb carries the one state cue beyond the glyph swap while running.
+  playButtonOn: { boxShadow: `${shadow.rim},${shadow.float},inset 0 0 0 1.5px ${colors.white}` },
   playGlyph: { transform: 'translateX(1px)', display: 'flex' },
   tempoBox: {
     flexGrow: 1,
@@ -170,14 +172,17 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     cursor: 'pointer',
-    touchAction: 'none'
+    touchAction: 'none',
+    borderRadius: radius.sm,
+    outlineWidth: 0,
+    boxShadow: { ':focus-visible': `inset 0 0 0 1.5px ${app.link}` }
   },
   sliderTrack: {
     position: 'relative',
     height: 6,
     width: '100%',
     borderRadius: radius.pill,
-    backgroundColor: app.fill3,
+    backgroundColor: { default: app.fill3, ':hover': app.fill2 },
     overflow: 'hidden'
   },
   sliderFill: (ratio: number) => ({
@@ -198,8 +203,12 @@ export const styles = stylex.create({
     backgroundColor: colors.white,
     boxShadow: shadow.card,
     transform: 'translate(-50%, -50%)',
-    pointerEvents: 'none'
+    pointerEvents: 'none',
+    transitionProperty: 'transform',
+    transitionDuration: motion.pressDuration,
+    transitionTimingFunction: easing.pop
   }),
+  sliderThumbHot: { transform: 'translate(-50%, -50%) scale(1.2)' },
   utilRow: { display: 'flex', flexDirection: 'row', gap: space.sm, flexShrink: 0 },
   utilButton: {
     width: 44,
@@ -238,7 +247,7 @@ export const styles = stylex.create({
     paddingBlock: space.xs,
     paddingInline: 0,
     borderRadius: radius.sm,
-    backgroundColor: 'transparent',
+    backgroundColor: { default: 'transparent', ':hover': app.fill3 },
     fontFamily: fonts.system,
     fontSize: typeScale.caption2,
     fontWeight: weight.semibold,
@@ -269,19 +278,26 @@ export const styles = stylex.create({
     minHeight: 0,
     borderWidth: 0,
     borderRadius: radius.sm,
-    backgroundColor: app.fill3,
+    backgroundColor: { default: app.fill3, ':hover': app.fill2 },
     cursor: 'pointer',
     paddingBlock: 0,
     paddingInline: 0,
+    transform: { default: 'scale(1)', ':active': motion.press },
     transitionProperty: 'transform, background-color, box-shadow',
     transitionDuration: '.12s',
     transitionTimingFunction: easing.pop
   },
-  padBeat: { backgroundColor: app.fill2 },
+  padBeat: { backgroundColor: { default: app.fill2, ':hover': app.fill } },
   // Unlit cells under the playhead lift one step of surface.
   padPlay: { backgroundColor: app.fill },
   // Lit cells pop as the playhead passes over them.
   padPlayLit: { transform: 'scale(1.12)' },
+  // The playhead also reads as a four-colour underline, one hue per track,
+  // so the current step is visible even on unlit cells.
+  edgeKeys: { boxShadow: `inset 0 -2px 0 0 ${colors.purpleDark}` },
+  edgeHat: { boxShadow: `inset 0 -2px 0 0 ${colors.yellowDark}` },
+  edgeSnare: { boxShadow: `inset 0 -2px 0 0 ${colors.orangeDark}` },
+  edgeKick: { boxShadow: `inset 0 -2px 0 0 ${colors.pinkDark}` },
   padLit: {
     animationName: { default: padIn, [reduce]: 'none' },
     animationDuration: '.18s',
@@ -298,6 +314,19 @@ export const styles = stylex.create({
   labelSnare: { color: colors.orangeDark },
   labelKick: { color: colors.pinkDark },
   padMuted: { opacity: 0.35 },
+  // Muted tracks strike their label through so the off state is not colour-only.
+  labelMuted: { textDecorationLine: 'line-through' },
+  // A track-colour accent tops each cover label so the column's hue reads even
+  // before any pad is lit.
+  accentKeys: { boxShadow: `inset 0 2px 0 0 ${colors.purpleDark}` },
+  accentHat: { boxShadow: `inset 0 2px 0 0 ${colors.yellowDark}` },
+  accentSnare: { boxShadow: `inset 0 2px 0 0 ${colors.orangeDark}` },
+  accentKick: { boxShadow: `inset 0 2px 0 0 ${colors.pinkDark}` },
+  labelDot: { width: 8, height: 8, borderRadius: radius.circle, flexShrink: 0 },
+  dotKeys: { backgroundColor: colors.purpleDark },
+  dotHat: { backgroundColor: colors.yellowDark },
+  dotSnare: { backgroundColor: colors.orangeDark },
+  dotKick: { backgroundColor: colors.pinkDark },
 
   // Wide arrangement: labels down the left, steps across.
   padRowWide: {
@@ -391,7 +420,7 @@ export const styles = stylex.create({
     paddingInline: space.sm,
     marginRight: space.xxs,
     backgroundColor: 'transparent',
-    color: app.label3,
+    color: { default: app.label3, ':hover': colors.redDark },
     fontFamily: fonts.system,
     fontSize: typeScale.subheadline,
     lineHeight: 1,
