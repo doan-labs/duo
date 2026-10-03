@@ -80,10 +80,14 @@ function MindMap() {
   const suppressClick = useRef(false)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
-  // Maps this copy has already fitted to its own canvas: one shared view
-  // cannot serve a 387pt cover and a 790pt inner, so each display computes
-  // its own framing on first sight of a doc.
-  const framedMine = useRef(new Set<string>())
+  // The doc id this copy framed for its own canvas: one shared view cannot
+  // serve a 387pt cover and a 790pt inner, so each display frames the doc it
+  // is showing. Keyed to the CURRENT doc, not a set - a map left and
+  // revisited must be re-framed for this canvas, not inherit the other
+  // display's stored view. It is cleared wherever a doc arrives carrying a
+  // view this copy did not compute (adopt, open, delete-fallback), so the
+  // frame effect cannot mistake the foreign view for a local fit.
+  const framedDoc = useRef<string | null>(null)
   const docRef = useRef(doc)
   docRef.current = doc
   const selRef = useRef(sel)
@@ -179,9 +183,10 @@ function MindMap() {
     }
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
-    // Keep this copy's own view for a doc it already fitted: a remote fit was
-    // computed for a different canvas and must not replace the local one.
-    const keep = docRef.current?.id === next.doc.id && framedMine.current.has(next.doc.id)
+    // Keep this copy's own view for the doc it already framed: a remote fit
+    // was computed for a different canvas and must not replace the local one.
+    const keep = docRef.current?.id === next.doc.id && framedDoc.current === next.doc.id
+    if (!keep) framedDoc.current = null
     setDoc(keep && docRef.current ? { ...next.doc, view: docRef.current.view } : next.doc)
     setSel(next.sel)
     setArming(null)
@@ -194,21 +199,23 @@ function MindMap() {
     })
   }, [live, stored.status, stored.set])
 
-  // First sight of a doc gets a fit computed for this display's own canvas.
-  // A hidden copy's canvas measures 0x0, so the observer retries once the
-  // fold gives the element a real box; the fitted view is published back so
-  // it also serves as the stored starting view.
+  // First sight of a doc frames the root and its nearest branches at a
+  // legible zoom for THIS canvas: a whole-map fit shrinks labels to dust on
+  // the 387pt cover, so overview stays the dock's explicit Fit button. A
+  // hidden copy's canvas measures 0x0, so the observer retries once the
+  // fold gives the element a real box; the framed view is published back
+  // so it also serves as the stored starting view.
   useEffect(() => {
-    if (!doc || framedMine.current.has(doc.id)) return
+    if (!doc || framedDoc.current === doc.id) return
     const el = canvasRef.current
     if (!el) return
     const fitLocal = () => {
       const box = el.getBoundingClientRect()
-      if (!box.width) return
-      framedMine.current.add(doc.id)
-      const b = docBounds(doc)
-      const zoom = Math.min(1, Math.min((box.width - 96) / b.w, (box.height - 96) / b.h))
-      const next = setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom, framed: true })
+      if (!box.width || !box.height) return
+      framedDoc.current = doc.id
+      const root = doc.nodes[doc.root]
+      const zoom = Math.min(1, box.width / 480)
+      const next = setView(doc, { x: -(root?.x ?? 0) * zoom, y: -(root?.y ?? 0) * zoom, zoom, framed: true })
       setDoc(next)
       enqueue(async () => {
         const lib = await readLib()
@@ -218,7 +225,7 @@ function MindMap() {
     }
     const f = requestAnimationFrame(fitLocal)
     const ro = new ResizeObserver(() => {
-      if (!framedMine.current.has(doc.id)) fitLocal()
+      if (framedDoc.current !== doc.id) fitLocal()
     })
     ro.observe(el)
     return () => {
@@ -241,7 +248,7 @@ function MindMap() {
   const zoomBy = (factor: number) => publish(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
   const fit = () => {
     const box = canvasRef.current?.getBoundingClientRect()
-    if (!box?.width) return
+    if (!box?.width || !box.height) return
     const b = docBounds(doc)
     const zoom = Math.min(1, Math.min((box.width - 96) / b.w, (box.height - 96) / b.h))
     publish(setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom }))
@@ -254,7 +261,12 @@ function MindMap() {
     // occluded, so a map the other display just made may not be listed yet.
     void (async () => {
       const next = (await readLib()).maps[id]
-      if (next && next.id !== docRef.current?.id) publish(next, next.root)
+      if (next && next.id !== docRef.current?.id) {
+        // The stored view may have been fit for the other display's canvas:
+        // opening a map is a fresh first sight, so this copy frames it again.
+        framedDoc.current = null
+        publish(next, next.root)
+      }
     })()
   }
   const makeMap = () => {
@@ -275,6 +287,7 @@ function MindMap() {
       const open = docRef.current?.id === id ? (latestDoc(lib) ?? newDoc('Map 1')) : null
       stored.set(serializeLibrary(open ? withDoc(lib, open) : lib))
       if (open) {
+        framedDoc.current = null
         setDoc(open)
         setSel(open.root)
         void os.session.set(DOC_KEY, serializeMirror(ME, open, open.root)).catch(() => {})
