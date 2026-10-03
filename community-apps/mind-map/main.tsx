@@ -274,6 +274,9 @@ function MindMap() {
     if (e.button !== 0) return
     const hit = (e.target as HTMLElement).closest('[data-node]')
     const id = hit instanceof HTMLElement ? (hit.dataset.node ?? null) : null
+    // The zoom dock lives inside the canvas: capturing its pointerdown would
+    // retarget the release to the canvas and swallow the button's click.
+    if (!id && (e.target as HTMLElement).closest('button, input, [role="toolbar"]')) return
     e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = {
       pointerId: e.pointerId,
