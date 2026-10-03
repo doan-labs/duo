@@ -26,6 +26,10 @@
       "folder": "2048",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.minesweeper": {
+      "folder": "minesweeper",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.tictactoe": {
       "folder": "tic-tac-toe",
       "maintainers": ["mnismt"]
