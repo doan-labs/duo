@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client'
 import {
   addChild,
   docBounds,
+  type Library,
   latestDoc,
   type MindDoc,
   type MindNode,
@@ -47,6 +48,15 @@ type Drag = {
   moved: boolean
 }
 
+const readLib = (): Promise<Library> => os.storage.get(LIB_KEY).then(parseLibrary, () => parseLibrary(null))
+
+let libQueue = Promise.resolve()
+// Library writes funnel through one queue so two quick edits cannot each merge
+// into the same stale snapshot and overwrite one another's maps.
+const enqueue = (job: () => Promise<void>) => {
+  libQueue = libQueue.then(job).catch(() => {})
+}
+
 const edgePath = (a: MindNode, b: MindNode) => {
   const dx = b.x - a.x
   return `M ${a.x} ${a.y} C ${a.x + dx * 0.5} ${a.y} ${b.x - dx * 0.5} ${b.y} ${b.x} ${b.y}`
@@ -55,7 +65,8 @@ const edgePath = (a: MindNode, b: MindNode) => {
 function MindMap() {
   const [rootRef, wide] = useWide<HTMLElement>()
   const stored = useKV(os.storage, LIB_KEY)
-  const mirror = useKV(os.session, DOC_KEY)
+  // Latest session value for the open map, fed by a raw watch - not useKV.
+  const [live, setLive] = useState<{ raw: string | null; known: boolean }>({ raw: null, known: false })
   const [doc, setDoc] = useState<MindDoc | null>(null)
   const [sel, setSel] = useState<string | null>(null)
   const [sheet, setSheet] = useState(false)
@@ -74,6 +85,16 @@ function MindMap() {
   const library = parseLibrary(stored.value)
   const selected = doc && sel ? (doc.nodes[sel] ?? null) : null
 
+  // Merges one doc into the freshest library it can read. Merging against a
+  // fresh get - not the KV mirror, which lags while occluded - is what stops a
+  // hidden copy from clobbering maps it has not seen yet.
+  const saveDoc = (next: MindDoc) => {
+    enqueue(async () => {
+      const lib = await readLib()
+      stored.set(serializeLibrary(withDoc(lib, next)))
+    })
+  }
+
   // Every edit lands in both places: the session key carries the live map
   // across the fold, the library key keeps it durable. A drag writes once, on
   // release - the moving frames only repaint locally.
@@ -81,10 +102,46 @@ function MindMap() {
     const selNow = nextSel === undefined ? selRef.current : nextSel
     setDoc(next)
     if (nextSel !== undefined) setSel(nextSel)
-    const lib = withDoc(parseLibrary(stored.value), next)
-    void stored.set(serializeLibrary(lib))
-    void mirror.set(serializeMirror(ME, next, selNow))
+    saveDoc(next)
+    void os.session.set(DOC_KEY, serializeMirror(ME, next, selNow)).catch(() => {})
   }
+
+  // Why a raw watch beside useKV: remote KV changes render through a view
+  // transition whose callback never runs while this copy is occluded by the
+  // fold - the hidden display's useKV value freezes and drops updates. The
+  // port-level watch fires on the message itself, so the folded copy stays
+  // current and opens already in sync.
+  useEffect(() => {
+    let dead = false
+    let off = () => {}
+    const boot = async () => {
+      try {
+        const seen = new Map<string, string>()
+        let rev = 0
+        let cursor: string | undefined
+        do {
+          const page = await os.session.snapshot(cursor)
+          rev = page.rev
+          for (const [k, v] of page.entries) seen.set(k, v)
+          cursor = page.cursor
+        } while (cursor)
+        if (dead) return
+        setLive({ raw: seen.get(DOC_KEY) ?? null, known: true })
+        off()
+        off = os.session.watch(rev, (e) => {
+          if (e.rev < 0) void boot()
+          else if (e.k === DOC_KEY) setLive({ raw: e.v, known: true })
+        })
+      } catch {
+        if (!dead) setTimeout(() => void boot(), 2000)
+      }
+    }
+    void boot()
+    return () => {
+      dead = true
+      off()
+    }
+  }, [])
 
   // Why adopt on the session key: the fold carries the open map to the other
   // display. A write this copy did not make is the new settled map; own writes
@@ -93,8 +150,8 @@ function MindMap() {
   // The raw string is the guard: the effect body must not re-fire on every
   // render of a remote value already on screen.
   useEffect(() => {
-    if (mirror.status === 'hydrating' || mirror.status === 'saving') return
-    const raw = mirror.value
+    if (!live.known) return
+    const raw = live.raw
     if (raw !== null && raw === lastSeen.current) return
     lastSeen.current = raw
     if (!raw) {
@@ -102,12 +159,14 @@ function MindMap() {
       // would otherwise let a peer write over maps it never saw.
       if (!seeded.current && stored.status === 'ready') {
         seeded.current = true
-        const lib = parseLibrary(stored.value)
-        const open = latestDoc(lib) ?? welcomeDoc()
-        setDoc(open)
-        setSel(null)
-        void stored.set(serializeLibrary(withDoc(lib, open)))
-        void mirror.set(serializeMirror(ME, open, null))
+        enqueue(async () => {
+          const lib = await readLib()
+          const open = latestDoc(lib) ?? welcomeDoc()
+          setDoc(open)
+          setSel(null)
+          stored.set(serializeLibrary(withDoc(lib, open)))
+          await os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
+        })
       }
       return
     }
@@ -116,12 +175,14 @@ function MindMap() {
     setDoc(next.doc)
     setSel(next.sel)
     setArming(null)
-    const lib = parseLibrary(stored.value)
-    const existing = lib.maps[next.doc.id]
-    if (!existing || existing.updated < next.doc.updated) {
-      void stored.set(serializeLibrary(withDoc(lib, next.doc)))
-    }
-  }, [mirror.value, mirror.status, stored.value, stored.status, stored.set, mirror.set])
+    enqueue(async () => {
+      const lib = await readLib()
+      const existing = lib.maps[next.doc.id]
+      if (!existing || existing.updated < next.doc.updated) {
+        stored.set(serializeLibrary(withDoc(lib, next.doc)))
+      }
+    })
+  }, [live, stored.status, stored.set])
 
   // A map asking to be framed waits for a copy with a real viewport: a hidden
   // copy's canvas measures 0x0, so the first visible one wins the publish.
@@ -134,11 +195,14 @@ function MindMap() {
       const zoom = Math.min(1, Math.min((box.width - 96) / b.w, (box.height - 96) / b.h))
       const next = setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom, framed: true })
       setDoc(next)
-      void stored.set(serializeLibrary(withDoc(parseLibrary(stored.value), next)))
-      void mirror.set(serializeMirror(ME, next, selRef.current))
+      enqueue(async () => {
+        const lib = await readLib()
+        stored.set(serializeLibrary(withDoc(lib, next)))
+      })
+      void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
     })
     return () => cancelAnimationFrame(f)
-  }, [doc, stored.value, stored.set, mirror.set])
+  }, [doc, stored.set])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -149,7 +213,7 @@ function MindMap() {
   if (!doc) return <main ref={rootRef} {...stylex.props(dark, styles.root)} />
 
   const count = Object.keys(doc.nodes).length
-  const saving = stored.status === 'saving' || mirror.status === 'saving'
+  const saving = stored.status === 'saving'
 
   const zoomBy = (factor: number) => publish(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
   const fit = () => {
@@ -160,36 +224,39 @@ function MindMap() {
     publish(setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom }))
   }
   const openMap = (id: string) => {
-    const next = library.maps[id]
-    if (!next || next.id === doc.id) {
-      setSheet(false)
-      return
-    }
     setSheet(false)
     setArming(null)
-    publish(next, next.root)
+    if (id === doc.id) return
+    // Read the library fresh: the KV mirror can lag while this copy is
+    // occluded, so a map the other display just made may not be listed yet.
+    void (async () => {
+      const next = (await readLib()).maps[id]
+      if (next && next.id !== docRef.current?.id) publish(next, next.root)
+    })()
   }
   const makeMap = () => {
-    const next = newDoc(`Map ${Object.keys(library.maps).length + 1}`)
     setSheet(false)
     setArming(null)
-    publish(next, next.root)
+    void (async () => {
+      const next = newDoc(`Map ${Object.keys((await readLib()).maps).length + 1}`)
+      publish(next, next.root)
+    })()
   }
-  // Deleting a map goes straight to storage - publish() would merge it back in
-  // from a stale stored.value. When the open map goes, the newest remaining one
-  // (or a fresh one) takes over the session.
+  // Deleting a map runs as one queued write so a republished doc cannot
+  // resurrect it from a stale list. When the open map goes, the newest
+  // remaining one (or a fresh one) takes over the session.
   const dropMap = (id: string) => {
-    const lib = withoutDoc(parseLibrary(stored.value), id)
     setArming(null)
-    if (doc.id !== id) {
-      void stored.set(serializeLibrary(lib))
-      return
-    }
-    const next = latestDoc(lib) ?? newDoc('Map 1')
-    setDoc(next)
-    setSel(next.root)
-    void stored.set(serializeLibrary(lib.maps[next.id] ? lib : withDoc(lib, next)))
-    void mirror.set(serializeMirror(ME, next, next.root))
+    enqueue(async () => {
+      const lib = withoutDoc(await readLib(), id)
+      const open = docRef.current?.id === id ? (latestDoc(lib) ?? newDoc('Map 1')) : null
+      stored.set(serializeLibrary(open ? withDoc(lib, open) : lib))
+      if (open) {
+        setDoc(open)
+        setSel(open.root)
+        void os.session.set(DOC_KEY, serializeMirror(ME, open, open.root)).catch(() => {})
+      }
+    })
   }
   const dropNode = (id: string) => {
     if (id === doc.root) return
