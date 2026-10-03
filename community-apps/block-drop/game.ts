@@ -35,6 +35,8 @@ export type Game = {
   cleared: number[]
   /** Points the last lock awarded (lines + combo), for the fly-up. */
   last: number
+  /** Cells a hard drop just slammed into place: the impact sheen's marks. */
+  landed: number[]
   /** PRNG state; the queue is deterministic for whichever copy next ticks. */
   rng: number
   /** Pieces spawned this run: the falling layer's key and the lock signal. */
@@ -325,6 +327,7 @@ export function newGame(by: string, seed = (Math.random() * 4294967296) >>> 0): 
     status: 'ready',
     cleared: [],
     last: 0,
+    landed: [],
     rng: seed,
     drops: 0,
     tick: 0
@@ -334,13 +337,15 @@ export function newGame(by: string, seed = (Math.random() * 4294967296) >>> 0): 
 
 export const intervalFor = (level: number) => Math.max(70, Math.round(800 * 0.8 ** (level - 1)))
 
-function lock(g: Game): Game {
+function lock(g: Game, impact = false): Game {
   const piece = g.piece!
   const board = [...g.board]
+  const landed: number[] = []
   let above = true
   for (const [x, y] of cellsOf(piece)) {
     if (y >= 0) {
       board[y * COLS + x] = piece.k
+      landed.push(y * COLS + x)
       above = false
     }
   }
@@ -370,6 +375,7 @@ function lock(g: Game): Game {
     combo,
     cleared,
     last: gained,
+    landed: impact ? landed : [],
     // A piece buried wholly above the field is a block out; otherwise spawn
     // decides lock out on the next piece's overlap.
     status: above ? 'over' : g.status
@@ -432,7 +438,7 @@ export function hardDrop(g: Game): Game {
   if (g.status !== 'playing' || !piece) return g
   let y = piece.y
   while (!blocked(g.board, cellsOf({ ...piece, y: y + 1 }))) y += 1
-  return lock({ ...g, piece: { ...piece, y }, score: g.score + (y - piece.y) * 2 })
+  return lock({ ...g, piece: { ...piece, y }, score: g.score + (y - piece.y) * 2 }, true)
 }
 
 /** Where the piece lands: the row a hard drop would take it to. */
@@ -498,6 +504,9 @@ export function adoptGame(saved: unknown, by: string): Game {
         : 'ready',
     cleared: Array.isArray(g.cleared) ? g.cleared.filter((y): y is number => typeof y === 'number') : [],
     last: clampInt(g.last, 0, 9999999, 0),
+    landed: Array.isArray(g.landed)
+      ? g.landed.filter((i): i is number => typeof i === 'number' && i >= 0 && i < COLS * ROWS)
+      : [],
     rng: clampInt(g.rng, 0, 4294967295, fallback.rng),
     drops: clampInt(g.drops, 0, 4294967295, 0),
     tick: clampInt(g.tick, 0, 4294967295, 0)
@@ -531,7 +540,7 @@ export function fitLayout(view: ViewDimensions, wide: boolean) {
   const availH = height - chrome - (cover ? 26 : 30)
   const cell = Math.max(8, Math.floor(Math.min(availH / ROWS, availW / COLS)))
   // A mini frame is 4x2 cells: hold and next draw pieces at reduced size.
-  const mini = wide ? 11 : 7
+  const mini = wide ? 11 : 8
   // Touch controls: five buttons share the row on the cover, cap at 56.
   const ctrl = wide ? 44 : Math.min(56, Math.floor((width - padX * 2 - 32) / 5))
   const pad = Math.max(4, Math.round(cell * 0.28))

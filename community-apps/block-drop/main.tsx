@@ -378,15 +378,21 @@ function BlockDrop() {
           </span>
           <span {...stylex.props(styles.statRow)}>
             <span {...stylex.props(styles.statLabel)}>Lines</span>
-            <b {...stylex.props(styles.statValue, !wide && styles.statValueNarrow)}>{game.lines}</b>
+            <b key={game.lines} {...stylex.props(styles.statValue, !wide && styles.statValueNarrow)}>
+              {game.lines}
+            </b>
           </span>
           <span {...stylex.props(styles.statRow)}>
             <span {...stylex.props(styles.statLabel)}>Level</span>
-            <b {...stylex.props(styles.statValue, !wide && styles.statValueNarrow)}>{game.level}</b>
+            <b key={game.level} {...stylex.props(styles.statValue, !wide && styles.statValueNarrow)}>
+              {game.level}
+            </b>
           </span>
           <span {...stylex.props(styles.statRow)}>
             <span {...stylex.props(styles.statLabel)}>Best</span>
-            <b {...stylex.props(styles.statValue, !wide && styles.statValueNarrow)}>{best.toLocaleString()}</b>
+            <b key={best} {...stylex.props(styles.statValue, !wide && styles.statValueNarrow)}>
+              {best.toLocaleString()}
+            </b>
           </span>
         </div>
       </div>
@@ -449,6 +455,7 @@ function BlockDrop() {
         <Playfield game={game} cell={fit.cell} pad={fit.pad} onNudge={(n) => nudge(n)}>
           {veil && (
             <button
+              key={game.status}
               type="button"
               onClick={veil.action}
               // The veil is the gesture - it must not also arm the board's drag.

@@ -113,6 +113,7 @@ export function Mini({ kind, cell }: { kind: Kind | null; cell: number }) {
       role="img"
       aria-label={kind ? `${KIND_NAME[kind]} piece` : 'empty'}
     >
+      {!shape && <i aria-hidden="true" {...stylex.props(styles.miniSlot)} />}
       {shape?.map(([x, y], i) => (
         <i
           // biome-ignore lint/suspicious/noArrayIndexKey: one piece's cells are order-stable
@@ -206,7 +207,9 @@ export function Playfield({
                 styles.ghost,
                 styles.ghostFill(TONE[piece.k]),
                 styles.fitCell(cellSize(cell).size, cellSize(cell).r),
-                styles.cellAt(x, ghost, cell)
+                // cellsOf is absolute; the ghost sits at the anchor row plus
+                // each cell's offset inside the piece.
+                styles.cellAt(x, y + ghost - piece.y, cell)
               )}
             />
           ))}
@@ -222,9 +225,20 @@ export function Playfield({
         {game.cleared.map((y) => (
           <i key={`${game.drops}:f${y}`} aria-hidden="true" {...stylex.props(styles.flash, styles.fitFlash(y, cell))} />
         ))}
+        {game.landed.map((i) => (
+          <i
+            key={`${game.drops}:l${i}`}
+            aria-hidden="true"
+            {...stylex.props(
+              styles.landMark,
+              styles.fitCell(cellSize(cell).size, cellSize(cell).r),
+              styles.cellAt(i % COLS, (i / COLS) | 0, cell)
+            )}
+          />
+        ))}
         {game.last > 0 && (
           <b key={`fly${game.drops}`} {...stylex.props(styles.fly, styles.fitFly(game.cleared[0] ?? 0, cell))}>
-            +{game.last.toLocaleString()}
+            {game.cleared.length === 4 ? `Tetris +${game.last.toLocaleString()}` : `+${game.last.toLocaleString()}`}
           </b>
         )}
         {danger && game.status === 'playing' && <i aria-hidden="true" {...stylex.props(styles.danger)} />}

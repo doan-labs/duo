@@ -69,6 +69,18 @@ const ghostIn = stylex.keyframes({
   from: { opacity: 0 },
   to: { opacity: 1 }
 })
+// Overlays lift in on transform only: a glass backdrop reads nothing behind
+// an animating opacity, so the veil glides instead of fading.
+const veilIn = stylex.keyframes({
+  '0%': { transform: 'translateY(14px) scale(.97)' },
+  '100%': { transform: 'translateY(0) scale(1)' }
+})
+// A hard drop's thump: a white sheen over the cells it just locked that
+// evaporates before the next piece is airborne.
+const landSheen = stylex.keyframes({
+  '0%': { opacity: '.9' },
+  '100%': { opacity: 0 }
+})
 
 export const styles = stylex.create({
   root: {
@@ -159,7 +171,7 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: radius.circle,
     color: colors.white,
-    backgroundColor: app.fill,
+    backgroundColor: { default: app.fill, ':hover': app.fill2, ':active': app.fill3 },
     cursor: 'pointer',
     flexShrink: 0,
     transitionProperty: 'transform,background-color',
@@ -210,7 +222,8 @@ export const styles = stylex.create({
     touchAction: 'none'
   },
   fitBoard: (pad: number) => ({ padding: `${pad}px` }),
-  grid: { position: 'relative', borderRadius: radius.lg, overflow: 'hidden' },
+  // Inner corner rides under the well's pad: xxl minus the inset, not lg.
+  grid: { position: 'relative', borderRadius: radius.xl, overflow: 'hidden' },
   // Faint graph paper the cells sit on - one background, not two hundred nodes.
   fitGrid: (w: number, h: number, cell: number) => ({
     width: `${w}px`,
@@ -269,9 +282,19 @@ export const styles = stylex.create({
     animationDuration: '.15s'
   },
   ghostFill: (base: string) => ({
-    backgroundColor: `color-mix(in srgb, ${base} 12%, transparent)`,
-    borderColor: `color-mix(in srgb, ${base} 55%, transparent)`
+    backgroundColor: `color-mix(in srgb, ${base} 18%, transparent)`,
+    borderColor: `color-mix(in srgb, ${base} 72%, transparent)`
   }),
+  // The cells a hard drop just locked wear a brief impact sheen.
+  landMark: {
+    position: 'absolute',
+    pointerEvents: 'none',
+    backgroundColor: `color-mix(in srgb, ${colors.white} 55%, transparent)`,
+    animationName: { default: landSheen, [reduce]: 'none' },
+    animationDuration: '.32s',
+    animationTimingFunction: easing.out,
+    animationFillMode: 'forwards'
+  },
   flash: {
     position: 'absolute',
     left: 0,
@@ -313,7 +336,8 @@ export const styles = stylex.create({
     justifyContent: 'center',
     gap: space.sm,
     borderWidth: 0,
-    borderRadius: radius.lg,
+    // Shares the well's corner: it covers the whole board box, pad included.
+    borderRadius: radius.xxl,
     cursor: 'pointer',
     color: colors.white,
     backgroundColor: `color-mix(in srgb, ${colors.black} 58%, transparent)`,
@@ -321,7 +345,11 @@ export const styles = stylex.create({
     WebkitBackdropFilter: glass.blur,
     fontFamily: fonts.system,
     paddingBlock: space.md,
-    paddingInline: space.md
+    paddingInline: space.md,
+    animationName: { default: veilIn, [reduce]: 'none' },
+    animationDuration: '.36s',
+    animationTimingFunction: easing.spring,
+    animationFillMode: 'both'
   },
   veilKicker: {
     fontSize: typeScale.caption1,
@@ -366,7 +394,7 @@ export const styles = stylex.create({
     gap: space.xs,
     paddingBlock: space.sm,
     paddingInline: space.sm,
-    borderRadius: radius.lg,
+    borderRadius: radius.xxl,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
@@ -380,6 +408,8 @@ export const styles = stylex.create({
     color: 'inherit',
     fontFamily: fonts.system,
     textAlign: 'start',
+    // Glass keeps its tint at rest; the flat hover fill marks it tappable.
+    backgroundColor: { ':hover': app.fill },
     transitionProperty: 'transform,background-color',
     transitionDuration: `${motion.pressDuration},.18s`,
     transitionTimingFunction: easing.pop,
@@ -399,6 +429,16 @@ export const styles = stylex.create({
   minisWide: { justifyContent: 'space-between' },
   mini: { position: 'relative', marginInline: 'auto' },
   fitMini: (w: number, h: number) => ({ width: `${w}px`, height: `${h}px` }),
+  // An empty hold slot still owns its frame: a quiet dashed outline instead
+  // of a hole that reads as missing content.
+  miniSlot: {
+    position: 'absolute',
+    inset: 0,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: `color-mix(in srgb, ${colors.white} 16%, transparent)`
+  },
   stats: { display: 'flex', flexDirection: 'column', gap: space.xs },
   statRow: {
     display: 'flex',
@@ -418,7 +458,12 @@ export const styles = stylex.create({
     fontSize: typeScale.callout,
     fontWeight: weight.semibold,
     lineHeight: leading.callout,
-    fontVariantNumeric: 'tabular-nums'
+    fontVariantNumeric: 'tabular-nums',
+    // Values are keyed on their number, so a change replays the pop.
+    animationName: { default: scorePop, [reduce]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: easing.pop,
+    animationFillMode: 'both'
   },
   statValueNarrow: { fontSize: typeScale.caption1, lineHeight: leading.caption1 },
   statAccent: { color: colors.cyanDark },
@@ -435,7 +480,9 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: radius.lg,
     color: colors.white,
-    backgroundColor: { default: app.fill, ':hover': app.fill2 },
+    // Press deepens the fill while the scale sells the tap: two channels of
+    // tactile feedback that read even on a thumb-sized target.
+    backgroundColor: { default: app.fill, ':hover': app.fill2, ':active': app.fill3 },
     cursor: 'pointer',
     touchAction: 'manipulation',
     transitionProperty: 'transform,background-color',
@@ -446,10 +493,10 @@ export const styles = stylex.create({
     ':disabled': { opacity: '.4', cursor: 'default' }
   },
   fitCtrl: (size: number) => ({ width: `${size}px`, height: `${size}px` }),
-  ctrlWide: { height: 40, width: '100%' },
+  ctrlWide: { height: 44, width: '100%' },
   ctrlAccent: {
     color: colors.grey6Dark,
-    backgroundColor: { default: colors.cyanDark, ':hover': colors.cyan }
+    backgroundColor: { default: colors.cyanDark, ':hover': colors.cyan, ':active': colors.cyan }
   },
   hint: {
     marginBlock: 0,
