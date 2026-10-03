@@ -71,12 +71,18 @@ function PocketBudget() {
   const [editing, setEditing] = useState<string | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [limitError, setLimitError] = useState<string | null>(null)
+  const [limitWarn, setLimitWarn] = useState<string | null>(null)
+  const [flashId, setFlashId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ kind: 'good' | 'warn'; text: string } | null>(null)
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
   const entryRef = useRef<HTMLElement | null>(null)
+  const amountRef = useRef<HTMLInputElement | null>(null)
 
-  // Storage stays the source of truth; the session mirror carries the ledger
-  // and the month being browsed so the fold hands the same view over.
+  // Storage stays the source of truth and converges the ledger across the
+  // two displays on its own; the session mirror carries only the viewed
+  // month so the fold hands the same view over.
   const publish = useCallback(
     (next: Budget, nextMonth?: string) => {
       const target = nextMonth ?? month
@@ -84,7 +90,7 @@ function PocketBudget() {
       const serialized = serializeBudget(next)
       pending.current = serialized
       void stored.set(serialized)
-      mirror.set(serializeMirror(ME, next, target))
+      mirror.set(serializeMirror(ME, target))
     },
     [stored, mirror, month]
   )
@@ -96,7 +102,7 @@ function PocketBudget() {
   const goMonth = useCallback(
     (next: string) => {
       setMonth(next)
-      mirror.set(serializeMirror(ME, null, next))
+      mirror.set(serializeMirror(ME, next))
     },
     [mirror]
   )
@@ -109,19 +115,24 @@ function PocketBudget() {
     if (!raw) {
       if (!seeded.current && stored.status === 'ready') {
         seeded.current = true
-        mirror.set(serializeMirror(ME, parseBudget(stored.value), month))
+        mirror.set(serializeMirror(ME, month))
       }
       return
     }
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
-    if (next.state !== null && next.state !== stored.value) void stored.set(next.state)
     if (next.month !== month) setMonth(next.month)
-  }, [mirror.value, mirror.status, mirror, stored.value, stored.status, stored, month])
+  }, [mirror.value, mirror.status, mirror, stored.status, month])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
+
+  const announce = (next: { kind: 'good' | 'warn'; text: string } | null) => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current)
+    setNotice(next)
+    if (next) noticeTimer.current = setTimeout(() => setNotice(null), 6000)
+  }
 
   const submit = () => {
     const bad: Errors = {}
@@ -132,20 +143,37 @@ function PocketBudget() {
     if (bad.date || bad.amount || minor === null) return
     const note = trimNote(draft.note)
     const target = monthOfDay(draft.date)
+    const cat = categoryOf(draft.category)
     if (editing) {
       publish(updateTx(budget, { id: editing, date: draft.date, category: draft.category, minor, note }), target)
       setEditing(null)
+      announce({ kind: 'good', text: 'Expense updated' })
     } else {
-      publish(addTx(budget, newTx(draft.date, draft.category, minor, note)), target)
+      const created = newTx(draft.date, draft.category, minor, note)
+      publish(addTx(budget, created), target)
+      setFlashId(created.id)
+      const monthSpend = (spendByCategory(budget.tx, monthOfDay(draft.date))[cat.id] ?? 0) + minor
+      const cap = budget.limits[cat.id] ?? 0
+      if (cap > 0 && monthSpend > cap) {
+        announce({
+          kind: 'warn',
+          text: `${cat.name} is $${formatMinor(monthSpend - cap)} over its $${formatMinor(cap)} limit`
+        })
+      } else {
+        announce({ kind: 'good', text: `Saved $${formatMinor(minor)} to ${cat.name}` })
+      }
     }
     setDraft({ date: draft.date, amount: '', category: draft.category, note: '' })
+    amountRef.current?.focus()
   }
 
   const beginEdit = (tx: Tx) => {
     setEditing(tx.id)
     setDraft({ date: tx.date, amount: minorInput(tx.minor), category: tx.category, note: tx.note })
     setErrors({})
+    announce(null)
     entryRef.current?.scrollIntoView({ block: 'nearest' })
+    amountRef.current?.focus()
   }
 
   const cancelEdit = () => {
@@ -169,6 +197,12 @@ function PocketBudget() {
     }
     setLimitError(null)
     publish(setLimit(budget, category, minor))
+    const already = spendByCategory(budget.tx, month)[category] ?? 0
+    setLimitWarn(
+      minor > 0 && already > minor
+        ? `${categoryOf(category).name} already spent $${formatMinor(already - minor)} past this limit`
+        : null
+    )
   }
 
   const tx = monthTx(budget.tx, month)
@@ -222,13 +256,34 @@ function PocketBudget() {
         <span {...stylex.props(styles.heroSign)}>$</span>
         {formatMinor(total)}
       </strong>
-      <span {...stylex.props(styles.heroSub, overTotal && styles.overText)}>
-        {limitsTotal > 0
-          ? overTotal
-            ? `$${formatMinor(total - limitsTotal)} over $${formatMinor(limitsTotal)} of limits`
-            : `$${formatMinor(limitsTotal - total)} left of $${formatMinor(limitsTotal)}`
-          : 'No monthly limits set'}
-      </span>
+      {limitsTotal > 0 ? (
+        <>
+          <div {...stylex.props(styles.track, styles.heroTrack)}>
+            <div
+              {...stylex.props(
+                styles.barFill,
+                tintBg.green,
+                styles.barWidth(Math.min(total, limitsTotal) / Math.max(total, limitsTotal))
+              )}
+            />
+            {overTotal && <div {...stylex.props(styles.overFill, styles.overSpan(limitsTotal / total, 1))} />}
+          </div>
+          <div {...stylex.props(styles.heroStats)}>
+            <span {...stylex.props(styles.heroStat)}>
+              <span {...stylex.props(styles.heroStatLabel)}>Budgeted</span>
+              <strong {...stylex.props(styles.heroStatValue)}>${formatMinor(limitsTotal)}</strong>
+            </span>
+            <span {...stylex.props(styles.heroStat)}>
+              <span {...stylex.props(styles.heroStatLabel)}>{overTotal ? 'Over by' : 'Left'}</span>
+              <strong {...stylex.props(styles.heroStatValue, overTotal ? styles.overText : styles.underText)}>
+                ${formatMinor(Math.abs(limitsTotal - total))}
+              </strong>
+            </span>
+          </div>
+        </>
+      ) : (
+        <span {...stylex.props(styles.heroSub)}>No monthly limits set</span>
+      )}
     </section>
   )
 
@@ -257,6 +312,7 @@ function PocketBudget() {
           <div {...stylex.props(styles.amountBox, !!errors.amount && styles.inputBad)}>
             <span {...stylex.props(styles.amountSign)}>$</span>
             <input
+              ref={amountRef}
               aria-label="Amount in dollars"
               aria-invalid={errors.amount ? true : undefined}
               inputMode="decimal"
@@ -318,6 +374,15 @@ function PocketBudget() {
           </>
         )}
       </div>
+      {notice && (
+        <p
+          role="status"
+          {...stylex.props(styles.notice, notice.kind === 'warn' ? styles.noticeWarn : styles.noticeGood)}
+        >
+          <Sym name={notice.kind === 'warn' ? 'gauge' : 'check'} size={12} />
+          {notice.text}
+        </p>
+      )}
     </section>
   )
 
@@ -347,6 +412,7 @@ function PocketBudget() {
                   <span {...stylex.props(styles.barValue, over && styles.overText)}>
                     ${formatMinor(s)}
                     {limit > 0 ? ` / ${formatMinor(limit)}` : ''}
+                    {over ? ` · +$${formatMinor(s - limit)} over` : ''}
                   </span>
                 </div>
                 <div
@@ -387,6 +453,7 @@ function PocketBudget() {
                 isThisMonth && i + 1 === today && amount > 0 && styles.dayToday
               )}
             />
+            <div {...stylex.props(styles.dayDot, !(isThisMonth && i + 1 === today) && styles.dayDotHidden)} />
           </div>
         ))}
       </div>
@@ -415,7 +482,11 @@ function PocketBudget() {
               </span>
               <span {...stylex.props(styles.limitBody)}>
                 <strong {...stylex.props(styles.limitName)}>{c.name}</strong>
-                <small {...stylex.props(tintText[c.tint])}>{s > 0 ? `$${formatMinor(s)} spent` : 'No spend'}</small>
+                {limit > 0 && s > limit ? (
+                  <small {...stylex.props(styles.overText)}>$${formatMinor(s - limit)} over</small>
+                ) : (
+                  <small {...stylex.props(tintText[c.tint])}>{s > 0 ? `$${formatMinor(s)} spent` : 'No spend'}</small>
+                )}
               </span>
               <div {...stylex.props(styles.limitBox, limitError === c.id && styles.inputBad)}>
                 <span {...stylex.props(styles.amountSign)}>$</span>
@@ -438,6 +509,12 @@ function PocketBudget() {
         })}
       </div>
       {limitError && <p {...stylex.props(styles.errorText)}>Limits take numbers like 400 or 400.00; 0 clears.</p>}
+      {limitWarn && !limitError && (
+        <p role="status" {...stylex.props(styles.notice, styles.noticeWarn)}>
+          <Sym name="gauge" size={12} />
+          {limitWarn}
+        </p>
+      )}
     </section>
   )
 
@@ -457,7 +534,10 @@ function PocketBudget() {
             const c = categoryOf(t.category)
             const on = editing === t.id
             return (
-              <li key={t.id} {...stylex.props(styles.txRow, on && styles.txRowEditing)}>
+              <li
+                key={t.id}
+                {...stylex.props(styles.txRow, on && styles.txRowEditing, flashId === t.id && styles.txFlash)}
+              >
                 <button
                   type="button"
                   aria-label={`Edit ${t.note || c.name}, $${formatMinor(t.minor)}`}

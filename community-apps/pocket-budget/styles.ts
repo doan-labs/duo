@@ -17,9 +17,16 @@ import * as stylex from '@stylexjs/stylex'
 
 const reduce = '@media (prefers-reduced-motion: reduce)'
 
+// Transform only: an opacity sweep on a card would blank its own backdrop
+// blur for the whole run (the ancestor-of-glass trap).
 const cardIn = stylex.keyframes({
-  '0%': { opacity: 0, transform: 'translateY(10px) scale(.98)' },
-  '100%': { opacity: 1, transform: 'translateY(0) scale(1)' }
+  '0%': { transform: 'translateY(10px) scale(.98)' },
+  '100%': { transform: 'translateY(0) scale(1)' }
+})
+
+const txIn = stylex.keyframes({
+  '0%': { opacity: 0, transform: 'translateY(6px)' },
+  '100%': { opacity: 1, transform: 'translateY(0)' }
 })
 
 export const tintBg = stylex.create({
@@ -148,6 +155,25 @@ export const styles = stylex.create({
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote
   },
+  heroTrack: { alignSelf: 'stretch', marginTop: space.xs },
+  heroStats: { display: 'flex', gap: space.lg, marginTop: space.xs },
+  heroStat: { display: 'flex', flexDirection: 'column', gap: space.xxs },
+  heroStatLabel: {
+    color: app.label3,
+    fontSize: typeScale.caption2,
+    lineHeight: leading.caption2,
+    letterSpacing: tracking.caption2,
+    fontWeight: weight.semibold,
+    textTransform: 'uppercase'
+  },
+  heroStatValue: {
+    fontFamily: fonts.mono,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    fontWeight: weight.semibold,
+    fontVariantNumeric: 'tabular-nums'
+  },
+  underText: { color: colors.greenDark },
   overText: { color: colors.redDark },
   nav: {
     display: 'flex',
@@ -239,7 +265,11 @@ export const styles = stylex.create({
     height: `calc(${space.xxxl} + ${space.xs})`,
     borderRadius: radius.md,
     paddingInline: space.md,
-    backgroundColor: app.fill3
+    backgroundColor: app.fill3,
+    outlineWidth: { default: 0, ':focus-within': 2 },
+    outlineStyle: 'solid',
+    outlineColor: app.link,
+    outlineOffset: 1
   },
   amountSign: { color: app.label2, fontSize: typeScale.footnote, fontWeight: weight.semibold },
   amountInput: {
@@ -250,9 +280,9 @@ export const styles = stylex.create({
     color: app.fg,
     backgroundColor: 'transparent',
     fontFamily: fonts.mono,
-    fontSize: typeScale.footnote,
-    lineHeight: leading.footnote,
-    letterSpacing: tracking.footnote,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
     outlineWidth: 0
   },
   errorText: { marginBlock: 0, color: colors.redDark, fontSize: typeScale.caption1, lineHeight: leading.caption1 },
@@ -263,7 +293,7 @@ export const styles = stylex.create({
     gap: space.xs,
     borderWidth: 0,
     borderRadius: radius.pill,
-    paddingBlock: space.xs,
+    paddingBlock: space.sm,
     paddingInline: space.md,
     color: app.fg,
     backgroundColor: app.fill3,
@@ -272,7 +302,7 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'transform,background-color',
+    transitionProperty: 'transform,background-color,color',
     transitionDuration: `${motion.pressDuration},.18s`,
     transitionTimingFunction: easing.pop,
     transform: { default: 'scale(1)', ':active': motion.press }
@@ -325,7 +355,7 @@ export const styles = stylex.create({
     left: 0,
     borderRadius: radius.pill,
     transitionProperty: 'width',
-    transitionDuration: '.3s',
+    transitionDuration: { default: '.3s', [reduce]: '0s' },
     transitionTimingFunction: easing.push
   },
   barWidth: (pct: number) => ({ width: `${pct * 100}%` }),
@@ -347,7 +377,16 @@ export const styles = stylex.create({
     height: `calc(${space.xxxl} * 2)`,
     minWidth: 0
   },
-  dayCol: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', height: '100%' },
+  dayCol: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: space.xxs,
+    height: '100%'
+  },
   dayBar: { width: '100%', borderRadius: radius.xs, backgroundColor: app.fill3 },
   dayEmpty: { height: space.xxs },
   dayFill: (pct: number) => ({
@@ -355,6 +394,9 @@ export const styles = stylex.create({
     backgroundColor: colors.greenDark
   }),
   dayToday: { backgroundColor: colors.mintDark },
+  // The dot repeats the mint fill so today reads without relying on hue alone.
+  dayDot: { width: space.xs, height: space.xs, borderRadius: radius.circle, backgroundColor: colors.mintDark },
+  dayDotHidden: { visibility: 'hidden' },
   dayAxis: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -440,7 +482,16 @@ export const styles = stylex.create({
     textAlign: 'start',
     cursor: 'pointer',
     borderRadius: radius.md,
-    touchAction: 'manipulation'
+    touchAction: 'manipulation',
+    transform: { default: 'scale(1)', ':active': motion.press },
+    transitionProperty: 'transform',
+    transitionDuration: motion.pressDuration,
+    transitionTimingFunction: easing.pop
+  },
+  txFlash: {
+    animationName: { default: txIn, [reduce]: 'none' },
+    animationDuration: '.3s',
+    animationTimingFunction: easing.pop
   },
   txIcon: {
     display: 'grid',
@@ -488,6 +539,17 @@ export const styles = stylex.create({
     transitionTimingFunction: easing.pop
   },
   hint: { marginBlock: 0, color: app.label2, fontSize: typeScale.footnote, lineHeight: leading.footnote },
+  notice: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.xs,
+    marginBlock: 0,
+    color: app.label2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1
+  },
+  noticeGood: { color: colors.greenDark },
+  noticeWarn: { color: colors.redDark },
   saved: {
     alignSelf: 'center',
     flexShrink: 0,

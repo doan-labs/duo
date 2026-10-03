@@ -79,30 +79,24 @@ export function serializeBudget(budget: Budget): string {
   return JSON.stringify({ tx: budget.tx, limits: budget.limits })
 }
 
-// The session key carries a whole serialized budget plus the month being
-// viewed: adopting a remote write lands as at most one storage write, so the
-// two displays converge instead of fighting.
-// A mirror row either carries the whole ledger (data hand-off) or just the
-// viewed month (null state): navigation writes must never push a possibly
-// stale ledger over a newer one that is still landing on the other display.
-export type Mirror = { by: string; month: string; state: string | null }
+// The session key carries the month being viewed on the other display.
+// The mirror carries only the viewed month: the ledger itself converges
+// through os.storage's rev-ordered watch on both copies, so putting state
+// here too would only re-open the stale-write-over-landing-write race.
+export type Mirror = { by: string; month: string }
 
-export function serializeMirror(by: string, budget: Budget | null, month: string): string {
-  return JSON.stringify({ by, month, state: budget ? serializeBudget(budget) : null } satisfies Mirror)
+export function serializeMirror(by: string, month: string): string {
+  return JSON.stringify({ by, month } satisfies Mirror)
 }
 
 export function parseMirror(raw: string | null): Mirror | null {
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as Mirror
-    if (
-      typeof parsed?.by !== 'string' ||
-      typeof parsed?.month !== 'string' ||
-      (parsed.state !== null && typeof parsed?.state !== 'string')
-    ) {
+    if (typeof parsed?.by !== 'string' || typeof parsed?.month !== 'string') {
       return null
     }
-    return parsed
+    return { by: parsed.by, month: parsed.month }
   } catch {
     return null
   }
