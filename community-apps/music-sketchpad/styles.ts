@@ -143,7 +143,7 @@ export const styles = stylex.create({
     transform: { default: 'scale(1)', ':active': motion.press }
   },
   // The orb carries the one state cue beyond the glyph swap while running.
-  playButtonOn: { boxShadow: `${shadow.rim},${shadow.float},inset 0 0 0 1.5px ${colors.white}` },
+  playButtonOn: { outlineWidth: 2, outlineStyle: 'solid', outlineColor: colors.white, outlineOffset: 2 },
   playGlyph: { transform: 'translateX(1px)', display: 'flex' },
   tempoBox: {
     flexGrow: 1,
@@ -174,8 +174,10 @@ export const styles = stylex.create({
     cursor: 'pointer',
     touchAction: 'none',
     borderRadius: radius.sm,
-    outlineWidth: 0,
-    boxShadow: { ':focus-visible': `inset 0 0 0 1.5px ${app.link}` }
+    outlineStyle: 'solid',
+    outlineWidth: { default: 0, ':focus-visible': 2 },
+    outlineColor: app.link,
+    outlineOffset: 2
   },
   sliderTrack: {
     position: 'relative',
@@ -283,7 +285,7 @@ export const styles = stylex.create({
     paddingBlock: 0,
     paddingInline: 0,
     transform: { default: 'scale(1)', ':active': motion.press },
-    transitionProperty: 'transform, background-color, box-shadow',
+    transitionProperty: 'transform, background-color',
     transitionDuration: '.12s',
     transitionTimingFunction: easing.pop
   },
@@ -294,10 +296,10 @@ export const styles = stylex.create({
   padPlayLit: { transform: 'scale(1.12)' },
   // The playhead also reads as a four-colour underline, one hue per track,
   // so the current step is visible even on unlit cells.
-  edgeKeys: { boxShadow: `inset 0 -2px 0 0 ${colors.purpleDark}` },
-  edgeHat: { boxShadow: `inset 0 -2px 0 0 ${colors.yellowDark}` },
-  edgeSnare: { boxShadow: `inset 0 -2px 0 0 ${colors.orangeDark}` },
-  edgeKick: { boxShadow: `inset 0 -2px 0 0 ${colors.pinkDark}` },
+  edgeKeys: { borderBottomWidth: 2, borderBottomStyle: 'solid', borderBottomColor: colors.purpleDark },
+  edgeHat: { borderBottomWidth: 2, borderBottomStyle: 'solid', borderBottomColor: colors.yellowDark },
+  edgeSnare: { borderBottomWidth: 2, borderBottomStyle: 'solid', borderBottomColor: colors.orangeDark },
+  edgeKick: { borderBottomWidth: 2, borderBottomStyle: 'solid', borderBottomColor: colors.pinkDark },
   padLit: {
     animationName: { default: padIn, [reduce]: 'none' },
     animationDuration: '.18s',
@@ -318,10 +320,10 @@ export const styles = stylex.create({
   labelMuted: { textDecorationLine: 'line-through' },
   // A track-colour accent tops each cover label so the column's hue reads even
   // before any pad is lit.
-  accentKeys: { boxShadow: `inset 0 2px 0 0 ${colors.purpleDark}` },
-  accentHat: { boxShadow: `inset 0 2px 0 0 ${colors.yellowDark}` },
-  accentSnare: { boxShadow: `inset 0 2px 0 0 ${colors.orangeDark}` },
-  accentKick: { boxShadow: `inset 0 2px 0 0 ${colors.pinkDark}` },
+  accentKeys: { borderTopWidth: 2, borderTopStyle: 'solid', borderTopColor: colors.purpleDark },
+  accentHat: { borderTopWidth: 2, borderTopStyle: 'solid', borderTopColor: colors.yellowDark },
+  accentSnare: { borderTopWidth: 2, borderTopStyle: 'solid', borderTopColor: colors.orangeDark },
+  accentKick: { borderTopWidth: 2, borderTopStyle: 'solid', borderTopColor: colors.pinkDark },
   labelDot: { width: 8, height: 8, borderRadius: radius.circle, flexShrink: 0 },
   dotKeys: { backgroundColor: colors.purpleDark },
   dotHat: { backgroundColor: colors.yellowDark },
@@ -397,7 +399,13 @@ export const styles = stylex.create({
     backgroundColor: app.fill3,
     overflow: 'hidden'
   },
-  loopChipOn: { backgroundColor: app.fill2, boxShadow: `inset 0 0 0 1.5px ${colors.pinkDark}` },
+  loopChipOn: {
+    backgroundColor: app.fill2,
+    outlineWidth: 1.5,
+    outlineStyle: 'solid',
+    outlineColor: colors.pinkDark,
+    outlineOffset: -1.5
+  },
   loopLoad: {
     borderWidth: 0,
     paddingBlock: space.sm,
@@ -440,7 +448,13 @@ export const styles = stylex.create({
     animationTimingFunction: easing.push,
     animationFillMode: 'backwards'
   },
-  loopRowOn: { backgroundColor: app.fill2, boxShadow: `inset 0 0 0 1.5px ${colors.pinkDark}` },
+  loopRowOn: {
+    backgroundColor: app.fill2,
+    outlineWidth: 1.5,
+    outlineStyle: 'solid',
+    outlineColor: colors.pinkDark,
+    outlineOffset: -1.5
+  },
   loopRowLoad: {
     flexGrow: 1,
     minWidth: 0,
