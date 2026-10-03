@@ -177,7 +177,9 @@ function libWithCards(fronts: string[], when = T0) {
   eq('again on the last card finishes', lib.reviews[deck.id]!.finished !== null, true)
   eq('again still counts as graded', lib.reviews[deck.id]!.finished!.graded, 2)
   eq('finished sessions hold the queue empty', lib.reviews[deck.id]!.queue.length, 0)
-  const relearned = lib.cards.find((c) => c.front === 'b')!
+  // The relearned card is whichever card the 'again' event names: with equal
+  // due and createdAt the queue's id tie-break does not follow front order.
+  const relearned = lib.cards.find((c) => c.id === lib.history.at(-1)!.cardId)!
   eq('again reschedules for +10m', relearned.due, T0 + 2000 + RELEARN_MS)
   eq('again card is due again after the wait', dueCount(lib, deck.id, T0 + 2000 + RELEARN_MS), 1)
 
