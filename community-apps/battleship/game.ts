@@ -43,6 +43,20 @@ export function shipCells(at: number, size: number, dir: Orientation): number[] 
   return cells
 }
 
+/** The in-grid portion of a run anchored at `at`: what is left of a placement
+ * preview when the anchor would overflow the edge. */
+export function clipRun(at: number, size: number, dir: Orientation): number[] {
+  const row = Math.floor(at / SIZE)
+  const col = at % SIZE
+  const cells: number[] = []
+  for (let k = 0; k < size; k++) {
+    const r = dir === 'v' ? row + k : row
+    const c = dir === 'h' ? col + k : col
+    if (r < SIZE && c < SIZE) cells.push(r * SIZE + c)
+  }
+  return cells
+}
+
 export function canPlace(fleet: Fleet, cells: number[]): boolean {
   return cells.every((c) => fleet.every((ship) => !ship?.includes(c)))
 }

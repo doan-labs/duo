@@ -267,7 +267,6 @@ export const styles = stylex.create({
     cursor: 'pointer',
     ':hover': { backgroundColor: `color-mix(in srgb, ${colors.cyanDark} 18%, transparent)` }
   },
-  seaReject: { backgroundColor: `color-mix(in srgb, ${colors.redDark} 30%, transparent)` },
   coord: {
     position: 'absolute',
     fontSize: typeScale.caption2,
@@ -275,7 +274,10 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     pointerEvents: 'none'
   },
-  coordFile: { right: space.xxs, bottom: 0 },
+  // Files live on the top row (top-right corner) and ranks on the left column
+  // (top-left), so the A1 corner pairs two single glyphs horizontally and the
+  // two-glyph "10" gets A10 to itself.
+  coordFile: { right: space.xxs, top: 0 },
   coordRank: { left: space.xxs, top: 0 },
   coordInk: { color: `color-mix(in srgb, ${colors.cyanDark} 45%, transparent)` },
   // Overlay layer: hulls, pegs, the last-shot ring and the placing ghost all

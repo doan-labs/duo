@@ -10,6 +10,7 @@ import {
   adoptGame,
   canPlace,
   cellName,
+  clipRun,
   type Derived,
   derive,
   type Fleet,
@@ -76,12 +77,11 @@ type OceanProps = {
   onHover?: (at: number | null) => void
   overlay?: ReactNode
   pulse?: 'win' | 'lose' | null
-  rejectAt?: number | null
 }
 
 /** One 10x10 sea. Cells stay buttons for focus and hit-testing even when the
  * board is only a readout. */
-function Ocean({ board, mode, onPick, onHover, overlay, pulse, rejectAt }: OceanProps) {
+function Ocean({ board, mode, onPick, onHover, overlay, pulse }: OceanProps) {
   const cells = []
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
@@ -98,13 +98,10 @@ function Ocean({ board, mode, onPick, onHover, overlay, pulse, rejectAt }: Ocean
             styles.sea,
             (r + c) % 2 === 1 && styles.seaAlt,
             mode === 'fire' && styles.seaLive,
-            mode === 'place' && styles.seaPlace,
-            rejectAt === at && styles.seaReject
+            mode === 'place' && styles.seaPlace
           )}
         >
-          {r === SIZE - 1 && (
-            <i {...stylex.props(styles.coord, styles.coordFile, styles.coordInk)}>{'ABCDEFGHIJ'[c]}</i>
-          )}
+          {r === 0 && <i {...stylex.props(styles.coord, styles.coordFile, styles.coordInk)}>{'ABCDEFGHIJ'[c]}</i>}
           {c === 0 && <i {...stylex.props(styles.coord, styles.coordRank, styles.coordInk)}>{r + 1}</i>}
         </button>
       )
@@ -488,10 +485,14 @@ function Game() {
   const lastEntry = d.log.length ? d.log[d.log.length - 1]! : null
   const nextIdx = game.fleet.indexOf(null)
   const hoverShip = placing && hover !== null ? game.fleet.findIndex((s) => s?.includes(hover)) : -1
-  const ghostCells =
-    placing && hover !== null && hoverShip < 0 && nextIdx >= 0 ? shipCells(hover, SHIPS[nextIdx]!.size, dir) : null
-  const ghost = ghostCells ? { cells: ghostCells, ok: canPlace(game.fleet, ghostCells) } : null
-  const rejectAt = placing && hover !== null && hoverShip < 0 && nextIdx >= 0 && !ghostCells ? hover : null
+  // Off-grid anchors still preview: the run clipped to the grid paints as a
+  // red ghost, which a cell :hover fill could never out-vote.
+  const run =
+    placing && hover !== null && hoverShip < 0 && nextIdx >= 0
+      ? (shipCells(hover, SHIPS[nextIdx]!.size, dir) ?? clipRun(hover, SHIPS[nextIdx]!.size, dir))
+      : null
+  const ghost =
+    run && run.length > 0 ? { cells: run, ok: run.length === SHIPS[nextIdx]!.size && canPlace(game.fleet, run) } : null
   const status = statusFor(d, game, dir)
 
   const fleetBoard = (
@@ -501,7 +502,6 @@ function Game() {
       onPick={pickFleet}
       onHover={setHover}
       pulse={d.winner === 'bot' ? 'lose' : null}
-      rejectAt={rejectAt}
       overlay={
         <>
           {game.fleet.map(
