@@ -782,12 +782,43 @@ export class LibraryStore {
     }
     if (e.rev <= this.rev) return
     this.rev = e.rev
-    if (this.pending.has(e.k)) {
+    const blocker = this.pending.get(e.k)
+    if (blocker && !blocker.failed) {
       this.deferred.set(e.k, e)
       return
     }
+    if (blocker) {
+      // A refused write can never settle, so its overlay must not hide the
+      // acknowledged remote truth behind the pending map forever.
+      this.pending.delete(e.k)
+      const g = genOf(e.k)
+      if (g && this.myGens.has(g)) this.deadGens.add(g)
+    }
     this.remote.set(e.k, e.v)
+    this.deferred.delete(e.k) // an applied event is newer than anything parked
+    // A durable commit pointer proves every failed overlay generation dead.
+    if (e.k === META_KEY) this.retireFailed()
     this.emit()
+  }
+
+  /**
+   * Drop failed pending overlays once a commit pointer lands on the remote.
+   * Their generations can never commit, so keeping them would pin the view on
+   * a revision the peer's newer commit already replaced - and hide that commit
+   * indefinitely. Live submissions keep their overlay and still defer events.
+   */
+  private retireFailed() {
+    for (const [k, p] of this.pending) {
+      if (!p.failed) continue
+      this.pending.delete(k)
+      const g = genOf(k)
+      if (g && this.myGens.has(g)) this.deadGens.add(g)
+      const d = this.deferred.get(k)
+      if (d) {
+        this.deferred.delete(k)
+        this.remote.set(k, d.v)
+      }
+    }
   }
 
   private async hydrate() {
@@ -815,6 +846,7 @@ export class LibraryStore {
         cursor = page.cursor
       } while (cursor)
       this.remote = values
+      this.deferred.clear() // the pulled truth supersedes every parked event
       this.rev = revision ?? 0
       this.attempts = 0
       this.hydrateFailed = false

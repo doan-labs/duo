@@ -14,7 +14,8 @@ import {
   renameDeck,
   revealReview,
   serializeLibrary,
-  startReview
+  startReview,
+  updateCard
 } from './cards.ts'
 import { decodeLibrary, encodeLibrary, LibraryStore, type Space, utf8 } from './storage.ts'
 
@@ -870,6 +871,110 @@ function envelopesOk(kv: FakeKV) {
   eq('retry ready', settled.status, 'ready')
   const cold = decodeLibrary(kv.map)
   eq('created card committed exactly once', cold.lib.cards.filter((c) => c.front === 'typed card').length, 1)
+}
+
+// --- a failed pending overlay cannot hide a newer peer commit ----------------
+
+{
+  const kv = new FakeKV()
+  const a = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'TwoCopies', T0)
+  const deck = lib.decks[0]!
+  lib = addCard(lib, deck.id, 'q', 'a', T0)
+  check('seed committed', a.store.save(lib))
+  eq('seeded ready', (await drain(a.store)).status, 'ready')
+
+  // A's save fails mid-generation; its dead pending overlay stays pinned.
+  kv.failOn = (k) => (k.includes('.activity') ? 'E_STORAGE' : null)
+  check('failing save accepted', a.store.save(updateCard(lib, lib.cards[0]!.id, 'local failed edit', 'a')))
+  eq('writer surfaces error', (await drain(a.store)).status, 'error')
+  kv.failOn = null
+
+  // A second display copy boots on the committed baseline and commits an edit
+  // to the same card - its pointer must not stay deferred behind A's dead meta.
+  const b = await bootStore(kv)
+  eq('peer boots ready', b.snap.status, 'ready')
+  const peer = updateCard(lib, lib.cards[0]!.id, 'peer committed edit', 'a')
+  check('peer save accepted', b.store.save(peer))
+  eq('peer committed', (await drain(b.store)).status, 'ready')
+  await tick()
+  eq('failed copy recovers', a.store.getSnapshot().status, 'ready')
+  eq('failed copy reflects peer edit', a.store.getSnapshot().lib.cards[0]!.front, 'peer committed edit')
+  eq('copies converged', canonical(a.store.getSnapshot().lib), canonical(b.store.getSnapshot().lib))
+  eq('cold decode matches peer', canonical(decodeLibrary(kv.map).lib), canonical(peer))
+
+  // Same flow, but the peer retried the failed copy's pinned-id creation from
+  // the shared draft: the committed card must appear exactly once.
+  const kv2 = new FakeKV()
+  const a2 = await bootStore(kv2)
+  let base = newLibrary()
+  base = addDeck(base, 'Pinned', T0)
+  check('seed2 committed', a2.store.save(base))
+  eq('seeded2 ready', (await drain(a2.store)).status, 'ready')
+  const deckId = base.decks[0]!.id
+  const pinned = addCard(base, deckId, 'typed front', 'typed back', T0 + 1)
+  const pinnedId = pinned.cards[0]!.id
+  kv2.failOn = (k) => (k.includes('.activity') ? 'E_STORAGE' : null)
+  check('failing create accepted', a2.store.save(pinned))
+  eq('creator surfaces error', (await drain(a2.store)).status, 'error')
+  kv2.failOn = null
+  const b2 = await bootStore(kv2)
+  // The peer's retry upserts the SAME pinned id - its committed library adds
+  // the card under the identity the shared draft recorded.
+  const retried = addCard(base, deckId, 'typed front', 'typed back', T0 + 1)
+  const remapped = {
+    ...retried,
+    cards: retried.cards.map((c) => ({ ...c, id: pinnedId }))
+  }
+  check('peer retry accepted', b2.store.save(remapped))
+  eq('peer retry committed', (await drain(b2.store)).status, 'ready')
+  await tick()
+  eq('failed copy recovers2', a2.store.getSnapshot().status, 'ready')
+  eq('exactly one pinned card', a2.store.getSnapshot().lib.cards.filter((c) => c.id === pinnedId).length, 1)
+  eq('copies converged2', canonical(a2.store.getSnapshot().lib), canonical(b2.store.getSnapshot().lib))
+}
+
+// --- a live local submission still defers a peer commit ----------------------
+
+{
+  const kv = new FakeKV()
+  const a = await bootStore(kv)
+  let lib = newLibrary()
+  lib = addDeck(lib, 'LiveGuard', T0)
+  const deck = lib.decks[0]!
+  lib = addCard(lib, deck.id, 'q', 'a', T0)
+  check('seed committed', a.store.save(lib))
+  eq('seeded ready', (await drain(a.store)).status, 'ready')
+
+  // First save fails, leaving the dead overlay; a retry then goes live.
+  kv.failOn = (k) => (k.includes('.activity') ? 'E_STORAGE' : null)
+  check('failing save accepted', a.store.save(updateCard(lib, lib.cards[0]!.id, 'v2', 'a')))
+  eq('writer surfaces error', (await drain(a.store)).status, 'error')
+  kv.failOn = null
+  kv.holdOn = (k, v) => k.includes('.deck.') && (v?.includes('local active edit') ?? false)
+  const retry = updateCard(lib, lib.cards[0]!.id, 'local active edit', 'a')
+  check('retry accepted', a.store.save(retry))
+  await tick()
+
+  // The peer commits while the retry is held: the LIVE submission's overlay
+  // must not be stomped by the peer's newer revision arriving mid-flight.
+  const b = await bootStore(kv)
+  const peer = updateCard(lib, lib.cards[0]!.id, 'peer mid-flight edit', 'a')
+  check('peer save accepted', b.store.save(peer))
+  eq('peer committed', (await drain(b.store)).status, 'ready')
+  eq('live save still shows its edit', a.store.getSnapshot().lib.cards[0]!.front, 'local active edit')
+  kv.resume()
+  const settled = await drain(a.store)
+  eq('live save settles', settled.status, 'ready')
+  await drain(b.store)
+  await tick()
+  // Revision order decides the winner: the later-acking commit's pointer is
+  // what durable remote decodes, and both copies converge on it.
+  const winner = settled.lib
+  eq('copies converged on winner', canonical(b.store.getSnapshot().lib), canonical(winner))
+  eq('cold decode matches winner', canonical(decodeLibrary(kv.map).lib), canonical(winner))
+  check('no torn decode', !decodeLibrary(kv.map).torn)
 }
 
 // --- decode-level regressions --------------------------------------------------
