@@ -595,9 +595,11 @@ function PocketBudget() {
           </div>
         </div>
       ) : (
+        // Cover leads with the entry form so a quick expense is the first
+        // thing on screen; the hero and charts sit one scroll below.
         <>
-          {hero}
           {entry}
+          {hero}
           {breakdown}
           {dayBars}
           {limitsCard}
