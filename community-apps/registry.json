@@ -6,20 +6,40 @@
       "folder": "habit-streaks",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.sudoku": {
+      "folder": "sudoku",
+      "maintainers": ["mnismt"]
+    },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
     },
+    "com.mnismt.duo.pixelstudio": {
+      "folder": "pixel-studio",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.pomodoro": {
       "folder": "pomodoro-timer",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.flashcards": {
+      "folder": "flashcards",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.2048": {
       "folder": "2048",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.minesweeper": {
+      "folder": "minesweeper",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.tictactoe": {
       "folder": "tic-tac-toe",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.nonogram": {
+      "folder": "nonogram",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.memorymatch": {
