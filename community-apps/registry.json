@@ -66,6 +66,10 @@
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
     },
+    "com.mnismt.duo.blockdrop": {
+      "folder": "block-drop",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.battleship": {
       "folder": "battleship",
       "maintainers": ["mnismt"]
