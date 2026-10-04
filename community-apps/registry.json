@@ -66,6 +66,10 @@
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
     },
+    "com.mnismt.duo.battleship": {
+      "folder": "battleship",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.musicsketchpad": {
       "folder": "music-sketchpad",
       "maintainers": ["mnismt"]
