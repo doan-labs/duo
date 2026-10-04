@@ -6,20 +6,40 @@
       "folder": "habit-streaks",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.sudoku": {
+      "folder": "sudoku",
+      "maintainers": ["mnismt"]
+    },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "maintainers": ["doan-labs"]
     },
+    "com.mnismt.duo.pixelstudio": {
+      "folder": "pixel-studio",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.pomodoro": {
       "folder": "pomodoro-timer",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.flashcards": {
+      "folder": "flashcards",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.2048": {
       "folder": "2048",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.minesweeper": {
+      "folder": "minesweeper",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.tictactoe": {
       "folder": "tic-tac-toe",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.nonogram": {
+      "folder": "nonogram",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.memorymatch": {
@@ -38,6 +58,10 @@
       "folder": "flappy-duo",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.recipebox": {
+      "folder": "recipe-box",
+      "maintainers": ["mnismt"]
+    },
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
@@ -45,6 +69,26 @@
     "com.lucpastc.lbpr.app": {
       "folder": "lbpr",
       "maintainers": ["lucazinho1002"]
+    },
+    "com.mnismt.duo.mindmap": {
+      "folder": "mind-map",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.blockdrop": {
+      "folder": "block-drop",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.battleship": {
+      "folder": "battleship",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.musicsketchpad": {
+      "folder": "music-sketchpad",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.pocketbudget": {
+      "folder": "pocket-budget",
+      "maintainers": ["mnismt"]
     }
   }
 }
