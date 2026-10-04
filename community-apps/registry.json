@@ -58,12 +58,20 @@
       "folder": "flappy-duo",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.recipebox": {
+      "folder": "recipe-box",
+      "maintainers": ["mnismt"]
+    },
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
     },
     "com.mnismt.duo.blockdrop": {
       "folder": "block-drop",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.pocketbudget": {
+      "folder": "pocket-budget",
       "maintainers": ["mnismt"]
     }
   }
