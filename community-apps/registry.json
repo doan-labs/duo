@@ -70,6 +70,10 @@
       "folder": "battleship",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.musicsketchpad": {
+      "folder": "music-sketchpad",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.pocketbudget": {
       "folder": "pocket-budget",
       "maintainers": ["mnismt"]
