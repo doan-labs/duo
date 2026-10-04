@@ -70,6 +70,10 @@
       "folder": "mind-map",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.battleship": {
+      "folder": "battleship",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.musicsketchpad": {
       "folder": "music-sketchpad",
       "maintainers": ["mnismt"]
