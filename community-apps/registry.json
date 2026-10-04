@@ -66,6 +66,10 @@
       "folder": "chess",
       "maintainers": ["linhtinhvovan"]
     },
+    "com.mnismt.duo.mindmap": {
+      "folder": "mind-map",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.blockdrop": {
       "folder": "block-drop",
       "maintainers": ["mnismt"]
