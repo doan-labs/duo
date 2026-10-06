@@ -137,10 +137,12 @@ function Pantry() {
   const stored = useKV(os.storage, 'pantry-v1')
   const mirror = useKV(os.session, 'pantry-view')
 
-  // The mirror applies local writes optimistically and foreign ones
-  // last-writer-wins, so the latest settled document is always stored.value -
-  // no pending-write mask on the read side. docRef.current follows publishes
-  // synchronously so rapid taps in one event batch stay consistent.
+  // Two read paths. `doc` renders whatever the mirror has settled: foreign
+  // writes land inside a React transition, so a copy that was hidden may lag a
+  // few hundred ms behind storage. docRef.current is the write-side truth -
+  // publishes update it synchronously and a raw space.watch keeps it aligned
+  // with every storage change regardless of render timing, so a tap right
+  // after a fold computes from the freshest document, not the lagging render.
   const doc = parseDoc(stored.value)
 
   const [darkMode, setDarkMode] = useState(false)
@@ -161,7 +163,7 @@ function Pantry() {
   const [flashId, setFlashId] = useState<string | null>(null)
 
   const docRef = useRef(doc)
-  docRef.current = doc
+  const docRev = useRef(0)
   const viewRef = useRef(view)
   viewRef.current = view
   const uiRef = useRef({ loc, q, sort })
@@ -172,6 +174,23 @@ function Pantry() {
   mirrorWrite.current = mirror.set
   const storedWrite = useRef(stored.set)
   storedWrite.current = stored.set
+
+  // Live doc for the write path: the socket watch fires on every storage
+  // change even while this copy is hidden, so docRef never falls a transition
+  // behind the truth.
+  useEffect(() => {
+    void os.storage
+      .get('pantry-v1')
+      .then((v) => {
+        if (docRev.current === 0) docRef.current = parseDoc(v)
+      })
+      .catch(() => {})
+    return os.storage.watch(0, (c) => {
+      if (c.k !== 'pantry-v1' || c.rev <= docRev.current) return
+      docRev.current = c.rev
+      docRef.current = parseDoc(c.v)
+    })
+  }, [])
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
 
@@ -642,7 +661,7 @@ function Pantry() {
         )}
         {errors.form && <p {...stylex.props(styles.errorText)}>{errors.form}</p>}
         <div {...stylex.props(styles.sheetActions)}>
-          <Button type="button" variant="filled" onClick={add}>
+          <Button type="button" variant="filled" onClick={add} xstyle={styles.btnH}>
             Add item
           </Button>
         </div>
@@ -826,7 +845,7 @@ function Pantry() {
             maxLength={40}
           />
         </label>
-        <Button type="button" variant="filled" onClick={addShopItem}>
+        <Button type="button" variant="filled" onClick={addShopItem} xstyle={styles.btnH}>
           Add
         </Button>
       </div>
@@ -972,12 +991,13 @@ function Pantry() {
                 <div {...stylex.props(styles.sheetActions)}>
                   {/* Keep lands focus first: the armed-delete state should hand the
                       safe choice to the finger, not the destructive one. */}
-                  <Button variant="plain" autoFocus onClick={() => setConfirming(false)}>
+                  <Button variant="plain" autoFocus onClick={() => setConfirming(false)} xstyle={styles.btnH}>
                     Keep it
                   </Button>
                   <Button
                     variant="filled"
                     onClick={confirmDelete}
+                    xstyle={styles.btnH}
                     aria-label={`Delete ${cleanName(editDraft.name) || 'item'} permanently`}
                   >
                     Delete
@@ -986,13 +1006,13 @@ function Pantry() {
               </div>
             ) : (
               <div {...stylex.props(styles.sheetActions)}>
-                <Button variant="plain" onClick={() => setConfirming(true)} xstyle={styles.dangerText}>
+                <Button variant="plain" onClick={() => setConfirming(true)} xstyle={[styles.dangerText, styles.btnH]}>
                   Delete
                 </Button>
-                <Button variant="tinted" onClick={closeEdit}>
+                <Button variant="tinted" onClick={closeEdit} xstyle={styles.btnH}>
                   Cancel
                 </Button>
-                <Button variant="filled" onClick={saveEdit}>
+                <Button variant="filled" onClick={saveEdit} xstyle={styles.btnH}>
                   Save
                 </Button>
               </div>
