@@ -150,8 +150,8 @@ export const styles = stylex.create({
     boxShadow: `${shadow.rim},${shadow.float}`
   },
   zoomBtn: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
@@ -162,7 +162,7 @@ export const styles = stylex.create({
   },
   zoomPct: {
     minWidth: 44,
-    height: 30,
+    height: 36,
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
@@ -216,8 +216,8 @@ export const styles = stylex.create({
     color: `color-mix(in srgb, ${colors.white} 66%, transparent)`
   },
   heldCancel: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
@@ -299,7 +299,7 @@ export const styles = stylex.create({
   },
   segFill: { display: 'flex', flexGrow: 1 },
   segBtn: {
-    height: 26,
+    minHeight: 44,
     paddingTop: 0,
     paddingRight: space.sm,
     paddingBottom: 0,
@@ -317,7 +317,7 @@ export const styles = stylex.create({
   },
   segOn: { backgroundColor: app.control, color: app.fg, boxShadow: shadow.card },
   action: {
-    height: 34,
+    minHeight: 44,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',

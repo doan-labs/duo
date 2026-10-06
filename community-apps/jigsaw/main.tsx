@@ -119,6 +119,9 @@ function Jigsaw() {
   const [pane, setPane] = useState<'board' | 'pieces'>('board')
   const [filter, setFilter] = useState<Filter>('all')
   const [confirmReset, setConfirmReset] = useState(false)
+  // The armed reset is bound to the puzzle it was opened on: a foreign game
+  // switch (other display) both closes the sheet and drops the armed intent.
+  const armedGameRef = useRef<string | null>(null)
   const [picker, setPicker] = useState(false)
   const [veilDown, setVeilDown] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
@@ -176,6 +179,8 @@ function Jigsaw() {
       setBoardView(fitView())
       setVeilDown(false)
       setFilter('all')
+      armedGameRef.current = null
+      setConfirmReset(false)
     }
   }, [])
 
@@ -604,8 +609,11 @@ function Jigsaw() {
 
   const doReset = useCallback(() => {
     setConfirmReset(false)
+    const armed = armedGameRef.current
+    armedGameRef.current = null
     act((ctx) => {
-      if (!ctx.game) return null
+      // The armed intent dies if the puzzle it was opened on is no longer live.
+      if (!ctx.game || `${ctx.game.art}:${ctx.game.count}:${ctx.game.seed}` !== armed) return null
       const next = resetGame(ctx.game, (Math.random() * 2 ** 31) | 0)
       gameKeyRef.current = `${next.art}:${next.count}:${next.seed}`
       return { next, held: null }
@@ -781,7 +789,10 @@ function Jigsaw() {
             name="reload"
             variant="round"
             aria-label="Start this puzzle over"
-            onClick={() => setConfirmReset(true)}
+            onClick={() => {
+              armedGameRef.current = `${game.art}:${game.count}:${game.seed}`
+              setConfirmReset(true)
+            }}
           />
           <IconButton name="photo" variant="round" aria-label="Choose a puzzle" onClick={() => setPicker(true)} />
         </div>
@@ -921,7 +932,7 @@ function Jigsaw() {
               The {placed} placed {placed === 1 ? 'piece returns' : 'pieces return'} to the tray and the timer restarts.
             </p>
             <div {...stylex.props(styles.confirmActions)}>
-              <Button variant="tinted" onClick={() => setConfirmReset(false)}>
+              <Button variant="tinted" autoFocus onClick={() => setConfirmReset(false)}>
                 Cancel
               </Button>
               <Button variant="filled" xstyle={styles.danger} onClick={doReset}>
