@@ -5,6 +5,7 @@
       "lane": "community",
       "author": "linhtinhvovan",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/chess",
+      "developer": "linhtinhvovan",
       "releases": [
         {
           "release": "1.0.2+3115a367",
@@ -25,6 +26,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/2048",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.1.0+17a50d77",
@@ -69,6 +71,7 @@
       "lane": "community",
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/battleship",
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+26538bd1",
@@ -83,6 +86,7 @@
       "lane": "community",
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/block-drop",
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+e3f0afa1",
@@ -97,6 +101,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flappy-duo",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.0.2+a6daf032",
@@ -124,6 +129,7 @@
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flashcards",
       "permissions": [],
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+9c3a0437",
@@ -138,6 +144,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/habit-streaks",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.1.0+71a61bff",
@@ -164,6 +171,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/memory-match",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.1.0+d83047d4",
@@ -190,6 +198,7 @@
       "lane": "community",
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/mind-map",
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+72d8682c",
@@ -205,6 +214,7 @@
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/minesweeper",
       "permissions": [],
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+a896101c",
@@ -219,6 +229,7 @@
       "lane": "community",
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/music-sketchpad",
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+9e101453",
@@ -234,6 +245,7 @@
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/nonogram",
       "permissions": [],
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+241338b1",
@@ -249,6 +261,7 @@
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pixel-studio",
       "permissions": [],
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+b4bab39a",
@@ -263,6 +276,7 @@
       "lane": "community",
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pocket-budget",
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+34617859",
@@ -277,6 +291,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pomodoro-timer",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.1.0+19d3c5db",
@@ -298,6 +313,7 @@
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/recipe-box",
       "permissions": [],
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+befb7e1a",
@@ -312,6 +328,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/snake",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.2.3+9d3bf860",
@@ -351,6 +368,7 @@
       "author": "devin",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/sudoku",
       "permissions": [],
+      "developer": "devin",
       "releases": [
         {
           "release": "1.0.0+cf0093f1",
@@ -365,6 +383,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tic-tac-toe",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.1.0+82bf1ef2",
@@ -391,6 +410,7 @@
       "lane": "community",
       "author": "mnismt",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/wordle-mini",
+      "developer": "mnismt",
       "releases": [
         {
           "release": "1.1.0+8b3eca1f",
@@ -417,6 +437,7 @@
       "lane": "community",
       "author": "Doan Labs",
       "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/fold-compass",
+      "developer": "doan-labs",
       "releases": [
         {
           "release": "1.1.0+112a7cfe",
@@ -431,6 +452,33 @@
           "sha256": "b49762362349c9397f439203614e5af90e3be459ca0974d1e5213680f01c43a2"
         }
       ]
+    }
+  },
+  "developers": {
+    "doan-labs": {
+      "name": "Doan Labs",
+      "description": "The team behind Duo: the folding simulator, the SDK and UI kit, and every official app.",
+      "imageUrl": "https://avatars.githubusercontent.com/doan-labs",
+      "website": "https://duo.doan-labs.com",
+      "github": "doan-labs"
+    },
+    "devin": {
+      "name": "Devin",
+      "description": "The AI software engineer from Cognition. Its games and tools arrive as pull requests and pass the same review as everyone else's.",
+      "imageUrl": "https://avatars.githubusercontent.com/in/811515",
+      "website": "https://devin.ai"
+    },
+    "linhtinhvovan": {
+      "name": "linhtinhvovan",
+      "description": "Brought chess to the fold: a full game against a real engine, playable on both displays.",
+      "imageUrl": "https://avatars.githubusercontent.com/linhtinhvovan",
+      "github": "linhtinhvovan"
+    },
+    "mnismt": {
+      "name": "mnismt",
+      "description": "Keeps the community catalog running and built many of its first apps, from Snake and 2048 to Flappy Duo.",
+      "imageUrl": "https://avatars.githubusercontent.com/mnismt",
+      "github": "mnismt"
     }
   }
 }

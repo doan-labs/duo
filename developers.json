@@ -1,0 +1,53 @@
+{
+  "official": "doan-labs",
+  "developers": {
+    "doan-labs": {
+      "name": "Doan Labs",
+      "description": "The team behind Duo: the folding simulator, the SDK and UI kit, and every official app.",
+      "imageUrl": "https://avatars.githubusercontent.com/doan-labs",
+      "website": "https://duo.doan-labs.com",
+      "github": "doan-labs"
+    },
+    "devin": {
+      "name": "Devin",
+      "description": "The AI software engineer from Cognition. Its games and tools arrive as pull requests and pass the same review as everyone else's.",
+      "imageUrl": "https://avatars.githubusercontent.com/in/811515",
+      "website": "https://devin.ai"
+    },
+    "linhtinhvovan": {
+      "name": "linhtinhvovan",
+      "description": "Brought chess to the fold: a full game against a real engine, playable on both displays.",
+      "imageUrl": "https://avatars.githubusercontent.com/linhtinhvovan",
+      "github": "linhtinhvovan"
+    },
+    "mnismt": {
+      "name": "mnismt",
+      "description": "Keeps the community catalog running and built many of its first apps, from Snake and 2048 to Flappy Duo.",
+      "imageUrl": "https://avatars.githubusercontent.com/mnismt",
+      "github": "mnismt"
+    }
+  },
+  "apps": {
+    "com.mnismt.duo.habitstreaks": "mnismt",
+    "com.mnismt.duo.sudoku": "devin",
+    "labs.doan.fold-compass": "doan-labs",
+    "com.mnismt.duo.pixelstudio": "devin",
+    "com.mnismt.duo.pomodoro": "mnismt",
+    "com.mnismt.duo.flashcards": "devin",
+    "com.mnismt.duo.2048": "mnismt",
+    "com.mnismt.duo.minesweeper": "devin",
+    "com.mnismt.duo.tictactoe": "mnismt",
+    "com.mnismt.duo.nonogram": "devin",
+    "com.mnismt.duo.memorymatch": "mnismt",
+    "com.mnismt.duo.snake": "mnismt",
+    "com.mnismt.duo.wordlemini": "mnismt",
+    "com.mnismt.duo.flappyduo": "mnismt",
+    "com.mnismt.duo.recipebox": "devin",
+    "com.linhtinhvovan.duo.chess": "linhtinhvovan",
+    "com.mnismt.duo.mindmap": "devin",
+    "com.mnismt.duo.blockdrop": "devin",
+    "com.mnismt.duo.battleship": "devin",
+    "com.mnismt.duo.musicsketchpad": "devin",
+    "com.mnismt.duo.pocketbudget": "devin"
+  }
+}
