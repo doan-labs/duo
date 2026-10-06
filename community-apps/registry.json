@@ -134,6 +134,11 @@
       "folder": "pocket-budget",
       "developer": "devin",
       "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.solitaire": {
+      "folder": "solitaire",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
     }
   }
 }
