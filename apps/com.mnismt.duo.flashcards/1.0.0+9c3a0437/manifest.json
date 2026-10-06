@@ -1,0 +1,13 @@
+{
+  "id": "com.mnismt.duo.flashcards",
+  "name": "Flashcards",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "devin",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flashcards",
+  "license": "MIT",
+  "light": true,
+  "permissions": []
+}

@@ -90,6 +90,21 @@
         }
       ]
     },
+    "com.mnismt.duo.flashcards": {
+      "name": "Flashcards",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/flashcards",
+      "permissions": [],
+      "releases": [
+        {
+          "release": "1.0.0+9c3a0437",
+          "sdk": "0.0.0",
+          "bytes": 571697,
+          "sha256": "a15e13ef763002782ffd2522e7263b89a67eecf5e3af7bc9176113d4b1dbe4d0"
+        }
+      ]
+    },
     "com.mnismt.duo.habitstreaks": {
       "name": "Habit Streak",
       "lane": "community",
