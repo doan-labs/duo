@@ -320,6 +320,13 @@ function Jigsaw() {
     [beginDrag, dropAt, holdPiece]
   )
 
+  // TrayPane reports the raw pointer event; a keyboard press carries no point.
+  const trayPress = useCallback(
+    (id: number, e: { clientX?: number; clientY?: number }) =>
+      pressPiece(id, typeof e.clientX === 'number' ? { x: e.clientX, y: e.clientY ?? 0 } : null),
+    [pressPiece]
+  )
+
   // Arrow-key placement and Enter-to-drop for the held piece; Backspace sends
   // a held board piece back to the tray.
   useEffect(() => {
@@ -475,6 +482,17 @@ function Jigsaw() {
 
   const art = ARTS.find((a) => a.id === (game.art as ArtId)) ?? ARTS[0]!
 
+  const collectBtn = (
+    <button
+      type="button"
+      {...stylex.props(styles.action, shared.press)}
+      onClick={doCollect}
+      disabled={looseCount(game) === 0}
+    >
+      Collect board pieces
+    </button>
+  )
+
   const boardEl = (
     <BoardPane
       api={boardApi}
@@ -617,37 +635,32 @@ function Jigsaw() {
           pane === 'board' ? (
             boardEl
           ) : (
-            <div {...stylex.props(styles.rail, styles.railCover)}>
-              <TrayPaneInner
-                game={game}
-                art={artUriNow}
-                filter={filter}
-                onFilter={setFilter}
-                heldId={held}
-                cover
-                onPress={pressPiece}
-                onCollect={doCollect}
-                loose={looseCount(game)}
-              />
-            </div>
+            <TrayPane
+              game={game}
+              art={artUriNow}
+              filter={filter}
+              onFilter={setFilter}
+              heldId={held}
+              onPress={trayPress}
+              railRef={railEl}
+              compact
+              action={collectBtn}
+            />
           )
         ) : (
           <>
             {boardEl}
-            <div {...stylex.props(styles.rail)}>
-              <TrayPaneInner
-                game={game}
-                art={artUriNow}
-                filter={filter}
-                onFilter={setFilter}
-                heldId={held}
-                cover={false}
-                onPress={pressPiece}
-                onCollect={doCollect}
-                loose={looseCount(game)}
-                railRef={railEl}
-              />
-            </div>
+            <TrayPane
+              game={game}
+              art={artUriNow}
+              filter={filter}
+              onFilter={setFilter}
+              heldId={held}
+              onPress={trayPress}
+              railRef={railEl}
+              compact={false}
+              action={collectBtn}
+            />
           </>
         )}
       </section>
@@ -750,49 +763,6 @@ function Jigsaw() {
         </div>
       </Sheet>
     </main>
-  )
-}
-
-/** Tray plus its header row and the collect button - shared by both layouts. */
-function TrayPaneInner({
-  game,
-  art,
-  filter,
-  onFilter,
-  heldId,
-  onPress,
-  onCollect,
-  loose,
-  cover,
-  railRef
-}: {
-  game: Game
-  art: string
-  filter: 'all' | 'corner' | 'edge'
-  onFilter: (f: 'all' | 'corner' | 'edge') => void
-  heldId: number | null
-  onPress: (id: number, pt: { x: number; y: number } | null) => void
-  onCollect: () => void
-  loose: number
-  cover: boolean
-  railRef?: MutableRefObject<HTMLElement | null>
-}) {
-  return (
-    <>
-      <TrayPane
-        game={game}
-        art={art}
-        filter={filter}
-        onFilter={onFilter}
-        heldId={heldId}
-        onPress={(id, e) => onPress(id, 'clientX' in e ? { x: e.clientX, y: e.clientY } : null)}
-        railRef={railRef ?? { current: null }}
-        compact={cover}
-      />
-      <button type="button" {...stylex.props(styles.action, shared.press)} onClick={onCollect} disabled={loose === 0}>
-        Collect board pieces
-      </button>
-    </>
   )
 }
 

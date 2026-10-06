@@ -365,7 +365,10 @@ export function BoardPane({
             tabIndex={0}
             aria-label={`Piece ${p.i + 1}, ${kindOf(grid, p.r, p.c)} piece, on the board`}
             style={{ cursor: 'grab' }}
-            onKeyDown={(e) => onPieceKey(p.i, e)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
+              onPieceKey(p.i, e)
+            }}
           >
             <PieceShape
               g={game}
@@ -480,7 +483,8 @@ export function TrayPane({
   heldId,
   onPress,
   railRef,
-  compact
+  compact,
+  action
 }: {
   game: Game
   art: string
@@ -490,12 +494,16 @@ export function TrayPane({
   onPress: (id: number, e: ReactPointerEvent<HTMLElement>) => void
   railRef: MutableRefObject<HTMLElement | null>
   compact: boolean
+  action?: ReactNode
 }) {
   const grid = useMemo(() => gridOf(game), [game])
   const list = useMemo(() => filterTray(game, filter), [game, filter])
   const left = looseCount(game)
   return (
-    <div {...stylex.props(styles.rail)} ref={railRef as MutableRefObject<HTMLDivElement | null>}>
+    <div
+      {...stylex.props(styles.rail, compact && styles.railCover)}
+      ref={railRef as MutableRefObject<HTMLDivElement | null>}
+    >
       <div {...stylex.props(styles.railHead)}>
         <span {...stylex.props(styles.railTitle)}>Tray</span>
         <span {...stylex.props(styles.railTitle, styles.railCount)}>
@@ -550,6 +558,7 @@ export function TrayPane({
           </div>
         )}
       </div>
+      {action}
     </div>
   )
 }
