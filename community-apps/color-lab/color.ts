@@ -102,9 +102,10 @@ export function parseColor(text: string): Rgb | null {
   }
   const hueRaw = chan[0]!
   let h = Number.NaN
+  // 'grad' must be matched before 'rad': every grad string also ends with 'rad'.
   if (hueRaw.endsWith('turn')) h = Number.parseFloat(hueRaw) * 360
-  else if (hueRaw.endsWith('rad')) h = Number.parseFloat(hueRaw) * (180 / Math.PI)
   else if (hueRaw.endsWith('grad')) h = Number.parseFloat(hueRaw) * 0.9
+  else if (hueRaw.endsWith('rad')) h = Number.parseFloat(hueRaw) * (180 / Math.PI)
   else h = Number.parseFloat(hueRaw.replace(/deg$/, ''))
   const sl = chan.slice(1).map((p) => {
     const n = p.endsWith('%') ? Number.parseFloat(p.slice(0, -1)) : Number.parseFloat(p)
