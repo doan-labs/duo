@@ -15,13 +15,28 @@ export interface Prefs {
   muted: boolean
   // True: full motion. False: reduced motion (user override; absent = follow OS).
   motion: boolean
+  seq: number
+  by: string
 }
 
 export interface UiState {
   v: 1
   model: string | null
   step: number
+  seq: number
+  by: string
 }
+
+// Total order over versioned docs: the two live copies share these keys and
+// either may write with state that is a few hundred ms stale (fold race).
+// Larger seq wins; `by` breaks simultaneous seq ties deterministically, so
+// every copy converges to the same doc and a stale write is never adopted.
+export interface Seq {
+  seq: number
+  by: string
+}
+
+export const newerSeq = (a: Seq, b: Seq): boolean => (a.seq !== b.seq ? a.seq > b.seq : a.by > b.by)
 
 export const clampStep = (steps: number, i: number): number =>
   Math.max(0, Math.min(steps, Number.isFinite(i) ? Math.floor(i) : 0))
@@ -51,6 +66,30 @@ export const recordProgress = (
 
 export const modelDone = (p: ModelProgress | undefined): boolean => Boolean(p?.done)
 
+// Progress is a grow-only map (hi only grows, done only latches), so merging
+// two copies is commutative, associative and idempotent: a stale whole-doc
+// write can never lose another model's progress once readers merge on read.
+export const mergeProgress = (a: ProgressMap, b: ProgressMap): ProgressMap => {
+  const out: ProgressMap = { ...a }
+  for (const [k, e] of Object.entries(b)) {
+    const c = out[k]
+    out[k] = {
+      hi: Math.max(c?.hi ?? 0, e.hi),
+      done: Boolean(c?.done) || e.done,
+      at: Math.max(c?.at ?? 0, e.at)
+    }
+  }
+  return out
+}
+
+// True when every entry in `a` is already covered by `b` - used to detect a
+// stale store write that dropped entries our merged view still holds.
+export const progressSubset = (a: ProgressMap, b: ProgressMap): boolean =>
+  Object.entries(a).every(([k, e]) => {
+    const c = b[k]
+    return !!c && c.hi >= e.hi && (c.done || !e.done)
+  })
+
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
 
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x)
@@ -76,7 +115,7 @@ export function parseProgress(raw: string | null | undefined): ProgressMap {
 }
 
 export function parsePrefs(raw: string | null | undefined): Prefs {
-  const fallback: Prefs = { v: 1, muted: false, motion: true }
+  const fallback: Prefs = { v: 1, muted: false, motion: true, seq: 0, by: '' }
   if (!raw) return fallback
   try {
     const v: unknown = JSON.parse(raw)
@@ -84,7 +123,9 @@ export function parsePrefs(raw: string | null | undefined): Prefs {
     return {
       v: 1,
       muted: v.muted === true,
-      motion: v.motion !== false
+      motion: v.motion !== false,
+      seq: num(v.seq) ? Math.max(0, Math.floor(v.seq)) : 0,
+      by: typeof v.by === 'string' ? v.by : ''
     }
   } catch {
     return fallback
@@ -92,7 +133,7 @@ export function parsePrefs(raw: string | null | undefined): Prefs {
 }
 
 export function parseUi(raw: string | null | undefined): UiState {
-  const fallback: UiState = { v: 1, model: null, step: 0 }
+  const fallback: UiState = { v: 1, model: null, step: 0, seq: 0, by: '' }
   if (!raw) return fallback
   try {
     const v: unknown = JSON.parse(raw)
@@ -100,7 +141,9 @@ export function parseUi(raw: string | null | undefined): UiState {
     return {
       v: 1,
       model: typeof v.model === 'string' ? v.model : null,
-      step: num(v.step) ? Math.max(0, Math.floor(v.step)) : 0
+      step: num(v.step) ? Math.max(0, Math.floor(v.step)) : 0,
+      seq: num(v.seq) ? Math.max(0, Math.floor(v.seq)) : 0,
+      by: typeof v.by === 'string' ? v.by : ''
     }
   } catch {
     return fallback

@@ -18,18 +18,22 @@ import {
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue, setMuted, unlockAudio } from './audio.ts'
 import { StepDiagram } from './diagram.tsx'
 import {
   clampStep,
   isResult,
+  mergeProgress,
   modelDone,
+  newerSeq,
+  type Prefs,
   type ProgressMap,
   parsePrefs,
   parseProgress,
   parseUi,
+  progressSubset,
   recordProgress,
   resumeStep,
   type UiState
@@ -440,9 +444,58 @@ function PaperFold() {
     }
   }, [])
 
-  const uiState = parseUi(ui.value)
-  const progress = parseProgress(progressKV.value)
-  const prefs = parsePrefs(prefsKV.value)
+  // Writer identity + best-known docs. useKV.value is a hydrated snapshot that
+  // can lag a foreign write by a few hundred ms, so every mutation builds on a
+  // locally held best rather than the snapshot: seq/by gives ui and prefs a
+  // total order (stale writes never adopted; the active copy repairs the store
+  // when an older foreign write lands), and progress merges as a CRDT.
+  const byId = useMemo(() => Math.random().toString(36).slice(2, 8), [])
+  const [uiState, setUiState] = useState<UiState>({ v: 1, model: null, step: 0, seq: 0, by: '' })
+  const [prefs, setPrefs] = useState<Prefs>({ v: 1, muted: false, motion: true, seq: 0, by: '' })
+  const [progress, setProgress] = useState<ProgressMap>({})
+  const uiBest = useRef(uiState)
+  const prefsBest = useRef(prefs)
+  const progressBest = useRef(progress)
+  const activeRef = useRef(false)
+  activeRef.current = view.active
+
+  useEffect(() => {
+    if (ui.status === 'hydrating') return
+    const f = parseUi(ui.value)
+    if (newerSeq(f, uiBest.current)) {
+      uiBest.current = f
+      setUiState(f)
+    } else if (f.by !== byId && (f.seq > 0 || f.model !== null) && activeRef.current) {
+      // A foreign write older than our best overwrote the shared doc - put the
+      // freshest version back so a later cold read does not resurrect it.
+      ui.set(JSON.stringify(uiBest.current))
+    }
+  }, [ui.value, ui.status, ui.set, byId])
+
+  useEffect(() => {
+    if (prefsKV.status === 'hydrating') return
+    const f = parsePrefs(prefsKV.value)
+    if (newerSeq(f, prefsBest.current)) {
+      prefsBest.current = f
+      setPrefs(f)
+    } else if (f.by !== byId && f.seq > 0 && activeRef.current) {
+      prefsKV.set(JSON.stringify(prefsBest.current))
+    }
+  }, [prefsKV.value, prefsKV.status, prefsKV.set, byId])
+
+  useEffect(() => {
+    if (progressKV.status === 'hydrating') return
+    const f = parseProgress(progressKV.value)
+    const merged = mergeProgress(progressBest.current, f)
+    progressBest.current = merged
+    setProgress(merged)
+    if (!progressSubset(merged, f) && activeRef.current) {
+      // The store doc is missing entries our merged view holds - re-emit the
+      // superset so a stale whole-map write cannot permanently drop entries.
+      progressKV.set(JSON.stringify(merged))
+    }
+  }, [progressKV.value, progressKV.status, progressKV.set])
+
   const still = !prefs.motion
 
   useEffect(() => setMuted(prefs.muted), [prefs.muted])
@@ -465,29 +518,52 @@ function PaperFold() {
     [active]
   )
 
-  const go = useCallback((u: UiState) => ui.set(JSON.stringify(u)), [ui.set])
+  const go = useCallback(
+    (patch: { model: string | null; step: number }) => {
+      const next: UiState = { ...uiBest.current, ...patch, seq: uiBest.current.seq + 1, by: byId }
+      uiBest.current = next
+      setUiState(next)
+      ui.set(JSON.stringify(next))
+    },
+    [ui.set, byId]
+  )
+
+  const commitPrefs = useCallback(
+    (patch: Partial<Pick<Prefs, 'muted' | 'motion'>>) => {
+      const next: Prefs = { ...prefsBest.current, ...patch, seq: prefsBest.current.seq + 1, by: byId }
+      prefsBest.current = next
+      setPrefs(next)
+      prefsKV.set(JSON.stringify(next))
+    },
+    [prefsKV.set, byId]
+  )
 
   const writeProgress = useCallback(
     (modelId: string, step: number, steps: number) => {
-      const cur = parseProgress(progressKV.value)
-      progressKV.set(JSON.stringify(recordProgress(cur, modelId, step, steps, Date.now())))
+      const merged = mergeProgress(
+        progressBest.current,
+        recordProgress(progressBest.current, modelId, step, steps, Date.now())
+      )
+      progressBest.current = merged
+      setProgress(merged)
+      progressKV.set(JSON.stringify(merged))
     },
-    [progressKV.set, progressKV.value]
+    [progressKV.set]
   )
 
   const openModel = useCallback(
     (m: Model) => {
-      const p = parseProgress(progressKV.value)[m.id]
-      go({ v: 1, model: m.id, step: resumeStep(m.steps.length, p) })
+      const p = progressBest.current[m.id]
+      go({ model: m.id, step: resumeStep(m.steps.length, p) })
       ping('select')
     },
-    [go, ping, progressKV.value]
+    [go, ping]
   )
 
   const goStep = useCallback(
     (m: Model, s: number, kind: Cue = 'fold') => {
       const step = clampStep(m.steps.length, s)
-      go({ v: 1, model: m.id, step })
+      go({ model: m.id, step })
       writeProgress(m.id, step, m.steps.length)
       ping(kind)
     },
@@ -495,20 +571,18 @@ function PaperFold() {
   )
 
   const toModels = useCallback(() => {
-    go({ v: 1, model: null, step: 0 })
+    go({ model: null, step: 0 })
     ping('back')
   }, [go, ping])
 
   const toggleSound = useCallback(() => {
-    const cur = parsePrefs(prefsKV.value)
-    prefsKV.set(JSON.stringify({ v: 1, muted: !cur.muted, motion: cur.motion }))
+    commitPrefs({ muted: !prefsBest.current.muted })
     ping('select')
-  }, [prefsKV.set, prefsKV.value, ping])
+  }, [commitPrefs, ping])
 
   const toggleMotion = useCallback(() => {
-    const cur = parsePrefs(prefsKV.value)
-    prefsKV.set(JSON.stringify({ v: 1, muted: cur.muted, motion: !cur.motion }))
-  }, [prefsKV.set, prefsKV.value])
+    commitPrefs({ motion: !prefsBest.current.motion })
+  }, [commitPrefs])
 
   // Arrow keys step through a model on whichever copy has focus.
   useEffect(() => {

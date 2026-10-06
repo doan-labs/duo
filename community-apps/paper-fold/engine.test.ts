@@ -4,12 +4,15 @@
 import {
   clampStep,
   isResult,
+  mergeProgress,
   modelDone,
+  newerSeq,
   nextStep,
   parsePrefs,
   parseProgress,
   parseUi,
   prevStep,
+  progressSubset,
   recordProgress,
   resumeStep
 } from './engine'
@@ -108,11 +111,47 @@ check('parsePrefs defaults and survives garbage', () => {
 check('parseUi round-trips and sanitizes', () => {
   eq(parseUi(null).model, null)
   eq(parseUi('junk').step, 0)
-  const ui = parseUi('{"v":1,"model":"boat","step":3}')
+  const ui = parseUi('{"v":1,"model":"boat","step":3,"seq":7,"by":"x1"}')
   eq(ui.model, 'boat')
   eq(ui.step, 3)
+  eq(ui.seq, 7)
+  eq(ui.by, 'x1')
   eq(parseUi('{"model":5,"step":-2}').model, null)
   eq(parseUi('{"model":5,"step":-2}').step, 0)
+  eq(parseUi('{"model":"a"}').seq, 0) // missing envelope defaults
+})
+
+check('newerSeq orders by seq then writer id', () => {
+  const a = { seq: 3, by: 'cover' }
+  const b = { seq: 5, by: 'inner' }
+  eq(newerSeq(b, a), true)
+  eq(newerSeq(a, b), false)
+  eq(newerSeq(a, a), false) // equal docs are never newer
+  eq(newerSeq({ seq: 4, by: 'z' }, { seq: 4, by: 'a' }), true) // deterministic tie-break
+  eq(newerSeq({ seq: 4, by: 'a' }, { seq: 4, by: 'z' }), false)
+})
+
+check('mergeProgress is commutative and keeps the max of every entry', () => {
+  const cover = recordProgress(recordProgress({}, 'dart', 6, 6, 1), 'cup', 2, 5, 2)
+  const inner = recordProgress(recordProgress({}, 'boat', 8, 8, 3), 'dart', 3, 6, 4)
+  const ab = mergeProgress(cover, inner)
+  const ba = mergeProgress(inner, cover)
+  eq(ab.dart?.hi, 6) // cover's finished dart beats inner's stale 3
+  eq(ab.dart?.done, true)
+  eq(ab.boat?.done, true)
+  eq(ab.cup?.hi, 2)
+  eq(ba.dart?.hi, 6) // order-independent content
+  eq(ba.cup?.hi, 2)
+  eq(JSON.stringify(mergeProgress(ab, ba).dart), JSON.stringify(ab.dart)) // idempotent
+})
+
+check('progressSubset detects a store doc missing merged entries', () => {
+  const store = recordProgress({}, 'dart', 6, 6, 1)
+  const merged = mergeProgress(store, recordProgress({}, 'cup', 4, 5, 2))
+  eq(progressSubset(merged, store), false) // merged overflows store - must re-emit
+  eq(progressSubset(store, merged), true) // store itself is covered, nothing lost
+  eq(progressSubset(merged, merged), true)
+  eq(progressSubset({}, merged), true)
 })
 
 if (failures.length) throw new Error(`${failures.length} failing: ${failures.join(', ')}`)
