@@ -269,17 +269,21 @@ function NumField({
   onError: () => void
 }) {
   const [draft, setDraft] = useState<string | null>(null)
-  const [bad, setBad] = useState(false)
+  // The error remembers which room size it complained about: once that value
+  // changes underneath (undo, a remote edit) the hint would describe a number
+  // the field no longer shows, so it hides itself.
+  const [badAt, setBadAt] = useState<number | null>(null)
+  const bad = badAt !== null && Math.round(badAt) === Math.round(cm)
   const shown = fmtLength(cm, units)
   const commit = (text: string) => {
     setDraft(null)
     const parsed = parseLength(text, units, 'room')
     if (parsed === null) {
-      setBad(true)
+      setBadAt(cm)
       onError()
       return
     }
-    setBad(false)
+    setBadAt(null)
     if (Math.round(parsed) !== Math.round(cm)) onCommit(parsed)
   }
   return (
@@ -291,7 +295,7 @@ function NumField({
         inputMode="decimal"
         onFocus={() => {
           setDraft(shown)
-          setBad(false)
+          setBadAt(null)
         }}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => commit(e.target.value)}
@@ -404,6 +408,16 @@ function RoomPlanner() {
   // they never need to re-subscribe on every render.
   const publishRef = useRef(publish)
   publishRef.current = publish
+
+  // Selection is part of the shared truth: a tap that only setSel()'d locally
+  // would leave the wire's `sel` stale until the next edit, and a fresh
+  // copy's framing republish could then wipe it last-writer-wins on both
+  // displays. Selecting publishes the doc unchanged with the new sel.
+  const pick = (id: string | null) => {
+    const now = docRef.current
+    if (now) publish(now, { sel: id, skipHist: true })
+    else setSel(id)
+  }
   const soundRef = useRef(sound)
   soundRef.current = sound
 
@@ -489,7 +503,7 @@ function RoomPlanner() {
       setHist(emptyHistory())
     }
     setDoc(keep && now ? { ...next.doc, view: now.view } : next.doc)
-    setSel(next.sel)
+    setSel(next.sel && next.doc.items[next.sel] ? next.sel : null)
     setArming(false)
     // Fold-side sound: faint cues for what the other display just did.
     if (now && now.id === next.doc.id) {
@@ -942,11 +956,11 @@ function RoomPlanner() {
     setArming(false)
     if (d.kind === 'item' && d.id) {
       if (selRef.current !== d.id) {
-        setSel(d.id)
+        pick(d.id)
         sound('select')
       }
     } else {
-      setSel(null)
+      pick(null)
     }
   }
 
@@ -1214,7 +1228,7 @@ function RoomPlanner() {
                       return
                     }
                     if (selRef.current !== item.id) {
-                      setSel(item.id)
+                      pick(item.id)
                       sound('select')
                     }
                   }}
