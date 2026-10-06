@@ -492,7 +492,15 @@ function Solitaire() {
       if (!s) return
       for (const m of smartMoves(game, s)) {
         if (canApply(game, m)) {
-          doMove(m)
+          const where =
+            m.t === 'wf' || m.t === 'tf'
+              ? `foundation ${m.f + 1}`
+              : m.t === 'tt'
+                ? `column ${m.d + 1}`
+                : m.t === 'wt' || m.t === 'ft'
+                  ? `column ${m.c + 1}`
+                  : 'the table'
+          doMove(m, `${selName(game, s)} to ${where}.`)
           return
         }
       }

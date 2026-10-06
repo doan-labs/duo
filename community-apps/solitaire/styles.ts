@@ -205,6 +205,13 @@ export const styles = stylex.create({
     transform: 'rotateY(180deg)',
     boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 16%, transparent),${shadow.card}`
   },
+  // A settled face-down card: flat back art with the same chrome, no flip rig.
+  cardDownStill: {
+    position: 'absolute',
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 16%, transparent),${shadow.card}`
+  },
   // The lifted selected run: a blue ring around every card it covers.
   selected: {
     outlineWidth: 2,

@@ -165,7 +165,8 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
     spot: Spot,
     index: number,
     dealAt: number,
-    isHot = false
+    isHot = false,
+    label?: string
   ) => {
     const picked = selIds.has(card.id)
     return (
@@ -173,7 +174,7 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
         key={`${key}.${card.id}`}
         type="button"
         ref={keepFocus(key)}
-        aria-label={cardName(card)}
+        aria-label={label ?? cardName(card)}
         aria-pressed={picked}
         onClick={() => onCard(card.id, spot, index)}
         onDoubleClick={() => onCardDouble(card.id, spot, index)}
@@ -224,8 +225,22 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
   if (!fit.cardW) return <div ref={ref} {...stylex.props(styles.board)} />
 
   // Stock: a face-down stack, or an empty well that redeals the waste.
+  // The top card's name stays out of the label - face-down is a secret.
   if (game.stock.length) {
-    out.push(cardEl({ ...game.stock.at(-1)!, up: false }, 0, 0, 1, 's', 's', game.stock.length - 1, 790))
+    out.push(
+      cardEl(
+        { ...game.stock.at(-1)!, up: false },
+        0,
+        0,
+        1,
+        's',
+        's',
+        game.stock.length - 1,
+        790,
+        false,
+        `Draw from the stock - ${game.stock.length} card${game.stock.length === 1 ? '' : 's'} left`
+      )
+    )
   } else {
     out.push(slotEl(0, 0, 's', game.waste.length ? 'Redeal the waste into the stock' : 'Stock empty', '↻'))
   }
@@ -275,12 +290,10 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
       const card = col[i]!
       const y = cardPos(fit, col, i, spacing)
       if (!card.up) {
+        // A settled face-down card shows its back flat - the rotateY pair is
+        // only for live cards mid-flip (a rotated faceSide shows its own back).
         out.push(
-          <span
-            key={card.id}
-            aria-hidden="true"
-            {...stylex.props(styles.faceSide, styles.faceBack, place(x, y, 30 + i))}
-          >
+          <span key={card.id} aria-hidden="true" {...stylex.props(styles.cardDownStill, place(x, y, 30 + i))}>
             <CardBack />
           </span>
         )
