@@ -1075,7 +1075,8 @@ function TripPlanner() {
   const undo = useMemo(() => parseUndo(session.get('undo')), [session])
   const prefs = useMemo(() => {
     try {
-      return JSON.parse(storage.get('prefs') ?? '{}') as { muted?: boolean }
+      const p = JSON.parse(storage.get('prefs') ?? '{}') as { muted?: boolean } | null
+      return p && typeof p === 'object' ? p : {}
     } catch {
       return {}
     }
