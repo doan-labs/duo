@@ -236,6 +236,10 @@ export function resizeRoom(doc: PlanDoc, w: number, d: number): PlanDoc {
 
 export function renameDoc(doc: PlanDoc, name: string): PlanDoc {
   const next = name.slice(0, NAME_LIMIT)
+  // A whitespace-only name would blank the plan row everywhere; keep the old
+  // one instead of committing it. The doc intentionally does not touch():
+  // history collapses same-tag renames, and a name is not layout truth.
+  if (!next.trim()) return doc
   return next === doc.name ? doc : { ...doc, name: next }
 }
 

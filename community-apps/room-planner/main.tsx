@@ -80,7 +80,7 @@ type Drag = {
 // A pinch anchors the world point that sat under its midpoint when the second
 // finger landed; every later frame keeps that point fixed under the moving
 // midpoint. Storing live view values here instead would drift.
-type Pinch = { d0: number; zoom0: number; x0: number; y0: number; mcx: number; mcy: number }
+type Pinch = { ids: [number, number]; d0: number; zoom0: number; x0: number; y0: number; mcx: number; mcy: number }
 
 const readLib = (): Promise<Library> => os.storage.get(LIB_KEY).then(parseLibrary, () => parseLibrary(null))
 
@@ -362,6 +362,24 @@ function RoomPlanner() {
   const sheetTrigger = useRef<HTMLElement | null>(null)
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
+
+  // Folding mid-gesture strands the pointer: its up/cancel never reaches a
+  // hidden iframe. Settle whatever the gesture already moved, then drop every
+  // tracked id so the first tap after unfold is single-finger again.
+  useEffect(() => {
+    if (view.visible) return
+    const now = docRef.current
+    if ((dragRef.current || pinchRef.current) && now) {
+      publishRef.current(now, { prev: gestureCore.current })
+    }
+    pointersRef.current.clear()
+    pinchRef.current = null
+    dragRef.current = null
+    gestureCore.current = null
+    suppressClick.current = false
+    setGesturing(false)
+    setDragId(null)
+  }, [view.visible])
 
   const library = parseLibrary(stored.value)
   const items = doc ? Object.values(doc.items) : []
@@ -839,17 +857,26 @@ function RoomPlanner() {
     // The zoom dock lives inside the canvas: capturing its pointerdown would
     // retarget the release to the canvas and swallow the button's click.
     if ((e.target as HTMLElement).closest('[role="toolbar"]')) return
+    // A pointer id can leak when its up/cancel never reaches the canvas - a
+    // fold or OS gesture mid-drag hides the iframe before the release lands.
+    // Any id that belongs to no live gesture is dead weight; left in the map
+    // it makes the next lone tap read as a second finger and pinches dead.
+    const live = new Set<number>()
+    if (dragRef.current) live.add(dragRef.current.pointerId)
+    if (pinchRef.current) for (const id of pinchRef.current.ids) live.add(id)
+    for (const id of [...pointersRef.current.keys()]) if (!live.has(id)) pointersRef.current.delete(id)
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointersRef.current.size === 2) {
       // Second finger: abandon the single-finger drag, start the pinch.
       dragRef.current = null
       setDragId(null)
       setGesturing(false)
-      const [a, b] = [...pointersRef.current.values()]
-      const pa = canvasPoint(a!.x, a!.y)
-      const pb = canvasPoint(b!.x, b!.y)
+      const [a, b] = [...pointersRef.current.entries()]
+      const pa = canvasPoint(a![1].x, a![1].y)
+      const pb = canvasPoint(b![1].x, b![1].y)
       pinchRef.current = {
-        d0: Math.max(10, Math.hypot(a!.x - b!.x, a!.y - b!.y)),
+        ids: [a![0], b![0]],
+        d0: Math.max(10, Math.hypot(a![1].x - b![1].x, a![1].y - b![1].y)),
         zoom0: now.view.zoom,
         x0: now.view.x,
         y0: now.view.y,
@@ -1045,7 +1072,11 @@ function RoomPlanner() {
       <TextField
         aria-label="Layout name"
         value={doc.name}
-        onChange={(e) => publish(renameDoc(doc, e.target.value), { tag: 'name' })}
+        onChange={(e) => {
+          // Whitespace alone is not a name; typing it would blank the plan
+          // row everywhere, so nothing below the trim publishes.
+          if (e.target.value.trim()) publish(renameDoc(doc, e.target.value), { tag: 'name' })
+        }}
       />
       <div {...stylex.props(styles.fieldRow)}>
         <NumField
@@ -1191,6 +1222,7 @@ function RoomPlanner() {
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
       onWheel={(e) => {
         const p = canvasPoint(e.clientX, e.clientY)
         zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0012))
