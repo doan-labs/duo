@@ -3,7 +3,7 @@ import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Button, IconButton, Segmented, Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ARTS, type ArtId, artUri, isArtId } from './art.ts'
 import { cue, setMuted, unlock } from './audio.ts'
@@ -207,6 +207,14 @@ function Jigsaw() {
 
   // Device dark-mode switch; the shell applies the real class natively.
   useEffect(() => os.device.on('switches', (sw: { darkMode: boolean }) => setDarkMode(sw.darkMode)), [])
+
+  // A fold hides this copy mid-gesture: cancel the in-flight drag so the
+  // follow-up pointerup cannot drop the piece loose on the felt.
+  useEffect(() => {
+    if (view.active || !dragRef.current) return
+    dragRef.current = null
+    setDrag(null)
+  }, [view.active])
 
   // Elapsed clock: derives from startedAt so both displays agree; ticks only
   // on the visible copy and stops at completion.
@@ -708,7 +716,7 @@ function Jigsaw() {
                 type="button"
                 role="radio"
                 aria-checked={prefs.count === n}
-                {...stylex.props(styles.segBtn, prefs.count === n && styles.segOn)}
+                {...stylex.props(styles.segBtn, shared.press, prefs.count === n && styles.segOn)}
                 onClick={() => setPrefs({ count: n })}
               >
                 {n} pieces

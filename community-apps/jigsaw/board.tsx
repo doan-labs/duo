@@ -518,7 +518,7 @@ export function TrayPane({
               type="button"
               role="radio"
               aria-checked={filter === f}
-              {...stylex.props(styles.segBtn, filter === f && styles.segOn)}
+              {...stylex.props(styles.segBtn, shared.press, filter === f && styles.segOn)}
               onClick={() => onFilter(f)}
             >
               {f === 'all' ? 'All' : f === 'corner' ? 'Corners' : 'Edges'}

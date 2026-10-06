@@ -104,7 +104,7 @@ export const styles = stylex.create({
     gap: space.lg,
     paddingTop: 0,
     paddingRight: space.lg,
-    paddingBottom: space.sm,
+    paddingBottom: space.xxl,
     paddingLeft: space.lg
   },
   stageCover: { flexDirection: 'column', gap: space.sm, paddingRight: space.md, paddingLeft: space.md },
@@ -339,6 +339,7 @@ export const styles = stylex.create({
   actionAccent: { backgroundColor: app.link, color: colors.white },
   hint: {
     margin: 0,
+    paddingBottom: space.xl,
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
