@@ -20,10 +20,12 @@ import {
   fmtSnap,
   type History,
   ITEM_LIMIT,
+  isOlderEdit,
   itemRect,
   itemSize,
   type Library,
   latestDoc,
+  mergeLib,
   moveItem,
   newPlan,
   PIECE,
@@ -90,6 +92,37 @@ let libQueue = Promise.resolve()
 const enqueue = (job: () => Promise<void>) => {
   libQueue = libQueue.then(job).catch(() => {})
 }
+
+const sameLib = (a: Library, b: Library) =>
+  Object.keys(a.plans).length === Object.keys(b.plans).length &&
+  Object.keys(a.gone).length === Object.keys(b.gone).length &&
+  Object.entries(a.plans).every(([id, d]) => b.plans[id] === d) &&
+  Object.entries(a.gone).every(([id, ts]) => b.gone[id] === ts)
+
+// os.storage has no cross-copy compare-and-set: the other display can commit
+// between our get and set and we would clobber it. Every write instead
+// re-reads, applies the mutation and merges per plan/tombstone (order-
+// independent), then loops - a peer's intervening write shows up in the next
+// read and the mutation is replayed on top of it, so concurrent edits from
+// both displays survive. `mutate` returning null means no write is needed.
+const writeLib = (mutate: (lib: Library) => Library | null): Promise<Library> =>
+  new Promise<Library>((resolve) => {
+    enqueue(async () => {
+      let out = parseLibrary(null)
+      for (let i = 0; i < 5; i++) {
+        const cur = await readLib()
+        const mine = mutate(cur)
+        const merged = mergeLib(cur, mine ?? cur)
+        if (!mine || sameLib(cur, merged)) {
+          out = merged
+          break
+        }
+        out = { ...merged, rev: Math.max(cur.rev, mine.rev) + 1 }
+        await os.storage.set(LIB_KEY, serializeLibrary(out))
+      }
+      resolve(out)
+    })
+  })
 
 // Registered before os.connect() so it fires ahead of the SDK's window-capture
 // Escape-to-home forward: while any app sheet is open, Escape cancels the top
@@ -349,6 +382,8 @@ function RoomPlanner() {
   // mistake the foreign view for a local fit.
   const framedDoc = useRef<string | null>(null)
   const docRef = useRef(doc)
+  // Newest foreign doc write seen on the wire, for the stale-base publish guard.
+  const remoteDoc = useRef<{ id: string; updated: number } | null>(null)
   docRef.current = doc
   const selRef = useRef(sel)
   selRef.current = sel
@@ -394,13 +429,13 @@ function RoomPlanner() {
   const issues = doc ? planIssues(doc) : { out: [], hits: [] }
   const issueCount = issues.out.length + issues.hits.length
 
-  // Merges one doc into the freshest library it can read. Merging against a
-  // fresh get - not the KV mirror, which lags while occluded - is what stops a
-  // hidden copy from clobbering plans it has not seen yet.
+  // Merges one doc into the freshest library it can read. writeLib replays
+  // the merge on top of any peer write that lands mid-flight, so the other
+  // display's save cannot be clobbered by this one.
   const saveDoc = (next: PlanDoc) => {
-    enqueue(async () => {
-      const lib = await readLib()
-      stored.set(serializeLibrary(withDoc(lib, next)))
+    void writeLib((lib) => {
+      const existing = lib.plans[next.id]
+      return !existing || existing.updated <= next.updated ? withDoc(lib, next) : null
     })
   }
 
@@ -419,6 +454,11 @@ function RoomPlanner() {
   ) => {
     const selNow = opts.sel === undefined ? selRef.current : opts.sel
     const before = docRef.current
+    // A same-doc edit grown from a base older than the newest adopted remote
+    // write would stamp stale content back over the fold (act right after
+    // unfold, before hydration settles). Adoption is already replaying the
+    // fresher doc; this edit is dropped rather than clobbering the peer.
+    if (before && before.id === next.id && isOlderEdit(before, remoteDoc.current)) return
     if (!opts.skipHist && before && before.id === next.id) {
       const prev = opts.prev ?? coreOf(before)
       setHist((h) => commitHistory(h, prev, coreOf(next), opts.tag ?? null))
@@ -502,19 +542,21 @@ function RoomPlanner() {
       // would otherwise let a peer write over plans it never saw.
       if (!seeded.current && stored.status === 'ready') {
         seeded.current = true
-        enqueue(async () => {
-          const lib = await readLib()
-          const open = latestDoc(lib) ?? welcomePlan()
+        void (async () => {
+          const open = latestDoc(await readLib()) ?? welcomePlan()
           setDoc(open)
           setSel(null)
-          stored.set(serializeLibrary(withDoc(lib, open)))
+          await writeLib((lib) => ((lib.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(lib, open)))
           await os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
-        })
+        })()
       }
       return
     }
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
+    if (remoteDoc.current?.id !== next.doc.id || remoteDoc.current.updated < next.doc.updated) {
+      remoteDoc.current = { id: next.doc.id, updated: next.doc.updated }
+    }
     const now = docRef.current
     // Keep this copy's own view for the plan it already framed: a remote fit
     // was computed for a different canvas and must not replace the local one.
@@ -551,14 +593,11 @@ function RoomPlanner() {
       else if (spun) soundRef.current('rotate')
       else if (moved) soundRef.current('settle')
     }
-    enqueue(async () => {
-      const lib = await readLib()
+    void writeLib((lib) => {
       const existing = lib.plans[next.doc.id]
-      if (!existing || existing.updated < next.doc.updated) {
-        stored.set(serializeLibrary(withDoc(lib, next.doc)))
-      }
+      return !existing || existing.updated < next.doc.updated ? withDoc(lib, next.doc) : null
     })
-  }, [live, stored.status, stored.set])
+  }, [live, stored.status])
 
   // First sight of a plan frames the whole room for THIS canvas: legibility on
   // first sight beats a heritage zoom, and the cover's fit is the app's front
@@ -585,11 +624,14 @@ function RoomPlanner() {
         framed: true
       })
       setDoc(next)
-      enqueue(async () => {
-        const lib = await readLib()
-        stored.set(serializeLibrary(withDoc(lib, next)))
-      })
-      void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
+      // Framing a stale doc must not push it back over a newer remote write.
+      if (!isOlderEdit(doc, remoteDoc.current)) {
+        void writeLib((lib) => {
+          const existing = lib.plans[next.id]
+          return !existing || existing.updated < next.updated ? withDoc(lib, next) : null
+        })
+        void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
+      }
     }
     const f = requestAnimationFrame(fitLocal)
     const ro = new ResizeObserver(() => {
@@ -600,7 +642,7 @@ function RoomPlanner() {
       cancelAnimationFrame(f)
       ro.disconnect()
     }
-  }, [doc, stored.set])
+  }, [doc])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -835,18 +877,18 @@ function RoomPlanner() {
     if (typeof confirm !== 'object' || !confirm?.drop) return
     const id = confirm.drop
     setConfirm(null)
-    enqueue(async () => {
-      const lib = withoutDoc(await readLib(), id)
+    void (async () => {
+      const lib = await writeLib((l) => withoutDoc(l, id))
       const open = docRef.current?.id === id ? (latestDoc(lib) ?? newPlan('Layout 1')) : null
-      stored.set(serializeLibrary(open ? withDoc(lib, open) : lib))
       if (open) {
+        await writeLib((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
         framedDoc.current = null
         setHist(emptyHistory())
         setDoc(open)
         setSel(null)
         void os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
       }
-    })
+    })()
     sound('delete')
   }
 

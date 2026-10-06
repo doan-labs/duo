@@ -24,7 +24,15 @@ export type PlanDoc = {
   /** Last-writer-wins clock for picking the newest layout in a library. */
   updated: number
 }
-export type Library = { plans: Record<string, PlanDoc> }
+export type Library = {
+  /** Monotonic write counter: two copies compare whose write landed last. */
+  rev: number
+  plans: Record<string, PlanDoc>
+  /** Delete tombstones: plan id -> deletion time, so a stale library merge
+   * cannot resurrect a deliberately removed layout but a genuinely newer
+   * edit still can. */
+  gone: Record<string, number>
+}
 export type Prefs = { units: Units; snap: number; muted: boolean }
 export type Mirror = { by: string; sel: string | null; doc: PlanDoc }
 
@@ -355,19 +363,25 @@ export function cleanDoc(v: unknown): PlanDoc | null {
 }
 
 export function parseLibrary(raw: string | null): Library {
-  if (!raw) return { plans: {} }
+  if (!raw) return { rev: 0, plans: {}, gone: {} }
   try {
     const parsed: unknown = JSON.parse(raw)
     const plans: Record<string, PlanDoc> = {}
+    const gone: Record<string, number> = {}
     if (record(parsed) && record(parsed.plans)) {
       for (const [id, value] of Object.entries(parsed.plans)) {
         const doc = cleanDoc(value)
         if (doc) plans[id] = doc
       }
+      if (record(parsed.gone)) {
+        for (const [id, ts] of Object.entries(parsed.gone)) {
+          if (typeof ts === 'number' && Number.isFinite(ts) && ts > 0) gone[id] = ts
+        }
+      }
     }
-    return { plans }
+    return { rev: record(parsed) ? num(parsed.rev, 0) : 0, plans, gone }
   } catch {
-    return { plans: {} }
+    return { rev: 0, plans: {}, gone: {} }
   }
 }
 
@@ -406,12 +420,43 @@ export function parseMirror(raw: string | null): Mirror | null {
 export const serializeMirror = (by: string, doc: PlanDoc, sel: string | null) =>
   JSON.stringify({ by, sel, doc } satisfies Mirror)
 
-export const withDoc = (lib: Library, doc: PlanDoc): Library => ({ plans: { ...lib.plans, [doc.id]: doc } })
+export const withDoc = (lib: Library, doc: PlanDoc): Library => ({ ...lib, plans: { ...lib.plans, [doc.id]: doc } })
+
 export function withoutDoc(lib: Library, id: string): Library {
   const plans = { ...lib.plans }
   delete plans[id]
-  return { plans }
+  return { ...lib, plans, gone: { ...lib.gone, [id]: Math.max(lib.gone[id] ?? 0, Date.now()) } }
 }
+
+/**
+ * Union of two library snapshots. Storage writes are read-modify-write with
+ * no cross-copy compare-and-set, so a cover and an inner writing at once can
+ * each clobber the other's merge; merging per-plan by `updated` and per-tombstone
+ * by timestamp makes the outcome order-independent. A tombstone only beats a
+ * plan the same age or older, so a real edit that postdates the delete
+ * survives.
+ */
+export function mergeLib(a: Library, b: Library): Library {
+  const plans: Record<string, PlanDoc> = { ...a.plans }
+  for (const [id, doc] of Object.entries(b.plans)) {
+    const cur = plans[id]
+    if (!cur || cur.updated < doc.updated) plans[id] = doc
+  }
+  const gone: Record<string, number> = { ...a.gone }
+  for (const [id, ts] of Object.entries(b.gone)) {
+    if ((gone[id] ?? 0) < ts) gone[id] = ts
+  }
+  for (const [id, ts] of Object.entries(gone)) {
+    const doc = plans[id]
+    if (doc && doc.updated <= ts) delete plans[id]
+  }
+  return { rev: Math.max(a.rev, b.rev), plans, gone }
+}
+
+/** A same-doc edit grown from a base older than the newest adopted remote
+ * write: stamping it back would be an older-over-newer overwrite. */
+export const isOlderEdit = (base: PlanDoc, remote: { id: string; updated: number } | null): boolean =>
+  !!remote && base.id === remote.id && base.updated < remote.updated
 
 /** The most recently edited layout, or null on a fresh install. */
 export function latestDoc(lib: Library): PlanDoc | null {

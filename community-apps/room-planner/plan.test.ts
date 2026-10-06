@@ -11,9 +11,11 @@ import {
   fmtDims,
   fmtLength,
   fmtSnap,
+  isOlderEdit,
   itemRect,
   itemSize,
   latestDoc,
+  mergeLib,
   moveItem,
   newPlan,
   parseLength,
@@ -212,7 +214,7 @@ check('identifiers stay stable across a wire roundtrip', () => {
   const mirror = parseMirror(serializeMirror('me', doc, id))!
   eq(mirror.sel, id)
   eq(Object.keys(mirror.doc.items), [id])
-  const lib = parseLibrary(serializeLibrary({ plans: { [doc.id]: doc } }))
+  const lib = parseLibrary(serializeLibrary({ rev: 0, plans: { [doc.id]: doc }, gone: {} }))
   eq(Object.keys(lib.plans[doc.id]!.items), [id])
   eq(lib.plans[doc.id]!.id, doc.id)
 })
@@ -252,9 +254,43 @@ check('parseLibrary and parseMirror survive garbage', () => {
 check('library helpers pick newest, drop plans, keep others', () => {
   const a = { ...plan(), id: 'a', updated: 1 }
   const b = { ...plan(), id: 'b', updated: 2 }
-  const lib = withDoc(withDoc({ plans: {} }, a), b)
+  const lib = withDoc(withDoc({ rev: 0, plans: {}, gone: {} }, a), b)
   eq(latestDoc(lib)!.id, 'b')
   eq(latestDoc(withoutDoc(lib, 'b'))!.id, 'a')
+})
+
+check('mergeLib unions racing libraries, tombstones stop resurrection', () => {
+  const a = { ...plan(), id: 'a', updated: 5 }
+  const b = { ...plan(), id: 'b', updated: 3 }
+  const left = { rev: 4, plans: { a, b }, gone: {} }
+  // Right deleted plan a while it held a stale b and a fresh c.
+  const c = { ...plan(), id: 'c', updated: 9 }
+  const right = { rev: 4, plans: { b: { ...b, updated: 7 }, c }, gone: { a: 100 } }
+  const merged = mergeLib(left, right)
+  eq(Object.keys(merged.plans).sort(), ['b', 'c'])
+  eq(merged.plans.b!.updated, 7)
+  eq(merged.rev, 4)
+  // Order-independent: the same two writes merge the same way either direction.
+  eq(mergeLib(right, left), merged)
+  // A plan edit newer than its tombstone is a real edit, not a resurrection.
+  const edited = { ...a, updated: 200 }
+  eq(mergeLib({ rev: 0, plans: { a: edited }, gone: {} }, right).plans.a!.updated, 200)
+})
+
+check('isOlderEdit flags a stale-base publish only for the same doc', () => {
+  const base = { ...plan(), id: 'a', updated: 5 }
+  ok(isOlderEdit(base, { id: 'a', updated: 9 }), 'same doc, older base should be stale')
+  ok(!isOlderEdit(base, { id: 'a', updated: 5 }), 'fresh base should publish')
+  ok(!isOlderEdit(base, { id: 'other', updated: 9 }), 'different doc unaffected')
+  ok(!isOlderEdit(base, null), 'no remote write yet')
+})
+
+check('parseLibrary reads rev and gone, defaults on junk', () => {
+  const lib = parseLibrary('{"rev":7,"plans":{},"gone":{"a":12}}')
+  eq(lib.rev, 7)
+  eq(lib.gone, { a: 12 })
+  eq(parseLibrary(null), { rev: 0, plans: {}, gone: {} })
+  eq(parseLibrary('{oops'), { rev: 0, plans: {}, gone: {} })
 })
 
 check('the welcome plan is clean and inside its room', () => {
