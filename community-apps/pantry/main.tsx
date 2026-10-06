@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Button, Checkbox, Select, Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
-import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -456,7 +456,7 @@ function Pantry() {
         </span>
         <button
           type="button"
-          {...stylex.props(styles.rowBody)}
+          {...stylex.props(styles.rowBody, shared.press)}
           onClick={() => openEdit(item)}
           aria-label={`Edit ${item.name}, ${qtyText(item)}${badge ? `, ${badge.aria}` : ''}, ${l.name}`}
         >
@@ -472,7 +472,7 @@ function Pantry() {
           <span {...stylex.props(styles.steppers)}>
             <button
               type="button"
-              {...stylex.props(styles.stepBtn, item.milli === 0 && styles.stepBtnOff)}
+              {...stylex.props(styles.stepBtn, shared.press, item.milli === 0 && styles.stepBtnOff)}
               onClick={() => step(item, 'use')}
               aria-label={`Use ${stepText} of ${item.name}`}
             >
@@ -486,7 +486,7 @@ function Pantry() {
             </span>
             <button
               type="button"
-              {...stylex.props(styles.stepBtn)}
+              {...stylex.props(styles.stepBtn, shared.press)}
               onClick={() => step(item, 'restock')}
               aria-label={`Restock ${stepText} of ${item.name}`}
             >
@@ -602,7 +602,7 @@ function Pantry() {
               role="radio"
               aria-checked={d.location === l.id}
               tabIndex={d.location === l.id ? 0 : -1}
-              {...stylex.props(styles.chip, d.location === l.id && styles.chipOn)}
+              {...stylex.props(styles.chip, shared.press, d.location === l.id && styles.chipOn)}
               onClick={() => set({ location: l.id })}
               onKeyDown={(e) =>
                 chipKeys(
@@ -703,7 +703,7 @@ function Pantry() {
         {q !== '' && (
           <button
             type="button"
-            {...stylex.props(styles.searchClear)}
+            {...stylex.props(styles.searchClear, shared.press)}
             onClick={() => setView({ q: '' })}
             aria-label="Clear search"
           >
@@ -720,7 +720,11 @@ function Pantry() {
               role="radio"
               aria-checked={loc === f.id}
               tabIndex={loc === f.id ? 0 : -1}
-              {...stylex.props(styles.chip, loc === f.id && (f.id === 'soon' ? styles.chipOnSoon : styles.chipOn))}
+              {...stylex.props(
+                styles.chip,
+                shared.press,
+                loc === f.id && (f.id === 'soon' ? styles.chipOnSoon : styles.chipOn)
+              )}
               onClick={() => setView({ loc: f.id })}
               onKeyDown={(e) =>
                 chipKeys(
@@ -741,7 +745,7 @@ function Pantry() {
           <button
             type="button"
             aria-pressed={sort === 'soon'}
-            {...stylex.props(styles.seg, sort === 'soon' && styles.segOn)}
+            {...stylex.props(styles.seg, shared.press, sort === 'soon' && styles.segOn)}
             onClick={() => setView({ sort: 'soon' })}
           >
             Use soon
@@ -749,7 +753,7 @@ function Pantry() {
           <button
             type="button"
             aria-pressed={sort === 'name'}
-            {...stylex.props(styles.seg, sort === 'name' && styles.segOn)}
+            {...stylex.props(styles.seg, shared.press, sort === 'name' && styles.segOn)}
             onClick={() => setView({ sort: 'name' })}
           >
             A-Z
@@ -840,7 +844,7 @@ function Pantry() {
               </span>
               <button
                 type="button"
-                {...stylex.props(styles.shopBody)}
+                {...stylex.props(styles.shopBody, shared.press)}
                 onClick={() => toggleBought(s.id)}
                 aria-label={`${s.done ? 'Reopen' : 'Mark bought'}: ${s.name}`}
               >
@@ -852,7 +856,7 @@ function Pantry() {
               </button>
               <button
                 type="button"
-                {...stylex.props(styles.shopDel)}
+                {...stylex.props(styles.shopDel, shared.press)}
                 onClick={() => dropShopItem(s.id)}
                 aria-label={`Remove ${s.name} from the list`}
               >
@@ -871,7 +875,7 @@ function Pantry() {
         </div>
       )}
       {boughtList > 0 && (
-        <button type="button" {...stylex.props(styles.clearBtn)} onClick={sweepBought}>
+        <button type="button" {...stylex.props(styles.clearBtn, shared.press)} onClick={sweepBought}>
           Clear bought
         </button>
       )}
@@ -906,7 +910,7 @@ function Pantry() {
         </div>
         <button
           type="button"
-          {...stylex.props(styles.muteBtn, doc.muted && styles.muteOff)}
+          {...stylex.props(styles.muteBtn, shared.press, doc.muted && styles.muteOff)}
           onClick={() =>
             publish({ ...docRef.current, muted: !docRef.current.muted }, undefined, {
               tone: 'good',
