@@ -64,7 +64,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
+      # Absent when no app folder changed (a profile edit or a delist): nothing to merge.
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: publish-input
           path: .cache/submissions
@@ -74,16 +76,21 @@ jobs:
             git init catalog-tree
             git -C catalog-tree checkout --orphan catalog
           fi
-      - name: Merge validated releases into the catalog tree
+      # The registry is maintainer-owned data from this checkout of main: profile edits
+      # publish even when no app folder changed, through the last, release-free run.
+      - name: Merge validated releases and developer profiles into the catalog tree
         run: |
           set -e
+          registry=community-apps/registry.json
           for built in .cache/submissions/*/catalog; do
             [ -d "$built" ] || continue
-            bun scripts/publish-catalog.ts "$built" catalog-tree | tee -a "$GITHUB_STEP_SUMMARY"
+            bun scripts/publish-catalog.ts "$built" catalog-tree --registry "$registry" | tee -a "$GITHUB_STEP_SUMMARY"
           done
+          mkdir -p .cache/empty
           if [ -n "${{ inputs.delist }}" ]; then
-            mkdir -p .cache/empty
-            bun scripts/publish-catalog.ts .cache/empty catalog-tree --delist "${{ inputs.delist }}" | tee -a "$GITHUB_STEP_SUMMARY"
+            bun scripts/publish-catalog.ts .cache/empty catalog-tree --registry "$registry" --delist "${{ inputs.delist }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            bun scripts/publish-catalog.ts .cache/empty catalog-tree --registry "$registry" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
       - name: Push the catalog branch
         id: catalog

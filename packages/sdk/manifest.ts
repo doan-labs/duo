@@ -24,6 +24,9 @@ export type Release = {
   files: { path: string; bytes: number; sha256: string }[]
 }
 export type CatalogRelease = { release: ReleaseId; sdk: string; bytes: number; sha256: string; note?: string }
+/** A developer profile as the catalog publishes it; `imageUrl` is an absolute https URL.
+ *  `description` is optional only because snapshots published before it carry none. */
+export type Developer = { name: string; description?: string; imageUrl: string; website?: string; github?: string }
 export type Catalog = {
   apps: Record<
     string,
@@ -33,9 +36,12 @@ export type Catalog = {
       author: string
       repo: string
       permissions?: PermissionName[]
+      /** Key into `developers`; absent in catalogs published before developer profiles. */
+      developer?: string
       releases: CatalogRelease[]
     }
   >
+  developers?: Record<string, Developer>
 }
 export const releaseId = (release: Release): ReleaseId => `${release.manifest.version}+${release.build.hash}`
 export const record = (value: unknown): value is Record<string, unknown> =>

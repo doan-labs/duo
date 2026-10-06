@@ -1,12 +1,15 @@
 // Publisher: merges validated release output into the hosted catalog tree. It treats
 // releases as data and never executes app code. The catalog tree is a directory (the
 // `catalog` branch in CI, any folder locally); files under apps/ are immutable and
-// index.json is rewritten last, from every release the tree contains.
+// index.json is rewritten last, from every release the tree contains. Developer profiles
+// are mutable: given the registry, they are snapshotted into developers.json; without
+// it, the tree's last snapshot stands.
 import { createHash } from 'node:crypto'
 import { access, cp, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { semver } from '../packages/sdk/compat.ts'
-import { type Catalog, type Release, releaseId, releaseValid } from '../packages/sdk/manifest.ts'
+import { type Catalog, type Developer, type Release, releaseId, releaseValid } from '../packages/sdk/manifest.ts'
+import { readRegistry, registryIssues } from './registry.ts'
 
 const hash = (data: string | Uint8Array) => createHash('sha256').update(data).digest('hex')
 const RELEASE = 'release.json'
@@ -47,13 +50,17 @@ export function compareReleases(a: Release, b: Release) {
   return y.major - x.major || y.minor - x.minor || y.patch - x.patch || b.build.hash.localeCompare(a.build.hash)
 }
 
+/** Who publishes what: profiles by handle, each community app's handle, and the official lane's. */
+export type Profiles = { official: string; developers: Record<string, Developer>; apps: Record<string, string> }
+const PROFILES = 'developers.json'
+
 /**
  * The index from every release in the tree, minus delisted identities. App metadata
  * follows the newest listed release. Nothing outside `entries` is dropped, so one
  * app's publication cannot lose another's listing.
  */
-export function assembleCatalog(entries: Entry[], delisted: Set<string> = new Set()): Catalog {
-  const index: Catalog = { apps: {} }
+export function assembleCatalog(entries: Entry[], delisted: Set<string> = new Set(), profiles?: Profiles): Catalog {
+  const index: Catalog = profiles ? { apps: {}, developers: profiles.developers } : { apps: {} }
   const byApp = new Map<string, Entry[]>()
   for (const entry of entries) {
     const id = entry.release.manifest.id
@@ -69,12 +76,14 @@ export function assembleCatalog(entries: Entry[], delisted: Set<string> = new Se
       versions.add(release.manifest.version)
     }
     const { name, lane, author, repo, permissions } = list[0]!.release.manifest
+    const developer = profiles?.apps[id] ?? (lane === 'official' ? profiles?.official : undefined)
     index.apps[id] = {
       name,
       lane,
       author,
       repo,
       permissions,
+      ...(developer ? { developer } : {}),
       releases: list.map(({ release, sha256 }) => ({
         release: releaseId(release),
         sdk: release.build.sdk,
@@ -100,12 +109,29 @@ async function verifyRelease(tree: string, release: Release) {
 
 export type PublishResult = { published: string[]; reused: string[]; delisted: string[] }
 
+/** Snapshot the registry's developer profiles into the tree, refusing invalid ones. */
+async function writeProfiles(tree: string, registryPath: string): Promise<Profiles> {
+  const registry = await readRegistry(registryPath)
+  const issues = registryIssues(registry)
+  if (issues.length) throw new Error(`Invalid developer profiles:\n${issues.join('\n')}`)
+  const apps = Object.fromEntries(Object.entries(registry.apps).map(([id, app]) => [id, app.developer]))
+  const profiles: Profiles = { official: registry.officialDeveloper, developers: registry.developers, apps }
+  await writeFile(join(tree, PROFILES), JSON.stringify(profiles, null, 2))
+  return profiles
+}
+
 /**
  * Copy new releases from `built` (a builder output directory) into `tree`, then rewrite
  * the index. Re-running with the same input reuses the existing release untouched; the
  * original metadata (including its build timestamp) wins over a rebuilt variant.
+ * `registry` (community-apps/registry.json) refreshes the developer profiles.
  */
-export async function publish(built: string, tree: string, delist: string[] = []): Promise<PublishResult> {
+export async function publish(
+  built: string,
+  tree: string,
+  delist: string[] = [],
+  registry?: string
+): Promise<PublishResult> {
   built = resolve(built)
   tree = resolve(tree)
   const result: PublishResult = { published: [], reused: [], delisted: delist }
@@ -158,13 +184,19 @@ export async function publish(built: string, tree: string, delist: string[] = []
   }
   const delisted = new Set([...(await readDelisted(tree)), ...delist])
   await writeFile(join(tree, 'delisted.json'), JSON.stringify([...delisted].sort(), null, 2))
-  const index = assembleCatalog(await readReleases(tree), delisted)
+  const profiles = registry ? await writeProfiles(tree, resolve(registry)) : await readProfiles(tree)
+  const index = assembleCatalog(await readReleases(tree), delisted, profiles)
   for (const [id, app] of Object.entries(index.apps))
     for (const listed of app.releases)
       if (!(await present(join(tree, 'apps', id, listed.release, RELEASE))))
         throw new Error(`Index references a missing release: ${id}@${listed.release}`)
   await writeFile(join(tree, 'index.json'), JSON.stringify(index, null, 2))
   return result
+}
+
+async function readProfiles(tree: string): Promise<Profiles | undefined> {
+  const text = await readFile(join(tree, PROFILES), 'utf8').catch(() => undefined)
+  return text === undefined ? undefined : (JSON.parse(text) as Profiles)
 }
 
 async function readDelisted(tree: string): Promise<string[]> {
@@ -181,10 +213,12 @@ if (import.meta.main) {
   const [built, tree] = process.argv.slice(2)
   if (!built || !tree)
     throw new Error(
-      'Usage: bun scripts/publish-catalog.ts <built-output> <catalog-tree> [--delist id@version+hash ...]'
+      'Usage: bun scripts/publish-catalog.ts <built-output> <catalog-tree> [--registry registry.json] [--delist id@version+hash ...]'
     )
+  const registryFlag = process.argv.indexOf('--registry')
+  const registry = registryFlag < 0 ? undefined : process.argv[registryFlag + 1]
   const flag = process.argv.indexOf('--delist')
   const delist = flag < 0 ? [] : process.argv.slice(flag + 1)
-  const result = await publish(built, tree, delist)
+  const result = await publish(built, tree, delist, registry)
   console.log(JSON.stringify(result, null, 2))
 }

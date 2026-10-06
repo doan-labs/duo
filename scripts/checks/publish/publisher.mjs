@@ -96,6 +96,29 @@ try {
     true
   )
   console.log('PASS delisting stops offering a release without deleting its files')
+
+  // Profiles come from the registry; a release-free run with it refreshes them, and a later
+  // run without it keeps the last snapshot. Invalid profiles leave the index untouched.
+  const profiled = join(scratch, 'registry.json')
+  const registry = await Bun.file('community-apps/registry.json').json()
+  await Bun.write(profiled, JSON.stringify(registry))
+  const empty = join(scratch, 'empty')
+  await mkdir(empty, { recursive: true })
+  await publish(empty, tree, [], profiled)
+  catalog = await index()
+  assert.equal(catalog.apps['labs.doan.fold-compass'].developer, 'doan-labs')
+  assert.equal(catalog.apps['labs.doan.ipduo.notes'].developer, registry.officialDeveloper)
+  assert.deepEqual(catalog.developers, registry.developers)
+  await publish(empty, tree)
+  assert.deepEqual((await index()).developers, catalog.developers)
+  const insecure = { ...registry.developers['doan-labs'], imageUrl: 'http://example.com/a.png' }
+  await Bun.write(
+    profiled,
+    JSON.stringify({ ...registry, developers: { ...registry.developers, 'doan-labs': insecure } })
+  )
+  await assert.rejects(publish(empty, tree, [], profiled), /imageUrl must be an https URL/)
+  assert.deepEqual(await index(), catalog)
+  console.log('PASS developer profiles publish from the registry, persist, and refuse bad data')
   console.log('Publisher PASS')
 } finally {
   await rm(scratch, { recursive: true, force: true })

@@ -1915,3 +1915,21 @@ Cost: the page mounts the live simulator for the SDK chapters, so it is the
 heaviest route after `/simulator`. The layer stills do not follow the shell:
 re-run the capture after a visible SpringBoard, Clock or model change.
 
+## 110. Developer profiles live in the registry and publish with the catalog
+
+2026-10-07, accepted. A free-text manifest `author` could not carry an icon or a
+website, and the Devin-built apps showed that the developer is not always the
+maintainer. `community-apps/registry.json` gains a `developers` table (name, a
+description of at most 160 characters, an https `imageUrl`, optional https website, optional GitHub login), a `developer` on
+every app entry, and an `officialDeveloper` for the official lane. The image is a
+URL rather than a file in the repository: nothing to resize or store, at the cost
+that the picture can change at its host without review. Profiles sit in the registry rather than
+in each manifest so they are not frozen into immutable releases and stay
+maintainer-controlled under the registry's CODEOWNERS entry; the cost is that a
+developer cannot edit their own profile without a repository maintainer.
+The publisher snapshots profiles into the catalog tree (`developers.json`) and adds `developers` and a per-app `developer` to
+`index.json`, both optional so older catalogs and external ones still parse; the
+shell's Store ignores them for now. The manifest `author` must equal the developer's
+handle or name. `/apps` shows community apps as one tab per developer, each opening on a
+profile card (icon, name, description, website) above that developer's apps. Details are in [publishing](platform/publishing.md#developer-profiles).
+

@@ -1,89 +1,138 @@
 {
-  "$comment": "Maintainer-controlled. Maps each published app id to its folder and the GitHub logins who may change its identity, transfer it or approve its releases. Ids starting with a reserved prefix are refused in community submissions.",
+  "$comment": "Maintainer-controlled. Maps each published app id to its folder, its developer and the GitHub logins who may change its identity, transfer it or approve its releases. Ids starting with a reserved prefix are refused in community submissions. Each developer is a profile the catalog publishes, its image an https imageUrl; officialDeveloper is the profile official-lane apps list under.",
   "reserved": ["labs.doan.ipduo.", "dev.example."],
+  "officialDeveloper": "doan-labs",
+  "developers": {
+    "doan-labs": {
+      "name": "Doan Labs",
+      "description": "The team behind Duo: the folding simulator, the SDK and UI kit, and every official app.",
+      "imageUrl": "https://avatars.githubusercontent.com/doan-labs",
+      "website": "https://duo.doan-labs.com",
+      "github": "doan-labs"
+    },
+    "devin": {
+      "name": "Devin",
+      "description": "The AI software engineer from Cognition. Its games and tools arrive as pull requests and pass the same review as everyone else's.",
+      "imageUrl": "https://avatars.githubusercontent.com/in/811515",
+      "website": "https://devin.ai"
+    },
+    "linhtinhvovan": {
+      "name": "linhtinhvovan",
+      "description": "Brought chess to the fold: a full game against a real engine, playable on both displays.",
+      "imageUrl": "https://avatars.githubusercontent.com/linhtinhvovan",
+      "github": "linhtinhvovan"
+    },
+    "mnismt": {
+      "name": "mnismt",
+      "description": "Keeps the community catalog running and built many of its first apps, from Snake and 2048 to Flappy Duo.",
+      "imageUrl": "https://avatars.githubusercontent.com/mnismt",
+      "github": "mnismt"
+    }
+  },
   "apps": {
     "com.mnismt.duo.habitstreaks": {
       "folder": "habit-streaks",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.sudoku": {
       "folder": "sudoku",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
+      "developer": "doan-labs",
       "maintainers": ["doan-labs"]
     },
     "com.mnismt.duo.pixelstudio": {
       "folder": "pixel-studio",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.pomodoro": {
       "folder": "pomodoro-timer",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.flashcards": {
       "folder": "flashcards",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.2048": {
       "folder": "2048",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.minesweeper": {
       "folder": "minesweeper",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.tictactoe": {
       "folder": "tic-tac-toe",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.nonogram": {
       "folder": "nonogram",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.memorymatch": {
       "folder": "memory-match",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.snake": {
       "folder": "snake",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.wordlemini": {
       "folder": "wordle-mini",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.flappyduo": {
       "folder": "flappy-duo",
+      "developer": "mnismt",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.recipebox": {
       "folder": "recipe-box",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
+      "developer": "linhtinhvovan",
       "maintainers": ["linhtinhvovan"]
     },
     "com.mnismt.duo.mindmap": {
       "folder": "mind-map",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.blockdrop": {
       "folder": "block-drop",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.battleship": {
       "folder": "battleship",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.musicsketchpad": {
       "folder": "music-sketchpad",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     },
     "com.mnismt.duo.pocketbudget": {
       "folder": "pocket-budget",
+      "developer": "devin",
       "maintainers": ["mnismt"]
     }
   }

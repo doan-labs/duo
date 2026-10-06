@@ -24,6 +24,21 @@ The registry, `OFFICIAL.txt`, `scripts/` and `.github/` are owned by maintainers
 `.github/CODEOWNERS`. `author` and `repo` strings prove nothing; identity changes,
 transfers and release approval need the listed maintainers.
 
+## Developer profiles
+
+The registry also holds who publishes each app. `developers` maps a kebab-case handle to
+a profile: `name` (1-32 characters), `description` (1-160 characters, shown under the name
+on the developer's tab on /apps), `imageUrl` (https), optional `website` (https) and
+optional `github` (a login); no other fields are accepted. The image stays where the URL
+points: the repository and the catalog carry no copy, so a change at that URL changes the
+picture without review. Every app entry names its `developer`,
+and `officialDeveloper` is the profile official-lane apps list under. A developer is not
+a maintainer: the Devin-built apps list under `devin` while `mnismt` maintains them.
+The manifest `author` must equal the developer's handle or name. Profiles are
+maintainer-controlled through the registry's CODEOWNERS entry, so a profile edit needs a
+repository maintainer. `scripts/registry.ts` validates them for the gate, the publisher
+and the website build alike.
+
 ## Automated checks
 
 `bun scripts/check-submissions.ts [folder] [--base origin/main]` checks every
@@ -32,6 +47,7 @@ changed folder (or the named ones) and writes `.cache/submissions/<slug>/` with
 
 | Group | Verified |
 | --- | --- |
+| Developer profiles | Every profile's fields, every app's developer and `officialDeveloper` resolve; checked on every run, even when no app folder changed; the manifest `author` matches the app's developer |
 | Identity and version | Valid manifest, kebab-case folder, registry entry and folder match, reserved namespaces, id unchanged against the base branch, version above the base branch and absent from the published index (`DUO_CATALOG_URL`, default the hosted catalog; unavailable history fails in CI) |
 | Completeness | Required files, PNG screenshots, MIT text, changelog entry for the version |
 | Source and dependencies | CLI `check` (imports, strict types, tokens, cap); dependencies beyond sdk/kit/stylex/react need `bun.lock` and are flagged for review |
@@ -68,7 +84,11 @@ releases into `tree/apps/<id>/<version>+<hash>/` (release.json last, staged then
 verifies uploaded hashes, refuses a version already published with different bytes, reuses an
 identical existing release without touching its metadata or timestamp, records delisted
 identities in `delisted.json`, then assembles `index.json` from every release in the tree,
-newest version first. One publication never drops another app or its history; a failure
+newest version first. With `--registry community-apps/registry.json` it also snapshots the
+developer profiles into `developers.json`; the index gains `developers` (handle to profile)
+and a `developer` handle on each app. Without the flag, the tree's last snapshot stands. Invalid profiles
+refuse the whole run before the index is touched. The workflow passes the registry on every
+call and ends with one release-free run, so a profile edit publishes on its own. One publication never drops another app or its history; a failure
 before the rename leaves the tree unchanged and a retry finishes. `git push` rejection is
 the conflict detection between close merges; rerun the workflow to publish on top.
 `scripts/checks/publish/publisher.mjs` exercises these cases.

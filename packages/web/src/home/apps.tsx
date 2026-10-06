@@ -7,12 +7,12 @@
 import * as stylex from '@stylexjs/stylex'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { animate, useReducedMotion } from 'motion/react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { Roll } from '../blog/diagram'
 import { type Reading, readingOf } from '../blog/reading'
 import { known } from '../docs'
-import { Fold } from '../fold'
-import { CATALOG, type CatalogApp, SHELL } from '../generated/catalog'
+import { Collapse, Fold } from '../fold'
+import { CATALOG, type CatalogApp, DEVELOPERS, SHELL } from '../generated/catalog'
 import { type Block as MdBlock, parse, render } from '../markdown'
 import { Segmented } from '../segmented'
 import { color, ease, font, radius } from '../tokens.stylex'
@@ -32,6 +32,8 @@ type Entry = {
   name: string
   icon: string
   author: string
+  /** Key into DEVELOPERS, for published apps. */
+  developer?: string
   status: Status
   version?: string
   permissions: Perm[]
@@ -104,7 +106,8 @@ function fromRelease(c: CatalogApp): Entry {
     slug: slugOf(c.id),
     name: c.name,
     icon: c.icon,
-    author: c.author,
+    author: (c.developer && DEVELOPERS[c.developer]?.name) || c.author,
+    developer: c.developer ?? undefined,
     status: 'published',
     version: c.version,
     permissions: c.permissions,
@@ -121,18 +124,16 @@ const BY_NAME = new Map([...OFFICIAL, ...COMMUNITY].map((e) => [e.name, e]))
 /** The changelog names apps as people see them; this finds the entry behind the name. */
 export const appForName = (name: string) => BY_NAME.get(name)
 
-type LaneInfo = { key: Lane; label: string; text: string; apps: Entry[] }
+type LaneInfo = { key: Lane; label: string; apps: Entry[] }
 const LANES: LaneInfo[] = [
   {
     key: 'official',
     label: 'Official',
-    text: 'Built by Doan Labs. Every app on the simulator’s home screen, from published releases to the mockups still being built.',
     apps: OFFICIAL
   },
   {
     key: 'community',
     label: 'Community',
-    text: 'Submitted through pull requests, reviewed, and published to the catalog.',
     apps: COMMUNITY
   }
 ]
@@ -247,32 +248,154 @@ export function Browser() {
   )
 }
 
-/** One lane, folded away only when the visitor folds it. The description stays in the summary, visible either way. */
+/**
+ * The chevron and label that fold a section. A button with `aria-expanded` inside the
+ * heading rather than `<details>`: a closing `<details>` hides its content at once, so
+ * it could only ever animate open.
+ */
+function Toggle({
+  open,
+  onToggle,
+  center = false,
+  children
+}: {
+  open: boolean
+  onToggle: () => void
+  /** Centre the row instead of sharing a baseline: an icon in it has no text baseline. */
+  center?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      {...stylex.props(styles.toggle, center && styles.toggleCenter)}
+    >
+      <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>
+        <Glyph name="chevron" />
+      </span>
+      {children}
+    </button>
+  )
+}
+
+/** One lane, folded away only when the visitor folds it. */
 function LaneSection({ lane, layout }: { lane: LaneInfo; layout: Layout }) {
   const [open, setOpen] = useState(true)
   return (
-    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} {...stylex.props(styles.lane)}>
-      <summary {...stylex.props(styles.laneTitle)}>
-        <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>
-          <Glyph name="chevron" />
-        </span>
-        <h2 {...stylex.props(styles.laneLabel)}>{lane.label}</h2>
-        <span {...stylex.props(styles.count)}>{lane.apps.length}</span>
-        <span {...stylex.props(styles.laneText)}>{lane.text}</span>
-      </summary>
-      {lane.apps.length === 0 ? (
-        <p {...stylex.props(styles.empty)}>No {lane.label.toLowerCase()} apps are published yet.</p>
-      ) : layout === 'list' ? (
-        <Shelf apps={lane.apps} layout="list" />
-      ) : (
-        <>
-          <Shelf apps={lane.apps.filter((a) => a.status !== 'mockup')} layout="grid" />
-          {lane.apps.some((a) => a.status === 'mockup') && (
-            <Group status="mockup" apps={lane.apps.filter((a) => a.status === 'mockup')} />
-          )}
-        </>
+    <section aria-label={lane.label} {...stylex.props(styles.lane)}>
+      <div {...stylex.props(styles.laneTitle)}>
+        <h2 {...stylex.props(styles.heading)}>
+          <Toggle open={open} onToggle={() => setOpen((o) => !o)}>
+            <span {...stylex.props(styles.laneLabel)}>{lane.label}</span>
+            <span {...stylex.props(styles.count)}>{lane.apps.length}</span>
+          </Toggle>
+        </h2>
+      </div>
+      <Collapse open={open}>
+        <LaneBody lane={lane} layout={layout} />
+      </Collapse>
+    </section>
+  )
+}
+
+function LaneBody({ lane, layout }: { lane: LaneInfo; layout: Layout }) {
+  return lane.apps.length === 0 ? (
+    <p {...stylex.props(styles.empty)}>No {lane.label.toLowerCase()} apps are published yet.</p>
+  ) : lane.key === 'community' ? (
+    <Developers apps={lane.apps} layout={layout} />
+  ) : layout === 'list' ? (
+    <Shelf apps={lane.apps} layout="list" />
+  ) : (
+    <>
+      <Shelf apps={lane.apps.filter((a) => a.status !== 'mockup')} layout="grid" />
+      {lane.apps.some((a) => a.status === 'mockup') && (
+        <Group status="mockup" apps={lane.apps.filter((a) => a.status === 'mockup')} />
       )}
-    </details>
+    </>
+  )
+}
+
+/** Community apps by developer, the most prolific first; each keeps the lane's Hot-first order. */
+function byDeveloper(apps: readonly Entry[]): [string, Entry[]][] {
+  const groups = Map.groupBy(apps, (a) => a.developer ?? a.author)
+  return [...groups].sort((a, b) => b[1].length - a[1].length)
+}
+
+/** The community lane as one tab per developer, their icon, name and count on the tab and their apps below. */
+function Developers({ apps, layout }: { apps: readonly Entry[]; layout: Layout }) {
+  const groups = byDeveloper(apps)
+  const [picked, setPicked] = useState(groups[0]![0])
+  const [handle, mine] = groups.find(([h]) => h === picked) ?? groups[0]!
+  const nameOf = (h: string, list: Entry[]) => DEVELOPERS[h]?.name ?? list[0]!.author
+  const profile = DEVELOPERS[handle]
+  const name = nameOf(handle, mine)
+  // One way out: the website, else the GitHub profile, shown as the address it opens.
+  const href = profile?.website ?? (profile?.github && `https://github.com/${profile.github}`)
+  const where = href && `${new URL(href).host.replace(/^www\./, '')}${new URL(href).pathname.replace(/\/$/, '')}`
+  return (
+    <>
+      <div {...stylex.props(styles.developerBar)}>
+        <Segmented
+          id="apps-developer"
+          label="Developer"
+          semantics="tablist"
+          value={handle}
+          onChange={setPicked}
+          options={groups.map(([h, list]) => ({
+            value: h,
+            label: nameOf(h, list),
+            icon: (
+              <span {...stylex.props(styles.developerTab)}>
+                {DEVELOPERS[h] && (
+                  <img
+                    src={DEVELOPERS[h].imageUrl}
+                    alt=""
+                    width={256}
+                    height={256}
+                    {...stylex.props(styles.developerIcon)}
+                  />
+                )}
+                {nameOf(h, list)}
+              </span>
+            ),
+            count: list.length
+          }))}
+        />
+      </div>
+      {/* Keyed by developer so the profile and the cards play their entrance again on every switch. */}
+      <div key={handle} role="tabpanel" aria-labelledby={`apps-developer-${handle}`}>
+        <div {...stylex.props(styles.profile)}>
+          {profile && (
+            <>
+              {/* The avatar again, blurred to a wash of its own colours: every profile gets a tint without a colour field to maintain. */}
+              <img src={profile.imageUrl} alt="" aria-hidden="true" {...stylex.props(styles.profileGlow)} />
+              <img src={profile.imageUrl} alt="" width={256} height={256} {...stylex.props(styles.profileAvatar)} />
+            </>
+          )}
+          <div {...stylex.props(styles.profileBody)}>
+            <h3 {...stylex.props(styles.profileName)}>{name}</h3>
+            {profile?.description && <p {...stylex.props(styles.profileText)}>{profile.description}</p>}
+            <div {...stylex.props(styles.profileMeta)}>
+              {href && (
+                <a href={href} target="_blank" rel="noreferrer" {...stylex.props(styles.profileLink)}>
+                  <Glyph name="network" />
+                  {where}
+                  <span {...stylex.props(styles.profileArrow)}>
+                    <Glyph name="external" />
+                  </span>
+                </a>
+              )}
+              <span {...stylex.props(styles.count)}>
+                {mine.length} {mine.length === 1 ? 'app' : 'apps'}
+              </span>
+            </div>
+          </div>
+        </div>
+        <Shelf apps={mine} layout={layout} byline={false} />
+      </div>
+    </>
   )
 }
 
@@ -280,26 +403,33 @@ function LaneSection({ lane, layout }: { lane: LaneInfo; layout: Layout }) {
 function Group({ status, apps }: { status: Status; apps: Entry[] }) {
   const [open, setOpen] = useState(status === 'published')
   return (
-    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} {...stylex.props(styles.group)}>
-      <summary {...stylex.props(styles.groupTitle)}>
-        <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>
-          <Glyph name="chevron" />
-        </span>
-        <StatusChip status={status} />
-        <span {...stylex.props(styles.groupText)}>{STATUS[status].text}</span>
-        <span {...stylex.props(styles.count)}>{apps.length}</span>
-      </summary>
-      <Shelf apps={apps} layout="grid" />
-    </details>
+    <section aria-label={STATUS[status].label} {...stylex.props(styles.group)}>
+      <div {...stylex.props(styles.groupTitle)}>
+        <Toggle open={open} onToggle={() => setOpen((o) => !o)} center>
+          <StatusChip status={status} />
+          <span {...stylex.props(styles.groupText)}>{STATUS[status].text}</span>
+          <span {...stylex.props(styles.count)}>{apps.length}</span>
+        </Toggle>
+      </div>
+      <Collapse open={open}>
+        <Shelf apps={apps} layout="grid" />
+      </Collapse>
+    </section>
   )
 }
 
-/** A shelf of apps; each card or row links to the app's /apps/<slug> sheet. */
-export function Shelf({ apps, layout }: { apps: readonly Entry[]; layout: Layout }) {
-  return layout === 'list' ? <List apps={apps} /> : <Grid apps={apps} />
+type ShelfProps = {
+  apps: readonly Entry[]
+  /** False under a developer's heading, where each card repeating the name is noise. */
+  byline?: boolean
 }
 
-function Grid({ apps }: { apps: readonly Entry[] }) {
+/** A shelf of apps; each card or row links to the app's /apps/<slug> sheet. */
+export function Shelf({ apps, layout, byline = true }: ShelfProps & { layout: Layout }) {
+  return layout === 'list' ? <List apps={apps} byline={byline} /> : <Grid apps={apps} byline={byline} />
+}
+
+function Grid({ apps, byline }: ShelfProps) {
   return (
     <ul {...stylex.props(styles.grid)}>
       {apps.map((a, i) => (
@@ -313,10 +443,14 @@ function Grid({ apps }: { apps: readonly Entry[] }) {
                   {HOT.has(a.key) && <span {...stylex.props(styles.hot)}>Hot</span>}
                 </span>
                 <span {...stylex.props(styles.meta)}>
-                  {a.author}
-                  {a.version && ` · v${a.version}`}
-                  {a.release && a.release.releases > 1 && ` · ${a.release.releases} releases`}
-                  {a.status === 'mockup' && ` · ${STATUS[a.status].label.toLowerCase()}`}
+                  {[
+                    byline && a.author,
+                    a.version && `v${a.version}`,
+                    a.release && a.release.releases > 1 && `${a.release.releases} releases`,
+                    a.status === 'mockup' && STATUS[a.status].label.toLowerCase()
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
                 <StatusChip status={a.status} />
               </span>
@@ -328,7 +462,7 @@ function Grid({ apps }: { apps: readonly Entry[] }) {
   )
 }
 
-function List({ apps }: { apps: readonly Entry[] }) {
+function List({ apps, byline }: ShelfProps) {
   return (
     <table {...stylex.props(styles.table)}>
       <thead>
@@ -352,7 +486,7 @@ function List({ apps }: { apps: readonly Entry[] }) {
                     {a.name}
                     {HOT.has(a.key) && <span {...stylex.props(styles.hot)}>Hot</span>}
                   </span>
-                  <span {...stylex.props(styles.rowMeta)}>{a.author}</span>
+                  {byline && <span {...stylex.props(styles.rowMeta)}>{a.author}</span>}
                 </span>
               </Link>
             </td>
@@ -685,7 +819,8 @@ const GLYPHS: Record<string, string> = {
   x: 'M4 4l8 8M12 4l-8 8',
   grid: 'M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5V7H9zM2.5 9H7v4.5H2.5zM9 9h4.5v4.5H9z',
   list: 'M5 3.5h8.5M5 8h8.5M5 12.5h8.5M2.5 3.5h.01M2.5 8h.01M2.5 12.5h.01',
-  chevron: 'M6 4l4 4-4 4'
+  chevron: 'M6 4l4 4-4 4',
+  external: 'M9.5 2.5h4v4M13.5 2.5L7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3'
 }
 
 const sheetIn = stylex.keyframes({
@@ -699,6 +834,10 @@ const sheetOut = stylex.keyframes({
   to: { opacity: 0, transform: 'translateY(12px) scale(0.97)' }
 })
 const fadeOut = stylex.keyframes({ from: { opacity: 1 }, to: { opacity: 0 } })
+const rise = stylex.keyframes({
+  from: { opacity: 0, transform: 'translateY(6px)' },
+  to: { opacity: 1, transform: 'translateY(0)' }
+})
 
 const styles = stylex.create({
   bar: {
@@ -762,15 +901,27 @@ const styles = stylex.create({
   resultMeta: { margin: 0, fontFamily: font.mono, fontSize: '13px', color: color.text3 },
   count: { fontFamily: font.mono, fontSize: '12px', color: color.text3 },
   lane: { marginTop: '56px' },
-  laneTitle: {
-    display: 'flex',
-    flexWrap: 'wrap',
+  laneTitle: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '10px' },
+  heading: { margin: 0, fontSize: 'inherit', fontWeight: 'inherit' },
+  toggle: {
+    margin: 0,
+    padding: 0,
+    display: 'inline-flex',
     alignItems: 'baseline',
     gap: '10px',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    font: 'inherit',
+    textAlign: 'start',
     cursor: 'pointer',
-    listStyleType: 'none',
-    '::-webkit-details-marker': { display: 'none' }
+    borderRadius: radius.sm,
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '4px'
   },
+  toggleCenter: { alignItems: 'center' },
   laneLabel: {
     margin: 0,
     fontFamily: font.display,
@@ -779,7 +930,6 @@ const styles = stylex.create({
     letterSpacing: '-0.02em',
     color: color.text
   },
-  laneText: { flexBasis: '100%', marginTop: '2px', maxWidth: '64ch', fontSize: '16px', color: color.text2 },
   group: { marginTop: '32px' },
   groupTitle: {
     margin: 0,
@@ -789,11 +939,103 @@ const styles = stylex.create({
     gap: '10px',
     fontFamily: font.sans,
     fontSize: '14px',
-    fontWeight: 400,
-    cursor: 'pointer',
-    listStyleType: 'none',
-    '::-webkit-details-marker': { display: 'none' }
+    fontWeight: 400
   },
+  developerBar: { marginTop: '20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' },
+  developerTab: { display: 'inline-flex', alignItems: 'center', gap: '8px' },
+  developerIcon: { width: '20px', height: '20px', flexShrink: 0, borderRadius: radius.pill },
+  // The tab's header card. Isolated so the glow's negative z-index sorts inside the card, not under the page.
+  profile: {
+    position: 'relative',
+    isolation: 'isolate',
+    overflow: 'hidden',
+    marginTop: '20px',
+    display: 'flex',
+    flexDirection: { default: 'row', [SMALL]: 'column' },
+    alignItems: { default: 'center', [SMALL]: 'flex-start' },
+    gap: '22px',
+    paddingTop: '26px',
+    paddingBottom: '26px',
+    paddingLeft: { default: '28px', [SMALL]: '20px' },
+    paddingRight: { default: '28px', [SMALL]: '20px' },
+    borderRadius: '20px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: color.border,
+    backgroundColor: color.surface,
+    animationName: rise,
+    animationDuration: '0.4s',
+    animationTimingFunction: ease.out
+  },
+  profileGlow: {
+    position: 'absolute',
+    zIndex: -1,
+    top: '-60%',
+    left: '-12%',
+    width: '80%',
+    height: '220%',
+    objectFit: 'cover',
+    filter: 'blur(72px) saturate(1.5)',
+    // The blur alone stops at the image's edge in a visible wall; the mask lets it thin out to nothing.
+    maskImage: 'linear-gradient(to right, black 20%, transparent 90%)',
+    WebkitMaskImage: 'linear-gradient(to right, black 20%, transparent 90%)',
+    opacity: 0.3,
+    pointerEvents: 'none'
+  },
+  profileAvatar: {
+    width: '72px',
+    height: '72px',
+    flexShrink: 0,
+    borderRadius: radius.pill,
+    backgroundColor: color.well,
+    boxShadow: color.shadow,
+    outlineWidth: '1px',
+    outlineStyle: 'solid',
+    outlineColor: color.border,
+    outlineOffset: '-1px'
+  },
+  profileBody: { display: 'flex', minWidth: 0, flexDirection: 'column', alignItems: 'flex-start' },
+  profileName: {
+    margin: 0,
+    fontFamily: font.display,
+    fontSize: '24px',
+    fontWeight: 600,
+    letterSpacing: '-0.02em',
+    lineHeight: 1.15,
+    color: color.text
+  },
+  profileText: {
+    marginTop: '6px',
+    marginBottom: 0,
+    maxWidth: '60ch',
+    fontSize: '15px',
+    lineHeight: 1.5,
+    color: color.text2
+  },
+  profileMeta: { marginTop: '14px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' },
+  profileLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '7px',
+    height: '30px',
+    paddingLeft: '11px',
+    paddingRight: '11px',
+    borderRadius: radius.pill,
+    backgroundColor: { default: color.well, ':hover': color.grayBg },
+    color: color.text,
+    fontFamily: font.sans,
+    fontSize: '13px',
+    fontWeight: 500,
+    textDecorationLine: 'none',
+    outlineColor: { default: 'transparent', ':focus-visible': color.ring },
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px',
+    transitionProperty: 'background-color',
+    transitionDuration: '0.18s',
+    transitionTimingFunction: ease.out
+  },
+  profileArrow: { display: 'inline-flex', color: color.text3 },
   chevron: {
     display: 'inline-flex',
     alignSelf: 'center',

@@ -27,7 +27,8 @@ if (fetched.status === 0) {
   }
   console.log('catalog: unpacked the catalog branch')
 } else console.log('catalog: no catalog branch reachable; serving the bundled releases only')
-const result = await publish(`${root}dist/cdn`, target)
+// The registry refreshes developer profiles from this checkout, as the publish workflow does.
+const result = await publish(`${root}dist/cdn`, target, [], `${root}community-apps/registry.json`)
 console.log(
   `catalog: ${result.published.length} bundled releases added, ${result.reused.length} reused → public/catalog/`
 )
@@ -80,6 +81,7 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
     id,
     name: app.name,
     author: app.author,
+    developer: app.developer ?? null,
     lane: app.lane,
     repo: app.repo,
     version: newest.manifest.version,
@@ -124,6 +126,8 @@ writeFileSync(
     '  id: string',
     '  name: string',
     '  author: string',
+    '  /** Key into DEVELOPERS. */',
+    '  developer: string | null',
     "  lane: 'official' | 'community'",
     '  repo: string',
     '  version: string',
@@ -136,6 +140,9 @@ writeFileSync(
     '  changelog: string | null',
     '}',
     `export const CATALOG: CatalogApp[] = ${JSON.stringify(shelf, null, 2)}`,
+    '/** Developer profiles from the catalog index. */',
+    'export const DEVELOPERS: Record<string, { name: string; description?: string; imageUrl: string; website?: string; github?: string }> =',
+    `  ${JSON.stringify(index.developers ?? {}, null, 2)}`,
     '/** Official apps built into the simulator; `mock` marks a static screen still in development.',
     ' *  Baked apps carry no release, so their dates are the first and last commit on their package. */',
     'export const SHELL: {',

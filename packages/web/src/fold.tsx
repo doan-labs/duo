@@ -20,7 +20,6 @@ export function Fold({
   children: ReactNode
 }) {
   const [open, setOpen] = useState(start)
-  const still = useReducedMotion() ?? false
   return (
     <div {...stylex.props(styles.fold)}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} {...stylex.props(styles.head)}>
@@ -42,20 +41,34 @@ export function Fold({
         </svg>
         {head}
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            {...stylex.props(styles.clip)}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={still ? { duration: 0 } : SHEET}
-          >
-            <div {...stylex.props(styles.body)}>{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Collapse open={open}>
+        <div {...stylex.props(styles.body)}>{children}</div>
+      </Collapse>
     </div>
+  )
+}
+
+/**
+ * A body that grows and shrinks on the sheet spring, instantly under reduced motion.
+ * Its height tween measures the child, so space above the content belongs in the
+ * child's padding: a margin would jump at the end.
+ */
+export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
+  const still = useReducedMotion() ?? false
+  return (
+    <AnimatePresence initial={false}>
+      {open && (
+        <motion.div
+          {...stylex.props(styles.clip)}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={still ? { duration: 0 } : SHEET}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
