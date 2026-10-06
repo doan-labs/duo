@@ -46,7 +46,13 @@ export type Library = {
   muted: boolean
 }
 export type Sel = { kind: 'node' | 'wire'; id: string } | null
-export type Mirror = { by: string; sel: Sel; doc: Doc }
+/**
+ * `base` is the session revision the doc was derived from: the fork detector.
+ * A copy that writes without having seen the peer's last write carries a base
+ * older than the holder's own, so the holder can refuse the stale fork instead
+ * of letting last-writer-wins erase a fresher edit.
+ */
+export type Mirror = { by: string; sel: Sel; doc: Doc; base: number }
 
 export const MAX_SWITCHES = 4
 export const MAX_BULBS = 4
@@ -583,6 +589,9 @@ export function parseMirror(raw: string | null): Mirror | null {
     if (!record(parsed) || typeof parsed.by !== 'string') return null
     const doc = cleanDoc(parsed.doc)
     if (!doc) return null
+    // Older payloads without a base read as -1: older than any live rev, so a
+    // holder always outranks them.
+    const base = num(parsed.base, -1)
     const s = record(parsed.sel) ? parsed.sel : null
     const sel: Sel =
       s && (s.kind === 'node' || s.kind === 'wire') && typeof s.id === 'string'
@@ -594,14 +603,14 @@ export function parseMirror(raw: string | null): Mirror | null {
             ? { kind: 'wire', id: s.id }
             : null
         : null
-    return { by: parsed.by, sel, doc }
+    return { by: parsed.by, sel, doc, base }
   } catch {
     return null
   }
 }
 
-export function serializeMirror(by: string, doc: Doc, sel: Sel) {
-  return JSON.stringify({ by, sel, doc } satisfies Mirror)
+export function serializeMirror(by: string, doc: Doc, sel: Sel, base = 0) {
+  return JSON.stringify({ by, sel, doc, base } satisfies Mirror)
 }
 
 export const latestDoc = (lib: Library): Doc | null =>

@@ -146,7 +146,11 @@ function CircuitLab() {
   const view = useDisplay()
   const stored = useKV(os.storage, LIB_KEY)
   // Latest session value for the open circuit, fed by a raw watch - not useKV.
-  const [live, setLive] = useState<{ raw: string | null; known: boolean }>({ raw: null, known: false })
+  const [live, setLive] = useState<{ raw: string | null; rev: number; known: boolean }>({
+    raw: null,
+    rev: 0,
+    known: false
+  })
   const [doc, setDoc] = useState<Doc | null>(null)
   const [sel, setSel] = useState<Sel>(null)
   const [armed, setArmed] = useState<string | null>(null)
@@ -161,6 +165,13 @@ function CircuitLab() {
   const dragRef = useRef<Drag | null>(null)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
+  // Fork accounting: lastRev is the newest session revision this copy has seen;
+  // ourBase is the rev the currently displayed doc was adopted or confirmed at.
+  // A mirror whose base is older than ourBase for the same doc id forked from
+  // state the holder already moved past - it must not overwrite.
+  const lastRev = useRef(0)
+  const ourBase = useRef(0)
+  const lastWritten = useRef<string | null>(null)
   const returnFocus = useRef<HTMLElement | null>(null)
   // The doc id this copy framed for its own canvas: one stored view cannot
   // serve a 387pt cover and a 790pt inner, so each display fits the circuit to
@@ -206,16 +217,23 @@ function CircuitLab() {
   const publish = (next: Doc, nextSel?: Sel) => {
     const selNow = pruneSel(nextSel === undefined ? selRef.current : nextSel, next)
     setDoc(next)
+    docRef.current = next
     if (selNow !== selRef.current) setSel(selNow)
     saveDoc(next)
-    void os.session.set(DOC_KEY, serializeMirror(ME, next, selNow)).catch(() => {})
+    const raw = serializeMirror(ME, next, selNow, lastRev.current)
+    lastWritten.current = raw
+    void os.session.set(DOC_KEY, raw).catch(() => {})
   }
 
   // Selection alone never writes storage - it rides the session mirror only.
   const publishSel = (s: Sel) => {
     const current = docRef.current
     setSel(s)
-    if (current) void os.session.set(DOC_KEY, serializeMirror(ME, current, s)).catch(() => {})
+    if (current) {
+      const raw = serializeMirror(ME, current, s, lastRev.current)
+      lastWritten.current = raw
+      void os.session.set(DOC_KEY, raw).catch(() => {})
+    }
   }
 
   const setMuted = (next: boolean) => {
@@ -245,11 +263,18 @@ function CircuitLab() {
           cursor = page.cursor
         } while (cursor)
         if (dead) return
-        setLive({ raw: seen.get(DOC_KEY) ?? null, known: true })
+        lastRev.current = Math.max(lastRev.current, rev)
+        setLive({ raw: seen.get(DOC_KEY) ?? null, rev, known: true })
         off()
         off = os.session.watch(rev, (e) => {
           if (e.rev < 0) void boot()
-          else if (e.k === DOC_KEY) setLive({ raw: e.v, known: true })
+          else {
+            lastRev.current = Math.max(lastRev.current, e.rev)
+            // Our own write's echo confirms the session position the doc we
+            // display now holds - the freshness watermark the fork gate needs.
+            if (e.v === lastWritten.current) ourBase.current = e.rev
+            if (e.k === DOC_KEY) setLive({ raw: e.v, rev: e.rev, known: true })
+          }
         })
       } catch {
         if (!dead) setTimeout(() => void boot(), 2000)
@@ -278,20 +303,40 @@ function CircuitLab() {
           const lib = await readLib()
           const open = latestDoc(lib) ?? welcomeDoc()
           setDoc(open)
+          docRef.current = open
           setSel(null)
           stored.set(serializeLibrary(withDoc(lib, open)))
-          await os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
+          const raw = serializeMirror(ME, open, null, lastRev.current)
+          lastWritten.current = raw
+          await os.session.set(DOC_KEY, raw).catch(() => {})
         })
       }
       return
     }
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
+    const cur = docRef.current
+    if (cur && next.doc.id === cur.id && next.base < ourBase.current) {
+      // A fold-race fork: the writer derived its doc from session state this
+      // copy already moved past. Refuse the overwrite and republish the
+      // fresher doc so both copies converge on it instead of splitting.
+      const heal = serializeMirror(ME, cur, selRef.current, lastRev.current)
+      lastWritten.current = heal
+      void os.session.set(DOC_KEY, heal).catch(() => {})
+      enqueue(async () => {
+        const lib = await readLib()
+        stored.set(serializeLibrary(withDoc(lib, cur)))
+      })
+      return
+    }
+    ourBase.current = live.rev
     // Keep this copy's own view for the doc it already framed: a remote fit
     // was computed for a different canvas and must not replace the local one.
-    const keep = docRef.current?.id === next.doc.id && framedDoc.current === next.doc.id
+    const keep = cur?.id === next.doc.id && framedDoc.current === next.doc.id
     if (!keep) framedDoc.current = null
-    setDoc(keep && docRef.current ? { ...next.doc, view: docRef.current.view } : next.doc)
+    const adopted = keep && cur ? { ...next.doc, view: cur.view } : next.doc
+    setDoc(adopted)
+    docRef.current = adopted
     setSel(pruneSel(next.sel, next.doc))
     setArmed(null)
     setArming(null)
@@ -1269,4 +1314,6 @@ addEventListener(
 )
 
 await os.connect()
-createRoot(document.getElementById('root')!).render(<CircuitLab />)
+// The app template ships a bare body - there is no #root element; every
+// community app mounts straight onto document.body.
+createRoot(document.body).render(<CircuitLab />)
