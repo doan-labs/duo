@@ -332,14 +332,26 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 30,
-    height: 30,
+    // Transparent 44pt hit box; the glyph itself stays header-sized.
+    minWidth: 44,
+    minHeight: 44,
     borderRadius: radius.sm,
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: app.link,
     cursor: 'pointer',
     padding: 0
+  },
+  // 44pt hit box for the kit IconButton (which ships at 30x24).
+  hdrTap: {
+    width: 44,
+    height: 44
+  },
+  // Back chevron: glyph keeps shared.bk's position, tap area reaches 44pt.
+  bkTap: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'flex-start'
   },
 
   // ---------- legend sheet ----------

@@ -341,14 +341,19 @@ function Coach({
     <div {...stylex.props(styles.coach)}>
       <div {...stylex.props(shared.hdr)}>
         {canGoBack && (
-          <button type="button" aria-label="Back to models" {...stylex.props(shared.bk, shared.press)} onClick={onBack}>
+          <button
+            type="button"
+            aria-label="Back to models"
+            {...stylex.props(shared.bk, styles.bkTap, shared.press)}
+            onClick={onBack}
+          >
             <Sym name="back" size={20} />
           </button>
         )}
         <span {...stylex.props(styles.hdrGrow)}>{model.name}</span>
         {wide && <span {...stylex.props(styles.hdrCenter)}>{result ? 'Finished' : `Step ${at + 1} of ${total}`}</span>}
         <div {...stylex.props(shared.hdrSm)}>
-          <IconButton name="info" aria-label="How to read the folds" onClick={onLegend} />
+          <IconButton name="info" aria-label="How to read the folds" xstyle={styles.hdrTap} onClick={onLegend} />
           <SoundButton muted={muted} onToggle={onToggleSound} />
         </div>
       </div>
