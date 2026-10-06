@@ -463,19 +463,30 @@ function PaperFold() {
   const progressBest = useRef(progress)
   const activeRef = useRef(false)
   activeRef.current = view.active
+  // Dedupe for repair writes: useKV's set is a fresh closure per render so
+  // these effects re-fire freely; each distinct payload repairs at most once.
+  const uiWritten = useRef<string | null>(null)
+  const prefsWritten = useRef<string | null>(null)
+  const progWritten = useRef<string | null>(null)
+  const progJson = useRef('{}')
 
+  // Adopt a strictly newer foreign position; when the shared doc lands behind
+  // our best (a stale foreign write), the active copy repairs it once.
   useEffect(() => {
     if (ui.status === 'hydrating') return
     const f = parseUi(ui.value)
     if (newerSeq(f, uiBest.current)) {
       uiBest.current = f
       setUiState(f)
-    } else if (f.by !== byId && (f.seq > 0 || f.model !== null) && activeRef.current) {
-      // A foreign write older than our best overwrote the shared doc - put the
-      // freshest version back so a later cold read does not resurrect it.
-      ui.set(JSON.stringify(uiBest.current))
+      return
     }
-  }, [ui.value, ui.status, ui.set, byId])
+    if (!activeRef.current || !newerSeq(uiBest.current, f)) return
+    if (f.seq === 0 && f.model === null) return // nothing stored - do not create it
+    const s = JSON.stringify(uiBest.current)
+    if (ui.value === s || uiWritten.current === s) return
+    uiWritten.current = s
+    ui.set(s)
+  }, [ui.value, ui.status, ui.set])
 
   useEffect(() => {
     if (prefsKV.status === 'hydrating') return
@@ -483,22 +494,32 @@ function PaperFold() {
     if (newerSeq(f, prefsBest.current)) {
       prefsBest.current = f
       setPrefs(f)
-    } else if (f.by !== byId && f.seq > 0 && activeRef.current) {
-      prefsKV.set(JSON.stringify(prefsBest.current))
+      return
     }
-  }, [prefsKV.value, prefsKV.status, prefsKV.set, byId])
+    if (!activeRef.current || !newerSeq(prefsBest.current, f) || f.seq === 0) return
+    const s = JSON.stringify(prefsBest.current)
+    if (prefsKV.value === s || prefsWritten.current === s) return
+    prefsWritten.current = s
+    prefsKV.set(s)
+  }, [prefsKV.value, prefsKV.status, prefsKV.set])
 
+  // Progress is a grow-only map: merge keeps every foreign entry (a stale
+  // whole-map write loses nothing on read), and the active copy re-emits the
+  // superset when the store doc is missing entries.
   useEffect(() => {
     if (progressKV.status === 'hydrating') return
     const f = parseProgress(progressKV.value)
     const merged = mergeProgress(progressBest.current, f)
     progressBest.current = merged
-    setProgress(merged)
-    if (!progressSubset(merged, f) && activeRef.current) {
-      // The store doc is missing entries our merged view holds - re-emit the
-      // superset so a stale whole-map write cannot permanently drop entries.
-      progressKV.set(JSON.stringify(merged))
+    const mJson = JSON.stringify(merged)
+    if (mJson !== progJson.current) {
+      progJson.current = mJson
+      setProgress(merged)
     }
+    if (!activeRef.current || progressSubset(merged, f)) return
+    if (progressKV.value === mJson || progWritten.current === mJson) return
+    progWritten.current = mJson
+    progressKV.set(mJson)
   }, [progressKV.value, progressKV.status, progressKV.set])
 
   const still = !prefs.motion
@@ -528,7 +549,9 @@ function PaperFold() {
       const next: UiState = { ...uiBest.current, ...patch, seq: uiBest.current.seq + 1, by: byId }
       uiBest.current = next
       setUiState(next)
-      ui.set(JSON.stringify(next))
+      const s = JSON.stringify(next)
+      uiWritten.current = s
+      ui.set(s)
     },
     [ui.set, byId]
   )
@@ -538,7 +561,9 @@ function PaperFold() {
       const next: Prefs = { ...prefsBest.current, ...patch, seq: prefsBest.current.seq + 1, by: byId }
       prefsBest.current = next
       setPrefs(next)
-      prefsKV.set(JSON.stringify(next))
+      const s = JSON.stringify(next)
+      prefsWritten.current = s
+      prefsKV.set(s)
     },
     [prefsKV.set, byId]
   )
@@ -550,8 +575,11 @@ function PaperFold() {
         recordProgress(progressBest.current, modelId, step, steps, Date.now())
       )
       progressBest.current = merged
+      const mJson = JSON.stringify(merged)
+      progJson.current = mJson
+      progWritten.current = mJson
       setProgress(merged)
-      progressKV.set(JSON.stringify(merged))
+      progressKV.set(mJson)
     },
     [progressKV.set]
   )

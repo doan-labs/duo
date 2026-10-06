@@ -118,7 +118,9 @@ const grow = stylex.keyframes({
 })
 
 const s = stylex.create({
-  svg: { display: 'block', width: '100%', height: 'auto' },
+  // Height follows the box so a flex-shrunk card letterboxes the drawing
+  // instead of overflowing it (preserveAspectRatio keeps it square).
+  svg: { display: 'block', width: '100%', height: '100%' },
   in0: {},
   fade: {
     animationName: { default: fade, '@media (prefers-reduced-motion: reduce)': 'none' },

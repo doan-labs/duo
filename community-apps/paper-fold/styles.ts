@@ -183,7 +183,13 @@ export const styles = stylex.create({
     borderRadius: radius.xl,
     boxShadow: shadow.card,
     padding: space.lg,
-    flexShrink: 0
+    // Shrinks below square rather than pushing the transport off-screen on a
+    // short pane; the SVG letterboxes inside.
+    flexShrink: 1,
+    minHeight: 140,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   cardInner: {
     maxWidth: 300
