@@ -1,6 +1,6 @@
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CardBack, CardFace } from './cards.tsx'
 import { type Card, RANK_NAMES } from './game.ts'
 import { styles } from './styles.ts'
@@ -100,6 +100,22 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
+  }, [])
+
+  // A keyboard-placed card re-renders its button away, and the browser drops
+  // focus to <body>: hand it to the board group so the next Tab or arrow key
+  // still starts inside the table. Focus moving to a real element (a rail
+  // button, the sheet) is left alone.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const onFocusOut = (event: FocusEvent) => {
+      const dead = event.relatedTarget === null || !el.contains(event.relatedTarget as Node)
+      if (dead && (document.activeElement === document.body || document.activeElement === document.documentElement))
+        el.focus()
+    }
+    el.addEventListener('focusout', onFocusOut)
+    return () => el.removeEventListener('focusout', onFocusOut)
   }, [])
   const fit = fitBoard(size.w, size.h)
   const focusables = useRef(new Map<string, HTMLElement>())
@@ -314,7 +330,7 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
   }
 
   return (
-    <div ref={ref} {...stylex.props(styles.board)} role="group" aria-label="Card table">
+    <div ref={ref} tabIndex={-1} {...stylex.props(styles.board)} role="group" aria-label="Card table">
       {out}
     </div>
   )

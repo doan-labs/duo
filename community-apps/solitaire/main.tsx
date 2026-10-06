@@ -266,6 +266,16 @@ function Solitaire() {
     }
   }, [])
 
+  // doAuto is declared below the sites that need to fire a resume; a ref
+  // hands them the current copy without reordering the component.
+  const doAutoRef = useRef<(quiet?: boolean) => void>(() => {})
+  const tryResume = useCallback(() => {
+    if (activeRef.current && resumeAuto.current && autoTimer.current === null) {
+      resumeAuto.current = false
+      doAutoRef.current(true)
+    }
+  }, [])
+
   const play = useCallback(
     (kind: Cue) => {
       // Only the copy the player is looking at makes sound.
@@ -282,10 +292,42 @@ function Solitaire() {
       // auto:true tells the other display a sweep is in flight here, so a fold
       // mid-Auto hands it off instead of silently dropping the timer.
       const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null))
-      lastSeen.current = raw
-      void saved.set(raw)
+      // The store, not the mirror, is the authority: a foreign write this copy
+      // has not been notified of yet still wins. Read before writing so a
+      // superseded deal is adopted rather than silently overwritten.
+      void os.storage
+        .get('game')
+        .then((cur) => {
+          if (cur && cur !== lastSeen.current) {
+            const foreign = adoptGame(cur)
+            if (foreign && foreign.by !== ME) {
+              lastSeen.current = cur
+              const t = { ...foreign.deal, game: foreign.game }
+              setTable(t)
+              tableRef.current = t
+              setSel(null)
+              setPending(null)
+              stopAuto()
+              resumeAuto.current = foreign.auto === true
+              tryResume()
+              setStatus('Game restored - the other screen moved first.')
+              return
+            }
+          }
+          // Queued behind an adoption this write is stale intent: the live
+          // table has already moved on, so only the publish that still owns
+          // it commits.
+          if (tableRef.current !== next) return
+          lastSeen.current = raw
+          void saved.set(raw)
+        })
+        .catch(() => {
+          if (tableRef.current !== next) return
+          lastSeen.current = raw
+          void saved.set(raw)
+        })
     },
-    [saved]
+    [saved, stopAuto, tryResume]
   )
 
   // The shared record must never regress to an older base. When the other
@@ -307,11 +349,12 @@ function Solitaire() {
         // let the record's auto flag resume whoever owns the screen.
         stopAuto()
         resumeAuto.current = next.auto === true
+        tryResume()
         return { table: t, foreign: true }
       }
     }
     return { table: tableRef.current, foreign: false }
-  }, [stopAuto])
+  }, [stopAuto, tryResume])
 
   // Why adopt on the storage key: the fold carries the running match to the
   // other display. A write this copy did not make is the newer settled deal;
@@ -339,8 +382,9 @@ function Solitaire() {
     // The other copy was mid-sweep when this one took the display: pick it up.
     // A record without the flag also clears any stale resume request.
     resumeAuto.current = next.auto === true
+    tryResume()
     setStatus('Game restored.')
-  }, [saved.value, saved.status, saved, publish, stopAuto])
+  }, [saved.value, saved.status, saved, publish, stopAuto, tryResume])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -350,9 +394,15 @@ function Solitaire() {
     (next: Stats) => {
       // Both copies write this key; merge with the freshest shared value so a
       // commit on a stale base unions deals instead of erasing the other
-      // display's increments.
-      const merged = mergeStats(readStats(statsRaw.value), next)
-      void statsRaw.set(JSON.stringify({ v: 1, by: ME, ...merged }))
+      // display's increments. Read the store, not the mirror, for the base.
+      const write = (base: Stats) => {
+        const merged = mergeStats(base, next)
+        void statsRaw.set(JSON.stringify({ v: 1, by: ME, ...merged }))
+      }
+      void os.storage
+        .get('stats')
+        .then((cur) => write(readStats(cur)))
+        .catch(() => write(readStats(statsRaw.value)))
     },
     [statsRaw]
   )
@@ -610,61 +660,71 @@ function Solitaire() {
   }, [game, ended, play])
 
   /** Auto-finish: the engine sweeps waste and tops to foundations, one hop a beat. */
-  const doAuto = useCallback(() => {
-    if (ended || autoTimer.current !== null || !activeRef.current) return
-    const steps = autoMoves(game)
-    if (!steps.length) {
-      setStatus('Nothing can move home by itself yet.')
-      return
-    }
-    setStatus('Sending eligible cards home...')
-    let i = 0
-    autoTimer.current = window.setInterval(() => {
-      if (!activeRef.current) return
-      const m = steps[i]
-      if (!m) {
-        stopAuto()
+  const doAuto = useCallback(
+    (quiet = false) => {
+      // Derive the sweep from the live deal, not this render's snapshot: a resume
+      // can fire in the same commit an adoption landed, when `game` still shows
+      // the pre-adoption table and would compute zero steps.
+      const live = tableRef.current
+      if (live.game.status !== 'playing' || autoTimer.current !== null || !activeRef.current) return
+      const steps = autoMoves(live.game)
+      if (!steps.length) {
+        // A resumed handoff that finds nothing left just ends quietly; only a
+        // manual press reports the empty sweep.
+        if (!quiet) setStatus('Nothing can move home by itself yet.')
         return
       }
-      i++
-      // The live table state, not the captured snapshot: each tick re-reads
-      // it, and a foreign write mid-sweep wins - this copy adopts, drops the
-      // timer, and lets the record's auto flag resume whoever holds the screen.
-      const base = freshBase()
-      if (base.foreign) {
-        stopAuto()
-        setStatus('Game restored.')
-        return
-      }
-      const current = base.table
-      if (!canApply(current.game, m)) {
-        stopAuto()
-        return
-      }
-      const { game: next } = apply(current.game, m)
-      const nextTable = { ...current, log: [...current.log, m], game: next }
-      // Count the deal on its first landed move; count the win once per seed.
-      let nextStats = recordPlay(statsRef.current, next.mode, nextTable.seed)
-      if (next.status === 'won') {
-        winMark.current = { seed: nextTable.seed, prevBest: statsRef.current[next.mode].best }
-        nextStats = recordWin(nextStats, next.mode, nextTable.seed, nextTable.log.length)
-      }
-      if (next.status === 'won' || i >= steps.length) {
-        // Clear the interval before publishing so the record's auto flag is
-        // honest: a stored auto:true would wake another copy's sweep forever.
-        stopAuto()
-      }
-      publish(nextTable)
-      if (nextStats !== statsRef.current) commitStats(nextStats)
-      if (next.status === 'won') {
-        setStatus(`You cleared the table in ${nextTable.log.length} moves.`)
-        play('win')
-      } else {
-        play('foundation')
-        setStatus(`Auto-finish: ${nextTable.log.length} moves.`)
-      }
-    }, 110)
-  }, [game, ended, stopAuto, publish, play, commitStats, freshBase])
+      setStatus('Sending eligible cards home...')
+      let i = 0
+      autoTimer.current = window.setInterval(() => {
+        if (!activeRef.current) return
+        const m = steps[i]
+        if (!m) {
+          stopAuto()
+          return
+        }
+        i++
+        // The live table state, not the captured snapshot: each tick re-reads
+        // it, and a foreign write mid-sweep wins - this copy adopts, drops the
+        // timer, and lets the record's auto flag resume whoever holds the screen.
+        const base = freshBase()
+        if (base.foreign) {
+          stopAuto()
+          setStatus('Game restored.')
+          return
+        }
+        const current = base.table
+        if (!canApply(current.game, m)) {
+          stopAuto()
+          return
+        }
+        const { game: next } = apply(current.game, m)
+        const nextTable = { ...current, log: [...current.log, m], game: next }
+        // Count the deal on its first landed move; count the win once per seed.
+        let nextStats = recordPlay(statsRef.current, next.mode, nextTable.seed)
+        if (next.status === 'won') {
+          winMark.current = { seed: nextTable.seed, prevBest: statsRef.current[next.mode].best }
+          nextStats = recordWin(nextStats, next.mode, nextTable.seed, nextTable.log.length)
+        }
+        if (next.status === 'won' || i >= steps.length) {
+          // Clear the interval before publishing so the record's auto flag is
+          // honest: a stored auto:true would wake another copy's sweep forever.
+          stopAuto()
+        }
+        publish(nextTable)
+        if (nextStats !== statsRef.current) commitStats(nextStats)
+        if (next.status === 'won') {
+          setStatus(`You cleared the table in ${nextTable.log.length} moves.`)
+          play('win')
+        } else {
+          play('foundation')
+          setStatus(`Auto-finish: ${nextTable.log.length} moves.`)
+        }
+      }, 110)
+    },
+    [stopAuto, publish, play, commitStats, freshBase]
+  )
+  doAutoRef.current = doAuto
 
   // DESIGN2: a hidden copy runs no timer at all. Going hidden mid-sweep clears
   // the interval and flags a resume; becoming visible again (or adopting a
@@ -678,11 +738,8 @@ function Solitaire() {
       }
       return
     }
-    if (resumeAuto.current && autoTimer.current === null) {
-      resumeAuto.current = false
-      doAuto()
-    }
-  }, [view.active, doAuto, stopAuto])
+    tryResume()
+  }, [view.active, tryResume, stopAuto])
 
   const toggleMute = useCallback(() => {
     void prefs.set(JSON.stringify({ v: 1, by: ME, muted: !muted }))
@@ -823,7 +880,7 @@ function Solitaire() {
         </button>
         <button
           type="button"
-          onClick={doAuto}
+          onClick={() => doAuto()}
           disabled={ended}
           aria-label="Auto-play every card that can go home"
           {...stylex.props(styles.tool, wide && styles.toolWide, ended && styles.toolDisabled, shared.press)}
