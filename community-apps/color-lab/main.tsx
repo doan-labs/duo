@@ -582,6 +582,16 @@ function ColorLab() {
     patchUi({ sheet: null, actionId: null, deleteId: null, copyText: null })
   }, [patchUi])
 
+  // Cancel or Escape an armed inline delete: clear it and put focus back on
+  // the row's ellipsis, which remounts with the row.
+  const dismissDelete = useCallback(() => {
+    const id = uiRef.current.deleteId
+    patchUi({ deleteId: null })
+    requestAnimationFrame(() => {
+      if (id) ellipsisRefs.current.get(id)?.focus()
+    })
+  }, [patchUi])
+
   const cancelField = useCallback(() => {
     const base = editBase.current
     editBase.current = null
@@ -596,11 +606,12 @@ function ColorLab() {
   }, [commitDoc, patchUi])
 
   useEffect(() => {
-    escapeCancel = ui.sheet !== null ? closeSheet : fieldEditing ? cancelField : null
+    escapeCancel =
+      ui.sheet !== null ? closeSheet : ui.deleteId !== null ? dismissDelete : fieldEditing ? cancelField : null
     return () => {
       escapeCancel = null
     }
-  }, [ui.sheet, fieldEditing, closeSheet, cancelField])
+  }, [ui.sheet, ui.deleteId, fieldEditing, closeSheet, cancelField, dismissDelete])
 
   // ---- copy: try the clipboard, fall back to an honest select-and-copy sheet ----
 
@@ -1139,16 +1150,7 @@ function ColorLab() {
                 <span {...stylex.props(styles.palInfo)}>
                   <span {...stylex.props(styles.palName)}>Delete {p.name}?</span>
                 </span>
-                <Button
-                  variant="plain"
-                  ref={deleteCancelRef}
-                  onClick={() => {
-                    const id = uiRef.current.deleteId
-                    patchUi({ deleteId: null })
-                    const el = id ? ellipsisRefs.current.get(id) : null
-                    if (el && document.contains(el)) el.focus()
-                  }}
-                >
+                <Button variant="plain" ref={deleteCancelRef} onClick={dismissDelete}>
                   Cancel
                 </Button>
                 <Button variant="filled" onClick={doDelete}>
