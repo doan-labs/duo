@@ -285,6 +285,7 @@ function ColorLab() {
   const sheetTrigger = useRef<HTMLElement | null>(null)
   const fieldRef = useRef<HTMLInputElement | null>(null)
   const copyFieldRef = useRef<HTMLInputElement | null>(null)
+  const skipFinalize = useRef(false)
   const pendingShared = useRef<Doc | null>(null)
   const publishRaf = useRef(0)
 
@@ -521,6 +522,7 @@ function ColorLab() {
     }
     const color = docRef.current?.color
     patchUi({ field: color ? toHex(color) : '', fieldErr: false })
+    skipFinalize.current = true
     fieldRef.current?.blur()
   }, [commitDoc, patchUi])
 
@@ -693,6 +695,9 @@ function ColorLab() {
   const chipChoices = pairChoices(doc)
   const fg = toHex(doc.pair.fg)
   const bg = toHex(doc.pair.bg)
+  // A pair value that is not in the derived choices still shows as a selected chip.
+  const choicesFor = (which: keyof Pair): Rgb[] =>
+    chipChoices.some((c) => rgbEq(c, doc.pair[which])) ? chipChoices : [doc.pair[which], ...chipChoices]
 
   const setPair = (which: keyof Pair, c: Rgb) => {
     commitCore(
@@ -777,11 +782,17 @@ function ColorLab() {
           }}
           onBlur={() => {
             setFieldEditing(false)
-            finalizeField()
+            // Enter already finalized; the blur that follows must not re-run it.
+            if (skipFinalize.current) {
+              skipFinalize.current = false
+            } else {
+              finalizeField()
+            }
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
+              skipFinalize.current = true
               finalizeField()
               fieldRef.current?.blur()
             }
@@ -924,7 +935,7 @@ function ColorLab() {
               aria-label={which === 'fg' ? 'Text colour' : 'Surface colour'}
               {...stylex.props(styles.pairChips)}
             >
-              {chipChoices.map((c) => {
+              {choicesFor(which).map((c) => {
                 const on = rgbEq(c, doc.pair[which])
                 return (
                   <button
