@@ -1,0 +1,14 @@
+{
+  "id": "com.mnismt.duo.jigsaw",
+  "name": "Jigsaw",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "light": true,
+  "permissions": [],
+  "author": "devin",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/jigsaw",
+  "license": "MIT",
+  "description": "Piece-assembly puzzles from three original illustrations, playable on the cover or unfolded."
+}
