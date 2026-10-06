@@ -799,10 +799,17 @@ function Solitaire() {
           {newBest ? ' - new best' : best === null ? '' : ` - best ${best}`}
         </span>
       </div>
-      <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press)}>
-        <Sym name="reload" size={13} />
-        New game
-      </button>
+      <div {...stylex.props(styles.resultActions)}>
+        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press)}>
+          <Sym name="reload" size={13} />
+          New game
+        </button>
+        {/* The card floats over the narrow toolbar, so undo lives here too. */}
+        <button type="button" onClick={undo} {...stylex.props(styles.action, shared.press)}>
+          <Sym name="undo" size={13} />
+          Take back
+        </button>
+      </div>
     </div>
   ) : null
 

@@ -459,6 +459,7 @@ export const styles = stylex.create({
     animationFillMode: 'both'
   },
   resultCopy: { display: 'flex', flexDirection: 'column', gap: space.xxs, minWidth: 0 },
+  resultActions: { display: 'flex', flexDirection: 'column', gap: space.xs, flexShrink: 0 },
   resultKicker: {
     color: colors.yellowDark,
     fontSize: typeScale.caption2,
