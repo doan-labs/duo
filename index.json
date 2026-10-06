@@ -200,6 +200,21 @@
         }
       ]
     },
+    "com.mnismt.duo.sudoku": {
+      "name": "Sudoku",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/sudoku",
+      "permissions": [],
+      "releases": [
+        {
+          "release": "1.0.0+cf0093f1",
+          "sdk": "0.0.0",
+          "bytes": 541249,
+          "sha256": "62e9dce1dd10911dc9772ba0c2e1554a65cb991ab3f559f940e98f94ee39ef99"
+        }
+      ]
+    },
     "com.mnismt.duo.tictactoe": {
       "name": "Tic-Tac-Toe",
       "lane": "community",
