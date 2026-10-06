@@ -35,7 +35,11 @@ reverse-DNS `id` is the durable identity and never changes after the first relea
 
 ## Ownership
 
-[`registry.json`](registry.json) maps each id to its folder and authorized GitHub maintainers.
+[`registry.json`](registry.json) maps each id to its folder, its developer and authorized GitHub
+maintainers. A developer is a profile in its `developers` table (name, a short description, an https `imageUrl`,
+optional https `website` and GitHub login); the catalog publishes it and the site groups
+community apps under it. The manifest `author` is that developer's handle or name. New
+developers add their profile in the same pull request.
 Anyone may open a fix. Identity changes, ownership transfers and release approval need review
 from the listed maintainers plus a repository maintainer. An `author` string or `repo` URL
 proves nothing. The registry, `OFFICIAL.txt`, `scripts/` and `.github/` are protected by

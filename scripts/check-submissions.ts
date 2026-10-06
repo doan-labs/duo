@@ -7,6 +7,7 @@ import { basename, join, relative, resolve } from 'node:path'
 import { semver } from '../packages/sdk/compat.ts'
 import { type Catalog, type Manifest, manifestValid, releaseId } from '../packages/sdk/manifest.ts'
 import { buildApp } from './build-app.ts'
+import { type Registry, readRegistry, registryIssues } from './registry.ts'
 
 const root = resolve(import.meta.dir, '..')
 const COMMUNITY = 'community-apps'
@@ -32,7 +33,6 @@ const git = (...args: string[]) => {
   return run.exitCode === 0 ? run.stdout.toString() : undefined
 }
 
-type Registry = { reserved: string[]; apps: Record<string, { folder: string; maintainers: string[] }> }
 type Report = {
   folder: string
   id?: string
@@ -112,6 +112,11 @@ async function check(folder: string, registry: Registry, evidence: string): Prom
   if (!entry) fail(`community-apps/registry.json has no entry for ${m.id}`)
   else if (entry.folder !== slug) fail(`registry.json maps ${m.id} to ${entry.folder}, not ${slug}`)
   else if (!entry.maintainers.length) fail(`registry.json lists no maintainers for ${m.id}`)
+  const developer = entry && registry.developers?.[entry.developer]
+  if (developer && m.author !== entry.developer && m.author !== developer.name)
+    fail(
+      `manifest author "${m.author}" must be the developer's handle or name: ${entry.developer} or ${developer.name}`
+    )
   const duplicates = Object.entries(registry.apps).filter(([id, e]) => e.folder === slug && id !== m.id)
   if (duplicates.length) fail(`Folder ${slug} is registered to another id: ${duplicates.map(([id]) => id).join(', ')}`)
 
@@ -202,13 +207,20 @@ function summarize(reports: Report[]) {
   return lines.join('\n')
 }
 
+// Profiles publish with every run, so they are checked even when no app folder changed.
+const registryPath = join(root, COMMUNITY, 'registry.json')
+const registry = await readRegistry(registryPath)
+const issues = registryIssues(registry)
+if (issues.length) {
+  console.error(`community-apps/registry.json:\n${issues.join('\n')}`)
+  process.exit(1)
+}
 const folders = argv.filter((a) => !a.startsWith('--') && a !== base)
 const targets = folders.length ? folders.map((f) => relative(root, resolve(f))) : await changedFolders()
 if (!targets.length) {
   console.log('No community-apps folders to check')
   process.exit(0)
 }
-const registry = (await Bun.file(join(root, COMMUNITY, 'registry.json')).json()) as Registry
 for (const [id, entry] of Object.entries(registry.apps))
   if (!(await readdir(join(root, COMMUNITY, entry.folder)).catch(() => undefined)))
     console.warn(`registry.json: ${id} points at a missing folder ${entry.folder}`)
