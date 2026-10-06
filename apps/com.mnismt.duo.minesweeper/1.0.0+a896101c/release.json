@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.minesweeper",
+    "name": "Minesweeper",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "permissions": [],
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/minesweeper",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:24:43.901Z",
+    "commit": "6f49757fb2c650c220947b7c5b2ecaf3cee52755",
+    "hash": "a896101c"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 542305,
+      "sha256": "fa46d5c565ecccb755ce6a726bdd3c88fc839dc8c20df112b10e733feb14fca5"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 307282,
+      "sha256": "f2d1765f2b5853e77d7e575e7050c3330cdfe42ceca79eebdb1564e6a8c766c9"
+    }
+  ]
+}

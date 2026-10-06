@@ -157,6 +157,21 @@
         }
       ]
     },
+    "com.mnismt.duo.minesweeper": {
+      "name": "Minesweeper",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/minesweeper",
+      "permissions": [],
+      "releases": [
+        {
+          "release": "1.0.0+a896101c",
+          "sdk": "0.0.0",
+          "bytes": 542305,
+          "sha256": "b2d827878029d13df4cfc602c1eb88d183dd05bfc6e13805a7d5e2ea780d9cc3"
+        }
+      ]
+    },
     "com.mnismt.duo.pomodoro": {
       "name": "Pomo Timer",
       "lane": "community",
