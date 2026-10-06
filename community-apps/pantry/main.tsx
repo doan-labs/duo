@@ -970,7 +970,9 @@ function Pantry() {
                   This cannot be undone.
                 </p>
                 <div {...stylex.props(styles.sheetActions)}>
-                  <Button variant="plain" onClick={() => setConfirming(false)}>
+                  {/* Keep lands focus first: the armed-delete state should hand the
+                      safe choice to the finger, not the destructive one. */}
+                  <Button variant="plain" autoFocus onClick={() => setConfirming(false)}>
                     Keep it
                   </Button>
                   <Button

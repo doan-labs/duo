@@ -302,8 +302,8 @@ export const styles = stylex.create({
   searchClear: {
     display: 'grid',
     placeItems: 'center',
-    width: space.xl,
-    height: space.xl,
+    width: `calc(${space.xxxl} + ${space.xs})`,
+    height: `calc(${space.xxxl} + ${space.xs})`,
     borderWidth: 0,
     borderRadius: radius.circle,
     padding: 0,
