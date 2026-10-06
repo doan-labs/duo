@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.mindmap",
+    "name": "Mind Map",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/mind-map",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:32:15.508Z",
+    "commit": "93e809ee5e536e3efdbc987b309642daa7bb3bbf",
+    "hash": "72d8682c"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 535318,
+      "sha256": "24351be5988cf2cfd0ebca9798c2eec0c876156b9db3d6bde1292321b37587e9"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1017591,
+      "sha256": "3704e649d37ea66f6b9bd1a9b169677c5f1e622ca2c6cf868bc95f27f5b44fdd"
+    }
+  ]
+}

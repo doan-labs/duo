@@ -185,6 +185,20 @@
         }
       ]
     },
+    "com.mnismt.duo.mindmap": {
+      "name": "Mind Map",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/mind-map",
+      "releases": [
+        {
+          "release": "1.0.0+72d8682c",
+          "sdk": "0.0.0",
+          "bytes": 535318,
+          "sha256": "980e8114405484b4ba1ea045d879ad3230827250d0e400dc9c70294d633725b0"
+        }
+      ]
+    },
     "com.mnismt.duo.minesweeper": {
       "name": "Minesweeper",
       "lane": "community",
