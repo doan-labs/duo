@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.recipebox",
+    "name": "Recipe Box",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/recipe-box",
+    "license": "MIT",
+    "permissions": []
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:28:27.949Z",
+    "commit": "9220b72f924e0565effa374fe9a375169b55125b",
+    "hash": "befb7e1a"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 539047,
+      "sha256": "062023fb1ad0dc3365c0b70d4e60e8681ed7c4fb709f39a942c44e7e6ceacdbd"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1264043,
+      "sha256": "2fee9f4c844ef0a9fb7f49f526c9fd5f3579cb85792534ba2a2d858c21fc9d46"
+    }
+  ]
+}

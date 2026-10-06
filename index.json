@@ -236,6 +236,21 @@
         }
       ]
     },
+    "com.mnismt.duo.recipebox": {
+      "name": "Recipe Box",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/recipe-box",
+      "permissions": [],
+      "releases": [
+        {
+          "release": "1.0.0+befb7e1a",
+          "sdk": "0.0.0",
+          "bytes": 539047,
+          "sha256": "fcb2568ff199fd1928f650b2fc4741b38664267f1edbe2bb96fa2c3e807a56e6"
+        }
+      ]
+    },
     "com.mnismt.duo.snake": {
       "name": "Snake",
       "lane": "community",
