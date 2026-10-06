@@ -182,7 +182,7 @@ export async function chooseMoveAsync(
   const empties = board.filter((p) => p === null).length
   const budget: LiveBudget = {
     nodes: 0,
-    deadline: Date.now() + 620,
+    deadline: Date.now() + budgetFor(empties, 620),
     nextYield: Date.now(),
     cancelled
   }
@@ -220,6 +220,12 @@ function depthFor(empties: number): number {
   return 6
 }
 
+/** Wall-clock budget in ms: endgames get a deeper allowance so the exact
+ * solve almost always completes instead of returning a shallower read. */
+function budgetFor(empties: number, mid: number): number {
+  return empties <= 12 ? 2400 : mid
+}
+
 export type Pick = { at: number; depth: number }
 
 /**
@@ -251,7 +257,7 @@ export function chooseMove(board: Board, color: Color, level: Level, rand: () =>
 
   // Hard: iterative deepening negamax with alpha-beta inside a soft clock.
   const empties = board.filter((p) => p === null).length
-  const budget = { nodes: 0, deadline: Date.now() + 550 }
+  const budget = { nodes: 0, deadline: Date.now() + budgetFor(empties, 550) }
   let best = options[0]!
   let reached = 0
   for (let depth = 1; depth <= depthFor(empties); depth++) {
