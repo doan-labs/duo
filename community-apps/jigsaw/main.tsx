@@ -127,6 +127,10 @@ function Jigsaw() {
 
   // ---- shared state ----
 
+  useEffect(() => {
+    requestAnimationFrame(() => os.ready())
+  }, [])
+
   // Session mirror adoption: a value this copy did not write is the settled
   // game from the other display. The raw-string guard keeps echoes of this
   // copy's own writes from re-firing.
