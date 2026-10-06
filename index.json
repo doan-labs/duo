@@ -172,6 +172,21 @@
         }
       ]
     },
+    "com.mnismt.duo.pixelstudio": {
+      "name": "Pixel Studio",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pixel-studio",
+      "permissions": [],
+      "releases": [
+        {
+          "release": "1.0.0+b4bab39a",
+          "sdk": "0.0.0",
+          "bytes": 550492,
+          "sha256": "a8d8bf8cf86aaa7b56c2947ea47ddb5ec0021f1dc7b5f5a3a9e6e84b63f105dd"
+        }
+      ]
+    },
     "com.mnismt.duo.pomodoro": {
       "name": "Pomo Timer",
       "lane": "community",

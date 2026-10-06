@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.pixelstudio",
+    "name": "Pixel Studio",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pixel-studio",
+    "license": "MIT",
+    "permissions": []
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:25:44.374Z",
+    "commit": "dc963cc5763b73d3ecbe5fd0b8e21de8b118a863",
+    "hash": "b4bab39a"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 550492,
+      "sha256": "2ef34f9e8f5cf98b71e2a772e051ac4dfcca0bf5cf14dbe423347fd2ad6462ef"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1074524,
+      "sha256": "b25c3f543a1d4ad2c3869dd35e683775b6e647ebb8eb3ad7ce6fdf02ed7cf9ed"
+    }
+  ]
+}
