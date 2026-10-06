@@ -78,6 +78,20 @@
         }
       ]
     },
+    "com.mnismt.duo.blockdrop": {
+      "name": "Block Drop",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/block-drop",
+      "releases": [
+        {
+          "release": "1.0.0+e3f0afa1",
+          "sdk": "0.0.0",
+          "bytes": 538159,
+          "sha256": "d7c6c8657598add01ad3ece034b412acdf7c90a42d23e2d9113eae3d83d261c1"
+        }
+      ]
+    },
     "com.mnismt.duo.flappyduo": {
       "name": "Flappy Duo",
       "lane": "community",

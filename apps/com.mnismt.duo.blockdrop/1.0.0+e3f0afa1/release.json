@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.blockdrop",
+    "name": "Block Drop",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/block-drop",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:31:17.712Z",
+    "commit": "08e743da9469d533b8021dca2b3c93ed9f8c7689",
+    "hash": "e3f0afa1"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 538159,
+      "sha256": "7883c2159eee6446dc4b227865b6f6f142a8253a844bb030799773201201cd7c"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 67262,
+      "sha256": "68c05516fc17bf93080c4a6872d330d061f68e9dc038b9564d6c54981f73d06e"
+    }
+  ]
+}
