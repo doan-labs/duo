@@ -64,6 +64,7 @@ export const styles = stylex.create({
   root: {
     position: 'absolute',
     inset: 0,
+    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -349,6 +350,9 @@ export const styles = stylex.create({
     textTransform: 'uppercase',
     color: app.label3
   },
+  // The moves card owns the rail's leftover height and scrolls inside itself
+  // so a long match can never push the layout past the display edge.
+  movesCard: { flexGrow: 1, minHeight: 0, overflow: 'hidden' },
   tally: { display: 'flex', gap: space.sm, alignItems: 'center', fontSize: typeScale.subheadline },
   tallyItem: { display: 'flex', alignItems: 'center', gap: space.xxs, fontVariantNumeric: 'tabular-nums' },
   log: {
@@ -357,7 +361,7 @@ export const styles = stylex.create({
     gap: space.xxs,
     overflowY: 'auto',
     flexGrow: 1,
-    minHeight: '72px',
+    minHeight: 0,
     scrollbarWidth: 'none'
   },
   logRow: {
@@ -380,7 +384,13 @@ export const styles = stylex.create({
     animationDuration: '.3s',
     animationTimingFunction: easing.out
   },
+  // The end-of-match card overlays the board's lower edge instead of growing
+  // the document: each display is a fixed viewport and nothing may scroll.
   result: {
+    position: 'absolute',
+    insetInline: space.lg,
+    bottom: space.xxxl,
+    zIndex: 2,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -393,9 +403,9 @@ export const styles = stylex.create({
     boxShadow: `${shadow.rim}, ${shadow.float}`,
     animationName: { default: cardIn, [reduce]: 'none' },
     animationDuration: '.4s',
-    animationTimingFunction: easing.spring,
-    width: '100%'
+    animationTimingFunction: easing.spring
   },
+  resultCover: { insetInline: space.sm, bottom: space.xl, padding: space.sm },
   resultTitle: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.title2,

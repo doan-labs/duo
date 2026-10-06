@@ -239,7 +239,6 @@ function Game() {
   // The pre-connect Escape guard gets the live cancel only while a sheet is up.
   useEffect(() => {
     sheetCancel = confirm ? closeConfirm : null
-    if (confirm) shownRef.current = confirm
   }, [confirm, closeConfirm])
 
   const newMatch = useCallback(
@@ -517,7 +516,7 @@ function Game() {
   )
 
   const result = d.over ? (
-    <div {...stylex.props(styles.result)}>
+    <div role="status" {...stylex.props(styles.result, !wide && styles.resultCover)}>
       <span {...stylex.props(styles.cardKicker)}>Game over</span>
       <strong {...stylex.props(styles.resultTitle)}>
         {d.over.winner === 'draw'
@@ -615,6 +614,11 @@ function Game() {
     </p>
   )
 
+  // The Sheet stays mounted for its close animation after confirm clears, so
+  // the last question keeps rendering (inert, so its buttons cannot act) until
+  // it unmounts rather than the card emptying mid-fade. The ref is written
+  // during render - an effect would leave the previous question visible.
+  if (confirm) shownRef.current = confirm
   const shown = shownRef.current
 
   const confirmSheet = (
@@ -686,11 +690,10 @@ function Game() {
                 <span {...stylex.props(styles.cardKicker)}>Game</span>
                 {controls}
               </div>
-              <div {...stylex.props(styles.card)}>
+              <div {...stylex.props(styles.card, styles.movesCard)}>
                 <span {...stylex.props(styles.cardKicker)}>Moves</span>
                 {logList}
               </div>
-              {result}
             </div>
           </section>
         ) : (
@@ -708,11 +711,10 @@ function Game() {
                 </span>
                 <span {...stylex.props(styles.tallyItem)}>Draws {record.draws}</span>
               </div>
-              {logList}
             </div>
-            {result}
           </section>
         )}
+        {result}
       </div>
       {confirmSheet}
     </main>
