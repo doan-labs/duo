@@ -5,24 +5,30 @@
 // The token gate flags fixed colour literals even in strings, so test inputs
 // are built with the small helpers below rather than written as literals.
 import {
+  applyPalOp,
   BLACK,
   contrast,
+  coreEq,
   coreOf,
   exportCodes,
   HARMONY_KINDS,
   harmonyColors,
   harmonyHues,
+  hslEq,
   hslToRgb,
   inkFor,
   luminance,
   MAX_PALETTES,
   newDoc,
   newPalette,
+  palOpDone,
   parseColor,
+  parseColorFull,
   parseDocJson,
   parsePalettes,
   parseShared,
   type Rgb,
+  ratioFloor,
   redoDoc,
   removePalette,
   renamePalette,
@@ -118,6 +124,42 @@ check('rejects bad codes', () => {
   eq(parseColor(rgbIn('1, 2')), null, 'too few channels')
   eq(parseColor('banana'), null, 'word')
   eq(parseColor(hslIn('deg, 50%, 50%')), null, 'bad hue')
+})
+check('rejects malformed channel tokens and arity', () => {
+  // Every malformed shape the parser once accepted must now fail.
+  eq(parseColor(rgbIn('1 2 3 / banana')), null, 'alpha word')
+  eq(parseColor(rgbIn('1,,2,3')), null, 'empty comma slot')
+  eq(parseColor(rgbIn(',1,2,3')), null, 'leading comma')
+  eq(parseColor(rgbIn('1 2 3 4')), null, 'fourth space channel')
+  eq(parseColor(rgbIn('5x%,0,0')), null, 'suffixed percent')
+  eq(parseColor(rgbIn('1e2,0,0')), null, 'scientific notation')
+  eq(parseColor(rgbIn('255, 0, 0, 0.5, 1')), null, 'five channels')
+  eq(parseColor(`${rgbIn('10 20 30')}/`), null, 'trailing slash')
+  eq(parseColor(hslIn('120abc 50% 50%')), null, 'hue junk suffix')
+  eq(parseColor(hslIn('120 50%x 50%')), null, 'percent junk suffix')
+  eq(parseColor(hslIn('turn 1 1')), null, 'unit without digits')
+  eq(parseColor(hslIn('120 50 50')), null, 'hsl s/l need percent signs')
+  eq(parseColor(rgbIn('')), null, 'empty parens')
+  eq(parseColor('cafe-extra'), null, 'word with hex prefix')
+})
+check('accepts valid alpha forms and discloses the drop', () => {
+  const slashPct = parseColorFull(rgbIn('255 0 0 / 50%'))
+  ok(slashPct?.droppedAlpha === true, '50% alpha disclosed')
+  rgbEqTo(slashPct!.color, 255, 0, 0, 'solid under alpha')
+  const opaque = parseColorFull(rgbIn('255 0 0 / 100%'))
+  ok(opaque !== null && !opaque?.droppedAlpha, 'opaque alpha not disclosed')
+  const hexAlpha = parseColorFull(hash('ff000080'))
+  ok(hexAlpha?.droppedAlpha === true, 'hex alpha disclosed')
+  const hexOpaque = parseColorFull(hash('ff0000ff'))
+  ok(hexOpaque !== null && !hexOpaque?.droppedAlpha, 'opaque hex not disclosed')
+  const comma = parseColorFull(rgbaIn('255, 0, 0, 0.5'))
+  ok(comma?.droppedAlpha === true, 'rgba comma alpha disclosed')
+})
+check('parseColorFull keeps authored HSL precision', () => {
+  const info = parseColorFull(hslIn('216.25 84.7% 58.2%'))
+  ok(info !== null, 'parsed')
+  near(info!.hsl.h, 216.25, 1e-9, 'h exact')
+  near(info!.hsl.s, 0.847, 1e-9, 's exact')
 })
 check('wraps out-of-range hue in hsl()', () => {
   rgbEqTo(parseColor(hslIn('360 100% 50%'))!, 255, 0, 0, '360 wraps to 0')
@@ -250,7 +292,33 @@ check('withCore no-ops on identical cores', () => {
 check('undo stack caps at limit', () => {
   let d = newDoc({ r: 0, g: 0, b: 0 })
   for (let i = 1; i <= 40; i++) d = withCore(d, { color: { r: i % 256, g: 0, b: 0 } })
-  ok(d.undo.length <= 32, `capped at 32, got ${d.undo.length}`)
+  eq(d.undo.length, 32, 'exactly 32 after overflow')
+  for (let i = 0; i < 40; i++) d = undoDoc(d)
+  eq(d.undo.length, 0, 'drained to zero')
+  eq(d.redo.length, 32, 'redo holds all 32')
+  ok(rgbEq(d.color, { r: 8, g: 0, b: 0 }), `oldest retained core, got ${toHex(d.color)}`)
+  for (let i = 0; i < 40; i++) d = redoDoc(d)
+  eq(d.redo.length, 0, 'redo drained')
+  ok(rgbEq(d.color, { r: 40, g: 0, b: 0 }), `redo restores newest, got ${toHex(d.color)}`)
+})
+check('hsl intent survives rgb quantization in cores', () => {
+  // Dragging L to black and back through the authority path must return the
+  // original hue/saturation, not the grey the quantization produced.
+  let d = newDoc(hslToRgb(SEED_COLOR))
+  const seed = d.hsl
+  d = withCore(d, { hsl: { ...seed, l: 0 }, color: hslToRgb({ ...seed, l: 0 }) })
+  ok(d.color.r === 0 && d.color.g === 0 && d.color.b === 0, 'black reached')
+  d = withCore(d, { hsl: seed, color: hslToRgb(seed) })
+  ok(hslEq(d.hsl, seed), 'hsl restored exactly')
+  ok(rgbEq(d.color, hslToRgb(SEED_COLOR)), 'rgb restored')
+  // A hue keyboard step that paints the same bytes still counts as a change.
+  const dark = newDoc({ r: 26, g: 22, b: 18 })
+  const stepped = withCore(dark, {
+    hsl: { ...dark.hsl, h: dark.hsl.h + 1 },
+    color: hslToRgb({ ...dark.hsl, h: dark.hsl.h + 1 })
+  })
+  ok(stepped !== dark, 'hue step committed even when rgb matched')
+  ok(!coreEq(coreOf(dark), coreOf(stepped)), 'cores differ on intent')
 })
 
 // ---- palettes ----
@@ -302,17 +370,53 @@ check('parseDocJson rejects garbage', () => {
   )
 })
 check('palettes survive serialize/parse round trip', () => {
-  const items = [newPalette('A', [rgb(1, 2, 3), rgb(4, 5, 6)])]
+  const items = [newPalette('A', [rgb(1, 2, 3), rgb(4, 5, 6)], 'triadic')]
   const back = parsePalettes(serializePalettes(items))
   eq(back.length, 1, 'count')
   rgbEqTo(back[0]!.colors[1]!, 4, 5, 6, 'second swatch')
+  eq(back[0]!.harmony, 'triadic', 'harmony kept')
   eq(parsePalettes('garbage').length, 0, 'garbage yields empty')
+  const dup = parsePalettes(
+    JSON.stringify({
+      v: 1,
+      items: [
+        { id: 'x', name: 'a', colors: [], updatedAt: 1 },
+        { id: 'x', name: 'b', colors: [], updatedAt: 2 }
+      ]
+    })
+  )
+  eq(dup.length, 1, 'duplicate ids deduped')
+})
+check('palette ops apply and settle', () => {
+  const a = newPalette('A', [rgb(255, 0, 0)])
+  const b = newPalette('B', [rgb(0, 0, 255)])
+  const addA = { id: 'o1', kind: 'add' as const, palette: a }
+  const addB = { id: 'o2', kind: 'add' as const, palette: b }
+  let items = applyPalOp([], addA)
+  ok(palOpDone(items, addA), 'add settles')
+  // The concurrent case: B was added onto a base that never saw A; replaying
+  // the unsettled add-A op merges it without losing B.
+  items = applyPalOp([b], addA)
+  eq(items.length, 2, 'replayed add merges')
+  ok(palOpDone(items, addA) && palOpDone(items, addB), 'both settled')
+  const rn = { id: 'o3', kind: 'rename' as const, target: a.id, name: 'Renamed' }
+  items = applyPalOp(items, rn)
+  eq(items.find((p) => p.id === a.id)!.name, 'Renamed', 'rename applied')
+  ok(palOpDone(items, rn), 'rename settles')
+  const del = { id: 'o4', kind: 'delete' as const, target: b.id }
+  items = applyPalOp(items, del)
+  ok(palOpDone(items, del), 'delete settles')
+  eq(items.length, 1, 'B gone')
+  ok(!palOpDone(items, addB), 'deleted add reports unsettled')
 })
 check('shared state survives serialize/parse round trip', () => {
   const d = newDoc(rgb(10, 20, 30))
+  const pal = newPalette('Wire', [rgb(9, 9, 9)], 'analogous')
   const s = serializeShared({
     by: 'writer-id',
     doc: d,
+    pals: [pal],
+    ops: [{ id: 'w1', kind: 'add', palette: pal }],
     view: {
       field: 'ff0000',
       fieldErr: false,
@@ -330,14 +434,45 @@ check('shared state survives serialize/parse round trip', () => {
   eq(back!.by, 'writer-id', 'writer')
   eq(back!.view.page, true, 'page kept')
   eq(back!.view.muted, true, 'mute kept')
+  eq(back!.pals?.length, 1, 'library on the wire')
+  eq(back!.pals?.[0]?.harmony, 'analogous', 'palette harmony on the wire')
+  eq(back!.ops?.length, 1, 'op window on the wire')
   eq(parseShared('{}'), null, 'empty object rejected')
   eq(parseShared('{"by":"x","doc":null}'), null, 'missing doc rejected')
+  const legacy = parseShared(
+    serializeShared({
+      by: 'old-build',
+      doc: d,
+      view: {
+        field: '',
+        fieldErr: false,
+        page: false,
+        sheet: null,
+        nameInput: '',
+        actionId: null,
+        deleteId: null,
+        copyText: null,
+        muted: false
+      }
+    })
+  )
+  ok(legacy !== null && legacy.pals === undefined, 'writes without a library leave it alone')
 })
-check('exportCodes writes name: hex lines', () => {
-  const text = exportCodes([rgb(255, 0, 0), rgb(0, 0, 255)], ['First', 'Second'])
-  ok(text.includes(`First: ${hash('ff0000')}`), 'first line')
-  ok(text.includes(`Second: ${hash('0000ff')}`), 'second line')
-  eq(text.split('\n').length, 2, 'two lines')
+check('exportCodes writes one unambiguous line', () => {
+  const text = exportCodes([rgb(255, 0, 0), rgb(0, 0, 255)], 'Deck')
+  eq(text, `Deck: ${hash('ff0000')}, ${hash('0000ff')}`, 'single line name: codes')
+  ok(!text.includes('\n'), 'no newlines to corrupt')
+})
+check('ratioFloor never reads past a failed threshold', () => {
+  eq(ratioFloor(4.49886, 2), '4.49', 'floored below 4.5')
+  eq(ratioFloor(2.99979, 2), '2.99', 'floored below 3')
+  eq(ratioFloor(4.5, 2), '4.50', 'exact threshold intact')
+  eq(ratioFloor(21, 2), '21.00', 'max unchanged')
+  eq(ratioFloor(2.99979, 1), '2.9', 'one decimal floored')
+  // A floored display can never claim a threshold the real ratio missed.
+  for (const r of [4.49886, 2.99979, 2.9955, 4.5, 6.9999, 7])
+    for (const t of [3, 4.5, 7])
+      ok(Number(ratioFloor(r, 2)) >= t === r >= t || Number(ratioFloor(r, 2)) < t, `${r} honest vs ${t}`)
 })
 check('coreOf is a copy, not an alias', () => {
   const d = newDoc(rgb(7, 8, 9))

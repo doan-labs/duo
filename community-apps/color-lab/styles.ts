@@ -4,7 +4,6 @@ import {
   easing,
   fonts,
   leading,
-  motion,
   radius,
   shadow,
   space,
@@ -128,9 +127,6 @@ export const styles = stylex.create({
     color: app.fg,
     fontFamily: fonts.system,
     textAlign: 'start',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transform: { default: 'scale(1)', ':active': motion.press, ':hover': 'scale(1)' },
     ':hover': { backgroundColor: app.elevated },
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
   },
@@ -176,11 +172,9 @@ export const styles = stylex.create({
     animationName: { default: heroIn, [reduce]: 'none' },
     animationDuration: '.34s',
     animationTimingFunction: easing.pop,
-    // The colour swap eases instead of snapping as sliders move.
-    transitionProperty: 'background-color,transform',
-    transitionDuration: `.18s,${motion.pressDuration}`,
-    transitionTimingFunction: easing.out,
-    transform: { default: 'scale(1)', ':active': motion.press }
+    // The colour swap eases instead of snapping as sliders move; shared.press
+    // supplies the press state and the background-colour ease.
+    transitionTimingFunction: easing.out
   },
   heroFill: (css: string) => ({ backgroundColor: css }),
   heroHex: {
@@ -226,9 +220,12 @@ export const styles = stylex.create({
     textTransform: 'uppercase'
   },
   sectionAction: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: 44,
     borderWidth: 0,
     paddingBlock: space.xxs,
-    paddingInline: space.sm,
+    paddingInline: space.md,
     borderRadius: radius.pill,
     backgroundColor: 'transparent',
     color: app.link,
@@ -239,15 +236,14 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     textTransform: 'uppercase',
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transform: { default: 'scale(1)', ':active': motion.press }
+    ':hover': { backgroundColor: app.fill3 },
+    ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
   },
 
   // The code field row: one input that takes hex, rgb() or hsl().
   fieldRow: { display: 'flex', alignItems: 'flex-start', gap: space.sm },
   field: { flexGrow: 1, minWidth: 0 },
-  fieldInput: { fontFamily: fonts.mono },
+  fieldInput: { fontFamily: fonts.mono, minHeight: 44 },
   fieldHint: { color: app.label2, fontSize: typeScale.caption2, lineHeight: leading.caption2 },
   fieldErr: { color: colors.red, fontSize: typeScale.caption2, lineHeight: leading.caption2 },
 
@@ -273,9 +269,6 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     cursor: 'pointer',
     textAlign: 'start',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transform: { default: 'scale(1)', ':active': motion.press, ':hover': 'scale(1)' },
     ':hover': { backgroundColor: app.fill2 }
   },
   chipLabel: { color: app.label2, fontFamily: fonts.system, fontWeight: weight.semibold },
@@ -292,16 +285,27 @@ export const styles = stylex.create({
     textAlign: 'center',
     flexShrink: 0
   },
+  // The interactive element carries the 44pt hit area; the painted track
+  // inside it stays 28 so the control does not look inflated.
+  sliderHit: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    flexGrow: 1,
+    minWidth: 0,
+    height: 44,
+    borderRadius: radius.pill,
+    cursor: 'pointer',
+    touchAction: 'none',
+    ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
+  },
   sliderTrack: {
     position: 'relative',
-    flexGrow: 1,
+    width: '100%',
     height: 28,
     borderRadius: radius.pill,
     backgroundColor: app.fill3,
-    cursor: 'pointer',
-    touchAction: 'none',
-    boxShadow: shadow.rim,
-    ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
+    boxShadow: shadow.rim
   },
   trackBg: (img: string) => ({ backgroundImage: img }),
   sliderThumb: {
@@ -311,7 +315,7 @@ export const styles = stylex.create({
     height: 22,
     borderRadius: radius.circle,
     backgroundColor: colors.white,
-    boxShadow: `${shadow.rim},${shadow.card}`,
+    boxShadow: shadow.card,
     pointerEvents: 'none'
   },
   thumbAt: (pct: number) => ({ left: `${pct}%`, transform: 'translate(-50%,-50%)' }),
@@ -329,7 +333,7 @@ export const styles = stylex.create({
   // The harmony kind chooser: a wrapping radio group of pill options.
   segRow: { display: 'flex', flexWrap: 'wrap', gap: space.xs },
   seg: {
-    minHeight: 34,
+    minHeight: 44,
     borderWidth: 0,
     borderRadius: radius.pill,
     paddingBlock: space.xs,
@@ -342,9 +346,6 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption1,
     fontWeight: weight.medium,
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color,color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
   },
   segOn: {
@@ -366,11 +367,6 @@ export const styles = stylex.create({
     borderRadius: radius.md,
     cursor: 'pointer',
     padding: 0,
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.22s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press, ':hover': 'scale(1.04)' },
-    // Selection reads as a focus ring plus a gentle lift, never a custom glow.
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
   },
   paint: (css: string) => ({ backgroundColor: css }),
@@ -401,18 +397,26 @@ export const styles = stylex.create({
     flexShrink: 0
   },
   pairChips: { display: 'flex', gap: space.xxs, flexWrap: 'wrap', flexGrow: 1, minWidth: 0 },
+  // A 44pt transparent hit area around the painted 26 disc: the button is the
+  // reachability, the dot inside is the swatch.
   pairChip: {
-    width: 26,
-    height: 26,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
     borderWidth: 0,
     borderRadius: radius.circle,
     padding: 0,
     cursor: 'pointer',
-    boxShadow: shadow.rim,
-    transitionProperty: 'transform',
-    transitionDuration: motion.pressDuration,
-    transform: { default: 'scale(1)', ':active': motion.press },
+    backgroundColor: 'transparent',
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
+  },
+  pairDot: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.circle,
+    boxShadow: shadow.rim
   },
   pairChipOn: { outlineWidth: 2.5, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 },
   swapBtn: { flexShrink: 0 },
@@ -524,12 +528,16 @@ export const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     borderWidth: 0,
-    padding: 0,
+    borderRadius: radius.sm,
+    paddingBlock: space.xs,
+    paddingInline: space.xxs,
+    marginInlineStart: -2,
     backgroundColor: 'transparent',
     color: app.fg,
     textAlign: 'start',
     cursor: 'pointer',
-    fontFamily: fonts.system
+    fontFamily: fonts.system,
+    ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 1 }
   },
   palMeta: {
     color: app.label2,
@@ -537,19 +545,28 @@ export const styles = stylex.create({
     lineHeight: leading.caption2,
     fontVariantNumeric: 'tabular-nums'
   },
-  palStrip: { display: 'flex', gap: space.xxs },
-  palDot: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.circle,
+  palStrip: { display: 'flex', gap: space.xxs, flexWrap: 'wrap' },
+  // Same reachability story as the pair chips: a 44pt transparent hit area
+  // around the painted dot; the strip wraps when a palette is wide.
+  palDotHit: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
     borderWidth: 0,
+    borderRadius: radius.circle,
     padding: 0,
     cursor: 'pointer',
-    boxShadow: shadow.rim,
-    transitionProperty: 'transform',
-    transitionDuration: motion.pressDuration,
-    transform: { default: 'scale(1)', ':active': motion.press, ':hover': 'scale(1.12)' },
+    backgroundColor: 'transparent',
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
+  },
+  palDot: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.circle,
+    boxShadow: shadow.rim,
+    pointerEvents: 'none'
   },
   palEmpty: {
     display: 'flex',
@@ -581,7 +598,8 @@ export const styles = stylex.create({
   hit44: { minHeight: 44, justifyContent: 'center' },
   btnDanger: { color: colors.white },
 
-  statusBar: { flexShrink: 0, paddingInline: space.lg, paddingBottom: space.sm },
+  // The footer clears the 22px home-bar zone on the cover.
+  statusBar: { flexShrink: 0, paddingInline: space.lg, paddingBottom: `calc(${space.xxl} + ${space.sm})` },
   status: {
     display: 'flex',
     alignItems: 'center',

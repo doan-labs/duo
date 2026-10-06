@@ -7,6 +7,7 @@ import { type MutableRefObject, type ReactNode, useCallback, useEffect, useId, u
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
 import {
+  applyPalOp,
   type Core,
   contrast,
   coreEq,
@@ -16,24 +17,30 @@ import {
   HARMONY_KINDS,
   HARMONY_LABEL,
   type HarmonyKind,
+  type Hsl,
   harmonyColors,
   hslCss,
+  hslEq,
   hslToRgb,
   inkFor,
   newDoc,
   newPalette,
+  PAL_OP_WINDOW,
   type Pair,
+  type PalOp,
   pairChoices,
-  parseColor,
+  palListEq,
+  palOpDone,
+  parseColorFull,
   parseDocJson,
   parsePalettes,
   parseShared,
   type Rgb,
+  ratioFloor,
   redoDoc,
-  removePalette,
-  renamePalette,
   rgbEq,
   rgbToHsl,
+  type SavedPalette,
   SEED_COLOR,
   type SheetKind,
   serializeDoc,
@@ -43,12 +50,13 @@ import {
   toHslString,
   toRgbString,
   undoDoc,
-  upsertPalette,
   variations,
   verdict,
   withCore
 } from './color.ts'
 import { styles } from './styles.ts'
+
+type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
 const ME = crypto.randomUUID()
 const SESSION_KEY = 'colorlab-doc'
@@ -122,21 +130,20 @@ function Slider(props: {
   }
 
   const pct = props.max === props.min ? 0 : ((props.value - props.min) / (props.max - props.min)) * 100
-  const text = `${Math.round(props.value)}${props.unit}`
+  const text = `${Math.min(props.max, Math.max(props.min, Math.round(props.value)))}${props.unit}`
 
   return (
     <div {...stylex.props(styles.sliderRow)}>
       <span {...stylex.props(styles.sliderKey)}>{props.label}</span>
       <div
-        ref={track}
         role="slider"
         tabIndex={0}
         aria-label={props.label}
         aria-valuemin={props.min}
         aria-valuemax={props.max}
-        aria-valuenow={Math.round(props.value)}
+        aria-valuenow={Math.min(props.max, Math.max(props.min, Math.round(props.value)))}
         aria-valuetext={text}
-        {...stylex.props(styles.sliderTrack, styles.trackBg(props.gradient))}
+        {...stylex.props(styles.sliderHit)}
         onPointerDown={(e) => {
           dragging.current = true
           e.currentTarget.setPointerCapture(e.pointerId)
@@ -172,7 +179,9 @@ function Slider(props: {
           props.onDragEnd()
         }}
       >
-        <span {...stylex.props(styles.sliderThumb, styles.thumbAt(pct))} />
+        <div ref={track} {...stylex.props(styles.sliderTrack, styles.trackBg(props.gradient))}>
+          <span {...stylex.props(styles.sliderThumb, styles.thumbAt(pct))} />
+        </div>
       </div>
       <span {...stylex.props(styles.sliderVal)}>{text}</span>
     </div>
@@ -187,6 +196,7 @@ function HarmonyPicker(props: { value: HarmonyKind; onPick: (k: HarmonyKind) => 
       {HARMONY_KINDS.map((k, i) => {
         const on = k === props.value
         return (
+          // biome-ignore lint/a11y/useSemanticElements: painted harmony pills need radio semantics, not a bare input
           <button
             key={k}
             ref={(el) => {
@@ -196,7 +206,7 @@ function HarmonyPicker(props: { value: HarmonyKind; onPick: (k: HarmonyKind) => 
             role="radio"
             aria-checked={on}
             tabIndex={on ? 0 : -1}
-            {...stylex.props(styles.seg, on && styles.segOn)}
+            {...stylex.props(styles.seg, on && styles.segOn, shared.press)}
             onClick={() => props.onPick(k)}
             onKeyDown={(e) => {
               let step = 0
@@ -216,25 +226,15 @@ function HarmonyPicker(props: { value: HarmonyKind; onPick: (k: HarmonyKind) => 
 }
 
 /** Kit Sheet plus the contract's extras: focus the first field, trap Tab, restore focus. */
-function GuardedSheet(props: {
-  open: boolean
-  onClose: () => void
-  label: string
-  trigger: MutableRefObject<HTMLElement | null>
-  children: ReactNode
-}) {
+function GuardedSheet(props: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
   const dialogId = useId()
   const bodyId = `${dialogId}-body`
   useEffect(() => {
     if (!props.open) return
     document.getElementById(bodyId)?.querySelector<HTMLElement>('input, button')?.focus()
-    const trigger = props.trigger
-    return () => {
-      const t = trigger.current
-      trigger.current = null
-      t?.focus()
-    }
-  }, [props.open, bodyId, props.trigger])
+    // Focus restore lives in ColorLab on the sheet-stack closing edge: a
+    // swap between sibling sheets must not drop the original row trigger.
+  }, [props.open, bodyId])
   if (!props.open) return null
   return (
     <Sheet
@@ -271,8 +271,7 @@ function GuardedSheet(props: {
 function ColorLab() {
   const [doc, setDoc] = useState<Doc | null>(null)
   const [ui, setUi] = useState<UiState>(UI0)
-  const [palettes, setPalettes] = useState<ReturnType<typeof parsePalettes>>([])
-  const [palsReady, setPalsReady] = useState(false)
+  const [palettes, setPalettes] = useState<SavedPalette[]>([])
   const [darkMode, setDarkMode] = useState(false)
   const [note, setNote] = useState('')
   const [fieldEditing, setFieldEditing] = useState(false)
@@ -284,10 +283,20 @@ function ColorLab() {
   const lastSeen = useRef<string | null>(null)
   const sheetTrigger = useRef<HTMLElement | null>(null)
   const fieldRef = useRef<HTMLInputElement | null>(null)
-  const copyFieldRef = useRef<HTMLInputElement | null>(null)
+  const copyFieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
   const skipFinalize = useRef(false)
   const pendingShared = useRef<Doc | null>(null)
   const publishRaf = useRef(0)
+  // The palette library: wire-authoritative, plus my unconfirmed writes.
+  const palsRef = useRef<SavedPalette[]>([])
+  const palsWireOps = useRef<PalOp[]>([])
+  const pendingPalOps = useRef<PalOp[]>([])
+  const persistedPals = useRef<string | null>(null)
+  const palOpSeq = useRef(0)
+  const ellipsisRefs = useRef(new Map<string, HTMLElement>())
+  const deleteCancelRef = useRef<HTMLButtonElement | null>(null)
+  const saveActionRef = useRef<HTMLButtonElement | null>(null)
+  const lastSheet = useRef<SheetKind | null>(null)
 
   const storedDoc = useKV(os.storage, STORE_DOC)
   const storedPals = useKV(os.storage, STORE_PALS)
@@ -331,7 +340,9 @@ function ColorLab() {
             deleteId: nextUi.deleteId,
             copyText: nextUi.copyText,
             muted: nextUi.muted
-          }
+          },
+          pals: palsRef.current,
+          ops: palsWireOps.current
         })
       )
       .catch(() => {})
@@ -384,6 +395,7 @@ function ColorLab() {
       if (!d) return
       const merged: Core = {
         color: patch.color ?? d.color,
+        hsl: patch.hsl ?? (patch.color ? rgbToHsl(patch.color) : d.hsl),
         harmony: patch.harmony ?? d.harmony,
         pair: patch.pair ?? d.pair
       }
@@ -455,7 +467,17 @@ function ColorLab() {
   const applyUi = useCallback((v: UiState) => {
     uiRef.current = v
     setUi(v)
-    void storedMuteSet.current(v.muted ? '1' : '0')
+    // The muted flag is persisted by the copy whose user toggled it; adopting
+    // a foreign publish must not rewrite storage, or hidden slider frames
+    // would spam redundant writes.
+  }, [])
+
+  /** Persist the library only when its serialized form actually changed. */
+  const persistPals = useCallback((items: SavedPalette[]) => {
+    const wire = serializePalettes(items)
+    if (persistedPals.current === wire) return
+    persistedPals.current = wire
+    void storedPalsSet.current(wire)
   }, [])
 
   // Adopt foreign writes; seed once storage is hydrated and no session exists.
@@ -480,32 +502,79 @@ function ColorLab() {
           copyText: shared.view.copyText,
           muted: shared.view.muted
         })
+        if (shared.pals !== undefined) {
+          // Foreign writes adopt wholesale, then any of my own ops the wire
+          // has not settled yet replay onto the adopted list in order. The
+          // merge republishes once so the library converges on both copies.
+          const seen = new Set((shared.ops ?? []).map((o) => o.id))
+          let merged = shared.pals
+          const keep: PalOp[] = []
+          for (const op of pendingPalOps.current) {
+            if (seen.has(op.id) || palOpDone(merged, op)) continue
+            const next = applyPalOp(merged, op)
+            if (palListEq(next, merged)) continue
+            merged = next
+            keep.push(op)
+          }
+          pendingPalOps.current = keep
+          palsRef.current = merged
+          setPalettes(merged)
+          persistPals(merged)
+          palsWireOps.current = [...(shared.ops ?? []), ...keep].slice(-PAL_OP_WINDOW)
+          if (keep.length && !palListEq(merged, shared.pals)) publish(shared.doc, uiRef.current)
+        }
       }
       return
     }
-    if (seeded.current || storedDoc.status === 'hydrating' || storedMute.status === 'hydrating') return
+    if (
+      seeded.current ||
+      storedDoc.status === 'hydrating' ||
+      storedMute.status === 'hydrating' ||
+      storedPals.status === 'hydrating'
+    )
+      return
     seeded.current = true
     const initial = parseDocJson(storedDoc.value) ?? newDoc(hslToRgb(SEED_COLOR))
     docRef.current = initial
     setDoc(initial)
+    const initialPals = parsePalettes(storedPals.value)
+    palsRef.current = initialPals
+    setPalettes(initialPals)
+    persistedPals.current = storedPals.value
     const bootUi: UiState = { ...UI0, field: toHex(initial.color), muted: storedMute.value === '1' }
     uiRef.current = bootUi
     setUi(bootUi)
     publish(initial, bootUi)
     if (!storedDoc.value) void storedDocSet.current(serializeDoc(initial))
-  }, [live, storedDoc.status, storedDoc.value, storedMute.status, storedMute.value, applyUi, publish])
+  }, [
+    live,
+    storedDoc.status,
+    storedDoc.value,
+    storedMute.status,
+    storedMute.value,
+    storedPals.status,
+    storedPals.value,
+    applyUi,
+    publish,
+    persistPals
+  ])
 
-  // Palettes: hydrate once from storage; every copy owns the same list.
-  useEffect(() => {
-    if (storedPals.status === 'hydrating' || palsReady) return
-    setPalsReady(true)
-    setPalettes(parsePalettes(storedPals.value))
-  }, [storedPals.status, storedPals.value, palsReady])
-
-  const savePalettes = useCallback((items: ReturnType<typeof parsePalettes>) => {
-    setPalettes(items)
-    void storedPalsSet.current(serializePalettes(items))
-  }, [])
+  /** Queue one library write: apply to the freshest list, append the op so a
+   *  peer can settle it, then publish the whole shared state. */
+  const queuePalOp = useCallback(
+    (op: DistOmit<PalOp, 'id'>) => {
+      const full = { ...op, id: `${ME}:${++palOpSeq.current}` } as PalOp
+      const next = applyPalOp(palsRef.current, full)
+      palsRef.current = next
+      setPalettes(next)
+      palsWireOps.current = [...palsWireOps.current, full].slice(-PAL_OP_WINDOW)
+      pendingPalOps.current = [...pendingPalOps.current, full].slice(-32)
+      persistPals(next)
+      const d = docRef.current
+      if (d) publish(d, uiRef.current)
+    },
+    [publish, persistPals]
+  )
 
   // ---- Escape arming: sheet first, then a mid-edit code field ----
 
@@ -579,14 +648,14 @@ function ColorLab() {
     const d = docRef.current
     if (!d) return
     const text = uiRef.current.field
-    const parsed = parseColor(text)
-    if (parsed) {
-      if (!rgbEq(parsed, d.color)) replaceCore({ color: parsed })
+    const info = parseColorFull(text)
+    if (info) {
+      if (!rgbEq(info.color, d.color) || !hslEq(info.hsl, d.hsl)) replaceCore({ color: info.color, hsl: info.hsl })
       const now = docRef.current!.color
       patchUi({ field: toHex(now), fieldErr: false })
       endLiveEdit()
       play('apply')
-      announce(`Colour set to ${toHex(now)}`)
+      announce(`Colour set to ${toHex(now)}${info.droppedAlpha ? ' - alpha ignored' : ''}`)
     } else {
       patchUi({ field: toHex(d.color), fieldErr: false })
       endLiveEdit()
@@ -601,7 +670,7 @@ function ColorLab() {
 
   const strip = useMemo(() => {
     if (!doc) return []
-    return harmonyColors(rgbToHsl(doc.color), doc.harmony).map(hslToRgb)
+    return harmonyColors(doc.hsl, doc.harmony).map(hslToRgb)
   }, [doc])
 
   const actionPalette = palettes.find((p) => p.id === ui.actionId) ?? null
@@ -609,35 +678,46 @@ function ColorLab() {
   const doSave = useCallback(() => {
     const d = docRef.current
     if (!d) return
-    const colors = harmonyColors(rgbToHsl(d.color), d.harmony).map(hslToRgb)
-    const pal = newPalette(uiRef.current.nameInput || `Palette ${palettes.length + 1}`, colors)
-    savePalettes(upsertPalette(palettes, pal))
+    const colors = harmonyColors(d.hsl, d.harmony).map(hslToRgb)
+    const pal = newPalette(uiRef.current.nameInput || `Palette ${palsRef.current.length + 1}`, colors, d.harmony)
+    queuePalOp({ kind: 'add', palette: pal })
     patchUi({ sheet: null, nameInput: '' })
     play('save')
     announce(`Saved ${pal.name}`)
-  }, [palettes, savePalettes, patchUi, play, announce])
+  }, [queuePalOp, patchUi, play, announce])
 
   const doRename = useCallback(() => {
     const id = uiRef.current.actionId
     if (!id) return
-    savePalettes(renamePalette(palettes, id, uiRef.current.nameInput))
+    const live = palsRef.current.find((p) => p.id === id)
+    if (!live) {
+      // The peer deleted it while the sheet was open: say so, do not pretend.
+      patchUi({ sheet: null, actionId: null, nameInput: '' })
+      play('error')
+      announce('That palette no longer exists')
+      return
+    }
+    queuePalOp({ kind: 'rename', target: id, name: uiRef.current.nameInput })
     patchUi({ sheet: null, actionId: null, nameInput: '' })
     play('save')
     announce('Palette renamed')
-  }, [palettes, savePalettes, patchUi, play, announce])
+  }, [queuePalOp, patchUi, play, announce])
 
   const doDelete = useCallback(() => {
     const id = uiRef.current.deleteId
     if (!id) return
-    savePalettes(removePalette(palettes, id))
     patchUi({ deleteId: null })
+    if (!palsRef.current.some((p) => p.id === id)) return
+    queuePalOp({ kind: 'delete', target: id })
     play('remove')
     announce('Palette deleted')
-  }, [palettes, savePalettes, patchUi, play, announce])
+    // The row unmounts with the delete: move focus to a stable control.
+    requestAnimationFrame(() => saveActionRef.current?.focus())
+  }, [queuePalOp, patchUi, play, announce])
 
   const adoptColor = useCallback(
-    (c: Rgb) => {
-      commitCore({ color: c }, 'apply', `Colour set to ${toHex(c)}`)
+    (c: Rgb, harmony?: HarmonyKind) => {
+      commitCore({ color: c, harmony }, 'apply', `Colour set to ${toHex(c)}`)
       patchUi({ field: toHex(c), fieldErr: false })
     },
     [commitCore, patchUi]
@@ -645,7 +725,7 @@ function ColorLab() {
 
   const doUndo = useCallback(() => {
     const d = docRef.current
-    if (!d || !d.undo.length) return
+    if (!d?.undo.length) return
     editBase.current = null
     const next = undoDoc(d)
     commitDoc(next, 'Undo')
@@ -654,12 +734,31 @@ function ColorLab() {
 
   const doRedo = useCallback(() => {
     const d = docRef.current
-    if (!d || !d.redo.length) return
+    if (!d?.redo.length) return
     editBase.current = null
     const next = redoDoc(d)
     commitDoc(next, 'Redo')
     patchUi({ field: toHex(next.color), fieldErr: false })
   }, [commitDoc, patchUi])
+
+  // Focus restore for the whole sheet stack: only when the last sheet closes,
+  // so a sheet-to-sheet swap keeps the original row trigger (the palette row's
+  // ellipsis) as the restore target instead of a button that just unmounted.
+  useEffect(() => {
+    if (ui.sheet === null && lastSheet.current !== null) {
+      const t = sheetTrigger.current
+      sheetTrigger.current = null
+      if (t && document.contains(t)) requestAnimationFrame(() => t.focus())
+    }
+    lastSheet.current = ui.sheet
+  }, [ui.sheet])
+
+  // The inline delete confirm takes focus on show so keyboard users land on it.
+  useEffect(() => {
+    if (ui.deleteId === null) return
+    const raf = requestAnimationFrame(() => deleteCancelRef.current?.focus())
+    return () => cancelAnimationFrame(raf)
+  }, [ui.deleteId])
 
   // App-level undo/redo keys; text inputs keep the browser's own undo.
   useEffect(() => {
@@ -686,7 +785,7 @@ function ColorLab() {
     return <main ref={wideRef} {...stylex.props(darkMode ? dark : light, styles.root)} />
   }
 
-  const hslNow = rgbToHsl(doc.color)
+  const hslNow = doc.hsl
   const hex = toHex(doc.color)
   const ink = inkFor(doc.color)
   const ladder = variations(hslNow).map(hslToRgb)
@@ -750,7 +849,7 @@ function ColorLab() {
     <button
       type="button"
       aria-label={`Current colour ${hex}. Activate to copy the hex code.`}
-      {...stylex.props(styles.hero, styles.heroFill(hex))}
+      {...stylex.props(styles.hero, shared.press, styles.heroFill(hex))}
       onClick={() => void copyText(hex, 'Hex')}
     >
       <span {...stylex.props(styles.heroHex, styles.heroInk(toHex(ink)))}>{hex}</span>
@@ -771,9 +870,10 @@ function ColorLab() {
           aria-invalid={ui.fieldErr}
           onChange={(e) => {
             const text = e.target.value
-            const parsed = parseColor(text)
-            patchUi({ field: text, fieldErr: text.trim() !== '' && !parsed })
-            if (parsed && !rgbEq(parsed, doc.color)) replaceCore({ color: parsed })
+            const info = parseColorFull(text)
+            patchUi({ field: text, fieldErr: text.trim() !== '' && !info })
+            if (info && (!rgbEq(info.color, doc.color) || !hslEq(info.hsl, doc.hsl)))
+              replaceCore({ color: info.color, hsl: info.hsl })
           }}
           onFocus={() => {
             setFieldEditing(true)
@@ -782,6 +882,9 @@ function ColorLab() {
           }}
           onBlur={() => {
             setFieldEditing(false)
+            // A blur on the copy that just went hidden in a fold must not
+            // finalize the shared draft: the other display is still typing.
+            if (!os.view.active) return
             // Enter already finalized; the blur that follows must not re-run it.
             if (skipFinalize.current) {
               skipFinalize.current = false
@@ -818,7 +921,7 @@ function ColorLab() {
             key={label}
             type="button"
             aria-label={`Copy ${label} ${value}`}
-            {...stylex.props(styles.chip)}
+            {...stylex.props(styles.chip, shared.press)}
             onClick={() => void copyText(value, label)}
           >
             <span {...stylex.props(styles.chipLabel)}>{label}</span>
@@ -845,13 +948,15 @@ function ColorLab() {
             if (!editBase.current) editBase.current = coreOf(doc)
           }}
           onChange={(value) => {
-            const next =
+            const next: Hsl =
               s.key === 'h'
-                ? hslToRgb({ h: value, s: hslNow.s, l: hslNow.l })
+                ? { h: value, s: hslNow.s, l: hslNow.l }
                 : s.key === 's'
-                  ? hslToRgb({ h: hslNow.h, s: value / 100, l: hslNow.l })
-                  : hslToRgb({ h: hslNow.h, s: hslNow.s, l: value / 100 })
-            replaceCore({ color: next })
+                  ? { h: hslNow.h, s: value / 100, l: hslNow.l }
+                  : { h: hslNow.h, s: hslNow.s, l: value / 100 }
+            // The slider edits the authoritative HSL; rgb() quantizes after,
+            // so hue and saturation survive achromatic and near-black stops.
+            replaceCore({ hsl: next, color: hslToRgb(next) })
           }}
           onDragEnd={() => {
             endLiveEdit()
@@ -881,7 +986,13 @@ function ColorLab() {
               role="option"
               aria-selected={on}
               aria-label={`${toHex(c)}${on ? ', current' : ''}`}
-              {...stylex.props(styles.stripSwatch, styles.stripCell, styles.paint(toHex(c)), on && styles.stripOn)}
+              {...stylex.props(
+                styles.stripSwatch,
+                styles.stripCell,
+                shared.press,
+                styles.paint(toHex(c)),
+                on && styles.stripOn
+              )}
               onClick={() => adoptColor(c)}
             />
           )
@@ -904,7 +1015,13 @@ function ColorLab() {
               role="option"
               aria-selected={on}
               aria-label={`${toHex(c)}${on ? ', current' : ''}`}
-              {...stylex.props(styles.stripSwatch, styles.stripCell, styles.paint(toHex(c)), on && styles.stripOn)}
+              {...stylex.props(
+                styles.stripSwatch,
+                styles.stripCell,
+                shared.press,
+                styles.paint(toHex(c)),
+                on && styles.stripOn
+              )}
               onClick={() => adoptColor(c)}
             />
           )
@@ -920,7 +1037,7 @@ function ColorLab() {
         <button
           type="button"
           aria-label="Swap text and surface colours"
-          {...stylex.props(styles.sectionAction)}
+          {...stylex.props(styles.sectionAction, shared.press)}
           onClick={() => commitCore({ pair: { fg: doc.pair.bg, bg: doc.pair.fg } }, 'pick', 'Text and surface swapped')}
         >
           Swap
@@ -938,6 +1055,7 @@ function ColorLab() {
               {choicesFor(which).map((c) => {
                 const on = rgbEq(c, doc.pair[which])
                 return (
+                  // biome-ignore lint/a11y/useSemanticElements: painted colour swatches need radio semantics, not a bare input
                   <button
                     key={toHex(c)}
                     type="button"
@@ -945,9 +1063,11 @@ function ColorLab() {
                     aria-checked={on}
                     aria-label={toHex(c)}
                     title={toHex(c)}
-                    {...stylex.props(styles.pairChip, styles.paint(toHex(c)), on && styles.pairChipOn)}
+                    {...stylex.props(styles.pairChip, shared.press)}
                     onClick={() => setPair(which, c)}
-                  />
+                  >
+                    <span {...stylex.props(styles.pairDot, styles.paint(toHex(c)), on && styles.pairChipOn)} />
+                  </button>
                 )
               })}
             </div>
@@ -955,8 +1075,13 @@ function ColorLab() {
         ))}
       </div>
       <div {...stylex.props(styles.ratioCard)}>
-        <div {...stylex.props(styles.ratioWrap)} role="group" aria-label={`Contrast ratio ${ratio.toFixed(2)} to 1`}>
-          <span {...stylex.props(styles.ratioBig)}>{ratio.toFixed(2)}</span>
+        {/* biome-ignore lint/a11y/useSemanticElements: a labelled readout group, not a fieldset of controls */}
+        <div
+          {...stylex.props(styles.ratioWrap)}
+          role="group"
+          aria-label={`Contrast ratio ${ratioFloor(ratio, 2)} to 1`}
+        >
+          <span {...stylex.props(styles.ratioBig)}>{ratioFloor(ratio, 2)}</span>
           <span {...stylex.props(styles.ratioColon)}>:1</span>
         </div>
         <div {...stylex.props(styles.ratioVerdicts)}>
@@ -971,10 +1096,11 @@ function ColorLab() {
           </span>
         </div>
       </div>
+      {/* biome-ignore lint/a11y/useSemanticElements: a labelled preview panel, not a fieldset of controls */}
       <div {...stylex.props(styles.preview, styles.pvBg(bg))} role="group" aria-label="Live preview">
         <h3 {...stylex.props(styles.previewTitle, styles.pvFg(fg))}>Card title</h3>
         <p {...stylex.props(styles.previewBody, styles.pvFg(fg))}>
-          Body text sits at {ratio.toFixed(1)}:1 here - AA needs 4.5:1, AAA needs 7:1.
+          Body text sits at {ratioFloor(ratio, 1)}:1 here - AA needs 4.5:1, AAA needs 7:1.
         </p>
         <div {...stylex.props(styles.previewBtnRow)}>
           <span {...stylex.props(styles.previewBtn, styles.pvBg(fg), styles.pvFg(bg))}>Button</span>
@@ -991,7 +1117,8 @@ function ColorLab() {
         Saved palettes
         <button
           type="button"
-          {...stylex.props(styles.sectionAction)}
+          ref={saveActionRef}
+          {...stylex.props(styles.sectionAction, shared.press)}
           onClick={() => patchUi({ sheet: 'save', nameInput: '' })}
         >
           Save current
@@ -1012,7 +1139,16 @@ function ColorLab() {
                 <span {...stylex.props(styles.palInfo)}>
                   <span {...stylex.props(styles.palName)}>Delete {p.name}?</span>
                 </span>
-                <Button variant="plain" onClick={() => patchUi({ deleteId: null })}>
+                <Button
+                  variant="plain"
+                  ref={deleteCancelRef}
+                  onClick={() => {
+                    const id = uiRef.current.deleteId
+                    patchUi({ deleteId: null })
+                    const el = id ? ellipsisRefs.current.get(id) : null
+                    if (el && document.contains(el)) el.focus()
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button variant="filled" onClick={doDelete}>
@@ -1024,11 +1160,11 @@ function ColorLab() {
                 <div {...stylex.props(styles.palInfo)}>
                   <button
                     type="button"
-                    {...stylex.props(styles.palName)}
+                    {...stylex.props(styles.palName, shared.press)}
                     aria-label={`Open palette ${p.name}`}
                     onClick={() => {
                       const first = p.colors[0]
-                      if (first) adoptColor(first)
+                      if (first) adoptColor(first, p.harmony)
                     }}
                   >
                     {p.name}
@@ -1042,9 +1178,11 @@ function ColorLab() {
                         type="button"
                         aria-label={`${p.name} colour ${toHex(c)}`}
                         title={toHex(c)}
-                        {...stylex.props(styles.palDot, styles.paint(toHex(c)))}
-                        onClick={() => adoptColor(c)}
-                      />
+                        {...stylex.props(styles.palDotHit, shared.press)}
+                        onClick={() => adoptColor(c, p.harmony)}
+                      >
+                        <span {...stylex.props(styles.palDot, styles.paint(toHex(c)))} />
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1053,6 +1191,10 @@ function ColorLab() {
                   variant="plain"
                   aria-label={`Actions for ${p.name}`}
                   xstyle={styles.icon44}
+                  ref={(el: HTMLButtonElement | null) => {
+                    if (el) ellipsisRefs.current.set(p.id, el)
+                    else ellipsisRefs.current.delete(p.id)
+                  }}
                   onClick={() => patchUi({ sheet: 'palette', actionId: p.id })}
                 />
               </>
@@ -1066,7 +1208,7 @@ function ColorLab() {
   const inspectorNav = (
     <button
       type="button"
-      {...stylex.props(styles.card, styles.navRow)}
+      {...stylex.props(styles.card, styles.navRow, shared.press)}
       onClick={() => patchUi({ page: true })}
       aria-label="Open contrast and preview inspector"
     >
@@ -1076,7 +1218,7 @@ function ColorLab() {
       <span {...stylex.props(styles.navRowText)}>
         <span {...stylex.props(styles.navRowTitle)}>Contrast and preview</span>
         <span {...stylex.props(styles.navRowSub)}>
-          {ratio.toFixed(2)}:1 - {fg} on {bg}
+          {ratioFloor(ratio, 2)}:1 - {fg} on {bg}
         </span>
       </span>
       <span {...stylex.props(styles.navRowChev)}>
@@ -1130,7 +1272,7 @@ function ColorLab() {
             />
             <button
               type="button"
-              aria-label={ui.muted ? 'Unmute sounds' : 'Mute sounds'}
+              aria-label="Sounds"
               aria-pressed={!ui.muted}
               {...stylex.props(shared.press, styles.muteBtn, ui.muted && styles.muteOff)}
               onClick={() => {
@@ -1176,7 +1318,7 @@ function ColorLab() {
         </footer>
       </div>
 
-      <GuardedSheet open={ui.sheet === 'save'} onClose={closeSheet} label="Save palette" trigger={sheetTrigger}>
+      <GuardedSheet open={ui.sheet === 'save'} onClose={closeSheet} label="Save palette">
         <h2 {...stylex.props(styles.sheetTitle)}>Save palette</h2>
         <p {...stylex.props(styles.sheetHint)}>Saves the current {HARMONY_LABEL[doc.harmony].toLowerCase()} strip.</p>
         <div {...stylex.props(styles.sheetStrip)} aria-hidden="true">
@@ -1214,7 +1356,6 @@ function ColorLab() {
         open={ui.sheet === 'palette'}
         onClose={closeSheet}
         label={actionPalette ? `Actions for ${actionPalette.name}` : 'Palette actions'}
-        trigger={sheetTrigger}
       >
         <h2 {...stylex.props(styles.sheetTitle)}>{actionPalette?.name ?? 'Palette'}</h2>
         {actionPalette && (
@@ -1238,10 +1379,7 @@ function ColorLab() {
             xstyle={styles.hit44}
             onClick={() => {
               if (actionPalette) {
-                const text = exportCodes(
-                  actionPalette.colors,
-                  actionPalette.colors.map((_, i) => `${actionPalette.name} ${i + 1}`)
-                )
+                const text = exportCodes(actionPalette.colors, actionPalette.name)
                 patchUi({ sheet: null, actionId: null })
                 void copyText(text, 'Palette codes')
               }
@@ -1265,7 +1403,7 @@ function ColorLab() {
         </div>
       </GuardedSheet>
 
-      <GuardedSheet open={ui.sheet === 'rename'} onClose={closeSheet} label="Rename palette" trigger={sheetTrigger}>
+      <GuardedSheet open={ui.sheet === 'rename'} onClose={closeSheet} label="Rename palette">
         <h2 {...stylex.props(styles.sheetTitle)}>Rename palette</h2>
         <TextField
           value={ui.nameInput}
@@ -1292,13 +1430,17 @@ function ColorLab() {
         </div>
       </GuardedSheet>
 
-      <GuardedSheet open={ui.sheet === 'copy'} onClose={closeSheet} label="Copy code" trigger={sheetTrigger}>
+      <GuardedSheet open={ui.sheet === 'copy'} onClose={closeSheet} label="Copy code">
         <h2 {...stylex.props(styles.sheetTitle)}>Copy code</h2>
         <p {...stylex.props(styles.sheetHint)}>
           Automatic clipboard access is blocked for community apps - select the code and copy it, or try again.
         </p>
         <TextField
-          ref={copyFieldRef}
+          // The kit types ref as input; multiline renders a textarea.
+          ref={(el) => {
+            copyFieldRef.current = el as unknown as HTMLTextAreaElement
+          }}
+          multiline
           value={ui.copyText ?? ''}
           aria-label="Code to copy"
           readOnly

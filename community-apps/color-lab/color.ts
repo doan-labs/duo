@@ -63,16 +63,37 @@ export function rgbToHsl({ r, g, b }: Rgb): Hsl {
 }
 
 const HEX = /^[0-9a-f]{3,8}$/i
-const NUMBER = /^[-+]?\d*\.?\d+$/
+// Anchored channel forms: a bare number, a percent, or a hue with an optional
+// angle unit. Anything else - extra digits, stray letters, empty slots,
+// scientific notation - is rejected rather than silently coerced.
+const CHAN_TOKEN = /^[-+]?\d*\.?\d+%?$/
+const PCT_TOKEN = /^[-+]?\d*\.?\d+%$/
+const HUE_TOKEN = /^[-+]?\d*\.?\d+(?:deg|grad|rad|turn)?$/
+
+/** A parsed code plus the editing state it implies. Alpha is never applied. */
+export interface ParsedColor {
+  color: Rgb
+  hsl: Hsl
+  droppedAlpha: boolean
+}
+
+const alphaValue = (token: string | null): number => {
+  if (token === null || !CHAN_TOKEN.test(token)) return Number.NaN
+  const n = token.endsWith('%') ? Number.parseFloat(token.slice(0, -1)) / 100 : Number.parseFloat(token)
+  return Number.isFinite(n) ? n : Number.NaN
+}
 
 /**
  * The code field's parser. Accepts `#abc`, `#aabbcc`, 4/8-digit alpha forms,
  * the same without the `#`, `rgb()`/`rgba()` with comma or space separators,
  * percent channels, and `hsl()`/`hsla()` in comma or space syntax with an
- * optional `/alpha`. Alpha is parsed and dropped: a swatch is always the
- * solid colour underneath, which is also what WCAG ratios are defined on.
+ * optional `/alpha` (comma form takes a fourth channel instead). Comma and
+ * space forms never mix, alpha needs `/` in space form, and channel counts and
+ * token shapes are exact. Alpha is parsed and reported as dropped: a swatch is
+ * always the solid colour underneath, which is what WCAG ratios are defined
+ * on. The caller discloses the drop; nothing pretends to render transparency.
  */
-export function parseColor(text: string): Rgb | null {
+export function parseColorFull(text: string): ParsedColor | null {
   const t = text.trim().toLowerCase()
   if (!t) return null
   const bare = t.startsWith('#') ? t.slice(1) : t
@@ -80,39 +101,64 @@ export function parseColor(text: string): Rgb | null {
     const v = bare.length <= 4 ? [...bare].map((c) => c + c).join('') : bare
     if (v.length !== 6 && v.length !== 8) return null
     const n = Number.parseInt(v.slice(0, 6), 16)
-    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+    const color = { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+    return { color, hsl: rgbToHsl(color), droppedAlpha: v.length === 8 && Number.parseInt(v.slice(6), 16) < 255 }
   }
-  const fn = /^(rgba?|hsla?)\((.*)\)$/s.exec(t)
+  const fn = /^(rgba?|hsla?)\((.*)\)$/is.exec(t)
   if (!fn) return null
   const kind = fn[1]!.startsWith('rgb') ? 'rgb' : 'hsl'
-  const parts = fn[2]!.replace(/\//g, ' ').replace(/,/g, ' ').trim().split(/\s+/)
-  // An alpha part is the one extra value after the three channels.
-  if (parts.length !== 3 && parts.length !== 4) return null
-  const chan = parts.slice(0, 3)
+  const body = fn[2]!.trim()
+  if (!body) return null
+  let chan: string[]
+  let alphaTok: string | null = null
+  if (body.includes(',')) {
+    if (body.includes('/')) return null
+    const parts = body.split(',').map((p) => p.trim())
+    if ((parts.length !== 3 && parts.length !== 4) || parts.some((p) => p === '')) return null
+    chan = parts.slice(0, 3)
+    alphaTok = parts[3] ?? null
+  } else {
+    const slash = body.split('/')
+    if (slash.length > 2) return null
+    chan = slash[0]!.trim().split(/\s+/)
+    if (chan.length !== 3 || chan.some((p) => p === '')) return null
+    if (slash.length === 2) {
+      const a = slash[1]!.trim()
+      if (!a || /[\s,]/.test(a)) return null
+      alphaTok = a
+    }
+  }
+  const alpha = alphaValue(alphaTok)
+  if (alphaTok !== null && !Number.isFinite(alpha)) return null
+  const droppedAlpha = Number.isFinite(alpha) && alpha < 1
   if (kind === 'rgb') {
     const vals = chan.map((p) => {
-      if (p.endsWith('%')) {
-        const n = Number.parseFloat(p.slice(0, -1))
-        return Number.isFinite(n) ? (n / 100) * 255 : Number.NaN
-      }
-      return NUMBER.test(p) ? Number.parseFloat(p) : Number.NaN
+      if (!CHAN_TOKEN.test(p)) return Number.NaN
+      return p.endsWith('%') ? (Number.parseFloat(p.slice(0, -1)) / 100) * 255 : Number.parseFloat(p)
     })
     if (vals.some((v) => !Number.isFinite(v) || v < 0 || v > 255)) return null
-    return rgb(vals[0]!, vals[1]!, vals[2]!)
+    const color = rgb(vals[0]!, vals[1]!, vals[2]!)
+    return { color, hsl: rgbToHsl(color), droppedAlpha }
   }
   const hueRaw = chan[0]!
+  if (!HUE_TOKEN.test(hueRaw)) return null
   let h = Number.NaN
   // 'grad' must be matched before 'rad': every grad string also ends with 'rad'.
   if (hueRaw.endsWith('turn')) h = Number.parseFloat(hueRaw) * 360
   else if (hueRaw.endsWith('grad')) h = Number.parseFloat(hueRaw) * 0.9
   else if (hueRaw.endsWith('rad')) h = Number.parseFloat(hueRaw) * (180 / Math.PI)
   else h = Number.parseFloat(hueRaw.replace(/deg$/, ''))
-  const sl = chan.slice(1).map((p) => {
-    const n = p.endsWith('%') ? Number.parseFloat(p.slice(0, -1)) : Number.parseFloat(p)
-    return Number.isFinite(n) ? n / 100 : Number.NaN
-  })
+  // Saturation and lightness are CSS percents; a bare number is rejected.
+  if (!PCT_TOKEN.test(chan[1]!) || !PCT_TOKEN.test(chan[2]!)) return null
+  const sl = chan.slice(1).map((p) => Number.parseFloat(p.slice(0, -1)) / 100)
   if (!Number.isFinite(h) || sl.some((v) => !Number.isFinite(v))) return null
-  return hslToRgb({ h, s: clamp(sl[0]!, 0, 1), l: clamp(sl[1]!, 0, 1) })
+  const hslv = { h: wrapHue(h), s: clamp(sl[0]!, 0, 1), l: clamp(sl[1]!, 0, 1) }
+  return { color: hslToRgb(hslv), hsl: hslv, droppedAlpha }
+}
+
+/** Parse a colour code to its solid swatch; see parseColorFull for detail. */
+export function parseColor(text: string): Rgb | null {
+  return parseColorFull(text)?.color ?? null
 }
 
 const byte = (v: number) => v.toString(16).padStart(2, '0')
@@ -193,7 +239,7 @@ export const variations = (base: Hsl, steps = VARIATION_STEPS): Hsl[] => {
 
 /** The contrast picker's candidates: current, anchors, harmony and ladder, deduped. */
 export const pairChoices = (doc: Doc): Rgb[] => {
-  const base = rgbToHsl(doc.color)
+  const base = doc.hsl
   const all = [
     doc.color,
     WHITE,
@@ -216,9 +262,12 @@ export interface Pair {
   fg: Rgb
   bg: Rgb
 }
-/** The undoable core: the colour, its harmony and the inspected pair. */
+/** The undoable core: the colour, its intended HSL, its harmony and the pair. */
 export interface Core {
   color: Rgb
+  /** The editing intent at full precision: survives rgb() rounding so hue and
+   *  saturation are never lost at achromatic or near-black extremes. */
+  hsl: Hsl
   harmony: HarmonyKind
   pair: Pair
 }
@@ -232,18 +281,40 @@ export const UNDO_LIMIT = 32
 /** A blue tuned to read against both themes on first launch. */
 export const SEED_COLOR: Hsl = { h: 216, s: 0.85, l: 0.58 }
 
-export const coreOf = (doc: Core): Core => ({ color: doc.color, harmony: doc.harmony, pair: doc.pair })
+export const coreOf = (doc: Core): Core => ({ color: doc.color, hsl: doc.hsl, harmony: doc.harmony, pair: doc.pair })
+/** Hue-aware equality: two cores differ if the intended HSL moved even when
+ *  the painted rgb() landed on the same byte triple (keyboard hue steps at
+ *  near-black must accumulate, not stick). */
+export const hslEq = (a: Hsl, b: Hsl) => {
+  const dh = Math.abs(wrapHue(a.h) - wrapHue(b.h))
+  return (dh < 1e-6 || dh > 360 - 1e-6) && Math.abs(a.s - b.s) < 1e-6 && Math.abs(a.l - b.l) < 1e-6
+}
 export const coreEq = (a: Core, b: Core) =>
-  a.harmony === b.harmony && rgbEq(a.color, b.color) && rgbEq(a.pair.fg, b.pair.fg) && rgbEq(a.pair.bg, b.pair.bg)
+  a.harmony === b.harmony &&
+  rgbEq(a.color, b.color) &&
+  hslEq(a.hsl, b.hsl) &&
+  rgbEq(a.pair.fg, b.pair.fg) &&
+  rgbEq(a.pair.bg, b.pair.bg)
 
 export function newDoc(color: Rgb): Doc {
-  return { v: 1, color, harmony: 'complementary', pair: { fg: color, bg: WHITE }, undo: [], redo: [] }
+  return {
+    v: 1,
+    color,
+    hsl: rgbToHsl(color),
+    harmony: 'complementary',
+    pair: { fg: color, bg: WHITE },
+    undo: [],
+    redo: []
+  }
 }
 
 /** One commit path for an editor change: pushes the old core on undo, clears redo. */
 export function withCore(doc: Doc, next: Partial<Core>): Doc {
   const merged: Core = {
     color: next.color ?? doc.color,
+    // A colour set without an explicit intent derives its HSL; sliders always
+    // pass both so the high-precision hue survives quantization.
+    hsl: next.hsl ?? (next.color ? rgbToHsl(next.color) : doc.hsl),
     harmony: next.harmony ?? doc.harmony,
     pair: next.pair ?? doc.pair
   }
@@ -267,16 +338,20 @@ export interface SavedPalette {
   id: string
   name: string
   colors: Rgb[]
+  /** The harmony that produced the strip, when known, so reopening restores
+   *  the palette rather than re-skinning its first colour under the live one. */
+  harmony?: HarmonyKind
   updatedAt: number
 }
 export const MAX_PALETTE_NAME = 40
 export const MAX_PALETTES = 24
 export const MAX_SWATCHES = 8
 
-export const newPalette = (name: string, colors: Rgb[]): SavedPalette => ({
+export const newPalette = (name: string, colors: Rgb[], harmony?: HarmonyKind): SavedPalette => ({
   id: crypto.randomUUID(),
   name: name.trim().slice(0, MAX_PALETTE_NAME) || 'Untitled palette',
   colors: colors.slice(0, MAX_SWATCHES),
+  harmony,
   updatedAt: Date.now()
 })
 export const upsertPalette = (items: SavedPalette[], p: SavedPalette): SavedPalette[] =>
@@ -286,9 +361,48 @@ export const renamePalette = (items: SavedPalette[], id: string, name: string): 
     i.id === id ? { ...i, name: name.trim().slice(0, MAX_PALETTE_NAME) || i.name, updatedAt: Date.now() } : i
   )
 export const removePalette = (items: SavedPalette[], id: string): SavedPalette[] => items.filter((i) => i.id !== id)
-/** The export text for one palette or strip: one `name: hex` line per colour. */
-export const exportCodes = (colors: Rgb[], names?: string[]) =>
-  colors.map((c, i) => `${names?.[i] ?? `Colour ${i + 1}`}: ${toHex(c)}`).join('\n')
+/** The export text for one palette or strip: one unambiguous line that
+ *  survives a single-line field - `name: #hex, #hex, ...`. */
+export const exportCodes = (colors: Rgb[], name: string) => `${name}: ${colors.map(toHex).join(', ')}`
+
+/** Conservative ratio display: floor, never round up across a WCAG threshold. */
+export const ratioFloor = (r: number, digits: number) => {
+  const k = 10 ** digits
+  return (Math.floor(r * k) / k).toFixed(digits)
+}
+
+// ---- Shared palette writes ----
+
+/**
+ * One palette mutation as a wire operation. Ops carry a unique id so a copy
+ * can tell whether an adopted state already contains its own write; ops that
+ * a foreign state missed are replayed onto it (in order) and republished,
+ * which serializes overlapping writes from both displays through the wire's
+ * total order instead of letting each cached list clobber the other.
+ */
+export type PalOp =
+  | { id: string; kind: 'add'; palette: SavedPalette }
+  | { id: string; kind: 'rename'; target: string; name: string }
+  | { id: string; kind: 'delete'; target: string }
+
+export const PAL_OP_WINDOW = 24
+
+export function applyPalOp(items: SavedPalette[], op: PalOp): SavedPalette[] {
+  if (op.kind === 'add') return upsertPalette(items, op.palette)
+  if (op.kind === 'rename') return renamePalette(items, op.target, op.name)
+  return removePalette(items, op.target)
+}
+
+/** True when `items` already reflects `op`'s effect: the write landed or the
+ *  target is genuinely gone. */
+export function palOpDone(items: SavedPalette[], op: PalOp): boolean {
+  if (op.kind === 'add') return items.some((p) => p.id === op.palette.id)
+  if (op.kind === 'rename')
+    return items.some((p) => p.id === op.target && p.name === (op.name.trim().slice(0, MAX_PALETTE_NAME) || p.name))
+  return items.every((p) => p.id !== op.target)
+}
+
+export const palListEq = (a: SavedPalette[], b: SavedPalette[]) => serializePalettes(a) === serializePalettes(b)
 
 // ---- Wire parsing and serialization ----
 
@@ -305,8 +419,20 @@ const parseCore = (v: unknown): Core | null => {
       : null
   const pair = isObj(v.pair) ? { fg: parseRgb(v.pair.fg), bg: parseRgb(v.pair.bg) } : null
   if (!color || !harmony || !pair?.fg || !pair.bg) return null
-  return { color, harmony, pair: { fg: pair.fg, bg: pair.bg } }
+  return { color, hsl: parseHsl(v.hsl) ?? rgbToHsl(color), harmony, pair: { fg: pair.fg, bg: pair.bg } }
 }
+const parseHsl = (v: unknown): Hsl | null =>
+  isObj(v) &&
+  typeof v.h === 'number' &&
+  Number.isFinite(v.h) &&
+  typeof v.s === 'number' &&
+  v.s >= 0 &&
+  v.s <= 1 &&
+  typeof v.l === 'number' &&
+  v.l >= 0 &&
+  v.l <= 1
+    ? { h: wrapHue(v.h), s: v.s, l: v.l }
+    : null
 export function parseDoc(raw: unknown): Doc | null {
   if (!isObj(raw) || raw.v !== 1) return null
   const core = parseCore(raw)
@@ -340,22 +466,42 @@ export interface SavedLibrary {
   v: 1
   items: SavedPalette[]
 }
+export function parsePaletteEntry(i: unknown): SavedPalette | null {
+  if (
+    !isObj(i) ||
+    typeof i.id !== 'string' ||
+    typeof i.name !== 'string' ||
+    !Array.isArray(i.colors) ||
+    !i.colors.every((c) => parseRgb(c) !== null) ||
+    typeof i.updatedAt !== 'number'
+  )
+    return null
+  const harmony =
+    typeof i.harmony === 'string' && (HARMONY_KINDS as readonly string[]).includes(i.harmony)
+      ? (i.harmony as HarmonyKind)
+      : undefined
+  return {
+    id: i.id,
+    name: i.name.slice(0, MAX_PALETTE_NAME),
+    colors: i.colors.map((c) => parseRgb(c)!),
+    harmony,
+    updatedAt: i.updatedAt
+  }
+}
+
 export function parsePalettes(raw: string | null): SavedPalette[] {
   if (!raw) return []
   try {
     const v: unknown = JSON.parse(raw)
     if (!isObj(v) || !Array.isArray(v.items)) return []
+    const seen = new Set<string>()
     return v.items
-      .filter(
-        (i): i is SavedPalette =>
-          isObj(i) &&
-          typeof i.id === 'string' &&
-          typeof i.name === 'string' &&
-          Array.isArray(i.colors) &&
-          i.colors.every((c) => parseRgb(c)) &&
-          typeof i.updatedAt === 'number'
-      )
-      .map((i) => ({ ...i, colors: (i.colors as unknown[]).map((c) => parseRgb(c)!) }))
+      .map(parsePaletteEntry)
+      .filter((i): i is SavedPalette => {
+        if (i === null || seen.has(i.id)) return false
+        seen.add(i.id)
+        return true
+      })
       .slice(0, MAX_PALETTES)
   } catch {
     return []
@@ -384,6 +530,12 @@ export interface SharedState {
   by: string
   doc: Doc
   view: SharedView
+  /** The authoritative palette library, mirrored on the wire so both copies
+   *  share one list instead of two cached ones. Absent in writes from builds
+   *  that predate the shared library: those leave the local list alone. */
+  pals?: SavedPalette[]
+  /** The trailing window of palette ops the writer has seen, newest last. */
+  ops?: PalOp[]
 }
 export const serializeShared = (s: SharedState) => JSON.stringify({ v: 1, ...s })
 export function parseShared(raw: string | null): SharedState | null {
@@ -393,10 +545,32 @@ export function parseShared(raw: string | null): SharedState | null {
     if (!isObj(v) || typeof v.by !== 'string') return null
     const doc = parseDoc(v.doc)
     if (!doc) return null
+    const pals = Array.isArray(v.pals)
+      ? v.pals.map(parsePaletteEntry).filter((p): p is SavedPalette => p !== null)
+      : undefined
+    const ops = Array.isArray(v.ops)
+      ? v.ops
+          .map((o): PalOp | null => {
+            if (!isObj(o) || typeof o.id !== 'string') return null
+            if (o.kind === 'add') {
+              const palette = parsePaletteEntry(o.palette)
+              return palette ? { id: o.id, kind: 'add', palette } : null
+            }
+            if (o.kind === 'rename' && typeof o.target === 'string' && typeof o.name === 'string')
+              return { id: o.id, kind: 'rename', target: o.target, name: o.name.slice(0, MAX_PALETTE_NAME) }
+            if (o.kind === 'delete' && typeof o.target === 'string')
+              return { id: o.id, kind: 'delete', target: o.target }
+            return null
+          })
+          .filter((o): o is PalOp => o !== null)
+          .slice(-PAL_OP_WINDOW)
+      : undefined
     const w = isObj(v.view) ? v.view : {}
     return {
       by: v.by,
       doc,
+      pals,
+      ops,
       view: {
         field: typeof w.field === 'string' ? w.field.slice(0, 80) : '',
         fieldErr: w.fieldErr === true,
