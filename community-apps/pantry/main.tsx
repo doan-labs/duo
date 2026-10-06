@@ -31,6 +31,7 @@ import {
   type Location,
   locationOf,
   metaLine,
+  NAME_CAP,
   parseDoc,
   parseMirror,
   parseQty,
@@ -499,7 +500,33 @@ function Pantry() {
     )
   }
 
-  const draftFields = (d: Draft, set: (patch: Partial<Draft>) => void, errs: Errors, idPrefix: string) => (
+  // Errors clear as soon as the field they flag changes, not on the next submit.
+  const stripErrors = (patch: Partial<Draft>, setter: (fn: (prev: Errors) => Errors) => void) => {
+    setter((prev) => {
+      const next = { ...prev }
+      for (const key of ['name', 'qty', 'date', 'form'] as const) {
+        if (key === 'form' || patch[key] !== undefined) delete next[key]
+      }
+      return next
+    })
+  }
+
+  // Enter inside a field submits: the app iframe sandbox has no allow-forms
+  // token, so real form submission never fires.
+  const enterKey = (onEnter: () => void) => (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onEnter()
+    }
+  }
+
+  const draftFields = (
+    d: Draft,
+    set: (patch: Partial<Draft>) => void,
+    errs: Errors,
+    idPrefix: string,
+    onEnter: () => void
+  ) => (
     <>
       <div {...stylex.props(styles.fieldGrid)}>
         <label {...stylex.props(styles.field)}>
@@ -509,9 +536,10 @@ function Pantry() {
             id={`${idPrefix}-name`}
             value={d.name}
             onChange={(e) => set({ name: e.target.value })}
+            onKeyDown={enterKey(onEnter)}
+            maxLength={NAME_CAP}
             placeholder="Eggs, milk, rice"
             autoComplete="off"
-            maxLength={60}
             aria-invalid={errs.name !== undefined}
           />
           {errs.name && <span {...stylex.props(styles.errorText)}>{errs.name}</span>}
@@ -523,6 +551,7 @@ function Pantry() {
             id={`${idPrefix}-qty`}
             value={d.qty}
             onChange={(e) => set({ qty: e.target.value })}
+            onKeyDown={enterKey(onEnter)}
             placeholder="1"
             inputMode="decimal"
             autoComplete="off"
@@ -555,6 +584,7 @@ function Pantry() {
             type="date"
             value={d.date}
             onChange={(e) => set({ date: e.target.value })}
+            onKeyDown={enterKey(onEnter)}
             aria-invalid={errs.date !== undefined}
           />
           {errs.date && <span {...stylex.props(styles.errorText)}>{errs.date}</span>}
@@ -599,24 +629,22 @@ function Pantry() {
           Stock the shelf
         </h2>
       </div>
-      {/* The app iframe sandbox has no allow-forms token, so a real form submit
-          never fires; Enter inside a field is wired through keydown instead. */}
-      <div
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
-            e.preventDefault()
-            add()
-          }
-        }}
-      >
-        <div {...stylex.props(styles.formCol)}>
-          {draftFields(draft, (patch) => setDraft({ ...draft, ...patch }), errors, 'add')}
-          {errors.form && <p {...stylex.props(styles.errorText)}>{errors.form}</p>}
-          <div {...stylex.props(styles.sheetActions)}>
-            <Button type="button" variant="filled" onClick={add}>
-              Add item
-            </Button>
-          </div>
+      <div {...stylex.props(styles.formCol)}>
+        {draftFields(
+          draft,
+          (patch) => {
+            setDraft({ ...draft, ...patch })
+            stripErrors(patch, setErrors)
+          },
+          errors,
+          'add',
+          add
+        )}
+        {errors.form && <p {...stylex.props(styles.errorText)}>{errors.form}</p>}
+        <div {...stylex.props(styles.sheetActions)}>
+          <Button type="button" variant="filled" onClick={add}>
+            Add item
+          </Button>
         </div>
       </div>
     </section>
@@ -763,44 +791,40 @@ function Pantry() {
           {doc.list.length ? `${openList} to buy${boughtList ? ` · ${boughtList} bought` : ''}` : 'clear'}
         </span>
       </div>
-      <div
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
-            e.preventDefault()
-            addShopItem()
-          }
-        }}
-      >
-        <div {...stylex.props(styles.fieldRow)}>
-          <label {...stylex.props(styles.field)}>
-            <span {...stylex.props(styles.fieldLabel)}>Need</span>
-            <input
-              {...stylex.props(styles.input, shopError !== '' && styles.inputBad)}
-              value={shopDraft.name}
-              onChange={(e) => setShopDraft({ ...shopDraft, name: e.target.value })}
-              placeholder="Olive oil"
-              autoComplete="off"
-              maxLength={60}
-              aria-invalid={shopError !== ''}
-            />
-          </label>
-          <label {...stylex.props(styles.field)}>
-            <span {...stylex.props(styles.fieldLabel)}>
-              Note <span {...stylex.props(styles.optional)}>optional</span>
-            </span>
-            <input
-              {...stylex.props(styles.input)}
-              value={shopDraft.note}
-              onChange={(e) => setShopDraft({ ...shopDraft, note: e.target.value })}
-              placeholder="2 bottles"
-              autoComplete="off"
-              maxLength={40}
-            />
-          </label>
-          <Button type="button" variant="filled" onClick={addShopItem}>
-            Add
-          </Button>
-        </div>
+      <div {...stylex.props(styles.fieldRow)}>
+        <label {...stylex.props(styles.field)}>
+          <span {...stylex.props(styles.fieldLabel)}>Need</span>
+          <input
+            {...stylex.props(styles.input, shopError !== '' && styles.inputBad)}
+            value={shopDraft.name}
+            onChange={(e) => {
+              setShopDraft({ ...shopDraft, name: e.target.value })
+              setShopError('')
+            }}
+            onKeyDown={enterKey(addShopItem)}
+            placeholder="Olive oil"
+            autoComplete="off"
+            maxLength={NAME_CAP}
+            aria-invalid={shopError !== ''}
+          />
+        </label>
+        <label {...stylex.props(styles.field)}>
+          <span {...stylex.props(styles.fieldLabel)}>
+            Note <span {...stylex.props(styles.optional)}>optional</span>
+          </span>
+          <input
+            {...stylex.props(styles.input)}
+            value={shopDraft.note}
+            onChange={(e) => setShopDraft({ ...shopDraft, note: e.target.value })}
+            onKeyDown={enterKey(addShopItem)}
+            placeholder="2 bottles"
+            autoComplete="off"
+            maxLength={40}
+          />
+        </label>
+        <Button type="button" variant="filled" onClick={addShopItem}>
+          Add
+        </Button>
       </div>
       {shopError && <p {...stylex.props(styles.errorText)}>{shopError}</p>}
       {doc.list.length ? (
@@ -924,7 +948,16 @@ function Pantry() {
       >
         {editDraft && (
           <div {...stylex.props(styles.sheetBody)}>
-            {draftFields(editDraft, (patch) => setEditDraft({ ...editDraft, ...patch }), editErrors, 'edit')}
+            {draftFields(
+              editDraft,
+              (patch) => {
+                setEditDraft({ ...editDraft, ...patch })
+                stripErrors(patch, setEditErrors)
+              },
+              editErrors,
+              'edit',
+              saveEdit
+            )}
             {confirming ? (
               <div {...stylex.props(styles.dangerZone)}>
                 <p {...stylex.props(styles.dangerTitle)}>Remove {cleanName(editDraft.name) || 'this item'}?</p>
