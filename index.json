@@ -172,6 +172,21 @@
         }
       ]
     },
+    "com.mnismt.duo.nonogram": {
+      "name": "Nonogram",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/nonogram",
+      "permissions": [],
+      "releases": [
+        {
+          "release": "1.0.0+241338b1",
+          "sdk": "0.0.0",
+          "bytes": 550099,
+          "sha256": "14db039e6111e38cca02596e9beea80917fb892c35a001247ae809cf73c27daf"
+        }
+      ]
+    },
     "com.mnismt.duo.pixelstudio": {
       "name": "Pixel Studio",
       "lane": "community",

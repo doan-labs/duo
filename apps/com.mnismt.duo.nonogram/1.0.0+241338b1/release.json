@@ -1,0 +1,34 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.nonogram",
+    "name": "Nonogram",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "light": true,
+    "permissions": [],
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/nonogram",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:26:39.698Z",
+    "commit": "766f19b8f264cca5a21cc06ed40b2f9e0042177d",
+    "hash": "241338b1"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 550099,
+      "sha256": "2b5d355aff74192a3181c93bdfdd12569723236f938e81182b8dbb5707d904ae"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1052073,
+      "sha256": "7ac59e2e6200f23a20f894455e6b46850ac54882a86099c4b10612a2f7a4c0c4"
+    }
+  ]
+}
