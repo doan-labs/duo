@@ -129,6 +129,43 @@ export function adoptGame(saved: string | object | null | undefined, me: string)
   }
 }
 
+// The seeded opening shares one id on both displays so a first move from
+// either side lands on the same match instead of forking two identities.
+export const OPENING_ID = 'reversi-opening'
+
+/** A write's verdict: apply the next document or reject the stale input. */
+export type Mutation = { ok: true; game: SavedGame } | { ok: false }
+
+/**
+ * A placement is only legal on the exact settled document the tap was aimed
+ * at. When the wire carries a newer match or newer moves, the input is stale:
+ * rejecting it is what stops a lagging display from clobbering foreign plies.
+ */
+export function tryPlace(base: SavedGame, expected: SavedGame, at: number): Mutation {
+  if (base.id !== expected.id || base.moves.length !== expected.moves.length) return { ok: false }
+  const d = derive(base.moves)
+  if (d.over || !d.legal.has(at)) return { ok: false }
+  if (base.mode === 'solo' && d.toMove !== base.you) return { ok: false }
+  return { ok: true, game: { ...base, moves: [...base.moves, at] } }
+}
+
+/** Same identity check for a takeback; the match keeps its id for the tally. */
+export function tryUndo(base: SavedGame, expected: SavedGame): Mutation {
+  if (base.id !== expected.id) return { ok: false }
+  const d = derive(base.moves)
+  if (!canUndo(base, d, false) || d.plies === 0) return { ok: false }
+  return { ok: true, game: { ...base, moves: undoCut(base) } }
+}
+
+/** The bot's deferred reply only lands while the position it read is settled. */
+export function tryReply(base: SavedGame, snapshot: SavedGame, at: number): Mutation {
+  if (base.mode !== 'solo') return { ok: false }
+  if (base.id !== snapshot.id || base.moves.length !== snapshot.moves.length) return { ok: false }
+  const d = derive(base.moves)
+  if (d.over || d.toMove === base.you || d.toMove === null || !d.legal.has(at)) return { ok: false }
+  return { ok: true, game: { ...base, moves: [...base.moves, at] } }
+}
+
 /**
  * Undo policy: in local mode take back the last ply. In solo, pop plies until
  * it is your turn again - two plies after the bot answered, one while it has
@@ -161,6 +198,21 @@ export function emptyTally(): Tally {
   return { black: 0, white: 0, draws: 0, lastGame: null }
 }
 
+/**
+ * Count a finished match exactly once. The match id is the dedupe key and it
+ * survives undo, replay, folds and reloads, so a re-finished match can never
+ * post a second win while a genuinely new match always can.
+ */
+export function countFinished(tally: Tally, id: string, winner: 'b' | 'w' | 'draw'): Tally {
+  if (tally.lastGame === id) return tally
+  return {
+    black: tally.black + (winner === 'b' ? 1 : 0),
+    white: tally.white + (winner === 'w' ? 1 : 0),
+    draws: tally.draws + (winner === 'draw' ? 1 : 0),
+    lastGame: id
+  }
+}
+
 export function parseTally(raw: string | null | undefined): Tally {
   try {
     const parsed = raw ? (JSON.parse(raw) as Partial<Tally>) : {}
@@ -187,19 +239,17 @@ export function parsePrefs(raw: string | null | undefined): Prefs {
   }
 }
 
-/** Per-display layout math. Hidden views can measure 0; callers guard on it. */
+/**
+ * Per-display layout math. The board owns nearly the full content width on
+ * both displays; on cover the controls live in a scroll region below it, so
+ * the reservation is a fixed chrome budget, not a second column.
+ */
 export function fitLayout(view: { width: number; height: number }, wide: boolean): { board: number } {
   const width = view.width || 740
   const height = view.height || 480
-  const padX = wide ? 24 : 14
-  const top = wide ? 16 : 10
-  const header = wide ? 56 : 40
-  const status = wide ? 26 : 20
-  const bottom = wide ? 30 : 20
-  const rail = wide ? 268 : 0
-  const under = wide ? 0 : 218
-  const gaps = wide ? 36 : 18
-  const freeH = height - top - header - status - bottom - gaps - under
-  const board = wide ? Math.min(freeH, width - padX * 2 - rail) : Math.min(freeH, width - padX * 2)
+  const padX = wide ? 24 : 16
+  const rail = wide ? 288 : 0
+  const chrome = wide ? 150 : 164
+  const board = Math.min(width - padX * 2 - rail, height - chrome)
   return { board: Math.max(160, Math.floor(board)) }
 }

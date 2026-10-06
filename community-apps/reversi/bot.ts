@@ -115,6 +115,104 @@ function negamax(
   return best
 }
 
+class SearchHalt extends Error {}
+
+type LiveBudget = { nodes: number; deadline: number; nextYield: number; cancelled: () => boolean }
+
+const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+/**
+ * The same search as `negamax` but cooperative: every slice of work hands the
+ * thread back to the event loop, so input, paint and timers stay live while
+ * Hard thinks. A cancelled or expired budget unwinds by throwing SearchHalt.
+ */
+async function negamaxAsync(
+  board: Board,
+  color: Color,
+  depth: number,
+  alpha: number,
+  beta: number,
+  budget: LiveBudget
+): Promise<number> {
+  if (++budget.nodes % 512 === 0) {
+    const now = Date.now()
+    if (now > budget.deadline || budget.cancelled()) throw new SearchHalt()
+    if (now > budget.nextYield) {
+      budget.nextYield = now + 9
+      await pause()
+    }
+  }
+  const moves = legalMoves(board, color)
+  if (moves.size === 0) {
+    if (legalMoves(board, other(color)).size === 0) return terminalScore(board, color)
+    return -1 * (await negamaxAsync(board, other(color), depth, -beta, -alpha, budget))
+  }
+  if (depth <= 0) return evaluate(board, color)
+  const ordered = [...moves.keys()].sort((a, z) => moveOrder(z) - moveOrder(a))
+  let best = -Infinity
+  for (const at of ordered) {
+    const score = -1 * (await negamaxAsync(applyMove(board, at, color), other(color), depth - 1, -beta, -alpha, budget))
+    if (score > best) best = score
+    if (best > alpha) alpha = best
+    if (alpha >= beta) break
+  }
+  return best
+}
+
+/**
+ * The UI path for a bot move. Easy and Medium are instant; Hard runs the
+ * sliced negamax so the thread is never held longer than one work slice. The
+ * deadline is wall clock, so quality is capped exactly like the sync pick;
+ * `cancelled` lets a fold, undo or foreign write abort the search outright.
+ */
+export async function chooseMoveAsync(
+  board: Board,
+  color: Color,
+  level: Level,
+  cancelled: () => boolean,
+  rand: () => number = Math.random
+): Promise<Pick | null> {
+  if (level !== 'Hard') {
+    await pause()
+    return cancelled() ? null : chooseMove(board, color, level, rand)
+  }
+  const options = [...legalMoves(board, color).keys()]
+  if (options.length === 0) return null
+  if (options.length === 1) return { at: options[0]!, depth: 0 }
+  const empties = board.filter((p) => p === null).length
+  const budget: LiveBudget = {
+    nodes: 0,
+    deadline: Date.now() + 620,
+    nextYield: Date.now(),
+    cancelled
+  }
+  let best = options[0]!
+  let reached = 0
+  try {
+    for (let depth = 1; depth <= depthFor(empties); depth++) {
+      let alpha = -Infinity
+      let roundBest = options[0]!
+      let roundScore = -Infinity
+      const ordered = [best, ...options.filter((o) => o !== best)]
+      for (const at of ordered) {
+        const score =
+          -1 * (await negamaxAsync(applyMove(board, at, color), other(color), depth - 1, -Infinity, -alpha, budget))
+        if (score > roundScore) {
+          roundScore = score
+          roundBest = at
+        }
+        if (score > alpha) alpha = score
+      }
+      best = roundBest
+      reached = depth
+    }
+  } catch (error) {
+    if (!(error instanceof SearchHalt)) throw error
+  }
+  if (cancelled()) return null
+  return { at: best, depth: reached }
+}
+
 /** Deepest search to attempt: solve outright once the endgame is small enough. */
 function depthFor(empties: number): number {
   if (empties <= 14) return empties + 2

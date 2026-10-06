@@ -6,29 +6,34 @@ import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue, setMuted, unlockAudio } from './audio.ts'
-import { chooseMove, LEVELS, type Level, THINK_MS } from './bot.ts'
+import { chooseMoveAsync, LEVELS, type Level, THINK_MS } from './bot.ts'
 import { type Color, cellName } from './engine.ts'
 import {
   adoptGame,
   canUndo,
+  countFinished,
   type Derived,
   derive,
   emptyTally,
   fitLayout,
   type Mode,
   newGame,
+  OPENING_ID,
   type Prefs,
   parsePrefs,
   parseTally,
   type SavedGame,
   type Tally,
-  undoCut
+  tryPlace,
+  tryReply,
+  tryUndo
 } from './game.ts'
 import { styles } from './styles.ts'
 
-// One storage key holds the whole match as a last-writer-wins document; a value
-// this copy did not write is always the newer settled state, so adopting it
-// unconditionally converges the two displays - including the fold race.
+// One storage key holds the whole match as a last-writer-wins document. Every
+// mutation re-reads the settled document before writing and validates the
+// input against it, so a display whose local copy lags the wire rejects stale
+// placements instead of clobbering the other display's moves.
 const ME = crypto.randomUUID()
 const GAME_KEY = 'reversi-game'
 const RECORD_KEY = 'reversi-record'
@@ -66,7 +71,7 @@ function Game() {
   const lastSeen = useRef<string | null | undefined>(undefined)
   const lastRecord = useRef<string | null | undefined>(undefined)
   const lastPrefs = useRef<string | null | undefined>(undefined)
-  const firstAdopt = useRef(true)
+  const liveRaw = useRef<string | null | undefined>(undefined)
   const seeded = useRef(false)
   const celebrated = useRef<string | null>(null)
   const returnFocus = useRef<Element | null>(null)
@@ -74,9 +79,19 @@ function Game() {
   const focusRef = useRef(-1)
   const boardRef = useRef<HTMLDivElement>(null)
   const shownRef = useRef<Confirm | null>(null)
+  // One serial writer queue per copy: reads and writes never interleave with
+  // each other, and each step validates the input against the freshest wire
+  // document before it is allowed to write.
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const wasActive = useRef(view.active)
+  const activeRef = useRef(view.active)
+  const mutedRef = useRef(prefs.muted)
+  const [showLog, setShowLog] = useState(false)
 
   gameRef.current = game
   focusRef.current = focusCell
+  activeRef.current = view.active
+  mutedRef.current = prefs.muted
 
   const d = useMemo<Derived | null>(() => (game ? derive(game.moves) : null), [game])
   const fit = useMemo(() => fitLayout(view, wide), [view, wide])
@@ -88,46 +103,120 @@ function Game() {
     return map
   }, [d])
 
-  const play = useCallback(
-    (kind: Cue) => {
-      if (!prefs.muted && view.active) cue(kind)
+  const play = useCallback((kind: Cue) => {
+    if (!mutedRef.current && activeRef.current) cue(kind)
+  }, [])
+
+  /** The settled wire document, or null when the store holds no game yet. */
+  const readStoredGame = useCallback(async (): Promise<SavedGame | null> => {
+    const raw = await os.storage.get(GAME_KEY)
+    return raw === null ? null : adoptGame(raw, ME)
+  }, [])
+
+  // Adopt whatever the store currently carries before deciding anything. The
+  // mirror (useKV) can lag a fold wake-up; this read does not.
+  const syncGame = useCallback(async (): Promise<SavedGame | null> => {
+    const stored = await readStoredGame()
+    const local = gameRef.current
+    if (
+      stored &&
+      (!local ||
+        stored.id !== local.id ||
+        stored.moves.length !== local.moves.length ||
+        stored.mode !== local.mode ||
+        stored.level !== local.level ||
+        stored.you !== local.you)
+    ) {
+      setGame(stored)
+      setHover(null)
+    }
+    return stored ?? local
+  }, [readStoredGame])
+
+  /**
+   * Every game write goes through here: sync to the wire, run the step on the
+   * freshest document, write once, then verify nothing foreign landed during
+   * our own write - if it did, the settled winner is adopted instead of
+   * argued with.
+   */
+  const enqueueGame = useCallback(
+    (step: (base: SavedGame) => SavedGame | null): Promise<boolean> => {
+      const job = queueRef.current.then(async () => {
+        const base = await syncGame()
+        if (!base) return false
+        const next = step(base)
+        if (!next) return false
+        const settled = { ...next, by: ME }
+        const wire = JSON.stringify(settled)
+        await os.storage.set(GAME_KEY, wire)
+        lastSeen.current = wire
+        setGame(settled)
+        const after = await os.storage.get(GAME_KEY)
+        if (after !== null && after !== wire) {
+          const winner = adoptGame(after, ME)
+          if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) setGame(winner)
+        }
+        return true
+      })
+      queueRef.current = job
+      return job
     },
-    [prefs.muted, view.active]
+    [syncGame]
   )
 
-  const publish = useCallback((next: SavedGame) => {
-    setGame(next)
-    void os.storage.set(GAME_KEY, JSON.stringify({ ...next, by: ME }))
-  }, [])
+  /** Read-through on the same queue: orders an activation sync before input. */
+  const enqueueSync = useCallback((): Promise<SavedGame | null> => {
+    const job = queueRef.current.then(syncGame)
+    queueRef.current = job
+    return job
+  }, [syncGame])
 
-  const publishRecord = useCallback((next: Tally) => {
-    setRecord(next)
-    void os.storage.set(RECORD_KEY, JSON.stringify(next))
-  }, [])
-
-  const publishPrefs = useCallback((patch: Partial<Prefs>) => {
-    setPrefs((prev) => {
-      const next = { ...prev, ...patch }
-      void os.storage.set(PREFS_KEY, JSON.stringify(next))
+  const enqueueRecord = useCallback((step: (base: Tally) => Tally): Promise<Tally> => {
+    const job = queueRef.current.then(async () => {
+      const base = parseTally(await os.storage.get(RECORD_KEY))
+      const next = step(base)
+      const wire = JSON.stringify(next)
+      await os.storage.set(RECORD_KEY, wire)
+      lastRecord.current = wire
+      setRecord(next)
       return next
     })
+    queueRef.current = job
+    return job
+  }, [])
+
+  const enqueuePrefs = useCallback((patch: Partial<Prefs>): Promise<Prefs> => {
+    const job = queueRef.current.then(async () => {
+      const base = parsePrefs(await os.storage.get(PREFS_KEY))
+      const next = { ...base, ...patch }
+      const wire = JSON.stringify(next)
+      await os.storage.set(PREFS_KEY, wire)
+      lastPrefs.current = wire
+      setPrefs(next)
+      return next
+    })
+    queueRef.current = job
+    return job
   }, [])
 
   useEffect(() => {
     setMuted(prefs.muted)
   }, [prefs.muted])
 
-  // Adopt whichever settled game the wire carries; ignore this copy's own echo.
+  // Adopt whichever settled game the wire carries; ignore this copy's own
+  // echo. `liveRaw` is the baseline the mirror last delivered while this copy
+  // was settled: the first adoption after a fold wake-up syncs silently, and
+  // only changes that land while we are actually live play their cue.
   useEffect(() => {
     if (saved.status === 'hydrating') return
     const raw = saved.value
     if (raw !== null && raw === lastSeen.current) return
     lastSeen.current = raw
     if (!raw) {
-      // A fresh store seeds a local opening; the first real move publishes.
+      // A fresh store seeds a shared opening; the first real move publishes.
       if (!seeded.current) {
         seeded.current = true
-        setGame(newGame(ME, 'solo', 'Medium', 'b'))
+        setGame({ ...newGame(ME, 'solo', 'Medium', 'b'), id: OPENING_ID })
       }
       return
     }
@@ -136,15 +225,29 @@ function Game() {
     if (next.by === ME) return
     setGame(next)
     setHover(null)
-    if (!firstAdopt.current && view.active && !prefs.muted) {
+    if (liveRaw.current !== undefined && view.active && !prefs.muted) {
       // Sound what just changed on the peer display: a fresh match, a takeback,
       // or the disc that just landed.
       if (next.id !== prev?.id || next.moves.length === 0) cue('new')
       else if (next.moves.length < prev.moves.length) cue('undo')
       else if (next.moves.length > prev.moves.length) cue('flip')
     }
-    firstAdopt.current = false
+    liveRaw.current = raw
   }, [saved.value, saved.status, view.active, prefs.muted])
+
+  // Becoming visible settles this copy to the wire BEFORE any input can land:
+  // the sync runs first on the serial queue, so a tap fired during a fold
+  // wake-up still validates against the freshest shared document.
+  useEffect(() => {
+    if (!view.active) {
+      liveRaw.current = undefined
+      wasActive.current = false
+      return
+    }
+    if (wasActive.current) return
+    wasActive.current = true
+    void enqueueSync()
+  }, [view.active, enqueueSync])
 
   useEffect(() => {
     if (stored.status === 'hydrating') return
@@ -162,53 +265,61 @@ function Game() {
     setPrefs(parsePrefs(raw))
   }, [prefsKv.value, prefsKv.status])
 
-  // The bot lives only on the active display; it re-derives from the latest
-  // wire state inside the timer so an undo, reset or foreign write that landed
-  // during the think beat can never produce a stale or duplicate reply.
+  // The bot lives only on the active display. Its search is time-sliced so the
+  // thread stays live, it is cancelled by any state change, and the reply is
+  // applied through the serial writer so a stale snapshot can never write.
   useEffect(() => {
     if (!view.active || !game || !d || d.over || game.mode !== 'solo' || d.toMove === game.you) return
     setThinking(true)
+    let cancelled = false
     const timer = setTimeout(() => {
-      const latest = gameRef.current
-      if (!latest || latest.id !== game.id || latest.moves.length !== game.moves.length) {
+      const snapshot = gameRef.current
+      if (!snapshot || snapshot.id !== game.id || snapshot.moves.length !== game.moves.length) {
         setThinking(false)
         return
       }
-      const dd = derive(latest.moves)
-      if (dd.over || dd.toMove === latest.you) {
+      const dd = derive(snapshot.moves)
+      const toMove = dd.toMove
+      if (dd.over || !toMove || toMove === snapshot.you) {
         setThinking(false)
         return
       }
-      const pick = dd.toMove ? chooseMove(dd.board, dd.toMove, latest.level) : null
-      setThinking(false)
-      if (pick) {
-        play('flip')
-        publish({ ...latest, by: ME, moves: [...latest.moves, pick.at] })
-      }
+      void (async () => {
+        try {
+          const pick = await chooseMoveAsync(dd.board, toMove, snapshot.level, () => cancelled)
+          if (cancelled || !pick) return
+          const ok = await enqueueGame((base) => {
+            const r = tryReply(base, snapshot, pick.at)
+            return r.ok ? r.game : null
+          })
+          if (ok) play('flip')
+        } finally {
+          if (!cancelled) setThinking(false)
+        }
+      })()
     }, THINK_MS[game.level])
     return () => {
+      cancelled = true
       clearTimeout(timer)
       setThinking(false)
     }
-  }, [game, d, view.active, play, publish])
+  }, [game, d, view.active, play, enqueueGame])
 
-  // One celebration per game on the display being looked at: jingle, tally.
+  // One celebration per match, counted once in shared storage: the cue and
+  // haptic fire only on the copy that actually posts the tally increment, so
+  // a folded-in peer stays silent and replays never double-count.
   useEffect(() => {
     if (!view.active || !game || !d?.over || celebrated.current === game.id) return
     if (stored.status !== 'ready' && stored.status !== 'saving') return
     celebrated.current = game.id
     const winner = d.over.winner
-    play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
-    navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
-    if (record.lastGame !== game.id) {
-      publishRecord({
-        black: record.black + (winner === 'b' ? 1 : 0),
-        white: record.white + (winner === 'w' ? 1 : 0),
-        draws: record.draws + (winner === 'draw' ? 1 : 0),
-        lastGame: game.id
-      })
-    }
-  }, [d, game, view.active, record, stored.status, play, publishRecord])
+    void enqueueRecord((tally) => {
+      if (tally.lastGame === game.id) return tally
+      if (activeRef.current) navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
+      play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
+      return countFinished(tally, game.id, winner)
+    })
+  }, [d, game, view.active, stored.status, play, enqueueRecord])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -244,12 +355,15 @@ function Game() {
   const newMatch = useCallback(
     (patch?: { mode?: Mode; you?: Color }) => {
       if (!game) return
-      play('new')
-      setHover(null)
-      setFocusCell(-1)
-      publish(newGame(ME, patch?.mode ?? game.mode, game.level, patch?.you ?? game.you))
+      const next = newGame(ME, patch?.mode ?? game.mode, game.level, patch?.you ?? game.you)
+      void enqueueGame(() => next).then((ok) => {
+        if (!ok) return
+        play('new')
+        setHover(null)
+        setFocusCell(-1)
+      })
     },
-    [game, play, publish]
+    [game, play, enqueueGame]
   )
 
   // A match with entered progress is never wiped silently: destructive starts
@@ -283,49 +397,65 @@ function Game() {
 
   const place = useCallback(
     (at: number) => {
-      if (!game || !d || d.over || thinking) return
+      if (!game || !d || d.over || thinking || !view.active) return
       if (game.mode === 'solo' && d.toMove !== game.you) {
         play('reject')
         return
       }
-      const flips = d.legal.get(at)
-      if (!flips) {
+      if (!d.legal.has(at)) {
         play('reject')
         navigator.vibrate?.(18)
         return
       }
-      play('flip')
-      publish({ ...game, by: ME, moves: [...game.moves, at] })
-      setFocusCell(at)
-      setHover(null)
+      const expected = game
+      void enqueueGame((base) => {
+        const r = tryPlace(base, expected, at)
+        return r.ok ? r.game : null
+      }).then((ok) => {
+        if (!ok) {
+          // The wire moved past the board this tap was aimed at: reject it,
+          // never overwrite the foreign moves that landed meanwhile.
+          play('reject')
+          if (activeRef.current) navigator.vibrate?.(18)
+          return
+        }
+        play('flip')
+        setFocusCell(at)
+        setHover(null)
+      })
     },
-    [game, d, thinking, play, publish]
+    [game, d, thinking, view.active, play, enqueueGame]
   )
 
   const undo = useCallback(() => {
     if (!game || !d || !canUndo(game, d, thinking)) return
-    const moves = undoCut(game)
-    play('undo')
-    // A finished match undone becomes a new game id so the tally cannot
-    // double-count the continuation.
-    publish({ ...game, by: ME, id: d.over ? crypto.randomUUID() : game.id, moves })
-    setHover(null)
-  }, [game, d, thinking, play, publish])
+    const expected = game
+    void enqueueGame((base) => {
+      const r = tryUndo(base, expected)
+      return r.ok ? r.game : null
+    }).then((ok) => {
+      if (!ok) return
+      play('undo')
+      setHover(null)
+    })
+  }, [game, d, thinking, play, enqueueGame])
 
   const setLevel = useCallback(
     (level: Level) => {
       if (!game || level === game.level) return
-      publish({ ...game, by: ME, level })
+      const expected = game
+      void enqueueGame((base) => (base.id === expected.id ? { ...base, level } : null))
     },
-    [game, publish]
+    [game, enqueueGame]
   )
 
   const toggleMute = useCallback(() => {
+    if (!view.active) return
     const next = !prefs.muted
-    publishPrefs({ muted: next })
+    void enqueuePrefs({ muted: next })
     setMuted(next)
-    if (!next && view.active) cue('place')
-  }, [prefs.muted, publishPrefs, view.active])
+    if (!next) cue('place')
+  }, [prefs.muted, enqueuePrefs, view.active])
 
   // Roving keyboard focus over the board grid; Enter/Space fire natively.
   const onBoardKey = (event: React.KeyboardEvent) => {
@@ -343,7 +473,7 @@ function Game() {
       requestNew()
       return
     } else if (event.key === 'h') {
-      publishPrefs({ hints: !prefs.hints })
+      void enqueuePrefs({ hints: !prefs.hints })
       return
     } else if (event.key === 'm') {
       toggleMute()
@@ -362,8 +492,12 @@ function Game() {
 
   const solo = game.mode === 'solo'
   const botTurn = solo && !d.over && d.toMove !== game.you
-  const humanTurn = !d.over && (!solo || d.toMove === game.you)
+  const humanTurn = !d.over && view.active && (!solo || d.toMove === game.you)
   const tail = d.log.at(-1)
+
+  // Roving tab stop: until a cell has focus the first legal move carries the
+  // tab stop, so Tab always reaches the board - fresh, reset, undo, fold.
+  const roving = focusCell >= 0 ? focusCell : humanTurn ? (d.legal.keys().next().value ?? 0) : 0
 
   const statusText = d.over
     ? d.over.winner === 'draw'
@@ -462,7 +596,7 @@ function Game() {
         <button
           type="button"
           aria-pressed={prefs.hints}
-          onClick={() => publishPrefs({ hints: !prefs.hints })}
+          onClick={() => void enqueuePrefs({ hints: !prefs.hints })}
           {...stylex.props(styles.btn, styles.btnGhost, shared.press)}
         >
           <Sym name={prefs.hints ? 'eye' : 'eyeSlash'} size={13} />
@@ -556,7 +690,7 @@ function Game() {
               type="button"
               data-cell={i}
               role="gridcell"
-              tabIndex={focusCell === i ? 0 : -1}
+              tabIndex={roving === i ? 0 : -1}
               aria-label={label}
               aria-disabled={!humanTurn || !d.legal.has(i)}
               onClick={() => place(i)}
@@ -700,16 +834,32 @@ function Game() {
           <section {...stylex.props(styles.stage)}>
             {statusEl}
             {boardEl}
-            {controls}
-            <div {...stylex.props(styles.card)}>
-              <div {...stylex.props(styles.tally)}>
-                <span {...stylex.props(styles.tallyItem)}>
-                  <i {...stylex.props(styles.discGlyph, styles.discB)} aria-hidden="true" /> {record.black}
-                </span>
-                <span {...stylex.props(styles.tallyItem)}>
-                  <i {...stylex.props(styles.discGlyph, styles.discW)} aria-hidden="true" /> {record.white}
-                </span>
-                <span {...stylex.props(styles.tallyItem)}>Draws {record.draws}</span>
+            {/* The board keeps the full cover width; everything else lives in
+                a scroll region below it so nothing is lost on the small pane. */}
+            <div {...stylex.props(styles.coverScroll)}>
+              {controls}
+              <div {...stylex.props(styles.card)}>
+                <div {...stylex.props(styles.tally)}>
+                  <span {...stylex.props(styles.tallyItem)}>
+                    <i {...stylex.props(styles.discGlyph, styles.discB)} aria-hidden="true" /> {record.black}
+                  </span>
+                  <span {...stylex.props(styles.tallyItem)}>
+                    <i {...stylex.props(styles.discGlyph, styles.discW)} aria-hidden="true" /> {record.white}
+                  </span>
+                  <span {...stylex.props(styles.tallyItem)}>Draws {record.draws}</span>
+                </div>
+                <button
+                  type="button"
+                  aria-expanded={showLog}
+                  onClick={() => setShowLog((v) => !v)}
+                  {...stylex.props(styles.movesToggle, shared.press)}
+                >
+                  <span>Moves</span>
+                  <span {...stylex.props(styles.cardKicker)}>
+                    {d.log.length} {showLog ? 'hide' : 'show'}
+                  </span>
+                </button>
+                {showLog ? logList : null}
               </div>
             </div>
           </section>

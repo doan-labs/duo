@@ -125,7 +125,7 @@ export const styles = stylex.create({
     outlineWidth: space.xxs,
     outlineOffset: space.xxs,
     outlineColor: 'transparent',
-    transitionProperty: 'outline-color',
+    transitionProperty: { default: 'outline-color', [reduce]: 'none' },
     transitionDuration: '.3s',
     transitionTimingFunction: easing.out
   },
@@ -140,12 +140,12 @@ export const styles = stylex.create({
     position: 'relative',
     display: 'grid',
     placeItems: 'center',
-    width: '40px',
-    height: '40px',
+    width: '44px',
+    height: '44px',
     borderRadius: radius.circle,
     color: colors.white,
     backgroundColor: app.fill,
-    transitionProperty: 'background-color, transform',
+    transitionProperty: { default: 'background-color, transform', [reduce]: 'none' },
     transitionDuration: '.25s',
     transitionTimingFunction: easing.out
   },
@@ -183,6 +183,12 @@ export const styles = stylex.create({
     position: 'relative',
     display: 'grid',
     placeItems: 'center',
+    // Zero padding keeps the content box square: percentage-sized discs stay
+    // circles instead of stretching into ovals on the UA button padding.
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
     aspectRatio: '1',
     borderRadius: radius.xs,
     backgroundColor: `color-mix(in srgb, ${colors.greenDark} 34%, ${colors.grey6Dark})`,
@@ -195,11 +201,14 @@ export const styles = stylex.create({
   },
   cellAlt: { backgroundColor: `color-mix(in srgb, ${colors.greenDark} 40%, ${colors.grey6Dark})` },
   cellLast: {
-    boxShadow: `inset 0 0 0 ${space.xxs} color-mix(in srgb, ${colors.green} 65%, transparent)`
+    outlineStyle: 'solid',
+    outlineWidth: space.xxs,
+    outlineOffset: `calc(0px - ${space.xxs})`,
+    outlineColor: `color-mix(in srgb, ${colors.green} 65%, transparent)`
   },
   disc: {
     width: '82%',
-    height: '82%',
+    aspectRatio: '1',
     borderRadius: radius.circle,
     boxShadow: `${shadow.rim}, ${shadow.card}`,
     pointerEvents: 'none'
@@ -227,7 +236,7 @@ export const styles = stylex.create({
   discGhost: {
     position: 'absolute',
     width: '82%',
-    height: '82%',
+    aspectRatio: '1',
     borderRadius: radius.circle,
     opacity: 0.42,
     animationName: { default: ghostPulse, [reduce]: 'none' },
@@ -285,6 +294,36 @@ export const styles = stylex.create({
     width: '100%',
     alignItems: 'center'
   },
+  // Cover: everything below the board scrolls inside this region, so the
+  // board keeps the full width and controls, tally and moves stay reachable.
+  coverScroll: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.sm,
+    width: '100%',
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    paddingBottom: space.xs
+  },
+  movesToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    minHeight: '44px',
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    paddingLeft: space.md,
+    paddingRight: space.md,
+    borderRadius: radius.md,
+    fontSize: typeScale.subheadline,
+    fontWeight: weight.semibold,
+    color: colors.white,
+    backgroundColor: app.fill,
+    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: colors.green }
+  },
   segTrack: {
     display: 'flex',
     gap: space.xxs,
@@ -294,6 +333,10 @@ export const styles = stylex.create({
     boxShadow: shadow.rim
   },
   segBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '44px',
     paddingTop: space.xs,
     paddingBottom: space.xs,
     paddingLeft: space.md,
@@ -307,6 +350,11 @@ export const styles = stylex.create({
   segOn: { backgroundColor: `color-mix(in srgb, ${colors.greenDark} 70%, ${colors.grey5Dark})`, color: colors.white },
   row: { display: 'flex', gap: space.xs, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
   btn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    minHeight: '44px',
     paddingTop: space.sm,
     paddingBottom: space.sm,
     paddingLeft: space.lg,
@@ -405,7 +453,7 @@ export const styles = stylex.create({
     animationDuration: '.4s',
     animationTimingFunction: easing.spring
   },
-  resultCover: { insetInline: space.sm, bottom: space.xl, padding: space.sm },
+  resultCover: { insetInline: space.sm, bottom: space.xxxl, padding: space.sm },
   resultTitle: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.title2,
