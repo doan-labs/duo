@@ -1107,7 +1107,7 @@ function CircuitLab() {
                   returnFocus.current = e.currentTarget
                   setConfirmDelete(c.id)
                 }}
-                {...stylex.props(styles.iconBtn, shared.press)}
+                {...stylex.props(styles.iconBtn, styles.iconBtnLg, shared.press)}
               >
                 <Sym name="trash" size={13} />
               </button>
@@ -1277,7 +1277,7 @@ function CircuitLab() {
             <h2 {...stylex.props(styles.confirmTitle)}>Delete {deleteName}?</h2>
             <span {...stylex.props(styles.confirmSub)}>Its gates, wires and undo history are removed for good.</span>
             <div {...stylex.props(styles.confirmActions)}>
-              <button type="button" onClick={closeConfirm} {...stylex.props(styles.btn, shared.press)}>
+              <button type="button" autoFocus onClick={closeConfirm} {...stylex.props(styles.btn, shared.press)}>
                 Cancel
               </button>
               <button

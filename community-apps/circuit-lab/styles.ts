@@ -269,10 +269,13 @@ export const styles = stylex.create({
     position: 'absolute',
     display: 'grid',
     placeItems: 'center',
-    width: 26,
-    height: 26,
+    // Wide and short: a 26px circle would collide with the neighbouring input
+    // pin on two-input gates (18.7px of spacing), so the target reaches
+    // sideways into open canvas instead of vertically into the other pin.
+    width: 34,
+    height: 18,
     borderWidth: 0,
-    borderRadius: radius.circle,
+    borderRadius: radius.pill,
     padding: 0,
     backgroundColor: 'transparent',
     cursor: 'crosshair'
@@ -290,7 +293,7 @@ export const styles = stylex.create({
   pinArmed: { outline: `2px solid ${ACCENT}`, outlineOffset: 2 },
   pinCandidate: { outline: `1.5px dashed color-mix(in srgb, ${ACCENT} 55%, transparent)`, outlineOffset: 2 },
   pinBad: { outline: `1.5px dashed color-mix(in srgb, ${colors.redDark} 60%, transparent)`, outlineOffset: 2 },
-  pinAt: (x: number, y: number) => ({ transform: `translate(${x - 13}px,${y - 13}px)` }),
+  pinAt: (x: number, y: number) => ({ transform: `translate(${x - 17}px,${y - 9}px)` }),
   banner: {
     position: 'absolute',
     top: space.sm,
@@ -333,7 +336,8 @@ export const styles = stylex.create({
     boxShadow: `${shadow.rim},${shadow.float}`
   },
   zoomPct: {
-    minWidth: 40,
+    minWidth: 48,
+    minHeight: 40,
     borderWidth: 0,
     borderRadius: radius.pill,
     paddingBlock: space.xxs,
@@ -349,8 +353,8 @@ export const styles = stylex.create({
   iconBtn: {
     display: 'grid',
     placeItems: 'center',
-    width: 30,
-    height: 30,
+    width: 40,
+    height: 40,
     borderWidth: 0,
     borderRadius: radius.pill,
     backgroundColor: { default: 'transparent', ':hover': app.fill },
@@ -425,7 +429,7 @@ export const styles = stylex.create({
   segBtn: {
     flex: 1,
     minWidth: 0,
-    height: 30,
+    height: 40,
     borderWidth: 0,
     borderRadius: radius.sm,
     backgroundColor: { default: 'transparent', ':hover': app.fill2 },
@@ -493,6 +497,7 @@ export const styles = stylex.create({
     gap: space.xxs,
     borderWidth: 0,
     borderRadius: radius.pill,
+    minHeight: 44,
     paddingBlock: space.sm,
     paddingInline: space.md,
     backgroundColor: { default: app.fill, ':hover': app.fill2 },
@@ -524,6 +529,7 @@ export const styles = stylex.create({
     minWidth: 0,
     borderWidth: 0,
     borderRadius: radius.lg,
+    minHeight: 44,
     paddingBlock: space.sm,
     paddingInline: space.sm,
     backgroundColor: { default: 'transparent', ':hover': app.fill3 },
