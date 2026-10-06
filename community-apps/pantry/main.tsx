@@ -599,23 +599,26 @@ function Pantry() {
           Stock the shelf
         </h2>
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          add()
+      {/* The app iframe sandbox has no allow-forms token, so a real form submit
+          never fires; Enter inside a field is wired through keydown instead. */}
+      <div
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+            e.preventDefault()
+            add()
+          }
         }}
-        noValidate
       >
         <div {...stylex.props(styles.formCol)}>
           {draftFields(draft, (patch) => setDraft({ ...draft, ...patch }), errors, 'add')}
           {errors.form && <p {...stylex.props(styles.errorText)}>{errors.form}</p>}
           <div {...stylex.props(styles.sheetActions)}>
-            <Button type="submit" variant="filled">
+            <Button type="button" variant="filled" onClick={add}>
               Add item
             </Button>
           </div>
         </div>
-      </form>
+      </div>
     </section>
   )
 
@@ -760,12 +763,13 @@ function Pantry() {
           {doc.list.length ? `${openList} to buy${boughtList ? ` · ${boughtList} bought` : ''}` : 'clear'}
         </span>
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          addShopItem()
+      <div
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+            e.preventDefault()
+            addShopItem()
+          }
         }}
-        noValidate
       >
         <div {...stylex.props(styles.fieldRow)}>
           <label {...stylex.props(styles.field)}>
@@ -793,11 +797,11 @@ function Pantry() {
               maxLength={40}
             />
           </label>
-          <Button type="submit" variant="filled">
+          <Button type="button" variant="filled" onClick={addShopItem}>
             Add
           </Button>
         </div>
-      </form>
+      </div>
       {shopError && <p {...stylex.props(styles.errorText)}>{shopError}</p>}
       {doc.list.length ? (
         <ul {...stylex.props(styles.rows)}>
