@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.battleship",
+    "name": "Battleship",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/battleship",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:30:20.559Z",
+    "commit": "e7e1a933fac2a1502d4ea450db180f021cd4bf31",
+    "hash": "26538bd1"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 539469,
+      "sha256": "ec7a081a361fa14f3887967e7386b5984ad60fe418ba89811de9c3db9cc26f9f"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1049870,
+      "sha256": "a0805beaa97a8b977754642d5445b491ab87ec2d2984974342bc4067c63d3101"
+    }
+  ]
+}

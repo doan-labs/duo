@@ -64,6 +64,20 @@
         }
       ]
     },
+    "com.mnismt.duo.battleship": {
+      "name": "Battleship",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/battleship",
+      "releases": [
+        {
+          "release": "1.0.0+26538bd1",
+          "sdk": "0.0.0",
+          "bytes": 539469,
+          "sha256": "fbe5750fbbebdaf1e81c4df41beee1f463aeeb41ecbf9a8bb06a1e197163e1d2"
+        }
+      ]
+    },
     "com.mnismt.duo.flappyduo": {
       "name": "Flappy Duo",
       "lane": "community",
