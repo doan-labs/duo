@@ -5,7 +5,6 @@ import {
   fonts,
   glass,
   leading,
-  motion,
   radius,
   shadow,
   space,
@@ -136,26 +135,29 @@ export const styles = stylex.create({
     minWidth: 0,
     perspective: '700px'
   },
-  // A pile's empty landing spot: a quiet well that also takes taps.
+  // A pile's empty landing spot: a quiet well that also takes taps. The
+  // hairline is an inside outline, not a shadow.
   slot: {
     position: 'absolute',
     borderWidth: 0,
     padding: 0,
     borderRadius: radius.sm,
     backgroundColor: `color-mix(in srgb, ${colors.black} 18%, transparent)`,
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 14%, transparent)`,
+    outlineWidth: 1,
+    outlineStyle: 'solid',
+    outlineColor: `color-mix(in srgb, ${colors.white} 14%, transparent)`,
+    outlineOffset: -1,
     display: 'grid',
     placeItems: 'center',
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'box-shadow,background-color',
+    transitionProperty: 'outline-color,background-color',
     transitionDuration: '.18s',
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
-  slotMark: { color: `color-mix(in srgb, ${colors.white} 30%, transparent)` },
   slotHot: {
     backgroundColor: `color-mix(in srgb, ${colors.green} 30%, ${colors.black} 30%)`,
-    boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${colors.white} 45%, transparent)`,
+    outlineColor: `color-mix(in srgb, ${colors.white} 45%, transparent)`,
     animationName: { default: slotPulse, [reduce]: 'none' },
     animationDuration: '1.2s',
     animationTimingFunction: easing.inOut,
@@ -170,9 +172,6 @@ export const styles = stylex.create({
     cursor: 'pointer',
     touchAction: 'manipulation',
     transformStyle: 'preserve-3d',
-    transitionProperty: 'transform',
-    transitionDuration: '.3s',
-    transitionTimingFunction: easing.pop,
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
@@ -197,28 +196,40 @@ export const styles = stylex.create({
     backfaceVisibility: 'hidden',
     WebkitBackfaceVisibility: 'hidden'
   },
+  // Card chrome is a hairline border plus the token rim; only a lifted card
+  // (the selection) earns shadow.card.
   faceFront: {
     backgroundColor: colors.white,
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.black} 12%, transparent),${shadow.card}`
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: `color-mix(in srgb, ${colors.black} 12%, transparent)`,
+    boxShadow: shadow.rim
   },
   faceBack: {
     transform: 'rotateY(180deg)',
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 16%, transparent),${shadow.card}`
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: `color-mix(in srgb, ${colors.white} 16%, transparent)`,
+    boxShadow: shadow.rim
   },
   // A settled face-down card: flat back art with the same chrome, no flip rig.
   cardDownStill: {
     position: 'absolute',
     borderRadius: radius.sm,
     overflow: 'hidden',
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 16%, transparent),${shadow.card}`
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: `color-mix(in srgb, ${colors.white} 16%, transparent)`,
+    boxShadow: shadow.rim
   },
-  // The lifted selected run: a blue ring around every card it covers.
+  // The lifted selected run: a blue ring and the one real drop shadow.
   selected: {
     outlineWidth: 2,
     outlineStyle: 'solid',
     outlineColor: app.link,
     outlineOffset: 2,
-    borderRadius: radius.sm
+    borderRadius: radius.sm,
+    boxShadow: shadow.card
   },
   foundationMark: { width: '55%', aspectRatio: '1' },
   // A legal destination breathing under the selected run.
@@ -323,7 +334,9 @@ export const styles = stylex.create({
     display: 'grid',
     placeItems: 'center',
     borderRadius: radius.xs,
-    boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${colors.white} 24%, transparent)`
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: `color-mix(in srgb, ${colors.white} 24%, transparent)`
   },
   backMark: { width: '46%', height: '46%' },
   // The toolbar: five labelled actions the same on both displays.
@@ -354,10 +367,6 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'transform,background-color,color',
-    transitionDuration: `${motion.pressDuration},.18s,.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
   toolWide: {
@@ -408,9 +417,6 @@ export const styles = stylex.create({
     overflow: 'hidden',
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'color,background-color',
-    transitionDuration: '.18s',
-    transitionTimingFunction: easing.inOut,
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
   segOn: {
@@ -432,7 +438,8 @@ export const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap'
   },
-  statusWide: { textAlign: 'start' },
+  // On the rail the status line wraps instead of clipping at the edge.
+  statusWide: { textAlign: 'start', whiteSpace: 'normal' },
   statusWarn: { color: colors.yellowDark, fontWeight: weight.semibold },
   statusAlert: { color: colors.orangeDark, fontWeight: weight.semibold },
   // The win card: floats over the table like Minesweeper's result card.
@@ -508,10 +515,6 @@ export const styles = stylex.create({
     cursor: 'pointer',
     flexShrink: 0,
     touchAction: 'manipulation',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
   action: {
@@ -532,12 +535,9 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
+  slotMark: { color: `color-mix(in srgb, ${colors.white} 30%, transparent)` },
   // The mode radio list the wide rail uses, same as Minesweeper's picker.
   pickPanel: {
     display: 'flex',
@@ -562,9 +562,6 @@ export const styles = stylex.create({
     textAlign: 'start',
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'color,background-color',
-    transitionDuration: '.18s',
-    transitionTimingFunction: easing.inOut,
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: -2 }
   },
   pickRowSep: {
@@ -621,14 +618,29 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     textTransform: 'uppercase'
   },
+  // The wide rail: controls and stats live in a scroll region so a short
+  // display lets them scroll instead of spilling over the header above or
+  // the home bar below. The status line stays pinned at the rail's foot.
   rail: {
     display: 'flex',
     flexDirection: 'column',
     gap: space.sm,
     width: '196px',
     flexShrink: 0,
-    justifyContent: 'center'
+    minHeight: 0
   },
+  railScroll: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    scrollbarWidth: 'none'
+  },
+  // marginBlock:auto centres the rail's contents while they fit and collapses
+  // to top alignment once they overflow - centered flex children would lose
+  // their top edge above the scrollport.
+  railBody: { display: 'flex', flexDirection: 'column', gap: space.sm, marginBlock: 'auto' },
   stage: { flexGrow: 1, minHeight: 0, minWidth: 0, display: 'flex', gap: space.lg, alignItems: 'stretch' },
   shell: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, gap: space.sm, position: 'relative' },
   confirmCard: {

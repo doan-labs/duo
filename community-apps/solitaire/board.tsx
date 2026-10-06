@@ -1,3 +1,4 @@
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { CardBack, CardFace } from './cards.tsx'
@@ -190,7 +191,8 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
           won && spot.startsWith('f') && styles.hop,
           won && spot.startsWith('f') && styles.delayAt(120 + Number(spot.slice(1)) * 90),
           shake === key && styles.shake,
-          picked && styles.selected
+          picked && styles.selected,
+          shared.press
         )}
       >
         <span {...stylex.props(styles.cardInner, !card.up && styles.cardInnerDown)}>
@@ -213,7 +215,13 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
       aria-label={label}
       onClick={() => onSpot(spot)}
       onKeyDown={(e) => nav(e, spot)}
-      {...stylex.props(styles.slot, place(x, y, 0), hot.has(spot) && styles.slotHot, shake === spot && styles.shake)}
+      {...stylex.props(
+        styles.slot,
+        place(x, y, 0),
+        hot.has(spot) && styles.slotHot,
+        shake === spot && styles.shake,
+        shared.press
+      )}
       tabIndex={-1}
     >
       {mark ? <span {...stylex.props(styles.slotMark)}>{mark}</span> : null}

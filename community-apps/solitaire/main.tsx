@@ -20,6 +20,7 @@ import {
   MODES,
   type Mode,
   type Move,
+  mergeStats,
   newGame,
   normalizeStats,
   recordPlay,
@@ -198,7 +199,7 @@ function Seg({
           aria-checked={o === value}
           tabIndex={o === value ? 0 : -1}
           onClick={() => onChange(o)}
-          {...stylex.props(styles.segBtn, o === value && styles.segOn)}
+          {...stylex.props(styles.segBtn, o === value && styles.segOn, shared.press)}
         >
           <span {...stylex.props(styles.segLabel)}>{o}</span>
         </button>
@@ -231,6 +232,13 @@ function Solitaire() {
   // arrives already settled.
   const [dealing, setDealing] = useState(false)
   const autoTimer = useRef<number | null>(null)
+  // A sweep the hidden copy dropped: the shared deal record carries an `auto`
+  // flag, so whichever copy next owns the screen can finish it from truth.
+  const resumeAuto = useRef(false)
+  // The pre-win best at the moment this session won this seed: only then is
+  // 'new best' honest - equal moves do not reannounce, and neither does a
+  // relaunched won game (this ref is empty there).
+  const winMark = useRef<{ seed: number; prevBest: number | null } | null>(null)
   const activeRef = useRef(view.active)
   activeRef.current = view.active
 
@@ -241,6 +249,15 @@ function Solitaire() {
   const prefs = useKV(os.storage, 'prefs')
   const stats = readStats(statsRaw.value)
   const muted = readMuted(prefs.value)
+  // Interval ticks and tap handlers need the live value, not the closure's
+  // copy - a fold can hand the record to the other display and back faster
+  // than one render cycle.
+  const tableRef = useRef(table)
+  tableRef.current = table
+  const statsRef = useRef(stats)
+  statsRef.current = stats
+  const savedValRef = useRef(saved.value)
+  savedValRef.current = saved.value
 
   const stopAuto = useCallback(() => {
     if (autoTimer.current !== null) {
@@ -261,12 +278,40 @@ function Solitaire() {
   const publish = useCallback(
     (next: Table) => {
       setTable(next)
-      const raw = JSON.stringify(serializeGame(ME, next))
+      tableRef.current = next
+      // auto:true tells the other display a sweep is in flight here, so a fold
+      // mid-Auto hands it off instead of silently dropping the timer.
+      const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null))
       lastSeen.current = raw
       void saved.set(raw)
     },
     [saved]
   )
+
+  // The shared record must never regress to an older base. When the other
+  // display wrote a deal this copy has not adopted yet - the gap between a
+  // fold, the KV echo and the next render is where taps land - adopt it
+  // synchronously before any move, undo or Auto tick computes its write.
+  const freshBase = useCallback((): { table: Table; foreign: boolean } => {
+    const raw = savedValRef.current
+    if (raw && raw !== lastSeen.current) {
+      const next = adoptGame(raw)
+      if (next && next.by !== ME) {
+        lastSeen.current = raw
+        const t = { ...next.deal, game: next.game }
+        setTable(t)
+        tableRef.current = t
+        setSel(null)
+        setPending(null)
+        // A newer record supersedes a local sweep: drop the timer here and
+        // let the record's auto flag resume whoever owns the screen.
+        stopAuto()
+        resumeAuto.current = next.auto === true
+        return { table: t, foreign: true }
+      }
+    }
+    return { table: tableRef.current, foreign: false }
+  }, [stopAuto])
 
   // Why adopt on the storage key: the fold carries the running match to the
   // other display. A write this copy did not make is the newer settled deal;
@@ -285,10 +330,15 @@ function Solitaire() {
     }
     const next = adoptGame(raw)
     if (!next || next.by === ME) return
-    setTable({ ...next.deal, game: next.game })
+    const t = { ...next.deal, game: next.game }
+    setTable(t)
+    tableRef.current = t
     setSel(null)
     setPending(null)
     stopAuto()
+    // The other copy was mid-sweep when this one took the display: pick it up.
+    // A record without the flag also clears any stale resume request.
+    resumeAuto.current = next.auto === true
     setStatus('Game restored.')
   }, [saved.value, saved.status, saved, publish, stopAuto])
 
@@ -298,7 +348,11 @@ function Solitaire() {
 
   const commitStats = useCallback(
     (next: Stats) => {
-      void statsRaw.set(JSON.stringify({ v: 1, by: ME, ...next }))
+      // Both copies write this key; merge with the freshest shared value so a
+      // commit on a stale base unions deals instead of erasing the other
+      // display's increments.
+      const merged = mergeStats(readStats(statsRaw.value), next)
+      void statsRaw.set(JSON.stringify({ v: 1, by: ME, ...merged }))
     },
     [statsRaw]
   )
@@ -318,7 +372,15 @@ function Solitaire() {
   /** Apply a legal move: the log grows by one entry and the match republishes. */
   const doMove = useCallback(
     (m: Move, note?: string) => {
-      const { game: prev, mode, seed, log } = table
+      const base = freshBase()
+      const { game: prev, mode, seed, log } = base.table
+      // A foreign base means the table under the tap was already superseded:
+      // the shape may be legal there but names different cards, so the tap
+      // is rejected and the restored deal is what the user now sees.
+      if (base.foreign) {
+        reject('board', 'Game restored - the other screen moved first.')
+        return false
+      }
       if (!canApply(prev, m)) {
         reject('board', 'That move is not legal here.')
         return false
@@ -326,13 +388,18 @@ function Solitaire() {
       const { game: next, revealed } = apply(prev, m)
       const log2 = [...log, m]
       publish({ mode, seed, log: log2, game: next })
+      // A deal counts once, on the first move that actually lands on it.
+      const played = recordPlay(stats, mode, seed)
       if (next.status === 'won') {
-        commitStats(recordWin(stats, mode, log2.length))
+        winMark.current = { seed, prevBest: stats[mode].best }
+        const after = recordWin(played, mode, seed, log2.length)
+        if (after !== stats) commitStats(after)
         setStatus(`You cleared the table in ${log2.length} moves.`)
         play('win')
         setSel(null)
         return true
       }
+      if (played !== stats) commitStats(played)
       const sounds: Cue[] = []
       if (m.t === 'draw') sounds.push('draw')
       else if (m.t === 'redeal') sounds.push('redeal')
@@ -344,12 +411,19 @@ function Solitaire() {
       setSel(null)
       return true
     },
-    [table, publish, play, reject, commitStats, stats]
+    [publish, play, reject, commitStats, stats, freshBase]
   )
 
   /** The undo step: the log loses its last move and the deal replays cleanly. */
   const undo = useCallback(() => {
-    const { mode, seed, log } = table
+    const base = freshBase()
+    if (base.foreign) {
+      // Undo takes back a move on the shared deal - but the shared deal just
+      // changed hands, so the last move is no longer this copy's to take.
+      reject('board', 'Game restored - the other screen moved first.')
+      return
+    }
+    const { mode, seed, log } = base.table
     if (!log.length) return
     const log2 = log.slice(0, -1)
     const game = buildGame(mode, seed, log2)
@@ -359,22 +433,23 @@ function Solitaire() {
     stopAuto()
     setStatus('Undid the last move.')
     play('undo')
-  }, [table, publish, play, stopAuto])
+  }, [publish, play, stopAuto, freshBase, reject])
 
   const restart = useCallback(
-    (mode: Mode = table.mode) => {
+    (mode: Mode = tableRef.current.mode) => {
       const next = freshTable(mode)
       setPending(null)
       setSel(null)
       stopAuto()
+      resumeAuto.current = false // a fresh deal supersedes any sweep handoff
       setDealing(true)
       window.setTimeout(() => setDealing(false), 1400)
-      commitStats(recordPlay(stats, mode))
+      // No stat yet: an untouched replacement deal was never played.
       publish(next)
       setStatus(`New ${MODES.find((m) => m.id === mode)!.label.toLowerCase()} game dealt.`)
       play('deal')
     },
-    [table.mode, publish, play, stopAuto, commitStats, stats]
+    [publish, play, stopAuto]
   )
 
   const ended = table.game.status === 'won'
@@ -536,13 +611,13 @@ function Solitaire() {
 
   /** Auto-finish: the engine sweeps waste and tops to foundations, one hop a beat. */
   const doAuto = useCallback(() => {
-    if (ended || autoTimer.current !== null) return
+    if (ended || autoTimer.current !== null || !activeRef.current) return
     const steps = autoMoves(game)
     if (!steps.length) {
       setStatus('Nothing can move home by itself yet.')
       return
     }
-    setStatus('Sending cards home...')
+    setStatus('Sending eligible cards home...')
     let i = 0
     autoTimer.current = window.setInterval(() => {
       if (!activeRef.current) return
@@ -552,32 +627,62 @@ function Solitaire() {
         return
       }
       i++
-      // The live table state, not the captured snapshot: each tick re-reads it.
-      setTable((current) => {
-        if (!canApply(current.game, m)) {
-          stopAuto()
-          return current
-        }
-        const { game: next } = apply(current.game, m)
-        const nextTable = { ...current, log: [...current.log, m], game: next }
-        const raw = JSON.stringify(serializeGame(ME, nextTable))
-        lastSeen.current = raw
-        void saved.set(raw)
-        if (next.status === 'won') {
-          commitStats(recordWin(stats, next.mode, nextTable.log.length))
-          setStatus(`You cleared the table in ${nextTable.log.length} moves.`)
-          play('win')
-          stopAuto()
-        } else {
-          play('foundation')
-          setStatus(`Auto-finish: ${nextTable.log.length} moves.`)
-        }
-        return nextTable
-      })
-      if (i >= steps.length) stopAuto()
+      // The live table state, not the captured snapshot: each tick re-reads
+      // it, and a foreign write mid-sweep wins - this copy adopts, drops the
+      // timer, and lets the record's auto flag resume whoever holds the screen.
+      const base = freshBase()
+      if (base.foreign) {
+        stopAuto()
+        setStatus('Game restored.')
+        return
+      }
+      const current = base.table
+      if (!canApply(current.game, m)) {
+        stopAuto()
+        return
+      }
+      const { game: next } = apply(current.game, m)
+      const nextTable = { ...current, log: [...current.log, m], game: next }
+      // Count the deal on its first landed move; count the win once per seed.
+      let nextStats = recordPlay(statsRef.current, next.mode, nextTable.seed)
+      if (next.status === 'won') {
+        winMark.current = { seed: nextTable.seed, prevBest: statsRef.current[next.mode].best }
+        nextStats = recordWin(nextStats, next.mode, nextTable.seed, nextTable.log.length)
+      }
+      if (next.status === 'won' || i >= steps.length) {
+        // Clear the interval before publishing so the record's auto flag is
+        // honest: a stored auto:true would wake another copy's sweep forever.
+        stopAuto()
+      }
+      publish(nextTable)
+      if (nextStats !== statsRef.current) commitStats(nextStats)
+      if (next.status === 'won') {
+        setStatus(`You cleared the table in ${nextTable.log.length} moves.`)
+        play('win')
+      } else {
+        play('foundation')
+        setStatus(`Auto-finish: ${nextTable.log.length} moves.`)
+      }
     }, 110)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, ended, stopAuto, saved, play, commitStats, stats])
+  }, [game, ended, stopAuto, publish, play, commitStats, freshBase])
+
+  // DESIGN2: a hidden copy runs no timer at all. Going hidden mid-sweep clears
+  // the interval and flags a resume; becoming visible again (or adopting a
+  // foreign deal whose record still says auto) restarts the sweep from the
+  // shared truth - never a no-op loop ticking where nobody can see it.
+  useEffect(() => {
+    if (!view.active) {
+      if (autoTimer.current !== null) {
+        resumeAuto.current = true
+        stopAuto()
+      }
+      return
+    }
+    if (resumeAuto.current && autoTimer.current === null) {
+      resumeAuto.current = false
+      doAuto()
+    }
+  }, [view.active, doAuto, stopAuto])
 
   const toggleMute = useCallback(() => {
     void prefs.set(JSON.stringify({ v: 1, by: ME, muted: !muted }))
@@ -629,7 +734,12 @@ function Solitaire() {
 
   const blocked = !ended && isBlocked(game)
   const best = stats[table.mode].best
-  const newBest = ended && best !== null && moves <= best
+  // 'new best' only when this session's win on this seed beat the previous one;
+  // a restored or relaunched won game has no winMark, and equal is not a record.
+  const newBest =
+    ended &&
+    winMark.current?.seed === table.seed &&
+    (winMark.current.prevBest === null || moves < winMark.current.prevBest)
   const hydrated = saved.status !== 'hydrating'
 
   const chips = (
@@ -668,7 +778,7 @@ function Solitaire() {
               aria-checked={m.id === table.mode}
               tabIndex={m.id === table.mode ? 0 : -1}
               onClick={() => requestMode(m.id)}
-              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep)}
+              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep, shared.press)}
             >
               <span {...stylex.props(styles.pickLabel)}>{m.label}</span>
               <span {...stylex.props(styles.pickMeta)}>{m.id === 'draw1' ? 'relaxed' : 'classic'}</span>
@@ -692,7 +802,12 @@ function Solitaire() {
           onClick={undo}
           disabled={!table.log.length}
           aria-label="Undo the last move"
-          {...stylex.props(styles.tool, wide && styles.toolWide, !table.log.length && styles.toolDisabled)}
+          {...stylex.props(
+            styles.tool,
+            wide && styles.toolWide,
+            !table.log.length && styles.toolDisabled,
+            shared.press
+          )}
         >
           <Sym name="undo" size={wide ? 15 : 13} />
           Undo
@@ -701,7 +816,7 @@ function Solitaire() {
           type="button"
           onClick={doHint}
           aria-label="Show a hint"
-          {...stylex.props(styles.tool, wide && styles.toolWide)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press)}
         >
           <Sym name="star" size={wide ? 15 : 13} />
           Hint
@@ -710,8 +825,8 @@ function Solitaire() {
           type="button"
           onClick={doAuto}
           disabled={ended}
-          aria-label="Send every safe card home"
-          {...stylex.props(styles.tool, wide && styles.toolWide, ended && styles.toolDisabled)}
+          aria-label="Auto-play every card that can go home"
+          {...stylex.props(styles.tool, wide && styles.toolWide, ended && styles.toolDisabled, shared.press)}
         >
           <Sym name="bolt" size={wide ? 15 : 13} />
           Auto
@@ -721,7 +836,7 @@ function Solitaire() {
           onClick={toggleMute}
           aria-pressed={muted}
           aria-label={muted ? 'Unmute card sounds' : 'Mute card sounds'}
-          {...stylex.props(styles.tool, wide && styles.toolWide, muted && styles.toolOn)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, muted && styles.toolOn, shared.press)}
         >
           <span {...stylex.props(styles.muteWrap)}>
             <Sym name="volume" size={wide ? 15 : 13} />
@@ -733,7 +848,7 @@ function Solitaire() {
           type="button"
           onClick={() => requestNew()}
           aria-label="Start a new game"
-          {...stylex.props(styles.tool, wide && styles.toolWide)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press)}
         >
           <Sym name="reload" size={wide ? 15 : 13} />
           New
@@ -889,8 +1004,15 @@ function Solitaire() {
           <section {...stylex.props(styles.stage)}>
             {boardEl}
             <div {...stylex.props(styles.rail)}>
-              {controls}
-              {statsCard}
+              {/* The scroll region holds controls and stats; when they fit they
+                  centre, when they do not they scroll - never over the header
+                  or the home bar. The status line stays pinned below. */}
+              <div {...stylex.props(styles.railScroll)}>
+                <div {...stylex.props(styles.railBody)}>
+                  {controls}
+                  {statsCard}
+                </div>
+              </div>
               <p aria-live="polite" {...stylex.props(styles.status, styles.statusWide, blocked && styles.statusWarn)}>
                 {hintText}
               </p>

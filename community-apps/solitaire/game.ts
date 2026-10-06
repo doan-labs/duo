@@ -288,19 +288,39 @@ const atName = (m: Move): { from: string; to: string } => {
   }
 }
 
+/** Moves that advance the match: up to a foundation, waste to the table, or off a covered card. */
+const productive = (g: Game): Set<string> => {
+  const out = new Set<string>()
+  for (const m of legalMoves(g)) {
+    if (m.t === 'wf' || m.t === 'tf' || m.t === 'wt') {
+      out.add(encodeMove(m))
+    } else if (m.t === 'tt') {
+      const col = g.tableau[m.c]!
+      const under = col[col.length - 1 - m.n]
+      if (under && !under.up) out.add(encodeMove(m))
+    }
+  }
+  return out
+}
+
 /**
  * The move worth suggesting: reveals first, then foundations, then waste plays,
- * then column moves; a draw when nothing else moves. Returns null when blocked.
- * A king run that only swaps between an empty column and an already bare column
- * is legal but worthless, so it is never suggested.
+ * then a draw. A tableau move that uncovers nothing is a pure sideways shuffle;
+ * it is only suggested when it unlocks a productive move next ply, and it never
+ * outranks a draw. That keeps hints honest - the old flat relocation bonus let
+ * the same two legal jumps ping-pong a run between equivalent homes forever.
+ * Returns null when blocked, or when only pointless sideways moves remain.
  */
 export function hint(g: Game): Hint | null {
   const moves = legalMoves(g)
   if (!moves.length) return null
+  const before = productive(g)
   const score = (m: Move): number => {
     if (m.t === 'draw') return 4
     if (m.t === 'redeal') return 2
-    if (m.t === 'ft') return 1
+    // Pulling a card back off a foundation undoes progress: suggesting it
+    // invites the same states to repeat, so a hint never offers it.
+    if (m.t === 'ft') return 0
     let s = 0
     if (m.t === 'tf' || m.t === 'tt') {
       const col = g.tableau[m.c]!
@@ -309,18 +329,20 @@ export function hint(g: Game): Hint | null {
     }
     if (m.t === 'wf' || m.t === 'tf') s += 40
     if (m.t === 'wt') s += 30
-    if (m.t === 'tt') {
-      const dst = g.tableau[m.d]!
+    if (m.t === 'tt' && s === 0) {
       const col = g.tableau[m.c]!
-      const runStartsAtBottom = m.n === col.length
-      if (dst.length === 0 && runStartsAtBottom)
-        s = 0 // bare column to bare column says nothing
-      else s += 10
+      if (g.tableau[m.d]!.length === 0 && m.n === col.length) return 0
+      // A bare relocation earns a suggestion only by unlocking a productive
+      // move that was not already on the table; otherwise it is sideways.
+      for (const k of productive(apply(g, m).game)) {
+        if (!before.has(k)) return 15
+      }
+      return 0
     }
     return s
   }
   const best = moves.reduce((a, b) => (score(b) > score(a) ? b : a))
-  if (score(best) === 0) return { move: best, text: 'Only sideways moves left' }
+  if (score(best) === 0) return null // only pointless sideways moves left
   const names = atName(best)
   const text =
     best.t === 'draw'
@@ -352,6 +374,7 @@ function moveCardsText(g: Game, m: Move): string {
  * as its own animated hop. Only clearly upward moves are offered.
  */
 export function autoMoves(g: Game): Move[] {
+  if (g.status !== 'playing') return []
   const out: Move[] = []
   let cur = g
   for (;;) {
@@ -385,10 +408,12 @@ export function autoMoves(g: Game): Move[] {
 
 // The wire record is the deal plus the move log: complete undo state by
 // construction, a few hundred bytes for a long game.
-export type SavedGame = { v: 1; by: string; mode: Mode; seed: number; moves: string }
+export type SavedGame = { v: 1; by: string; mode: Mode; seed: number; moves: string; auto?: true }
 
-export function serializeGame(by: string, deal: Deal): SavedGame {
-  return { v: 1, by, mode: deal.mode, seed: deal.seed, moves: encodeLog(deal.log) }
+export function serializeGame(by: string, deal: Deal, auto = false): SavedGame {
+  const out: SavedGame = { v: 1, by, mode: deal.mode, seed: deal.seed, moves: encodeLog(deal.log) }
+  if (auto) out.auto = true
+  return out
 }
 
 export type Deal = { mode: Mode; seed: number; log: Move[] }
@@ -465,59 +490,140 @@ export function buildGame(mode: Mode, seed: number, log: Move[]): Game | null {
 }
 
 /** Rebuilds from the stored string form. Null means malformed or corrupt. */
-export function adoptGame(raw: string): { by: string; deal: Deal; game: Game } | null {
+export function adoptGame(raw: string): { by: string; deal: Deal; game: Game; auto: boolean } | null {
   let saved: SavedGame
   try {
     saved = JSON.parse(raw) as SavedGame
   } catch {
     return null
   }
+  // JSON.parse hands back any type: 'null', 'true', '42', '"x"' all parse fine.
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null
   if (saved.v !== 1 || typeof saved.by !== 'string' || typeof saved.seed !== 'number') return null
   if (saved.mode !== 'draw1' && saved.mode !== 'draw3') return null
   if (typeof saved.moves !== 'string') return null
   const log = parseLog(saved.moves)
   if (!log) return null
-  const game = buildGame(saved.mode, saved.seed, log)
+  // Seeds live and die as u32: the dealer truncates anyway, so adopt the same value.
+  const seed = saved.seed >>> 0
+  const game = buildGame(saved.mode, seed, log)
   if (!game) return null
-  return { by: saved.by, deal: { mode: saved.mode, seed: saved.seed, log }, game }
+  return { by: saved.by, deal: { mode: saved.mode, seed, log }, game, auto: saved.auto === true }
 }
 
 // --- Match statistics -------------------------------------------------------
 
 export type ModeStats = { plays: number; wins: number; best: number | null }
-export type Stats = Record<Mode, ModeStats>
+// Seeds of deals already counted, per mode: a play is counted on its first move,
+// a win on its first win - replaying either is idempotent.
+export type Stats = Record<Mode, ModeStats> & { played: Record<Mode, number[]>; won: Record<Mode, number[]> }
 
 export const EMPTY_STATS: Stats = {
   draw1: { plays: 0, wins: 0, best: null },
-  draw3: { plays: 0, wins: 0, best: null }
+  draw3: { plays: 0, wins: 0, best: null },
+  played: { draw1: [], draw3: [] },
+  won: { draw1: [], draw3: [] }
+}
+
+// How many distinct deals a stat keeps identity for. Far past a lifetime of play.
+const KNOWN_DEALS = 256
+
+const seedList = (raw: unknown): number[] => {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<number>()
+  const out: number[] = []
+  for (const v of raw) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    const s = v >>> 0
+    if (seen.has(s)) continue
+    seen.add(s)
+    out.push(s)
+  }
+  return out.slice(-KNOWN_DEALS)
 }
 
 export function normalizeStats(raw: unknown): Stats {
-  const out: Stats = { draw1: { ...EMPTY_STATS.draw1 }, draw3: { ...EMPTY_STATS.draw3 } }
+  const out: Stats = {
+    draw1: { ...EMPTY_STATS.draw1 },
+    draw3: { ...EMPTY_STATS.draw3 },
+    played: { draw1: [], draw3: [] },
+    won: { draw1: [], draw3: [] }
+  }
   if (raw && typeof raw === 'object') {
+    const rec = raw as Record<string, unknown>
     for (const mode of ['draw1', 'draw3'] as const) {
-      const row = (raw as Record<string, Partial<ModeStats> | undefined>)[mode]
+      const row = (rec as Record<string, Partial<ModeStats> | undefined>)[mode]
       if (!row) continue
       out[mode] = {
         plays: typeof row.plays === 'number' && row.plays >= 0 ? Math.floor(row.plays) : 0,
         wins: typeof row.wins === 'number' && row.wins >= 0 ? Math.floor(row.wins) : 0,
         best: typeof row.best === 'number' && row.best >= 1 ? Math.floor(row.best) : null
       }
+      const lists = rec.played as Record<string, unknown> | undefined
+      const wons = rec.won as Record<string, unknown> | undefined
+      out.played[mode] = seedList(lists?.[mode])
+      out.won[mode] = seedList(wons?.[mode])
+      // A deal cannot be won without being played once; repair inflated records.
+      if (out[mode].wins > out[mode].plays) out[mode].wins = out[mode].plays
     }
   }
   return out
 }
 
-/** A deal counts as played once its first move lands. */
-export function recordPlay(stats: Stats, mode: Mode): Stats {
-  return { ...stats, [mode]: { ...stats[mode], plays: stats[mode].plays + 1 } }
-}
-
-/** A win counts once and keeps the fewest-moves record for that mode. */
-export function recordWin(stats: Stats, mode: Mode, moves: number): Stats {
-  const row = stats[mode]
+/**
+ * A deal counts as played once its first move lands - and never again, so undo
+ * back to the deal, a re-dealt replacement or a fresh copy adopting it can
+ * never count the same seed twice.
+ */
+export function recordPlay(stats: Stats, mode: Mode, seed: number): Stats {
+  const s = seed >>> 0
+  if (stats.played[mode].includes(s)) return stats
   return {
     ...stats,
-    [mode]: { plays: row.plays, wins: row.wins + 1, best: row.best === null ? moves : Math.min(row.best, moves) }
+    [mode]: { ...stats[mode], plays: stats[mode].plays + 1 },
+    played: { ...stats.played, [mode]: [...stats.played[mode], s].slice(-KNOWN_DEALS) }
   }
+}
+
+/**
+ * A win counts once per deal - undoing back past the winning move and winning
+ * the same seed again cannot inflate the tally, but a lower move count on a
+ * re-win still earns the best. Robust to undo, fold, relaunch and Auto.
+ */
+export function recordWin(stats: Stats, mode: Mode, seed: number, moves: number): Stats {
+  const s = seed >>> 0
+  const row = stats[mode]
+  const best = row.best === null ? moves : Math.min(row.best, moves)
+  if (stats.won[mode].includes(s)) return { ...stats, [mode]: { ...row, best } }
+  return {
+    ...stats,
+    [mode]: { ...row, wins: row.wins + 1, best },
+    won: { ...stats.won, [mode]: [...stats.won[mode], s].slice(-KNOWN_DEALS) }
+  }
+}
+
+/**
+ * Set-merge two stat records from different displays. Each copy writes the
+ * same key, so a plain last-writer-wins save would drop whichever increments
+ * the other screen just made; unioning the deal sets and keeping the larger
+ * counters / smaller best makes every commit converge instead of clobber.
+ */
+export function mergeStats(a: Stats, b: Stats): Stats {
+  const out: Stats = {
+    draw1: { plays: 0, wins: 0, best: null },
+    draw3: { plays: 0, wins: 0, best: null },
+    played: { draw1: [], draw3: [] },
+    won: { draw1: [], draw3: [] }
+  }
+  for (const mode of ['draw1', 'draw3'] as const) {
+    out.played[mode] = [...new Set([...a.played[mode], ...b.played[mode]])].slice(-KNOWN_DEALS)
+    out.won[mode] = [...new Set([...a.won[mode], ...b.won[mode]])].slice(-KNOWN_DEALS)
+    const best =
+      a[mode].best === null ? b[mode].best : b[mode].best === null ? a[mode].best : Math.min(a[mode].best, b[mode].best)
+    // Counters can outlive the capped deal lists, so keep the larger of each.
+    const plays = Math.max(out.played[mode].length, a[mode].plays, b[mode].plays)
+    const wins = Math.min(Math.max(out.won[mode].length, a[mode].wins, b[mode].wins), plays)
+    out[mode] = { plays, wins, best }
+  }
+  return out
 }

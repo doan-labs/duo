@@ -11,6 +11,7 @@ import {
   canFoundation,
   canTableau,
   card,
+  EMPTY_STATS,
   type Game,
   hint,
   isBlocked,
@@ -19,7 +20,10 @@ import {
   legalMoves,
   type Move,
   newGame,
+  normalizeStats,
   parseLog,
+  recordPlay,
+  recordWin,
   serializeGame
 } from './game.ts'
 
@@ -325,6 +329,121 @@ check('autoMoves only walks cards home and stops when safe moves run out', () =>
     tableau: [[card(0, 5, true)], [card(1, 8, true)], [], [], [], [], []]
   })
   eq(autoMoves(dry), [])
+})
+
+check('adoptGame survives null, primitive and truncated records', () => {
+  // JSON.parse accepts far more than objects: 'null' parsed to null used to
+  // crash on a property read. Every one of these must return null, not throw.
+  for (const raw of ['null', '"str"', '42', 'true', '[]', '{}', '{', '', ' ']) {
+    let out: unknown = 'threw'
+    try {
+      out = adoptGame(raw)
+    } catch {
+      /* stays 'threw' */
+    }
+    eq(out, null)
+  }
+  // A move token missing a field parses to nothing rather than crashing.
+  eq(adoptGame('{"v":1,"by":"x","mode":"draw1","seed":5,"moves":"tf1"}'), null)
+  // The auto handoff flag rides along; absent reads as false.
+  const auto = adoptGame(JSON.stringify({ v: 1, by: 'x', mode: 'draw1', seed: 5, moves: '', auto: true }))
+  eq(auto!.auto, true)
+  const plain = adoptGame(JSON.stringify({ v: 1, by: 'x', mode: 'draw1', seed: 5, moves: '' }))
+  eq(plain!.auto, false)
+  // Negative seeds normalize to u32 just like the dealer does.
+  const neg = adoptGame(JSON.stringify({ v: 1, by: 'x', mode: 'draw1', seed: -1, moves: '' }))
+  eq(neg!.deal.seed, 0xffffffff)
+})
+
+check('stats count each deal once for plays and wins', () => {
+  let st = EMPTY_STATS
+  st = recordPlay(st, 'draw1', 5)
+  st = recordPlay(st, 'draw1', 5) // second move on the same deal: still one play
+  st = recordPlay(st, 'draw1', 7)
+  st = recordPlay(st, 'draw3', 5) // same seed, other mode: a different deal
+  eq(st.draw1.plays, 2)
+  eq(st.draw3.plays, 1)
+  st = recordWin(st, 'draw1', 7, 120)
+  eq(st.draw1.wins, 1)
+  eq(st.draw1.best, 120)
+  // Undo past the winning move and win the same deal slower: no second win.
+  st = recordWin(st, 'draw1', 7, 140)
+  eq(st.draw1.wins, 1)
+  eq(st.draw1.best, 120)
+  // A faster re-win keeps the win count but takes the record.
+  st = recordWin(st, 'draw1', 7, 100)
+  eq(st.draw1.wins, 1)
+  eq(st.draw1.best, 100)
+  // A different seed is a different deal.
+  st = recordWin(st, 'draw1', 9, 80)
+  eq(st.draw1.wins, 2)
+  eq(st.draw1.best, 80)
+})
+
+check('normalizeStats repairs inflated records and keeps deal identity', () => {
+  // A stored record with wins > plays is corrupt: a deal cannot win unplayed.
+  const corrupt = normalizeStats({
+    draw1: { plays: 0, wins: 3, best: 200 },
+    draw3: { plays: 1, wins: 1, best: 44 }
+  })
+  eq(corrupt.draw1.wins, 0)
+  eq(corrupt.draw3.wins, 1)
+  eq(corrupt.draw1.best, 200)
+  const lists = normalizeStats({
+    draw1: { plays: 1, wins: 1, best: 9 },
+    played: { draw1: [5, 'x', -1] },
+    won: { draw1: [5, 5] }
+  })
+  eq(lists.played.draw1, [5, 0xffffffff])
+  eq(lists.won.draw1, [5])
+})
+
+check('autoMoves returns nothing on a finished game', () => {
+  const won = makeGame({
+    status: 'won',
+    waste: [card(0, 2, true)],
+    foundations: [[card(0, 0, true), card(0, 1, true)], [], [], []]
+  })
+  eq(autoMoves(won), [])
+})
+
+// Follow hints across seeded deals the way a player would; a repeated board
+// under a non-draw suggestion is the ping-pong the reviewer caught.
+const hintCycles = (seeds: [number, 'draw1' | 'draw3'][]): string[] => {
+  const found: string[] = []
+  for (const [seed, mode] of seeds) {
+    let g = newGame(seed, mode)
+    const seen = new Set<string>()
+    for (let i = 0; i < 600 && g.status === 'playing'; i++) {
+      const h = hint(g)
+      if (!h) break
+      const k = JSON.stringify(g)
+      if (seen.has(k) && h.move.t !== 'draw' && h.move.t !== 'redeal') {
+        found.push(`${mode} seed ${seed} step ${i}: ${h.text}`)
+        break
+      }
+      seen.add(k)
+      g = apply(g, h.move).game
+    }
+  }
+  return found
+}
+
+check('review repro seeds never ping-pong a run between columns', () => {
+  eq(
+    hintCycles([
+      [15839, 'draw1'],
+      [23758, 'draw3']
+    ]),
+    []
+  )
+})
+
+check('hint following across 200 seeds never revisits a state', () => {
+  const seeds: [number, 'draw1' | 'draw3'][] = []
+  for (let s = 0; s < 200; s++) seeds.push([(s * 7919 + 1) >>> 0, s % 2 ? 'draw3' : 'draw1'])
+  const found = hintCycles(seeds)
+  eq(found, [])
 })
 
 check('red is hearts and diamonds', () => {
