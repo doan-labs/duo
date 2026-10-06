@@ -1,0 +1,11 @@
+{
+  "id": "com.mnismt.duo.musicsketchpad",
+  "name": "Sketchpad",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "devin",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/music-sketchpad",
+  "license": "MIT"
+}

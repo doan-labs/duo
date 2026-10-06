@@ -172,6 +172,20 @@
         }
       ]
     },
+    "com.mnismt.duo.musicsketchpad": {
+      "name": "Sketchpad",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/music-sketchpad",
+      "releases": [
+        {
+          "release": "1.0.0+9e101453",
+          "sdk": "0.0.0",
+          "bytes": 530335,
+          "sha256": "61e72f371094fff6bdb1f61954dd91550e5be42a8718b07fbf50d88f4e4d93b4"
+        }
+      ]
+    },
     "com.mnismt.duo.nonogram": {
       "name": "Nonogram",
       "lane": "community",

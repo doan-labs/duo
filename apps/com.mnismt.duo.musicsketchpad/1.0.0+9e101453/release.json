@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.musicsketchpad",
+    "name": "Sketchpad",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/music-sketchpad",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:29:24.681Z",
+    "commit": "3ddf41353142f0efb15b0a9ace996cdf6069f83f",
+    "hash": "9e101453"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 530335,
+      "sha256": "158a15c1f6eb4c433256adf466a192626d7e27ccf48fb0270b857d2f94dccdc9"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 619406,
+      "sha256": "3b238345d0ed04488e40fc9783a73575f5e4ab7a4c9c606aa010397191840257"
+    }
+  ]
+}
