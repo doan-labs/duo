@@ -165,6 +165,7 @@ export const styles = stylex.create({
     fontWeight: weight.medium,
     color: app.label2,
     textAlign: 'end',
+    whiteSpace: 'nowrap',
     fontVariantNumeric: 'tabular-nums'
   },
   tlRail: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' },

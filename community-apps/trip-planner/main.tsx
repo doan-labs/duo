@@ -1261,7 +1261,7 @@ function TripPlanner() {
         pushUndo({
           kind: 'leg',
           tripId: t.id,
-          label: `Deleted ${l.from || l.to || 'transport'}`,
+          label: `Deleted ${[l.from, l.to].filter(Boolean).join(' → ') || 'transport'}`, // matches the confirm sheet's route label
           item: res.leg,
           index: res.index
         })
@@ -1991,9 +1991,24 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
 /** The shared undo toast: whichever copy holds the slot, both displays see it. */
 function UndoToast({ undo, onUndo, onDismiss }: { undo: Undo | null; onUndo: () => void; onDismiss: () => void }) {
   const { mounted, closing } = usePresence(!!undo, 250)
+  // The float-in holds opacity 0 until the animation advances; on a stalled
+  // frame clock the toast would never appear, so drop the animation class on
+  // a wall-clock timer and let the static style take over.
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    if (!mounted) {
+      setSettled(false)
+      return
+    }
+    const t = setTimeout(() => setSettled(true), 400)
+    return () => clearTimeout(t)
+  }, [mounted])
   if (!mounted || !undo) return null
   return (
-    <div role="status" {...stylex.props(styles.toast, closing ? animations.floatOut : animations.float)}>
+    <div
+      role="status"
+      {...stylex.props(styles.toast, closing ? animations.floatOut : settled ? undefined : animations.float)}
+    >
       <span>{undo.label}</span>
       <button type="button" onClick={onUndo} {...stylex.props(styles.toastBtn, shared.press)}>
         Undo
