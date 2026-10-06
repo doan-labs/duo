@@ -303,6 +303,23 @@ function Jigsaw() {
     setDrag(dragRef.current)
   }, [])
 
+  // Pressing a tray option picks its piece up; pressing the already-held
+  // piece's own option drops it at the ghost position.
+  const pressPiece = useCallback(
+    (id: number, pt: { x: number; y: number } | null) => {
+      if (pt) {
+        beginDrag(id, pt.x, pt.y)
+        return
+      }
+      if (heldRef.current === id && heldPosRef.current) {
+        dropAt(id, heldPosRef.current.x, heldPosRef.current.y)
+        return
+      }
+      holdPiece(id)
+    },
+    [beginDrag, dropAt, holdPiece]
+  )
+
   // Arrow-key placement and Enter-to-drop for the held piece; Backspace sends
   // a held board piece back to the tray.
   useEffect(() => {
@@ -608,7 +625,7 @@ function Jigsaw() {
                 onFilter={setFilter}
                 heldId={held}
                 cover
-                onPress={(id, pt) => (pt ? beginDrag(id, pt.x, pt.y) : holdPiece(id))}
+                onPress={pressPiece}
                 onCollect={doCollect}
                 loose={looseCount(game)}
               />
@@ -625,7 +642,7 @@ function Jigsaw() {
                 onFilter={setFilter}
                 heldId={held}
                 cover={false}
-                onPress={(id, pt) => (pt ? beginDrag(id, pt.x, pt.y) : holdPiece(id))}
+                onPress={pressPiece}
                 onCollect={doCollect}
                 loose={looseCount(game)}
                 railRef={railEl}

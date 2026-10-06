@@ -208,6 +208,9 @@ export function BoardPane({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    // Nested buttons (zoom dock, held card, completion veil) must keep their
+    // click: pointer capture retargets the follow-up click to the wrap.
+    if ((e.target as Element).closest?.('button')) return
     wrap.current?.setPointerCapture(e.pointerId)
     pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pts.current.size === 2) {
@@ -533,7 +536,10 @@ export function TrayPane({
                 onPointerDown={(e) => onPress(i, e)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
+                    // The document listener drops a held piece on the same key;
+                    // this press already handles it.
                     e.preventDefault()
+                    e.stopPropagation()
                     onPress(i, e as unknown as ReactPointerEvent<HTMLElement>)
                   }
                 }}
