@@ -293,7 +293,7 @@ export const exportCodes = (colors: Rgb[], names?: string[]) =>
 // ---- Wire parsing and serialization ----
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
-const isByte = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 255
+const isByte = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 255
 export const parseRgb = (v: unknown): Rgb | null =>
   isObj(v) && isByte(v.r) && isByte(v.g) && isByte(v.b) ? { r: v.r, g: v.g, b: v.b } : null
 const parseCore = (v: unknown): Core | null => {
