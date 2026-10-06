@@ -134,6 +134,11 @@
       "folder": "pocket-budget",
       "developer": "devin",
       "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.roomplanner": {
+      "folder": "room-planner",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
     }
   }
 }
