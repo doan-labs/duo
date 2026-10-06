@@ -164,7 +164,7 @@ export type Game = {
   finishedAt: number | null
 }
 
-export type Live = { v: 1; by: string; held: number | null; game: Game }
+export type Live = { v: 1; by: string; rev: number; held: number | null; game: Game }
 
 export const slotX = (g: Game, p: Piece) => p.c * (BOARD_W / g.cols)
 export const slotY = (g: Game, p: Piece) => p.r * (BOARD_H / g.rows)
@@ -366,8 +366,16 @@ export function parseGame(raw: string | null): Game | null {
 }
 
 /** The session mirror: who wrote it, the game and which piece is held. */
-export function liveOf(by: string, game: Game, held: number | null): string {
-  return JSON.stringify({ v: 1, by, held, game } satisfies Live)
+export function liveOf(by: string, rev: number, game: Game, held: number | null): string {
+  return JSON.stringify({ v: 1, by, rev, held, game } satisfies Live)
+}
+
+/**
+ * Total order for shared envelopes: higher revision wins, writer id breaks
+ * ties so every copy resolves the same race the same way.
+ */
+export function newerDoc(rev: number, by: string, otherRev: number, otherBy: string): boolean {
+  return rev > otherRev || (rev === otherRev && by > otherBy)
 }
 
 export function parseLive(raw: string | null): Live | null {
@@ -381,6 +389,7 @@ export function parseLive(raw: string | null): Live | null {
     return {
       v: 1,
       by: v.by,
+      rev: num(v.rev) ?? 0,
       held: held !== null && game.pieces[held] && game.pieces[held]!.z !== LOCKED ? held : null,
       game
     }
@@ -390,23 +399,25 @@ export function parseLive(raw: string | null): Live | null {
 }
 
 /** Durable save: one game per art:count config plus the last-open pointer. */
-export type Saves = { current: string | null; games: Record<string, Game> }
+export type Saves = { rev: number; by: string; current: string | null; games: Record<string, Game> }
 export const configKey = (art: string, count: number) => `${art}:${count}`
 
+const SAVES0: Saves = { rev: 0, by: '', current: null, games: {} }
+
 export function parseSaves(raw: string | null): Saves {
-  if (!raw) return { current: null, games: {} }
+  if (!raw) return SAVES0
   try {
     const v: unknown = JSON.parse(raw)
-    if (!record(v) || !record(v.games)) return { current: null, games: {} }
+    if (!record(v) || !record(v.games)) return SAVES0
     const games: Record<string, Game> = {}
     for (const [key, value] of Object.entries(v.games)) {
       const g = cleanGame(value)
       if (g && key === configKey(g.art, g.count)) games[key] = g
     }
     const current = typeof v.current === 'string' && games[v.current] ? v.current : null
-    return { current, games }
+    return { rev: num(v.rev) ?? 0, by: typeof v.by === 'string' ? v.by : '', current, games }
   } catch {
-    return { current: null, games: {} }
+    return SAVES0
   }
 }
 

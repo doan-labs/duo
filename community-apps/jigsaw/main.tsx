@@ -18,14 +18,17 @@ import {
   elapsedMs,
   formatTime,
   type Game,
+  type Live,
   liveOf,
   looseCount,
+  newerDoc,
   newGame,
   parseLive,
   parseSaves,
   placeAt,
   placedCount,
   resetGame,
+  type Saves,
   sendToTray,
   serializeSaves
 } from './puzzle.ts'
@@ -53,6 +56,25 @@ function cleanPrefs(raw: string | null): Prefs {
     return { art, count, muted: o.muted === true, guide: o.guide !== false }
   } catch {
     return PREFS0
+  }
+}
+
+/** The prefs wire envelope: prefs plus the revision and writer for ordering. */
+type PrefsDoc = { rev: number; by: string; prefs: Prefs }
+
+function parsePrefsDoc(raw: string | null): PrefsDoc {
+  const prefs = cleanPrefs(raw)
+  try {
+    const v: unknown = raw ? JSON.parse(raw) : null
+    if (typeof v !== 'object' || v === null) return { rev: 0, by: '', prefs }
+    const o = v as Record<string, unknown>
+    return {
+      rev: typeof o.rev === 'number' && Number.isSafeInteger(o.rev) ? o.rev : 0,
+      by: typeof o.by === 'string' ? o.by : '',
+      prefs
+    }
+  } catch {
+    return { rev: 0, by: '', prefs }
   }
 }
 
@@ -84,8 +106,9 @@ function Jigsaw() {
   const live = useKV(os.session, LIVE_KEY)
   const savesKV = useKV(os.storage, SAVES_KEY)
   const prefsKV = useKV(os.storage, PREFS_KEY)
+  // The last ACCEPTED saves document. Unconditional reads of the KV mirror can
+  // see a stale racing write, so this ref only moves through revision checks.
   const savesRaw = useRef<string | null>(null)
-  savesRaw.current = savesKV.value
 
   const [prefs, setPrefsState] = useState<Prefs | null>(null)
   const [game, setGame] = useState<Game | null>(null)
@@ -118,6 +141,15 @@ function Jigsaw() {
   const seeded = useRef(false)
   const gameKeyRef = useRef('')
   const liveRawRef = useRef<string | null>(null)
+  // Lamport clocks: revision/writer of the newest accepted doc per key. A
+  // stale racing write (lower or equal-with-lower-by) is rejected and healed.
+  const liveRevRef = useRef(0)
+  const liveByRef = useRef('')
+  const savesRevRef = useRef(0)
+  const savesByRef = useRef('')
+  const prefsRevRef = useRef(0)
+  const prefsByRef = useRef('')
+  const actQueue = useRef(Promise.resolve())
 
   const cw = game ? BOARD_W / game.cols : 1
   const ch = game ? BOARD_H / game.rows : 1
@@ -131,16 +163,10 @@ function Jigsaw() {
     requestAnimationFrame(() => os.ready())
   }, [])
 
-  // Session mirror adoption: a value this copy did not write is the settled
-  // game from the other display. The raw-string guard keeps echoes of this
-  // copy's own writes from re-firing.
-  useEffect(() => {
-    if (live.status !== 'ready') return
-    const raw = live.value
-    if (raw === liveRawRef.current) return
-    liveRawRef.current = raw
-    const doc = parseLive(raw)
-    if (!doc || doc.by === ME) return
+  // Applies a foreign doc whose revision beats the one last accepted here.
+  const adoptLive = useCallback((doc: Live) => {
+    liveRevRef.current = doc.rev
+    liveByRef.current = doc.by
     setGame(doc.game)
     setHeld(doc.held)
     setHeldPos(null)
@@ -151,38 +177,160 @@ function Jigsaw() {
       setVeilDown(false)
       setFilter('all')
     }
-  }, [live.value, live.status])
+  }, [])
 
-  const publish = useCallback(
-    (next: Game, heldId: number | null) => {
-      setGame(next)
-      setHeld(heldId)
-      live.set(liveOf(ME, next, heldId))
-      const key = configKey(next.art, next.count)
-      const saves = parseSaves(savesRaw.current)
-      saves.games[key] = next
-      saves.current = key
-      savesKV.set(serializeSaves(saves))
+  // Serialized read-modify-write: every mutation rebases on the settled shared
+  // doc read straight from the store, so a tap right after a fold - before the
+  // deferred mirror catches up - cannot overwrite a newer remote state. The
+  // saves map is merged onto the freshest envelope the same way.
+  const act = useCallback(
+    (
+      fn: (ctx: {
+        game: Game | null
+        held: number | null
+        saves: Record<string, Game>
+      }) => { next: Game; held: number | null } | null
+    ) => {
+      actQueue.current = actQueue.current.then(async () => {
+        const [liveRaw, savesDoc] = await Promise.all([
+          os.session.get(LIVE_KEY).catch(() => null),
+          os.storage.get(SAVES_KEY).catch(() => null)
+        ])
+        const doc = parseLive(liveRaw)
+        let base = gameRef.current
+        let heldBase = heldRef.current
+        if (doc && doc.by !== ME && newerDoc(doc.rev, doc.by, liveRevRef.current, liveByRef.current)) {
+          adoptLive(doc)
+          base = doc.game
+          heldBase = doc.held
+        }
+        const sd = parseSaves(savesDoc)
+        if (newerDoc(sd.rev, sd.by, savesRevRef.current, savesByRef.current)) {
+          savesRevRef.current = sd.rev
+          savesByRef.current = sd.by
+          savesRaw.current = serializeSaves(sd)
+        }
+        const r = fn({ game: base, held: heldBase, saves: sd.games })
+        if (!r) return
+        liveRevRef.current = Math.max(liveRevRef.current, doc?.rev ?? 0) + 1
+        liveByRef.current = ME
+        setGame(r.next)
+        setHeld(r.held)
+        live.set(liveOf(ME, liveRevRef.current, r.next, r.held))
+        const key = configKey(r.next.art, r.next.count)
+        savesRevRef.current += 1
+        savesByRef.current = ME
+        const saves: Saves = { rev: savesRevRef.current, by: ME, current: key, games: { ...sd.games, [key]: r.next } }
+        savesRaw.current = serializeSaves(saves)
+        savesKV.set(savesRaw.current)
+      })
+      actQueue.current.catch(() => {})
     },
-    [live, savesKV]
+    [adoptLive, live, savesKV]
   )
 
-  // Prefs hydrate and follow the other display's switches (mute especially).
+  const repairLive = useCallback(() => {
+    act((ctx) => (ctx.game ? { next: ctx.game, held: ctx.held } : null))
+  }, [act])
+
+  // Session mirror adoption: a foreign doc wins only by revision. A stale
+  // racing write is dropped and the store is healed with our newer doc.
+  useEffect(() => {
+    if (live.status !== 'ready') return
+    const raw = live.value
+    if (raw === liveRawRef.current) return
+    liveRawRef.current = raw
+    const doc = parseLive(raw)
+    if (!doc || doc.by === ME) return
+    if (!newerDoc(doc.rev, doc.by, liveRevRef.current, liveByRef.current)) {
+      repairLive()
+      return
+    }
+    adoptLive(doc)
+  }, [live.value, live.status, adoptLive, repairLive])
+
+  const repairPrefs = useCallback(() => {
+    if (prefsRevRef.current === 0) return
+    prefsRevRef.current += 1
+    prefsByRef.current = ME
+    prefsKV.set(JSON.stringify({ ...(prefsRef.current ?? PREFS0), rev: prefsRevRef.current, by: ME }))
+  }, [prefsKV])
+
+  const repairSaves = useCallback(() => {
+    const saves = parseSaves(savesRaw.current)
+    if (!savesRaw.current) return
+    savesRevRef.current += 1
+    savesByRef.current = ME
+    savesRaw.current = serializeSaves({ ...saves, rev: savesRevRef.current, by: ME })
+    savesKV.set(savesRaw.current)
+  }, [savesKV])
+
+  // Saves follow the same revision order: a newer foreign library (a sibling
+  // puzzle saved on the other display) is adopted; a stale write is healed.
+  useEffect(() => {
+    if (savesKV.status !== 'ready') return
+    const env = parseSaves(savesKV.value)
+    if (env.by === ME) {
+      if (env.rev > savesRevRef.current) {
+        savesRevRef.current = env.rev
+        savesByRef.current = env.by
+      }
+      savesRaw.current = savesKV.value
+      return
+    }
+    // Clock at 0 means nothing accepted yet: take the doc as the baseline,
+    // including rev-0 envelopes left by older builds.
+    if (savesRevRef.current !== 0 && !newerDoc(env.rev, env.by, savesRevRef.current, savesByRef.current)) {
+      repairSaves()
+      return
+    }
+    savesRevRef.current = env.rev
+    savesByRef.current = env.by
+    savesRaw.current = savesKV.value
+  }, [savesKV.value, savesKV.status, repairSaves])
+
+  // Prefs hydrate and follow the other display's switches (mute especially),
+  // with the same revision order as the live doc: stale writes are dropped.
   useEffect(() => {
     if (prefsKV.status !== 'ready') return
-    const next = cleanPrefs(prefsKV.value)
-    setPrefsState((cur) => (cur && JSON.stringify(cur) === JSON.stringify(next) ? cur : next))
-    setMuted(next.muted)
-  }, [prefsKV.value, prefsKV.status])
+    const env = parsePrefsDoc(prefsKV.value)
+    if (env.by === ME) {
+      if (env.rev > prefsRevRef.current) {
+        prefsRevRef.current = env.rev
+        prefsByRef.current = env.by
+      }
+      return
+    }
+    if (prefsRevRef.current !== 0 && !newerDoc(env.rev, env.by, prefsRevRef.current, prefsByRef.current)) {
+      repairPrefs()
+      return
+    }
+    prefsRevRef.current = env.rev
+    prefsByRef.current = env.by
+    setPrefsState((cur) => (cur && JSON.stringify(cur) === JSON.stringify(env.prefs) ? cur : env.prefs))
+    setMuted(env.prefs.muted)
+  }, [prefsKV.value, prefsKV.status, repairPrefs])
 
+  // Patch rebases on the settled prefs doc the same way `act` does for games.
+  const prefsQueue = useRef(Promise.resolve())
   const setPrefs = useCallback(
     (patch: Partial<Prefs>) => {
-      setPrefsState((cur) => {
-        const next = { ...(cur ?? PREFS0), ...patch }
-        prefsKV.set(JSON.stringify(next))
+      prefsQueue.current = prefsQueue.current.then(async () => {
+        const env = parsePrefsDoc(await os.storage.get(PREFS_KEY).catch(() => null))
+        let base = prefsRef.current ?? PREFS0
+        if (env.by !== ME && newerDoc(env.rev, env.by, prefsRevRef.current, prefsByRef.current)) {
+          prefsRevRef.current = env.rev
+          prefsByRef.current = env.by
+          base = env.prefs
+        }
+        const next = { ...base, ...patch }
+        prefsRevRef.current += 1
+        prefsByRef.current = ME
+        setPrefsState(next)
         setMuted(next.muted)
-        return next
+        prefsKV.set(JSON.stringify({ ...next, rev: prefsRevRef.current, by: ME }))
       })
+      prefsQueue.current.catch(() => {})
     },
     [prefsKV]
   )
@@ -194,16 +342,14 @@ function Jigsaw() {
     seeded.current = true
     const remote = parseLive(live.value)
     if (remote) {
-      gameKeyRef.current = `${remote.game.art}:${remote.game.count}:${remote.game.seed}`
-      setGame(remote.game)
-      setHeld(remote.held)
+      adoptLive(remote)
       return
     }
-    const saves = parseSaves(savesKV.value)
+    const saves = parseSaves(savesRaw.current ?? savesKV.value)
     const key = configKey(prefs.art, prefs.count)
     const g = saves.games[key] ?? newGame(prefs.art, prefs.count, (Math.random() * 2 ** 31) | 0)
-    publish(g, null)
-  }, [savesKV.status, savesKV.value, live.status, live.value, prefs, publish])
+    act(() => ({ next: g, held: null }))
+  }, [savesKV.status, savesKV.value, live.status, live.value, prefs, act, adoptLive])
 
   // Device dark-mode switch; the shell applies the real class natively.
   useEffect(() => os.device.on('switches', (sw: { darkMode: boolean }) => setDarkMode(sw.darkMode)), [])
@@ -243,8 +389,7 @@ function Jigsaw() {
       if (heldRef.current !== null) {
         setHeld(null)
         setHeldPos(null)
-        const g = gameRef.current
-        if (g) live.set(liveOf(ME, g, null))
+        act((ctx) => (ctx.game ? { next: ctx.game, held: null } : null))
         return true
       }
       return false
@@ -252,25 +397,24 @@ function Jigsaw() {
     return () => {
       escapeTop = null
     }
-  }, [live])
+  }, [act])
 
   // ---- actions ----
 
   const dropAt = useCallback(
     (id: number, x: number, y: number) => {
-      const g = gameRef.current
-      if (!g) return
-      const res = placeAt(g, id, x, y, Date.now())
-      if (res.game === g) {
-        setHeld(null)
-        return
-      }
-      const finishedNow = res.game.finishedAt !== null && g.finishedAt === null
-      publish(res.game, null)
       setHeldPos(null)
-      cue(finishedNow ? 'done' : res.snapped ? 'snap' : 'drop')
+      act((ctx) => {
+        const g = ctx.game
+        if (!g) return null
+        const res = placeAt(g, id, x, y, Date.now())
+        if (res.game === g) return { next: g, held: null }
+        const finishedNow = res.game.finishedAt !== null && g.finishedAt === null
+        cue(finishedNow ? 'done' : res.snapped ? 'snap' : 'drop')
+        return { next: res.game, held: null }
+      })
     },
-    [publish]
+    [act]
   )
 
   const holdPiece = useCallback(
@@ -284,10 +428,10 @@ function Jigsaw() {
       cue('lift')
       setHeld(id)
       setHeldPos(p.z === 1 ? { x: p.x, y: p.y } : { x: BOARD_W / 2 - w / 2, y: BOARD_H / 2 - h / 2 })
-      live.set(liveOf(ME, g, id))
+      act((ctx) => (ctx.game && ctx.game.pieces[id]?.z !== 2 ? { next: ctx.game, held: id } : null))
       if (cover) setPane('board')
     },
-    [cover, live]
+    [act, cover]
   )
 
   const beginDrag = useCallback((id: number, clientX: number, clientY: number) => {
@@ -365,15 +509,21 @@ function Jigsaw() {
         const p = g.pieces[hid]
         if (p && p.z === 1) {
           e.preventDefault()
-          const next = sendToTray(g, hid)
-          publish(next, null)
-          cue('drop')
+          setHeld(null)
+          act((ctx) => {
+            const cg = ctx.game
+            if (!cg) return null
+            const next = sendToTray(cg, hid)
+            if (next === cg) return null
+            cue('drop')
+            return { next, held: null }
+          })
         }
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [dropAt, publish])
+  }, [act, dropAt])
 
   // One pair of window listeners carries every drag: a tap that never moves is
   // a pick-up, a moved pointer drops on the board or the rail.
@@ -412,8 +562,15 @@ function Jigsaw() {
         e.clientY <= rail.bottom &&
         g.pieces[d.id]?.z === 1
       ) {
-        publish(sendToTray(g, d.id), null)
-        cue('drop')
+        setHeld(null)
+        act((ctx) => {
+          const cg = ctx.game
+          if (!cg) return null
+          const next = sendToTray(cg, d.id)
+          if (next === cg) return null
+          cue('drop')
+          return { next, held: null }
+        })
         return
       }
       // A drop outside both targets cancels; a held piece stays held.
@@ -426,40 +583,45 @@ function Jigsaw() {
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
     }
-  }, [dropAt, holdPiece, publish])
+  }, [act, dropAt, holdPiece])
 
   const chooseConfig = useCallback(
     (art: ArtId, count: Count) => {
       const key = configKey(art, count)
-      const saves = parseSaves(savesRaw.current)
-      const g = saves.games[key] ?? newGame(art, count, (Math.random() * 2 ** 31) | 0)
       setPrefs({ art, count })
-      publish(g, null)
+      act(({ saves }) => {
+        const g = saves[key] ?? newGame(art, count, (Math.random() * 2 ** 31) | 0)
+        gameKeyRef.current = `${key}:${g.seed}`
+        return { next: g, held: null }
+      })
       setHeldPos(null)
       setBoardView(fitView())
       setVeilDown(false)
       setPane('board')
-      gameKeyRef.current = `${key}:${g.seed}`
     },
-    [publish, setPrefs]
+    [act, setPrefs]
   )
 
   const doReset = useCallback(() => {
-    const g = gameRef.current
-    if (!g) return
-    publish(resetGame(g, (Math.random() * 2 ** 31) | 0), null)
+    setConfirmReset(false)
+    act((ctx) => {
+      if (!ctx.game) return null
+      const next = resetGame(ctx.game, (Math.random() * 2 ** 31) | 0)
+      gameKeyRef.current = `${next.art}:${next.count}:${next.seed}`
+      return { next, held: null }
+    })
     setHeldPos(null)
     setBoardView(fitView())
     setVeilDown(false)
-    setConfirmReset(false)
-  }, [publish])
+  }, [act])
 
   const doCollect = useCallback(() => {
-    const g = gameRef.current
-    if (!g || looseCount(g) === 0) return
-    publish(collectBoard(g), heldRef.current)
-    cue('drop')
-  }, [publish])
+    act((ctx) => {
+      if (!ctx.game || looseCount(ctx.game) === 0) return null
+      cue('drop')
+      return { next: collectBoard(ctx.game), held: ctx.held }
+    })
+  }, [act])
 
   const toggleMute = useCallback(() => {
     unlock()
@@ -543,10 +705,9 @@ function Jigsaw() {
             aria-label="Put piece back"
             {...stylex.props(styles.heldCancel, shared.press)}
             onClick={() => {
-              const g = gameRef.current
               setHeld(null)
               setHeldPos(null)
-              if (g) live.set(liveOf(ME, g, null))
+              act((ctx) => (ctx.game ? { next: ctx.game, held: null } : null))
             }}
           >
             <Sym name="close" size={11} />
@@ -686,7 +847,7 @@ function Jigsaw() {
           <div {...stylex.props(styles.artRow)} role="radiogroup" aria-label="Picture">
             {ARTS.map((a) => {
               const key = configKey(a.id, prefs.count)
-              const saved = parseSaves(savesKV.value).games[key]
+              const saved = parseSaves(savesRaw.current).games[key]
               const done = saved?.finishedAt !== null && !!saved
               const prog = saved ? placedCount(saved) : 0
               return (

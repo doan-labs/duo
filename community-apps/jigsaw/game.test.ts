@@ -19,6 +19,7 @@ import {
   liveOf,
   looseCount,
   makeGrid,
+  newerDoc,
   newGame,
   parseGame,
   parseLive,
@@ -28,6 +29,7 @@ import {
   placeAt,
   placedCount,
   resetGame,
+  type Saves,
   SNAP,
   sendToTray,
   serializeGame,
@@ -258,23 +260,43 @@ check('cleanGame rejects shape violations', () => {
 
 check('liveOf/parseLive roundtrips and marks foreign writers', () => {
   const g = newGame('lantern', 12, 9)
-  const raw = liveOf('writer-a', g, 3)
+  const raw = liveOf('writer-a', 7, g, 3)
   const doc = parseLive(raw)
   ok(doc !== null, 'live doc did not parse')
   eq(doc!.by, 'writer-a')
+  eq(doc!.rev, 7)
   eq(doc!.held, 3)
   eq(doc!.game, g)
   eq(parseLive('{}'), null)
   eq(parseLive(null), null)
 })
 
+check('newerDoc orders shared envelopes by revision then writer', () => {
+  ok(newerDoc(2, 'a', 1, 'z'), 'higher rev loses')
+  ok(!newerDoc(1, 'z', 2, 'a'), 'lower rev won')
+  ok(newerDoc(3, 'b', 3, 'a'), 'writer tiebreak lost')
+  ok(!newerDoc(3, 'a', 3, 'b'), 'writer tiebreak won')
+  ok(!newerDoc(3, 'a', 3, 'a'), 'same doc beat itself')
+})
+
 check('saves keep one game per art:count and survive a roundtrip', () => {
   const a = newGame('harbour', 12, 1)
   const b = placeAt(newGame('alpine', 24, 2), 0, 5, 5, 9).game
-  const s = { current: configKey('alpine', 24), games: { [configKey('harbour', 12)]: a, [configKey('alpine', 24)]: b } }
+  const s: Saves = {
+    rev: 4,
+    by: 'writer-b',
+    current: configKey('alpine', 24),
+    games: { [configKey('harbour', 12)]: a, [configKey('alpine', 24)]: b }
+  }
   const back = parseSaves(serializeSaves(s))
+  eq(back.rev, 4)
+  eq(back.by, 'writer-b')
   eq(back.current, s.current)
   eq(back.games, s.games)
+  // Malformed and empty docs hydrate to the rev-0 empty envelope.
+  const empty = parseSaves(null)
+  eq(empty.rev, 0)
+  eq(Object.keys(empty.games).length, 0)
   // A saved game keyed under the wrong config is dropped.
   const bad = parseSaves(JSON.stringify({ current: 'x', games: { 'wrong:key': a } }))
   eq(bad.current, null)
