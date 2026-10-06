@@ -202,6 +202,20 @@
         }
       ]
     },
+    "com.mnismt.duo.pocketbudget": {
+      "name": "Budget",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pocket-budget",
+      "releases": [
+        {
+          "release": "1.0.0+34617859",
+          "sdk": "0.0.0",
+          "bytes": 538378,
+          "sha256": "d117ffa41fbfa79142c5419a5f23294bc81aa9a5877d7c93cd13dc716fa53f39"
+        }
+      ]
+    },
     "com.mnismt.duo.pomodoro": {
       "name": "Pomo Timer",
       "lane": "community",

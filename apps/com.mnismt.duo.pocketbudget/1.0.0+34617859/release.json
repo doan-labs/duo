@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.pocketbudget",
+    "name": "Budget",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pocket-budget",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.0.0",
+    "kit": "1.2.0",
+    "at": "2026-10-06T03:27:34.405Z",
+    "commit": "9dbb23d6e4d0bfdce4f531b693d92b84d6072eaa",
+    "hash": "34617859"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 538378,
+      "sha256": "24615e9b832f272e8a2fe15a3fdd5673264939e7cb721c3732fa1f46fafbde75"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 873323,
+      "sha256": "a86c3acbd371f49954b58eb5a8060e157397ca05834874565df6ecca0eda1037"
+    }
+  ]
+}
