@@ -1,0 +1,63 @@
+# Circuit Lab
+
+A community app for the Duo folding device: a pocket digital-logic sandbox.
+Place input switches, AND/OR/NOT/XOR gates and output bulbs on a perfboard
+canvas, wire them by tapping pins, and watch HIGH signals travel the curved
+traces to light the bulbs. A live truth table enumerates every input row, and
+a challenge shelf asks for real combinational builds.
+
+This is a teaching toy about Boolean logic, not an electronics simulator:
+wires carry pure HIGH/LOW values, gates are ideal, and nothing here models
+voltage, current, timing hazards or any real hardware.
+
+## Layouts
+
+- **Cover (closed):** the canvas fills the display and a bottom tray switches
+  between Build (parts palette plus the selected part's controls), Table (the
+  live truth table), Tasks (challenges) and Saved (the circuit library).
+- **Unfolded:** the canvas grows beside a floating panel holding the palette,
+  the inspector, and a segmented Table/Tasks/Saved switch.
+- Both layouts recompose at any width, and the open circuit follows the fold
+  through `os.session` so a mid-build fold never splits the work.
+
+## Controls
+
+- **Tap a switch** to flip it. Its wires light amber and the HIGH state
+  ripples downstream, gate by gate.
+- **Tap an output pin** (right side of a part) to arm a wire - it follows
+  your finger - then **tap an input pin** on another part to land it.
+  Candidate pins glow, pins that would close a loop refuse. Landing on a
+  wired pin replaces its wire.
+- **Tap a part or a wire** to select it; the inspector renames parts and
+  deletes the selection (with a second-tap confirm for parts, a sheet for
+  whole circuits). **Tap bare canvas** to clear the selection.
+- **Drag** a part to move it (it snaps to the grid on release); **drag the
+  canvas** to pan; the dock zooms and fits.
+- **Undo/redo** buttons or Cmd/Ctrl+Z, +Shift/Ctrl+Y: every structural edit
+  is one step. Switch positions are play state and stay put through undo.
+- **Keyboard:** Delete/Backspace removes the selection; Escape drops an armed
+  wire or closes a sheet, otherwise goes home.
+
+## Rules of the board
+
+- Up to four switches, four bulbs, twenty-two gates and sixty-four wires.
+- One wire feeds one input pin; an output pin fans out freely.
+- **A disconnected input pin reads LOW (0).** It is stated in the palette so
+  every circuit evaluates cleanly.
+- Feedback loops are refused when you wire them, and any loop that still
+  reaches storage is cut on load and its gates flagged in the canvas.
+
+## Challenges
+
+Nine fixed-I/O builds: First Light, Two Keys, Either Door, The Opposite,
+Different (with the XOR chip off the shelf), All Agree, Majority, Half Adder
+(two bulbs at once) and Four Doors. A challenge scaffolds its switches and
+bulbs for you and locks that row; the banner counts matching truth-table rows
+live and banks a solve stamp the moment every row agrees.
+
+## Persistence
+
+Circuits, solve stamps and the mute switch persist in `os.storage`; the open
+circuit, selection and undo history ride `os.session` across the fold and
+survive app relaunch through the library. Both displays run their own copy of
+the app - whichever copy is visible owns sound and the marching signal dashes.
