@@ -5,7 +5,6 @@ import {
   fonts,
   glass,
   leading,
-  motion,
   radius,
   shadow,
   space,
@@ -70,7 +69,8 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     lineHeight: leading.subheadline
   },
-  rootCover: { gap: space.sm, paddingTop: space.sm, paddingInline: space.sm },
+  // The home bar owns the bottom 22 px on the cover too; the tray clears it.
+  rootCover: { gap: space.sm, paddingTop: space.sm, paddingInline: space.sm, paddingBottom: space.xxxl },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.sm, flexShrink: 0 },
   brand: { display: 'flex', flexDirection: 'column', gap: space.xxs, minWidth: 0 },
   kicker: {
@@ -125,10 +125,6 @@ export const styles = stylex.create({
     color: app.fg,
     cursor: 'pointer',
     flexShrink: 0,
-    transitionProperty: 'transform,background-color,opacity',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':disabled': { opacity: '.35', cursor: 'default' },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
@@ -330,10 +326,6 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     fontVariantNumeric: 'tabular-nums',
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
   hint: {
@@ -399,10 +391,6 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     textAlign: 'start',
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
   palName: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -431,10 +419,6 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color,opacity',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':disabled': { opacity: '.35', cursor: 'default' },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
@@ -468,10 +452,6 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color,color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
   segOn: { backgroundColor: app.elevated, color: app.fg, boxShadow: shadow.card },
@@ -487,10 +467,6 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.medium,
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
   chipOn: { backgroundColor: { default: app.link, ':hover': app.link }, color: colors.white },
@@ -528,10 +504,6 @@ export const styles = stylex.create({
     fontWeight: weight.medium,
     textAlign: 'start',
     cursor: 'pointer',
-    transitionProperty: 'transform,background-color',
-    transitionDuration: `${motion.pressDuration},.18s`,
-    transitionTimingFunction: easing.pop,
-    transform: { default: 'scale(1)', ':active': motion.press },
     ':focus-visible': { outline: `2px solid ${colors.blue}`, outlineOffset: 1 }
   },
   layoutOn: {

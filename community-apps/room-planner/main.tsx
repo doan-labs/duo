@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Sheet, Sym, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
-import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -241,7 +241,7 @@ function Seg<T extends string>({
           tabIndex={o.v === value ? 0 : -1}
           onClick={() => onPick(o.v)}
           onKeyDown={(e) => onKey(e, i)}
-          {...stylex.props(styles.segBtn, o.v === value && styles.segOn)}
+          {...stylex.props(styles.segBtn, shared.press, o.v === value && styles.segOn)}
         >
           {o.name}
         </button>
@@ -377,6 +377,13 @@ function RoomPlanner() {
     dragRef.current = null
     gestureCore.current = null
     suppressClick.current = false
+    // A queued zoom debounce would fire after the fold and publish from the
+    // dark - settle it now instead so the peer sees the final view.
+    if (wheelTimer.current) {
+      clearTimeout(wheelTimer.current)
+      wheelTimer.current = null
+      if (now) publishRef.current(now)
+    }
     setGesturing(false)
     setDragId(null)
   }, [view.visible])
@@ -1003,7 +1010,7 @@ function RoomPlanner() {
             type="button"
             aria-label={`Add ${piece.name}, ${fmtDims(piece.w, piece.d, prefs.units)}`}
             onClick={() => spawn(piece.kind)}
-            {...stylex.props(styles.palItem)}
+            {...stylex.props(styles.palItem, shared.press)}
           >
             <i aria-hidden="true" {...stylex.props(styles.palSwatch, styles.swatchAt(hueFill(piece.hue, darkMode)))} />
             <span {...stylex.props(styles.palName)}>
@@ -1044,20 +1051,25 @@ function RoomPlanner() {
           type="button"
           aria-label="Rotate counter-clockwise"
           onClick={() => rotateSel(-1)}
-          {...stylex.props(styles.btn)}
+          {...stylex.props(styles.btn, shared.press)}
         >
           <span aria-hidden="true" {...stylex.props(styles.flipIcon)}>
             <Sym name="reload" size={13} />
           </span>
         </button>
-        <button type="button" aria-label="Rotate clockwise" onClick={() => rotateSel(1)} {...stylex.props(styles.btn)}>
+        <button
+          type="button"
+          aria-label="Rotate clockwise"
+          onClick={() => rotateSel(1)}
+          {...stylex.props(styles.btn, shared.press)}
+        >
           <Sym name="reload" size={13} />
         </button>
         <button
           type="button"
           aria-label={arming ? 'Confirm delete item' : `Delete ${PIECE.get(selected.kind)?.name ?? 'item'}`}
           onClick={() => (arming ? dropSel() : setArming(true))}
-          {...stylex.props(styles.btn, arming && styles.btnWarn)}
+          {...stylex.props(styles.btn, shared.press, arming && styles.btnWarn)}
         >
           <Sym name="trash" size={12} />
           {arming ? 'Sure?' : 'Delete'}
@@ -1115,7 +1127,7 @@ function RoomPlanner() {
               type="button"
               aria-pressed={prefs.snap === step}
               onClick={() => savePrefs({ ...prefs, snap: step })}
-              {...stylex.props(styles.chipBtn, prefs.snap === step && styles.chipOn)}
+              {...stylex.props(styles.chipBtn, shared.press, prefs.snap === step && styles.chipOn)}
             >
               {fmtSnap(step, prefs.units)}
             </button>
@@ -1130,7 +1142,7 @@ function RoomPlanner() {
             sheetTrigger.current = e.currentTarget
             setConfirm('clear')
           }}
-          {...stylex.props(styles.btn, styles.btnWarn)}
+          {...stylex.props(styles.btn, shared.press, styles.btnWarn)}
         >
           <Sym name="xmark" size={12} />
           Clear room
@@ -1145,7 +1157,7 @@ function RoomPlanner() {
         type="button"
         aria-current={p.id === doc.id}
         onClick={() => openPlan(p.id)}
-        {...stylex.props(styles.layoutRow, styles.grow, p.id === doc.id && styles.layoutOn)}
+        {...stylex.props(styles.layoutRow, shared.press, styles.grow, p.id === doc.id && styles.layoutOn)}
       >
         <span {...stylex.props(styles.layoutName)}>{p.name}</span>
         <span {...stylex.props(styles.layoutMeta)}>{Object.keys(p.items).length}</span>
@@ -1155,7 +1167,7 @@ function RoomPlanner() {
         type="button"
         aria-label={`Delete ${p.name}`}
         onClick={(e) => askDrop(p.id, p.name, e)}
-        {...stylex.props(styles.iconBtn)}
+        {...stylex.props(styles.iconBtn, shared.press)}
       >
         <Sym name="trash" size={13} />
       </button>
@@ -1177,11 +1189,11 @@ function RoomPlanner() {
         )}
       </div>
       <div {...stylex.props(styles.rowBtns)}>
-        <button type="button" onClick={makePlan} {...stylex.props(styles.btn)}>
+        <button type="button" onClick={makePlan} {...stylex.props(styles.btn, shared.press)}>
           <Sym name="plus" size={12} />
           New layout
         </button>
-        <button type="button" onClick={dupPlan} {...stylex.props(styles.btn)}>
+        <button type="button" onClick={dupPlan} {...stylex.props(styles.btn, shared.press)}>
           <Sym name="saved" size={12} />
           Duplicate
         </button>
@@ -1191,21 +1203,31 @@ function RoomPlanner() {
 
   const zoomDock = (
     <div role="toolbar" aria-label="Zoom" {...stylex.props(styles.zoomDock)}>
-      <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)} {...stylex.props(styles.iconBtn)}>
+      <button
+        type="button"
+        aria-label="Zoom out"
+        onClick={() => zoomBy(1 / 1.25)}
+        {...stylex.props(styles.iconBtn, shared.press)}
+      >
         <Sym name="minus" size={13} />
       </button>
       <button
         type="button"
         aria-label="Reset zoom to 100 percent"
         onClick={() => publish(setView(doc, { ...doc.view, zoom: 1 }))}
-        {...stylex.props(styles.zoomPct)}
+        {...stylex.props(styles.zoomPct, shared.press)}
       >
         {Math.round(zoom * 100)}%
       </button>
-      <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)} {...stylex.props(styles.iconBtn)}>
+      <button
+        type="button"
+        aria-label="Zoom in"
+        onClick={() => zoomBy(1.25)}
+        {...stylex.props(styles.iconBtn, shared.press)}
+      >
         <Sym name="plus" size={13} />
       </button>
-      <button type="button" aria-label="Fit room" onClick={fit} {...stylex.props(styles.iconBtn)}>
+      <button type="button" aria-label="Fit room" onClick={fit} {...stylex.props(styles.iconBtn, shared.press)}>
         <Sym name="expand" size={13} />
       </button>
     </div>
@@ -1387,7 +1409,7 @@ function RoomPlanner() {
         savePrefs(next)
         if (!next.muted) cue('select')
       }}
-      {...stylex.props(styles.iconBtn)}
+      {...stylex.props(styles.iconBtn, shared.press)}
     >
       <Sym name="volume" size={14} />
       {prefs.muted && <i aria-hidden="true" {...stylex.props(styles.muteSlash)} />}
@@ -1401,7 +1423,7 @@ function RoomPlanner() {
         aria-label="Undo"
         disabled={!hist.past.length}
         onClick={undo}
-        {...stylex.props(styles.iconBtn)}
+        {...stylex.props(styles.iconBtn, shared.press)}
       >
         <Sym name="undo" size={14} />
       </button>
@@ -1410,7 +1432,7 @@ function RoomPlanner() {
         aria-label="Redo"
         disabled={!hist.future.length}
         onClick={redo}
-        {...stylex.props(styles.iconBtn)}
+        {...stylex.props(styles.iconBtn, shared.press)}
       >
         <span aria-hidden="true" {...stylex.props(styles.flipIcon)}>
           <Sym name="undo" size={14} />
@@ -1530,10 +1552,10 @@ function RoomPlanner() {
           Removes all {count} pieces from {doc.name}. The layout and its walls stay; undo can bring the pieces back.
         </p>
         <div {...stylex.props(styles.confirmBtns)}>
-          <button type="button" onClick={() => setConfirm(null)} {...stylex.props(styles.btn)}>
+          <button type="button" onClick={() => setConfirm(null)} {...stylex.props(styles.btn, shared.press)}>
             Keep
           </button>
-          <button type="button" onClick={doClear} {...stylex.props(styles.btn, styles.btnWarn)}>
+          <button type="button" onClick={doClear} {...stylex.props(styles.btn, shared.press, styles.btnWarn)}>
             <Sym name="trash" size={12} />
             Clear
           </button>
@@ -1554,10 +1576,10 @@ function RoomPlanner() {
             : 'This layout is removed from the library on both displays. This cannot be undone.'}
         </p>
         <div {...stylex.props(styles.confirmBtns)}>
-          <button type="button" onClick={() => setConfirm(null)} {...stylex.props(styles.btn)}>
+          <button type="button" onClick={() => setConfirm(null)} {...stylex.props(styles.btn, shared.press)}>
             Keep
           </button>
-          <button type="button" onClick={dropPlan} {...stylex.props(styles.btn, styles.btnWarn)}>
+          <button type="button" onClick={dropPlan} {...stylex.props(styles.btn, shared.press, styles.btnWarn)}>
             <Sym name="trash" size={12} />
             Delete
           </button>
