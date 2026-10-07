@@ -29,8 +29,10 @@ voltage, current, timing hazards or any real hardware.
   ripples downstream, gate by gate.
 - **Tap an output pin** (right side of a part) to arm a wire - it follows
   your finger - then **tap an input pin** on another part to land it. Every
-  pin is a constant 44pt target at any zoom; crowded pads repel so no tap is
-  ambiguous, and zoomed-out pins still land through the inspector.
+  pin is a constant 44pt target anchored just outside its part's body, so a
+  switch body tap still flips it and a pin tap is unambiguous. Crowded pads
+  repel; the ones that cannot reach clear space retire to a dot
+  deterministically, and every pin still lands through the inspector.
 - The inspector also wires without the canvas: pick a part, tap **Wire from
   output**, then pick the target and tap its input row. Tapping a fed input
   row disconnects it.
@@ -46,6 +48,10 @@ voltage, current, timing hazards or any real hardware.
   arm and land wires without a pointer.
 - Only the visible copy takes input: gestures, keys and armed intent on the
   folded display cancel instead of mutating, so a fold mid-gesture is safe.
+- Each display keeps its own camera (`view:<doc>:<display>` in storage), so
+  cover Fit and pinch-pan never drag the unfolded view along, a stored frame
+  restores on reopen, and remote edits update the circuit without moving
+  this display's view.
 
 ## Rules of the board
 

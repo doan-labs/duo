@@ -445,19 +445,23 @@ export function newDoc(name: string): Doc {
 
 /** First-run circuit: a wired half adder so signals, labels and bulbs show at a glance. */
 export function welcomeDoc(): Doc {
-  const a = mkNode('switch', -260, -56, 'A')
-  const b = mkNode('switch', -260, 56, 'B')
-  const xor = mkNode('xor', -20, -50, '')
-  const and = mkNode('and', -20, 62, '')
-  const sum = mkNode('bulb', 240, -50, 'SUM')
-  const carry = mkNode('bulb', 240, 62, 'CARRY')
+  // Every id is constant, not spawned: both displays can seed concurrently on
+  // a fresh boot and the two writes describe one identical graph, so a heal
+  // that unions them finds nothing missing - spawned ids would read as six
+  // extra nodes and duplicate the whole adder.
+  const a = { ...mkNode('switch', -260, -56, 'A'), id: 'w-a' }
+  const b = { ...mkNode('switch', -260, 56, 'B'), id: 'w-b' }
+  const xor = { ...mkNode('xor', -20, -50, ''), id: 'w-xor' }
+  const and = { ...mkNode('and', -20, 62, ''), id: 'w-and' }
+  const sum = { ...mkNode('bulb', 240, -50, 'SUM'), id: 'w-sum' }
+  const carry = { ...mkNode('bulb', 240, 62, 'CARRY'), id: 'w-carry' }
   const wires: Wire[] = [
-    { id: spawn(), from: a.id, to: xor.id, port: 0 },
-    { id: spawn(), from: b.id, to: xor.id, port: 1 },
-    { id: spawn(), from: a.id, to: and.id, port: 0 },
-    { id: spawn(), from: b.id, to: and.id, port: 1 },
-    { id: spawn(), from: xor.id, to: sum.id, port: 0 },
-    { id: spawn(), from: and.id, to: carry.id, port: 0 }
+    { id: 'w-w1', from: a.id, to: xor.id, port: 0 },
+    { id: 'w-w2', from: b.id, to: xor.id, port: 1 },
+    { id: 'w-w3', from: a.id, to: and.id, port: 0 },
+    { id: 'w-w4', from: b.id, to: and.id, port: 1 },
+    { id: 'w-w5', from: xor.id, to: sum.id, port: 0 },
+    { id: 'w-w6', from: and.id, to: carry.id, port: 0 }
   ]
   return {
     // A fixed id keeps a both-displays seed race to one doc, not two.
@@ -503,7 +507,7 @@ export function docBounds(doc: CircuitState): { cx: number; cy: number; w: numbe
 
 // ---- validation ----------------------------------------------------------
 
-function cleanView(v: unknown): View {
+export function cleanView(v: unknown): View {
   const view = record(v) ? v : {}
   return {
     x: clamp(num(view.x, 0), -WORLD_LIMIT * 2, WORLD_LIMIT * 2),
@@ -831,19 +835,41 @@ export function decideRemote(
 export type Pad = { key: string; x: number; y: number; off: boolean }
 
 /**
- * Lays out PIN_PAD-screen-point hit pads over world-space pin centres. Pads
- * that overlap (two input pins sit 18.7 world units apart - under 9 px at
- * cover zoom) are repelled along the axis of least overlap, capped so a pad
- * never drifts so far its pin lies outside it. A pad that still collides after
- * the pass comes back `off`: it renders as a dot only, so no tap ever lands on
- * an ambiguous boundary, and the inspector's wire rows stay the reachable
+ * Lays out PIN_PAD-screen-point hit pads over world-space pin centres. `dir`
+ * is the side of the node body the pin sits on: +1 for an output pin on the
+ * right edge, -1 for an input on the left; `margin` is the screen-pixel
+ * overhang of the counter-scaled visual body beyond the pin. The pad anchors
+ * just outside the visual body edge, so a body tap and a pin tap never
+ * contend for the same pixels. Pads that overlap (two input pins sit 18.7
+ * world units apart - under 9 px at cover zoom) repel along the axis of
+ * least overlap; sideways repel only ever pushes outward, never back over
+ * the body. A pad that still collides after the pass - or lands on another
+ * node's body - comes back `off`: it renders as a dot only, so no tap lands
+ * on an ambiguous boundary, and the inspector's wire rows stay the reachable
  * path. Below PIN_PAD_ZOOM every pad is off.
  */
-export function layoutPads(pins: { key: string; x: number; y: number }[], zoom: number): Pad[] {
+export function layoutPads(
+  pins: { key: string; x: number; y: number; dir: 1 | -1; margin?: number }[],
+  zoom: number,
+  bodies: { id: string; x: number; y: number; w: number; h: number; inputs?: boolean; output?: boolean }[] = []
+): Pad[] {
   const size = PIN_PAD
-  const maxOff = size * 0.45
-  const pts = pins.map((p) => ({ key: p.key, sx: p.x * zoom, sy: p.y * zoom, ox: 0, oy: 0 }))
+  // Sideways repel only ever pushes outward; the drift budget is capped so a
+  // pad never slides so far its pin lies outside the pad's own 44pt zone.
+  const maxOff = size / 2
+  const pts = pins.map((p) => ({
+    key: p.key,
+    dir: p.dir,
+    sx: p.x * zoom + (p.dir * size) / 2 + p.dir * (p.margin ?? 0),
+    sy: p.y * zoom,
+    ox: 0,
+    oy: 0
+  }))
   const eff = (p: (typeof pts)[number]) => ({ x: p.sx + p.ox, y: p.sy + p.oy })
+  // Sideways repel may push a pad farther out but never back across the pin
+  // onto its node body.
+  const outClamp = (p: (typeof pts)[number], v: number) =>
+    clamp(v, Math.min(0, p.dir * maxOff), Math.max(0, p.dir * maxOff))
   for (let it = 0; it < 12; it++) {
     let moved = false
     for (let i = 0; i < pts.length; i++) {
@@ -859,25 +885,79 @@ export function layoutPads(pins: { key: string; x: number; y: number }[], zoom: 
         if (ox <= 0 || oy <= 0) continue
         moved = true
         // Push on the axis that resolves fastest: stacked input pins part
-        // vertically, a neighbouring node's pads part sideways.
-        const axis = oy <= ox ? ('y' as const) : ('x' as const)
-        const push = (axis === 'y' ? oy : ox) / 2
-        const dir = axis === 'y' ? (dy >= 0 ? 1 : -1) : dx >= 0 ? 1 : -1
-        if (axis === 'y') {
-          a.oy = clamp(a.oy - dir * push, -maxOff, maxOff)
-          b.oy = clamp(b.oy + dir * push, -maxOff, maxOff)
-        } else {
-          a.ox = clamp(a.ox - dir * push, -maxOff, maxOff)
-          b.ox = clamp(b.ox + dir * push, -maxOff, maxOff)
+        // vertically, a neighbouring node's pads part sideways. When that
+        // axis is already saturated (a pad may only repel outward), the other
+        // axis takes the push instead of stalling on the collision.
+        const apart = (ax: 'x' | 'y'): boolean => {
+          if (ax === 'y') {
+            const d = dy >= 0 ? 1 : -1
+            const na = clamp(a.oy - d * (oy / 2), -maxOff, maxOff)
+            const nb = clamp(b.oy + d * (oy / 2), -maxOff, maxOff)
+            const did = na !== a.oy || nb !== b.oy
+            a.oy = na
+            b.oy = nb
+            return did
+          }
+          const d = dx >= 0 ? 1 : -1
+          const na = outClamp(a, a.ox - d * (ox / 2))
+          const nb = outClamp(b, b.ox + d * (ox / 2))
+          const did = na !== a.ox || nb !== b.ox
+          a.ox = na
+          b.ox = nb
+          return did
         }
+        if (!apart(oy <= ox ? 'y' : 'x')) apart(oy <= ox ? 'x' : 'y')
       }
     }
     if (!moved) break
   }
-  return pts.map((p) => {
+  // Some clusters physically cannot host disjoint 44pt pads (two pin rows a
+  // few px apart across a narrow gap). Deterministically retire the most
+  // contended pad and repeat until nothing collides: those pins keep their
+  // dot plus the inspector wire row instead of sharing an ambiguous zone.
+  const dead = new Set<number>()
+  for (;;) {
+    let worst = -1
+    let worstHits = 0
+    for (let i = 0; i < pts.length; i++) {
+      if (dead.has(i)) continue
+      const pi = eff(pts[i]!)
+      let hits = 0
+      for (let j = 0; j < pts.length; j++) {
+        if (i === j || dead.has(j)) continue
+        const pj = eff(pts[j]!)
+        if (Math.abs(pj.x - pi.x) < size && Math.abs(pj.y - pi.y) < size) hits++
+      }
+      if (hits > worstHits) {
+        worst = i
+        worstHits = hits
+      }
+    }
+    if (worstHits === 0) break
+    dead.add(worst)
+  }
+  return pts.map((p, i) => {
     const pos = eff(p)
-    const blocked = pts.some((q) => q !== p && Math.abs(eff(q).x - pos.x) < size && Math.abs(eff(q).y - pos.y) < size)
-    return { key: p.key, x: pos.x / zoom, y: pos.y / zoom, off: blocked || zoom < PIN_PAD_ZOOM }
+    const half = size / 2
+    // A pad that would sit over another node's body makes that spot
+    // ambiguous - except the pin-side strip, the outer fifth of a body edge
+    // where the pins themselves live and a tap already reads as pin intent.
+    // Deeper overlap turns the pad off: a dot renders, the inspector row
+    // stays the guaranteed path.
+    const own = pins[i]!.key.split(':')[0]
+    const inBody = bodies.some((b) => {
+      if (b.id === own) return false
+      const strip = b.w * 0.2
+      const coreX = b.x + (b.inputs ? strip : 0)
+      const coreW = b.w - (b.inputs ? strip : 0) - (b.output ? strip : 0)
+      return (
+        pos.x + half > coreX * zoom &&
+        pos.x - half < (coreX + coreW) * zoom &&
+        pos.y + half > b.y * zoom &&
+        pos.y - half < (b.y + b.h) * zoom
+      )
+    })
+    return { key: p.key, x: pos.x / zoom, y: pos.y / zoom, off: dead.has(i) || inBody || zoom < PIN_PAD_ZOOM }
   })
 }
 

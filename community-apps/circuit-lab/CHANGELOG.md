@@ -9,9 +9,25 @@ First release.
   Node cards counter-scale for legibility at fit zoom; the cover tray grows
   on a chevron when the inspector needs room.
 - Tap an output pin, then an input pin, to wire them - every pin is a
-  constant 44pt target, repelled out of overlap, with an inspector wire row
-  as the always-reachable path. Landing on a wired pin replaces it. Cycles
-  are refused at write time and repaired on load.
+  constant 44pt target anchored outside its part's body so a body tap is
+  never absorbed. Crowded pads repel; the ones that still cannot land on
+  clear space retire to dots deterministically, and the inspector wire row
+  stays the always-reachable path. Landing on a wired pin replaces it.
+  Cycles are refused at write time and repaired on load.
+- Each display keeps its own camera under `view:<doc>:<display>`: pan, zoom
+  and Fit on the cover never clobber the unfolded view, stored cameras
+  restore on reopen, and a remote edit refreshes content without moving this
+  display's frame. The welcome circuit seeds with constant node and wire
+  ids, so both displays seeding the same blank store still converge on one
+  half adder. New work admits only on `os.view.visible && os.view.active`
+  read live - an occluded copy can still report active, so visibility alone
+  is not enough and every pointer, key, control, confirm, audio, focus and
+  timer path takes both flags; writes and gestures already in flight finish
+  their own completion.
+- The cover tray's Build tab pins the parts palette above the inspector's
+  own scroll, so selecting a part can never slide the grid out from under a
+  tap already in flight. Tray segments and the zoom dock meet the 44pt
+  touch bar.
 - Live evaluation: HIGH signals propagate down the wires with a travelling
   glow and marching dashes; open input pins read LOW, stated everywhere.
 - Live truth table enumerates every input row, bounded to the first eight

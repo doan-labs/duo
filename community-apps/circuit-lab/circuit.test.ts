@@ -8,6 +8,7 @@ import {
   bulbsOf,
   type CircuitNode,
   cleanDoc,
+  cleanView,
   commit,
   commitMove,
   connect,
@@ -22,7 +23,6 @@ import {
   type NodeKind,
   newDoc,
   PIN_PAD,
-  PIN_PAD_ZOOM,
   parseLibrary,
   parseMirror,
   reaches,
@@ -37,6 +37,7 @@ import {
   truthTable,
   undo,
   type Wire,
+  WORLD_LIMIT,
   welcomeDoc,
   wireAt,
   withDoc,
@@ -705,27 +706,78 @@ check('pin pads repel to unambiguous 44pt targets', () => {
   // Two input pins 18.67 world units apart, seen at cover zoom ~0.47:
   // pads must end up at least PIN_PAD apart centre-to-centre.
   const pins = [
-    { key: 'a:0', x: 0, y: 0 },
-    { key: 'a:1', x: 0, y: 18.67 }
+    { key: 'a:0', x: 0, y: 0, dir: -1 as const },
+    { key: 'a:1', x: 0, y: 18.67, dir: -1 as const }
   ]
   const pads = layoutPads(pins, 0.47)
   const dScreen = Math.hypot((pads[0]!.x - pads[1]!.x) * 0.47, (pads[0]!.y - pads[1]!.y) * 0.47)
   ok(dScreen >= PIN_PAD - 0.5, `pads only ${dScreen.toFixed(1)}px apart`)
   ok(!pads[0]!.off && !pads[1]!.off, 'both pads active at cover zoom')
-  // Well separated pins keep their true positions.
+  // Pads anchor outside the body: an input pad's inner edge sits at or left of
+  // the pin, never over it.
+  for (const p of pads) ok(p.x * 0.47 <= -PIN_PAD / 2 + 0.5, 'input pad covers only outward space')
+  // Well separated pins keep their anchored positions.
   const wide = layoutPads(
     [
-      { key: 'a', x: 0, y: 0 },
-      { key: 'b', x: 500, y: 0 }
+      { key: 'a', x: 0, y: 0, dir: 1 as const },
+      { key: 'b', x: 500, y: 0, dir: -1 as const }
     ],
     1
   )
-  eq([wide[0]!.x, wide[0]!.y], [0, 0])
+  eq([wide[0]!.x, wide[0]!.y], [PIN_PAD / 2, 0])
+  eq([wide[1]!.x, wide[1]!.y], [500 - PIN_PAD / 2, 0])
   // Deep in the weeds every pad is off - dots render instead.
   ok(
     layoutPads(pins, 0.3).every((p) => p.off),
     'pads off below PIN_PAD_ZOOM'
   )
+})
+
+check('dense pin clusters fall back deterministically without ambiguity', () => {
+  // Two columns one narrow gap apart at cover zoom: the gap cannot host
+  // back-to-back 44pt pads on both sides, so pads retire deterministically -
+  // never two live pads overlapping, never a live pad on a foreign body core.
+  const bodies = [
+    { id: 'a', x: -60, y: -30, w: 60, h: 60, inputs: false, output: true },
+    { id: 'b', x: 20, y: -30, w: 60, h: 60, inputs: true, output: false }
+  ]
+  const pins = [
+    { key: 'a:out', x: 0, y: 0, dir: 1 as const },
+    { key: 'b:0', x: 20, y: -10, dir: -1 as const },
+    { key: 'b:1', x: 20, y: 10, dir: -1 as const }
+  ]
+  const zoom = 0.55
+  const pads = layoutPads(pins, zoom, bodies)
+  eq(layoutPads(pins, zoom, bodies), pads)
+  const live = pads.filter((p) => !p.off)
+  for (let i = 0; i < live.length; i++) {
+    for (let j = i + 1; j < live.length; j++) {
+      ok(
+        Math.abs(live[i]!.x - live[j]!.x) * zoom >= PIN_PAD - 0.5 ||
+          Math.abs(live[i]!.y - live[j]!.y) * zoom >= PIN_PAD - 0.5,
+        'live pads stay disjoint'
+      )
+    }
+    for (const b of bodies) {
+      const strip = b.w * 0.2
+      const coreX = b.x + (b.inputs ? strip : 0)
+      const coreW = b.w - (b.inputs ? strip : 0) - (b.output ? strip : 0)
+      const hitsCore =
+        live[i]!.x * zoom + PIN_PAD / 2 > coreX * zoom &&
+        live[i]!.x * zoom - PIN_PAD / 2 < (coreX + coreW) * zoom &&
+        live[i]!.y * zoom + PIN_PAD / 2 > b.y * zoom &&
+        live[i]!.y * zoom - PIN_PAD / 2 < (b.y + b.h) * zoom
+      ok(!(b.id !== live[i]!.key.split(':')[0] && hitsCore), 'no live pad on a foreign body core')
+    }
+  }
+})
+
+check('a stored camera round-trips through cleanView', () => {
+  const v = cleanView(JSON.parse('{"x":5,"y":-7,"zoom":0.46,"framed":false}'))
+  eq(v, { x: 5, y: -7, zoom: 0.46, framed: false })
+  const wild = cleanView({ x: 1e9, y: -1e9, zoom: 99, framed: true })
+  ok(wild.zoom <= 2.5 && wild.x <= WORLD_LIMIT * 2, 'wild camera clamps')
+  ok(!('framed' in wild) || wild.framed === false, 'no stored camera claims to be framed')
 })
 
 check('the welcome circuit is a working half adder', () => {
@@ -740,6 +792,28 @@ check('the welcome circuit is a working half adder', () => {
       [false, true]
     ]
   )
+})
+
+check('two concurrent welcome seeds merge into one identical half adder', () => {
+  // Both displays seed on a fresh boot: constant ids make the two writes
+  // describe the same graph, so the heal merge cannot duplicate nodes.
+  const seedA = welcomeDoc()
+  const seedB = welcomeDoc()
+  eq(Object.keys(seedA.nodes).sort(), Object.keys(seedB.nodes).sort())
+  eq(Object.keys(seedA.wires).sort(), Object.keys(seedB.wires).sort())
+  // Adversarial order: B seeds null state, A's write arrives, then B's own
+  // stale seed reaches A and heals - neither direction may double the graph.
+  const pair = mkPair()
+  pair.deliver(pair.a, { by: 'B', sel: null, doc: seedB, base: 0, op: { t: 'doc' } }, 1)
+  pair.a.docRev = 1
+  pair.deliver(pair.a, { by: 'B', sel: null, doc: seedA, base: 0, op: { t: 'doc' } }, 2)
+  eq(Object.keys(pair.a.doc!.nodes).length, 6)
+  eq(Object.keys(pair.a.doc!.wires).length, 6)
+  for (const n of Object.values(pair.a.doc!.nodes)) eq(welcomeDoc().nodes[n.id]!.kind, n.kind)
+  // And B converges to the same graph once A's mirror answers.
+  pair.deliver(pair.b, { by: 'A', sel: null, doc: pair.a.doc!, base: 2, op: null }, 3)
+  eq(Object.keys(pair.b.doc!.nodes).length, 6)
+  eq(Object.keys(pair.b.doc!.wires).length, 6)
 })
 
 if (failures.length) throw new Error(`${failures.length} failing checks\n${failures.join('\n')}`)

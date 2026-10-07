@@ -13,7 +13,7 @@ import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Sheet, Sym, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { type Cue, cue } from './audio.ts'
@@ -22,6 +22,7 @@ import {
   addNode,
   bulbsOf,
   type CircuitNode,
+  cleanView,
   commitMove,
   connect,
   type Doc,
@@ -58,11 +59,11 @@ import {
   serializeLibrary,
   serializeMirror,
   setLabel,
-  setView,
   switchesOf,
   toggleSwitch,
   truthTable,
   undo,
+  type View,
   welcomeDoc,
   wireAt,
   withDoc,
@@ -73,6 +74,15 @@ import { styles } from './styles.ts'
 const ME = crypto.randomUUID()
 const LIB_KEY = 'circuitlab-library'
 const DOC_KEY = 'circuitlab-doc'
+
+// view.active from useDisplay is batched through rAF, so on the occluded
+// copy it can lag a fold behind; the SDK's os.view property updates on the
+// message itself, and an occluded copy can still report active while
+// invisible. Anything that admits new work - mutates, plays, focuses, times
+// or moves input - therefore reads both flags at execution time: only a
+// copy that is on screen AND in charge takes it. Writes and gestures
+// already in flight may finish their own completion without this gate.
+const admit = () => os.view.visible && os.view.active
 
 type Tab = 'Build' | 'Table' | 'Tasks' | 'Saved'
 
@@ -171,6 +181,8 @@ function CircuitLab() {
   const [trayOpen, setTrayOpen] = useState(false)
   const [note, setNote] = useState('')
   const canvasRef = useRef<HTMLDivElement>(null)
+  const bannerRef = useRef<HTMLDivElement>(null)
+  const chromeRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
@@ -189,6 +201,16 @@ function CircuitLab() {
   // serve a 387pt cover and a 790pt inner, so each display fits the circuit to
   // the box it actually has and the framed flag marks "this copy computed it".
   const framedDoc = useRef<string | null>(null)
+  // The camera is per-display state, not document content: a cover Fit must
+  // never clobber the inner's view and a remote edit must never drag this
+  // display's camera along. doc.view stays the authored home view; the live
+  // camera rides cam/camRef and persists in shared storage keyed by display.
+  const [cam, setCam] = useState<View>({ x: 0, y: 0, zoom: 1, framed: false })
+  const camRef = useRef(cam)
+  camRef.current = cam
+  // Doc ids whose stored camera read is still in flight: the first-sight fit
+  // waits out that read so a returning display's saved view is never clobbered.
+  const camWait = useRef(new Set<string>())
   const docRef = useRef(doc)
   docRef.current = doc
   const selRef = useRef(sel)
@@ -201,12 +223,8 @@ function CircuitLab() {
   const mutedRef = useRef(muted)
   mutedRef.current = muted
 
-  // view.active from useDisplay is batched through rAF, so on the occluded
-  // copy it can lag a fold behind; the SDK's os.view property updates on the
-  // message itself. Anything that mutates, plays, focuses or moves input must
-  // read os.view at execution time - the hidden copy then always refuses.
   const play = (c: Cue) => {
-    if (mutedRef.current || !os.view.active) return
+    if (mutedRef.current || !admit()) return
     cue(c)
   }
 
@@ -231,7 +249,7 @@ function CircuitLab() {
   // describes the edit so a holder can merge this write if it was a stale
   // fork. Gated on the live view: nothing on the hidden copy may write.
   const publish = (next: Doc, nextSel?: Sel, op: Op | null = null) => {
-    if (!os.view.active) return
+    if (!admit()) return
     const selNow = pruneSel(nextSel === undefined ? selRef.current : nextSel, next)
     setDoc(next)
     docRef.current = next
@@ -242,28 +260,97 @@ function CircuitLab() {
     void os.session.set(DOC_KEY, raw).catch(() => {})
   }
 
-  // View-only edits (pan, zoom, fit) are per-display state: they persist to
-  // the library for relaunch but never touch the session mirror, where a
-  // mechanical write could fork the doc against the peer's real edits.
-  const publishView = (next: Doc) => {
-    if (!os.view.active) return
-    setDoc(next)
-    docRef.current = next
-    saveDoc(next)
-  }
+  // View-only edits (pan, zoom, fit) are per-display camera state: they never
+  // write the shared doc or session mirror, so a cover gesture cannot move the
+  // inner's camera and doc history never records a pan. Each display keeps its
+  // own camera in shared storage keyed `view:<doc>:<display>`.
+  const camKey = useCallback((docId: string) => `view:${docId}:${view.display}`, [view.display])
+  // The live frame moves every pointer tick; the stored camera only needs the
+  // resting one, so the storage write settles after the gesture. The pending
+  // payload is kept so a read (or unmount) can flush it before it goes stale.
+  const camPending = useRef<{ key: string; json: string } | null>(null)
+  const camSave = useRef<number | undefined>(undefined)
+  const flushCam = useCallback(() => {
+    window.clearTimeout(camSave.current)
+    const p = camPending.current
+    camPending.current = null
+    if (p) void os.storage.set(p.key, p.json).catch(() => {})
+  }, [])
+  const applyCam = useCallback(
+    (docId: string, v: View) => {
+      camRef.current = v
+      setCam(v)
+      camPending.current = { key: camKey(docId), json: JSON.stringify(v) }
+      window.clearTimeout(camSave.current)
+      camSave.current = window.setTimeout(flushCam, 250)
+    },
+    [camKey, flushCam]
+  )
+  // Camera for a doc this display just opened or adopted: its own stored view
+  // wins, else the doc's authored home view frames it. The async stored read
+  // only ever overlays while the camera still sits on that same authored frame.
+  const loadCam = useCallback(
+    (docId: string, authored: View) => {
+      camRef.current = authored
+      setCam(authored)
+      // A still-pending debounced write must land before this read, or the
+      // stored camera would answer with a frame the gesture just left.
+      flushCam()
+      camWait.current.add(docId)
+      void os.storage
+        .get(camKey(docId))
+        .then((raw) => {
+          let saved: View | null = null
+          try {
+            saved = raw ? cleanView(JSON.parse(raw)) : null
+          } catch {
+            saved = null
+          }
+          if (saved && camRef.current === authored) {
+            camRef.current = saved
+            setCam(saved)
+            framedDoc.current = docId
+          } else if (!saved && camRef.current === authored) {
+            // Nothing stored: re-set the authored view as a fresh object so
+            // the first-sight effect re-fires and frames this doc.
+            setCam({ ...authored, framed: false })
+          }
+          camWait.current.delete(docId)
+        })
+        .catch(() => {
+          camWait.current.delete(docId)
+        })
+    },
+    [camKey, flushCam]
+  )
+
+  // Canvas chrome - a challenge banner up top, the hint and zoom dock strip
+  // at the bottom - rides over the board. `fitBox` returns the room between
+  // them: w/h the usable box and dy how far its centre sits below the canvas
+  // centre, so a fit never slides the circuit under either strip.
+  const fitBox = useCallback(() => {
+    const el = canvasRef.current
+    if (!el) return null
+    const box = el.getBoundingClientRect()
+    if (!box.width || !box.height) return null
+    const pad = 12
+    const top = (bannerRef.current?.getBoundingClientRect().bottom ?? box.top) - box.top
+    const bottom = box.bottom - (chromeRef.current?.getBoundingClientRect().top ?? box.bottom)
+    return { w: box.width - pad * 2, h: box.height - top - bottom - pad, dy: top - bottom }
+  }, [])
 
   // Selection alone never writes storage - it rides the session mirror only.
   // Its echo is untracked on purpose: a selection write carries no new doc
   // content, so it must not advance docRev and make real peer edits read stale.
   const publishSel = (s: Sel) => {
-    if (!os.view.active) return
+    if (!admit()) return
     const current = docRef.current
     setSel(s)
     if (current) void os.session.set(DOC_KEY, serializeMirror(ME, current, s, docRev.current, null)).catch(() => {})
   }
 
   const setMuted = (next: boolean) => {
-    if (!os.view.active) return
+    if (!admit()) return
     enqueue(async () => {
       const lib = await readLib()
       stored.set(serializeLibrary({ ...lib, muted: next }))
@@ -318,15 +405,18 @@ function CircuitLab() {
   // A copy frozen on the occluded display can miss session events; on becoming
   // the visible display again, re-snapshot so its doc can never lag the peer.
   // A visibility flip also drops every armed intent - a wire half-drawn or a
-  // delete half-confirmed never survives the fold either way around.
+  // delete half-confirmed never survives the fold either way around, and an
+  // occluded copy can stay active while invisible, so both flags trigger it.
   useEffect(() => {
-    setArming(null)
-    setArmed(null)
-    setGhost(null)
-    dragRef.current = null
-    setGesturing(false)
+    if (!view.visible || !view.active) {
+      setArming(null)
+      setArmed(null)
+      setGhost(null)
+      dragRef.current = null
+      setGesturing(false)
+    }
     if (view.active) void bootRef.current()
-  }, [view.active])
+  }, [view.active, view.visible])
 
   // Even while visible, an armed confirm is a momentary intent - disarm after
   // a few idle seconds. The tick re-reads os.view at fire time: the effect's
@@ -335,7 +425,7 @@ function CircuitLab() {
   useEffect(() => {
     if (arming === null || !view.active) return
     const t = setTimeout(() => {
-      if (os.view.active) setArming(null)
+      if (admit()) setArming(null)
     }, 6000)
     return () => clearTimeout(t)
   }, [arming, view.active])
@@ -382,6 +472,7 @@ function CircuitLab() {
           const open = latestDoc(lib) ?? welcomeDoc()
           setDoc(open)
           docRef.current = open
+          loadCam(open.id, open.view)
           setSel(null)
           stored.set(serializeLibrary(withDoc(lib, open)))
           const raw = serializeMirror(ME, open, null, docRev.current, { t: 'doc' })
@@ -409,7 +500,7 @@ function CircuitLab() {
       // Only the live copy may answer a stale write - a hidden copy's heal
       // would itself be a stale writer. The same write re-decides when this
       // copy becomes visible, so convergence waits for the fold, not for it.
-      if (os.view.active) {
+      if (admit()) {
         answeredRev.current = live.rev
         const heal = serializeMirror(ME, merged, selNow, decision.base, null)
         lastWritten.current = heal
@@ -418,11 +509,14 @@ function CircuitLab() {
       return
     }
     docRev.current = live.rev
-    // Keep this copy's own view for the doc it already framed: a remote fit
-    // was computed for a different canvas and must not replace the local one.
-    const keep = cur?.id === next.doc.id && framedDoc.current === next.doc.id
-    if (!keep) framedDoc.current = null
-    const adopted = keep && cur ? { ...next.doc, view: cur.view } : next.doc
+    // A different circuit resets the camera too - to this display's stored
+    // view for it, or the doc's authored home view. The same doc adopting new
+    // content never moves the camera: the mutation is data, not a pan.
+    if (cur?.id !== next.doc.id) {
+      framedDoc.current = null
+      loadCam(next.doc.id, next.doc.view)
+    }
+    const adopted = next.doc
     setDoc(adopted)
     docRef.current = adopted
     setSel(pruneSel(next.sel, next.doc))
@@ -435,33 +529,30 @@ function CircuitLab() {
         stored.set(serializeLibrary(withDoc(lib, next.doc)))
       }
     })
-  }, [live, stored.status, stored.set])
+  }, [live, stored.status, stored.set, loadCam])
 
   // First sight of a circuit fits it whole - circuits are small, so the
   // overview is the legible one - for THIS canvas. A hidden copy measures 0x0
-  // and defers through the observer until the fold gives it a real box; the
-  // framed view publishes back so it also serves as the stored start view.
+  // and defers through the observer until the fold gives it a real box. The
+  // fit lands in this display's own camera only: the shared doc and the peer's
+  // view never see it.
   useEffect(() => {
-    if (!doc || framedDoc.current === doc.id) return
+    // A framed camera - this display's stored view or its own fit - means the
+    // position is already owned; only a fresh authored view gets fitted.
+    if (!doc || framedDoc.current === doc.id || cam.framed === true) return
     const el = canvasRef.current
     if (!el) return
     const fitLocal = () => {
-      const box = el.getBoundingClientRect()
-      if (!box.width || !box.height) return
-      framedDoc.current = doc.id
+      if (camWait.current.has(doc.id)) return
       const b = docBounds(doc)
+      const u = fitBox()
+      if (!u) return
+      framedDoc.current = doc.id
       // First sight floors at a legible zoom rather than a whole-graph
       // overview: 55% still shows the whole I/O row of any scaffold while the
       // counter-scaled bodies keep labels readable. Fit-all stays a tap away.
-      const zoom = Math.min(1.15, Math.max(0.55, Math.min((box.width - 40) / b.w, (box.height - 40) / b.h)))
-      const next = setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom, framed: true })
-      setDoc(next)
-      enqueue(async () => {
-        const lib = await readLib()
-        stored.set(serializeLibrary(withDoc(lib, next)))
-      })
-      if (os.view.active)
-        void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current, docRev.current)).catch(() => {})
+      const zoom = Math.min(1.15, Math.max(0.55, Math.min(u.w / b.w, u.h / b.h)))
+      applyCam(doc.id, { x: -b.cx * zoom, y: u.dy / 2 - b.cy * zoom, zoom, framed: true })
     }
     const f = requestAnimationFrame(fitLocal)
     const ro = new ResizeObserver(() => {
@@ -472,7 +563,7 @@ function CircuitLab() {
       cancelAnimationFrame(f)
       ro.disconnect()
     }
-  }, [doc, stored.set])
+  }, [doc, cam, applyCam, fitBox])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -483,7 +574,7 @@ function CircuitLab() {
   const solvedNow = run?.solved === true && !!activeChallenge && !library.solved.includes(activeChallenge.id)
   useEffect(() => {
     if (!solvedNow || !doc || !activeChallenge) return
-    if (!mutedRef.current && os.view.active) cue('solve')
+    if (!mutedRef.current && admit()) cue('solve')
     setNote(`${activeChallenge.title} solved`)
     enqueue(async () => {
       const lib = await readLib()
@@ -509,7 +600,7 @@ function CircuitLab() {
       // Keyboard input on the hidden copy - only reachable through forced
       // dispatch - must not mutate; os.view is the live read, not the batched
       // hook value.
-      if (confirmDelete !== null || !os.view.active) return
+      if (confirmDelete !== null || !admit()) return
       const current = docRef.current
       if (!current) return
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -563,8 +654,8 @@ function CircuitLab() {
 
   const toWorld = (clientX: number, clientY: number) => {
     const el = canvasRef.current
-    const v = docRef.current?.view
-    if (!el || !v) return { x: 0, y: 0 }
+    const v = camRef.current
+    if (!el) return { x: 0, y: 0 }
     const rect = el.getBoundingClientRect()
     return {
       x: (clientX - rect.left - rect.width / 2 - v.x) / v.zoom,
@@ -574,7 +665,7 @@ function CircuitLab() {
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Forced input delivered to the folded copy must not start a gesture.
-    if (e.button !== 0 || !os.view.active) return
+    if (e.button !== 0 || !admit()) return
     const target = e.target as HTMLElement
     // Pins answer their own taps; dock and tray controls are not the board.
     if (target.closest('[data-pin]')) return
@@ -590,15 +681,15 @@ function CircuitLab() {
       id,
       px: e.clientX,
       py: e.clientY,
-      ox: id ? now.nodes[id]!.x : now.view.x,
-      oy: id ? now.nodes[id]!.y : now.view.y,
+      ox: id ? now.nodes[id]!.x : camRef.current.x,
+      oy: id ? now.nodes[id]!.y : camRef.current.y,
       moved: false
     }
     if (armedRef.current) setGhost(toWorld(e.clientX, e.clientY))
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!os.view.active) return
+    if (!admit()) return
     if (armedRef.current) setGhost(toWorld(e.clientX, e.clientY))
     const d = dragRef.current
     const now = docRef.current
@@ -608,8 +699,8 @@ function CircuitLab() {
     if (!d.moved && Math.hypot(dx, dy) < 5) return
     if (!d.moved) setGesturing(true)
     d.moved = true
-    if (d.kind === 'pan') setDoc({ ...now, view: { ...now.view, x: d.ox + dx, y: d.oy + dy } })
-    else if (d.id) setDoc(moveNode(now, d.id, d.ox + dx / now.view.zoom, d.oy + dy / now.view.zoom))
+    if (d.kind === 'pan') applyCam(now.id, { ...camRef.current, x: d.ox + dx, y: d.oy + dy })
+    else if (d.id) setDoc(moveNode(now, d.id, d.ox + dx / camRef.current.zoom, d.oy + dy / camRef.current.zoom))
   }
 
   const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -618,7 +709,7 @@ function CircuitLab() {
     dragRef.current = null
     setGesturing(false)
     const now = docRef.current
-    if (!now || !os.view.active) return
+    if (!now || !admit()) return
     if (d.moved) {
       if (d.kind === 'node' && d.id) {
         const moved = commitMove(now, d.id, d.ox, d.oy)
@@ -632,7 +723,8 @@ function CircuitLab() {
             y: moved.nodes[d.id]!.y
           }
         )
-      } else publishView(now)
+      }
+      // A pan was already committed to the per-display camera on each move.
       return
     }
     setArming(null)
@@ -656,7 +748,7 @@ function CircuitLab() {
   // ---- wiring --------------------------------------------------------------
 
   const armOut = (nodeId: string) => {
-    if (!os.view.active) return
+    if (!admit()) return
     play(armed === nodeId ? 'cut' : 'arm')
     setArmed(armed === nodeId ? null : nodeId)
     publishSel(null)
@@ -664,7 +756,7 @@ function CircuitLab() {
 
   const tapIn = (nodeId: string, port: number) => {
     const now = docRef.current
-    if (!now || !os.view.active) return
+    if (!now || !admit()) return
     if (armedRef.current) {
       const from = armedRef.current
       const result = connect(now, from, nodeId, port)
@@ -707,8 +799,8 @@ function CircuitLab() {
   const targets = pinTargets(armed)
 
   const addPart = (kind: CircuitNode['kind']) => {
-    if (!os.view.active) return
-    const v = doc.view
+    if (!admit()) return
+    const v = camRef.current
     // New parts land near the visible centre, columned by role.
     const cx = -v.x / v.zoom
     const cy = -v.y / v.zoom
@@ -745,7 +837,7 @@ function CircuitLab() {
   }
 
   const dropNode = (id: string) => {
-    if (!os.view.active) return
+    if (!admit()) return
     if (!canDelete(doc, id)) {
       play('reject')
       setNote('Challenge inputs and bulbs stay put')
@@ -757,13 +849,13 @@ function CircuitLab() {
   }
 
   const dropWire = (id: string) => {
-    if (!os.view.active) return
+    if (!admit()) return
     play('cut')
     publish(removeWire(doc, id), null, { t: 'drop-wire', id })
   }
 
   const doUndo = () => {
-    if (!os.view.active) return
+    if (!admit()) return
     const next = undo(doc)
     if (next === doc) return
     play('undo')
@@ -771,7 +863,7 @@ function CircuitLab() {
     publish(next, undefined, { t: 'doc' })
   }
   const doRedo = () => {
-    if (!os.view.active) return
+    if (!admit()) return
     const next = redo(doc)
     if (next === doc) return
     play('undo')
@@ -780,24 +872,26 @@ function CircuitLab() {
   }
 
   const zoomBy = (factor: number) => {
-    if (!os.view.active) return
-    publishView(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
+    if (!admit()) return
+    const v = camRef.current
+    applyCam(doc.id, { ...v, zoom: v.zoom * factor })
   }
   const fit = () => {
-    if (!os.view.active) return
-    const box = canvasRef.current?.getBoundingClientRect()
-    if (!box?.width || !box.height) return
+    if (!admit()) return
+    const u = fitBox()
+    if (!u) return
     const b = docBounds(doc)
-    // Explicit Fit keeps the true fit-all: even a wide circuit packs in whole
-    // below the legibility floor first sight enforces.
-    const zoom = Math.min(1.15, Math.min((box.width - 40) / b.w, (box.height - 40) / b.h))
-    publishView(setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom }))
+    // Explicit Fit keeps the true fit-all as closely as wiring allows: it
+    // floors at PIN_PAD_ZOOM so the 44pt pin pads - and the canvas's wiring
+    // path - stay live on the small cover where a full fit would hide them.
+    const zoom = Math.min(1.15, Math.max(PIN_PAD_ZOOM, Math.min(u.w / b.w, u.h / b.h)))
+    applyCam(doc.id, { x: -b.cx * zoom, y: u.dy / 2 - b.cy * zoom, zoom })
   }
 
   // ---- library & challenges --------------------------------------------------
 
   const openCircuit = (id: string) => {
-    if (!os.view.active) return
+    if (!admit()) return
     setArming(null)
     if (id === doc.id) return
     // Read the library fresh: the KV mirror can lag while this copy is
@@ -806,33 +900,37 @@ function CircuitLab() {
       const next = (await readLib()).circuits[id]
       if (next && next.id !== docRef.current?.id) {
         framedDoc.current = null
+        loadCam(next.id, next.view)
         publish(next, null, { t: 'doc' })
       }
     })()
   }
   const makeCircuit = () => {
-    if (!os.view.active) return
+    if (!admit()) return
     setArming(null)
     void (async () => {
       const next = newDoc(`Circuit ${Object.keys((await readLib()).circuits).length + 1}`)
       framedDoc.current = null
+      loadCam(next.id, next.view)
       publish(next, null, { t: 'doc' })
     })()
   }
   const startChallenge = (id: string) => {
-    if (!os.view.active) return
+    if (!admit()) return
     setArming(null)
     void (async () => {
       const lib = await readLib()
       const existing = Object.values(lib.circuits).find((c) => c.challenge === id)
       const ch = challengeById(id)
       if (!ch) return
+      const open = existing ?? scaffold(ch)
       framedDoc.current = null
-      publish(existing ?? scaffold(ch), null, { t: 'doc' })
+      loadCam(open.id, open.view)
+      publish(open, null, { t: 'doc' })
     })()
   }
   const dropCircuit = (id: string) => {
-    if (!os.view.active) return
+    if (!admit()) return
     setConfirmDelete(null)
     enqueue(async () => {
       const lib = withoutDoc(await readLib(), id)
@@ -840,6 +938,7 @@ function CircuitLab() {
       stored.set(serializeLibrary(open ? withDoc(lib, open) : lib))
       if (open) {
         framedDoc.current = null
+        loadCam(open.id, open.view)
         setDoc(open)
         setSel(null)
         void os.session.set(DOC_KEY, serializeMirror(ME, open, null, docRev.current, { t: 'doc' })).catch(() => {})
@@ -852,8 +951,8 @@ function CircuitLab() {
   // Nodes counter-scale against the canvas zoom so first-sight and Fit zooms
   // never shrink a chip below a legible floor; pins ride a separate layer so
   // their 44pt targets stay constant at every zoom.
-  const nodeScale = Math.min(1.6, Math.max(1, 0.8 / doc.view.zoom))
-  const zoom = doc.view.zoom
+  const nodeScale = Math.min(1.6, Math.max(1, 0.8 / cam.zoom))
+  const zoom = cam.zoom
 
   const nodeView = (n: CircuitNode) => {
     const dead = ev.dead.has(n.id)
@@ -895,18 +994,49 @@ function CircuitLab() {
     )
   }
 
-  // Every pin as a constant 44pt pad plus a pip pinned to the true wire
-  // endpoint. layoutPads repels colliding pads in screen space; a pad that
-  // still collides (or sits under PIN_PAD_ZOOM) renders its dot only, and the
+  // Every pin as a constant 44pt pad anchored just outside its node body -
+  // the pin rests on the pad's inner edge, so the pad and the body never
+  // contend for one tap - plus a pip pinned to the true wire endpoint.
+  // layoutPads repels colliding pads in screen space; a pad that still
+  // collides (or sits under PIN_PAD_ZOOM) renders its dot only, and the
   // inspector's wire rows stay the always-reachable path onto that pin.
   const pinDefs = Object.values(doc.nodes).flatMap((n) => {
-    const defs: { key: string; node: CircuitNode; port: number; x: number; y: number }[] = []
-    if (hasOutput(n.kind)) defs.push({ key: `${n.id}:out`, node: n, port: -1, ...outPin(n) })
+    // The counter-scaled visual body reaches `margin` screen px beyond the
+    // logical pin; anchoring the pad past it keeps body taps and pin taps on
+    // disjoint pixels.
+    const margin = (NODE_W[n.kind] * (nodeScale - 1) * zoom) / 2
+    const defs: {
+      key: string
+      node: CircuitNode
+      port: number
+      x: number
+      y: number
+      dir: 1 | -1
+      margin: number
+    }[] = []
+    if (hasOutput(n.kind)) defs.push({ key: `${n.id}:out`, node: n, port: -1, dir: 1, margin, ...outPin(n) })
     for (let port = 0; port < inputCount(n.kind); port++)
-      defs.push({ key: `${n.id}:${port}`, node: n, port, ...inPin(n, port) })
+      defs.push({ key: `${n.id}:${port}`, node: n, port, dir: -1, margin, ...inPin(n, port) })
     return defs
   })
-  const pads = zoom >= PIN_PAD_ZOOM ? layoutPads(pinDefs, zoom) : []
+  const pads =
+    zoom >= PIN_PAD_ZOOM
+      ? layoutPads(
+          pinDefs,
+          zoom,
+          // The bodies pads must not sit on are the visual (counter-scaled)
+          // ones, not the logical rects.
+          Object.values(doc.nodes).map((n) => ({
+            id: n.id,
+            x: n.x - (NODE_W[n.kind] * nodeScale) / 2,
+            y: n.y - (NODE_H * nodeScale) / 2,
+            w: NODE_W[n.kind] * nodeScale,
+            h: NODE_H * nodeScale,
+            inputs: inputCount(n.kind) > 0,
+            output: hasOutput(n.kind)
+          }))
+        )
+      : []
 
   const canvas = (
     <div
@@ -917,14 +1047,9 @@ function CircuitLab() {
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      {...stylex.props(
-        styles.canvas,
-        styles.dots,
-        styles.dotsAt(doc.view.x, doc.view.y),
-        gesturing && styles.canvasBusy
-      )}
+      {...stylex.props(styles.canvas, styles.dots, styles.dotsAt(cam.x, cam.y), gesturing && styles.canvasBusy)}
     >
-      <div {...stylex.props(styles.world, styles.worldAt(doc.view.x, doc.view.y, doc.view.zoom))}>
+      <div {...stylex.props(styles.world, styles.worldAt(cam.x, cam.y, cam.zoom))}>
         <svg aria-hidden="true" {...stylex.props(styles.wiresSvg)}>
           {Object.values(doc.wires).map((w) => {
             const a = doc.nodes[w.from]
@@ -1018,18 +1143,22 @@ function CircuitLab() {
         ) : null}
       </div>
       {activeChallenge ? (
-        <div {...stylex.props(styles.banner, run?.solved && styles.bannerSolved)} role="status">
+        <div ref={bannerRef} {...stylex.props(styles.banner, run?.solved && styles.bannerSolved)} role="status">
           <span {...stylex.props(run?.solved ? styles.bannerOk : styles.bannerMiss)}>
             {run?.solved ? 'Solved' : `${okRows}/${run?.rows.length ?? 0}`}
           </span>
           <span {...stylex.props(styles.bannerText)}>{activeChallenge.brief}</span>
         </div>
       ) : null}
-      <div {...stylex.props(styles.chromeBottom)}>
+      <div ref={chromeRef} {...stylex.props(styles.chromeBottom)}>
         <span {...stylex.props(styles.hint)}>
           {armed
-            ? 'Tap an input pin to land the wire'
-            : 'Tap a switch to flip it. Tap an output pin, then an input, to wire.'}
+            ? pads.some((p) => !p.off && !p.key.endsWith(':out'))
+              ? 'Tap an input pin to land the wire'
+              : 'Select a part, then tap its input row, to land the wire'
+            : pads.some((p) => !p.off && p.key.endsWith(':out'))
+              ? 'Tap a switch to flip it. Tap an output pin, then an input, to wire.'
+              : 'Tap a switch to flip it. Select a part to wire it.'}
         </span>
         <div role="toolbar" aria-label="Zoom" {...stylex.props(styles.zoomDock)}>
           <button
@@ -1043,10 +1172,10 @@ function CircuitLab() {
           <button
             type="button"
             aria-label="Reset zoom"
-            onClick={() => publishView(setView(doc, { ...doc.view, zoom: 1 }))}
+            onClick={() => applyCam(doc.id, { ...camRef.current, zoom: 1 })}
             {...stylex.props(styles.zoomPct, shared.press)}
           >
-            {Math.round(doc.view.zoom * 100)}%
+            {Math.round(cam.zoom * 100)}%
           </button>
           <button
             type="button"
@@ -1172,7 +1301,7 @@ function CircuitLab() {
               type="button"
               disabled={!canDelete(doc, selNode.id)}
               onClick={() =>
-                os.view.active ? (arming === selNode.id ? dropNode(selNode.id) : setArming(selNode.id)) : undefined
+                admit() ? (arming === selNode.id ? dropNode(selNode.id) : setArming(selNode.id)) : undefined
               }
               {...stylex.props(styles.btn, arming === selNode.id && styles.btnWarn, shared.press)}
             >
@@ -1302,7 +1431,7 @@ function CircuitLab() {
                 type="button"
                 aria-label={`Delete ${c.name}`}
                 onClick={(e) => {
-                  if (!os.view.active) return
+                  if (!admit()) return
                   returnFocus.current = e.currentTarget
                   setConfirmDelete(c.id)
                 }}
@@ -1343,7 +1472,7 @@ function CircuitLab() {
           role="radio"
           aria-checked={o === value}
           onClick={() => {
-            if (os.view.active) onChange(o)
+            if (admit()) onChange(o)
           }}
           {...stylex.props(styles.segBtn, o === value && styles.segBtnOn, shared.press)}
         >
@@ -1417,7 +1546,7 @@ function CircuitLab() {
     }
   }
   const closeConfirm = () => {
-    if (!os.view.active) return
+    if (!admit()) return
     setConfirmDelete(null)
     const el = returnFocus.current
     returnFocus.current = null
@@ -1426,7 +1555,7 @@ function CircuitLab() {
     if (el instanceof HTMLElement) {
       let tries = 0
       const restore = () => {
-        if (!el.isConnected || !os.view.active) return
+        if (!el.isConnected || !admit()) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
@@ -1473,13 +1602,26 @@ function CircuitLab() {
                   type="button"
                   aria-label={trayOpen ? 'Shrink panel' : 'Grow panel'}
                   aria-expanded={trayOpen}
-                  onClick={() => os.view.active && setTrayOpen(!trayOpen)}
+                  onClick={() => admit() && setTrayOpen(!trayOpen)}
                   {...stylex.props(styles.iconBtn, styles.iconBtnLg, shared.press)}
                 >
                   <Sym name={trayOpen ? 'down' : 'up'} size={14} />
                 </button>
               </div>
-              <div {...stylex.props(styles.trayBody)}>{tabContent(coverTab)}</div>
+              <div {...stylex.props(styles.trayBody, coverTab === 'Build' && styles.trayBodyBuild)}>
+                {/* Build splits into a pinned Parts block and the inspector's
+                    own scroll pane: the auto-reveal on selection can nudge the
+                    inspector, but it can never slide the Parts grid out from
+                    under a tap already in flight. */}
+                {coverTab === 'Build' ? (
+                  <>
+                    <div {...stylex.props(styles.buildPin)}>{palette}</div>
+                    <div {...stylex.props(styles.buildScroll)}>{inspector}</div>
+                  </>
+                ) : (
+                  tabContent(coverTab)
+                )}
+              </div>
             </div>
           </section>
         )}
@@ -1526,7 +1668,7 @@ addEventListener(
   (event) => {
     // os.view is read live: an Escape forced into the folded copy falls
     // through to the SDK's own forwarder instead of cancelling phantom state.
-    if (event.key !== 'Escape' || !cancelTop || !os.view.active) return
+    if (event.key !== 'Escape' || !cancelTop || !admit()) return
     event.preventDefault()
     event.stopImmediatePropagation()
     cancelTop()

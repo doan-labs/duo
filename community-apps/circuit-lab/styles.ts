@@ -93,7 +93,7 @@ export const styles = stylex.create({
     paddingInline: space.md,
     borderWidth: 0,
     borderRadius: radius.pill,
-    color: app.label2,
+    color: app.fg,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
@@ -209,7 +209,7 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.bold,
     letterSpacing: tracking.caption1,
-    color: app.label2
+    color: app.fg
   },
   nodeLabel: {
     position: 'absolute',
@@ -217,7 +217,7 @@ export const styles = stylex.create({
     marginTop: space.xxs,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
-    color: app.label2,
+    color: app.fg,
     whiteSpace: 'nowrap',
     pointerEvents: 'none'
   },
@@ -264,7 +264,7 @@ export const styles = stylex.create({
     transitionTimingFunction: easing.out
   },
   bulbOn: { backgroundColor: HIGH, color: colors.grey6Dark },
-  bulbOff: { backgroundColor: `color-mix(in srgb, ${colors.grey5Dark} 85%, transparent)`, color: app.label3 },
+  bulbOff: { backgroundColor: `color-mix(in srgb, ${colors.grey5Dark} 85%, transparent)`, color: app.label2 },
   // Pin pads: the real wiring target is an invisible square rendered at a
   // constant 44pt on screen - the element lives in world coordinates with its
   // box sized 1/zoom, so zoom never shrinks the target. layoutPads repels
@@ -342,7 +342,7 @@ export const styles = stylex.create({
   bannerText: {
     flex: 1,
     minWidth: 0,
-    color: app.label2,
+    color: app.fg,
     display: '-webkit-box',
     WebkitBoxOrient: 'vertical',
     WebkitLineClamp: 2,
@@ -377,7 +377,7 @@ export const styles = stylex.create({
   },
   zoomPct: {
     minWidth: 48,
-    minHeight: 40,
+    minHeight: 44,
     borderWidth: 0,
     borderRadius: radius.pill,
     paddingBlock: space.xxs,
@@ -393,8 +393,8 @@ export const styles = stylex.create({
   iconBtn: {
     display: 'grid',
     placeItems: 'center',
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderWidth: 0,
     borderRadius: radius.pill,
     backgroundColor: { default: 'transparent', ':hover': app.fill, ':active': app.fill },
@@ -407,14 +407,14 @@ export const styles = stylex.create({
   },
   iconBtnLg: { width: 44, height: 44 },
   iconBtnTintOn: { color: colors.yellowDark },
-  iconBtnMuted: { color: app.label3 },
+  iconBtnMuted: { color: app.label2 },
   hint: {
     flex: 1,
     minWidth: 0,
     paddingBlock: space.xs,
     paddingInline: space.md,
     borderRadius: radius.lg,
-    color: app.label2,
+    color: app.fg,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
@@ -454,13 +454,13 @@ export const styles = stylex.create({
   section: { display: 'flex', flexDirection: 'column', gap: space.sm, minWidth: 0, flexShrink: 0 },
   anchor: { display: 'flex', flexDirection: 'column', minHeight: 0, flexShrink: 0 },
   fieldLabel: {
-    color: app.label2,
+    color: app.fg,
     fontSize: typeScale.caption2,
     fontWeight: weight.bold,
     letterSpacing: tracking.caption2,
     textTransform: 'uppercase'
   },
-  meta: { color: app.label2, fontSize: typeScale.caption1, lineHeight: leading.caption1 },
+  meta: { color: app.fg, fontSize: typeScale.caption1, lineHeight: leading.caption1 },
   seg: {
     display: 'flex',
     gap: space.xxs,
@@ -474,7 +474,7 @@ export const styles = stylex.create({
   segBtn: {
     flex: 1,
     minWidth: 0,
-    height: 40,
+    height: 44,
     borderWidth: 0,
     borderRadius: radius.sm,
     backgroundColor: { default: 'transparent', ':hover': app.fill2, ':active': app.fill2 },
@@ -507,7 +507,7 @@ export const styles = stylex.create({
     ':disabled': { opacity: '.35', cursor: 'default' },
     ':focus-visible': { outline: `2px solid ${ACCENT}`, outlineOffset: 1 }
   },
-  tileLock: { color: app.label3 },
+  tileLock: { color: app.label2 },
   // The cover tray is a sheet with two heights: collapsed keeps the whole
   // Parts grid and a peek at the inspector above the fold line, open trades
   // canvas for room to work the inspector, table and lists without scrolling.
@@ -542,6 +542,11 @@ export const styles = stylex.create({
     flexDirection: 'column',
     gap: space.sm
   },
+  // The Build tab pins Parts above the inspector's own scroller: a selection
+  // reveal scrolls only the pane, never the controls under the user's finger.
+  trayBodyBuild: { overflowY: 'hidden' },
+  buildPin: { flexShrink: 0 },
+  buildScroll: { minHeight: 0, flexGrow: 1, overflowY: 'auto', scrollbarWidth: 'none' },
   rowBtns: { display: 'flex', gap: space.xs, flexWrap: 'wrap' },
   // One input pin of the selected part: name and feed, tappable to land an
   // armed wire or cut the one already there - the non-canvas wiring path.
@@ -572,7 +577,7 @@ export const styles = stylex.create({
       ':active': `color-mix(in srgb, ${ACCENT} 18%, transparent)`
     }
   },
-  pinRowDim: { color: app.label3 },
+  pinRowDim: { color: app.label2 },
   btn: {
     display: 'flex',
     alignItems: 'center',
@@ -631,7 +636,7 @@ export const styles = stylex.create({
     }
   },
   rowName: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  rowMeta: { color: app.label2, fontSize: typeScale.caption2, flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
+  rowMeta: { color: app.fg, fontSize: typeScale.caption2, flexShrink: 0, fontVariantNumeric: 'tabular-nums' },
   // Truth table.
   tableWrap: { overflow: 'auto', minHeight: 0, scrollbarWidth: 'none', borderRadius: radius.md },
   table: {
@@ -646,7 +651,7 @@ export const styles = stylex.create({
     top: 0,
     paddingBlock: space.xs,
     paddingInline: space.sm,
-    color: app.label2,
+    color: app.fg,
     fontSize: typeScale.caption2,
     fontWeight: weight.bold,
     textAlign: 'center',
@@ -657,7 +662,7 @@ export const styles = stylex.create({
     paddingBlock: space.xs,
     paddingInline: space.sm,
     textAlign: 'center',
-    color: app.label3,
+    color: app.fg,
     fontWeight: weight.medium
   },
   tdOn: { color: colors.white },
@@ -672,7 +677,7 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: space.xxs,
-    color: app.label2,
+    color: app.fg,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
     letterSpacing: tracking.caption2,
@@ -687,7 +692,7 @@ export const styles = stylex.create({
     letterSpacing: tracking.title3,
     fontWeight: weight.semibold
   },
-  confirmSub: { color: app.label2, fontSize: typeScale.footnote, lineHeight: leading.footnote },
+  confirmSub: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote },
   confirmActions: { display: 'flex', justifyContent: 'flex-end', gap: space.sm },
   // Aria-live announcer, visually hidden.
   announce: {
