@@ -425,6 +425,9 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       readyNow: () => readyNow.current,
       /** True once the port accepted the write; false on rejection. */
       put: (k: string, v: string) => write(k, v),
+      /** Session-scope ephemeral keys (undo/draft/confirm) only - library
+       * records go through commitLibWrites and are never deleted. */
+      del: (k: string) => write(k, null),
       /** Resolves once every write queued so far finished; true iff all landed. */
       settled: () => writes.current.settled()
     }),
