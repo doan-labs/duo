@@ -20,6 +20,7 @@ import {
   harmonyHues,
   hslEq,
   hslToRgb,
+  hydrateNeedsEmit,
   inkFor,
   luminance,
   MAX_PALETTES,
@@ -30,6 +31,7 @@ import {
   PAL_ACK_LIMIT,
   PAL_OP_WINDOW,
   PAL_PENDING_LIMIT,
+  type PalOp,
   PalStore,
   PalsLib,
   palBase,
@@ -954,6 +956,58 @@ check('two copies converge across loss and recovery', () => {
   b.adopt({ pals: cWire.pals!, ops: cWire.ops, acks: cWire.acks })
   const again = b.adopt({ pals: cWire.pals!, ops: cWire.ops, acks: cWire.acks })
   eq(again.replayed.length, 0, 're-adopting the same wire replays nothing new')
+})
+
+check('a stale bootstrap read cannot resurrect a peer delete on wire or disk', () => {
+  // The reproduced race: six palettes durable, A deletes one, and B's
+  // bootstrap read - taken before the delete landed - resolves with the
+  // pre-delete wire. B's merged content serializes back to exactly what it
+  // read, so it may not publish or persist anything: re-emitting the stale
+  // wire is what clobbered both the session and the disk with the dead row.
+  const base = sixPals()
+  const rawPre = serializePalettes(base)
+  const a = new PalsLib('A')
+  a.hydrate(rawPre)
+  const b = new PalsLib('B')
+  a.push({ kind: 'delete', target: base[0]!.id })
+  const aWire = sharedLib(a.ready, a.list, a.wireOps, a.wireAcks())
+  const durable: string[] = [serializePalettes(a.list)]
+  let session: { pals?: SavedPalette[]; ops?: PalOp[]; acks?: Record<string, number> } = aWire as {
+    pals?: SavedPalette[]
+    ops?: PalOp[]
+    acks?: Record<string, number>
+  }
+  // B's read resolves with rawPre while A's delete wire is still in flight.
+  ok(b.hydrate(rawPre), 'read applied while B was unconfirmed')
+  if (hydrateNeedsEmit(rawPre, b.list)) {
+    session = sharedLib(b.ready, b.list, b.wireOps, b.wireAcks())
+    durable.push(serializePalettes(b.list))
+  }
+  eq(session.pals!.length, 5, 'the session still carries the post-delete list')
+  eq(durable.length, 1, 'the stale read never touched the disk')
+  // A's delete wire arrives; B converges and persists the same five rows.
+  b.adopt({ pals: session.pals!, ops: session.ops, acks: session.acks })
+  eq(b.list.length, 5, 'B honours the delete after its own read')
+  durable.push(serializePalettes(b.list))
+  eq(durable[durable.length - 1], durable[0], 'both copies end on the same wire')
+  // A relaunch hydrates from that durable: the deleted row stays dead.
+  const c = new PalsLib('C')
+  c.hydrate(durable[durable.length - 1]!)
+  eq(c.list.length, 5, 'no resurrection on relaunch')
+  eq(
+    c.list.some((p) => p.id === base[0]!.id),
+    false,
+    'dead row stays dead'
+  )
+})
+
+check('hydrateNeedsEmit gates publish+persist on a real delta only', () => {
+  const pals = [palNamed('p1'), palNamed('p2')]
+  const raw = serializePalettes(pals)
+  eq(hydrateNeedsEmit(raw, pals), false, 'identical read stays silent')
+  eq(hydrateNeedsEmit(raw, [palNamed('p3'), ...pals]), true, 'merged delta must emit')
+  eq(hydrateNeedsEmit(null, []), true, 'confirmed-absent still writes the true empty')
+  eq(hydrateNeedsEmit(null, pals), true, 'pending ops on an absent key emit')
 })
 
 check('empty bootstrap publish differs from an explicit delete-all', () => {

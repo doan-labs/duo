@@ -534,6 +534,17 @@ export function mergeAcks(into: Record<string, number>, from: Record<string, num
 export const palListEq = (a: SavedPalette[], b: SavedPalette[]) => serializePalettes(a) === serializePalettes(b)
 
 /**
+ * Whether a confirmed bootstrap read may touch the wire or the disk. A read
+ * whose merged result serializes back to the exact stored wire carries no
+ * delta - re-emitting it would let a stale read (taken before a peer's
+ * delete landed) win the last-writer race and resurrect tombstoned rows.
+ * A null record is confirmed-absent, where the legitimate empty first boot
+ * still writes and an in-flight op still publishes.
+ */
+export const hydrateNeedsEmit = (raw: string | null, merged: SavedPalette[]): boolean =>
+  raw === null || serializePalettes(merged) !== raw
+
+/**
  * Merge one foreign publish's library into mine: the wire list is adopted
  * wholesale, then each of my ops the publisher has not incorporated replays
  * onto it in seq order. An op stops needing replay exactly when the

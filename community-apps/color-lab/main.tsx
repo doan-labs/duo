@@ -24,6 +24,7 @@ import {
   hslCss,
   hslEq,
   hslToRgb,
+  hydrateNeedsEmit,
   inkFor,
   MAX_PALETTES,
   newDoc,
@@ -600,11 +601,16 @@ function ColorLab() {
         if (lib.current.hydrate(raw)) {
           setPalettes(lib.current.list)
           palStore.current?.seed(raw)
-          // Now authoritative: republish so a peer folds in whatever the
-          // pending ops replayed, and persist when the merge moved the wire.
+          // The read merged in ops the durable never saw (a pending queue):
+          // only a real delta may touch the wire or disk, because re-emitting
+          // identical content is how a stale read wins the last-writer race
+          // over a peer delete that landed in flight. A null record is a
+          // confirmed-absent key, where the empty first boot still writes.
           const d = docRef.current
-          if (d) publish(d, uiRef.current)
-          persistPals(lib.current.list)
+          if (d && hydrateNeedsEmit(raw, lib.current.list)) {
+            publish(d, uiRef.current)
+            persistPals(lib.current.list)
+          }
         }
       } catch {
         hydratingPals.current = false
