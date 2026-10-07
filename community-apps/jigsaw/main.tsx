@@ -32,6 +32,7 @@ import {
   sendToTray,
   serializeSaves
 } from './puzzle.ts'
+import { enqueue } from './queue.ts'
 import { press, styles } from './styles.ts'
 
 // Both displays share one session key; a write this copy did not make is the
@@ -170,6 +171,8 @@ function Jigsaw() {
   const adoptLive = useCallback((doc: Live) => {
     liveRevRef.current = doc.rev
     liveByRef.current = doc.by
+    gameRef.current = doc.game
+    heldRef.current = doc.held
     setGame(doc.game)
     setHeld(doc.held)
     setHeldPos(null)
@@ -196,7 +199,7 @@ function Jigsaw() {
         saves: Record<string, Game>
       }) => { next: Game; held: number | null } | null
     ) => {
-      actQueue.current = actQueue.current.then(async () => {
+      enqueue(actQueue, async () => {
         const [liveRaw, savesDoc] = await Promise.all([
           os.session.get(LIVE_KEY).catch(() => null),
           os.storage.get(SAVES_KEY).catch(() => null)
@@ -219,6 +222,8 @@ function Jigsaw() {
         if (!r) return
         liveRevRef.current = Math.max(liveRevRef.current, doc?.rev ?? 0) + 1
         liveByRef.current = ME
+        gameRef.current = r.next
+        heldRef.current = r.held
         setGame(r.next)
         setHeld(r.held)
         live.set(liveOf(ME, liveRevRef.current, r.next, r.held))
@@ -229,7 +234,6 @@ function Jigsaw() {
         savesRaw.current = serializeSaves(saves)
         savesKV.set(savesRaw.current)
       })
-      actQueue.current.catch(() => {})
     },
     [adoptLive, live, savesKV]
   )
@@ -320,7 +324,7 @@ function Jigsaw() {
   const prefsQueue = useRef(Promise.resolve())
   const setPrefs = useCallback(
     (patch: Partial<Prefs>) => {
-      prefsQueue.current = prefsQueue.current.then(async () => {
+      enqueue(prefsQueue, async () => {
         const env = parsePrefsDoc(await os.storage.get(PREFS_KEY).catch(() => null))
         let base = prefsRef.current ?? PREFS0
         if (env.by !== ME && newerDoc(env.rev, env.by, prefsRevRef.current, prefsByRef.current)) {
@@ -331,11 +335,11 @@ function Jigsaw() {
         const next = { ...base, ...patch }
         prefsRevRef.current += 1
         prefsByRef.current = ME
+        prefsRef.current = next
         setPrefsState(next)
         setMuted(next.muted)
         prefsKV.set(JSON.stringify({ ...next, rev: prefsRevRef.current, by: ME }))
       })
-      prefsQueue.current.catch(() => {})
     },
     [prefsKV]
   )
@@ -915,12 +919,12 @@ function Jigsaw() {
             ))}
           </div>
           <div {...stylex.props(styles.confirmActions)}>
-            <Button variant="tinted" xstyle={styles.sheetBtn} onClick={() => setPicker(false)}>
+            <Button variant="tinted" xstyle={[styles.sheetBtn, styles.sheetCancel]} onClick={() => setPicker(false)}>
               Cancel
             </Button>
             <Button
               variant="filled"
-              xstyle={styles.sheetBtn}
+              xstyle={[styles.sheetBtn, styles.sheetFill]}
               onClick={() => {
                 if (prefs.art !== game.art || prefs.count !== game.count) chooseConfig(prefs.art, prefs.count)
                 setPicker(false)
@@ -952,10 +956,15 @@ function Jigsaw() {
               The {placed} placed {placed === 1 ? 'piece returns' : 'pieces return'} to the tray and the timer restarts.
             </p>
             <div {...stylex.props(styles.confirmActions)}>
-              <Button variant="tinted" autoFocus xstyle={styles.sheetBtn} onClick={() => setConfirmReset(false)}>
+              <Button
+                variant="tinted"
+                autoFocus
+                xstyle={[styles.sheetBtn, styles.sheetCancel]}
+                onClick={() => setConfirmReset(false)}
+              >
                 Cancel
               </Button>
-              <Button variant="filled" xstyle={[styles.sheetBtn, styles.danger]} onClick={doReset}>
+              <Button variant="filled" xstyle={[styles.sheetBtn, styles.sheetFill]} onClick={doReset}>
                 Start over
               </Button>
             </div>

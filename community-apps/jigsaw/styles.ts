@@ -1,6 +1,7 @@
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import {
   app,
+  chrome,
   colors,
   easing,
   glass,
@@ -64,7 +65,7 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     textTransform: 'uppercase',
     fontWeight: weight.semibold,
-    color: app.label2
+    color: app.fg
   },
   title: {
     fontSize: typeScale.title2,
@@ -100,7 +101,7 @@ export const styles = stylex.create({
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
     fontWeight: weight.medium,
-    color: app.label2
+    color: app.fg
   },
   chipValue: { fontWeight: weight.semibold, color: app.fg, fontVariantNumeric: 'tabular-nums' },
   iconBtn: {
@@ -164,7 +165,9 @@ export const styles = stylex.create({
     paddingBottom: space.xs,
     paddingLeft: space.xs,
     borderRadius: radius.pill,
-    backgroundColor: glass.tintDark,
+    // The zoom dock is a HUD pill over bright artwork: glass.tintDark lets white
+    // text fall under 4.5:1 on light scenes, so it uses the deeper HUD recipe.
+    backgroundColor: chrome.hud,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim},${shadow.float}`
@@ -263,9 +266,9 @@ export const styles = stylex.create({
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
     fontWeight: weight.semibold,
-    color: app.label2
+    color: app.fg
   },
-  railCount: { marginLeft: 'auto', color: app.label2, fontVariantNumeric: 'tabular-nums' },
+  railCount: { marginLeft: 'auto', color: app.fg, fontVariantNumeric: 'tabular-nums' },
   trayBox: {
     flexGrow: 1,
     minHeight: 0,
@@ -284,7 +287,7 @@ export const styles = stylex.create({
     paddingTop: space.xl,
     paddingBottom: space.xl,
     textAlign: 'center',
-    color: app.label2,
+    color: app.fg,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote
@@ -327,7 +330,7 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: radius.sm,
     backgroundColor: 'transparent',
-    color: app.label2,
+    color: app.fg,
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
@@ -363,14 +366,13 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     cursor: 'pointer'
   },
-  actionAccent: { backgroundColor: app.link, color: colors.white },
   hint: {
     margin: 0,
     paddingBottom: space.xl,
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
-    color: app.label2,
+    color: app.fg,
     textAlign: 'center'
   },
 
@@ -419,7 +421,7 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
-    color: app.label2
+    color: app.fg
   },
   confirmCard: { display: 'flex', flexDirection: 'column', gap: space.md },
   confirmTitle: {
@@ -433,11 +435,15 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
-    color: app.label2,
+    color: app.fg,
     margin: 0
   },
   confirmActions: { display: 'flex', gap: space.sm, justifyContent: 'flex-end' },
   sheetBtn: { minHeight: 44 },
+  // Sheet actions: the tinted pill keeps the secondary look but must read at
+  // body-text contrast; the primary inverts the app's own surface pairing.
+  sheetCancel: { color: app.fg },
+  sheetFill: { backgroundColor: app.fg, color: app.bg },
 
   // Completion veil over the board.
   veil: {
@@ -490,7 +496,9 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
-    color: `color-mix(in srgb, ${colors.white} 72%, transparent)`
+    // 72% white sits near 4.5:1 over the veil's dark glass on a light canvas;
+    // 85% keeps the title/sub hierarchy with real margin.
+    color: `color-mix(in srgb, ${colors.white} 85%, transparent)`
   },
   veilActions: { display: 'flex', gap: space.sm, paddingTop: space.sm },
   veilBtn: {
@@ -512,7 +520,8 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     cursor: 'pointer'
   },
-  veilBtnAccent: { backgroundColor: app.link },
+  // The veil's primary cue: a solid pill over the dark glass, not blue.
+  veilBtnAccent: { backgroundColor: colors.white, color: colors.black },
   confetti: {
     position: 'absolute',
     top: 0,
@@ -544,7 +553,7 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     zIndex: 4
   },
-  savedTag: { display: 'inline-flex', alignItems: 'center', gap: space.xs, color: app.label2 },
+  savedTag: { display: 'inline-flex', alignItems: 'center', gap: space.xs, color: app.fg },
   segWrap: { paddingRight: space.md, paddingLeft: space.md, display: 'flex', flexShrink: 0 },
   // The piece riding the pointer mid-drag: floats above everything, never
   // receives the pointer itself.
@@ -567,7 +576,6 @@ export const styles = stylex.create({
     animationDelay: `${(i % 5) * 0.28}s`,
     backgroundColor: [colors.yellow, colors.blue, colors.red, colors.green, colors.purple][i % 5]
   }),
-  danger: { backgroundColor: colors.red, color: colors.white },
   // shared.press has no reduced-motion variant (platform gap): keep the press
   // colour ease but flatten the scale so reduce truly means reduce.
   // StyleX merges array entries per property key, not per condition, so this

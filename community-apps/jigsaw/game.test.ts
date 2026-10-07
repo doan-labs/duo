@@ -37,6 +37,7 @@ import {
   slotX,
   slotY
 } from './puzzle.ts'
+import { enqueue } from './queue.ts'
 
 let passed = 0
 const failures: string[] = []
@@ -316,6 +317,35 @@ check('reset produces a different tray order only via its seed', () => {
   const c = resetGame(g, 11)
   ok(JSON.stringify(a.tray) !== JSON.stringify(c.tray) || JSON.stringify(a) !== JSON.stringify(c), 'reseed did nothing')
 })
+
+// Serial write queues must survive a failed step: the next enqueued step is
+// the rejection handler too, so one mid-write failure can never deadlock every
+// later mutation. Order is preserved and a failed step is not retried - a
+// canceled mutation cannot resurrect.
+try {
+  const q = { current: Promise.resolve() }
+  const order: string[] = []
+  enqueue(q, async () => {
+    order.push('a')
+  })
+  enqueue(q, async () => {
+    order.push('b')
+    throw new Error('mid-write failure')
+  })
+  enqueue(q, async () => {
+    order.push('c')
+  })
+  await q.current.catch(() => {})
+  eq(order, ['a', 'b', 'c'], 'queue order')
+  enqueue(q, async () => {
+    order.push('d')
+  })
+  await q.current.catch(() => {})
+  eq(order, ['a', 'b', 'c', 'd'], 'queue after a failed step')
+  passed++
+} catch (error) {
+  failures.push(`serial queue recovery: ${error instanceof Error ? error.message : String(error)}`)
+}
 
 if (failures.length) {
   console.error(`${failures.length} failing checks:`)
