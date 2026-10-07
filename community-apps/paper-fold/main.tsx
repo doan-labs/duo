@@ -37,7 +37,7 @@ import {
   resumeStep,
   type UiState
 } from './engine.ts'
-import { live, stepTarget } from './live.ts'
+import { live, stepTarget, stillBound } from './live.ts'
 import { MODELS, type Model, modelById } from './models.ts'
 import { styles } from './styles.ts'
 
@@ -242,12 +242,14 @@ function StepRail({
   model,
   at,
   result,
-  onStep
+  onStep,
+  best
 }: {
   model: Model
   at: number
   result: boolean
   onStep: (step: number, kind?: Cue) => void
+  best: { current: { model: string | null } }
 }) {
   const railRef = useRef<HTMLDivElement>(null)
   const total = model.steps.length
@@ -255,10 +257,18 @@ function StepRail({
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    // New intent needs a live copy at dispatch; onStep alone rejecting the
+    // mutation would still leave a hidden copy scheduling focus work.
+    if (!liveNow()) return
     e.preventDefault()
     const target = Math.max(0, Math.min(total, current + (e.key === 'ArrowDown' ? 1 : -1)))
     onStep(target)
+    const railModel = model.id
     requestAnimationFrame(() => {
+      // Deferred focus is admitted work, not persistence completion: it
+      // re-admits against the current snapshot and drops if a peer switched
+      // the session to another model meanwhile.
+      if (!stillBound(os.view, best.current, railModel)) return
       railRef.current?.querySelector<HTMLElement>('[data-current="true"]')?.focus()
     })
   }
@@ -319,6 +329,7 @@ function Coach({
   onBack,
   onStep,
   onStepBy,
+  best,
   onReplay,
   onNextModel,
   muted,
@@ -335,6 +346,7 @@ function Coach({
   onBack: () => void
   onStep: (step: number, kind?: Cue) => void
   onStepBy: (delta: number, kind?: Cue) => void
+  best: { current: { model: string | null } }
   onReplay: () => void
   onNextModel: (m: Model) => void
   muted: boolean
@@ -368,7 +380,7 @@ function Coach({
         </div>
       </div>
       <div {...stylex.props(styles.stage)}>
-        {wide && <StepRail model={model} at={at} result={result} onStep={onStep} />}
+        {wide && <StepRail model={model} at={at} result={result} onStep={onStep} best={best} />}
         <div {...stylex.props(styles.pane, !wide && styles.paneNarrow)}>
           {result ? (
             <>
@@ -456,7 +468,9 @@ function PaperFold() {
   // unmounts its focused node), so keys keep landing on the invisible copy.
   // Landing focus on the visible copy's root restores keyboard control to it.
   useEffect(() => {
-    if (view.visible && view.active) rootRef.current?.focus({ preventScroll: true })
+    // The render-time view decides when to retry; the synchronous os.view
+    // snapshot decides whether this copy is still admitted at fire time.
+    if (view.visible && view.active && liveNow()) rootRef.current?.focus({ preventScroll: true })
   }, [view.visible, view.active, rootRef])
 
   // Audio unlock needs a real gesture once per copy - and only on the live
@@ -729,6 +743,7 @@ function PaperFold() {
       onBack={toModels}
       onStep={(s, kind) => goStep(model, s, kind)}
       onStepBy={(d, kind) => goStepBy(model, d, kind)}
+      best={uiBest}
       onReplay={() => goStep(model, 0, 'turn')}
       onNextModel={openModel}
       muted={prefs.muted}

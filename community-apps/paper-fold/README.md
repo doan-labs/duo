@@ -40,9 +40,12 @@ completion are deliberately different:
   intent before any ref, UI, KV, session, progress or audio state moves.
   Converged shared state is not authorization.
 - **Completion**: an intent admitted while live finishes its storage
-  writes even if the copy hides a moment later. Hydration and foreign
-  adoption keep rendering on both copies; only repair writes also require
-  the copy to be live.
+  writes even if the copy hides a moment later. Deferred focus work is
+  not completion: a rail key schedules a frame that re-admits against the
+  current `os.view` and the bound model (`stillBound` in `live.ts`), so a
+  stale callback cannot focus a copy that hid or a model the session has
+  since left. Hydration and foreign adoption keep rendering on both
+  copies; only repair writes also require the copy to be live.
 - Relative transport (`Next`/`Back`/arrows) resolves against the
   best-known step so rapid accepted inputs cannot reuse a stale rendered
   step, and every model-bound intent is dropped if a peer has since moved

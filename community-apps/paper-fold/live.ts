@@ -44,3 +44,13 @@ export const stepTarget = (
   delta: number,
   steps: number
 ): number | null => (best.model === modelId ? clampStep(steps, best.step + delta) : null)
+
+/**
+ * Deferred work scheduled while admitted is not persistence completion: it
+ * fires only while the copy is still live AND the intent's bound model is
+ * still the session's best-known model. A hide or a peer model switch between
+ * admission and fire time drops it instead of replaying onto the wrong copy
+ * or the wrong model.
+ */
+export const stillBound = (v: ViewLike, best: { model: string | null }, modelId: string): boolean =>
+  live(v) && best.model === modelId
