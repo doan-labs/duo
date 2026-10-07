@@ -331,7 +331,9 @@ function Game() {
   }, [])
 
   // The Sheet closes on cancel (scrim, Escape, Cancel) and after the confirmed
-  // action; either way the control that opened it takes focus back.
+  // action; either way the control that opened it takes focus back - but only
+  // while this copy stays the visible one. A hidden copy's deferred restore
+  // would steal focus from the display the user is actually looking at.
   const closeConfirm = useCallback(() => {
     setConfirm(null)
     const el = returnFocus.current
@@ -339,7 +341,7 @@ function Game() {
     if (el instanceof HTMLElement) {
       let tries = 0
       const restore = () => {
-        if (!el.isConnected) return
+        if (!activeRef.current || !el.isConnected) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
