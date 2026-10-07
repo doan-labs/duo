@@ -37,7 +37,7 @@ export function applyWatch(pending: PendingMap, k: string, v: string | null): st
     if (!q.length) pending.delete(k)
   }
   const tail = pending.get(k)
-  if (tail?.length) return tail[tail.length - 1]
+  if (tail?.length) return tail[tail.length - 1] ?? null
   return v
 }
 

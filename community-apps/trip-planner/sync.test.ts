@@ -198,8 +198,5 @@ const mkPending = () => new Map<string, (string | null)[]>()
   check('send resolves not rejects on failure', r === false)
 }
 
-if (failed) {
-  console.log(`\nsync: ${passed} passed, ${failed} failed`)
-  process.exit(1)
-}
-console.log(`\nsync: ${passed} passed, 0 failed`)
+console.log(`\nsync: ${passed} passed, ${failed} failed`)
+if (failed) throw new Error(`${failed} checks failed`)

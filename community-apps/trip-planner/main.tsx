@@ -331,7 +331,10 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
         return next
       })
       return writes.current.send(
-        () => (v === null ? space.del(k) : space.set(k, v)),
+        async () => {
+          if (v === null) await space.del(k)
+          else await space.set(k, v)
+        },
         () => {
           // The write never landed: drop this copy's pending mask for the key
           // and re-snapshot so the display converges on the stored truth.
