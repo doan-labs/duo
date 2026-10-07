@@ -608,7 +608,10 @@ gated on a repaint callback or a throttled timer, since visibility is what
 gates timers, effects and input work and an occluded document may get neither.
 Geometry-only updates (`width`, `height`, `angle`) keep the per-frame
 coalescing, with a bounded timer as the delivery floor when a view's document
-stops producing frames. If a view's port backlog exceeds 60 undelivered `view`
+stops producing frames. Discrete host transitions (sleep, wake) apply to the
+derived display state the moment they happen and are pushed then, never at the
+next rendered frame; the loop still drives fold, clip and opacity truth. If a
+view's port backlog exceeds 60 undelivered `view`
 events, the host drops the older ones; only the latest matters.
 
 ### 3.3 State synchronization
