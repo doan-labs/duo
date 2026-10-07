@@ -677,7 +677,7 @@ check('a stale op=null write merges its doc content instead of clobbering', () =
   pair.deliver(pair.a, { by: 'B', sel: null, doc: bDoc, base: 4, op: null }, 6)
   // Both sides converge on the union: A's toggle and B's wire and move.
   for (const side of [pair.a.doc, pair.b.doc]) {
-    eq(side!.nodes[a.id]!.on, true, 'holder toggle kept')
+    ok(side!.nodes[a.id]!.on === true, 'holder toggle kept')
     ok(wireAt(side!, g.id, 0) !== undefined, 'stale wire kept via union')
     eq(side!.nodes[g.id]!.x, g.x + 30)
   }
@@ -697,7 +697,7 @@ check('a holder drop is not resurrected by a stale union merge', () => {
   pair.b.docRev = 4
   pair.deliver(pair.a, { by: 'B', sel: null, doc: shared, base: 4, op: null }, 6)
   for (const side of [pair.a.doc, pair.b.doc]) {
-    eq(side!.nodes[g.id], undefined, 'dropped node must stay dropped')
+    ok(side!.nodes[g.id] === undefined, 'dropped node must stay dropped')
   }
 })
 
