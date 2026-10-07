@@ -114,11 +114,14 @@ hosted production symptom presented; misses, redirects and errors get
 `no-store`. Only Cache-Control is overridden; bodies and other headers pass
 through. `scripts/checks/publish/headers.mjs` asserts the routing contract
 (`run_worker_first` covers exactly the three trees and `assets.binding` stays
-`ASSETS`, the name `worker.ts` dereferences), validates any `_headers` rules
-present (grammar, comma-join and detach, directive values, and conflicting
-same-name directives in the joined value on probed paths), and drives the real
-Worker handler over canned statuses; live edge behavior is verified against
-the deploy itself.
+`ASSETS`, the name `worker.ts` dereferences), and resolves `assets.directory`
+to the real build output rather than matching a substring. `_headers` never
+applies to Worker-served responses, so release-tree rules there are dead
+config; the checker still validates any `_headers` file present (grammar,
+comma-join and detach, directive values, and conflicting same-name directives
+in the joined value on probed paths) because broken directives are defects
+wherever they sit, and drives the real Worker handler over canned statuses;
+live edge behavior is verified against the deploy itself.
 Site Created/Updated dates are the release `build.at` for community apps but the first
 and last package commit for official apps: their `dist/cdn` release is rebuilt on every
 site build, so its timestamp is only the deploy minute. For the same reason the script

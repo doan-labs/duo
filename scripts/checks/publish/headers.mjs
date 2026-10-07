@@ -163,6 +163,7 @@ function ccConflicts(map) {
   if (map.has('no-store') && (map.has('immutable') || map.has('public') || Number(map.get('max-age')) > 0))
     errs.push('no-store contradicts public/immutable/max-age')
   if (map.has('no-cache') && map.has('immutable')) errs.push('no-cache contradicts immutable')
+  if (map.has('public') && map.has('private')) errs.push('public and private are mutually exclusive')
   const long = (k) => map.has(k) && Number(map.get(k)) > 0
   if (map.has('immutable') && !long('max-age') && !long('s-maxage'))
     errs.push('immutable without a positive max-age does nothing')
@@ -306,8 +307,14 @@ function checkConfig({ headersText, wranglerText }) {
   if (wrangler) {
     const assets = wrangler.assets ?? {}
     errors.push(...checkRunWorkerFirst(assets))
-    if (typeof assets.directory !== 'string' || !assets.directory.includes('packages/web/dist/client'))
-      errors.push('assets.directory must serve packages/web/dist/client')
+    // Wrangler resolves assets.directory relative to the wrangler.jsonc
+    // location (the repo root here), so compare resolved paths - substring
+    // checks accept siblings, nesting and traversal while wrongly rejecting
+    // equivalent normalized spellings.
+    const directory = typeof assets.directory === 'string' ? assets.directory : ''
+    const expectedDirectory = resolve(process.cwd(), 'packages/web/dist/client')
+    if (!directory || resolve(process.cwd(), directory) !== expectedDirectory)
+      errors.push(`assets.directory '${assets.directory}' must resolve to packages/web/dist/client`)
     if (assets.binding !== 'ASSETS')
       errors.push("assets.binding must be 'ASSETS' - packages/web/worker.ts reaches the asset layer through env.ASSETS")
     if (assets.not_found_handling === 'single-page-application')
@@ -410,6 +417,9 @@ if (realResult.wrangler) errors.push(...(await checkWorker(realResult.wrangler))
   assert.throws(() => directives('immutable-ish'))
   assert.throws(() => directives('public, max-age=60, max-age=0'))
   assert.deepEqual(directives('public, max-age=60, max-age=60').get('max-age'), '60')
+  assert.equal(ccConflicts(directives('public, private, max-age=0')).length, 1)
+  assert.equal(ccConflicts(directives('private, max-age=60')).length, 0)
+  assert.equal(ccConflicts(directives('no-cache="Set-Cookie", max-age=0')).length, 0)
   assert.deepEqual(directives('public, max-age=60').get('max-age'), '60')
 }
 
@@ -525,6 +535,34 @@ const FIXTURES = [
   ['run_worker_first not an array', null, withRwf('"/blog/*"'), false],
   ['malformed jsonc', null, W.replace('"run_worker_first"', '"run_worker_first'), false],
   ['assets.directory moved', null, W.replace('./packages/web/dist/client', './dist'), false],
+  [
+    'assets.directory sibling name',
+    null,
+    W.replace('./packages/web/dist/client', './packages/web/dist/client-old'),
+    false
+  ],
+  [
+    'assets.directory nested under target',
+    null,
+    W.replace('./packages/web/dist/client', './packages/web/dist/client/unintended'),
+    false
+  ],
+  [
+    'assets.directory traversal escapes target',
+    null,
+    W.replace('./packages/web/dist/client', './packages/web/dist/client/../unintended'),
+    false
+  ],
+  [
+    'assets.directory equivalent normalized spelling',
+    null,
+    W.replace('./packages/web/dist/client', './packages/web/dist/./client/'),
+    true
+  ],
+  ['assets.directory wrong build root', null, W.replace('./packages/web/dist/client', './dist/client'), false],
+  ['public and private together', '/apps\n  Cache-Control: public, private, max-age=0\n', W, false],
+  ['private alone is valid', '/x\n  Cache-Control: private, max-age=60\n', W, true],
+  ['rfc-qualified no-cache is valid', '/x\n  Cache-Control: no-cache="Set-Cookie", max-age=0\n', W, true],
   [
     'spa fallback on misses',
     null,
