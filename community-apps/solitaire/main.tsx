@@ -258,6 +258,10 @@ function Solitaire() {
   statsRef.current = stats
   const savedValRef = useRef(saved.value)
   savedValRef.current = saved.value
+  // Set when the store proved the mirror behind (a foreign record adopted via
+  // read-before-write): until the mirror catches up its stale value must not
+  // be mistaken for a new foreign write on every tap.
+  const mirrorBehind = useRef(false)
 
   const stopAuto = useCallback(() => {
     if (autoTimer.current !== null) {
@@ -301,6 +305,7 @@ function Solitaire() {
           if (cur && cur !== lastSeen.current) {
             const foreign = adoptGame(cur)
             if (foreign && foreign.by !== ME) {
+              mirrorBehind.current = true
               lastSeen.current = cur
               const t = { ...foreign.deal, game: foreign.game }
               setTable(t)
@@ -336,7 +341,8 @@ function Solitaire() {
   // synchronously before any move, undo or Auto tick computes its write.
   const freshBase = useCallback((): { table: Table; foreign: boolean } => {
     const raw = savedValRef.current
-    if (raw && raw !== lastSeen.current) {
+    if (raw === lastSeen.current) mirrorBehind.current = false
+    if (!mirrorBehind.current && raw && raw !== lastSeen.current) {
       const next = adoptGame(raw)
       if (next && next.by !== ME) {
         lastSeen.current = raw
@@ -362,7 +368,10 @@ function Solitaire() {
   useEffect(() => {
     if (saved.status === 'hydrating' || saved.status === 'saving') return
     const raw = saved.value
-    if (raw !== null && raw === lastSeen.current) return
+    if (raw !== null && raw === lastSeen.current) {
+      mirrorBehind.current = false
+      return
+    }
     lastSeen.current = raw
     if (!raw) {
       if (!seeded.current) {
@@ -383,6 +392,9 @@ function Solitaire() {
     // A record without the flag also clears any stale resume request.
     resumeAuto.current = next.auto === true
     tryResume()
+    // A foreign record arriving through the channel means the mirror is live
+    // again; the per-tap mirror check is trustworthy once more.
+    mirrorBehind.current = false
     setStatus('Game restored.')
   }, [saved.value, saved.status, saved, publish, stopAuto, tryResume])
 
