@@ -378,7 +378,11 @@ function Jigsaw() {
   // while this copy is the live visible one and stops at completion.
   useEffect(() => {
     if (!view.active || !view.visible || !game || game.finishedAt !== null) return
-    const t = setInterval(() => setNow(Date.now()), 1000)
+    const t = setInterval(() => {
+      // Admission is re-read at tick time, not captured at schedule time: a
+      // copy that just went hidden stops updating the clock immediately.
+      if (admitInput(os.view)) setNow(Date.now())
+    }, 1000)
     return () => clearInterval(t)
   }, [view.active, view.visible, game])
 
@@ -399,12 +403,19 @@ function Jigsaw() {
     }
   }, [])
 
-  // Escape settles app UI in order: sheet (handled by Sheet itself), then a
-  // held piece returns to where it came from. Nothing stops the pass-through.
+  // Escape settles app UI in order: an open sheet closes first, then a held
+  // piece returns to where it came from. Both consume the key at the
+  // pre-connect guard, so the SDK's later capture listener never forwards it
+  // to Home. Only unconsumed Escapes still go home.
   useEffect(() => {
     escapeTop = () => {
-      if (sheetRef.current) return false
       if (!liveNow()) return false
+      if (sheetRef.current) {
+        armedGameRef.current = null
+        setPicker(false)
+        setConfirmReset(false)
+        return true
+      }
       const g = gameRef.current
       if (heldRef.current !== null) {
         setHeld(null)
@@ -734,7 +745,8 @@ function Jigsaw() {
         if (held !== null) dropAt(held, pt.x - cw / 2, pt.y - ch / 2)
       }}
       onHover={(pt) => {
-        if (held !== null && pt) setHeldPos({ x: pt.x - cw / 2, y: pt.y - ch / 2 })
+        if (!liveNow() || held === null || !pt) return
+        setHeldPos({ x: pt.x - cw / 2, y: pt.y - ch / 2 })
       }}
     >
       {held !== null ? (
@@ -781,6 +793,7 @@ function Jigsaw() {
                 type="button"
                 {...stylex.props(styles.veilBtn, styles.veilBtnAccent, press)}
                 onClick={() => {
+                  if (!liveNow()) return
                   // Dismiss the veil first: the picker sheet must stack above it.
                   setVeilDown(true)
                   setPicker(true)
@@ -844,7 +857,9 @@ function Jigsaw() {
             variant="round"
             aria-label="Choose a puzzle"
             xstyle={styles.iconHit}
-            onClick={() => setPicker(true)}
+            onClick={() => {
+              if (liveNow()) setPicker(true)
+            }}
           />
         </div>
       </header>
@@ -912,7 +927,13 @@ function Jigsaw() {
         </p>
       ) : null}
 
-      <Sheet open={picker} onClose={() => setPicker(false)} aria-label="Choose a puzzle">
+      <Sheet
+        open={picker}
+        onClose={() => {
+          if (liveNow()) setPicker(false)
+        }}
+        aria-label="Choose a puzzle"
+      >
         <div {...stylex.props(styles.sheetBody)}>
           <div {...stylex.props(styles.artRow)} role="radiogroup" aria-label="Picture">
             {ARTS.map((a) => {
@@ -955,13 +976,20 @@ function Jigsaw() {
             ))}
           </div>
           <div {...stylex.props(styles.confirmActions)}>
-            <Button variant="tinted" xstyle={[styles.sheetBtn, styles.sheetCancel]} onClick={() => setPicker(false)}>
+            <Button
+              variant="tinted"
+              xstyle={[styles.sheetBtn, styles.sheetCancel]}
+              onClick={() => {
+                if (liveNow()) setPicker(false)
+              }}
+            >
               Cancel
             </Button>
             <Button
               variant="filled"
               xstyle={styles.sheetBtn}
               onClick={() => {
+                if (!liveNow()) return
                 if (prefs.art !== game.art || prefs.count !== game.count) chooseConfig(prefs.art, prefs.count)
                 setPicker(false)
               }}
@@ -984,7 +1012,13 @@ function Jigsaw() {
         </div>
       ) : null}
 
-      <Sheet open={confirmReset} onClose={() => setConfirmReset(false)} aria-label="Start over">
+      <Sheet
+        open={confirmReset}
+        onClose={() => {
+          if (liveNow()) setConfirmReset(false)
+        }}
+        aria-label="Start over"
+      >
         <div {...stylex.props(styles.sheetBody)}>
           <div {...stylex.props(styles.confirmCard)}>
             <h2 {...stylex.props(styles.confirmTitle)}>Start this puzzle over?</h2>
@@ -996,7 +1030,9 @@ function Jigsaw() {
                 variant="tinted"
                 autoFocus
                 xstyle={[styles.sheetBtn, styles.sheetCancel]}
-                onClick={() => setConfirmReset(false)}
+                onClick={() => {
+                  if (liveNow()) setConfirmReset(false)
+                }}
               >
                 Cancel
               </Button>

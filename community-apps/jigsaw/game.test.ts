@@ -15,6 +15,7 @@ import {
   filterTray,
   type Game,
   GRIDS,
+  gameKeyOf,
   isComplete,
   kindOf,
   liveOf,
@@ -748,6 +749,89 @@ check('input admission requires active AND visible', () => {
   eq(admitInput({ active: false, visible: false }), false)
   eq(admitInput(null), false, 'missing view snapshot admitted input')
   eq(admitInput(undefined), false)
+})
+
+await checkAsync('a rebase on a stale store keeps saves already accepted but not yet durable', async () => {
+  // The queue serializes reads/rebases, not durable delivery. Model the
+  // delayed ordered-mirror case: the durable read keeps returning the boot
+  // doc while three accepted writes are still in flight.
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const g0 = newGame('harbour', 12, 5)
+  const pinned = serializeSaves({ rev: 1, by: 'old', current: 'harbour:12', games: { 'harbour:12': g0 } })
+  saves.store.set('saves', pinned)
+  saves.get = async () => pinned
+  const { p, refs } = makePersist('me', live, saves)
+  refs.game.current = g0
+
+  await p.act((ctx) => ({ next: ctx.saves['alpine:24'] ?? newGame('alpine', 24, 7), held: null }))
+  await p.act((ctx) => {
+    if (!ctx.game) return null
+    return { next: placeAt(ctx.game, 0, 0, 0, 500).game, held: null }
+  }, gameKeyOf(refs.game.current!))
+  await p.act((ctx) => ({ next: ctx.saves['lantern:48'] ?? newGame('lantern', 48, 9), held: null }))
+
+  const docs = saves.sets.map((s) => parseSaves(s.v)!)
+  eq(Object.keys(docs[0]!.games).sort(), ['alpine:24', 'harbour:12'], 'first write lost the boot save')
+  eq(
+    Object.keys(docs[1]!.games).sort(),
+    ['alpine:24', 'harbour:12'],
+    'rebase on a stale store dropped the pending alpine save'
+  )
+  eq(docs[1]!.games['alpine:24']!.pieces[0]!.z, 2, 'placement was not carried forward')
+  eq(
+    Object.keys(docs[2]!.games).sort(),
+    ['alpine:24', 'harbour:12', 'lantern:48'],
+    'the last write dropped accepted progress'
+  )
+  eq(docs.at(-1)!.by, 'me', 'writes not attributed to this copy')
+})
+
+await checkAsync('a re-pick of a pending config re-adopts the accepted game instead of re-seeding', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const pinned = serializeSaves({ rev: 1, by: 'old', current: 'harbour:12', games: {} })
+  saves.store.set('saves', pinned)
+  saves.get = async () => pinned
+  const { p, refs } = makePersist('me', live, saves)
+
+  const choose = (seed: number) => (ctx: Parameters<Parameters<typeof p.act>[0]>[0]) => ({
+    next: ctx.saves['alpine:24'] ?? newGame('alpine', 24, seed),
+    held: null
+  })
+  await p.act(choose(7))
+  const first = refs.game.current!
+  await p.act(choose(11))
+  eq(refs.game.current!.seed, 7, 're-pick re-seeded over a pending game')
+  const lastDoc = parseSaves(saves.sets.at(-1)!.v)!
+  eq(lastDoc.games['alpine:24']!.seed, first.seed, 're-pick wrote a fresh seed over the pending game')
+})
+
+await checkAsync('a saves heal preserves keys the store has that our mirror never saw', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const { p, clocks, state } = makePersist('me', live, saves)
+  const g0 = newGame('harbour', 12, 5)
+  const gAlpine = newGame('alpine', 24, 7)
+  const gLantern = newGame('lantern', 48, 9)
+  // Our accepted doc is newer than the stale store read, so the heal writes;
+  // the store holds a lantern save our mirror never accepted.
+  clocks.saves = { rev: 9, by: 'me' }
+  state.savesRaw = serializeSaves({
+    rev: 9,
+    by: 'me',
+    current: 'alpine:24',
+    games: { 'harbour:12': g0, 'alpine:24': gAlpine }
+  })
+  saves.store.set(
+    'saves',
+    serializeSaves({ rev: 4, by: 'old', current: 'harbour:12', games: { 'harbour:12': g0, 'lantern:48': gLantern } })
+  )
+  await p.healSaves()
+  const healed = parseSaves(saves.sets.at(-1)!.v)!
+  eq(Object.keys(healed.games).sort(), ['alpine:24', 'harbour:12', 'lantern:48'], 'heal dropped a key from the union')
+  eq(healed.games['alpine:24'], gAlpine, 'heal let a stale store overwrite our pending save')
+  eq(healed.games['lantern:48'], gLantern, 'heal dropped a store key our mirror never saw')
 })
 
 if (failures.length) {

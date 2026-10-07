@@ -181,7 +181,12 @@ export function createGamePersistence(deps: {
         if (!mine) return
         deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
         deps.clocks.saves.by = deps.me
-        deps.writeSaves(serializeSaves({ ...mine, rev: deps.clocks.saves.rev, by: deps.me }))
+        // The store doc can hold saves our mirror never saw (a peer write
+        // that landed between our last accepted envelope and this read).
+        // Republish union-style: their keys survive, our pending ones win.
+        deps.writeSaves(
+          serializeSaves({ ...mine, games: { ...sd.games, ...mine.games }, rev: deps.clocks.saves.rev, by: deps.me })
+        )
       })
     },
     act(fn, bind) {
@@ -201,7 +206,16 @@ export function createGamePersistence(deps: {
         // the live puzzle changed (peer switch, seed rollover) the intent dies
         // here rather than mutating a game it was never aimed at.
         if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
-        const r = fn({ game: base, held: heldBase, saves: sd.games })
+        // The queue serializes reads/rebases, not durable delivery: a
+        // confirmed read can still lag behind writes this copy already
+        // accepted (mirror sets fire-and-forget). When the store doc is not
+        // newer than our last accepted envelope, that envelope is the better
+        // library - it carries the pending games a bare rebase would drop.
+        // A newer store doc has just been adopted above, so savesDoc() is the
+        // union winner in both cases; on a cold start it falls back to the
+        // confirmed read.
+        const lib = (deps.savesDoc() ?? sd).games
+        const r = fn({ game: base, held: heldBase, saves: lib })
         if (!r) return
         deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
         deps.clocks.live.by = deps.me
@@ -212,7 +226,7 @@ export function createGamePersistence(deps: {
           rev: deps.clocks.saves.rev,
           by: deps.me,
           current: key,
-          games: { ...sd.games, [key]: r.next }
+          games: { ...lib, [key]: r.next }
         }
         const payload: GameApply = {
           game: r.next,
