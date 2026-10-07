@@ -3,12 +3,17 @@
 // `bun test` too (a failing check throws while the file is evaluated, which
 // the runner reports as a failure).
 //
-// The KV stub makes reads and writes fail and resolve in a controlled order so
-// the persistence queue's failure paths are exercised end to end: a failed
-// read must stay 'unknown' (never an implied-empty library), a failed write
-// must reach a null terminal instead of an empty-success shape or a hang, and
-// the queue must not wedge later writes after either.
-import { admitSeed, LIB_KEY, type LibKV, readLib, seedDoc, writeLib } from './library.ts'
+// Two failure families are covered end to end:
+//  - adapter failures: a failed read stays 'unknown' (never an implied-empty
+//    library), a failed write reaches a null terminal instead of an
+//    empty-success shape or a hang, and one bad drain cannot wedge the next.
+//  - copy races: two LibStore instances with independent queues share one
+//    backing cell. A delayed successful set lands LAST over a peer commit and
+//    destroys it, and no re-read can reveal the loss - the peer data is
+//    already gone. Convergence is what repair() provides: every stored change
+//    fires it on both copies, and each copy re-offers its own committed union
+//    until the stored value carries it.
+import { admitSeed, LIB_KEY, type LibKV, LibStore, readLib, seedDoc } from './library.ts'
 import {
   type Library,
   latestDoc,
@@ -17,7 +22,8 @@ import {
   parseLibrary,
   serializeLibrary,
   welcomePlan,
-  withDoc
+  withDoc,
+  withoutDoc
 } from './plan.ts'
 
 const fakeKV = (impl: {
@@ -33,6 +39,57 @@ const lib = (plans: Record<string, PlanDoc> = {}, gone: Record<string, number> =
   gone,
   rev
 })
+
+// One backing cell with a change feed: every landed set fires the watchers,
+// which stand in for the useKV mirror that drives LibStore.repair() in the app.
+const cell = (initial: Library) => {
+  let stored = serializeLibrary(initial)
+  const listeners: (() => void)[] = []
+  const kv = (gate?: () => Promise<void>): LibKV => ({
+    get: () => Promise.resolve(stored),
+    set: async (_k, v) => {
+      await gate?.()
+      stored = v
+      // The mirror fires on every landed change, not just once.
+      for (const f of listeners) f()
+      return { rev: 0 }
+    }
+  })
+  return {
+    kv,
+    onChange: (fn: () => void) => listeners.push(fn),
+    now: () => parseLibrary(stored)
+  }
+}
+
+const docAt = (name: string, id: string, updated: number): PlanDoc => ({ ...newPlan(name), id, updated })
+
+// A latch that blocks exactly one set call so a peer commit can be scheduled
+// between a copy's get and its delayed successful set.
+const once = () => {
+  let armed = true
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  return {
+    gate: async () => {
+      if (!armed) return
+      armed = false
+      await gate
+    },
+    release: () => release(),
+    // True once the gated copy has reached its set call - its get already ran.
+    entered: () => !armed
+  }
+}
+
+// Run the queue until every scheduled drain resolves: the equivalent of the
+// app's change feed going quiet after all copies' repairs have settled.
+const settle = async (stores: LibStore[], rounds = 8) => {
+  for (let i = 0; i < rounds; i++) {
+    await Promise.all(stores.map((s) => s.repair()))
+    await new Promise((r) => setTimeout(r, 0))
+  }
+}
 
 let passed = 0
 const failures: string[] = []
@@ -59,9 +116,7 @@ await check('a failed bootstrap read is unknown, never an empty seed', async () 
   const kv = fakeKV({
     get: () => (++reads === 1 ? Promise.reject(new Error('E_IO')) : Promise.resolve(stored))
   })
-  // Read 1 fails: 'retry', not a fabricated welcome doc to overwrite the real one.
   eq(admitSeed(await readLib(kv), false), 'retry')
-  // Read 2 sees the real library: the stored edited doc is what opens.
   const open = admitSeed(await readLib(kv), false)
   if (open === 'retry' || !open) throw new Error('expected the stored doc')
   eq(open.id, edited.id)
@@ -80,41 +135,20 @@ await check('regression: the pre-fix seed path would have clobbered the edited w
   // beats the stored `updated` at the write guard.
   const oldOpen = latestDoc((await readLib(kv)) ?? parseLibrary(null)) ?? welcomePlan()
   ok(oldOpen.updated > 1, 'the pre-fix fallback seed is always newer than the stored doc')
-  // Same storage, same sequence, fixed admission: the next read finds the
-  // real edited doc and it is what opens.
   const open = admitSeed(await readLib(kv), false)
   if (open === 'retry' || !open) throw new Error('expected the stored doc')
   eq(open.updated, 1)
 })
 
-await check('regression: the pre-fix write resolved an empty library on failure', async () => {
-  const kv = fakeKV({ get: () => Promise.reject(new Error('E_IO')) })
-  // Old loop verbatim from main.tsx@68b5ef4: `out` starts as a fresh empty
-  // library, so an all-fail write still resolves an empty-success shape a
-  // caller (dropPlan) treats as the real library.
-  const oldOut = await (async () => {
-    let out = parseLibrary(null)
-    for (let i = 0; i < 5; i++) {
-      const cur = await readLib(kv)
-      if (!cur) continue
-      out = cur
-    }
-    return out
-  })()
-  eq(Object.keys(oldOut.plans), [])
-  // New contract: the same failure reports null instead.
-  eq(await writeLib(kv, () => null), null)
-})
-
-await check('a failed bootstrap read returns the edited welcome, not a fresher fake', async () => {
-  // The pre-fix path built welcomePlan() with Date.now() on a failed read; its
-  // newer `updated` then beat the real stored welcome at the merge guard. The
-  // admission path must never reach seedDoc without a confirmed library.
-  const edited = { ...welcomePlan(), updated: 1 }
-  const kv = fakeKV({ get: () => Promise.resolve(serializeLibrary(lib({ [edited.id]: edited }, {}, 2))) })
-  const open = admitSeed(await readLib(kv), false)
-  if (open === 'retry' || !open) throw new Error('expected the stored doc')
-  eq(open.updated, 1)
+await check('a confirmed-empty library admits the deterministic welcome once', async () => {
+  const c = cell(lib({}, {}, 0))
+  const store = new LibStore(c.kv())
+  const open = admitSeed(await readLib(c.kv()), false)
+  if (open === 'retry' || !open) throw new Error('expected the welcome doc')
+  eq(open.id, 'welcome')
+  const wrote = await store.write((l) => withDoc(l, open))
+  if (!wrote?.confirmed) throw new Error('the seed write must be confirmed')
+  ok(wrote.lib.plans.welcome !== undefined, 'the welcome doc is stored')
 })
 
 await check('all reads rejected resolves null, not an empty library', async () => {
@@ -126,7 +160,7 @@ await check('all reads rejected resolves null, not an empty library', async () =
       return Promise.resolve({ rev: 1 })
     }
   })
-  const out = await writeLib(kv, (l) => withDoc(l, newPlan('X')))
+  const out = await new LibStore(kv).write((l) => withDoc(l, newPlan('X')))
   eq(out, null)
   eq(sets, 0)
 })
@@ -137,19 +171,20 @@ await check('a failed set does not wedge the queue or hang the caller', async ()
   const kv = fakeKV({
     get: () => Promise.resolve(stored),
     set: (_k, v) => {
-      if (++sets <= 5) return Promise.reject(new Error('E_IO'))
+      if (++sets <= 6) return Promise.reject(new Error('E_IO'))
       stored = v
       return Promise.resolve({ rev: 2 })
     }
   })
-  // First write exhausts its retries and reports failure.
-  eq(await writeLib(kv, (l) => withDoc(l, newPlan('A'))), null)
-  // The next queued write reads, applies and lands.
+  const store = new LibStore(kv)
+  const planA = newPlan('A')
+  const first = await store.write((l) => withDoc(l, planA))
+  ok(first !== null && !first.confirmed, 'exhausted retries report unconfirmed, not null or applied')
   const plan = newPlan('B')
-  const out = await writeLib(kv, (l) => withDoc(l, plan))
+  const out = await store.write((l) => withDoc(l, plan))
   if (!out) throw new Error('the queue wedged behind the failed write')
-  eq(out.plans[plan.id]?.id, plan.id)
-  eq(Object.keys(parseLibrary(stored).plans), [plan.id])
+  // The unconfirmed 'A' intent was still pending: it rides this drain in too.
+  eq(Object.keys(parseLibrary(stored).plans).sort(), [planA.id, plan.id].sort())
 })
 
 await check('a mutation replayed after a failed set merges over the peer write it reveals', async () => {
@@ -161,70 +196,179 @@ await check('a mutation replayed after a failed set merges over the peer write i
   const kv = fakeKV({
     get: () => {
       reads++
-      // A peer commits between our failed set and the re-read it triggers.
       if (reads === 2) stored = lib({ [peer.id]: peer }, {}, 2)
       return Promise.resolve(serializeLibrary(stored))
     },
     set: () => (++sets === 1 ? Promise.reject(new Error('E_IO')) : Promise.resolve({ rev: 3 }))
   })
-  const out = await writeLib(kv, (l) => withDoc(l, mine))
+  const out = await new LibStore(kv).write((l) => withDoc(l, mine))
   if (!out) throw new Error('the write should have landed on retry')
-  eq(Object.keys(out.plans).sort(), [peer.id, mine.id].sort())
+  eq(Object.keys(out.lib.plans).sort(), [peer.id, mine.id].sort())
 })
 
-await check('two cold seeds over an empty library converge to one welcome doc', async () => {
-  let stored = serializeLibrary(lib({}, {}, 0))
-  let rev = 0
-  const kv = fakeKV({
-    get: () => Promise.resolve(stored),
-    set: (_k, v) => {
-      stored = v
-      return Promise.resolve({ rev: ++rev })
+// Parent probe duo-room46-success-race-probe.ts, replayed on the real adapter:
+// a foreign commit lands after this copy's get and before its delayed
+// successful set. The delayed blob still lands last, so the peer write is
+// destroyed in storage; the convergence contract is that the change feed
+// fires repair() and the clobbered copy re-offers its union until storage
+// carries it.
+await check('a delayed successful set that lands over a foreign add is repaired to the union', async () => {
+  const original = docAt('Original', 'original', 1)
+  const mine = docAt('Mine', 'mine', 2)
+  const peer = docAt('Peer', 'peer', 3)
+  const c = cell(lib({ original }, {}, 1))
+  const gate = once()
+  const storeA = new LibStore(c.kv(gate.gate))
+  const storeB = new LibStore(c.kv())
+  // Each copy's stored-value change fires its repair, as the useKV mirror does.
+  c.onChange(() => void storeA.repair())
+  c.onChange(() => void storeB.repair())
+
+  const pA = storeA.write((l) => withDoc(l, mine))
+  while (!gate.entered()) await new Promise((r) => setTimeout(r, 0))
+  // B commits between A's get and A's set; the write is acknowledged.
+  const bRes = await storeB.write((l) => withDoc(l, peer))
+  ok(bRes?.confirmed === true, 'peer commit acknowledged')
+  gate.release()
+  const aRes = await pA
+  ok(aRes !== null, 'own write landed and reports a terminal value')
+  // A's stale blob destroyed B's commit; without repair the loss is invisible
+  // to every reader. Drive quiescence and demand the union.
+  await settle([storeA, storeB])
+  const final = c.now()
+  ok(final.plans.peer !== undefined, 'peerPlanSurvived: peer plan restored after clobber')
+  ok(final.plans.mine !== undefined, 'own plan survived')
+  ok(final.plans.original !== undefined, 'untouched plan survived')
+})
+
+await check('a delayed successful set that lands over a foreign delete restores the tombstone', async () => {
+  const original = docAt('Original', 'original', 1)
+  const edited = { ...original, name: 'Edited', updated: 2 }
+  const c = cell(lib({ original }, {}, 1))
+  const gate = once()
+  const storeA = new LibStore(c.kv(gate.gate))
+  const storeB = new LibStore(c.kv())
+  c.onChange(() => void storeA.repair())
+  c.onChange(() => void storeB.repair())
+
+  const pA = storeA.write((l) => withDoc(l, edited))
+  while (!gate.entered()) await new Promise((r) => setTimeout(r, 0))
+  const bRes = await storeB.write((l) => withoutDoc(l, 'original'))
+  ok(bRes?.confirmed === true, 'peer delete acknowledged')
+  gate.release()
+  await pA
+  await settle([storeA, storeB])
+  const final = c.now()
+  ok(final.gone.original !== undefined, 'peerTombstoneSurvived: delete restored after clobber')
+  ok(final.plans.original === undefined, 'deletedOriginalResurrected must stay false')
+})
+
+await check('the same races converge when the peer set lands last', async () => {
+  const original = docAt('Original', 'original', 1)
+  const mine = docAt('Mine', 'mine', 2)
+  const peer = docAt('Peer', 'peer', 3)
+  const c = cell(lib({ original }, {}, 1))
+  const gate = once()
+  const storeA = new LibStore(c.kv())
+  const storeB = new LibStore(c.kv(gate.gate))
+  c.onChange(() => void storeA.repair())
+  c.onChange(() => void storeB.repair())
+
+  const pB = storeB.write((l) => withDoc(l, peer))
+  while (!gate.entered()) await new Promise((r) => setTimeout(r, 0))
+  const aRes = await storeA.write((l) => withDoc(l, mine))
+  ok(aRes?.confirmed === true, 'A commit acknowledged')
+  gate.release()
+  await pB
+  await settle([storeA, storeB])
+  const final = c.now()
+  ok(final.plans.peer !== undefined && final.plans.mine !== undefined, 'both plans survive B-last order')
+})
+
+await check('two cold copies racing a seed converge, welcome tombstone respected', async () => {
+  // Both copies cold-open a library whose welcome plan was deleted: each
+  // seeds a fresh non-welcome doc, their writes race, and union convergence
+  // must keep both and keep the tombstone.
+  const c = cell(lib({}, { welcome: 5 }, 2))
+  const storeA = new LibStore(c.kv())
+  const storeB = new LibStore(c.kv())
+  c.onChange(() => void storeA.repair())
+  c.onChange(() => void storeB.repair())
+  const seedA = seedDoc(lib({}, { welcome: 5 }))
+  const seedB = seedDoc(lib({}, { welcome: 5 }))
+  ok(seedA.id !== 'welcome' && seedB.id !== 'welcome', 'post-tombstone seeds avoid the welcome id')
+  await Promise.all([storeA.write((l) => withDoc(l, seedA)), storeB.write((l) => withDoc(l, seedB))])
+  await settle([storeA, storeB])
+  const final = c.now()
+  ok(final.plans[seedA.id] !== undefined && final.plans[seedB.id] !== undefined, 'both cold seeds survive')
+  eq(final.gone.welcome, 5)
+})
+
+await check('an unconfirmed seed write is retried until confirmed, never admitted blind', async () => {
+  // Bootstrap path: the UI only shows a doc the store confirmed. Reject every
+  // set; the loop must come back unconfirmed, not with a screen a reader
+  // could mistake for saved.
+  const c = cell(lib({}, {}, 0))
+  let sets = 0
+  const kv: LibKV = {
+    get: () => c.kv().get(LIB_KEY),
+    set: (_k, _v) => {
+      sets++
+      return Promise.reject(new Error('E_IO'))
     }
-  })
-  await Promise.all([writeLib(kv, (l) => withDoc(l, welcomePlan())), writeLib(kv, (l) => withDoc(l, welcomePlan()))])
-  eq(Object.keys(parseLibrary(stored).plans), ['welcome'])
+  }
+  const store = new LibStore(kv)
+  const wrote = await store.write((l) => withDoc(l, welcomePlan()))
+  ok(wrote === null || !wrote.confirmed, 'all-fail sets stay unconfirmed')
+  ok(sets > 0, 'the write actually attempted sets')
+  eq(Object.keys(c.now().plans), [])
 })
 
-await check('a deleted welcome tombstone stops the shared id from resurrecting', () => {
-  const open = seedDoc(lib({}, { welcome: 42 }))
-  ok(open.id !== 'welcome', 'the seeded doc must not reuse the deleted welcome id')
-  const admitted = admitSeed(lib({}, { welcome: 42 }), false)
-  if (admitted === 'retry' || !admitted) throw new Error('expected a fresh plan')
-  ok(admitted.id !== 'welcome', 'admission must honor the tombstone')
+await check('a single copy cannot self-restore a clobbered peer write', async () => {
+  // Negative control for the probe schedule: the peer commit inside the
+  // delayed set is invisible to every later read, so convergence CANNOT come
+  // from this copy alone - it needs the peer's own union re-offer. This is
+  // the failure the probe reported at 46e374a.
+  const peer = docAt('Peer', 'peer', 3)
+  const mine = docAt('Mine', 'mine', 2)
+  const c = cell(lib({}, {}, 1))
+  const gate = once()
+  const store = new LibStore(c.kv(gate.gate))
+  const p = store.write((l) => withDoc(l, mine))
+  while (!gate.entered()) await new Promise((r) => setTimeout(r, 0))
+  // Peer lands while A waits on its set; then A's stale blob lands last.
+  await c.kv().set(LIB_KEY, serializeLibrary(withDoc(lib({}, {}, 1), peer)))
+  gate.release()
+  const res = await p
+  if (!res) throw new Error('terminal reached')
+  ok(c.now().plans.peer === undefined, 'single-copy storage cannot self-restore a clobbered peer')
+  ok(res.lib.plans.mine !== undefined, 'own write survived')
+})
+
+await check('a throwing mutation resolves null and drops nothing else', async () => {
+  const c = cell(lib())
+  const store = new LibStore(c.kv())
+  eq(
+    await store.write(() => {
+      throw new Error('boom')
+    }),
+    null
+  )
+  const plan = newPlan('C')
+  const out = await store.write((l) => withDoc(l, plan))
+  ok(out?.confirmed === true && out.lib.plans[plan.id] !== undefined, 'queue healthy after a thrown intent')
+})
+
+await check('a no-op mutation resolves confirmed with the observed library', async () => {
+  const kv = fakeKV({ get: () => Promise.resolve(serializeLibrary(lib({}, {}, 7))) })
+  const out = await new LibStore(kv).write(() => null)
+  ok(out?.confirmed === true, 'noop is confirmed')
+  eq(out?.lib.rev, 7)
 })
 
 await check('a doc already on screen blocks the seed entirely', () => {
   eq(admitSeed(lib(), true), null)
   eq(admitSeed(lib({ welcome: welcomePlan() }), true), null)
-})
-
-await check('a no-op mutation resolves the confirmed library', async () => {
-  const kv = fakeKV({ get: () => Promise.resolve(serializeLibrary(lib({}, {}, 7))) })
-  const out = await writeLib(kv, () => null)
-  eq(out?.rev, 7)
-})
-
-await check('a throwing mutation resolves null instead of hanging the caller', async () => {
-  const kv = fakeKV({ get: () => Promise.resolve(serializeLibrary(lib())) })
-  eq(
-    await writeLib(kv, () => {
-      throw new Error('boom')
-    }),
-    null
-  )
-  // And the queue still accepts work after the rejected job.
-  const plan = newPlan('C')
-  let stored = serializeLibrary(lib())
-  const kv2 = fakeKV({
-    get: () => Promise.resolve(stored),
-    set: (_k, v) => {
-      stored = v
-      return Promise.resolve({ rev: 1 })
-    }
-  })
-  const out = await writeLib(kv2, (l) => withDoc(l, plan))
-  eq(out?.plans[plan.id]?.id, plan.id)
 })
 
 await check('readLib distinguishes a failed get from a missing key', async () => {
@@ -234,23 +378,22 @@ await check('readLib distinguishes a failed get from a missing key', async () =>
   eq(missing.rev, 0)
   eq(Object.keys(missing.plans), [])
   const open = admitSeed(missing, false)
-  ok(
-    open !== 'retry' && open !== null && open.id === 'welcome',
-    'a confirmed-empty library seeds the deterministic welcome'
-  )
+  ok(open !== 'retry' && open !== null && open.id === 'welcome', 'a confirmed-empty library seeds the welcome')
 })
 
 await check(`writes address only ${LIB_KEY}`, async () => {
   const touched: string[] = []
+  let stored = serializeLibrary(lib())
   const kv = fakeKV({
-    get: () => Promise.resolve(serializeLibrary(lib())),
-    set: (k, _v) => {
+    get: () => Promise.resolve(stored),
+    set: (k, v) => {
       touched.push(k)
+      stored = v
       return Promise.resolve({ rev: 1 })
     }
   })
   const plan = newPlan('D')
-  await writeLib(kv, (l) => withDoc(l, plan))
+  await new LibStore(kv).write((l) => withDoc(l, plan))
   eq(touched, [LIB_KEY])
 })
 

@@ -6,7 +6,7 @@ import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
-import { admitSeed, LIB_KEY, readLib, writeLib } from './library.ts'
+import { admitSeed, LIB_KEY, LibStore, readLib } from './library.ts'
 import {
   addItem,
   CATALOG,
@@ -63,6 +63,17 @@ import { COVER_PEEK, HUES, HUES_DARK, styles } from './styles.ts'
 const ME = crypto.randomUUID()
 const DOC_KEY = 'roomplanner-doc'
 const PREF_KEY = 'roomplanner-prefs'
+
+// One persistence adapter per copy: its pending intents and committed union
+// are the convergence state the other display's writes race against.
+const libStore = new LibStore(os.storage)
+
+// os.view is mutated synchronously on every view event, so reading it at
+// admission time sees the current flags - the React copy (useDisplay) can lag
+// a same-turn flip by a render. A hidden or inactive copy must never admit a
+// key, pointer, button or audio cue as if it were live; gestures and writes
+// already admitted still complete across the hide.
+const liveNow = () => os.view.visible === true && os.view.active === true
 
 type Drag = {
   pointerId: number
@@ -371,8 +382,8 @@ function RoomPlanner() {
   const prefs = parsePrefs(prefKV.value)
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
-  const activeRef = useRef(view.active)
-  activeRef.current = view.active
+  const activeRef = useRef(view.visible && view.active)
+  activeRef.current = view.visible && view.active
   const sheetTrigger = useRef<HTMLElement | null>(null)
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
@@ -413,7 +424,7 @@ function RoomPlanner() {
   // the merge on top of any peer write that lands mid-flight, so the other
   // display's save cannot be clobbered by this one.
   const saveDoc = (next: PlanDoc) => {
-    void writeLib(os.storage, (lib) => {
+    void libStore.write((lib) => {
       const existing = lib.plans[next.id]
       return !existing || existing.updated <= next.updated ? withDoc(lib, next) : null
     })
@@ -426,7 +437,9 @@ function RoomPlanner() {
   // Sound is only for the copy on the lit display, and only after a gesture
   // has had a chance to unlock the AudioContext.
   const sound = (kind: Cue) => {
-    if (activeRef.current && !prefsRef.current.muted) cue(kind)
+    // Cues are admitted on the live view flags, not the React copy: a hidden
+    // copy stays silent even when a remote adoption fires mid-fold.
+    if (liveNow() && !prefsRef.current.muted) cue(kind)
   }
   const publish = (
     next: PlanDoc,
@@ -459,6 +472,7 @@ function RoomPlanner() {
   // copy's framing republish could then wipe it last-writer-wins on both
   // displays. Selecting publishes the doc unchanged with the new sel.
   const pick = (id: string | null) => {
+    if (!liveNow()) return
     const now = docRef.current
     if (id !== selRef.current) setArming(null)
     if (now) publish(now, { sel: id, skipHist: true })
@@ -468,6 +482,7 @@ function RoomPlanner() {
   soundRef.current = sound
 
   const savePrefs = (next: Prefs) => {
+    if (!liveNow()) return
     prefKV.set(serializePrefs(next))
   }
 
@@ -524,25 +539,29 @@ function RoomPlanner() {
       if (!seeded.current && stored.status === 'ready') {
         seeded.current = true
         void (async () => {
-          const open = admitSeed(await readLib(os.storage), docRef.current !== null || remoteDoc.current !== null)
-          if (open === 'retry') {
-            // The read failed: the library's true state is unknown, never
-            // empty. Leave the gate open so a later fold pass can seed once a
-            // read succeeds - seeding over 'unknown' risks overwriting real
-            // plans when storage recovers.
-            seeded.current = false
+          // Confirm before admitting: the screen only ever shows a doc the
+          // store accepted. A failed read is 'unknown', not empty, so the
+          // loop re-reads; a failed write retries the whole pass; a peer
+          // adopted meanwhile stops the seed without a stale stamp.
+          for (let pass = 0; pass < 4; pass++) {
+            const open = admitSeed(await readLib(os.storage), docRef.current !== null || remoteDoc.current !== null)
+            if (open === 'retry') continue
+            if (!open) return
+            const wrote = await libStore.write((lib) =>
+              (lib.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(lib, open)
+            )
+            if (!wrote?.confirmed) continue
+            if (docRef.current !== null || remoteDoc.current !== null) return
+            // The confirmed union can carry a newer peer doc: adopt what won.
+            const openNow = latestDoc(wrote.lib) ?? open
+            setDoc(openNow)
+            setSel(null)
+            await os.session.set(DOC_KEY, serializeMirror(ME, openNow, null)).catch(() => {})
             return
           }
-          if (!open) return
-          setDoc(open)
-          setSel(null)
-          const wrote = await writeLib(os.storage, (lib) =>
-            (lib.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(lib, open)
-          )
-          // An unconfirmed write or a peer doc adopted meanwhile must not be
-          // stamped over the fold's settled plan.
-          if (!wrote || docRef.current !== open || remoteDoc.current !== null) return
-          await os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
+          // Never seeded: reopen the gate so a later storage recovery or fold
+          // pass can try again instead of leaving a fake welcome on screen.
+          seeded.current = false
         })()
       }
       return
@@ -588,11 +607,19 @@ function RoomPlanner() {
       else if (spun) soundRef.current('rotate')
       else if (moved) soundRef.current('settle')
     }
-    void writeLib(os.storage, (lib) => {
+    void libStore.write((lib) => {
       const existing = lib.plans[next.doc.id]
       return !existing || existing.updated < next.doc.updated ? withDoc(lib, next.doc) : null
     })
   }, [live, stored.status])
+
+  // Whole-blob writes have no CAS: a delayed foreign set can land on top of a
+  // commit from this copy and erase it. Every observed change to the library
+  // key runs a repair pass that re-offers our union and unconfirmed intents -
+  // without it a clobbered plan would simply be gone.
+  useEffect(() => {
+    if (stored.status === 'ready') void libStore.repair()
+  }, [stored])
 
   // First sight of a plan frames the whole room for THIS canvas: legibility on
   // first sight beats a heritage zoom, and the cover's fit is the app's front
@@ -629,7 +656,7 @@ function RoomPlanner() {
       setDoc(next)
       // Framing a stale doc must not push it back over a newer remote write.
       if (!isOlderEdit(doc, remoteDoc.current)) {
-        void writeLib(os.storage, (lib) => {
+        void libStore.write((lib) => {
           const existing = lib.plans[next.id]
           return !existing || existing.updated < next.updated ? withDoc(lib, next) : null
         })
@@ -662,6 +689,9 @@ function RoomPlanner() {
   // R rotates, Delete removes, Cmd/Ctrl+Z steps the plan's own undo stack.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A hidden or inactive copy admits no keys: a forged keydown must not
+      // move, delete, undo or write. Gestures admitted while live still run.
+      if (!liveNow()) return
       const at = e.target as HTMLElement
       if (at.closest('input, textarea, select')) return
       const now = docRef.current
@@ -740,10 +770,12 @@ function RoomPlanner() {
   const fs = Math.min(2, cs)
 
   const zoomBy = (factor: number) => {
+    if (!liveNow()) return
     const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor))
     publish(setView(doc, { ...doc.view, zoom: z, framed: false }))
   }
   const zoomAt = (px: number, py: number, factor: number) => {
+    if (!liveNow()) return
     const box = canvasRef.current?.getBoundingClientRect()
     const now = docRef.current
     if (!box || !now) return
@@ -759,6 +791,7 @@ function RoomPlanner() {
     }, 280)
   }
   const fit = () => {
+    if (!liveNow()) return
     const box = canvasRef.current?.getBoundingClientRect()
     if (!box?.width || !box.height) return
     const b = docBounds(doc)
@@ -771,6 +804,7 @@ function RoomPlanner() {
   }
 
   const undo = () => {
+    if (!liveNow()) return
     const r = undoHistory(hist, coreOf(doc))
     if (!r.core) return
     setHist(r.h)
@@ -780,6 +814,7 @@ function RoomPlanner() {
     sound('undo')
   }
   const redo = () => {
+    if (!liveNow()) return
     const r = redoHistory(hist, coreOf(doc))
     if (!r.core) return
     setHist(r.h)
@@ -792,6 +827,7 @@ function RoomPlanner() {
   // --- plan actions ----------------------------------------------------------
 
   const spawn = (kind: string) => {
+    if (!liveNow()) return
     if (count >= ITEM_LIMIT) {
       sound('error')
       return
@@ -815,23 +851,27 @@ function RoomPlanner() {
     sound('place')
   }
   const rotateSel = (dir: 1 | -1) => {
+    if (!liveNow()) return
     if (!selected) return
     publish(rotateItem(doc, selected.id, dir))
     sound('rotate')
   }
   const dropSel = () => {
+    if (!liveNow()) return
     if (!selected) return
     publish(removeItem(doc, selected.id), { sel: null })
     setArming(null)
     sound('delete')
   }
   const commitRoom = (w: number, d: number) => {
+    if (!liveNow()) return
     const next = resizeRoom(doc, w, d)
     if (next === doc) return
     publish(next, { sel: null, tag: 'room' })
     sound('settle')
   }
   const pickUnits = (units: Units) => {
+    if (!liveNow()) return
     if (units === prefs.units) return
     // Carry the snap over to the nearest step in the new unit system.
     const steps = snapSteps(units)
@@ -842,6 +882,7 @@ function RoomPlanner() {
     savePrefs({ ...prefs, units, snap })
   }
   const doClear = () => {
+    if (!liveNow()) return
     setConfirm(null)
     if (!count) return
     publish(clearItems(doc), { sel: null })
@@ -850,6 +891,7 @@ function RoomPlanner() {
   }
 
   const openPlan = (id: string) => {
+    if (!liveNow()) return
     if (id === doc.id) return
     // Read the library fresh: the KV mirror can lag while this copy is
     // occluded, so a plan the other display just made may not be listed yet.
@@ -865,6 +907,7 @@ function RoomPlanner() {
     })()
   }
   const makePlan = () => {
+    if (!liveNow()) return
     void (async () => {
       const n = Object.keys((await readLib(os.storage))?.plans ?? {}).length + 1
       framedDoc.current = null
@@ -873,6 +916,7 @@ function RoomPlanner() {
     })()
   }
   const dupPlan = () => {
+    if (!liveNow()) return
     const copy: PlanDoc = {
       ...doc,
       id: crypto.randomUUID().slice(0, 8),
@@ -885,6 +929,7 @@ function RoomPlanner() {
   }
   const askDrop = (id: string, name: string, e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation()
+    if (!liveNow()) return
     sheetTrigger.current = e.currentTarget
     setConfirm({ drop: id, name })
   }
@@ -892,17 +937,19 @@ function RoomPlanner() {
   // resurrect it from a stale list. When the open plan goes, the newest
   // remaining one (or a fresh one) takes over the session.
   const dropPlan = () => {
+    if (!liveNow()) return
     if (typeof confirm !== 'object' || !confirm?.drop) return
     const id = confirm.drop
     setConfirm(null)
     void (async () => {
-      const lib = await writeLib(os.storage, (l) => withoutDoc(l, id))
-      // null means the delete never landed: keep the current doc rather than
-      // adopting a fresh one over an unconfirmed write.
-      if (!lib) return
-      const open = docRef.current?.id === id ? (latestDoc(lib) ?? newPlan('Layout 1')) : null
+      const wrote = await libStore.write((l) => withoutDoc(l, id))
+      // The delete only happened if the tombstone is in the reached library:
+      // an unreadable or unconfirmed write keeps the current doc instead of
+      // publishing a fresh 'Layout 1' over a state nobody saw.
+      if (!wrote || wrote.lib.gone[id] === undefined) return
+      const open = docRef.current?.id === id ? (latestDoc(wrote.lib) ?? newPlan('Layout 1')) : null
       if (open) {
-        await writeLib(os.storage, (l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
+        await libStore.write((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
         framedDoc.current = null
         setHist(emptyHistory())
         setDoc(open)
@@ -921,6 +968,9 @@ function RoomPlanner() {
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only the live copy admits a gesture; a drag already in flight keeps its
+    // move/up across a hide, so the gate sits on the down alone.
+    if (!liveNow()) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     const now = docRef.current
     if (!now) return
@@ -1143,7 +1193,7 @@ function RoomPlanner() {
           aria-label={
             arming === selected.id ? 'Confirm delete item' : `Delete ${PIECE.get(selected.kind)?.name ?? 'item'}`
           }
-          onClick={() => (arming === selected.id ? dropSel() : setArming(selected.id))}
+          onClick={() => liveNow() && (arming === selected.id ? dropSel() : setArming(selected.id))}
           {...stylex.props(styles.btn, shared.press, arming === selected.id && styles.btnWarn)}
         >
           <Sym name="trash" size={12} />
@@ -1161,6 +1211,7 @@ function RoomPlanner() {
         value={doc.name}
         xstyle={styles.tallField}
         onChange={(e) => {
+          if (!liveNow()) return
           // Whitespace alone is not a name; typing it would blank the plan
           // row everywhere, so nothing below the trim publishes.
           if (e.target.value.trim()) publish(renameDoc(doc, e.target.value), { tag: 'name' })
@@ -1215,6 +1266,7 @@ function RoomPlanner() {
           type="button"
           disabled={!count}
           onClick={(e) => {
+            if (!liveNow()) return
             sheetTrigger.current = e.currentTarget
             setConfirm('clear')
           }}
@@ -1610,6 +1662,7 @@ function RoomPlanner() {
                       ]}
                       value={tab}
                       onPick={(t) => {
+                        if (!liveNow()) return
                         if (t === tab) tuckTray()
                         else {
                           setTab(t)
@@ -1626,6 +1679,7 @@ function RoomPlanner() {
                     aria-label={trayOpen ? 'Tuck tray away' : 'Show tray panel'}
                     {...stylex.props(styles.iconBtn, shared.press)}
                     onClick={() => {
+                      if (!liveNow()) return
                       if (trayOpen) tuckTray()
                       else {
                         setTrayOpen(true)
