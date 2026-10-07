@@ -215,6 +215,7 @@ export const styles = stylex.create({
   inputDate: { paddingInline: space.sm, fontVariantNumeric: 'tabular-nums' },
   inputBad: { outlineStyle: 'solid', outlineWidth: 1, outlineColor: colors.redDark },
   selectWrap: { position: 'relative' },
+  select44: { minHeight: `calc(${space.xxxl} + ${space.md})` },
   chips: { display: 'flex', flexWrap: 'wrap', gap: space.xs },
   chip: {
     display: 'inline-flex',
@@ -254,6 +255,8 @@ export const styles = stylex.create({
     borderRadius: radius.pill,
     paddingBlock: space.xs,
     paddingInline: space.sm,
+    minWidth: `calc(${space.xxxl} + ${space.md})`,
+    justifyContent: 'center',
     color: app.label2,
     backgroundColor: 'transparent',
     fontFamily: fonts.system,
@@ -290,6 +293,7 @@ export const styles = stylex.create({
   searchIcon: { color: app.label3, display: 'inline-flex', flexShrink: 0 },
   searchInput: {
     flex: 1,
+    alignSelf: 'stretch',
     minWidth: 0,
     borderWidth: 0,
     padding: 0,
@@ -378,6 +382,7 @@ export const styles = stylex.create({
     outlineOffset: -1
   },
   rowNameWrap: { display: 'flex', alignItems: 'center', gap: space.xs, minWidth: 0 },
+  rowMetaWrap: { display: 'flex', alignItems: 'center', gap: space.sm, minWidth: 0, flexWrap: 'wrap' },
   rowName: {
     fontWeight: weight.medium,
     overflow: 'hidden',
@@ -462,8 +467,8 @@ export const styles = stylex.create({
     alignItems: 'center',
     gap: space.sm,
     borderRadius: radius.md,
-    paddingBlock: space.xxs,
-    paddingInline: space.xxs,
+    paddingBlock: space.xs,
+    paddingInline: space.xs,
     backgroundColor: { default: 'transparent', ':hover': app.fill3 }
   },
   shopCheck: { flexShrink: 0 },

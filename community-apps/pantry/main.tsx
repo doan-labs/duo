@@ -483,11 +483,13 @@ function Pantry() {
         >
           <span {...stylex.props(styles.rowNameWrap)}>
             <span {...stylex.props(styles.rowName)}>{item.name}</span>
+          </span>
+          <span {...stylex.props(styles.rowMetaWrap)}>
+            <span {...stylex.props(styles.rowMeta)}>{metaLine(item, today)}</span>
             {badge && (
               <span {...stylex.props(styles.badge, toneText[badge.tone], toneEdge[badge.tone])}>{badge.text}</span>
             )}
           </span>
-          <span {...stylex.props(styles.rowMeta)}>{metaLine(item, today)}</span>
         </button>
         {showSteps ? (
           <span {...stylex.props(styles.steppers)}>
@@ -583,6 +585,7 @@ function Pantry() {
         <label {...stylex.props(styles.field)}>
           <span {...stylex.props(styles.fieldLabel)}>Unit</span>
           <Select
+            xstyle={styles.select44}
             id={`${idPrefix}-unit`}
             value={d.unit}
             onChange={(e) => set({ unit: e.target.value as Unit })}
@@ -872,9 +875,11 @@ function Pantry() {
               >
                 <span {...stylex.props(styles.rowNameWrap)}>
                   <span {...stylex.props(styles.rowName, s.done && styles.rowNameDone)}>{s.name}</span>
-                  {s.done && <span {...stylex.props(styles.badge, toneText.green, toneEdge.green)}>Bought</span>}
                 </span>
-                {s.note !== '' && <span {...stylex.props(styles.shopNote)}>{s.note}</span>}
+                <span {...stylex.props(styles.rowMetaWrap)}>
+                  {s.done && <span {...stylex.props(styles.badge, toneText.green, toneEdge.green)}>Bought</span>}
+                  {s.note !== '' && <span {...stylex.props(styles.shopNote)}>{s.note}</span>}
+                </span>
               </button>
               <button
                 type="button"
