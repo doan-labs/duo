@@ -16,12 +16,11 @@ import {
   useWide
 } from '@doan-labs/duo-uikit'
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
-import { app, colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue, setMuted, unlockAudio } from './audio.ts'
-import { StepDiagram } from './diagram.tsx'
+import { ink, StepDiagram } from './diagram.tsx'
 import {
   clampStep,
   isResult,
@@ -121,10 +120,11 @@ function ModelRow({
   return (
     <Row
       as="button"
-      label={model.name}
+      label={<span {...stylex.props(styles.titleText)}>{model.name}</span>}
       subtitle={
         <span {...stylex.props(styles.subFlex)}>
-          {model.blurb} <LevelDots level={model.level} />
+          <span {...stylex.props(styles.subText)}>{model.blurb}</span>
+          <LevelDots level={model.level} />
         </span>
       }
       icon={
@@ -160,7 +160,7 @@ function LegendSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
               <path
                 d="M8 15 L48 15"
                 fill="none"
-                stroke={colors.blue}
+                stroke={ink.valley}
                 strokeWidth={2}
                 strokeDasharray="5 3.5"
                 strokeLinecap="round"
@@ -178,7 +178,7 @@ function LegendSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
               <path
                 d="M8 15 L48 15"
                 fill="none"
-                stroke={colors.orange}
+                stroke={ink.mountain}
                 strokeWidth={2}
                 strokeDasharray="6 2.4 1.6 2.4"
                 strokeLinecap="round"
@@ -193,8 +193,8 @@ function LegendSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
         <div {...stylex.props(styles.legendRow)}>
           <span {...stylex.props(styles.legendSample)}>
             <svg viewBox="0 0 56 30" width={56} height={30} aria-hidden="true">
-              <path d="M10 22 Q28 4 46 14" fill="none" stroke={colors.green} strokeWidth={2} strokeLinecap="round" />
-              <path d="M46 14 L38.6 12.4 L44.4 7.4 Z" fill={colors.green} />
+              <path d="M10 22 Q28 4 46 14" fill="none" stroke={ink.arrow} strokeWidth={2} strokeLinecap="round" />
+              <path d="M46 14 L38.6 12.4 L44.4 7.4 Z" fill={ink.arrow} />
             </svg>
           </span>
           <div>
@@ -207,11 +207,11 @@ function LegendSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
         <div {...stylex.props(styles.legendRow)}>
           <span {...stylex.props(styles.legendSample)}>
             <svg viewBox="0 0 56 30" width={56} height={30} aria-hidden="true">
-              <circle cx={28} cy={15} r={10} fill="none" stroke={app.separator} strokeWidth={1} />
+              <circle cx={28} cy={15} r={10} fill="none" stroke={ink.crease} strokeWidth={1} />
               <path
                 d="M24.6 16.2 A5 5 0 1 1 26.6 10.2 M23 10.4 L26.6 10.2 L26.4 13.4"
                 fill="none"
-                stroke={app.label2}
+                stroke={ink.edge}
                 strokeWidth={1.4}
                 strokeLinecap="round"
               />
@@ -650,16 +650,18 @@ function PaperFold() {
     return () => document.removeEventListener('keydown', onKey)
   }, [model, legend, uiState.step, goStep])
 
-  const modelsList = (
+  // The cover keeps the kit's grouped insets; the narrow rail trades the
+  // doubled section margins for label room (see listWrapRail).
+  const modelsList = (rail: boolean) => (
     <>
       <Title>Paper Fold</Title>
-      <div {...stylex.props(styles.listWrap)}>
-        <Section aria-label="Models">
+      <div {...stylex.props(styles.listWrap, rail && styles.listWrapRail)}>
+        <Section aria-label="Models" xstyle={rail && styles.sectionFlush}>
           {MODELS.map((m) => (
             <ModelRow key={m.id} model={m} progress={progress[m.id]} current={model?.id === m.id} onOpen={openModel} />
           ))}
         </Section>
-        <Section aria-label="Options">
+        <Section aria-label="Options" xstyle={rail && styles.sectionFlush}>
           <Row
             label="Sound effects"
             icon={<Sym name="volume" size={16} />}
@@ -718,7 +720,7 @@ function PaperFold() {
         ) : wide ? (
           <div {...stylex.props(styles.split)}>
             <div {...stylex.props(styles.rail)}>
-              <div {...stylex.props(styles.coverScroll)}>{modelsList}</div>
+              <div {...stylex.props(styles.coverScroll)}>{modelsList(true)}</div>
             </div>
             {coach ?? (
               <div {...stylex.props(styles.coach)}>
@@ -734,7 +736,7 @@ function PaperFold() {
         ) : (
           <Push open={!!model} sheet={coach}>
             <div {...stylex.props(styles.coverList)}>
-              <div {...stylex.props(styles.coverScroll)}>{modelsList}</div>
+              <div {...stylex.props(styles.coverScroll)}>{modelsList(false)}</div>
             </div>
           </Push>
         )}

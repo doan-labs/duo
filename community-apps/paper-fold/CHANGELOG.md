@@ -3,7 +3,7 @@
 ## 1.0.0
 
 - Six beginner models with original step diagrams: Dart, Boat, Cup, Helmet,
-  Tulip and Water Balloon.
+  Tulip and Balloon.
 - Flat origami-diagram language: dashed blue valley folds, dash-dot orange
   mountain folds, green motion arrows and faint landing outlines, with an
   in-app legend sheet.

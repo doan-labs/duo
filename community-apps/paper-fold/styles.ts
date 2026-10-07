@@ -36,7 +36,7 @@ export const styles = stylex.create({
     minHeight: 0
   },
   rail: {
-    width: 284,
+    width: 300,
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
@@ -63,6 +63,17 @@ export const styles = stylex.create({
     flexDirection: 'column',
     gap: space.lg
   },
+  // The rail is 300 pt: the usual 16 pt list pad plus the Section's own 16 pt
+  // margins would leave a caption-width label column that word-stacks. Halve
+  // the wrap pad and let the group run to the rail inset.
+  listWrapRail: {
+    paddingLeft: space.sm,
+    paddingRight: space.sm
+  },
+  sectionFlush: {
+    marginLeft: 0,
+    marginRight: 0
+  },
   modelIcon: {
     width: 44,
     height: 44,
@@ -78,7 +89,9 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: space.xs,
-    color: colors.green,
+    // System green alone is ~2.2:1 on light rows; pulling it toward the label
+    // colour keeps the status hue at reading contrast in both appearances.
+    color: `color-mix(in srgb, ${colors.green}, ${app.fg} 45%)`,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold
   },
@@ -87,10 +100,29 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     fontWeight: weight.regular
   },
+  // Model names are one line too: a block box in the pair column gets its
+  // width from the column, so nowrap + ellipsis truncates instead of wrapping.
+  titleText: {
+    display: 'block',
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  // One line of secondary text per row: the blurb truncates ahead of the
+  // level dots instead of stacking a second line under the label.
   subFlex: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: space.xs
+    display: 'flex',
+    alignItems: 'baseline',
+    minWidth: 0
+  },
+  subText: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
   },
 
   // ---------- coach ----------
@@ -145,7 +177,7 @@ export const styles = stylex.create({
     height: 34,
     flexShrink: 0,
     borderRadius: radius.sm,
-    backgroundColor: app.surface,
+    backgroundColor: app.fill3,
     overflow: 'hidden'
   },
   stepItemLabel: {
@@ -184,7 +216,9 @@ export const styles = stylex.create({
     width: '100%',
     maxWidth: 340,
     aspectRatio: '1',
-    backgroundColor: app.surface,
+    // A fill mat under the white diagram paper: app.surface made the sheet
+    // and the stage the same colour, so the paper silhouette vanished.
+    backgroundColor: app.fill3,
     borderRadius: radius.xl,
     boxShadow: shadow.card,
     padding: space.lg,
@@ -306,7 +340,9 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'row',
     gap: space.xxs,
-    alignItems: 'center'
+    alignItems: 'center',
+    flexShrink: 0,
+    marginLeft: space.xs
   },
   levelDot: {
     width: 5,
@@ -339,9 +375,12 @@ export const styles = stylex.create({
   rowOn: {
     backgroundColor: app.fill3
   },
-  // Tappable grouped rows get a fill press (kit Row ships none); app.fill
-  // stays visible even over the selected row's fill3.
+  // A Row rendered as a <button> shrinks to its content (UA fit-content) and
+  // centres its text; pin it to the group width and left reading edge so the
+  // label column, not the browser, decides the row's shape.
   rowTap: {
+    width: '100%',
+    textAlign: 'left',
     transitionProperty: 'background-color',
     transitionDuration: '.15s',
     backgroundColor: { default: app.surface, ':active': app.fill }

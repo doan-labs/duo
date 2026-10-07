@@ -2,14 +2,32 @@
 // lines and arrows animate in when `still` is false (the app's own reduced
 // motion flag) and honour the OS media query through the keyframes below.
 
-import { app, colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+import { colors, easing } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import type { El, Pt } from './models.ts'
 
+// A diagram depicts literal paper, so its stock and ink are constants rather
+// than theme surfaces: a white sheet stays a white sheet in either appearance
+// (before this it borrowed app.surface and vanished on the dark stage), and
+// its linework keeps a single reading contrast everywhere it is drawn.
 const paperFill = {
-  top: app.surface,
-  flap: `color-mix(in srgb, ${app.surface}, ${app.fg} 7%)`,
-  back: `color-mix(in srgb, ${app.surface}, ${app.fg} 13%)`
+  top: colors.white,
+  flap: `color-mix(in srgb, ${colors.white}, ${colors.black} 9%)`,
+  back: `color-mix(in srgb, ${colors.white}, ${colors.black} 17%)`
+} as const
+
+// The printed ink ramp: solid contours and layer edges darkest, prior creases
+// a step lighter, ghost landing outlines intentionally faintest of all.
+export const ink = {
+  edge: `color-mix(in srgb, ${colors.black}, ${colors.white} 45%)`,
+  crease: `color-mix(in srgb, ${colors.black}, ${colors.white} 52%)`,
+  ghost: `color-mix(in srgb, ${colors.black}, ${colors.white} 68%)`,
+  badge: `color-mix(in srgb, ${colors.white}, ${colors.black} 7%)`,
+  valley: colors.blue,
+  // Fold/action hues on white stock dip under 3:1; pulling them toward black
+  // keeps the blue/orange/green semantics at reading contrast in both themes.
+  mountain: `color-mix(in srgb, ${colors.orange}, ${colors.black} 22%)`,
+  arrow: `color-mix(in srgb, ${colors.green}, ${colors.black} 22%)`
 } as const
 
 const path = (pts: readonly Pt[], close = false) =>
@@ -77,6 +95,9 @@ export function StepDiagram({ els, still, eager }: { els: readonly El[]; still?:
                 key={key}
                 d={path(el.pts, true)}
                 fill={paperFill[el.tone ?? 'top']}
+                stroke={ink.edge}
+                strokeWidth={0.8}
+                strokeLinejoin="round"
                 {...stylex.props(still || eager ? s.in0 : s.fade)}
               />
             )
@@ -145,19 +166,19 @@ const s = stylex.create({
     animationDelay: '.3s',
     animationFillMode: 'backwards'
   },
-  edge: { fill: 'none', stroke: app.separator, strokeWidth: 0.7 },
-  crease: { fill: 'none', stroke: app.label3, strokeWidth: 0.6, strokeDasharray: '0.1 2.2', strokeLinecap: 'round' },
-  valley: { fill: 'none', stroke: colors.blue, strokeWidth: 1.5, strokeDasharray: '3.4 2.4', strokeLinecap: 'round' },
+  edge: { fill: 'none', stroke: ink.edge, strokeWidth: 0.7 },
+  crease: { fill: 'none', stroke: ink.crease, strokeWidth: 0.6, strokeDasharray: '0.1 2.2', strokeLinecap: 'round' },
+  valley: { fill: 'none', stroke: ink.valley, strokeWidth: 1.5, strokeDasharray: '3.4 2.4', strokeLinecap: 'round' },
   mountain: {
     fill: 'none',
-    stroke: colors.orange,
+    stroke: ink.mountain,
     strokeWidth: 1.5,
     strokeDasharray: '4.4 1.6 1 1.6',
     strokeLinecap: 'round'
   },
-  ghost: { fill: 'none', stroke: app.label3, strokeWidth: 0.8, strokeDasharray: '2.2 2.2' },
-  arrowLine: { fill: 'none', stroke: colors.green, strokeWidth: 1.6, strokeLinecap: 'round' },
-  arrowHead: { fill: colors.green, stroke: 'none' },
+  ghost: { fill: 'none', stroke: ink.ghost, strokeWidth: 0.8, strokeDasharray: '2.2 2.2' },
+  arrowLine: { fill: 'none', stroke: ink.arrow, strokeWidth: 1.6, strokeLinecap: 'round' },
+  arrowHead: { fill: ink.arrow, stroke: 'none' },
   mark: {
     transformBox: 'fill-box',
     transformOrigin: 'center',
@@ -166,6 +187,6 @@ const s = stylex.create({
     animationDelay: '.35s',
     animationFillMode: 'backwards'
   },
-  markBg: { fill: app.fill3, stroke: app.separator, strokeWidth: 0.5 },
-  markGlyph: { fill: 'none', stroke: app.label2, strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  markBg: { fill: ink.badge, stroke: ink.crease, strokeWidth: 0.5 },
+  markGlyph: { fill: 'none', stroke: ink.edge, strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round' }
 })

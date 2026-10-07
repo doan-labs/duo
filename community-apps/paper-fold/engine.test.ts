@@ -16,6 +16,7 @@ import {
   recordProgress,
   resumeStep
 } from './engine'
+import { MODELS } from './models'
 
 const failures: string[] = []
 
@@ -152,6 +153,42 @@ check('progressSubset detects a store doc missing merged entries', () => {
   eq(progressSubset(store, merged), true) // store itself is covered, nothing lost
   eq(progressSubset(merged, merged), true)
   eq(progressSubset({}, merged), true)
+})
+
+// Diagram scenes carry the app: every step and result must hold at least one
+// paper element (the silhouette the fold lines read against) and keep every
+// point inside the 0..100 viewBox the renderer maps onto the stage.
+check('every model scene has paper and stays inside the 0..100 viewBox', () => {
+  eq(MODELS.length, 6)
+  const ids = new Set<string>()
+  for (const m of MODELS) {
+    if (ids.has(m.id)) throw new Error(`duplicate model id ${m.id}`)
+    ids.add(m.id)
+    if (!m.name.trim() || !m.blurb.trim()) throw new Error(`${m.id}: missing name or blurb`)
+    if (m.steps.length === 0) throw new Error(`${m.id}: no steps`)
+    const scenes = [...m.steps.map((s) => s.els), m.result]
+    scenes.forEach((els, i) => {
+      if (!els.some((el) => el.k === 'paper')) throw new Error(`${m.id} scene ${i}: no paper element`)
+      for (const el of els) {
+        const pts = el.k === 'mark' ? [el.at] : el.pts
+        for (const [x, y] of pts) {
+          if (x < 0 || x > 100 || y < 0 || y > 100)
+            throw new Error(`${m.id} scene ${i}: ${el.k} point (${x},${y}) outside viewBox`)
+        }
+      }
+    })
+  }
+})
+
+// Progress written for one model must survive alongside preferences writes:
+// the two docs live in different storage keys but the merge path is shared.
+check('progress and prefs round-trip through their parsers unchanged', () => {
+  const prefs = { v: 1 as const, muted: true, motion: false, seq: 9, by: 'cover' }
+  eq(JSON.stringify(parsePrefs(JSON.stringify(prefs))), JSON.stringify(prefs))
+  const prog = recordProgress(recordProgress({}, 'cup', 3, 5, 1), 'dart', 6, 6, 2)
+  eq(JSON.stringify(parseProgress(JSON.stringify(prog))), JSON.stringify(prog))
+  const ui = { v: 1 as const, model: 'cup', step: 4, seq: 3, by: 'inner' }
+  eq(JSON.stringify(parseUi(JSON.stringify(ui))), JSON.stringify(ui))
 })
 
 if (failures.length) throw new Error(`${failures.length} failing: ${failures.join(', ')}`)

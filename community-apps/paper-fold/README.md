@@ -1,10 +1,10 @@
 # Paper Fold
 
-An origami coach for Duo. Six beginner models - Dart, Boat, Cup, Samurai
-Helmet, Tulip and Water Balloon - each walked through with original flat
-diagrams in the classic convention: dashed blue lines for valley folds,
-dash-dot orange for mountain folds, green arrows for where the paper moves,
-and faint outlines for where a flap lands.
+An origami coach for Duo. Six beginner models - Dart, Boat, Cup, Helmet,
+Tulip and Balloon - each walked through with original flat diagrams in the
+classic convention: dashed blue lines for valley folds, dash-dot orange for
+mountain folds, green arrows for where the paper moves, and faint outlines
+for where a flap lands.
 
 ## Using it
 
