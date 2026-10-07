@@ -3,7 +3,15 @@
  * resumed on every cue so the first user gesture unlocks sound; cues requested
  * while the context is still suspended are dropped rather than queued, so a
  * bot move that lands before the first tap does not pile up as a held chord.
+ *
+ * Audio work is admitted like every other side effect: a hidden copy never
+ * opens or resumes a context, no matter which caller asks.
  */
+import { os } from '@doan-labs/duo-sdk'
+import { admitted } from './admission.ts'
+
+const liveAudio = () => admitted(os.view)
+
 export type Cue = 'place' | 'flip' | 'pass' | 'reject' | 'undo' | 'new' | 'win' | 'lose' | 'draw'
 
 let ctx: AudioContext | null = null
@@ -15,6 +23,7 @@ export function setMuted(value: boolean): void {
 
 /** Call from a real user gesture so suspended audio wakes up. */
 export function unlockAudio(): void {
+  if (!liveAudio()) return
   try {
     if (!ctx) ctx = new AudioContext()
     if (ctx.state !== 'running') void ctx.resume()
@@ -47,7 +56,7 @@ function tick(freq: number, when: number, level: number, duration = 0.08): void 
 }
 
 export function cue(kind: Cue): void {
-  if (muted) return
+  if (muted || !liveAudio()) return
   try {
     if (!ctx) ctx = new AudioContext()
     if (ctx.state === 'suspended') {

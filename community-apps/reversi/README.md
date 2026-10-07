@@ -39,19 +39,34 @@ The bot only thinks on the display being looked at, and it re-reads the latest
 wire state inside its think timer: an undo, reset or foreign write during the
 beat cancels the reply, so no stale or duplicate bot turns exist.
 
+## Input admission
+
+Every keyboard, pointer, button, confirmation, preference, focus, audio and
+timer path is admitted synchronously at its own handler, checking the SDK's
+live `os.view` snapshot - `active && visible` - rather than a React prop that
+can lag in a frame that no longer renders. Input fired at a hidden copy is
+rejected before it can schedule work, so it can never slip in through a later
+activation. Once admitted, an intent validates exactly once against the settled
+wire document and then completes: a tap taken the instant before a fold still
+lands, while a stale write validates and rejects instead of clobbering the
+board the other display moved to.
+
 ## Sound and motion
 
 A soft knock places a disc, a second tick rides the flip cascade, a low double
 tap marks a pass, and a short win/lose/draw jingle lands once per game on the
-active display only. Audio unlocks on the first real gesture and the speaker
-button mutes everything, persisted. Discs flip over with a staged rotateY
-cascade that honours reduced-motion by dropping to instant colour changes.
+active display only. Audio unlocks on the first real gesture on the live
+display - a hidden copy never opens or resumes an AudioContext - and the
+speaker button mutes everything, persisted. Discs flip over with a staged
+rotateY cascade that honours reduced-motion by dropping to instant colour
+changes.
 
 ## Verification
 
 - `bun test community-apps/reversi` - deterministic engine, replay, undo,
-  wire-hydration and bot-legality tests, including an all-eight-directions
-  capture, a real forced pass and a played-out 60-ply game.
+  wire-hydration, bot-legality and call-time admission tests, including an
+  all-eight-directions capture, a real forced pass, a played-out 60-ply game
+  and same-turn fold admission flips.
 - `bun packages/cli/index.mjs check community-apps/reversi` - manifest,
   source, design-token and strict typecheck gates.
 - `bun packages/cli/index.mjs build community-apps/reversi` - bundle well

@@ -2,6 +2,7 @@
 // through the tiny runner below: `bun game.test.ts` directly, and `bun test`
 // too (a failing check throws while the file is evaluated, which the runner
 // reports as a failure).
+import { admitted, type ViewState } from './admission.ts'
 import { chooseMove, evaluate, LEVELS } from './bot.ts'
 import {
   applyMove,
@@ -467,6 +468,64 @@ check('the shared opening id means both displays seed the same match', () => {
   // Fresh stores seed the same identity, not two forking uuids.
   eq({ a: a.by, blank: a.moves.length }, { a: '', blank: 0 })
   eq(b.moves.length, 0)
+})
+
+// --- Call-time admission: the single gate every input handler runs first ---
+// A copy may act on input only while its view is both visible and active in
+// the freshest snapshot. The check is synchronous, so nothing a hidden copy
+// receives can queue work that a later activation would wrongly adopt.
+
+check('admission requires a view that is visible and active', () => {
+  eq(admitted({ active: true, visible: true }), true)
+  eq(admitted({ active: false, visible: true }), false)
+  eq(admitted({ active: true, visible: false }), false)
+  eq(admitted({ active: false, visible: false }), false)
+})
+
+check('a same-turn fold rescinds admission immediately', () => {
+  const view: ViewState = { active: true, visible: true }
+  ok(admitted(view), 'the live view admits input')
+  view.visible = false
+  ok(!admitted(view), 'hidden under an active prop admits nothing')
+  view.active = false
+  view.visible = true
+  ok(!admitted(view), 'visible under an inactive prop admits nothing')
+  view.visible = false
+  ok(!admitted(view), 'a fully hidden copy admits nothing')
+  view.active = true
+  view.visible = true
+  ok(admitted(view), 'a copy live again admits input')
+})
+
+check('input rejected at call time can never be admitted by a later activation', () => {
+  // Model the handler contract: admitted() runs synchronously before any work
+  // is scheduled, so a hidden dispatch queues nothing - and with nothing
+  // queued, an activation moments later has no stale intent to execute.
+  const view: ViewState = { active: true, visible: false }
+  const scheduled: string[] = []
+  const handler = (input: string) => {
+    if (!admitted(view)) return false
+    scheduled.push(input)
+    return true
+  }
+  eq(handler('hidden-tap'), false)
+  view.visible = true
+  eq(scheduled, [])
+  ok(handler('live-tap'), 'input on the now-live copy admits')
+  eq(scheduled, ['live-tap'])
+})
+
+check('an intent admitted live still validates once, then lands across a fold', () => {
+  // Admission passed at the tap; by the time the queued job runs the copy may
+  // have folded. The job validates against the settled document exactly once:
+  // a matching document takes the move, a stale one rejects it - never a
+  // replay against a board the input was not aimed at.
+  const cover = settled([cellIndex('D3')])
+  const at = [...derive(cover.moves).legal.keys()][0]!
+  const applied = tryPlace(cover, cover, at)
+  ok(applied.ok, 'a validated admitted intent applies')
+  const moved = settled([cellIndex('D3'), cellIndex('C4')])
+  eq(tryPlace(moved, cover, at).ok, false)
 })
 
 if (failures.length) throw new Error(`${failures.length} failing checks\n${failures.join('\n')}`)

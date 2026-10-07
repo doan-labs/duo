@@ -5,6 +5,7 @@ import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { admitted } from './admission.ts'
 import { type Cue, cue, setMuted, unlockAudio } from './audio.ts'
 import { chooseMoveAsync, LEVELS, type Level, THINK_MS } from './bot.ts'
 import { type Color, cellName } from './engine.ts'
@@ -41,11 +42,14 @@ const PREFS_KEY = 'reversi-prefs'
 
 // The platform's freshest visibility truth: os.view is replaced synchronously
 // when the view event lands, while the React prop only moves when this frame
-// renders - and a hidden frame may not render at all. Every write, cue, focus
-// restore and bot step checks this directly, so work a fold cut loose cancels
-// instead of running hidden. Forced input on an occluded copy fails it too;
-// real keyboard input only ever reaches the visible, active view.
-const liveActive = () => os.view.active && os.view.visible
+// renders - and a hidden frame may not render at all. Input is admitted once,
+// synchronously, at its own handler through this check: nothing a hidden copy
+// receives can schedule work, focus, sound or a timer, so a queued-while-hidden
+// intent can never sneak in through a later activation. Bot steps and cues
+// re-check it too, since work admitted while live can outlast the view that
+// admitted it. Real keyboard input only ever reaches the visible, active view,
+// but forced input on an occluded copy fails the same gate.
+const liveActive = () => admitted(os.view)
 
 const MODES: { id: Mode; label: string }[] = [
   { id: 'solo', label: 'Solo' },
@@ -180,12 +184,13 @@ function Game() {
     (step: (base: SavedGame) => SavedGame | null): Promise<boolean> =>
       enqueue(async () => {
         const base = await syncGame()
-        // Re-check live visibility after the storage round-trip: a fold that
-        // landed mid-read hands the wire to the visible copy, so this job
-        // cancels rather than writing from a hidden frame.
-        if (!base || !liveActive()) return false
+        // Admission already happened at the handler. The only gate left is
+        // validation against this fresh read: a rejected step never writes,
+        // while an accepted one lands even if the copy folded during the
+        // round-trip - admitted work finishes rather than silently dropping.
+        if (!base) return false
         const next = step(base)
-        if (!next || !liveActive()) return false
+        if (!next) return false
         const settled = { ...next, by: ME }
         const wire = JSON.stringify(settled)
         await os.storage.set(GAME_KEY, wire)
@@ -225,7 +230,8 @@ function Game() {
     (patch: Partial<Prefs>): Promise<Prefs> =>
       enqueue(async () => {
         const base = parsePrefs(await os.storage.get(PREFS_KEY))
-        if (!liveActive()) return base
+        // Callers admit at the handler; the merge is unconditional so a pref
+        // flipped the instant before a fold still lands on the wire.
         const next = { ...base, ...patch }
         const wire = JSON.stringify(next)
         await os.storage.set(PREFS_KEY, wire)
@@ -307,7 +313,15 @@ function Game() {
   // thread stays live, it is cancelled by any state change, and the reply is
   // applied through the serial writer so a stale snapshot can never write.
   useEffect(() => {
-    if (!view.active || !game || !d || d.over || game.mode !== 'solo' || d.toMove === game.you) return
+    // Scheduling and cleanup follow both view fields: the props re-run this
+    // effect so a flip of either cancels the pending timer, and liveActive()
+    // closes the gap where a stale prop still says live but os.view already
+    // folded. The callback and the search probe re-check the live snapshot so
+    // a stale prop cannot keep hidden bot work running, and the handoff to
+    // the other display stays safe because the reply validates against the
+    // settled wire document.
+    if (!view.active || !view.visible || !liveActive()) return
+    if (!game || !d || d.over || game.mode !== 'solo' || d.toMove === game.you) return
     setThinking(true)
     let cancelled = false
     const timer = setTimeout(() => {
@@ -349,13 +363,17 @@ function Game() {
       clearTimeout(timer)
       setThinking(false)
     }
-  }, [game, d, view.active, play, enqueueGame])
+  }, [game, d, view.active, view.visible, play, enqueueGame])
 
   // One celebration per match, counted once in shared storage: the cue and
   // haptic fire only on the copy that actually posts the tally increment, so
   // a folded-in peer stays silent and replays never double-count.
   useEffect(() => {
-    if (!view.active || !game || !d?.over || celebrated.current === game.id) return
+    // Props and the live snapshot both gate: on re-activation this effect
+    // re-runs even when game and tally were already settled while hidden, so
+    // the celebration the folded copy could not post still lands here once.
+    if (!view.active || !view.visible || !liveActive()) return
+    if (!game || !d?.over || celebrated.current === game.id) return
     if (stored.status !== 'ready' && stored.status !== 'saving') return
     celebrated.current = game.id
     const winner = d.over.winner
@@ -365,13 +383,14 @@ function Game() {
       play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
       return countFinished(tally, game.id, winner)
     })
-  }, [d, game, view.active, stored.status, play, enqueueRecord])
+  }, [d, game, view.active, view.visible, stored.status, play, enqueueRecord])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
 
   const askConfirm = useCallback((entry: Confirm) => {
+    if (!liveActive()) return
     returnFocus.current = document.activeElement
     setConfirm(entry)
   }, [])
@@ -381,6 +400,7 @@ function Game() {
   // while this copy stays the visible one. A hidden copy's deferred restore
   // would steal focus from the display the user is actually looking at.
   const closeConfirm = useCallback(() => {
+    if (!liveActive()) return
     setConfirm(null)
     const el = returnFocus.current
     returnFocus.current = null
@@ -402,7 +422,7 @@ function Game() {
 
   const newMatch = useCallback(
     (patch?: { mode?: Mode; you?: Color }) => {
-      if (!game) return
+      if (!game || !liveActive()) return
       const next = newGame(ME, patch?.mode ?? game.mode, game.level, patch?.you ?? game.you)
       void enqueueGame(() => next).then((ok) => {
         if (!ok) return
@@ -418,7 +438,7 @@ function Game() {
   // go through the Sheet; a fresh or finished board swaps directly.
   const requestNew = useCallback(
     (patch?: { mode?: Mode; you?: Color }) => {
-      if (!game || !d) return
+      if (!game || !d || !liveActive()) return
       const live = d.plies > 0 && !d.over
       if (!live) {
         newMatch(patch)
@@ -485,7 +505,7 @@ function Game() {
   )
 
   const undo = useCallback(() => {
-    if (!game || !d || !canUndo(game, d, thinking) || pendingRef.current > 0) return
+    if (!game || !d || !liveActive() || !canUndo(game, d, thinking) || pendingRef.current > 0) return
     const expected = game
     void enqueueGame((base) => {
       const r = tryUndo(base, expected)
@@ -499,7 +519,7 @@ function Game() {
 
   const setLevel = useCallback(
     (level: Level) => {
-      if (!game || level === game.level) return
+      if (!game || !liveActive() || level === game.level) return
       const expected = game
       void enqueueGame((base) => (base.id === expected.id ? { ...base, level } : null))
     },
@@ -507,16 +527,21 @@ function Game() {
   )
 
   const toggleMute = useCallback(() => {
-    if (!view.active || !liveActive()) return
+    if (!liveActive()) return
     const next = !prefs.muted
     void enqueuePrefs({ muted: next })
     setMuted(next)
     if (!next) cue('place')
-  }, [prefs.muted, enqueuePrefs, view.active])
+  }, [prefs.muted, enqueuePrefs])
+
+  const toggleHints = useCallback(() => {
+    if (!liveActive()) return
+    void enqueuePrefs({ hints: !prefs.hints })
+  }, [prefs.hints, enqueuePrefs])
 
   // Roving keyboard focus over the board grid; Enter/Space fire natively.
   const onBoardKey = (event: React.KeyboardEvent) => {
-    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !liveActive()) return
     const cur = focusRef.current
     let next = cur
     if (event.key === 'ArrowLeft' && cur % 8 !== 0) next = cur - 1
@@ -530,7 +555,7 @@ function Game() {
       requestNew()
       return
     } else if (event.key === 'h') {
-      void enqueuePrefs({ hints: !prefs.hints })
+      toggleHints()
       return
     } else if (event.key === 'm') {
       toggleMute()
@@ -655,7 +680,7 @@ function Game() {
         <button
           type="button"
           aria-pressed={prefs.hints}
-          onClick={() => void enqueuePrefs({ hints: !prefs.hints })}
+          onClick={toggleHints}
           {...stylex.props(styles.btn, styles.btnGhost, shared.press, styles.pressCalm)}
         >
           <Sym name={prefs.hints ? 'eye' : 'eyeSlash'} size={13} />
@@ -766,9 +791,15 @@ function Game() {
               aria-label={label}
               aria-disabled={!humanTurn || pending > 0 || !d.legal.has(i)}
               onClick={() => place(i)}
-              onFocus={() => setFocusCell(i)}
-              onPointerEnter={() => setHover(i)}
-              onPointerLeave={() => setHover((h) => (h === i ? null : h))}
+              onFocus={() => {
+                if (liveActive()) setFocusCell(i)
+              }}
+              onPointerEnter={() => {
+                if (liveActive()) setHover(i)
+              }}
+              onPointerLeave={() => {
+                if (liveActive()) setHover((h) => (h === i ? null : h))
+              }}
               {...stylex.props(
                 styles.cell,
                 (i + Math.floor(i / 8)) % 2 === 0 && styles.cellAlt,
@@ -930,7 +961,9 @@ function Game() {
                 <button
                   type="button"
                   aria-expanded={showLog}
-                  onClick={() => setShowLog((v) => !v)}
+                  onClick={() => {
+                    if (liveActive()) setShowLog((v) => !v)
+                  }}
                   {...stylex.props(styles.movesToggle, shared.press, styles.pressCalm)}
                 >
                   <span>Moves</span>
@@ -953,7 +986,7 @@ function Game() {
 // the shell's go-home shortcut stay inert behind the question; the app marks
 // its content inert and loops Tab inside the card while it is open.
 const trapTab = (event: React.KeyboardEvent<HTMLDialogElement>) => {
-  if (event.key !== 'Tab') return
+  if (event.key !== 'Tab' || !liveActive()) return
   const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button, [href], [tabindex]')].filter(
     (el) => el.tabIndex >= 0
   )
@@ -978,7 +1011,9 @@ let sheetCancel: (() => void) | null = null
 addEventListener(
   'keydown',
   (event) => {
-    if (event.key !== 'Escape' || !sheetCancel) return
+    // Live-gated: a hidden copy neither cancels its sheet nor swallows the
+    // Escape the SDK still owes the go-home shortcut.
+    if (event.key !== 'Escape' || !sheetCancel || !liveActive()) return
     event.preventDefault()
     event.stopImmediatePropagation()
     sheetCancel()
@@ -986,9 +1021,13 @@ addEventListener(
   true
 )
 
-// A real gesture unlocks the AudioContext before any cue needs it.
-addEventListener('pointerdown', () => unlockAudio(), { capture: true })
-addEventListener('keydown', () => unlockAudio(), { capture: true })
+// A real gesture on the live display unlocks the AudioContext before any cue
+// needs it; unlockAudio re-checks admission inside audio.ts for every caller.
+const unlockOnGesture = () => {
+  if (liveActive()) unlockAudio()
+}
+addEventListener('pointerdown', unlockOnGesture, { capture: true })
+addEventListener('keydown', unlockOnGesture, { capture: true })
 
 await os.connect()
 createRoot(document.body).render(<Game />)
