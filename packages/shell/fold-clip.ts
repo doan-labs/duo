@@ -42,11 +42,9 @@ export const foldClip = (bend: number, camX: number, camZ: number, panel: FoldPa
 }
 
 /**
- * A panel whose clip covers its whole width paints nothing. Whatever the
- * compositor would have drawn, the honest state is empty, so the object is
- * culled: a composited element clipped at its edge can raster a mirrored copy
- * of itself at the boundary (the raster artifact docs/debug.md lists under
- * false alarms), and the fully clipped copy is also where taps meant for the
- * page background were landing.
+ * A panel whose clip covers its whole width paints nothing, so the object is
+ * culled rather than kept as a zero-pixel composited layer for the rest of
+ * the travel. Hiding it also guarantees no residual clipped sliver of it can
+ * sit in the hit-test path at the boundary.
  */
 export const panelGone = (clip: number) => clip >= 1

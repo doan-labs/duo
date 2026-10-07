@@ -1950,7 +1950,8 @@ nothing. Cover semantics are unchanged: its panel already fades and hides on
 its own.
 
 The mirrored strip of app content reported at the folded cover's right edge is
-a separate compositor raster artifact (debug.md): reproduced after live folds
-inside the cover app iframe's raster, past the app's painted width, on builds
-with and without this change. It is named here only so the two are not
-conflated; this cull is not asserted as its repair.
+a separate, reproduced rendering defect whose mechanism is not established
+(debug.md): it appears after live folds inside the cover app iframe element's
+raster, past the app's painted width, on builds with and without this change,
+nondeterministically. It is named here only so the two are not conflated; this
+cull is not asserted as its repair.
