@@ -259,12 +259,10 @@ function Solitaire() {
   const savedValRef = useRef(saved.value)
   savedValRef.current = saved.value
   // Set when the store proved the mirror behind (a foreign record adopted via
-  // read-before-write): until the mirror catches up its stale value must not
-  // be mistaken for a new foreign write on every tap. staleMirror remembers
-  // exactly which mirror value was stale; a different value landing later
-  // means the channel is alive again and the flag clears.
+  // read-before-write). While set, mirror values are not trusted as writes:
+  // only a value matching the adopted record (mirror caught up) or a new
+  // foreign delivery through the channel clears it.
   const mirrorBehind = useRef(false)
-  const staleMirror = useRef<string | null>(null)
 
   const stopAuto = useCallback(() => {
     if (autoTimer.current !== null) {
@@ -309,7 +307,6 @@ function Solitaire() {
             const foreign = adoptGame(cur)
             if (foreign && foreign.by !== ME) {
               mirrorBehind.current = true
-              staleMirror.current = savedValRef.current
               lastSeen.current = cur
               const t = { ...foreign.deal, game: foreign.game }
               setTable(t)
@@ -345,7 +342,7 @@ function Solitaire() {
   // synchronously before any move, undo or Auto tick computes its write.
   const freshBase = useCallback((): { table: Table; foreign: boolean } => {
     const raw = savedValRef.current
-    if (raw === lastSeen.current || (raw !== staleMirror.current && raw !== null)) mirrorBehind.current = false
+    if (raw === lastSeen.current) mirrorBehind.current = false
     if (!mirrorBehind.current && raw && raw !== lastSeen.current) {
       const next = adoptGame(raw)
       if (next && next.by !== ME) {
@@ -376,9 +373,14 @@ function Solitaire() {
       mirrorBehind.current = false
       return
     }
-    // While the mirror is behind, its stale value is not a foreign write.
-    // Any other value landing here is a live delivery, so the flag clears.
-    if (mirrorBehind.current && raw === staleMirror.current) return
+    // While the mirror is behind the store, a value that does not parse to a
+    // foreign record - the stale deal it keeps serving, or our own optimistic
+    // echo - is not a write and must not re-stamp lastSeen. Only a genuinely
+    // different foreign record is a live delivery worth adopting.
+    if (mirrorBehind.current) {
+      const maybe = raw ? adoptGame(raw) : null
+      if (!maybe || maybe.by === ME) return
+    }
     mirrorBehind.current = false
     lastSeen.current = raw
     if (!raw) {
