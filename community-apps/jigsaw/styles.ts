@@ -5,6 +5,7 @@ import {
   easing,
   glass,
   leading,
+  motion,
   radius,
   shadow,
   space,
@@ -551,8 +552,11 @@ export const styles = stylex.create({
   danger: { backgroundColor: colors.red, color: colors.white },
   // shared.press has no reduced-motion variant (platform gap): keep the press
   // colour ease but flatten the scale so reduce truly means reduce.
+  // StyleX merges array entries per property key, not per condition, so this
+  // transform must re-declare the whole map: shared.press's scale under
+  // default media and a flat press under reduced motion.
   pressCalm: {
-    transform: { [reduce]: { ':active': 'scale(1)' } }
+    transform: { default: 'scale(1)', ':active': motion.press, [reduce]: { ':active': 'scale(1)' } }
   }
 })
 
