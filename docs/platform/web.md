@@ -31,6 +31,11 @@ Deployment requirements:
 - Configure DNS and HTTPS for the canonical domain, and serve correct content
   types. Do not return the website's HTML fallback for missing catalog or
   artifact paths.
+- Serve release bytes untransformed. Hash verification at install time requires
+  the response to equal the committed bytes for every request class, including
+  document navigations the edge may rewrite (analytics snippet injection and
+  similar features). `packages/web/public/_headers` pins `no-transform` on the
+  release trees for exactly this.
 - Cache immutable versioned bundles long-term. Revalidate site entry documents
   and keep catalog freshness short (the store proposal uses 60 seconds).
   Publish complete artifacts before the catalog references them. An already
@@ -89,6 +94,22 @@ compatibility have already been verified.
 ## Build record
 
 Newest first. Each pass records what changed and how it was verified.
+
+### Release responses pinned to committed bytes
+
+- `packages/web/public/_headers` scopes `Cache-Control: public,
+  max-age=31536000, immutable, no-transform` to the three release trees
+  (`/catalog/apps/*`, `/cdn/apps/*`, `/preinstalled/apps/*`). The site host was
+  found rewriting `text/html` release documents for `Accept: text/html`
+  requests (an edge analytics injection), which changed the bytes the
+  downloader hashes and broke install verification. `no-transform` is the
+  documented control for that path; content-addressed release URLs also get the
+  long-term caching this page requires.
+- Verification: `scripts/checks/publish/headers.mjs` parses the file and proves
+  every release path carries the invariant while indexes and pages do not;
+  `bunx biome check`, `bun run typecheck`, `bun run build` and the publisher
+  checks run clean. Edge behavior verified by the `Accept` split before the
+  fix: `*/*` served committed bytes, `text/html` served an injected document.
 
 ### Kit scenes follow the page's appearance
 

@@ -103,6 +103,14 @@ The website build runs `packages/web/scripts/catalog.ts`: it unpacks `origin/cat
 `public/catalog/` when reachable and merges the bundled official releases from
 `dist/cdn` with the same publisher, so the hosted Store lists official and community apps
 from one origin. The Store loads `/catalog/index.json`, then `/cdn`, then `/preinstalled`.
+`packages/web/public/_headers` pins the serving contract on the release trees
+(`/catalog/apps/*`, `/cdn/apps/*`, `/preinstalled/apps/*`): `Cache-Control:
+no-transform` forbids edge rewriting of the responses - an injected analytics
+snippet changes the bytes and fails the downloader's hash check, which is how the
+hosted production symptom presented - and content-addressed paths get the
+documented immutable long-term caching. `scripts/checks/publish/headers.mjs`
+proves every release path carries both, without leaking onto catalog indexes or
+site pages.
 Site Created/Updated dates are the release `build.at` for community apps but the first
 and last package commit for official apps: their `dist/cdn` release is rebuilt on every
 site build, so its timestamp is only the deploy minute. For the same reason the script

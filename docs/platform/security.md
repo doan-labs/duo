@@ -46,8 +46,9 @@ must support the required CORS behavior; apps must not send credentials.
 Installed documents execute verified stored bytes through `srcdoc`. Preview documents
 execute verified bytes through an owned Blob `src`, avoiding a validation/second-fetch
 gap. Replacement/removal revokes old URLs under the app lock. Shell hosting policy must
-permit these frames and selected-source downloads; deployment-specific header verification
-is still required. See [website deployment](web.md#deployment).
+permit these frames and selected-source downloads; the served bytes must also reach
+the downloader untransformed for every request class - `no-transform` on the release
+trees holds that line (`_headers`). See [website deployment](web.md#deployment).
 
 ## Storage and lifecycle
 

@@ -1,0 +1,16 @@
+# Release files are immutable and hash-verified: every byte under
+# apps/<id>/<version>+<buildhash>/ must equal the bytes the publisher committed,
+# for every request class. The identity already embeds the build hash, so a
+# URL's content never changes.
+#
+# Cache-Control replaces the asset-layer default on these paths:
+#   no-transform forbids any edge HTML rewriting (analytics snippet injection
+#   and friends) that would change the bytes the downloader hashes;
+#   long-term immutable caching matches the deployment requirement in
+#   docs/platform/web.md for versioned bundles.
+/catalog/apps/*
+  Cache-Control: public, max-age=31536000, immutable, no-transform
+/cdn/apps/*
+  Cache-Control: public, max-age=31536000, immutable, no-transform
+/preinstalled/apps/*
+  Cache-Control: public, max-age=31536000, immutable, no-transform
