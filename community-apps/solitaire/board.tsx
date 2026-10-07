@@ -29,14 +29,16 @@ export interface Fit {
 /** Fit the classic seven-column table into the measured region. */
 export function fitBoard(w: number, h: number): Fit {
   if (w <= 0 || h <= 0) return { w: 0, h: 0, cardW: 0, cardH: 0, gapX: 0, rowGap: 0, tabY: 0, wasteStep: 0, font: 0 }
-  const gapX = Math.max(4, Math.min(14, w * 0.022))
+  // Tight column gutters keep cover cards at the 44pt touch bar.
+  const gapX = Math.max(4, Math.min(14, w * 0.016))
   // Card width comes off the columns; the top row and a healthy fan cap it.
   let cardW = (w - gapX * 6) / 7
   cardW = Math.min(cardW, h * 0.31, 118)
   const cardH = cardW * 1.42
   const rowGap = Math.max(6, Math.min(16, h * 0.028))
   const tabY = cardH + rowGap
-  const wasteStep = cardW * 0.34
+  // The draw-3 fan must keep a two-digit rank fully readable on the waste.
+  const wasteStep = cardW * 0.42
   const font = Math.max(9, cardW * 0.3)
   return { w, h, cardW, cardH, gapX, rowGap, tabY, wasteStep, font }
 }
@@ -176,7 +178,10 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
     if (col) for (let i = sel.i; i < col.length; i++) selIds.add(col[i]!.id)
   }
 
-  /** One live card: a positioned button with a 3D flip between face and back. */
+  /** One live card: a positioned button with a 3D flip between face and back.
+      The element key is the card id alone, so a card that moves piles keeps
+      its DOM node and glides on the left/top transition; a card turning face
+      up stays the same element and the inner rotateY animates the reveal. */
   const place = (x: number, y: number, z: number) => styles.place(x, y, fit.cardW, fit.cardH, z)
   const cardEl = (
     card: Card,
@@ -188,21 +193,24 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
     index: number,
     dealAt: number,
     isHot = false,
-    label?: string
+    label?: string,
+    down = false
   ) => {
-    const picked = selIds.has(card.id)
+    const picked = !down && selIds.has(card.id)
     return (
       <button
-        key={`${key}.${card.id}`}
+        key={card.id}
         type="button"
-        ref={keepFocus(key)}
-        aria-label={label ?? cardName(card)}
-        aria-pressed={picked}
-        onClick={() => onCard(card.id, spot, index)}
-        onDoubleClick={() => onCardDouble(card.id, spot, index)}
-        onKeyDown={(e) => nav(e, key)}
+        inert={down}
+        ref={down ? undefined : keepFocus(key)}
+        aria-label={down ? undefined : (label ?? cardName(card))}
+        aria-pressed={picked || undefined}
+        onClick={down ? undefined : () => onCard(card.id, spot, index)}
+        onDoubleClick={down ? undefined : () => onCardDouble(card.id, spot, index)}
+        onKeyDown={down ? undefined : (e) => nav(e, key)}
         {...stylex.props(
           styles.card,
+          down && styles.cardDown,
           styles.cardFont(fit.font),
           place(x, y, z + (picked ? 300 : 0)),
           isHot && styles.hotCard,
@@ -213,7 +221,7 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
           won && spot.startsWith('f') && styles.delayAt(120 + Number(spot.slice(1)) * 90),
           shake === key && styles.shake,
           picked && styles.selected,
-          shared.press,
+          !down && shared.press,
           styles.pressRm
         )}
       >
@@ -319,18 +327,22 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
     for (let i = 0; i < col.length; i++) {
       const card = col[i]!
       const y = cardPos(fit, col, i, spacing)
-      if (!card.up) {
-        // A settled face-down card shows its back flat - the rotateY pair is
-        // only for live cards mid-flip (a rotated faceSide shows its own back).
-        out.push(
-          <span key={card.id} aria-hidden="true" {...stylex.props(styles.cardDownStill, place(x, y, 30 + i))}>
-            <CardBack />
-          </span>
-        )
-        continue
-      }
+      // Face-down cards are live pile members too: same element type and id
+      // key, inert, so turning one up flips on the same node.
       out.push(
-        cardEl(card, x, y, 30 + i * 2, `t${c}.${i}`, `t${c}`, i, (i * 7 + c) * 24, colHot && i === col.length - 1)
+        cardEl(
+          card,
+          x,
+          y,
+          30 + i * 2,
+          `t${c}.${i}`,
+          `t${c}`,
+          i,
+          (i * 7 + c) * 24,
+          card.up && colHot && i === col.length - 1,
+          undefined,
+          !card.up
+        )
       )
     }
   }

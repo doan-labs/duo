@@ -92,15 +92,15 @@ export const styles = stylex.create({
     overflow: 'hidden',
     textOverflow: 'ellipsis'
   },
-  scores: { display: 'flex', gap: space.xs, flexShrink: 0 },
+  scores: { display: 'flex', gap: space.sm, flexShrink: 0 },
   chip: {
-    minWidth: 46,
+    minWidth: 52,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: space.xxs,
-    paddingBlock: space.xxs,
-    paddingInline: space.xs,
+    paddingBlock: space.xs,
+    paddingInline: space.sm,
     borderRadius: radius.lg,
     backgroundColor: `color-mix(in srgb, ${colors.black} 30%, transparent)`,
     boxShadow: shadow.rim
@@ -163,7 +163,8 @@ export const styles = stylex.create({
     animationTimingFunction: easing.inOut,
     animationIterationCount: 'infinite'
   },
-  // One playing card: the shell positions it; the inner face flips.
+  // One playing card: the shell positions it and glides between spots; the
+  // inner face flips. Reduced motion snaps the travel instantly.
   card: {
     position: 'absolute',
     borderWidth: 0,
@@ -175,8 +176,14 @@ export const styles = stylex.create({
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
+    transitionProperty: { default: 'left, top', [reduce]: 'none' },
+    transitionDuration: '.24s',
+    transitionTimingFunction: easing.push,
     ':focus-visible': { zIndex: 4000 }
   },
+  // A face-down card in a live pile: inert, but it keeps the flip rig so
+  // turning it up animates on the same element.
+  cardDown: { cursor: 'default' },
   // The deal wave's per-card stagger, set from the deal index at render time.
   delayAt: (ms: number) => ({ animationDelay: `${ms}ms` }),
   cardInner: {
@@ -184,7 +191,7 @@ export const styles = stylex.create({
     inset: 0,
     transformStyle: 'preserve-3d',
     transitionProperty: 'transform',
-    transitionDuration: '.34s',
+    transitionDuration: { default: '.34s', [reduce]: '0s' },
     transitionTimingFunction: easing.pop
   },
   cardInnerDown: { transform: 'rotateY(180deg)' },
@@ -207,16 +214,6 @@ export const styles = stylex.create({
   },
   faceBack: {
     transform: 'rotateY(180deg)',
-    borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor: `color-mix(in srgb, ${colors.white} 16%, transparent)`,
-    boxShadow: shadow.rim
-  },
-  // A settled face-down card: flat back art with the same chrome, no flip rig.
-  cardDownStill: {
-    position: 'absolute',
-    borderRadius: radius.sm,
-    overflow: 'hidden',
     borderWidth: 1,
     borderStyle: 'solid',
     borderColor: `color-mix(in srgb, ${colors.white} 16%, transparent)`,
@@ -263,13 +260,13 @@ export const styles = stylex.create({
     display: 'block',
     color: colors.grey6Dark
   },
+  // Rank and suit read side by side so the covered strip of a fanned card
+  // still carries suit identity, not just the rank's colour.
   corner: {
     position: 'absolute',
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     gap: space.xxs,
-    width: '22%',
     lineHeight: 1
   },
   cornerTop: { top: '4%', left: '5%' },
@@ -281,7 +278,7 @@ export const styles = stylex.create({
   },
   // Corner type scales with the card: the board passes the card's px size in.
   cardFont: (font: number) => ({ fontSize: font }),
-  cornerSuit: { display: 'block', width: '72%', aspectRatio: '1' },
+  cornerSuit: { display: 'block', width: '.85em', aspectRatio: '1' },
   suitGlyph: { display: 'block', width: '100%', height: '100%' },
   // The suit's ink: black or red from the kit ramp, passed per card.
   suitInk: (color: string) => ({ color }),
@@ -340,7 +337,7 @@ export const styles = stylex.create({
   },
   backMark: { width: '46%', height: '46%' },
   // The toolbar: five labelled actions the same on both displays.
-  toolbar: { display: 'flex', gap: space.xs, flexShrink: 0 },
+  toolbar: { display: 'flex', gap: space.sm, flexShrink: 0 },
   toolbarWide: { flexDirection: 'column' },
   tool: {
     flex: 1,
@@ -353,8 +350,8 @@ export const styles = stylex.create({
     minHeight: 44,
     borderWidth: 0,
     borderRadius: radius.lg,
-    paddingBlock: space.xs,
-    paddingInline: space.xxs,
+    paddingBlock: space.sm,
+    paddingInline: space.xs,
     color: colors.white,
     backgroundColor: {
       default: `color-mix(in srgb, ${colors.black} 24%, transparent)`,
@@ -579,9 +576,9 @@ export const styles = stylex.create({
   statsCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.xs,
-    paddingBlock: space.sm,
-    paddingInline: space.sm,
+    gap: space.sm,
+    paddingBlock: space.lg,
+    paddingInline: space.lg,
     borderRadius: radius.xl,
     backgroundColor: `color-mix(in srgb, ${colors.black} 26%, transparent)`,
     boxShadow: shadow.rim
@@ -629,6 +626,7 @@ export const styles = stylex.create({
     flexShrink: 0,
     minHeight: 0
   },
+  railWrap: { position: 'relative', flexGrow: 1, minHeight: 0, display: 'flex' },
   railScroll: {
     display: 'flex',
     flexDirection: 'column',
@@ -637,12 +635,22 @@ export const styles = stylex.create({
     overflowY: 'auto',
     scrollbarWidth: 'none'
   },
+  // A quiet fade at the rail's scroll edge: the only affordance a bar-less
+  // scroll region has that more controls sit below.
+  railFade: {
+    position: 'absolute',
+    insetInline: 0,
+    bottom: 0,
+    height: space.xxxl,
+    pointerEvents: 'none',
+    backgroundImage: `linear-gradient(transparent, color-mix(in srgb, ${colors.green} 26%, ${colors.black}) 82%)`
+  },
   // marginBlock:auto centres the rail's contents while they fit and collapses
   // to top alignment once they overflow - centered flex children would lose
   // their top edge above the scrollport.
   railBody: { display: 'flex', flexDirection: 'column', gap: space.sm, marginBlock: 'auto' },
   stage: { flexGrow: 1, minHeight: 0, minWidth: 0, display: 'flex', gap: space.lg, alignItems: 'stretch' },
-  shell: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, gap: space.sm, position: 'relative' },
+  shell: { display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, gap: space.lg, position: 'relative' },
   confirmCard: {
     display: 'flex',
     flexDirection: 'column',

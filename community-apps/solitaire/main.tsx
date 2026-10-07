@@ -3,7 +3,7 @@ import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
 import { Board, cardName, type Sel, type Spot } from './board.tsx'
@@ -263,6 +263,19 @@ function Solitaire() {
   // only a value matching the adopted record (mirror caught up) or a new
   // foreign delivery through the channel clears it.
   const mirrorBehind = useRef(false)
+  // Whether the rail's contents overflow its scrollport: only then does the
+  // bottom fade appear - a fitted rail gets no fake affordance.
+  const railScrollRef = useRef<HTMLDivElement>(null)
+  const [railScrolls, setRailScrolls] = useState(false)
+  useLayoutEffect(() => {
+    const el = railScrollRef.current
+    if (!el) return
+    const check = () => setRailScrolls(el.scrollHeight - el.clientHeight > 4)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const stopAuto = useCallback(() => {
     if (autoTimer.current !== null) {
@@ -1094,12 +1107,16 @@ function Solitaire() {
             <div {...stylex.props(styles.rail)}>
               {/* The scroll region holds controls and stats; when they fit they
                   centre, when they do not they scroll - never over the header
-                  or the home bar. The status line stays pinned below. */}
-              <div {...stylex.props(styles.railScroll)}>
-                <div {...stylex.props(styles.railBody)}>
-                  {controls}
-                  {statsCard}
+                  or the home bar, and a fade at the scroll edge says there is
+                  more below. The status line stays pinned below. */}
+              <div {...stylex.props(styles.railWrap)}>
+                <div ref={railScrollRef} {...stylex.props(styles.railScroll)}>
+                  <div {...stylex.props(styles.railBody)}>
+                    {controls}
+                    {statsCard}
+                  </div>
                 </div>
+                {railScrolls ? <div aria-hidden="true" {...stylex.props(styles.railFade)} /> : null}
               </div>
               <p aria-live="polite" {...stylex.props(styles.status, styles.statusWide, blocked && styles.statusWarn)}>
                 {hintText}
