@@ -8,6 +8,7 @@ import {
   bulbsOf,
   type CircuitNode,
   cleanDoc,
+  commit,
   commitMove,
   connect,
   type Doc,
@@ -651,6 +652,53 @@ check('a stale unmergeable op converges without losing the holder doc', () => {
   const before = pair.rev
   pair.deliver(pair.a, stale, 6)
   eq(pair.rev, before)
+})
+
+check('a stale op=null write merges its doc content instead of clobbering', () => {
+  // The live regression: a fit/selection mirror carries no op, so a holder
+  // that answered by republishing its own doc let the stale side adopt it and
+  // lose a fresh wire. The heal must union whatever the stale doc holds.
+  const a = mk('switch', 'A')
+  const b = mk('switch', 'B')
+  const g = mk('and')
+  const shared = { ...mkDoc([a, b, g]), id: 'shared3' }
+  const pair = mkPair()
+  // The holder's doc has A's toggle at rev5.
+  const aDoc = toggleSwitch(shared, a.id)
+  pair.a.doc = aDoc
+  pair.a.docRev = 5
+  // The stale side forked at rev4, then wired B->g AND moved g before writing
+  // a snapshot-style mirror (no op, e.g. a fit or selection write).
+  const b1 = connect(shared, b.id, g.id, 0).doc
+  // The stale doc is timestamped newest: its last edit came after the fork.
+  const bDoc = { ...moveNode(b1, g.id, g.x + 30, g.y), updated: aDoc.updated + 5000 }
+  pair.b.doc = bDoc
+  pair.b.docRev = 4
+  pair.deliver(pair.a, { by: 'B', sel: null, doc: bDoc, base: 4, op: null }, 6)
+  // Both sides converge on the union: A's toggle and B's wire and move.
+  for (const side of [pair.a.doc, pair.b.doc]) {
+    eq(side!.nodes[a.id]!.on, true, 'holder toggle kept')
+    ok(wireAt(side!, g.id, 0) !== undefined, 'stale wire kept via union')
+    eq(side!.nodes[g.id]!.x, g.x + 30)
+  }
+})
+
+check('a holder drop is not resurrected by a stale union merge', () => {
+  const a = mk('switch', 'A')
+  const g = mk('and')
+  const shared = { ...mkDoc([a, g]), id: 'shared4' }
+  const pair = mkPair()
+  // The holder deleted g at rev5: its history shows g was dropped.
+  const aDoc = removeNode(commit(shared, { nodes: shared.nodes, wires: {} }), g.id)
+  pair.a.doc = aDoc
+  pair.a.docRev = 5
+  // The stale side forked before the delete and still holds g.
+  pair.b.doc = shared
+  pair.b.docRev = 4
+  pair.deliver(pair.a, { by: 'B', sel: null, doc: shared, base: 4, op: null }, 6)
+  for (const side of [pair.a.doc, pair.b.doc]) {
+    eq(side!.nodes[g.id], undefined, 'dropped node must stay dropped')
+  }
 })
 
 check('pin pads repel to unambiguous 44pt targets', () => {

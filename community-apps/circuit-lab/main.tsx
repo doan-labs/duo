@@ -397,9 +397,7 @@ function CircuitLab() {
     const decision = decideRemote(cur, docRev.current, next, live.rev, answeredRev.current)
     if (decision.kind === 'drop') return
     if (decision.kind === 'heal') {
-      // Stale fork answered: our doc plus whatever the stale write changed,
-      // republished so the session's last value carries the union of edits.
-      answeredRev.current = live.rev
+      // Stale fork answered: our doc plus whatever the stale write changed.
       const merged = decision.doc
       const selNow = pruneSel(selRef.current, merged)
       setDoc(merged)
@@ -408,9 +406,15 @@ function CircuitLab() {
         const lib = await readLib()
         stored.set(serializeLibrary(withDoc(lib, merged)))
       })
-      const heal = serializeMirror(ME, merged, selNow, decision.base, null)
-      lastWritten.current = heal
-      void os.session.set(DOC_KEY, heal).catch(() => {})
+      // Only the live copy may answer a stale write - a hidden copy's heal
+      // would itself be a stale writer. The same write re-decides when this
+      // copy becomes visible, so convergence waits for the fold, not for it.
+      if (os.view.active) {
+        answeredRev.current = live.rev
+        const heal = serializeMirror(ME, merged, selNow, decision.base, null)
+        lastWritten.current = heal
+        void os.session.set(DOC_KEY, heal).catch(() => {})
+      }
       return
     }
     docRev.current = live.rev
@@ -456,7 +460,8 @@ function CircuitLab() {
         const lib = await readLib()
         stored.set(serializeLibrary(withDoc(lib, next)))
       })
-      if (os.view.active) void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
+      if (os.view.active)
+        void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current, docRev.current)).catch(() => {})
     }
     const f = requestAnimationFrame(fitLocal)
     const ro = new ResizeObserver(() => {
@@ -673,7 +678,11 @@ function CircuitLab() {
       setNote(
         `Wired ${now.nodes[from] ? displayName(now.nodes[from]!) : 'pin'} to ${displayName(now.nodes[nodeId]!)}${inputCount(now.nodes[nodeId]!.kind) > 1 ? ` ${PIN_A[port]}` : ''}`
       )
-      publish(result.doc, { kind: 'wire', id: result.wire!.id }, { t: 'wire', from, to: nodeId, port })
+      publish(
+        result.doc,
+        { kind: 'wire', id: result.wire!.id },
+        { t: 'wire', from, to: nodeId, port, id: result.wire!.id }
+      )
       return
     }
     // Not armed: tapping a fed pin selects the wire on it, so Disconnect is
@@ -833,7 +842,7 @@ function CircuitLab() {
         framedDoc.current = null
         setDoc(open)
         setSel(null)
-        void os.session.set(DOC_KEY, serializeMirror(ME, open, null, 0, { t: 'doc' })).catch(() => {})
+        void os.session.set(DOC_KEY, serializeMirror(ME, open, null, docRev.current, { t: 'doc' })).catch(() => {})
       }
     })
   }

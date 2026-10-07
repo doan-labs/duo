@@ -56,7 +56,7 @@ export type Op =
   | { t: 'add'; n: CircuitNode }
   | { t: 'drop-node'; id: string }
   | { t: 'move'; id: string; x: number; y: number }
-  | { t: 'wire'; from: string; to: string; port: number }
+  | { t: 'wire'; from: string; to: string; port: number; id?: string }
   | { t: 'drop-wire'; id: string }
   | { t: 'toggle'; id: string }
   | { t: 'label'; id: string; label: string }
@@ -637,7 +637,13 @@ function cleanOp(v: unknown): Op | null {
         typeof v.to === 'string' &&
         typeof v.port === 'number' &&
         Number.isInteger(v.port)
-        ? { t: 'wire', from: v.from, to: v.to, port: v.port }
+        ? {
+            t: 'wire',
+            from: v.from,
+            to: v.to,
+            port: v.port,
+            id: typeof v.id === 'string' ? v.id : undefined
+          }
         : null
     case 'drop-wire':
       return typeof v.id === 'string' ? { t: 'drop-wire', id: v.id } : null
@@ -711,7 +717,15 @@ export function applyOp(doc: Doc, op: Op | null): Doc {
     }
     case 'wire': {
       const r = connect(doc, op.from, op.to, op.port)
-      return r.error ? doc : r.doc
+      if (r.error || !r.wire) return doc
+      // Keep the writer's wire id so every copy stores the same identity -
+      // otherwise a union merge sees the same logical wire as two new ones
+      // and duplicates it onto the pin.
+      if (!op.id || r.wire.id === op.id) return r.doc
+      const wires = { ...r.doc.wires }
+      delete wires[r.wire.id]
+      wires[op.id] = { ...r.wire, id: op.id }
+      return touch({ ...r.doc, wires })
     }
     case 'drop-wire':
       return removeWire(doc, op.id)
@@ -724,6 +738,56 @@ export function applyOp(doc: Doc, op: Op | null): Doc {
     default:
       return doc
   }
+}
+
+/**
+ * Union-merge for content the stale write carries but our doc lacks. An op on
+ * the mirror describes the writer's last edit; anything else its doc has that
+ * ours does not - an add it made before its op - is still an accepted edit and
+ * survives the merge as the union. An id our own undo history shows we dropped
+ * is not resurrected: a delete is an edit too.
+ */
+const droppedBefore = (doc: Doc, id: string): boolean =>
+  doc.past.some((s) => s.nodes[id] !== undefined || s.wires[id] !== undefined)
+
+export function unionRemote(cur: Doc, next: Doc): Doc {
+  // A node both sides hold is a field conflict: the doc touched most recently
+  // wins the structure, while play state unions - a switch either side turned
+  // on stays on, since off is not an edit either way.
+  const preferNext = next.updated > cur.updated
+  const nodes = { ...cur.nodes }
+  const wires = { ...cur.wires }
+  let changed = false
+  for (const [id, n] of Object.entries(next.nodes)) {
+    const have = nodes[id]
+    if (have === undefined) {
+      if (!droppedBefore(cur, id)) {
+        nodes[id] = n
+        changed = true
+      }
+      continue
+    }
+    const picked = preferNext ? n : have
+    const mergedNode = { ...picked, on: have.on === true || n.on === true }
+    if (
+      mergedNode.x !== have.x ||
+      mergedNode.y !== have.y ||
+      mergedNode.on !== have.on ||
+      mergedNode.label !== have.label ||
+      mergedNode.kind !== have.kind
+    ) {
+      nodes[id] = mergedNode
+      changed = true
+    }
+  }
+  for (const [id, w] of Object.entries(next.wires)) {
+    const occupied = Object.values(wires).some((have) => have.to === w.to && have.port === w.port)
+    if (wires[id] === undefined && !occupied && !droppedBefore(cur, id) && nodes[w.from] && nodes[w.to]) {
+      wires[id] = w
+      changed = true
+    }
+  }
+  return changed ? touch({ ...cur, nodes, wires }) : cur
 }
 
 export type RemoteDecision =
@@ -755,7 +819,10 @@ export function decideRemote(
   if (!cur || next.doc.id !== cur.id) return { kind: 'adopt', doc: next.doc, sel: next.sel }
   if (next.base >= curRev) return { kind: 'adopt', doc: next.doc, sel: next.sel }
   if (nextRev <= answeredRev) return { kind: 'drop' }
-  const merged = applyOp(cur, next.op)
+  // The carried op covers the writer's last edit; unionRemote keeps whatever
+  // else its doc holds that ours does not, so a write made from a doc that
+  // forked several edits back still merges all of them.
+  const merged = unionRemote(applyOp(cur, next.op), next.doc)
   return { kind: 'heal', doc: merged, base: Math.max(curRev, nextRev) }
 }
 
