@@ -19,12 +19,16 @@
   toggle, unlocked on first gesture and silent when audio is unavailable.
 - Light and dark themes, reduced-motion support, roving-arrow day chips and
   44pt targets throughout.
-- Ordered storage commits with no reads and no rollback: record writes land
-  first, then retained tomb markers, then the index - a peer edit landing
-  mid-commit is preserved (orphan recovery), never erased by old work.
-  Records are never deleted; a commit reports 'applied', 'failed' (provably
-  nothing landed) or 'partial' (landed data preserved, honestly reported).
-  Tombs are ~16 bytes each but retained per historical delete - the
-  platform quota, not the trip cap, is the bound. Nothing accepted
-  silently vanishes across a fold or a storage outage, and an acknowledged
-  delete can never resurrect.
+- Ordered storage commits with no reads, no rollback and no app-level
+  retry: record writes land first, then retained tomb markers, then the
+  index - a peer edit landing mid-commit is preserved (orphan recovery),
+  never erased by old work. Each planned write is issued once (the SDK
+  owns same-request-ID timeout retry; re-sending a payload as a new
+  request could clobber a peer's confirmed edit). Refusals report
+  'missed'; timeouts/closes/transport failures report 'unknown', so a
+  commit resolves 'applied', 'failed' (provably nothing landed) or
+  'partial' (landed or ambiguous data preserved, honestly reported).
+  Records are never deleted; tombs are ~16 bytes each but retained per
+  historical delete - the platform quota, not the trip cap, is the bound.
+  Nothing accepted silently vanishes across a fold or a storage outage,
+  and an acknowledged delete can never resurrect.

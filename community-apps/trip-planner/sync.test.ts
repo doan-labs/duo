@@ -125,11 +125,15 @@ const mkPending = () => new Map<string, (string | null)[]>()
   const ok = await Promise.all(done)
   gate = 1
   check('writes execute in order', order.join(',') === '1,2,3' && gate === 1)
-  check('all succeeded', ok.every(Boolean))
+  check(
+    'all landed',
+    ok.every((r) => r === 'landed')
+  )
 }
 
-// Failure injection: rejected write resolves false, calls onFail once, and
-// does not block or poison later writes.
+// Failure injection: a write that throws ambiguously resolves 'unknown',
+// calls onFail once, and does not block or poison later writes. Only a
+// definitive refusal code resolves 'missed'.
 {
   const q = new WriteQueue()
   let fails = 0
@@ -149,9 +153,51 @@ const mkPending = () => new Map<string, (string | null)[]>()
       () => fails++
     )
   ])
-  check('failed write reports false', results[1] === false)
-  check('neighbors still land', results[0] === true && results[2] === true)
+  check('ambiguous write reports unknown', results[1] === 'unknown')
+  check('neighbors still land', results[0] === 'landed' && results[2] === 'landed')
   check('onFail fired once', fails === 1)
+}
+
+// Outcome classification: definitive refusal codes (host NACK / client-side
+// pre-send reject) resolve 'missed'; timeouts, closes, protocol breaks,
+// host-internal errors and non-platform throws all resolve 'unknown' -
+// the write may still have landed and nothing may be re-sent blindly.
+{
+  const q = new WriteQueue()
+  const refused = (code: string) =>
+    q.send(
+      async () => {
+        throw Object.assign(new Error(code), { code })
+      },
+      () => {}
+    )
+  check('E_ARGS refuses -> missed', (await refused('E_ARGS')) === 'missed')
+  check('E_QUOTA refuses -> missed', (await refused('E_QUOTA')) === 'missed')
+  check('E_RATE refuses -> missed', (await refused('E_RATE')) === 'missed')
+  check('E_DENIED refuses -> missed', (await refused('E_DENIED')) === 'missed')
+  check('E_STALE refuses -> missed', (await refused('E_STALE')) === 'missed')
+  check('E_GONE refuses -> missed', (await refused('E_GONE')) === 'missed')
+  check('E_UNSUPPORTED refuses -> missed', (await refused('E_UNSUPPORTED')) === 'missed')
+  check('E_TIMEOUT ambiguous -> unknown', (await refused('E_TIMEOUT')) === 'unknown')
+  check('E_CLOSED ambiguous -> unknown', (await refused('E_CLOSED')) === 'unknown')
+  check('E_PROTOCOL ambiguous -> unknown', (await refused('E_PROTOCOL')) === 'unknown')
+  check('E_STORAGE ambiguous -> unknown', (await refused('E_STORAGE')) === 'unknown')
+  check(
+    'bare throw ambiguous -> unknown',
+    (await q.send(
+      async () => {
+        throw new Error('x')
+      },
+      () => {}
+    )) === 'unknown'
+  )
+  check(
+    'clean write lands',
+    (await q.send(
+      async () => {},
+      () => {}
+    )) === 'landed'
+  )
 }
 
 // settled(): false when any enqueued write failed, true when all landed.
@@ -172,6 +218,16 @@ const mkPending = () => new Map<string, (string | null)[]>()
   )
   check('settled false after failure', (await q2.settled()) === false)
 
+  // A definitive refusal also settles false.
+  const q4 = new WriteQueue()
+  q4.send(
+    async () => {
+      throw Object.assign(new Error('refused'), { code: 'E_QUOTA' })
+    },
+    () => {}
+  )
+  check('settled false after refusal', (await q4.settled()) === false)
+
   // A failure snapshot taken at call time does not wait on writes enqueued later.
   const q3 = new WriteQueue()
   q3.send(
@@ -186,7 +242,7 @@ const mkPending = () => new Map<string, (string | null)[]>()
   check('settled snapshots inflight set', (await early) === true)
 }
 
-// send() itself never rejects on port failure (callers get boolean outcomes).
+// send() itself never rejects on port failure (callers get outcomes).
 {
   const q = new WriteQueue()
   const r = await q.send(
@@ -195,7 +251,7 @@ const mkPending = () => new Map<string, (string | null)[]>()
     },
     () => {}
   )
-  check('send resolves not rejects on failure', r === false)
+  check('send resolves not rejects on failure', r === 'unknown')
 }
 
 // --- commitLibWrites -----------------------------------------------------------
@@ -393,7 +449,10 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   check('index unchanged on abort', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
 }
 
-// Transient reject on the first attempt recovers inside the write.
+// A definitive refusal is terminal for that request - the commit never
+// re-sends a pre-planned payload (the SDK owns same-ID retry; a new
+// request is a new mutation that could land LWW over a peer). One clean
+// reject -> 'failed', exactly one put issued, nothing stored.
 {
   const { lib } = mk()
   const s = new Store()
@@ -401,8 +460,9 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   s.rejects.set('put trip.tc', 1)
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib))
-  check('transient reject still applied', ok === 'applied')
-  check('record present', s.map.has('trip.tc'))
+  check('refused create reports failed', ok === 'failed')
+  check('no retry of a planned payload', s.log.filter((l) => l === 'put trip.tc').length === 1)
+  check('record absent after refusal', !s.map.has('trip.tc'))
 }
 
 // Delayed step: a slow put does not reorder later writes.
@@ -717,6 +777,148 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   check('64 delete cycles retain 64 tomb keys', tombs === 64)
   check('assembler hides every tomb', s.lib().trips.length === 0)
   check('index stays empty', JSON.parse(s.map.get('index')!).order.length === 0)
+}
+
+const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(`trip.${id}`) ?? '{}').name
+
+// --- cycle-12 regression: ACK loss after a durable write -----------------
+// The parent's exact interleaving: A's put lands durably but its ACK is
+// lost (ambiguous). Under the old app-level retry A re-sent the SAME
+// planned payload as a NEW request 120ms later, and it landed LWW over B's
+// confirmed edit - both receipts 'applied', peer data erased. Now the
+// write resolves 'unknown', the commit aborts honestly as 'partial', and
+// exactly ONE put is ever issued - B's edit is preserved.
+{
+  const { lib, ta } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const records = () => new Map([...data].filter(([k]) => k.startsWith('trip.')))
+  const qa = new WriteQueue()
+  const qb = new WriteQueue()
+  let aPuts = 0
+  const failedA = Promise.withResolvers<void>()
+  const a = {
+    put: (k: string, v: string) =>
+      qa.send(
+        async () => {
+          aPuts++
+          data.set(k, v)
+          if (aPuts === 1) throw new Error('ACK lost after durable set')
+        },
+        () => failedA.resolve()
+      )
+  }
+  const b = {
+    put: (k: string, v: string) =>
+      qb.send(
+        async () => void data.set(k, v),
+        () => {}
+      )
+  }
+  const nextA = updateTrip(lib, 'ta', { name: 'A accepted edit' })
+  const receiptA = commitLibWrites(a, planLibWrites(lib, nextA))
+  await failedA.promise
+  // B reads durable state and commits a confirmed edit while A's outcome
+  // is still resolving.
+  const beforeB = assembleLibrary(data.get('index') ?? null, records())
+  const nextB = updateTrip(beforeB, 'ta', { name: 'B confirmed edit' })
+  const receiptB = await commitLibWrites(b, planLibWrites(beforeB, nextB))
+  const resultA = await receiptA
+  const final = assembleLibrary(data.get('index') ?? null, records())
+  check('peer durable before A resolves', tripName(data, ta.id) === 'B confirmed edit')
+  check('A never re-sent the stale payload', aPuts === 1)
+  check('ambiguous write reports partial not applied', resultA === 'partial')
+  check('peer edit confirmed applied', receiptB === 'applied')
+  check('peer edit preserved after A settles', tripName(data, ta.id) === 'B confirmed edit')
+  check('assembler agrees', final.trips.find((t) => t.id === 'ta')?.name === 'B confirmed edit')
+}
+
+// Repeated ACK loss on every put: each write lands durably then drops the
+// response. Nothing may be retried; the terminal is 'partial' (never a
+// false 'failed' over data that landed) and the durable value survives.
+{
+  const { lib, ta } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const qu = new WriteQueue()
+  let puts = 0
+  const u = {
+    put: (k: string, v: string) =>
+      qu.send(
+        async () => {
+          puts++
+          data.set(k, v)
+          throw Object.assign(new Error('ACK lost after durable set'), { code: 'E_TIMEOUT' })
+        },
+        () => {}
+      )
+  }
+  const next = updateTrip(lib, 'ta', { name: 'Unknown-but-durable edit' })
+  const outcome = await commitLibWrites(u, planLibWrites(lib, next))
+  check('one put despite repeated-attempt hazard', puts === 1)
+  check('landing-with-lost-ack reports partial', outcome === 'partial')
+  check('durable value is the landed one', tripName(data, ta.id) === 'Unknown-but-durable edit')
+}
+
+// Request dropped BEFORE the host write: the host never saw it, but the
+// app cannot tell a pre-write drop from a post-write drop - 'unknown' is
+// still the honest outcome and no stale payload is re-sent.
+{
+  const { lib, ta } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const qu = new WriteQueue()
+  let puts = 0
+  const u = {
+    put: (k: string, v: string) =>
+      qu.send(
+        async () => {
+          puts++
+          throw Object.assign(new Error('request dropped before write'), { code: 'E_TIMEOUT' })
+        },
+        () => {}
+      )
+  }
+  const next = updateTrip(lib, 'ta', { name: 'Dropped edit' })
+  const outcome = await commitLibWrites(u, planLibWrites(lib, next))
+  check('pre-write drop also reports partial', outcome === 'partial')
+  check('no second request after ambiguous drop', puts === 1)
+  check('prior value untouched', tripName(data, ta.id) === 'A')
+}
+
+// Multi-key plan where a middle write loses its ACK: landed prefix plus
+// 'unknown' resolves 'partial' and the remainder is aborted - the durable
+// state matches exactly the landed prefix.
+{
+  const { lib, ta, tb } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const qu = new WriteQueue()
+  let n = 0
+  const u = {
+    put: (k: string, v: string) =>
+      qu.send(
+        async () => {
+          n++
+          if (n === 2) throw new Error('ACK lost mid-plan')
+          data.set(k, v)
+        },
+        () => {}
+      )
+  }
+  const next = updateTrip(updateTrip(lib, 'ta', { name: 'A2' }), 'tb', { name: 'B2' })
+  const outcome = await commitLibWrites(u, planLibWrites(lib, next))
+  check('mid-plan ambiguous step stops the commit', outcome === 'partial' && n === 2)
+  check('landed prefix durable', tripName(data, ta.id) === 'A2')
+  check('index never written after ambiguous step', JSON.parse(data.get('index')!).order.join(',') === 'ta,tb')
 }
 
 console.log(`\nsync: ${passed} passed, ${failed} failed`)

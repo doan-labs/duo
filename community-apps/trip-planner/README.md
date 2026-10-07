@@ -47,10 +47,16 @@ erase a newer same-id incarnation restored in between. Each tomb is a
 delete history (not bounded by the trip cap), so the platform's per-app
 key/byte quota is the real bound and exhausting it surfaces as an ordinary
 write failure - an honest error, never silent loss. A commit performs no
-reads and issues no rollback: a verify-read's value is only valid at its
-captured revision, so a snapshot-driven write could erase a peer's
-acknowledged edit. Instead the outcome is 'applied', 'failed' (provably
-nothing landed) or 'partial' (landed data preserved, honestly reported).
+reads, issues no rollback, and never retries a planned write app-side: the
+SDK already retries a timed-out request once with the same ID, and a new
+request carrying the old payload could land LWW over a peer's confirmed
+edit - so each plan step is issued exactly once. A refusal (host NACK or
+client-side reject) reports 'missed'; anything else (timeout, close,
+protocol break) reports 'unknown' because the write may still have landed.
+The commit outcome is 'applied', 'failed' (first step definitively
+refused - provably nothing landed) or 'partial' (landed prefix or
+ambiguous step preserved, honestly reported); the resnapshot that follows
+settles the view on durable truth without re-sending anything.
 Every mutation rebases on the storage mirror (never the render
 snapshot), and watch echoes keep the newest still-pending own write so
 older acknowledgements

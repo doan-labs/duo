@@ -11,10 +11,11 @@
  *   mirror would silently drop them.
  *
  * - `WriteQueue` serializes port writes and reports a durable outcome per
- *   write. `send` resolves true only after the port accepted the write;
- *   `settled` resolves false if any write enqueued so far failed, so a
- *   caller can distinguish 'applied' from 'failed' instead of treating an
- *   enqueued write as committed.
+ *   write: 'landed' only after the port accepted the write, 'missed' only
+ *   after a definitive refusal, 'unknown' when the outcome is ambiguous.
+ *   `settled` resolves false unless every write enqueued so far landed, so
+ *   a caller can distinguish 'applied' from anything else instead of
+ *   treating an enqueued write as committed.
  */
 
 export type PendingMap = Map<string, (string | null)[]>
@@ -55,24 +56,51 @@ export function clearPending(pending: PendingMap, k?: string): void {
 }
 
 /**
+ * Durable outcome of one port write:
+ * - 'landed': the port accepted the write.
+ * - 'missed': the request was definitively REFUSED - a host NACK or a
+ *   client-side reject before the request was sent - so it provably never
+ *   applied.
+ * - 'unknown': the outcome is ambiguous (timeout, closed port, protocol
+ *   break, host-internal error, non-platform failure). The write may still
+ *   have landed; nothing further may be assumed.
+ */
+export type WriteOutcome = 'landed' | 'missed' | 'unknown'
+
+/**
+ * Error codes that mean the request was refused and provably never applied:
+ * host NACKs sent before any write (argument validation, quota, rate,
+ * permission, stale-epoch, gone, unsupported) plus client-side pre-send
+ * rejects (E_ARGS on an invalid request). E_TIMEOUT/E_CLOSED/E_PROTOCOL/
+ * E_STORAGE and non-platform errors are ambiguous: the host may already
+ * have applied the write before the failure was observed.
+ */
+const REFUSAL_CODES = new Set(['E_ARGS', 'E_QUOTA', 'E_RATE', 'E_DENIED', 'E_STALE', 'E_GONE', 'E_UNSUPPORTED'])
+
+export function isRefusal(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && 'code' in e && REFUSAL_CODES.has(String((e as { code: unknown }).code))
+}
+
+/**
  * Serialized port-write queue with durable outcomes.
  * `send` runs one write after every earlier write finished; the returned
- * promise resolves true only when the port accepted it. A rejected write
- * calls `onFail` (the caller re-snapshots) and resolves false without
+ * promise resolves 'landed' only when the port accepted it, 'missed' only
+ * on a definitive refusal, and 'unknown' when the outcome is ambiguous.
+ * A non-landed write calls `onFail` (the caller re-snapshots) without
  * breaking the queue for later writes.
  */
 export class WriteQueue {
   private tail: Promise<void> = Promise.resolve()
-  private live = new Set<Promise<boolean>>()
+  private live = new Set<Promise<WriteOutcome>>()
 
-  send(run: () => Promise<void>, onFail: () => void): Promise<boolean> {
-    const p = this.tail.then(async () => {
+  send(run: () => Promise<void>, onFail: (e: unknown) => void): Promise<WriteOutcome> {
+    const p = this.tail.then(async (): Promise<WriteOutcome> => {
       try {
         await run()
-        return true
-      } catch {
-        onFail()
-        return false
+        return 'landed'
+      } catch (e) {
+        onFail(e)
+        return isRefusal(e) ? 'missed' : 'unknown'
       }
     })
     this.tail = p.then(() => {})
@@ -81,17 +109,19 @@ export class WriteQueue {
     return p
   }
 
-  /** Resolves once every write enqueued so far has finished; true iff all succeeded. */
+  /** Resolves once every write enqueued so far has finished; true iff all landed. */
   settled(): Promise<boolean> {
-    return Promise.all([...this.live]).then((rs) => rs.every(Boolean))
+    return Promise.all([...this.live]).then((rs) => rs.every((r) => r === 'landed'))
   }
 }
 
 /**
- * A minimal boolean storage adapter - the exact surface `commitLibWrites`
- * needs from useSpace. `put` resolves false when the port rejects the write
- * and throws when the outcome is ambiguous (e.g. a transport timeout where
- * the write may still have landed).
+ * A minimal outcome storage adapter - the exact surface `commitLibWrites`
+ * needs from useSpace. `put` resolves 'landed' when the port accepted the
+ * write, 'missed' on a definitive refusal, 'unknown' (or throws) when the
+ * outcome is ambiguous - e.g. a transport timeout where the write may still
+ * have landed. Plain boolean true/false results from a simpler adapter are
+ * accepted and read as 'landed'/'missed'.
  *
  * There is deliberately no `del` and no `get`:
  * - `trip.<id>` records are never deleted, only overwritten or tombed, so
@@ -105,14 +135,14 @@ export class WriteQueue {
  *   a write derived from a stale stored value.
  */
 export type LibStore = {
-  put: (k: string, v: string) => Promise<boolean>
+  put: (k: string, v: string) => Promise<WriteOutcome | boolean>
 }
 
 /**
  * 'applied': every planned write durably landed.
- * 'failed': the commit aborted and provably nothing landed - every write
- *   attempt was cleanly rejected (the port refused it), so the caller may
- *   honestly say nothing applied.
+ * 'failed': the commit aborted and provably nothing landed - the first
+ *   write was definitively refused, so the caller may honestly say
+ *   nothing applied.
  * 'partial': the commit aborted with a landed prefix (some writes durable,
  *   at least one failed), or an ambiguous write outcome where landing
  *   cannot be disproved. Landed data is PRESERVED: no rollback is issued
@@ -123,32 +153,27 @@ export type LibStore = {
  */
 export type CommitOutcome = 'applied' | 'failed' | 'partial'
 
-const beat = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
-
 type Attempt = 'landed' | 'missed' | 'unknown'
 
 /**
- * Try once, wait, try once more.
- * 'landed': the port accepted a write.
- * 'missed': BOTH attempts were cleanly rejected - the value was never
- *   accepted, so nothing landed.
- * 'unknown': at least one attempt threw ambiguously (timeout/transport) and
- *   no later clean rejection proved it never landed - the durable value is
- *   uncertain, so the commit must not claim a clean failure.
+ * Issue the planned write exactly once. There is deliberately NO app-level
+ * retry: the SDK already retries a timed-out mutation once with the SAME
+ * request ID, and its contract is 'read back before retrying with a new
+ * request'. A second request carrying this commit's pre-planned payload is
+ * a NEW mutation that lands LWW over any peer write which landed during the
+ * backoff - the stale-retry clobber. An ambiguous outcome therefore stops
+ * the commit as 'unknown' and leaves reconciliation to the resnapshot,
+ * which settles the view on the durable truth without re-sending anything.
+ * 'missed' means the single request was definitively refused and provably
+ * never applied.
  */
-async function attempt(op: () => Promise<boolean>): Promise<Attempt> {
-  let ambiguous = false
-  for (let i = 0; i < 2; i++) {
-    if (i > 0) await beat(120)
-    try {
-      if (await op()) return 'landed'
-      // A clean false means the port refused this attempt. If an earlier
-      // attempt threw ambiguously, landing cannot be ruled out.
-    } catch {
-      ambiguous = true
-    }
+async function attempt(op: () => Promise<WriteOutcome | boolean>): Promise<Attempt> {
+  try {
+    const r = await op()
+    return r === true || r === 'landed' ? 'landed' : r === false || r === 'missed' ? 'missed' : 'unknown'
+  } catch {
+    return 'unknown'
   }
-  return ambiguous ? 'unknown' : 'missed'
 }
 
 /**
@@ -163,14 +188,18 @@ async function attempt(op: () => Promise<boolean>): Promise<Attempt> {
  *   recovered by the assembler - instead of being erased by a late step.
  * - The index lands LAST: reachability flips only after every record and
  *   tomb write it references has landed.
- * - The first failed step ABORTS the rest of the plan: remaining writes
- *   were computed assuming the earlier ones landed.
- * - No repair/rollback writes exist. A repair would have to write a value
- *   derived from a read, and a read->write pair is not atomic on this port:
- *   a peer's acknowledged edit landing between the read's capture and the
- *   repair's put would be erased. Instead the commit reports the truthful
- *   terminal - 'partial' when anything landed or might have - and the
- *   caller re-snapshots to the durable state.
+ * - The first non-landed step ABORTS the rest of the plan: remaining
+ *   writes were computed assuming the earlier ones landed.
+ * - No repair/rollback writes exist and nothing is retried app-side. A
+ *   repair would have to write a value derived from a read, and a
+ *   read->write pair is not atomic on this port: a peer's acknowledged
+ *   edit landing between the read's capture and the repair's put would be
+ *   erased. A retried planned write is the same hazard in the other
+ *   direction: the SDK already owns same-request-ID retry for timeouts,
+ *   so re-sending this commit's payload as a new request could land LWW
+ *   over a peer's confirmed write. Instead the commit reports the
+ *   truthful terminal - 'partial' when anything landed or might have -
+ *   and the caller re-snapshots to the durable state.
  * - Nothing is written after the commit returns.
  *
  * Resolves 'applied' only when every planned write landed.

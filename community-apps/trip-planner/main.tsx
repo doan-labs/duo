@@ -48,7 +48,7 @@ import {
 import { createRoot } from 'react-dom/client'
 import { cue, setCueGate, setMuted } from './audio.ts'
 import { styles } from './styles.ts'
-import { applyWatch, clearPending, commitLibWrites, queuePending, WriteQueue } from './sync.ts'
+import { applyWatch, clearPending, commitLibWrites, queuePending, type WriteOutcome, WriteQueue } from './sync.ts'
 import {
   addLeg,
   addPack,
@@ -380,10 +380,14 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   // performs no reads - a verify-read's value is only valid at its captured
   // revision, and a read->write pair cannot be atomic on this port.)
 
-  // Resolves true once the port accepted this write, false on rejection -
-  // 'applied' callers distinguish a landed commit from an enqueued hope.
+  // Resolves the durable outcome: 'landed' once the port accepted the
+  // write, 'missed' on a definitive refusal, 'unknown' when the outcome is
+  // ambiguous (e.g. a timeout - the write may still have landed). Callers
+  // must never re-send the same payload after 'unknown': the SDK already
+  // retried the request with the same ID, and a new request would land
+  // LWW over any peer write in between.
   const write = useCallback(
-    (k: string, v: string | null): Promise<boolean> => {
+    (k: string, v: string | null): Promise<WriteOutcome> => {
       queuePending(pending.current, k, v)
       if (v === null) latest.current.delete(k)
       else latest.current.set(k, v)
@@ -399,8 +403,10 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
           else await space.set(k, v)
         },
         () => {
-          // The write never landed: drop this copy's pending mask for the key
+          // Refused or uncertain: drop this copy's pending mask for the key
           // and re-snapshot so the display converges on the stored truth.
+          // A 'unknown' outcome may still have landed - only the snapshot
+          // can say; it is never permission to re-send the payload.
           clearPending(pending.current, k)
           setError(true)
           bootRef.current()
@@ -423,7 +429,8 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       /** Live readiness check - unlike `ready` state this stays true in a
        * callback captured before the first snapshot resolved. */
       readyNow: () => readyNow.current,
-      /** True once the port accepted the write; false on rejection. */
+      /** 'landed' once the port accepted the write; 'missed' on refusal;
+       * 'unknown' when ambiguous - never re-send the payload then. */
       put: (k: string, v: string) => write(k, v),
       /** Session-scope ephemeral keys (undo/draft/confirm) only - library
        * records go through commitLibWrites and are never deleted. */
