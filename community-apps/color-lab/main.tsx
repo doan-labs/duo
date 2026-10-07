@@ -33,6 +33,7 @@ import {
   type Pair,
   type PalOp,
   pairChoices,
+  palBase,
   palListEq,
   parseColorFull,
   parseDocJson,
@@ -748,7 +749,9 @@ function ColorLab() {
       return
     }
     const colors = harmonyColors(d.hsl, d.harmony).map(hslToRgb)
-    const pal = newPalette(uiRef.current.nameInput || `Palette ${palsRef.current.length + 1}`, colors, d.harmony)
+    // The authored base travels with the strip: analogous and split do not
+    // paint the base first, so reopening cannot infer it from colors[0].
+    const pal = newPalette(uiRef.current.nameInput || `Palette ${palsRef.current.length + 1}`, colors, d.harmony, d.hsl)
     queuePalOp({ kind: 'add', palette: pal })
     patchUi({ sheet: null, nameInput: '' })
     play('save')
@@ -790,6 +793,25 @@ function ColorLab() {
       patchUi({ field: toHex(c), fieldErr: false })
     },
     [commitCore, patchUi]
+  )
+
+  // Open restores the authored base and ordering: analogous/split strips do
+  // not paint the base first, so adopting colors[0] would regenerate a
+  // different strip under a shifted base. Palettes without a recoverable
+  // base (saved before harmony/base fields existed) fall back to the first
+  // stored colour honestly.
+  const adoptPalette = useCallback(
+    (p: SavedPalette) => {
+      const base = palBase(p)
+      if (!base) {
+        const first = p.colors[0]
+        if (first) adoptColor(first, p.harmony)
+        return
+      }
+      commitCore(base, 'apply', `Opened ${p.name}`)
+      patchUi({ field: toHex(base.color), fieldErr: false })
+    },
+    [adoptColor, commitCore, patchUi]
   )
 
   const doUndo = useCallback(() => {
@@ -1238,10 +1260,7 @@ function ColorLab() {
                     type="button"
                     {...stylex.props(styles.palName, press)}
                     aria-label={`Open palette ${p.name}`}
-                    onClick={() => {
-                      const first = p.colors[0]
-                      if (first) adoptColor(first, p.harmony)
-                    }}
+                    onClick={() => adoptPalette(p)}
                   >
                     {p.name}
                   </button>

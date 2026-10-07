@@ -341,19 +341,82 @@ export interface SavedPalette {
   /** The harmony that produced the strip, when known, so reopening restores
    *  the palette rather than re-skinning its first colour under the live one. */
   harmony?: HarmonyKind
+  /** The authored base the strip was generated from, at full HSL precision.
+   *  The strip's hue order is not always base-first (analogous and split put
+   *  the base at index 1), so the base cannot be assumed from `colors[0]`. */
+  base?: Hsl
   updatedAt: number
 }
 export const MAX_PALETTE_NAME = 40
 export const MAX_PALETTES = 24
 export const MAX_SWATCHES = 8
 
-export const newPalette = (name: string, colors: Rgb[], harmony?: HarmonyKind): SavedPalette => ({
+export const newPalette = (name: string, colors: Rgb[], harmony?: HarmonyKind, base?: Hsl): SavedPalette => ({
   id: crypto.randomUUID(),
   name: name.trim().slice(0, MAX_PALETTE_NAME) || 'Untitled palette',
   colors: colors.slice(0, MAX_SWATCHES),
   harmony,
+  base,
   updatedAt: Date.now()
 })
+
+/** Painted strip equality, all channels exact. */
+const stripEq = (a: Rgb[], b: Rgb[]) => a.length === b.length && a.every((c, i) => rgbEq(c, b[i]!))
+
+/** The strip a base intent regenerates under a harmony. */
+const regen = (base: Hsl, kind: HarmonyKind): Rgb[] => harmonyColors(base, kind).map(hslToRgb)
+
+/** Total channel error between two painted strips. */
+const stripErr = (a: Rgb[], b: Rgb[]) => {
+  if (a.length !== b.length) return Number.POSITIVE_INFINITY
+  let err = 0
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]!,
+      y = b[i]!
+    err += Math.abs(x.r - y.r) + Math.abs(x.g - y.g) + Math.abs(x.b - y.b)
+  }
+  return err
+}
+
+/**
+ * How far a candidate's regenerated strip may drift from the stored one and
+ * still count as its generator: byte quantization can shift a swatch by a
+ * unit or two, while a swatch that was never the base regenerates hues tens
+ * of degrees off and sits orders of magnitude past this bound.
+ */
+export const PAL_BASE_TOLERANCE = 8
+
+/**
+ * Resolve the authored working colour of a saved palette so reopening
+ * restores the original base and ordering instead of blindly adopting
+ * `colors[0]` - which is the h-30/h+150 sibling for analogous and split.
+ *
+ * A persisted `base` is trusted only when it still regenerates the stored
+ * strip exactly; entries saved before `base` existed are recovered by
+ * scanning the stored swatches for the colour whose own derivation paints
+ * the strip most closely. Degenerate strips (all-equal swatches) can match
+ * several slots; the earliest match is deterministic and paints the same
+ * strip. A palette with no recoverable base returns null so callers can
+ * adopt the first colour honestly instead of fabricating one.
+ */
+export const palBase = (p: SavedPalette): { color: Rgb; hsl: Hsl; harmony: HarmonyKind } | null => {
+  if (!p.harmony) return null
+  if (p.base && stripEq(regen(p.base, p.harmony), p.colors)) {
+    return { color: hslToRgb(p.base), hsl: p.base, harmony: p.harmony }
+  }
+  let best: { color: Rgb; hsl: Hsl; harmony: HarmonyKind } | null = null
+  let bestErr = Number.POSITIVE_INFINITY
+  for (const c of p.colors) {
+    const intent = rgbToHsl(c)
+    const err = stripErr(regen(intent, p.harmony), p.colors)
+    if (err < bestErr) {
+      bestErr = err
+      best = { color: c, hsl: intent, harmony: p.harmony }
+      if (err === 0) break
+    }
+  }
+  return bestErr <= PAL_BASE_TOLERANCE ? best : null
+}
 export const upsertPalette = (items: SavedPalette[], p: SavedPalette): SavedPalette[] =>
   [p, ...items.filter((i) => i.id !== p.id)].slice(0, MAX_PALETTES)
 export const renamePalette = (items: SavedPalette[], id: string, name: string): SavedPalette[] =>
@@ -548,11 +611,15 @@ export function parsePaletteEntry(i: unknown): SavedPalette | null {
     typeof i.harmony === 'string' && (HARMONY_KINDS as readonly string[]).includes(i.harmony)
       ? (i.harmony as HarmonyKind)
       : undefined
+  // `base` is validated like any other wire field; palBase re-verifies it
+  // against the stored strip at open time before trusting it.
+  const base = parseHsl(i.base) ?? undefined
   return {
     id: i.id,
     name: i.name.slice(0, MAX_PALETTE_NAME),
     colors: i.colors.map((c) => parseRgb(c)!),
     harmony,
+    base,
     updatedAt: i.updatedAt
   }
 }

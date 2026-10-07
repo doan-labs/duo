@@ -12,6 +12,7 @@ import {
   coreOf,
   exportCodes,
   HARMONY_KINDS,
+  type Hsl,
   harmonyColors,
   harmonyHues,
   hslEq,
@@ -23,7 +24,10 @@ import {
   mergePalWire,
   newDoc,
   newPalette,
+  PAL_ACK_LIMIT,
   PAL_OP_WINDOW,
+  PAL_PENDING_LIMIT,
+  palBase,
   parseColor,
   parseColorFull,
   parseCore,
@@ -77,6 +81,7 @@ const near = (a: number, b: number, eps: number, msg: string) => {
 const rgbEqTo = (a: Rgb, r: number, g: number, b: number, msg: string) => {
   if (!rgbEq(a, { r, g, b })) throw new Error(`${msg}: expected ${r},${g},${b} got ${a.r},${a.g},${a.b}`)
 }
+const stripEq = (a: Rgb[], b: Rgb[]) => a.length === b.length && a.every((c, i) => rgbEq(c, b[i]!))
 
 // Builders so no fixed colour literal ever enters a string.
 const hash = (s: string) => `#${s}`
@@ -327,6 +332,87 @@ check('hsl intent survives rgb quantization in cores', () => {
 
 // ---- palettes ----
 
+check('palBase restores the authored base for every harmony', () => {
+  // The deterministic defect: Open adopted colors[0], but analogous and
+  // split paint the base at index 1, so reopening regenerated a shifted
+  // strip and shifted the heading colour.
+  const intents: Hsl[] = [
+    { h: 216, s: 0.85, l: 0.58 },
+    { h: 5, s: 0.9, l: 0.5 },
+    { h: 350, s: 0.7, l: 0.4 },
+    { h: 120, s: 0.2, l: 0.08 },
+    { h: 300, s: 1, l: 0.5 },
+    { h: 40, s: 0.6, l: 1 },
+    { h: 0, s: 0, l: 0.5 }
+  ]
+  for (const kind of HARMONY_KINDS)
+    for (const intent of intents) {
+      const colors = harmonyColors(intent, kind).map(hslToRgb)
+      const b = palBase(newPalette('P', colors, kind, intent))!
+      ok(b !== null, `${kind} h${intent.h} resolves a base`)
+      ok(rgbEq(b.color, hslToRgb(intent)), `${kind} h${intent.h} keeps the authored colour`)
+      ok(hslEq(b.hsl, intent), `${kind} h${intent.h} keeps full-precision intent`)
+      eq(b.harmony, kind, 'harmony carried')
+      ok(stripEq(harmonyColors(b.hsl, kind).map(hslToRgb), colors), `${kind} h${intent.h} reopened strip is exact`)
+    }
+})
+check('palBase infers the authored slot for legacy entries without base', () => {
+  for (const kind of HARMONY_KINDS) {
+    const intent = { h: 216, s: 0.85, l: 0.58 }
+    const colors = harmonyColors(intent, kind).map(hslToRgb)
+    const legacy = newPalette('L', colors, kind)
+    const b = palBase(legacy)!
+    ok(b !== null, `${kind} legacy resolves`)
+    const expected = kind === 'analogous' || kind === 'split' ? colors[1]! : colors[0]!
+    ok(rgbEq(b.color, expected), `${kind} legacy picks the authored slot, not colors[0]`)
+    ok(stripEq(harmonyColors(b.hsl, kind).map(hslToRgb), colors), `${kind} legacy strip regenerates`)
+  }
+})
+check('palBase keeps a split palette on its authored base', () => {
+  // The reviewed repro: a stored split strip [h+150, h, h+210] reopened as
+  // if the first swatch were the base, regenerating a shifted strip.
+  const intent = { h: 216, s: 0.85, l: 0.58 }
+  const colors = harmonyColors(intent, 'split').map(hslToRgb)
+  const b = palBase(newPalette('Review', colors, 'split'))!
+  ok(b !== null, 'split resolves without a stored base')
+  ok(rgbEq(b.color, colors[1]!), 'base is the middle swatch, not colors[0]')
+  ok(stripEq(harmonyColors(b.hsl, 'split').map(hslToRgb), colors), 'reopened strip identical to stored')
+})
+check('palBase is honest on forged base, missing harmony and foreign strips', () => {
+  const intent = { h: 216, s: 0.85, l: 0.58 }
+  const colors = harmonyColors(intent, 'split').map(hslToRgb)
+  const forged = newPalette('F', colors, 'split', { h: 0, s: 0.5, l: 0.5 })
+  const b = palBase(forged)!
+  ok(b !== null && rgbEq(b.color, colors[1]!), 'forged base falls back to inference')
+  eq(palBase(newPalette('N', [rgb(1, 2, 3), rgb(4, 5, 6)])), null, 'no harmony returns null')
+  // A strip no stored swatch can regenerate is not this palette's generator.
+  const foreign = newPalette('X', [rgb(10, 20, 30), rgb(200, 10, 10), rgb(10, 200, 200), rgb(90, 90, 200)], 'split')
+  eq(palBase(foreign), null, 'non-generated strip returns null')
+})
+check('palBase stays deterministic on achromatic strips', () => {
+  const colors = harmonyColors({ h: 216, s: 0, l: 0.5 }, 'split').map(hslToRgb)
+  const b = palBase(newPalette('G', colors, 'split'))!
+  ok(b !== null, 'grey strip resolves')
+  ok(rgbEq(b.color, colors[0]!), 'identical swatches pick the first matching slot')
+})
+check('palette base survives serialize/parse round trip', () => {
+  const intent = { h: 216.4, s: 0.85, l: 0.58 }
+  const p = newPalette('R', harmonyColors(intent, 'analogous').map(hslToRgb), 'analogous', intent)
+  const back = parsePalettes(serializePalettes([p]))
+  ok(back[0]!.base !== undefined && hslEq(back[0]!.base!, intent), 'base intent persists through the wire')
+  const b = palBase(back[0]!)!
+  ok(b !== null && rgbEq(b.color, hslToRgb(intent)), 'reloaded palette reopens the same base')
+})
+check('repeated save and open cycles do not drift the palette', () => {
+  // Quantization guard: save -> open -> save again must be a fixed point.
+  const intent = { h: 216, s: 0.85, l: 0.58 }
+  let colors = harmonyColors(intent, 'split').map(hslToRgb)
+  for (let round = 0; round < 3; round++) {
+    const b = palBase(newPalette('C', colors, 'split', rgbToHsl(colors[1]!)))!
+    colors = harmonyColors(b.hsl, 'split').map(hslToRgb)
+  }
+  ok(stripEq(colors, harmonyColors(intent, 'split').map(hslToRgb)), 'strip is a fixed point across reopens')
+})
 check('palette create/upsert/rename/remove', () => {
   const red = rgb(255, 0, 0)
   let items = upsertPalette([], newPalette('Warm', [red]))
@@ -513,6 +599,60 @@ check('a 100-op burst converges and the log stays bounded', () => {
   eq(kSeesI.merged.length, 2, 'peer sees both adds')
   const iSeesK = mergePalWire({ pals: [pal('kb', 'KB')], ops: [...kOps], acks: { K: 1 } }, iOps, 'I', 0)
   eq(iSeesK.merged.length, 2, 'both converge to two palettes')
+})
+check('ack map stays sound past the 32-writer bound', () => {
+  const into: Record<string, number> = { me: 5 }
+  for (let i = 1; i <= 33; i++) mergeAcks(into, { [`w${i}`]: i }, 'me')
+  ok(Object.keys(into).length <= PAL_ACK_LIMIT, 'writer map bounded')
+  eq(into.me, 5, 'own watermark never evicted')
+  // An evicted writer's later, higher claim re-enters: watermarks only move
+  // forward, so a transient eviction loses no settlement state.
+  mergeAcks(into, { w1: 40 }, 'me')
+  eq(into.w1, 40, 'evicted writer re-learned on a higher claim')
+})
+check('pending replay honours seq order across holes and tombstones', () => {
+  // Seq holes (a writer whose log skipped numbers) do not block replay.
+  const sparse = [rn('I', 3, 't', 'B'), rn('I', 7, 't', 'G')]
+  const r = mergePalWire({ pals: [pal('t', 'A')], ops: [], acks: { I: 1 } }, sparse, 'I', 0)
+  eq(r.merged[0]!.name, 'G', 'ops replay in seq order across holes')
+  eq(r.ops.length, 2, 'both unacked ops kept')
+  const r2 = mergePalWire({ pals: [pal('t', 'A')], ops: [], acks: { I: 3 } }, sparse, 'I', 0)
+  eq(r2.replayed.length, 1, 'covered prefix settles, hole does not block the tail')
+  eq(r2.merged[0]!.name, 'G', 'uncovered tail applies')
+  // Tombstone: delete then re-add of the same id keeps the last write.
+  const life = [add('I', 1, pal('x', 'One')), del('I', 2, 'x'), add('I', 3, pal('x', 'Back'))]
+  const t = mergePalWire({ pals: [], ops: [], acks: {} }, life, 'I', 0)
+  eq(t.merged.length, 1, 're-add after delete survives')
+  eq(t.merged[0]!.name, 'Back', 'last write wins the tombstone')
+})
+check('a regressed publisher is repaired by the settled tail', () => {
+  const all: ReturnType<typeof rn>[] = []
+  for (let i = 1; i <= 30; i++) all.push(rn('I', i, 't', `R${i}`))
+  const covered = mergePalWire(
+    { pals: all.reduce((l, o) => applyPalOp(l, o), [pal('t', 'A')]), ops: all.slice(-PAL_OP_WINDOW), acks: { I: 30 } },
+    all,
+    'I',
+    0
+  )
+  // A publish that skipped six ops claims only ack 24; the settled tail
+  // (window-deep below the high watermark) re-replays exactly those ops.
+  const staleList = all.slice(0, 24).reduce((l, o) => applyPalOp(l, o), [pal('t', 'A')])
+  const r = mergePalWire({ pals: staleList, ops: all.slice(0, 24), acks: { I: 24 } }, covered.ops, 'I', covered.maxAck)
+  eq(r.replayed.length, 6, 'exactly the uncovered ops replay')
+  eq(r.merged[0]!.name, 'R30', 'settled tail repairs the gap')
+  eq(r.maxAck, 30, 'high watermark retained')
+})
+check('the pending bound trims history, not the applied result', () => {
+  // >PAL_PENDING_LIMIT unacked writes is a synthetic-only condition - it
+  // needs more than 128 palette mutations without any publish echo. Model
+  // the app's own slice: the log keeps the newest window and still lands
+  // the latest state.
+  const many: ReturnType<typeof rn>[] = []
+  for (let i = 1; i <= 140; i++) many.push(rn('I', i, 't', `R${i}`))
+  const trimmed = many.slice(-PAL_PENDING_LIMIT)
+  const r = mergePalWire({ pals: [pal('t', 'R0')], ops: [], acks: {} }, trimmed, 'I', 0)
+  eq(r.merged[0]!.name, 'R140', 'bounded log still lands the latest')
+  ok(r.ops.length <= PAL_PENDING_LIMIT, 'log never exceeds the pending bound')
 })
 check('mergeAcks keeps watermarks monotone and bounded', () => {
   const into: Record<string, number> = { me: 5 }
