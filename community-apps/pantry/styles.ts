@@ -94,7 +94,7 @@ export const styles = stylex.create({
     lineHeight: leading.subheadline,
     letterSpacing: tracking.subheadline
   },
-  rootCover: { gap: space.md, paddingTop: space.md, paddingInline: space.md },
+  rootCover: { gap: space.lg, paddingTop: space.md, paddingInline: space.md },
   header: {
     display: 'flex',
     alignItems: 'flex-end',
@@ -318,7 +318,7 @@ export const styles = stylex.create({
   rows: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.xxs,
+    gap: space.xs,
     marginBlock: 0,
     paddingInline: 0,
     listStyle: 'none'
@@ -328,8 +328,8 @@ export const styles = stylex.create({
     alignItems: 'center',
     gap: space.sm,
     borderRadius: radius.md,
-    paddingBlock: space.xxs,
-    paddingInline: space.xxs,
+    paddingBlock: space.xs,
+    paddingInline: space.xs,
     backgroundColor: { default: 'transparent', ':hover': app.fill3 }
   },
   rowFlash: {
