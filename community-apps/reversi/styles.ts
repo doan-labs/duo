@@ -102,7 +102,7 @@ export const styles = stylex.create({
     lineHeight: leading.title3,
     fontWeight: weight.bold
   },
-  chips: { display: 'flex', alignItems: 'center', gap: space.xs },
+  chips: { display: 'flex', alignItems: 'center', gap: space.sm },
   chip: {
     display: 'flex',
     alignItems: 'center',
@@ -290,7 +290,7 @@ export const styles = stylex.create({
   controls: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.xs,
+    gap: space.sm,
     width: '100%',
     alignItems: 'center'
   },
@@ -348,7 +348,7 @@ export const styles = stylex.create({
     ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: colors.green }
   },
   segOn: { backgroundColor: `color-mix(in srgb, ${colors.greenDark} 70%, ${colors.grey5Dark})`, color: colors.white },
-  row: { display: 'flex', gap: space.xs, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
+  row: { display: 'flex', gap: space.sm, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
   btn: {
     display: 'flex',
     alignItems: 'center',
@@ -384,7 +384,7 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: space.sm,
-    padding: space.md,
+    padding: space.lg,
     borderRadius: radius.lg,
     backgroundColor: `color-mix(in srgb, ${glass.tintDark} 70%, transparent)`,
     backdropFilter: glass.blur,
@@ -418,8 +418,8 @@ export const styles = stylex.create({
     gap: space.xs,
     paddingTop: space.xxs,
     paddingBottom: space.xxs,
-    paddingLeft: space.xs,
-    paddingRight: space.xs,
+    paddingLeft: space.sm,
+    paddingRight: space.sm,
     borderRadius: radius.xs,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
@@ -443,7 +443,7 @@ export const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'center',
     gap: space.xs,
-    padding: space.md,
+    padding: space.lg,
     borderRadius: radius.lg,
     backgroundColor: `color-mix(in srgb, ${glass.tintDark} 78%, transparent)`,
     backdropFilter: glass.blur,
@@ -453,7 +453,7 @@ export const styles = stylex.create({
     animationDuration: '.4s',
     animationTimingFunction: easing.spring
   },
-  resultCover: { insetInline: space.sm, bottom: space.xxxl, padding: space.sm },
+  resultCover: { insetInline: space.sm, bottom: space.xxxl, padding: space.md },
   resultTitle: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.title2,
