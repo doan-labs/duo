@@ -441,7 +441,10 @@ export const styles = stylex.create({
     lineHeight: leading.title3,
     letterSpacing: tracking.title3,
     fontWeight: weight.semibold,
-    overflowWrap: 'break-word'
+    // 'anywhere' (not break-word): a long unbroken name wraps inside the rail
+    // instead of overflowing its overflow:hidden parent.
+    overflowWrap: 'anywhere',
+    minWidth: 0
   },
   metaRow: { display: 'flex', alignItems: 'baseline', gap: space.md, paddingTop: space.sm },
   metaKey: { width: 72, flexShrink: 0, fontSize: typeScale.footnote, color: app.label2 },

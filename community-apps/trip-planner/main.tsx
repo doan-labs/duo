@@ -223,7 +223,7 @@ function DestructiveSheet({
   children: React.ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
-  useFocusTrap(box, open, 'last', restoreTo, mayFocus)
+  useFocusTrap(box, open, 'first', restoreTo, mayFocus)
   useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
   return (
     <Sheet open={open} onClose={onClose} aria-label={label} xstyle={xstyle}>
@@ -250,6 +250,11 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   const pending = useRef(new Map<string, (string | null)[]>())
   const queue = useRef<Promise<void>>(Promise.resolve())
   const bootRef = useRef<() => void>(() => {})
+  // Live mirror of the space's truth: every snapshot, watch event and own
+  // optimistic write lands here synchronously, so mutation chains can rebase
+  // on the freshest state without waiting for a React render.
+  const latest = useRef(new Map<string, string>())
+  const readyNow = useRef(false)
 
   useEffect(() => {
     let dead = false
@@ -268,6 +273,8 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
         if (dead) return
         setError(false)
         setValues(new Map(seen))
+        latest.current = new Map(seen)
+        readyNow.current = true
         off()
         off = space.watch(rev, (e) => {
           if (e.rev < 0) {
@@ -280,6 +287,8 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
             q.shift()
             if (!q.length) pending.current.delete(e.k)
           }
+          if (e.v === null) latest.current.delete(e.k)
+          else latest.current.set(e.k, e.v)
           setValues((cur) => {
             const next = new Map(cur ?? [])
             if (e.v === null) next.delete(e.k)
@@ -305,6 +314,8 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       const q = pending.current.get(k) ?? []
       q.push(v)
       pending.current.set(k, q)
+      if (v === null) latest.current.delete(k)
+      else latest.current.set(k, v)
       setValues((cur) => {
         const next = new Map(cur ?? [])
         if (v === null) next.delete(k)
@@ -333,6 +344,13 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       error,
       get: (k: string) => values?.get(k) ?? null,
       values,
+      /** Latest known value synchronously, including unrendered own writes. */
+      now: (k: string) => latest.current.get(k) ?? null,
+      /** Live key->value mirror for whole-space reads (see `now`). */
+      allNow: () => latest.current,
+      /** Live readiness check - unlike `ready` state this stays true in a
+       * callback captured before the first snapshot resolved. */
+      readyNow: () => readyNow.current,
       put: (k: string, v: string) => write(k, v),
       del: (k: string) => write(k, null),
       /** Resolves once every write queued so far has been flushed to the port. */
@@ -472,6 +490,9 @@ function parseDraft(raw: string | null): Draft | null {
     return null
   }
 }
+
+/** Outcome reported to a mutateLib `after` hook (see TripPlanner). */
+type MutateResult = 'applied' | 'noop' | 'dropped'
 
 /** Undo slot: the payload needed to restore what a delete removed. */
 type Undo = {
@@ -1214,9 +1235,9 @@ function TripPlanner() {
   const confirmTrigger = useRef<HTMLElement | null>(null)
   // `vis` captured per render is enough for handlers; the cue gate needs a
   // stable accessor for the audio module.
-  const visRef = useRef(vis)
-  visRef.current = vis
-  useEffect(() => setCueGate(() => visRef.current), [])
+  // The cue gate reads the live view, not the render prop, so a copy that
+  // just folded cannot fire a cue its next frame would never show.
+  useEffect(() => setCueGate(() => os.view.visible && os.view.active), [])
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
 
@@ -1241,23 +1262,15 @@ function TripPlanner() {
   const viewDraft = useHeld(vis ? draft : null)
   const viewConfirm = useHeld(vis ? confirm : null)
 
-  // Finite removal feedback: ids marked leaving render a short fade before
-  // the delete write lands. libRef keeps the deferred write on latest state.
-  const libRef = useRef(lib)
-  libRef.current = lib
+  /** Read live view state at call time: `os.view` mutates synchronously on
+   * the port event while the `useDisplay` subscription that feeds `vis` is
+   * rAF-batched, so a folded copy's render prop stays stale-true long after
+   * its real view went hidden. Every user-driven write reads this gate. */
+  // Read-at-call-time gate: os.view mutates synchronously on the port event,
+  // so unlike the rAF-batched `view` render prop this never lags a fold.
+  const liveVis = useCallback(() => os.view.visible && os.view.active, [])
+
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
-  const markLeaving = useCallback((id: string, commit: (cur: Library) => Library) => {
-    setLeaving((s) => new Set(s).add(id))
-    setTimeout(() => {
-      setLeaving((s) => {
-        const n = new Set(s)
-        n.delete(id)
-        return n
-      })
-      const cur = libRef.current
-      applyLibRef.current(commit(cur), cur)
-    }, 190)
-  }, [])
 
   const prefs = useMemo(() => {
     try {
@@ -1286,43 +1299,36 @@ function TripPlanner() {
   }, [storage.ready, session.ready])
 
   // A folded-away copy must not steer shared state: every user-path write
-  // (navigation, drafts, confirmations, undo, library mutations) is ignored
-  // when this display is hidden. Corrective effect writes (stale save lock,
-  // undo expiry, confirm whose target vanished) bypass the gate so either
-  // copy can keep the space clean.
+  // (navigation, drafts, confirmations, undo, library mutations) is gated on
+  // the LIVE view (liveVis), never the render snapshot. Corrective effect
+  // writes (stale save lock, undo expiry, confirm whose target vanished)
+  // bypass the gate so either copy can keep the space clean.
   const setUi = useCallback(
     (patch: Partial<Ui>) => {
-      if (!vis) return
+      if (!liveVis()) return
       const next: Ui = {
-        ...parseUi(session.get('ui')),
+        ...parseUi(session.now('ui')),
         ...patch,
         v: 1,
-        tab: tabFor(patch.tab ?? parseUi(session.get('ui')).tab)
+        tab: tabFor(patch.tab ?? parseUi(session.now('ui')).tab)
       }
       session.put('ui', JSON.stringify(next))
     },
-    [session, vis]
+    [session, liveVis]
   )
 
   const setDraft = useCallback(
     (d: Draft | null) => {
-      if (!vis) return
+      if (!liveVis()) return
       if (d) session.put('draft', JSON.stringify(d))
       else session.del('draft')
     },
-    [session, vis]
+    [session, liveVis]
   )
 
-  /** Apply a new library: one storage write per changed trip plus the index. */
-  const applyLibRef = useRef<(n: Library, p: Library) => void>(() => {})
-
-  /** Apply a new library: one storage write per changed trip plus the index.
-   *  The vis write-gate lives at the event entry points (pushUndo/confirmGo/
-   *  doUndo/commitDraft/mute are all vis-gated), not here: markLeaving commits
-   *  the delete ~190ms after the tap, and dropping it when the copy folds
-   *  mid-fade would arm an Undo for a row that was never removed. */
-  const applyLib = useCallback(
-    (next: Library, prev: Library) => {
+  /** One storage write per changed trip plus the index. */
+  const writeLibDiff = useCallback(
+    (prev: Library, next: Library) => {
       const prevById = new Map(prev.trips.map((t) => [t.id, t]))
       for (const id of prev.order) if (!next.order.includes(id)) storage.del(`trip.${id}`)
       for (const t of next.trips) if (prevById.get(t.id) !== t) storage.put(`trip.${t.id}`, serializeTrip(t))
@@ -1330,61 +1336,141 @@ function TripPlanner() {
     },
     [storage]
   )
-  applyLibRef.current = applyLib
+
+  /** The freshest library, assembled from the storage mirror rather than the
+   * render snapshot: own optimistic writes land there before React renders,
+   * so back-to-back mutations never rebase on a stale base. */
+  const libNow = useCallback((): Library => {
+    const records = new Map<string, string>()
+    storage.allNow().forEach((v, k) => {
+      if (k.startsWith('trip.')) records.set(k, v)
+    })
+    return assembleLibrary(storage.now('index'), records)
+  }, [storage])
+
+  /** Every library mutation runs through one serialized chain. Entry is
+   * gated on the live view; each step re-gates at execution, rebases the
+   * pure mutation onto `libNow()`, diffs, writes, then runs `after` so
+   * follow-ups (arming Undo, clearing locks) happen only after the write.
+   * 'noop' means the mutation found nothing to change; 'dropped' means this
+   * copy hid before the step ran - callers arm Undo only on 'applied' and
+   * dismiss it on 'applied'|'noop'. */
+  const libWrites = useRef<Promise<void>>(Promise.resolve())
+  const mutateLib = useCallback(
+    (mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void) => {
+      if (!liveVis() || !storage.readyNow()) return
+      libWrites.current = libWrites.current
+        .then(() => {
+          if (!liveVis()) {
+            after?.('dropped')
+            return
+          }
+          const cur = libNow()
+          const next = mutate(cur)
+          if (!next || next === cur) {
+            after?.('noop')
+            return
+          }
+          writeLibDiff(cur, next)
+          after?.('applied')
+        })
+        .catch(() => {})
+    },
+    [libNow, writeLibDiff, liveVis, storage.readyNow]
+  )
+
+  // Finite removal feedback: ids marked leaving render a short fade before
+  // the delete write lands. The deferred commit goes through mutateLib, so
+  // it rebases on the freshest library and is dropped if this copy hides.
+  const markLeaving = useCallback(
+    (ids: string | string[], mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void) => {
+      const list = Array.isArray(ids) ? ids : [ids]
+      setLeaving((s) => {
+        const n = new Set(s)
+        for (const id of list) n.add(id)
+        return n
+      })
+      setTimeout(() => {
+        setLeaving((s) => {
+          const n = new Set(s)
+          for (const id of list) n.delete(id)
+          return n
+        })
+        mutateLib(mutate, after)
+      }, 190)
+    },
+    [mutateLib]
+  )
 
   const pushUndo = useCallback(
     (u: Omit<Undo, 'v' | 'by' | 'at'>) => {
-      if (!vis) return
+      if (!liveVis()) return
       session.put('undo', JSON.stringify({ ...u, v: 1, by: ME, at: Date.now() } satisfies Undo))
     },
-    [session, vis]
+    [session, liveVis]
   )
 
   const dismissUndo = useCallback(() => {
-    if (!vis) return
+    if (!liveVis()) return
     session.del('undo')
-  }, [session, vis])
+  }, [session, liveVis])
 
   const openConfirm = useCallback(
     (c: Omit<Confirm, 'v'>) => {
-      if (!vis) return
+      if (!liveVis()) return
       confirmTrigger.current = lastControl.current
       session.put('confirm', JSON.stringify({ ...c, v: 1, by: ME } satisfies Confirm))
     },
-    [session, vis]
+    [session, liveVis]
   )
   const closeConfirm = useCallback(() => {
-    if (!vis) return
+    if (!liveVis()) return
     session.del('confirm')
-  }, [session, vis])
+  }, [session, liveVis])
 
   const doUndo = useCallback(() => {
-    if (!undo) return
-    applyLib(applyUndo(lib, undo), lib)
-    dismissUndo()
-    cue('undo')
-  }, [undo, applyLib, lib, dismissUndo])
+    if (!liveVis() || !undo) return
+    const u = undo
+    // Apply the inverse against the freshest library, then consume the slot
+    // only once the write queue has settled - and only if it still holds
+    // this undo (a fresher one may have arrived meanwhile).
+    mutateLib(
+      (cur) => applyUndo(cur, u),
+      (r) => {
+        if (r === 'dropped') return
+        void storage.settled().then(() => {
+          const cur2 = parseUndo(session.now('undo'))
+          if (cur2 && cur2.at === u.at) session.del('undo')
+        })
+        if (r === 'applied') cue('undo')
+      }
+    )
+  }, [undo, mutateLib, storage, session, liveVis])
 
-  // One auto-dismiss timer, owned by the active/visible copy only.
+  // One auto-dismiss timer, armed by the live copy only - a hidden copy must
+  // not expire a slot it cannot display.
   const undoAt = undo?.at
   useEffect(() => {
-    if (undoAt === undefined || !view.visible) return
+    if (undoAt === undefined) return
     const left = UNDO_MS - (Date.now() - undoAt)
+    const expire = () => {
+      if (liveVis()) session.del('undo')
+    }
     if (left <= 0) {
-      session.del('undo')
+      expire()
       return
     }
-    const t = setTimeout(() => session.del('undo'), left)
+    const t = setTimeout(expire, left)
     return () => clearTimeout(t)
-  }, [undoAt, view.visible, session])
+  }, [undoAt, session, liveVis])
 
   const openDraft = useCallback(
     (d: Omit<Draft, 'v'>) => {
-      if (!vis) return
+      if (!liveVis()) return
       draftTrigger.current = lastControl.current
       setDraft({ ...d, v: 1, by: ME })
     },
-    [setDraft, vis]
+    [setDraft, liveVis]
   )
 
   const openStopNew = (trip: Trip, day: number) =>
@@ -1403,8 +1489,8 @@ function TripPlanner() {
 
   /** Validate + commit the current draft. The save lock prevents doubles. */
   const commitDraft = () => {
-    if (!vis || !draft || draft.saving) return
-    const res = buildCommit(draft, lib)
+    if (!liveVis() || !draft || draft.saving) return
+    const res = buildCommit(draft, libNow())
     if ('err' in res) {
       setDraft({ ...draft, err: res.err, saving: undefined })
       cue('error')
@@ -1412,27 +1498,41 @@ function TripPlanner() {
     }
     const stamp = Date.now()
     setDraft({ ...draft, err: undefined, saving: stamp })
-    applyLib(res.lib, lib)
     if (draft.kind === 'trip-new' && draft.createdId) setUi({ tripId: draft.createdId, day: 0 })
-    void storage.settled().then(async () => {
-      const cur = await os.session.get('draft').catch(() => null)
-      if (parseDraft(cur)?.saving === stamp) session.del('draft')
-    })
+    // Rebase the commit on the freshest library inside the chain, then clear
+    // the lock only after the write queue has settled.
+    mutateLib(
+      (cur) => {
+        const r2 = buildCommit(draft, cur)
+        return 'err' in r2 ? cur : r2.lib
+      },
+      (r) => {
+        if (r === 'dropped') return
+        void storage.settled().then(async () => {
+          const cur2 = await os.session.get('draft').catch(() => null)
+          if (parseDraft(cur2)?.saving === stamp) session.del('draft')
+        })
+      }
+    )
     cue('save')
   }
 
   // A peer's commit left a saving flag behind when its watch went quiet;
-  // clear it once it is older than the lock window.
+  // clear it once it is older than the lock window. The live copy owns the
+  // expiry so a hidden copy cannot drop a lock while someone is saving.
   useEffect(() => {
-    if (!draft?.saving || !vis) return
+    if (!draft?.saving) return
+    const clear = () => {
+      if (liveVis()) session.del('draft')
+    }
     const left = SAVE_LOCK_MS - (Date.now() - draft.saving)
     if (left <= 0) {
-      session.del('draft')
+      clear()
       return
     }
-    const t = setTimeout(() => session.del('draft'), left)
+    const t = setTimeout(clear, left)
     return () => clearTimeout(t)
-  }, [draft?.saving, session, vis])
+  }, [draft?.saving, session, liveVis])
 
   // The editor only makes sense against an existing trip for edit kinds; a
   // peer that deleted the trip mid-draft gets the sheet closed cleanly.
@@ -1472,54 +1572,65 @@ function TripPlanner() {
   const shownStop = selStop ?? lastStop.current
 
   const confirmGo = () => {
-    if (!vis || !confirm) return
-    const t = getTrip(lib, confirm.tripId)
+    if (!liveVis() || !confirm) return
+    const fresh = libNow()
+    const t = getTrip(fresh, confirm.tripId)
     closeConfirm()
     if (!t) return
-    // The row fades first; the write lands when the fade ends, against the
-    // latest library so interleaved edits survive.
+    // The row fades first; the write lands when the fade ends, rebased on
+    // the freshest library so interleaved edits survive. Undo arms only
+    // after the delete actually commits - a fold that drops the commit
+    // cannot leave an undo for a row that was never removed.
     const targetId = confirm.id ?? confirm.tripId
+    let payload: Omit<Undo, 'v' | 'by' | 'at'> | null = null
     if (confirm.kind === 'trip') {
       if (ui.tripId === t.id) setUi({ tripId: undefined, sel: undefined })
-      pushUndo({ kind: 'trip', tripId: t.id, label: `Deleted "${t.name}"`, item: t, index: lib.order.indexOf(t.id) })
+      payload = { kind: 'trip', tripId: t.id, label: `Deleted "${t.name}"`, item: t, index: fresh.order.indexOf(t.id) }
     } else if (confirm.kind === 'stop') {
       const s = t.stops.find((x) => x.id === confirm.id)
       if (!s) return
       if (ui.sel === s.id) setUi({ sel: undefined })
-      pushUndo({ kind: 'stop', tripId: t.id, label: `Deleted "${s.title}"`, item: s, index: t.stops.indexOf(s) })
+      payload = { kind: 'stop', tripId: t.id, label: `Deleted "${s.title}"`, item: s, index: t.stops.indexOf(s) }
     } else if (confirm.kind === 'leg') {
       const l = t.legs.find((x) => x.id === confirm.id)
       if (!l) return
-      pushUndo({
+      payload = {
         kind: 'leg',
         tripId: t.id,
         label: `Deleted ${[l.from, l.to].filter(Boolean).join(' → ') || 'transport'}`,
         item: l,
         index: t.legs.indexOf(l)
-      })
+      }
     } else {
       const s = t.stays.find((x) => x.id === confirm.id)
       if (!s) return
-      pushUndo({ kind: 'stay', tripId: t.id, label: `Deleted "${s.name}"`, item: s, index: t.stays.indexOf(s) })
+      payload = { kind: 'stay', tripId: t.id, label: `Deleted "${s.name}"`, item: s, index: t.stays.indexOf(s) }
     }
-    markLeaving(targetId, (cur) => {
-      const t2 = getTrip(cur, confirm.tripId)
-      if (!t2) return cur
-      if (confirm.kind === 'trip') return removeTrip(cur, t2.id).lib
-      if (confirm.kind === 'stop') return removeStop(cur, t2.id, confirm.id!).lib
-      if (confirm.kind === 'leg') return removeLeg(cur, t2.id, confirm.id!).lib
-      return removeStay(cur, t2.id, confirm.id!).lib
-    })
-    cue('delete')
+    markLeaving(
+      targetId,
+      (cur) => {
+        const t2 = getTrip(cur, confirm.tripId)
+        if (!t2) return cur
+        if (confirm.kind === 'trip') return removeTrip(cur, t2.id).lib
+        if (confirm.kind === 'stop') return removeStop(cur, t2.id, confirm.id!).lib
+        if (confirm.kind === 'leg') return removeLeg(cur, t2.id, confirm.id!).lib
+        return removeStay(cur, t2.id, confirm.id!).lib
+      },
+      (r) => {
+        if (r === 'dropped') return
+        if (r === 'applied' && payload) pushUndo(payload)
+        if (r === 'applied') cue('delete')
+      }
+    )
   }
 
   const modalOpen = !!draft || !!confirm
-  useFocusTrap(editorBox, !!draft, 'first', draft?.by === ME ? draftTrigger.current : null, () => vis)
+  useFocusTrap(editorBox, !!draft, 'first', draft?.by === ME ? draftTrigger.current : null, () => liveVis())
   useEffect(() => (draft ? pushEscape(() => setDraft(null)) : undefined), [draft, setDraft])
   useEffect(() => (menuOpen ? pushEscape(() => setMenuOpen(false)) : undefined), [menuOpen])
 
   const mute = (m: boolean) => {
-    if (!vis) return
+    if (!liveVis()) return
     storage.put('prefs', JSON.stringify({ v: 1, muted: m }))
     if (!m) cue('check')
   }
@@ -1641,7 +1752,7 @@ function TripPlanner() {
                 arrange={ui.arrange === true}
                 isToday={day >= 0 && dayDate(t, day) === today}
                 onOpen={(s) => setUi({ sel: s.id })}
-                onMove={(s, toIndex) => applyLib(moveStop(lib, t.id, s.id, day, toIndex), lib)}
+                onMove={(s, toIndex) => mutateLib((cur) => moveStop(cur, t.id, s.id, day, toIndex))}
               />
             )}
             <div {...stylex.props(styles.listPad)}>
@@ -1726,45 +1837,51 @@ function TripPlanner() {
         {ui.tab === 'Pack' && (
           <PackTab
             trip={t}
-            onToggle={(p) => applyLib(togglePack(lib, t.id, p.id), lib)}
-            onAdd={(label) => {
-              const r = addPack(lib, t.id, label)
-              if (r) applyLib(r.lib, lib)
-            }}
-            onRemove={(p) => {
-              pushUndo({
-                kind: 'pack',
-                tripId: t.id,
-                label: `Removed "${p.label}"`,
-                item: p,
-                index: t.packing.indexOf(p)
-              })
-              markLeaving(p.id, (cur) => removePack(cur, t.id, p.id).lib)
-            }}
-            onClear={() => {
-              const res = clearPacked(lib, t.id)
-              if (!res.items.length) return
-              pushUndo({
-                kind: 'packs',
-                tripId: t.id,
-                label: `Cleared ${res.items.length} packed`,
-                items: res.items,
-                indexes: res.indexes
-              })
-              for (const [i, it] of res.items.entries()) {
-                setLeaving((s) => new Set(s).add(it.id))
-                // One write after the fade clears all marked rows at once.
-                if (i === res.items.length - 1)
-                  setTimeout(() => {
-                    setLeaving((s) => {
-                      const n = new Set(s)
-                      for (const it2 of res.items) n.delete(it2.id)
-                      return n
+            onToggle={(p) => mutateLib((cur) => togglePack(cur, t.id, p.id))}
+            onAdd={(label) => mutateLib((cur) => addPack(cur, t.id, label)?.lib ?? null)}
+            onRemove={(p) =>
+              markLeaving(
+                p.id,
+                (cur) => {
+                  const r = removePack(cur, t.id, p.id)
+                  return r.item ? r.lib : cur
+                },
+                (r) => {
+                  if (r === 'applied')
+                    pushUndo({
+                      kind: 'pack',
+                      tripId: t.id,
+                      label: `Removed "${p.label}"`,
+                      item: p,
+                      index: t.packing.indexOf(p)
                     })
-                    const cur = libRef.current
-                    applyLibRef.current(clearPacked(cur, t.id).lib, cur)
-                  }, 190)
-              }
+                }
+              )
+            }
+            onClear={() => {
+              const ids = t.packing.filter((p) => p.done).map((p) => p.id)
+              if (!ids.length) return
+              // The batch's recorded positions are captured inside the
+              // mutation so the undo restores exactly what this write took.
+              let cleared: { items: PackItem[]; indexes: number[] } | null = null
+              markLeaving(
+                ids,
+                (cur) => {
+                  const r = clearPacked(cur, t.id)
+                  cleared = r.items.length ? { items: r.items, indexes: r.indexes } : null
+                  return cleared ? r.lib : cur
+                },
+                (r) => {
+                  if (r === 'applied' && cleared)
+                    pushUndo({
+                      kind: 'packs',
+                      tripId: t.id,
+                      label: `Cleared ${cleared.items.length} packed`,
+                      items: cleared.items,
+                      indexes: cleared.indexes
+                    })
+                }
+              )
             }}
           />
         )}
@@ -2033,7 +2150,7 @@ function TripPlanner() {
             label={viewConfirm ? `Delete ${viewConfirm.label}` : 'Delete'}
             onClose={closeConfirm}
             restoreTo={confirm?.by === ME ? confirmTrigger.current : null}
-            mayFocus={() => vis}
+            mayFocus={() => liveVis()}
             xstyle={styles.sheetCard}
           >
             {viewConfirm && (
