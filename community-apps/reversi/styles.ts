@@ -183,6 +183,14 @@ export const styles = stylex.create({
     animationTimingFunction: easing.out
   },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: space.xxs },
+  // While a write is in flight the board settles visibly: cells report
+  // aria-disabled, the grid dims a touch, and the status line says Saving.
+  gridBusy: {
+    opacity: { default: 0.72, [reduce]: 0.72 },
+    transitionProperty: { default: 'opacity', [reduce]: 'none' },
+    transitionDuration: '.25s',
+    transitionTimingFunction: easing.out
+  },
   cell: {
     position: 'relative',
     display: 'grid',

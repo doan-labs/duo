@@ -39,6 +39,14 @@ const GAME_KEY = 'reversi-game'
 const RECORD_KEY = 'reversi-record'
 const PREFS_KEY = 'reversi-prefs'
 
+// The platform's freshest visibility truth: os.view is replaced synchronously
+// when the view event lands, while the React prop only moves when this frame
+// renders - and a hidden frame may not render at all. Every write, cue, focus
+// restore and bot step checks this directly, so work a fold cut loose cancels
+// instead of running hidden. Forced input on an occluded copy fails it too;
+// real keyboard input only ever reaches the visible, active view.
+const liveActive = () => os.view.active && os.view.visible
+
 const MODES: { id: Mode; label: string }[] = [
   { id: 'solo', label: 'Solo' },
   { id: 'local', label: 'Two players' }
@@ -84,13 +92,16 @@ function Game() {
   // document before it is allowed to write.
   const queueRef = useRef<Promise<unknown>>(Promise.resolve())
   const wasActive = useRef(view.active)
-  const activeRef = useRef(view.active)
   const mutedRef = useRef(prefs.muted)
   const [showLog, setShowLog] = useState(false)
+  // Writes in flight on the serial queue: the board reports aria-busy and
+  // dims while one settles, so a tap during the storage round-trip answers
+  // with an explicit reject instead of dropping invisibly.
+  const [pending, setPending] = useState(0)
+  const pendingRef = useRef(0)
 
   gameRef.current = game
   focusRef.current = focusCell
-  activeRef.current = view.active
   mutedRef.current = prefs.muted
 
   const d = useMemo<Derived | null>(() => (game ? derive(game.moves) : null), [game])
@@ -112,7 +123,7 @@ function Game() {
   }, [d])
 
   const play = useCallback((kind: Cue) => {
-    if (!mutedRef.current && activeRef.current) cue(kind)
+    if (!mutedRef.current && liveActive()) cue(kind)
   }, [])
 
   /** The settled wire document, or null when the store holds no game yet. */
@@ -147,13 +158,34 @@ function Game() {
    * our own write - if it did, the settled winner is adopted instead of
    * argued with.
    */
+  // One tail on the serial queue: every job (write or read-through sync)
+  // marks the board busy until it settles.
+  const enqueue = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
+    pendingRef.current += 1
+    setPending(pendingRef.current)
+    const job = queueRef.current.then(work).finally(() => {
+      pendingRef.current -= 1
+      setPending(pendingRef.current)
+    })
+    // The chain must survive a failed job: later work queues on a settled
+    // promise, while callers still get the real outcome on `job`.
+    queueRef.current = job.then(
+      () => {},
+      () => {}
+    )
+    return job
+  }, [])
+
   const enqueueGame = useCallback(
-    (step: (base: SavedGame) => SavedGame | null): Promise<boolean> => {
-      const job = queueRef.current.then(async () => {
+    (step: (base: SavedGame) => SavedGame | null): Promise<boolean> =>
+      enqueue(async () => {
         const base = await syncGame()
-        if (!base) return false
+        // Re-check live visibility after the storage round-trip: a fold that
+        // landed mid-read hands the wire to the visible copy, so this job
+        // cancels rather than writing from a hidden frame.
+        if (!base || !liveActive()) return false
         const next = step(base)
-        if (!next) return false
+        if (!next || !liveActive()) return false
         const settled = { ...next, by: ME }
         const wire = JSON.stringify(settled)
         await os.storage.set(GAME_KEY, wire)
@@ -165,47 +197,44 @@ function Game() {
           if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) setGame(winner)
         }
         return true
-      })
-      queueRef.current = job
-      return job
-    },
-    [syncGame]
+      }),
+    [enqueue, syncGame]
   )
 
   /** Read-through on the same queue: orders an activation sync before input. */
-  const enqueueSync = useCallback((): Promise<SavedGame | null> => {
-    const job = queueRef.current.then(syncGame)
-    queueRef.current = job
-    return job
-  }, [syncGame])
+  const enqueueSync = useCallback((): Promise<SavedGame | null> => enqueue(syncGame), [enqueue, syncGame])
 
-  const enqueueRecord = useCallback((step: (base: Tally) => Tally): Promise<Tally> => {
-    const job = queueRef.current.then(async () => {
-      const base = parseTally(await os.storage.get(RECORD_KEY))
-      const next = step(base)
-      const wire = JSON.stringify(next)
-      await os.storage.set(RECORD_KEY, wire)
-      lastRecord.current = wire
-      setRecord(next)
-      return next
-    })
-    queueRef.current = job
-    return job
-  }, [])
+  const enqueueRecord = useCallback(
+    (step: (base: Tally) => Tally): Promise<Tally> =>
+      enqueue(async () => {
+        const base = parseTally(await os.storage.get(RECORD_KEY))
+        // The celebration (cue/haptic and the tally write) belongs to the
+        // copy that is actually on screen; a hidden copy posts nothing.
+        if (!liveActive()) return base
+        const next = step(base)
+        const wire = JSON.stringify(next)
+        await os.storage.set(RECORD_KEY, wire)
+        lastRecord.current = wire
+        setRecord(next)
+        return next
+      }),
+    [enqueue]
+  )
 
-  const enqueuePrefs = useCallback((patch: Partial<Prefs>): Promise<Prefs> => {
-    const job = queueRef.current.then(async () => {
-      const base = parsePrefs(await os.storage.get(PREFS_KEY))
-      const next = { ...base, ...patch }
-      const wire = JSON.stringify(next)
-      await os.storage.set(PREFS_KEY, wire)
-      lastPrefs.current = wire
-      setPrefs(next)
-      return next
-    })
-    queueRef.current = job
-    return job
-  }, [])
+  const enqueuePrefs = useCallback(
+    (patch: Partial<Prefs>): Promise<Prefs> =>
+      enqueue(async () => {
+        const base = parsePrefs(await os.storage.get(PREFS_KEY))
+        if (!liveActive()) return base
+        const next = { ...base, ...patch }
+        const wire = JSON.stringify(next)
+        await os.storage.set(PREFS_KEY, wire)
+        lastPrefs.current = wire
+        setPrefs(next)
+        return next
+      }),
+    [enqueue]
+  )
 
   useEffect(() => {
     setMuted(prefs.muted)
@@ -233,15 +262,16 @@ function Game() {
     if (next.by === ME) return
     setGame(next)
     setHover(null)
-    if (liveRaw.current !== undefined && view.active && !prefs.muted) {
+    if (liveRaw.current !== undefined) {
       // Sound what just changed on the peer display: a fresh match, a takeback,
-      // or the disc that just landed.
-      if (next.id !== prev?.id || next.moves.length === 0) cue('new')
-      else if (next.moves.length < prev.moves.length) cue('undo')
-      else if (next.moves.length > prev.moves.length) cue('flip')
+      // or the disc that just landed. play() re-checks live visibility, so a
+      // copy this render left behind still stays silent.
+      if (next.id !== prev?.id || next.moves.length === 0) play('new')
+      else if (next.moves.length < prev.moves.length) play('undo')
+      else if (next.moves.length > prev.moves.length) play('flip')
     }
     liveRaw.current = raw
-  }, [saved.value, saved.status, view.active, prefs.muted])
+  }, [saved.value, saved.status, play])
 
   // Becoming visible settles this copy to the wire BEFORE any input can land:
   // the sync runs first on the serial queue, so a tap fired during a fold
@@ -286,6 +316,12 @@ function Game() {
         setThinking(false)
         return
       }
+      // Live re-check before the search even starts: a fold during THINK_MS
+      // leaves this copy hidden, and hidden copies never run bot work.
+      if (!liveActive()) {
+        setThinking(false)
+        return
+      }
       const dd = derive(snapshot.moves)
       const toMove = dd.toMove
       if (dd.over || !toMove || toMove === snapshot.you) {
@@ -294,8 +330,10 @@ function Game() {
       }
       void (async () => {
         try {
-          const pick = await chooseMoveAsync(dd.board, toMove, snapshot.level, () => cancelled)
-          if (cancelled || !pick) return
+          // liveActive() inside the cancel probe aborts the search within one
+          // work slice of a fold, even while this frame stops rendering.
+          const pick = await chooseMoveAsync(dd.board, toMove, snapshot.level, () => cancelled || !liveActive())
+          if (cancelled || !pick || !liveActive()) return
           const ok = await enqueueGame((base) => {
             const r = tryReply(base, snapshot, pick.at)
             return r.ok ? r.game : null
@@ -323,7 +361,7 @@ function Game() {
     const winner = d.over.winner
     void enqueueRecord((tally) => {
       if (tally.lastGame === game.id) return tally
-      if (activeRef.current) navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
+      if (liveActive()) navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
       play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
       return countFinished(tally, game.id, winner)
     })
@@ -349,7 +387,7 @@ function Game() {
     if (el instanceof HTMLElement) {
       let tries = 0
       const restore = () => {
-        if (!activeRef.current || !el.isConnected) return
+        if (!liveActive() || !el.isConnected) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
@@ -408,6 +446,15 @@ function Game() {
   const place = useCallback(
     (at: number) => {
       if (!game || !d || d.over || thinking || !view.active) return
+      if (!liveActive()) return
+      if (pendingRef.current > 0) {
+        // A write is still in flight: the board reads busy (aria-busy, dimmed
+        // cells), so this tap answers honestly instead of queueing into a
+        // stale-state rejection nobody can see.
+        play('reject')
+        navigator.vibrate?.(18)
+        return
+      }
       if (game.mode === 'solo' && d.toMove !== game.you) {
         play('reject')
         return
@@ -426,7 +473,7 @@ function Game() {
           // The wire moved past the board this tap was aimed at: reject it,
           // never overwrite the foreign moves that landed meanwhile.
           play('reject')
-          if (activeRef.current) navigator.vibrate?.(18)
+          if (liveActive()) navigator.vibrate?.(18)
           return
         }
         play('flip')
@@ -438,7 +485,7 @@ function Game() {
   )
 
   const undo = useCallback(() => {
-    if (!game || !d || !canUndo(game, d, thinking)) return
+    if (!game || !d || !canUndo(game, d, thinking) || pendingRef.current > 0) return
     const expected = game
     void enqueueGame((base) => {
       const r = tryUndo(base, expected)
@@ -460,7 +507,7 @@ function Game() {
   )
 
   const toggleMute = useCallback(() => {
-    if (!view.active) return
+    if (!view.active || !liveActive()) return
     const next = !prefs.muted
     void enqueuePrefs({ muted: next })
     setMuted(next)
@@ -517,13 +564,15 @@ function Game() {
         : `${d.over.winner === 'b' ? 'Black' : 'White'} wins ${Math.max(d.scores.b, d.scores.w)} to ${Math.min(d.scores.b, d.scores.w)}`
     : thinking || botTurn
       ? 'Bot is thinking'
-      : tail?.kind === 'pass'
-        ? `${sideLabel(game, tail.side)} ${sideLabel(game, tail.side) === 'You' ? 'have' : 'has'} no moves - ${sideLabel(game, d.toMove!)} to play`
-        : solo
-          ? 'Your move'
-          : `${sideLabel(game, d.toMove!)} to move`
+      : pending > 0
+        ? 'Saving…'
+        : tail?.kind === 'pass'
+          ? `${sideLabel(game, tail.side)} ${sideLabel(game, tail.side) === 'You' ? 'have' : 'has'} no moves - ${sideLabel(game, d.toMove!)} to play`
+          : solo
+            ? 'Your move'
+            : `${sideLabel(game, d.toMove!)} to move`
 
-  const undoable = canUndo(game, d, thinking)
+  const undoable = canUndo(game, d, thinking) && pending === 0
   const hoveredFlips = hover !== null ? (d.legal.get(hover) ?? null) : null
 
   const chip = (side: Color) => (
@@ -689,7 +738,14 @@ function Game() {
 
   const boardEl = (
     <div {...stylex.props(styles.board, styles.fitBoard(fit.board))}>
-      <div ref={boardRef} role="grid" aria-label="Reversi board" onKeyDown={onBoardKey} {...stylex.props(styles.grid)}>
+      <div
+        ref={boardRef}
+        role="grid"
+        aria-label="Reversi board"
+        aria-busy={pending > 0}
+        onKeyDown={onBoardKey}
+        {...stylex.props(styles.grid, pending > 0 && styles.gridBusy)}
+      >
         {d.board.map((piece, i) => {
           const legalHere = humanTurn && prefs.hints && d.legal.has(i)
           const isLast = d.last?.at === i
@@ -708,7 +764,7 @@ function Game() {
               role="gridcell"
               tabIndex={roving === i ? 0 : -1}
               aria-label={label}
-              aria-disabled={!humanTurn || !d.legal.has(i)}
+              aria-disabled={!humanTurn || pending > 0 || !d.legal.has(i)}
               onClick={() => place(i)}
               onFocus={() => setFocusCell(i)}
               onPointerEnter={() => setHover(i)}
