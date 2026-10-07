@@ -546,7 +546,7 @@ export const styles = stylex.create({
   palRow: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.xs,
+    gap: space.sm,
     minWidth: 0,
     borderRadius: radius.lg,
     padding: space.md,
