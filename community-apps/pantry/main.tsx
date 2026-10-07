@@ -189,11 +189,15 @@ function Pantry() {
   mirrorWrite.current = mirror.set
   const syncRef = useRef<PantrySync | null>(null)
 
-  // The live gate: a copy must be both visible and active before its input can
-  // mutate the document. Stale or forged input from a hidden copy is rejected
-  // here, before any side effect; ops already admitted while live keep
-  // draining to storage even if this copy is folded away mid-write.
-  const live = useCallback(() => viewRef.current.visible && viewRef.current.active, [])
+  // Input, timers, audio and focus belong only to the copy the user is
+  // looking at: the shell's visible+active view AND a rendered document.
+  // `view.visible` can stay stale-true on a folded-away copy (its view notify
+  // is rAF-starved), so the document's own visibility state is the backstop -
+  // a display:none iframe reports hidden and its input is rejected untouched.
+  const live = useCallback(
+    () => viewRef.current.visible && viewRef.current.active && document.visibilityState === 'visible',
+    []
+  )
   const curDoc = () => syncRef.current?.current() ?? docRef.current
 
   // Engine lifecycle: one PantrySync per copy, watching the doc key.
