@@ -26,6 +26,7 @@ import {
   tryReply,
   tryUndo
 } from './game.ts'
+import * as hydration from './hydration.ts'
 import {
   type Guard,
   type NewPatch,
@@ -72,6 +73,51 @@ const sideLabel = (game: SavedGame, side: Color): string =>
   game.mode === 'solo' ? (side === game.you ? 'You' : 'Bot') : side === 'b' ? 'Black' : 'White'
 
 type Confirm = { title: string; body: string; action: string; run: () => void }
+
+/**
+ * The recovery card for an unreadable game document: the only UI allowed to
+ * overwrite corrupt bytes, and only on an explicit click. Busy reports the
+ * serial queue honestly - while a job is in flight the buttons refuse a
+ * second intent nobody could honor.
+ */
+function CorruptCard({
+  busy,
+  onStartFresh,
+  onRetry
+}: {
+  busy: boolean
+  onStartFresh: () => void
+  onRetry: () => void
+}) {
+  return (
+    <>
+      <span {...stylex.props(styles.sheetTitle)}>The saved match could not be read</span>
+      <span {...stylex.props(styles.sheetBody)}>
+        The store answered with something this game cannot understand. Nothing is discarded unless you choose to start
+        fresh.
+      </span>
+      <div {...stylex.props(styles.row)}>
+        <button
+          type="button"
+          onClick={onStartFresh}
+          disabled={busy}
+          {...stylex.props(styles.btn, shared.press, styles.pressCalm)}
+        >
+          Start fresh
+        </button>
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={busy}
+          {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
+        >
+          <Sym name="reload" size={13} />
+          Retry
+        </button>
+      </div>
+    </>
+  )
+}
 
 function Game() {
   const view = useDisplay()
@@ -156,28 +202,26 @@ function Game() {
   const readGameWire = useCallback((): Promise<string | null> => os.storage.get(GAME_KEY), [])
 
   // Settle a just-read wire document into local state: adopt what the store
-  // carries, or seed an opening only when the answer was confirmed empty.
-  // Queued callers validate against gameRef before the state commit lands,
-  // so adoption publishes synchronously here too.
+  // carries - an equal-length alternate branch is still unseen work the board
+  // must show before re-offering - or seed the canonical opening when the
+  // answer was confirmed empty, even over a stale rendered match. Unknown or
+  // corrupt reads never reach here. Queued callers validate against gameRef
+  // before the state commit lands, so adoption publishes synchronously too.
   const settleStored = useCallback((stored: SavedGame | null) => {
     const local = gameRef.current
-    if (
-      stored &&
-      (!local ||
-        stored.id !== local.id ||
-        stored.moves.length !== local.moves.length ||
-        stored.mode !== local.mode ||
-        stored.level !== local.level ||
-        stored.you !== local.you)
-    ) {
+    const decision = hydration.adoptDecision(stored, local)
+    if (decision === 'adopt' && stored) {
       setGame(stored)
       gameRef.current = stored
       setHover(null)
-    } else if (!stored && !local && !seeded.current) {
+      return
+    }
+    if (decision === 'seed' && (local || !seeded.current)) {
       seeded.current = true
       const seed = openingSeed(ME)
       setGame(seed)
       gameRef.current = seed
+      setHover(null)
     }
   }, [])
 
@@ -248,7 +292,7 @@ function Game() {
           if (foreign.kind === 'corrupt') markCorrupt(true)
           else if (foreign.kind === 'ok') {
             const winner = foreign.game
-            if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) {
+            if (winner.id !== settled.id || !hydration.sameMoves(winner.moves, settled.moves)) {
               setGame(winner)
               gameRef.current = winner
             }
@@ -390,7 +434,7 @@ function Game() {
     // a stale prop cannot keep hidden bot work running, and the handoff to
     // the other display stays safe because the reply validates against the
     // settled wire document.
-    if (!view.active || !view.visible || !liveActive()) return
+    if (!view.active || !view.visible || !liveActive() || corrupt) return
     if (!game || !d || d.over || game.mode !== 'solo' || d.toMove === game.you) return
     setThinking(true)
     let cancelled = false
@@ -433,7 +477,7 @@ function Game() {
       clearTimeout(timer)
       setThinking(false)
     }
-  }, [game, d, view.active, view.visible, play, enqueueGame])
+  }, [game, d, corrupt, view.active, view.visible, play, enqueueGame])
 
   // One celebration per match, counted once in shared storage: the cue and
   // haptic fire only on the copy that actually posts the tally increment, so
@@ -442,7 +486,7 @@ function Game() {
     // Props and the live snapshot both gate: on re-activation this effect
     // re-runs even when game and tally were already settled while hidden, so
     // the celebration the folded copy could not post still lands here once.
-    if (!view.active || !view.visible || !liveActive()) return
+    if (!view.active || !view.visible || !liveActive() || corrupt) return
     if (!game || !d?.over || celebrated.current === game.id) return
     if (!settledRead(stored.status)) return
     celebrated.current = game.id
@@ -456,7 +500,7 @@ function Game() {
       // The tally write never landed: un-mark so a later activation retries.
       celebrated.current = null
     })
-  }, [d, game, view.active, view.visible, stored.status, play, enqueueRecord])
+  }, [d, game, corrupt, view.active, view.visible, stored.status, play, enqueueRecord])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -704,11 +748,24 @@ function Game() {
   }, [enqueue, recoverAll])
 
   // The user's own wipe: the only path allowed to overwrite a document the
-  // reader could not understand, and only on an explicit click. The shared
-  // opening identity keeps both displays on one match afterwards.
+  // reader could not understand, and only on an explicit click. The reset is
+  // authorized for the unreadable state the card was shown against, not
+  // blindly - the queued job re-reads the wire first, seeds only when it is
+  // still unreadable-or-empty, and recovers a healthy match a peer stored
+  // after the card instead of destroying it. The shared opening identity
+  // keeps both displays on one match afterwards.
   const startFresh = useCallback(() => {
     if (!liveActive()) return
     void enqueue(async () => {
+      const w = hydration.settleGame(await os.storage.get(GAME_KEY), ME)
+      if (w.kind === 'ok') {
+        // A readable match reached the store after the card: adopt it and
+        // clear the card - never clobber unseen progress on a stale reset.
+        markCorrupt(false)
+        setGame(w.game)
+        gameRef.current = w.game
+        return
+      }
       const seed = { ...openingSeed(ME), by: ME }
       const wire = JSON.stringify(seed)
       await os.storage.set(GAME_KEY, wire)
@@ -724,35 +781,14 @@ function Game() {
     // The shell still renders while the store hydrates: useWide's observer
     // needs the element on the first commit. A failed hydrate is 'unknown',
     // never 'empty': the card says so honestly and offers a real re-read.
+    // While the store is busy on the serial queue the buttons read busy
+    // instead of accepting a second intent nobody could honor.
     return (
-      <main ref={rootRef} {...stylex.props(dark, styles.root)}>
+      <main ref={rootRef} {...stylex.props(dark, styles.root)} aria-busy={pending > 0}>
         <section {...stylex.props(styles.loadWrap)}>
           <div {...stylex.props(styles.card, styles.loadCard)}>
             {corrupt ? (
-              <>
-                <span {...stylex.props(styles.sheetTitle)}>The saved match could not be read</span>
-                <span {...stylex.props(styles.sheetBody)}>
-                  The store answered with something this game cannot understand. Nothing is discarded unless you choose
-                  to start fresh.
-                </span>
-                <div {...stylex.props(styles.row)}>
-                  <button
-                    type="button"
-                    onClick={startFresh}
-                    {...stylex.props(styles.btn, shared.press, styles.pressCalm)}
-                  >
-                    Start fresh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={recover}
-                    {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
-                  >
-                    <Sym name="reload" size={13} />
-                    Retry
-                  </button>
-                </div>
-              </>
+              <CorruptCard busy={pending > 0} onStartFresh={startFresh} onRetry={recover} />
             ) : gameGate === 'error' ? (
               <>
                 <span {...stylex.props(styles.sheetTitle)}>Could not load your saved game</span>
@@ -762,6 +798,7 @@ function Game() {
                 <button
                   type="button"
                   onClick={recover}
+                  disabled={pending > 0}
                   {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
                 >
                   <Sym name="reload" size={13} />
@@ -778,6 +815,22 @@ function Game() {
                 </span>
               </>
             )}
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  if (corrupt) {
+    // Runtime corruption found after a match was already rendered takes the
+    // whole surface too: the stale board must not keep posing as durable
+    // authority. The match stays in state untouched and returns when a
+    // healthy read recovers it.
+    return (
+      <main ref={rootRef} {...stylex.props(dark, styles.root)} aria-busy={pending > 0}>
+        <section {...stylex.props(styles.loadWrap)}>
+          <div {...stylex.props(styles.card, styles.loadCard)}>
+            <CorruptCard busy={pending > 0} onStartFresh={startFresh} onRetry={recover} />
           </div>
         </section>
       </main>

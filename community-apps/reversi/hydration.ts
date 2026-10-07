@@ -60,6 +60,34 @@ export const offerPlan = (game: SavedGame): 'confirm' | 'direct' => {
 /** The fresh local board shown only after an empty store is confirmed. */
 export const openingSeed = (me: string): SavedGame => ({ ...newGame(me, 'solo', 'Medium', 'b'), id: OPENING_ID })
 
+/** Two move lists are the same history only when every ply matches: equal length alone says nothing. */
+export const sameMoves = (a: number[], b: number[]): boolean => a.length === b.length && a.every((v, i) => v === b[i])
+
+/**
+ * What a just-read wire document means for local state: 'keep' when the
+ * rendered board already is that exact history, 'adopt' when it differs -
+ * a same-id alternate branch of equal plies is still unseen progress the
+ * board must show before anything is re-offered against it - and 'seed'
+ * when the store confirmed it holds nothing while local state is not the
+ * canonical opening. The seed answer reaches past a stale rendered match
+ * too: a confirmed-empty read replaces it with the shared opening, the
+ * same authority a first empty read used. Unknown/error reads never reach
+ * this decision - callers gate on settleGame's kind first.
+ */
+export const adoptDecision = (stored: SavedGame | null, local: SavedGame | null): 'keep' | 'adopt' | 'seed' => {
+  if (stored) {
+    const same =
+      local !== null &&
+      stored.id === local.id &&
+      stored.mode === local.mode &&
+      stored.level === local.level &&
+      stored.you === local.you &&
+      sameMoves(stored.moves, local.moves)
+    return same ? 'keep' : 'adopt'
+  }
+  return local !== null && local.id === OPENING_ID && local.moves.length === 0 ? 'keep' : 'seed'
+}
+
 /**
  * Whether a mirror read actually answered. 'hydrating' is unanswered and
  * 'error' is unanswerable so far: neither may seed, adopt, or clear state.

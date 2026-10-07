@@ -33,11 +33,13 @@ import {
   undoCut
 } from './game.ts'
 import {
+  adoptDecision,
   type Guard,
   offerPlan,
   openingSeed,
   recoverReads,
   replaceStep,
+  sameMoves,
   settledRead,
   settleGame,
   storeGate
@@ -693,6 +695,62 @@ check('a guard built on a fallback opening can never overwrite durable progress'
   const durable = progressed(8)
   eq(replaceStep(durable, { id: seed.id, moves: [] }, { mode: 'local' }, 'me'), null)
   eq(replaceStep(durable, { id: seed.id, moves: [] }, undefined, 'me'), null)
+})
+
+check('adoptDecision keeps the same history and adopts equal-length unseen branches', () => {
+  const seen = progressed(2, { id: 'match-a' })
+  const altFirst = [...derive([]).legal.keys()].find((m) => m !== seen.moves[0])!
+  const alternate = { ...seen, moves: [altFirst, [...derive([altFirst]).legal.keys()][0]!] }
+  ok(sameMoves(seen.moves, seen.moves), 'identical lists match')
+  ok(!sameMoves(seen.moves, alternate.moves), 'equal-length different branches differ')
+  ok(!sameMoves(seen.moves, seen.moves.slice(0, 1)), 'a longer history differs')
+  // The same document rendered is kept; an unseen same-id alternate at equal
+  // plies is adopted so the board shows the freshest history before any
+  // re-asked confirmation is armed against it.
+  eq(adoptDecision(seen, seen), 'keep')
+  eq(adoptDecision(alternate, seen), 'adopt')
+  eq(adoptDecision(seen, null), 'adopt')
+  eq(adoptDecision({ ...seen, id: 'match-b' }, seen), 'adopt')
+  eq(adoptDecision({ ...seen, mode: 'solo' }, seen), 'adopt')
+})
+
+check('adoptDecision seeds on confirmed empty even over a stale rendered match', () => {
+  const seed = openingSeed('me')
+  // A confirmed-empty answer after a rendered match reseeds the canonical
+  // opening - the same authority a first empty read uses.
+  eq(adoptDecision(null, progressed(2)), 'seed')
+  eq(adoptDecision(null, null), 'seed')
+  // Already the seed: nothing to churn.
+  eq(adoptDecision(null, seed), 'keep')
+  // A zero-ply match with a different id is not the canonical seed: reseed.
+  eq(adoptDecision(null, settled([])), 'seed')
+})
+
+check('settleGame keeps readable documents with dropped tails and rejects unreadable shapes', () => {
+  // Non-integer and out-of-range move entries are dropped by adoption, then
+  // the legal prefix replays: a doctored or mangled tail cannot corrupt the
+  // board, it is simply not there. The document itself is still readable.
+  const trailing = JSON.stringify({ id: 'm1', v: 1, mode: 'local', level: 'Medium', you: 'b', moves: [19, 'x', 999] })
+  const w = settleGame(trailing, 'me')
+  ok(w.kind === 'ok', 'non-integer tails stay a readable document')
+  eq(w.kind === 'ok' ? w.game.moves : null, [19])
+  // An illegal move stops the replay at the first unplayable ply.
+  const illegal = JSON.stringify({ id: 'm2', v: 1, mode: 'solo', level: 'Medium', you: 'b', moves: [19, 44] })
+  const w2 = settleGame(illegal, 'me')
+  eq(w2.kind === 'ok' ? w2.game.moves : null, [19])
+  // Unreadable shapes are corrupt, never quietly emptied.
+  for (const raw of [
+    '{broken json',
+    'null',
+    '42',
+    '"x"',
+    '[1,2,3]',
+    '{"id":3,"moves":[]}',
+    '{"id":"x"}',
+    '{"id":"x","moves":{}}'
+  ]) {
+    eq(settleGame(raw, 'me').kind, 'corrupt')
+  }
 })
 
 check('the destructive plan confirms live progress and swaps finished or fresh boards', () => {

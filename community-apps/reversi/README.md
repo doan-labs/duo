@@ -57,13 +57,31 @@ becoming visible and active again re-reads the wire document the same way, so
 a transient outage self-heals on the next visit. A store that genuinely is
 empty still seeds a fresh solo game normally - the same canonical opening on
 every copy, so two recovering displays agree on one match rather than forking
-invented boards.
+invented boards. Confirmed-empty is authoritative at every read, not just the
+first: when the store answers empty while a stale match is still rendered,
+the board reseeds the canonical opening instead of keeping a document the
+store no longer holds.
+
+Adoption compares the whole history, not just its length: a same-id document
+with an equal number of different plies is an unseen branch, so it is adopted
+and shown before any re-asked confirmation is armed against it - a refused
+swap can therefore always be re-confirmed once against the board actually
+standing.
 
 An answered-but-unreadable game document is a third case, honest corruption:
 a card says the saved match could not be read and offers Retry plus an
-explicit Start fresh. Nothing is adopted as an invented fallback board (which
-would mint a different random match per read and churn every guard), and only
-the user's own click ever overwrites the unreadable bytes.
+explicit Start fresh. The card takes over the whole surface - corruption
+found after a match was already rendered does not leave the stale board on
+screen posing as durable authority, while bot, focus and timer paths stop
+with it. Nothing is adopted as an invented fallback board (which would mint
+a different random match per read and churn every guard), and only the
+user's own click ever overwrites the unreadable bytes. Even that click is
+guarded: Start fresh re-reads the wire and seeds only while it is still
+unreadable or empty, so a healthy match a peer stored after the card is
+recovered and shown instead of destroyed. Move lists stay readable on a
+best-effort basis: entries that are not real cells are dropped and the
+replay stops at the first illegal ply, while documents without a string id
+or a moves array are corrupt.
 
 Destructive intents - new match, mode or colour switch, or a confirmed Sheet
 run - carry a guard: the match id AND the exact move history the user saw.
@@ -107,10 +125,13 @@ changes.
   get/set, transient read failures, ambiguous writes and read-backs, record
   and prefs failure and recovery, both display copy orders, peer progress or
   a whole new match landing between an ask and its queued write, same-id
-  unseen undo-and-replay branches refusing at equal or fewer plies, corrupt
-  wire documents surfacing instead of minting random boards, canonical
-  confirmed-empty seeding on every copy, stale fallback guards, and admitted
-  finite writes completing across a fold.
+  unseen undo-and-replay branches refusing at equal or fewer plies and
+  adopting before the re-ask, corrupt wire documents surfacing instead of
+  minting random boards, guarded corrupt-wipe writes refusing to clobber
+  unseen healthy progress, canonical confirmed-empty seeding on every copy
+  including over a stale rendered match, stale fallback guards, legal and
+  malformed tail classification, and admitted finite writes completing
+  across a fold.
 - `bun packages/cli/index.mjs check community-apps/reversi` - manifest,
   source, design-token and strict typecheck gates.
 - `bun packages/cli/index.mjs build community-apps/reversi` - bundle well
