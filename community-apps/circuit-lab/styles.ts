@@ -63,7 +63,9 @@ export const styles = stylex.create({
     lineHeight: leading.subheadline
   },
   rootCover: { gap: space.sm, paddingTop: space.sm, paddingInline: space.sm },
-  shell: { display: 'flex', flexDirection: 'column', gap: space.md, flexGrow: 1, minHeight: 0 },
+  // isolation bounds the banner/dock z-index to this box, so the delete
+  // Sheet's scrim and card (later siblings, no z-index) always paint above it.
+  shell: { display: 'flex', flexDirection: 'column', gap: space.md, flexGrow: 1, minHeight: 0, isolation: 'isolate' },
   shellCover: { gap: space.sm },
   flipX: { display: 'inline-flex', transform: 'scaleX(-1)' },
   header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.sm, flexShrink: 0 },
