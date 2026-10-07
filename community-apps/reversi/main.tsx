@@ -10,7 +10,6 @@ import { type Cue, cue, setMuted, unlockAudio } from './audio.ts'
 import { chooseMoveAsync, LEVELS, type Level, THINK_MS } from './bot.ts'
 import { type Color, cellName } from './engine.ts'
 import {
-  adoptGame,
   canUndo,
   countFinished,
   type Derived,
@@ -35,6 +34,7 @@ import {
   recoverReads,
   replaceStep,
   settledRead,
+  settleGame,
   storeGate
 } from './hydration.ts'
 import { styles } from './styles.ts'
@@ -92,6 +92,15 @@ function Game() {
   // answer may flip this, so an exhausted hydrate can never mint an opening
   // board, a zero tally, or default prefs as authority.
   const [recovered, setRecovered] = useState(false)
+  // The store answered but the game document is unreadable: honest failure,
+  // not an empty store. The ref mirrors the state so queued callbacks see
+  // it before the next render commits.
+  const [corrupt, setCorrupt] = useState(false)
+  const corruptRef = useRef(false)
+  const markCorrupt = useCallback((value: boolean) => {
+    corruptRef.current = value
+    setCorrupt(value)
+  }, [])
 
   const lastSeen = useRef<string | null | undefined>(undefined)
   const lastRecord = useRef<string | null | undefined>(undefined)
@@ -143,11 +152,8 @@ function Game() {
     if (!mutedRef.current && liveActive()) cue(kind)
   }, [])
 
-  /** The settled wire document, or null when the store holds no game yet. */
-  const readStoredGame = useCallback(async (): Promise<SavedGame | null> => {
-    const raw = await os.storage.get(GAME_KEY)
-    return raw === null ? null : adoptGame(raw, ME)
-  }, [])
+  /** The raw wire value, or null when the store holds no game yet. */
+  const readGameWire = useCallback((): Promise<string | null> => os.storage.get(GAME_KEY), [])
 
   // Settle a just-read wire document into local state: adopt what the store
   // carries, or seed an opening only when the answer was confirmed empty.
@@ -179,12 +185,19 @@ function Game() {
   // mirror (useKV) can lag a fold wake-up; this read does not. A successful
   // read is also the recovery path: it confirms the store after a failed
   // hydrate, seeds only when the empty answer is real, and re-opens the gate.
+  // A corrupt document is neither authority nor empty - it is surfaced, not
+  // adopted and not seeded over.
   const syncGame = useCallback(async (): Promise<SavedGame | null> => {
-    const stored = await readStoredGame()
+    const w = settleGame(await readGameWire(), ME)
     setRecovered(true)
-    settleStored(stored)
-    return stored ?? gameRef.current
-  }, [readStoredGame, settleStored])
+    if (w.kind === 'corrupt') {
+      markCorrupt(true)
+      return null
+    }
+    markCorrupt(false)
+    settleStored(w.kind === 'ok' ? w.game : null)
+    return w.kind === 'ok' ? w.game : gameRef.current
+  }, [readGameWire, settleStored, markCorrupt])
 
   /**
    * Every game write goes through here: sync to the wire, run the step on the
@@ -229,15 +242,21 @@ function Game() {
         gameRef.current = settled
         const after = await os.storage.get(GAME_KEY)
         if (after !== null && after !== wire) {
-          const winner = adoptGame(after, ME)
-          if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) {
-            setGame(winner)
-            gameRef.current = winner
+          // A foreign write raced ours: adopt the settled winner, or flag a
+          // document the reader cannot understand instead of inventing one.
+          const foreign = settleGame(after, ME)
+          if (foreign.kind === 'corrupt') markCorrupt(true)
+          else if (foreign.kind === 'ok') {
+            const winner = foreign.game
+            if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) {
+              setGame(winner)
+              gameRef.current = winner
+            }
           }
         }
         return true
       }),
-    [enqueue, syncGame]
+    [enqueue, syncGame, markCorrupt]
   )
 
   /** Read-through on the same queue: orders an activation sync before input. */
@@ -292,7 +311,15 @@ function Game() {
     const raw = saved.value
     if (raw !== null && raw === lastSeen.current) return
     lastSeen.current = raw
-    if (!raw) {
+    const w = settleGame(raw, ME)
+    if (w.kind === 'corrupt') {
+      // An unreadable wire document is surfaced, never silently adopted as an
+      // invented fallback.
+      markCorrupt(true)
+      return
+    }
+    markCorrupt(false)
+    if (w.kind === 'empty') {
       // Only a confirmed-empty store seeds a shared opening; the first real
       // move publishes.
       if (!seeded.current) {
@@ -303,8 +330,8 @@ function Game() {
       }
       return
     }
+    const next = w.game
     const prev = gameRef.current
-    const next = adoptGame(raw, ME)
     if (next.by === ME) return
     setGame(next)
     gameRef.current = next
@@ -318,7 +345,7 @@ function Game() {
       else if (next.moves.length > prev.moves.length) play('flip')
     }
     liveRaw.current = raw
-  }, [saved.value, saved.status, play])
+  }, [saved.value, saved.status, play, markCorrupt])
 
   // Becoming visible settles this copy to the wire BEFORE any input can land:
   // the sync runs first on the serial queue, so a tap fired during a fold
@@ -481,7 +508,9 @@ function Game() {
           setFocusCell(-1)
           return
         }
-        reoffer(patch)
+        // An unreadable wire cannot be argued with: the card offers Retry and
+        // Start fresh instead of an endless re-ask.
+        if (!corruptRef.current) reoffer(patch)
       })
       .catch(() => {
         // A failed write is not a refusal: the board simply keeps the match
@@ -500,7 +529,7 @@ function Game() {
       title: 'The board changed while you decided',
       body: 'Starting over now replaces the latest match - confirm again to continue.',
       action: 'Replace',
-      run: () => newMatch(patch, { id: g.id, plies: g.moves.length })
+      run: () => newMatch(patch, { id: g.id, moves: [...g.moves] })
     })
   }
 
@@ -524,7 +553,7 @@ function Game() {
   function requestNew(patch?: NewPatch) {
     const g = gameRef.current
     if (!g || !liveActive()) return
-    const guard: Guard = { id: g.id, plies: g.moves.length }
+    const guard: Guard = { id: g.id, moves: [...g.moves] }
     if (offerPlan(g) === 'confirm') askConfirm(confirmFor(patch, g, guard))
     else newMatch(patch, guard)
   }
@@ -644,8 +673,11 @@ function Game() {
 
   // Recovery re-reads every key once, on the serial queue: each answer
   // confirms its own key, the game read re-opens the gate, and a confirmed
-  // empty answer seeds the shared opening. A failed batch adopts nothing and
-  // the error card stays for the next attempt. Runs only while live.
+  // empty answer seeds the shared opening through the same authority path as
+  // a first read - the canonical OPENING_ID seed, so two recovering copies
+  // agree instead of forking random fallbacks. An unreadable document is
+  // surfaced, not adopted. A failed batch adopts nothing and the error card
+  // stays for the next attempt. Runs only while live.
   const recoverAll = useCallback(async () => {
     const reads = await recoverReads((k) => os.storage.get(k), {
       record: RECORD_KEY,
@@ -657,13 +689,36 @@ function Game() {
     lastPrefs.current = reads.prefs
     setPrefs(parsePrefs(reads.prefs))
     setRecovered(true)
-    settleStored(adoptGame(reads.game, ME))
-  }, [settleStored])
+    const w = settleGame(reads.game, ME)
+    if (w.kind === 'corrupt') {
+      markCorrupt(true)
+      return
+    }
+    markCorrupt(false)
+    settleStored(w.kind === 'ok' ? w.game : null)
+  }, [settleStored, markCorrupt])
 
   const recover = useCallback(() => {
     if (!liveActive()) return
     void enqueue(recoverAll).catch(() => {})
   }, [enqueue, recoverAll])
+
+  // The user's own wipe: the only path allowed to overwrite a document the
+  // reader could not understand, and only on an explicit click. The shared
+  // opening identity keeps both displays on one match afterwards.
+  const startFresh = useCallback(() => {
+    if (!liveActive()) return
+    void enqueue(async () => {
+      const seed = { ...openingSeed(ME), by: ME }
+      const wire = JSON.stringify(seed)
+      await os.storage.set(GAME_KEY, wire)
+      lastSeen.current = wire
+      setRecovered(true)
+      markCorrupt(false)
+      setGame(seed)
+      gameRef.current = seed
+    }).catch(() => {})
+  }, [enqueue, markCorrupt])
 
   if (!game || !d) {
     // The shell still renders while the store hydrates: useWide's observer
@@ -673,7 +728,32 @@ function Game() {
       <main ref={rootRef} {...stylex.props(dark, styles.root)}>
         <section {...stylex.props(styles.loadWrap)}>
           <div {...stylex.props(styles.card, styles.loadCard)}>
-            {gameGate === 'error' ? (
+            {corrupt ? (
+              <>
+                <span {...stylex.props(styles.sheetTitle)}>The saved match could not be read</span>
+                <span {...stylex.props(styles.sheetBody)}>
+                  The store answered with something this game cannot understand. Nothing is discarded unless you choose
+                  to start fresh.
+                </span>
+                <div {...stylex.props(styles.row)}>
+                  <button
+                    type="button"
+                    onClick={startFresh}
+                    {...stylex.props(styles.btn, shared.press, styles.pressCalm)}
+                  >
+                    Start fresh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={recover}
+                    {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
+                  >
+                    <Sym name="reload" size={13} />
+                    Retry
+                  </button>
+                </div>
+              </>
+            ) : gameGate === 'error' ? (
               <>
                 <span {...stylex.props(styles.sheetTitle)}>Could not load your saved game</span>
                 <span {...stylex.props(styles.sheetBody)}>

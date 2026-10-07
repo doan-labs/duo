@@ -55,13 +55,25 @@ Retry re-reads the match, tally and preferences directly through the storage
 adapter and adopts whatever actually answers - no reload needed. Simply
 becoming visible and active again re-reads the wire document the same way, so
 a transient outage self-heals on the next visit. A store that genuinely is
-empty still seeds a fresh solo game normally.
+empty still seeds a fresh solo game normally - the same canonical opening on
+every copy, so two recovering displays agree on one match rather than forking
+invented boards.
+
+An answered-but-unreadable game document is a third case, honest corruption:
+a card says the saved match could not be read and offers Retry plus an
+explicit Start fresh. Nothing is adopted as an invented fallback board (which
+would mint a different random match per read and churn every guard), and only
+the user's own click ever overwrites the unreadable bytes.
 
 Destructive intents - new match, mode or colour switch, or a confirmed Sheet
-run - carry a guard: the match id and ply count the user saw. The queued
-write re-checks the freshest settled document before landing and is refused
-when unseen progress or a different match arrived; a refusal re-asks instead
-of overwriting. Confirmed-empty stores still start fresh instantly.
+run - carry a guard: the match id AND the exact move history the user saw.
+The queued write re-checks the freshest settled document and lands only when
+the wire still shows the confirmed history itself or a real prefix of it - a
+peer's undo to a seen position. Unseen work refuses: newer plies, a different
+match, or an unseen alternate branch of the same match (a peer undid and
+replayed a different line), no matter how few plies it has. A refusal re-asks
+against the board now showing instead of overwriting. Confirmed-empty stores
+still start fresh instantly.
 
 ## Input admission
 
@@ -94,8 +106,11 @@ changes.
   a controlled wire adapter: exhausted snapshot hydration with working
   get/set, transient read failures, ambiguous writes and read-backs, record
   and prefs failure and recovery, both display copy orders, peer progress or
-  a whole new match landing between an ask and its queued write, stale
-  fallback guards, and admitted finite writes completing across a fold.
+  a whole new match landing between an ask and its queued write, same-id
+  unseen undo-and-replay branches refusing at equal or fewer plies, corrupt
+  wire documents surfacing instead of minting random boards, canonical
+  confirmed-empty seeding on every copy, stale fallback guards, and admitted
+  finite writes completing across a fold.
 - `bun packages/cli/index.mjs check community-apps/reversi` - manifest,
   source, design-token and strict typecheck gates.
 - `bun packages/cli/index.mjs build community-apps/reversi` - bundle well

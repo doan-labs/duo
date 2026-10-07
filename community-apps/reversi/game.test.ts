@@ -32,7 +32,16 @@ import {
   tryUndo,
   undoCut
 } from './game.ts'
-import { type Guard, offerPlan, openingSeed, recoverReads, replaceStep, settledRead, storeGate } from './hydration.ts'
+import {
+  type Guard,
+  offerPlan,
+  openingSeed,
+  recoverReads,
+  replaceStep,
+  settledRead,
+  settleGame,
+  storeGate
+} from './hydration.ts'
 
 let passed = 0
 const failures: string[] = []
@@ -643,20 +652,38 @@ check('only answered reads may seed or adopt state', () => {
   eq(settledRead('saving'), true)
 })
 
-check('a destructive swap validates the captured incarnation against the wire', () => {
-  const confirmed = settled(cells('F5', 'D6'), { id: 'match-a' })
-  const guard: Guard = { id: 'match-a', plies: 2 }
+check('a destructive swap validates the captured incarnation and history against the wire', () => {
+  const confirmed = progressed(2, { id: 'match-a' })
+  const guard: Guard = { id: 'match-a', moves: [...confirmed.moves] }
   // Same match still standing: the swap applies with a fresh id, keeping level.
   const next = replaceStep(confirmed, guard, { mode: 'solo' }, 'me')
   ok(next !== null && next.moves.length === 0, 'a matching wire doc still replaces')
   eq(next!.mode, 'solo')
   eq(next!.level, 'Medium')
   ok(next!.id !== 'match-a', 'a replacement gets a fresh match id')
+  // A peer undo to a position this copy saw is still seen history.
+  const rewound = { ...confirmed, moves: confirmed.moves.slice(0, 1) }
+  ok(replaceStep(rewound, guard, undefined, 'me') !== null, 'a seen-prefix wire doc still replaces')
   // Newer unseen progress or a different peer match refuses the write.
-  eq(replaceStep({ ...confirmed, moves: [...confirmed.moves, cellIndex('C5')] }, guard, undefined, 'me'), null)
+  eq(replaceStep(progressed(3, { id: 'match-a' }), guard, undefined, 'me'), null)
   eq(replaceStep(settled([], { id: 'match-b' }), guard, { mode: 'local' }, 'me'), null)
   eq(replaceStep(settled([], { id: 'match-b' }), guard, { you: 'w' }, 'me'), null)
   eq(replaceStep(null, guard, undefined, 'me'), null)
+})
+
+check('a same-id unseen branch refuses even at equal or fewer plies', () => {
+  // The user confirmed at 2 plies; a peer undid twice and replayed a
+  // different legal first move. Same incarnation, unseen history: length
+  // alone cannot admit it.
+  const seen = progressed(2, { id: 'match-a' })
+  const guard: Guard = { id: 'match-a', moves: [...seen.moves] }
+  const altFirst = [...derive([]).legal.keys()].find((m) => m !== seen.moves[0])!
+  const altShort = { ...seen, moves: [altFirst] }
+  const altEqual = { ...seen, moves: [altFirst, [...derive([altFirst]).legal.keys()][0]!] }
+  eq(replaceStep(altShort, guard, undefined, 'me'), null)
+  eq(replaceStep(altEqual, guard, { mode: 'solo' }, 'me'), null)
+  // The empty wire and the seed doc are not this match either.
+  eq(replaceStep(openingSeed('me'), guard, undefined, 'me'), null)
 })
 
 check('a guard built on a fallback opening can never overwrite durable progress', () => {
@@ -664,8 +691,8 @@ check('a guard built on a fallback opening can never overwrite durable progress'
   // authority, whose fresh-match write lands on a real wire document.
   const seed = openingSeed('me')
   const durable = progressed(8)
-  eq(replaceStep(durable, { id: seed.id, plies: 0 }, { mode: 'local' }, 'me'), null)
-  eq(replaceStep(durable, { id: seed.id, plies: 0 }, undefined, 'me'), null)
+  eq(replaceStep(durable, { id: seed.id, moves: [] }, { mode: 'local' }, 'me'), null)
+  eq(replaceStep(durable, { id: seed.id, moves: [] }, undefined, 'me'), null)
 })
 
 check('the destructive plan confirms live progress and swaps finished or fresh boards', () => {
@@ -801,7 +828,7 @@ checkAsync('peer progress between admission and the queued step refuses the stal
   const base = progressed(2, { id: 'match-a', mode: 'solo' })
   const store = freshStore({ 'reversi-game': JSON.stringify(base) })
   const { space } = wireSpace(store)
-  const guard: Guard = { id: 'match-a', plies: 2 }
+  const guard: Guard = { id: 'match-a', moves: [...base.moves] }
   store.box['reversi-game'] = JSON.stringify(progressed(3, { id: 'match-a', mode: 'solo' }))
   const fresh = adoptGame(await space.get('reversi-game'), 'a')
   eq(replaceStep(fresh, guard, undefined, 'a'), null)
@@ -813,7 +840,7 @@ checkAsync('a stale confirm for match-a after peer match-b writes nothing', asyn
   // had already swapped in a whole different match. Refusal keeps match-b.
   const store = freshStore({ 'reversi-game': JSON.stringify(progressed(1, { id: 'match-a' })) })
   const { space, stats } = wireSpace(store)
-  const guard: Guard = { id: 'match-a', plies: 1 }
+  const guard: Guard = { id: 'match-a', moves: progressed(1).moves }
   store.box['reversi-game'] = JSON.stringify(progressed(3, { id: 'match-b' }))
   const fresh = adoptGame(await space.get('reversi-game'), 'a')
   eq(replaceStep(fresh, guard, { mode: 'local' }, 'a'), null)
@@ -829,7 +856,7 @@ checkAsync('the copy whose confirm still matches the wire swaps cleanly, in eith
     const store = freshStore({ 'reversi-game': JSON.stringify(base) })
     const { space } = wireSpace(store)
     const fresh = adoptGame(await space.get('reversi-game'), me)
-    const next = replaceStep(fresh, { id: 'match-a', plies: 2 }, { mode: 'solo' }, me)
+    const next = replaceStep(fresh, { id: 'match-a', moves: [...base.moves] }, { mode: 'solo' }, me)
     ok(next !== null, 'a matching guard still replaces')
     await space.set('reversi-game', JSON.stringify({ ...next!, by: me }))
     const readBack = adoptGame(await space.get('reversi-game'), me)
@@ -853,6 +880,47 @@ checkAsync('a foreign write inside our own write window wins the read-back', asy
   const winner = adoptGame(await space.get('reversi-game'), 'me')
   eq(winner.moves.length, 2)
   eq(winner.by, 'peer')
+})
+
+check('settleGame classifies empty, corrupt and readable wires', () => {
+  eq(settleGame(null, 'me').kind, 'empty')
+  eq(settleGame('not json {', 'me').kind, 'corrupt')
+  eq(settleGame('{"id":5,"moves":[]}', 'me').kind, 'corrupt')
+  eq(settleGame('{"id":"match-a"}', 'me').kind, 'corrupt')
+  eq(settleGame('null', 'me').kind, 'corrupt')
+  const readable = settleGame(JSON.stringify(progressed(2, { id: 'match-a' })), 'me')
+  ok(
+    readable.kind === 'ok' && readable.game.id === 'match-a' && readable.game.moves.length === 2,
+    'a readable wire adopts'
+  )
+})
+
+checkAsync('confirmed empty seeds the same canonical opening on every copy', async () => {
+  // Two displays recovering a confirmed-empty store must agree on one
+  // incarnation: a random fallback would fork the match on the first write.
+  const { space } = wireSpace(freshStore({}))
+  const a = settleGame(await space.get('reversi-game'), 'copy-a')
+  const b = settleGame(await space.get('reversi-game'), 'copy-b')
+  eq(a.kind, 'empty')
+  eq(b.kind, 'empty')
+  const seedA = openingSeed('copy-a')
+  const seedB = openingSeed('copy-b')
+  eq(seedA.id, OPENING_ID)
+  eq(seedB.id, seedA.id)
+})
+
+checkAsync('a corrupt wire surfaces as corrupt on every read and only an explicit wipe heals it', async () => {
+  // An unreadable document is never adopted as an invented board and never
+  // churns a new random incarnation per read; the user's own fresh start is
+  // the only overwrite.
+  const store = freshStore({ 'reversi-game': '{broken' })
+  const { space } = wireSpace(store)
+  eq(settleGame(await space.get('reversi-game'), 'copy-a').kind, 'corrupt')
+  eq(settleGame(await space.get('reversi-game'), 'copy-b').kind, 'corrupt')
+  const seed = { ...openingSeed('copy-a'), by: 'copy-a' }
+  await space.set('reversi-game', JSON.stringify(seed))
+  const healed = settleGame(await space.get('reversi-game'), 'copy-b')
+  ok(healed.kind === 'ok' && healed.game.id === OPENING_ID, 'both copies adopt the canonical seed')
 })
 
 await Promise.all(pending)
