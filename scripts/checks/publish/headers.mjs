@@ -152,6 +152,7 @@ function directives(cc) {
     if (!KNOWN_CC.has(name)) throw new Error(`unknown directive '${name}'`)
     if (['max-age', 's-maxage', 'stale-while-revalidate', 'stale-if-error'].includes(name))
       if (value === true || !/^\d+$/.test(value)) throw new Error(`${name} needs a non-negative integer`)
+    if (map.has(name) && map.get(name) !== value) throw new Error(`conflicting duplicate directive '${name}'`)
     map.set(name, value)
   }
   return map
@@ -275,9 +276,14 @@ function checkConfig({ headersText, wranglerText }) {
           errors.push(`${r.pattern}: Cache-Control ${err.message}`)
         }
       }
-  // Index and site paths keep short freshness; a long-cache or immutable rule
-  // leaking onto them is a real defect.
-  for (const path of [...INDEX_PATHS, ...SITE_PATHS]) {
+  // The comma-joined effective value on every probed path must still parse and
+  // be internally consistent - a later same-name directive silently replaces
+  // an earlier one in a naive map, so conflicting duplicates are defects even
+  // on release paths where _headers is dead config. Index and site paths also
+  // keep short freshness; a long-cache or immutable rule leaking onto them is
+  // a real defect.
+  const shortFreshPaths = new Set([...INDEX_PATHS, ...SITE_PATHS])
+  for (const path of [...shortFreshPaths, ...RELEASE_PATHS, ...SURFACE_PATHS]) {
     const cc = effective(rules, path).get('cache-control')
     if (cc === undefined) continue
     let map
@@ -287,7 +293,8 @@ function checkConfig({ headersText, wranglerText }) {
       errors.push(`${path}: Cache-Control ${err.message}`)
       continue
     }
-    if (!freshEnough(map)) errors.push(`${path}: Cache-Control '${cc}' pins long freshness on a non-release path`)
+    if (shortFreshPaths.has(path) && !freshEnough(map))
+      errors.push(`${path}: Cache-Control '${cc}' pins long freshness on a non-release path`)
     errors.push(...ccConflicts(map).map((m) => `${path}: ${m}`))
   }
   let wrangler
@@ -301,8 +308,8 @@ function checkConfig({ headersText, wranglerText }) {
     errors.push(...checkRunWorkerFirst(assets))
     if (typeof assets.directory !== 'string' || !assets.directory.includes('packages/web/dist/client'))
       errors.push('assets.directory must serve packages/web/dist/client')
-    if (typeof assets.binding !== 'string' || !assets.binding)
-      errors.push('assets.binding must be set for the Worker to reach the asset layer')
+    if (assets.binding !== 'ASSETS')
+      errors.push("assets.binding must be 'ASSETS' - packages/web/worker.ts reaches the asset layer through env.ASSETS")
     if (assets.not_found_handling === 'single-page-application')
       errors.push('not_found_handling single-page-application would 200 a missing release with index.html')
     if (typeof wrangler.main !== 'string' || !existsSync(resolve(process.cwd(), wrangler.main)))
@@ -401,6 +408,8 @@ if (realResult.wrangler) errors.push(...(await checkWorker(realResult.wrangler))
   const detached = parseHeadersFile('/x\n  Cache-Control: public\n/x\n  ! Cache-Control\n').rules
   assert.equal(effective(detached, '/x').get('cache-control'), undefined)
   assert.throws(() => directives('immutable-ish'))
+  assert.throws(() => directives('public, max-age=60, max-age=0'))
+  assert.deepEqual(directives('public, max-age=60, max-age=60').get('max-age'), '60')
   assert.deepEqual(directives('public, max-age=60').get('max-age'), '60')
 }
 
@@ -448,6 +457,30 @@ const FIXTURES = [
   ['targeted index leak', '/catalog/index.json\n  Cache-Control: public, max-age=86400\n', W, false],
   ['no-store contradicts immutable', '/x\n  Cache-Control: no-store, immutable\n', W, false],
   ['immutable without max-age', '/x\n  Cache-Control: immutable\n', W, false],
+  [
+    'joined conflicting index freshness across matching rules',
+    '/catalog/index.json\n  Cache-Control: public, max-age=31536000\n/catalog/index.json\n  Cache-Control: max-age=0\n',
+    W,
+    false
+  ],
+  [
+    'conflicting index freshness within one rule',
+    '/catalog/index.json\n  Cache-Control: public, max-age=31536000\n  Cache-Control: max-age=0\n',
+    W,
+    false
+  ],
+  [
+    'conflicting freshness on a release path',
+    '/catalog/apps/*\n  Cache-Control: public, max-age=31536000\n  Cache-Control: max-age=0\n',
+    W,
+    false
+  ],
+  [
+    'identical duplicate directives tolerated',
+    '/catalog/index.json\n  Cache-Control: public, max-age=60\n/catalog/index.json\n  Cache-Control: max-age=60\n',
+    W,
+    true
+  ],
   ['non-integer max-age', '/x\n  Cache-Control: max-age=abc\n', W, false],
   ['empty directive value', '/x\n  Cache-Control:\n', W, false],
   ['two splats in one pattern', '/catalog/*/apps/*\n  Cache-Control: no-store\n', W, false],
@@ -499,6 +532,7 @@ const FIXTURES = [
     false
   ],
   ['assets.binding removed', null, W.replace('"binding": "ASSETS",\n', ''), false],
+  ['asset binding renamed', null, W.replace('"binding": "ASSETS"', '"binding": "DIFFERENT_ASSETS"'), false],
   ['main resolves nowhere', null, W.replace('./packages/web/worker.ts', './packages/web/nope.ts'), false]
 ]
 
