@@ -27,13 +27,43 @@ each other exactly, then shuffled into the tray.
 
 - `puzzle.ts` - edge grid, piece paths, placement/snap rules, filters and the
   session and storage wire shapes. No React and no SDK.
+- `persist.ts` - the mutation pipeline: confirmed reads before every rebase,
+  foreign adoption by revision, view admission and intent binding. No React.
+- `queue.ts` - the serial write chain that survives a failed step.
 - `art.ts` - the three bundled illustrations as standalone SVG documents.
 - `board.tsx` - the felt board (SVG pieces, pan/pinch/zoom, snap preview) and
   the tray rail.
-- `audio.ts` - the cue synth.
+- `audio.ts` - the cue synth; `setAdmission` gates it on the live display.
 - `main.tsx` - the app: shared session state, durable saves, sheets, veil.
-- `game.test.ts` - logic checks over the rules and wire formats.
+- `game.test.ts` - logic checks over the rules, wire formats and the
+  persistence adapter (failed reads, delayed dual-boot, admission).
 - `styles.ts` - StyleX styles built on the kit's tokens and themes.
+
+## Persistence rules
+
+Two copies of this app run at once (one per display), so writes follow rules
+that differ from a single-display app:
+
+- A KV read that resolves `null` means the key is empty; a read that REJECTS
+  means the settled state is unknown. `persist.ts` never writes from a
+  rejected read - it fails the step instead, so a one-game library can never
+  overwrite the other saved puzzles, and later mutations retry on their own
+  confirmed reads. Do not add `.catch(() => null)` to store reads.
+- New input (taps, drags, keys, sheet confirms, prefs) is admitted only while
+  `os.view` reports the copy both `active` and `visible`; a hidden copy keeps
+  hydrating and reconciling shared docs but drops gestures before they
+  schedule work. Internal reconciliation (repair, boot seeding) is not input
+  and never passes the gate. The clock and the audio path obey the same two
+  flags.
+- Gestures that outlive their admission bind to the puzzle they were aimed
+  at (`gameKeyOf` - art, count and seed): if a different puzzle is live when
+  the step runs, the intent is dropped rather than applied to a piece index
+  in another game.
+- First boot seeds inside the queued step, after the confirmed reads: a peer
+  that already seeded or saved wins by adoption, never by being overwritten.
+- `queue.ts` keeps the serial chain alive after a failed step; a step that
+  genuinely never settles only delays later writes - do not add timeouts or
+  reload workarounds on top of it.
 
 ## Verification
 

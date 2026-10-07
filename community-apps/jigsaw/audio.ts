@@ -3,9 +3,16 @@
 // because a snap sound arriving late reads as a bug, not a held chord.
 let audio: AudioContext | undefined
 let muted = false
+// The copy that may make sound: main wires this to the live-view admission
+// rule so a hidden display never wakes the context nor plays a cue.
+let admit: () => boolean = () => true
 
 export function setMuted(value: boolean) {
   muted = value
+}
+
+export function setAdmission(fn: () => boolean) {
+  admit = fn
 }
 
 export function audioReady(): boolean {
@@ -14,6 +21,7 @@ export function audioReady(): boolean {
 
 /** Called from inside a user gesture so the context is allowed to run. */
 export function unlock() {
+  if (!admit()) return
   try {
     audio ??= new AudioContext()
     void audio.resume()
@@ -42,7 +50,7 @@ function tone(type: OscillatorType, notes: [number, number][], level: number, su
 export type Cue = 'lift' | 'drop' | 'snap' | 'done'
 
 export function cue(kind: Cue) {
-  if (muted) return
+  if (muted || !admit()) return
   try {
     if (audio?.state !== 'running') return
     if (kind === 'lift') {

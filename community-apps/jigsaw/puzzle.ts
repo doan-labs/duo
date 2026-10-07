@@ -401,6 +401,8 @@ export function parseLive(raw: string | null): Live | null {
 /** Durable save: one game per art:count config plus the last-open pointer. */
 export type Saves = { rev: number; by: string; current: string | null; games: Record<string, Game> }
 export const configKey = (art: string, count: number) => `${art}:${count}`
+/** The game identity a delayed intent binds to: art, count and its seed. */
+export const gameKeyOf = (g: Game) => `${g.art}:${g.count}:${g.seed}`
 
 const SAVES0: Saves = { rev: 0, by: '', current: null, games: {} }
 

@@ -1,7 +1,6 @@
 import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import {
   app,
-  chrome,
   colors,
   easing,
   glass,
@@ -104,18 +103,6 @@ export const styles = stylex.create({
     color: app.fg
   },
   chipValue: { fontWeight: weight.semibold, color: app.fg, fontVariantNumeric: 'tabular-nums' },
-  iconBtn: {
-    width: 34,
-    height: 34,
-    display: 'grid',
-    placeItems: 'center',
-    borderWidth: 0,
-    borderRadius: radius.circle,
-    backgroundColor: app.fill3,
-    color: app.label2,
-    cursor: 'pointer'
-  },
-  iconBtnOn: { backgroundColor: app.link, color: colors.white },
   iconBtnWarn: { backgroundColor: colors.red, color: colors.white },
 
   stage: {
@@ -165,33 +152,32 @@ export const styles = stylex.create({
     paddingBottom: space.xs,
     paddingLeft: space.xs,
     borderRadius: radius.pill,
-    // The zoom dock is a HUD pill over bright artwork: glass.tintDark lets white
-    // text fall under 4.5:1 on light scenes, so it uses the deeper HUD recipe.
-    backgroundColor: chrome.hud,
-    backdropFilter: glass.blur,
-    WebkitBackdropFilter: glass.blur,
+    // A toolbar over bright artwork must not depend on what is behind it: the
+    // opaque app surface keeps the labels at body contrast on every scene, in
+    // light and dark, without touching the shell's chrome tokens.
+    backgroundColor: app.surface,
     boxShadow: `${shadow.rim},${shadow.float}`
   },
   zoomBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
     borderRadius: radius.circle,
     backgroundColor: 'transparent',
-    color: colors.white,
+    color: app.fg,
     cursor: 'pointer'
   },
   zoomPct: {
     minWidth: 44,
-    height: 36,
+    height: 44,
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
     borderRadius: radius.pill,
     backgroundColor: 'transparent',
-    color: colors.white,
+    color: app.fg,
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
@@ -441,9 +427,9 @@ export const styles = stylex.create({
   confirmActions: { display: 'flex', gap: space.sm, justifyContent: 'flex-end' },
   sheetBtn: { minHeight: 44 },
   // Sheet actions: the tinted pill keeps the secondary look but must read at
-  // body-text contrast; the primary inverts the app's own surface pairing.
+  // body-text contrast; the primary keeps UIKit's own filled recipe, app.link
+  // with white - the platform's interaction pairing, not a recolour.
   sheetCancel: { color: app.fg },
-  sheetFill: { backgroundColor: app.fg, color: app.bg },
 
   // Completion veil over the board.
   veil: {
@@ -520,8 +506,8 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     cursor: 'pointer'
   },
-  // The veil's primary cue: a solid pill over the dark glass, not blue.
-  veilBtnAccent: { backgroundColor: colors.white, color: colors.black },
+  // The veil's primary cue: the one interaction colour as a filled pill.
+  veilBtnAccent: { backgroundColor: app.link, color: colors.white },
   confetti: {
     position: 'absolute',
     top: 0,

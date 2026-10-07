@@ -4,6 +4,7 @@
 // reports as a failure).
 
 import { ARTS, isArtId } from './art.ts'
+import { admitInput, createGamePersistence, createPrefsPersistence, PREFS0, parsePrefsDoc } from './persist.ts'
 import {
   BOARD_H,
   BOARD_W,
@@ -44,6 +45,14 @@ const failures: string[] = []
 function check(name: string, fn: () => void) {
   try {
     fn()
+    passed++
+  } catch (error) {
+    failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+async function checkAsync(name: string, fn: () => Promise<void>) {
+  try {
+    await fn()
     passed++
   } catch (error) {
     failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
@@ -346,6 +355,265 @@ try {
 } catch (error) {
   failures.push(`serial queue recovery: ${error instanceof Error ? error.message : String(error)}`)
 }
+
+// A genuinely pending step is not a wedge: later steps wait behind it and run
+// once it settles. This is the normal serial ordering, distinct from a
+// rejection poisoning the chain.
+await checkAsync('serial queue: a still-pending step only delays later work', async () => {
+  const q = { current: Promise.resolve() as Promise<unknown> }
+  let release: (() => void) | null = null
+  enqueue(q, () => new Promise<void>((r) => (release = r)))
+  const done: string[] = []
+  enqueue(q, async () => {
+    done.push('late')
+  })
+  await Promise.resolve()
+  await Promise.resolve()
+  eq(done, [], 'later step ran before the pending step settled')
+  release!()
+  await q.current.catch(() => {})
+  eq(done, ['late'], 'pending step never released later work')
+})
+
+// ---------- persistence adapter checks ----------
+//
+// These exercise the real write path (persist.ts) the UI calls, over a fake KV
+// pair whose reads can reject or be delayed - the exact failure shapes the
+// display pair produces.
+
+class FakeKV {
+  store = new Map<string, string>()
+  sets: { k: string; v: string }[] = []
+  failNext = 0
+  getHook: ((k: string) => Promise<string | null>) | null = null
+  async get(k: string): Promise<string | null> {
+    if (this.getHook) {
+      const h = this.getHook
+      this.getHook = null
+      return h(k)
+    }
+    if (this.failNext > 0) {
+      this.failNext--
+      throw new Error('kv read failed')
+    }
+    return this.store.get(k) ?? null
+  }
+  async set(k: string, v: string) {
+    this.sets.push({ k, v })
+    this.store.set(k, v)
+  }
+}
+
+function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
+  const state = { game: null as Game | null, adopted: [] as string[], savesRaw: null as string | null }
+  const clocks = { live: { rev: 0, by: '' }, saves: { rev: 0, by: '' } }
+  const refs = { game: { current: null as Game | null }, held: { current: null as number | null } }
+  const queue = { current: Promise.resolve() as Promise<unknown> }
+  const p = createGamePersistence({
+    me,
+    liveKV,
+    savesKV,
+    liveKey: 'live',
+    savesKey: 'saves',
+    queue,
+    clocks,
+    refs,
+    adopt(doc) {
+      state.adopted.push(doc.by)
+      state.game = doc.game
+      refs.game.current = doc.game
+      refs.held.current = doc.held
+      clocks.live.rev = doc.rev
+      clocks.live.by = doc.by
+    },
+    acceptSaves(sd) {
+      clocks.saves.rev = sd.rev
+      clocks.saves.by = sd.by
+      state.savesRaw = serializeSaves(sd)
+    },
+    apply(pl) {
+      state.game = pl.game
+      refs.game.current = pl.game
+      refs.held.current = pl.held
+      state.savesRaw = pl.saves
+      void liveKV.set('live', pl.live)
+      void savesKV.set('saves', pl.saves)
+    }
+  })
+  return { p, state, clocks, refs }
+}
+
+await checkAsync('a rejected saves read fails the step and loses no saved config', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const gA = newGame('harbour', 12, 1)
+  const gB = newGame('alpine', 24, 2)
+  saves.store.set(
+    'saves',
+    serializeSaves({ rev: 3, by: 'peer', current: 'harbour:12', games: { 'harbour:12': gA, 'alpine:24': gB } })
+  )
+  const { p } = makePersist('me', live, saves)
+  saves.failNext = 1
+  let failed = false
+  await p
+    .act(() => ({ next: newGame('lantern', 12, 9), held: null }))
+    .then(
+      () => {},
+      () => {
+        failed = true
+      }
+    )
+  ok(failed, 'act did not fail on a rejected read')
+  eq(saves.sets.length, 0, 'a write landed on an unknown snapshot')
+  eq(Object.keys(parseSaves(saves.store.get('saves')!).games).length, 2, 'other saved configs lost')
+  // Recovery: the next mutation sees the confirmed library and preserves both.
+  await p.act(() => ({ next: newGame('lantern', 12, 9), held: null }))
+  const after = parseSaves(saves.store.get('saves')!)
+  eq(Object.keys(after.games).length, 3)
+  ok(after.games['harbour:12'] !== undefined, 'harbour save lost')
+  ok(after.games['alpine:24'] !== undefined, 'alpine save lost')
+  ok(after.games['lantern:12'] !== undefined, 'new game missing')
+})
+
+await checkAsync('a rejected live read fails the step too', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const { p } = makePersist('me', live, saves)
+  live.failNext = 1
+  let failed = false
+  await p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      () => {
+        failed = true
+      }
+    )
+  ok(failed, 'act did not fail on a rejected live read')
+  eq(live.sets.length + saves.sets.length, 0, 'a write landed on an unknown snapshot')
+})
+
+await checkAsync('a newer foreign live doc is adopted before the mutation runs', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const peer = placeAt(newGame('harbour', 12, 5), 0, 10, 20, 100).game
+  live.store.set('live', liveOf('peer', 9, peer, 2))
+  const { p, state, clocks } = makePersist('me', live, saves)
+  let saw: Game | null = null
+  await p.act((ctx) => {
+    saw = ctx.game
+    return ctx.game ? { next: ctx.game, held: ctx.held } : null
+  })
+  eq(state.adopted, ['peer'], 'foreign doc not adopted')
+  eq(saw, peer, 'mutation ran on the stale local game')
+  eq(clocks.live.rev, 10, 'live clock did not advance past the adopted doc')
+})
+
+await checkAsync('a bind-bound intent dies when the live puzzle is no longer the one admitted', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const { p, refs } = makePersist('me', live, saves)
+  const mine = newGame('harbour', 12, 5)
+  refs.game.current = mine
+  // The admitted bind belongs to a different puzzle than what is live now.
+  live.store.set('live', liveOf('peer', 4, newGame('alpine', 24, 7), null))
+  await p.act(() => ({ next: mine, held: 0 }), `harbour:12:${mine.seed}`)
+  eq(live.sets.length + saves.sets.length, 0, 'a piece intent mutated a puzzle it was not admitted against')
+})
+
+await checkAsync('delayed dual-boot: the second copy adopts the peer game instead of seeding over it', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const A = makePersist('copy-a', live, saves)
+  const B = makePersist('copy-b', live, saves)
+  // B's live read is in flight while A boots, seeds, and places a piece.
+  let resolveB: ((v: string | null) => void) | null = null
+  live.getHook = () => new Promise<string | null>((r) => (resolveB = r))
+  const bootB = B.p.act((ctx) => (ctx.game ? null : { next: newGame('lantern', 12, 99), held: null }))
+  await A.p.act((ctx) => (ctx.game ? null : { next: newGame('harbour', 12, 5), held: null }))
+  const seeded = A.state.game!
+  const placed = placeAt(
+    seeded,
+    seeded.tray[0]!,
+    slotX(seeded, seeded.pieces[seeded.tray[0]!]!),
+    slotY(seeded, seeded.pieces[seeded.tray[0]!]!),
+    1000
+  ).game
+  await A.p.act((ctx) => (ctx.game ? { next: placed, held: null } : null))
+  // B's read now returns the settled doc (it arrives after the peer's writes).
+  resolveB!(live.store.get('live') ?? null)
+  await bootB
+  eq(B.state.adopted, ['copy-a'], 'second boot did not adopt the peer')
+  eq(B.state.game, placed, 'second boot kept its own stale seed')
+  const settled = parseLive(live.store.get('live')!)
+  eq(settled!.rev, 2, 'second boot bumped the revision over peer progress')
+  eq(settled!.game, placed, 'placed pieces were reset by the late seed')
+})
+
+await checkAsync('a stale null live read cannot seed over a game the mirror already delivered', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const B = makePersist('copy-b', live, saves)
+  // The session mirror already hydrated the peer game into the local refs;
+  // the confirm read then returns a stale pre-write snapshot.
+  const peerGame = newGame('harbour', 12, 5)
+  B.refs.game.current = peerGame
+  live.getHook = async () => null
+  await B.p.act((ctx) => (ctx.game ? null : { next: newGame('lantern', 12, 9), held: null }))
+  eq(live.sets.length, 0, 'a stale read produced a write over confirmed local state')
+})
+
+await checkAsync('prefs: a rejected read loses nothing, a confirmed read rebases on the peer', async () => {
+  const kv = new FakeKV()
+  kv.store.set('prefs', JSON.stringify({ art: 'lantern', count: 48, muted: true, guide: false, rev: 5, by: 'peer' }))
+  const clock = { rev: 2, by: 'me' }
+  let cur = { ...PREFS0, muted: false }
+  const queue = { current: Promise.resolve() as Promise<unknown> }
+  const pp = createPrefsPersistence({
+    me: 'me',
+    kv,
+    key: 'prefs',
+    queue,
+    clock,
+    current: () => cur,
+    accept(env) {
+      cur = env.prefs
+    },
+    apply(pl) {
+      cur = pl.prefs
+      void kv.set('prefs', pl.raw)
+    }
+  })
+  kv.failNext = 1
+  let failed = false
+  await pp.setPrefs({ muted: false }).then(
+    () => {},
+    () => {
+      failed = true
+    }
+  )
+  ok(failed, 'setPrefs did not fail on a rejected read')
+  eq(kv.sets.length, 0, 'prefs wrote over an unknown snapshot')
+  eq(parsePrefsDoc(kv.store.get('prefs')!).by, 'peer', 'peer prefs were overwritten')
+  // Recovery merges on the peer doc: the patch wins its field, peer fields survive.
+  await pp.setPrefs({ muted: false })
+  const env = parsePrefsDoc(kv.store.get('prefs')!)
+  eq(env.rev, 6)
+  eq(env.by, 'me')
+  eq(env.prefs.muted, false)
+  eq(env.prefs.art, 'lantern', 'peer art lost')
+  eq(env.prefs.count, 48, 'peer count lost')
+  eq(env.prefs.guide, false, 'peer guide lost')
+})
+
+check('input admission requires active AND visible', () => {
+  eq(admitInput({ active: true, visible: true }), true)
+  eq(admitInput({ active: true, visible: false }), false, 'active-but-hidden copy admitted input')
+  eq(admitInput({ active: false, visible: true }), false, 'inactive copy admitted input')
+  eq(admitInput({ active: false, visible: false }), false)
+  eq(admitInput(null), false, 'missing view snapshot admitted input')
+  eq(admitInput(undefined), false)
+})
 
 if (failures.length) {
   console.error(`${failures.length} failing checks:`)
