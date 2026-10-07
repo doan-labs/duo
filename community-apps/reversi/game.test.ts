@@ -23,6 +23,7 @@ import {
   derive,
   emptyTally,
   newGame,
+  OPENING_ID,
   parsePrefs,
   parseTally,
   type SavedGame,
@@ -31,9 +32,11 @@ import {
   tryUndo,
   undoCut
 } from './game.ts'
+import { type Guard, offerPlan, openingSeed, recoverReads, replaceStep, settledRead, storeGate } from './hydration.ts'
 
 let passed = 0
 const failures: string[] = []
+const pending: Promise<void>[] = []
 function check(name: string, fn: () => void) {
   try {
     fn()
@@ -41,6 +44,20 @@ function check(name: string, fn: () => void) {
   } catch (error) {
     failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
   }
+}
+// Storage-round-trip checks await real adapter promises; the runner collects
+// them and only reports after every check settles.
+function checkAsync(name: string, fn: () => Promise<void>) {
+  pending.push(
+    fn().then(
+      () => {
+        passed++
+      },
+      (error) => {
+        failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    )
+  )
 }
 function eq(actual: unknown, want: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(want))
@@ -66,6 +83,16 @@ const cells = (...names: string[]) => names.map(cellIndex)
 /** A settled document with a fixed id, as one display would carry it. */
 function settled(moves: number[], patch: Partial<SavedGame> = {}): SavedGame {
   return { by: 'peer', id: 'match-1', v: 1, mode: 'local', level: 'Medium', you: 'b', moves, ...patch }
+}
+
+/** A settled document with n legal plies - adoptGame keeps only legal tails. */
+function progressed(moves: number, patch: Partial<SavedGame> = {}): SavedGame {
+  let g = settled([], patch)
+  for (let i = 0; i < moves; i++) {
+    const at = [...derive(g.moves).legal.keys()][0]!
+    g = { ...g, moves: [...g.moves, at] }
+  }
+  return g
 }
 
 let seed = 1
@@ -528,5 +555,306 @@ check('an intent admitted live still validates once, then lands across a fold', 
   eq(tryPlace(moved, cover, at).ok, false)
 })
 
+// --- Hydration authority: an unread store is unknown, never empty ---
+// The incident: an exhausted hydrate reported value:null,status:error and the
+// app treated it as an empty store - seeded an opening, skipped the
+// destructive-op confirmation, and a queued write pushed the seed over an
+// 8-ply durable match. These checks pin the contract: failure means unknown,
+// recovery means a real read, and every destructive write revalidates the
+// captured match against the freshest wire document.
+
+const FULL_GAME = cells(
+  'F5',
+  'F4',
+  'F3',
+  'F6',
+  'E6',
+  'D6',
+  'C4',
+  'G4',
+  'D7',
+  'C6',
+  'E7',
+  'D3',
+  'B7',
+  'F2',
+  'H4',
+  'B4',
+  'D2',
+  'C8',
+  'D8',
+  'A8',
+  'E2',
+  'G2',
+  'G6',
+  'H3',
+  'A4',
+  'E3',
+  'B8',
+  'G7',
+  'H5',
+  'G3',
+  'G8',
+  'E1',
+  'F1',
+  'B3',
+  'H2',
+  'C5',
+  'F7',
+  'C3',
+  'A6',
+  'H1',
+  'B2',
+  'E8',
+  'C7',
+  'C2',
+  'G1',
+  'F8',
+  'G5',
+  'D1',
+  'B5',
+  'A1',
+  'A2',
+  'A5',
+  'A3',
+  'C1',
+  'B1',
+  'A7',
+  'H6',
+  'H8',
+  'B6',
+  'H7'
+)
+
+check('the store gate maps mirror states to loading, error and ready', () => {
+  eq(storeGate('hydrating', false), 'loading')
+  eq(storeGate('hydrating', true), 'loading')
+  eq(storeGate('error', false), 'error')
+  // Only a real read flips an errored store back to ready.
+  eq(storeGate('error', true), 'ready')
+  eq(storeGate('ready', false), 'ready')
+  eq(storeGate('saving', false), 'ready')
+})
+
+check('only answered reads may seed or adopt state', () => {
+  eq(settledRead('hydrating'), false)
+  eq(settledRead('error'), false)
+  eq(settledRead('ready'), true)
+  eq(settledRead('saving'), true)
+})
+
+check('a destructive swap validates the captured incarnation against the wire', () => {
+  const confirmed = settled(cells('F5', 'D6'), { id: 'match-a' })
+  const guard: Guard = { id: 'match-a', plies: 2 }
+  // Same match still standing: the swap applies with a fresh id, keeping level.
+  const next = replaceStep(confirmed, guard, { mode: 'solo' }, 'me')
+  ok(next !== null && next.moves.length === 0, 'a matching wire doc still replaces')
+  eq(next!.mode, 'solo')
+  eq(next!.level, 'Medium')
+  ok(next!.id !== 'match-a', 'a replacement gets a fresh match id')
+  // Newer unseen progress or a different peer match refuses the write.
+  eq(replaceStep({ ...confirmed, moves: [...confirmed.moves, cellIndex('C5')] }, guard, undefined, 'me'), null)
+  eq(replaceStep(settled([], { id: 'match-b' }), guard, { mode: 'local' }, 'me'), null)
+  eq(replaceStep(settled([], { id: 'match-b' }), guard, { you: 'w' }, 'me'), null)
+  eq(replaceStep(null, guard, undefined, 'me'), null)
+})
+
+check('a guard built on a fallback opening can never overwrite durable progress', () => {
+  // The incident's fatal combination: an invented opening treated as
+  // authority, whose fresh-match write lands on a real wire document.
+  const seed = openingSeed('me')
+  const durable = progressed(8)
+  eq(replaceStep(durable, { id: seed.id, plies: 0 }, { mode: 'local' }, 'me'), null)
+  eq(replaceStep(durable, { id: seed.id, plies: 0 }, undefined, 'me'), null)
+})
+
+check('the destructive plan confirms live progress and swaps finished or fresh boards', () => {
+  eq(offerPlan(settled(cells('F5', 'D6'))), 'confirm')
+  eq(offerPlan(settled(FULL_GAME)), 'direct')
+  eq(offerPlan(settled([])), 'direct')
+  const seed = openingSeed('me')
+  eq(seed.id, OPENING_ID)
+  eq(seed.moves.length, 0)
+  eq(offerPlan(seed), 'direct')
+})
+
+// A controlled adapter at the same surface the app calls - os.storage get,
+// set and snapshot-style discovery - with per-method failure counts and a
+// shared box two copies can attach to. Reads and writes are independent of
+// snapshot-style failures, matching the incident's adapter contract.
+type Store = { box: Record<string, string>; rev: number }
+const freshStore = (seed: Record<string, string> = {}): Store => ({ box: { ...seed }, rev: 7 })
+
+type FailKey = 'snapshot' | 'get' | 'set' | 'del' | 'keys'
+function wireSpace(store: Store, fail: Partial<Record<FailKey, number>> = {}) {
+  const left = { ...fail }
+  const stats = { snapshot: 0, get: 0, set: 0, del: 0, keys: 0 }
+  const bomb = (m: FailKey) => {
+    const n = left[m] ?? 0
+    if (n > 0) {
+      left[m] = n - 1
+      const error = new Error('E_STORAGE')
+      ;(error as Error & { code: string }).code = 'E_STORAGE'
+      throw error
+    }
+  }
+  const space = {
+    async get(k: string) {
+      stats.get++
+      bomb('get')
+      return store.box[k] ?? null
+    },
+    async set(k: string, v: string) {
+      stats.set++
+      bomb('set')
+      store.box[k] = v
+      store.rev++
+      return { rev: store.rev }
+    },
+    async del(k: string) {
+      stats.del++
+      bomb('del')
+      delete store.box[k]
+      store.rev++
+      return { rev: store.rev }
+    },
+    async keys() {
+      stats.keys++
+      bomb('keys')
+      return { keys: Object.keys(store.box) }
+    },
+    async snapshot() {
+      stats.snapshot++
+      bomb('snapshot')
+      return { rev: store.rev, entries: Object.entries(store.box) }
+    }
+  }
+  return { space, stats, left }
+}
+
+const KEYS = { record: 'reversi-record', prefs: 'reversi-prefs', game: 'reversi-game' }
+
+checkAsync('snapshot failures never reach the app reads: get/set keep answering', async () => {
+  // The incident's adapter: discovery-style snapshot failures exhaust retries
+  // upstream, but the app's own get/set calls keep working - and a failed
+  // hydrate must never turn that into empty-store authority.
+  const durable = progressed(8, { mode: 'local' })
+  const store = freshStore({ 'reversi-game': JSON.stringify(durable) })
+  const { space, stats } = wireSpace(store, { snapshot: 99 })
+  let snapshots = 0
+  for (let i = 0; i < 9; i++) {
+    try {
+      await space.snapshot()
+    } catch {
+      snapshots++
+    }
+  }
+  eq(snapshots, 9)
+  eq(stats.snapshot, 9)
+  // The durable match still answers direct reads, unchanged.
+  const adopted = adoptGame(await space.get('reversi-game'), 'me')
+  eq(adopted.moves.length, 8)
+  // A write on the same adapter lands fine.
+  const moved = progressed(9, { mode: 'local' })
+  await space.set('reversi-game', JSON.stringify(moved))
+  eq(adoptGame(await space.get('reversi-game'), 'me').moves.length, 9)
+})
+
+checkAsync('the recovery batch re-reads every durable key and adopts the real answers', async () => {
+  const tallyWire = '{"black":3,"white":2,"draws":1,"lastGame":"g9"}'
+  const prefsWire = '{"hints":false,"muted":true}'
+  const durable = progressed(2, { mode: 'local' })
+  const store = freshStore({
+    'reversi-record': tallyWire,
+    'reversi-prefs': prefsWire,
+    'reversi-game': JSON.stringify(durable)
+  })
+  const { space } = wireSpace(store)
+  // The exact batch recoverAll issues against os.storage.
+  const reads = await recoverReads((k) => space.get(k), KEYS)
+  eq(parseTally(reads.record), { black: 3, white: 2, draws: 1, lastGame: 'g9' })
+  eq(parsePrefs(reads.prefs), { hints: false, muted: true })
+  eq(adoptGame(reads.game, 'me').moves.length, 2)
+})
+
+checkAsync('a recovery batch that partially fails adopts nothing', async () => {
+  const store = freshStore({ 'reversi-record': '{"black":1,"white":0,"draws":0,"lastGame":"g"}' })
+  const { space } = wireSpace(store, { get: 1 })
+  let threw = false
+  try {
+    await recoverReads((k) => space.get(k), KEYS)
+  } catch {
+    threw = true
+  }
+  ok(threw, 'a failed recovery read must reject the batch, not half-adopt')
+  // The next attempt succeeds and reads the real values.
+  const reads = await recoverReads((k) => space.get(k), KEYS)
+  eq(parseTally(reads.record).black, 1)
+  eq(reads.prefs, null)
+  eq(reads.game, null)
+})
+
+checkAsync('peer progress between admission and the queued step refuses the stale swap', async () => {
+  // Two copies, one store: copy A confirms New on match-a at 2 plies; the peer
+  // pushes a third move before A's queued write executes. The step revalidates
+  // against the fresh base and refuses - match-a's progress survives intact.
+  const base = progressed(2, { id: 'match-a', mode: 'solo' })
+  const store = freshStore({ 'reversi-game': JSON.stringify(base) })
+  const { space } = wireSpace(store)
+  const guard: Guard = { id: 'match-a', plies: 2 }
+  store.box['reversi-game'] = JSON.stringify(progressed(3, { id: 'match-a', mode: 'solo' }))
+  const fresh = adoptGame(await space.get('reversi-game'), 'a')
+  eq(replaceStep(fresh, guard, undefined, 'a'), null)
+  eq(adoptGame(await space.get('reversi-game'), 'a').moves.length, 3)
+})
+
+checkAsync('a stale confirm for match-a after peer match-b writes nothing', async () => {
+  // Copy A's Sheet was confirmed against match-a; by execution time the peer
+  // had already swapped in a whole different match. Refusal keeps match-b.
+  const store = freshStore({ 'reversi-game': JSON.stringify(progressed(1, { id: 'match-a' })) })
+  const { space, stats } = wireSpace(store)
+  const guard: Guard = { id: 'match-a', plies: 1 }
+  store.box['reversi-game'] = JSON.stringify(progressed(3, { id: 'match-b' }))
+  const fresh = adoptGame(await space.get('reversi-game'), 'a')
+  eq(replaceStep(fresh, guard, { mode: 'local' }, 'a'), null)
+  eq(stats.set, 0)
+  eq(adoptGame(await space.get('reversi-game'), 'a').id, 'match-b')
+})
+
+checkAsync('the copy whose confirm still matches the wire swaps cleanly, in either order', async () => {
+  // Both directions of the pairing: whichever copy runs the destructive swap
+  // sees the same guard contract - the live board it confirmed may be replaced.
+  const run = async (me: string) => {
+    const base = progressed(2, { id: 'match-a', mode: 'local' })
+    const store = freshStore({ 'reversi-game': JSON.stringify(base) })
+    const { space } = wireSpace(store)
+    const fresh = adoptGame(await space.get('reversi-game'), me)
+    const next = replaceStep(fresh, { id: 'match-a', plies: 2 }, { mode: 'solo' }, me)
+    ok(next !== null, 'a matching guard still replaces')
+    await space.set('reversi-game', JSON.stringify({ ...next!, by: me }))
+    const readBack = adoptGame(await space.get('reversi-game'), me)
+    eq(readBack.moves.length, 0)
+    eq(readBack.mode, 'solo')
+    ok(readBack.id !== 'match-a', 'the replacement carries a new id')
+  }
+  await run('cover')
+  await run('inner')
+})
+
+checkAsync('a foreign write inside our own write window wins the read-back', async () => {
+  // enqueueGame's settle contract: after our set resolves, a read-back that
+  // returns a different document adopts it - the peer's match is never argued.
+  const store = freshStore({})
+  const { space } = wireSpace(store)
+  const ours = { ...progressed(1, { id: 'a' }), by: 'me' }
+  const theirs = progressed(2, { id: 'a' })
+  await space.set('reversi-game', JSON.stringify(ours))
+  store.box['reversi-game'] = JSON.stringify(theirs)
+  const winner = adoptGame(await space.get('reversi-game'), 'me')
+  eq(winner.moves.length, 2)
+  eq(winner.by, 'peer')
+})
+
+await Promise.all(pending)
 if (failures.length) throw new Error(`${failures.length} failing checks\n${failures.join('\n')}`)
 console.log(`game.test.ts: ${passed} checks passed`)

@@ -508,6 +508,24 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     lineHeight: leading.headline
   },
+  // The load/error state fills the shell viewport and centers one card: the
+  // frame stays dark rather than faking a board the store never confirmed.
+  loadWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
+    width: '100%',
+    animationName: { default: cardIn, [reduce]: 'none' },
+    animationDuration: '.4s',
+    animationTimingFunction: easing.spring
+  },
+  loadCard: {
+    alignItems: 'center',
+    textAlign: 'center',
+    maxWidth: '300px'
+  },
   sheetBody: { fontSize: typeScale.body, lineHeight: leading.body, color: app.label2 },
   sheetRow: { display: 'flex', gap: space.sm, justifyContent: 'flex-end', paddingTop: space.xs },
   delay: (ms: number) => ({ animationDelay: `${ms}ms` }),

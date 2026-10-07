@@ -22,7 +22,10 @@ differentiated engines, or hand the phone over for local pass-and-play.
   bot is thinking.
 - New game, a mode switch or a colour switch with a live match always asks
   first; Escape, the scrim or Cancel backs out and focus returns to the
-  control that asked.
+  control that asked. If the board changed between the ask and the confirmed
+  run - another display moved the match on, or a different match arrived -
+  the write is refused and the Sheet asks again against the board now
+  showing.
 - Keyboard: arrows move the cell focus, Enter/Space places, U undoes, N asks
   for a new game, H toggles hints, M mutes.
 - The match tally card counts black wins, white wins and draws across games.
@@ -38,6 +41,27 @@ replay inserts them itself.
 The bot only thinks on the display being looked at, and it re-reads the latest
 wire state inside its think timer: an undo, reset or foreign write during the
 beat cancels the reply, so no stale or duplicate bot turns exist.
+
+## Store failures
+
+An unread store is an unknown store, never an empty one. While the SDK mirror
+is still hydrating the app shows a Loading card; if the hydration retries run
+out it shows an error card instead, explaining that the match and tally are
+kept safe and offering Retry. No board, tally or default preferences are
+invented from a failed read, so a later write can never clobber real progress
+with an imagined empty store.
+
+Retry re-reads the match, tally and preferences directly through the storage
+adapter and adopts whatever actually answers - no reload needed. Simply
+becoming visible and active again re-reads the wire document the same way, so
+a transient outage self-heals on the next visit. A store that genuinely is
+empty still seeds a fresh solo game normally.
+
+Destructive intents - new match, mode or colour switch, or a confirmed Sheet
+run - carry a guard: the match id and ply count the user saw. The queued
+write re-checks the freshest settled document before landing and is refused
+when unseen progress or a different match arrived; a refusal re-asks instead
+of overwriting. Confirmed-empty stores still start fresh instantly.
 
 ## Input admission
 
@@ -66,7 +90,12 @@ changes.
 - `bun test community-apps/reversi` - deterministic engine, replay, undo,
   wire-hydration, bot-legality and call-time admission tests, including an
   all-eight-directions capture, a real forced pass, a played-out 60-ply game
-  and same-turn fold admission flips.
+  and same-turn fold admission flips. The durable-storage checks run against
+  a controlled wire adapter: exhausted snapshot hydration with working
+  get/set, transient read failures, ambiguous writes and read-backs, record
+  and prefs failure and recovery, both display copy orders, peer progress or
+  a whole new match landing between an ask and its queued write, stale
+  fallback guards, and admitted finite writes completing across a fold.
 - `bun packages/cli/index.mjs check community-apps/reversi` - manifest,
   source, design-token and strict typecheck gates.
 - `bun packages/cli/index.mjs build community-apps/reversi` - bundle well

@@ -18,8 +18,6 @@ import {
   emptyTally,
   fitLayout,
   type Mode,
-  newGame,
-  OPENING_ID,
   type Prefs,
   parsePrefs,
   parseTally,
@@ -29,6 +27,16 @@ import {
   tryReply,
   tryUndo
 } from './game.ts'
+import {
+  type Guard,
+  type NewPatch,
+  offerPlan,
+  openingSeed,
+  recoverReads,
+  replaceStep,
+  settledRead,
+  storeGate
+} from './hydration.ts'
 import { styles } from './styles.ts'
 
 // One storage key holds the whole match as a last-writer-wins document. Every
@@ -79,6 +87,11 @@ function Game() {
   const [hover, setHover] = useState<number | null>(null)
   const [focusCell, setFocusCell] = useState(-1)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
+  // Hydration authority: until a read answers - the mirror's hydrate or a
+  // direct get - the store's contents are unknown, not empty. Only a real
+  // answer may flip this, so an exhausted hydrate can never mint an opening
+  // board, a zero tally, or default prefs as authority.
+  const [recovered, setRecovered] = useState(false)
 
   const lastSeen = useRef<string | null | undefined>(undefined)
   const lastRecord = useRef<string | null | undefined>(undefined)
@@ -136,10 +149,11 @@ function Game() {
     return raw === null ? null : adoptGame(raw, ME)
   }, [])
 
-  // Adopt whatever the store currently carries before deciding anything. The
-  // mirror (useKV) can lag a fold wake-up; this read does not.
-  const syncGame = useCallback(async (): Promise<SavedGame | null> => {
-    const stored = await readStoredGame()
+  // Settle a just-read wire document into local state: adopt what the store
+  // carries, or seed an opening only when the answer was confirmed empty.
+  // Queued callers validate against gameRef before the state commit lands,
+  // so adoption publishes synchronously here too.
+  const settleStored = useCallback((stored: SavedGame | null) => {
     const local = gameRef.current
     if (
       stored &&
@@ -151,10 +165,26 @@ function Game() {
         stored.you !== local.you)
     ) {
       setGame(stored)
+      gameRef.current = stored
       setHover(null)
+    } else if (!stored && !local && !seeded.current) {
+      seeded.current = true
+      const seed = openingSeed(ME)
+      setGame(seed)
+      gameRef.current = seed
     }
-    return stored ?? local
-  }, [readStoredGame])
+  }, [])
+
+  // Adopt whatever the store currently carries before deciding anything. The
+  // mirror (useKV) can lag a fold wake-up; this read does not. A successful
+  // read is also the recovery path: it confirms the store after a failed
+  // hydrate, seeds only when the empty answer is real, and re-opens the gate.
+  const syncGame = useCallback(async (): Promise<SavedGame | null> => {
+    const stored = await readStoredGame()
+    setRecovered(true)
+    settleStored(stored)
+    return stored ?? gameRef.current
+  }, [readStoredGame, settleStored])
 
   /**
    * Every game write goes through here: sync to the wire, run the step on the
@@ -196,10 +226,14 @@ function Game() {
         await os.storage.set(GAME_KEY, wire)
         lastSeen.current = wire
         setGame(settled)
+        gameRef.current = settled
         const after = await os.storage.get(GAME_KEY)
         if (after !== null && after !== wire) {
           const winner = adoptGame(after, ME)
-          if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) setGame(winner)
+          if (winner.id !== settled.id || winner.moves.length !== settled.moves.length) {
+            setGame(winner)
+            gameRef.current = winner
+          }
         }
         return true
       }),
@@ -227,7 +261,7 @@ function Game() {
   )
 
   const enqueuePrefs = useCallback(
-    (patch: Partial<Prefs>): Promise<Prefs> =>
+    (patch: Partial<Prefs>): Promise<Prefs | undefined> =>
       enqueue(async () => {
         const base = parsePrefs(await os.storage.get(PREFS_KEY))
         // Callers admit at the handler; the merge is unconditional so a pref
@@ -238,7 +272,7 @@ function Game() {
         lastPrefs.current = wire
         setPrefs(next)
         return next
-      }),
+      }).catch(() => undefined),
     [enqueue]
   )
 
@@ -251,15 +285,21 @@ function Game() {
   // was settled: the first adoption after a fold wake-up syncs silently, and
   // only changes that land while we are actually live play their cue.
   useEffect(() => {
-    if (saved.status === 'hydrating') return
+    // Anything but a real answer - 'hydrating' or 'error' - leaves the store
+    // unknown: the board stays empty (load/error UI below) rather than
+    // seeding an invented opening a later write could push over real progress.
+    if (!settledRead(saved.status)) return
     const raw = saved.value
     if (raw !== null && raw === lastSeen.current) return
     lastSeen.current = raw
     if (!raw) {
-      // A fresh store seeds a shared opening; the first real move publishes.
+      // Only a confirmed-empty store seeds a shared opening; the first real
+      // move publishes.
       if (!seeded.current) {
         seeded.current = true
-        setGame({ ...newGame(ME, 'solo', 'Medium', 'b'), id: OPENING_ID })
+        const seed = openingSeed(ME)
+        setGame(seed)
+        gameRef.current = seed
       }
       return
     }
@@ -267,6 +307,7 @@ function Game() {
     const next = adoptGame(raw, ME)
     if (next.by === ME) return
     setGame(next)
+    gameRef.current = next
     setHover(null)
     if (liveRaw.current !== undefined) {
       // Sound what just changed on the peer display: a fresh match, a takeback,
@@ -290,11 +331,13 @@ function Game() {
     }
     if (wasActive.current) return
     wasActive.current = true
-    void enqueueSync()
+    // An activation re-read doubles as store recovery after a failed hydrate:
+    // a failed attempt settles this job and the error card stays for Retry.
+    void enqueueSync().catch(() => {})
   }, [view.active, enqueueSync])
 
   useEffect(() => {
-    if (stored.status === 'hydrating') return
+    if (!settledRead(stored.status)) return
     const raw = stored.value
     if (raw !== null && raw === lastRecord.current) return
     lastRecord.current = raw
@@ -302,7 +345,7 @@ function Game() {
   }, [stored.value, stored.status])
 
   useEffect(() => {
-    if (prefsKv.status === 'hydrating') return
+    if (!settledRead(prefsKv.status)) return
     const raw = prefsKv.value
     if (raw !== null && raw === lastPrefs.current) return
     lastPrefs.current = raw
@@ -351,7 +394,7 @@ function Game() {
           const ok = await enqueueGame((base) => {
             const r = tryReply(base, snapshot, pick.at)
             return r.ok ? r.game : null
-          })
+          }).catch(() => false)
           if (ok) play('flip')
         } finally {
           if (!cancelled) setThinking(false)
@@ -374,7 +417,7 @@ function Game() {
     // the celebration the folded copy could not post still lands here once.
     if (!view.active || !view.visible || !liveActive()) return
     if (!game || !d?.over || celebrated.current === game.id) return
-    if (stored.status !== 'ready' && stored.status !== 'saving') return
+    if (!settledRead(stored.status)) return
     celebrated.current = game.id
     const winner = d.over.winner
     void enqueueRecord((tally) => {
@@ -382,6 +425,9 @@ function Game() {
       if (liveActive()) navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
       play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
       return countFinished(tally, game.id, winner)
+    }).catch(() => {
+      // The tally write never landed: un-mark so a later activation retries.
+      celebrated.current = null
     })
   }, [d, game, view.active, view.visible, stored.status, play, enqueueRecord])
 
@@ -420,48 +466,68 @@ function Game() {
     sheetCancel = confirm ? closeConfirm : null
   }, [confirm, closeConfirm])
 
-  const newMatch = useCallback(
-    (patch?: { mode?: Mode; you?: Color }) => {
-      if (!game || !liveActive()) return
-      const next = newGame(ME, patch?.mode ?? game.mode, game.level, patch?.you ?? game.you)
-      void enqueueGame(() => next).then((ok) => {
-        if (!ok) return
-        play('new')
-        setHover(null)
-        setFocusCell(-1)
+  // Destructive swaps are functions rather than callbacks so newMatch and
+  // requestNew can re-enter cleanly: every entry point (button tap, confirmed
+  // Sheet run, re-ask after a refusal) captures a guard - the match id and
+  // ply count the user actually saw - and the queued step writes only while
+  // the freshest wire document still matches it.
+  function newMatch(patch: NewPatch | undefined, guard: Guard) {
+    if (!gameRef.current || !liveActive()) return
+    void enqueueGame((base) => replaceStep(base, guard, patch, ME))
+      .then((ok) => {
+        if (ok) {
+          play('new')
+          setHover(null)
+          setFocusCell(-1)
+          return
+        }
+        reoffer(patch)
       })
-    },
-    [game, play, enqueueGame]
-  )
+      .catch(() => {
+        // A failed write is not a refusal: the board simply keeps the match
+        // the wire still holds - no re-ask, no silent swap.
+      })
+  }
+
+  // A refusal means the wire moved past what was confirmed - newer unseen
+  // progress or a different match entirely. Neither may be overwritten on a
+  // stale answer, so the path asks again against the match now on screen;
+  // the retry is always the user's own click, never an automatic clobber.
+  function reoffer(patch: NewPatch | undefined) {
+    const g = gameRef.current
+    if (!g || !liveActive()) return
+    askConfirm({
+      title: 'The board changed while you decided',
+      body: 'Starting over now replaces the latest match - confirm again to continue.',
+      action: 'Replace',
+      run: () => newMatch(patch, { id: g.id, plies: g.moves.length })
+    })
+  }
+
+  const confirmFor = (patch: NewPatch | undefined, g: SavedGame, guard: Guard): Confirm => {
+    let title = 'Start a new game?'
+    let action = 'New game'
+    if (patch?.mode && patch.mode !== g.mode) {
+      title = patch.mode === 'local' ? 'Switch to two players?' : 'Switch to solo?'
+      action = 'Switch'
+    } else if (patch?.you && patch.you !== g.you) {
+      title = `Play as ${patch.you === 'b' ? 'Black' : 'White'}?`
+      action = 'Start over'
+    }
+    return { title, body: 'The match in progress will be lost.', action, run: () => newMatch(patch, guard) }
+  }
 
   // A match with entered progress is never wiped silently: destructive starts
-  // go through the Sheet; a fresh or finished board swaps directly.
-  const requestNew = useCallback(
-    (patch?: { mode?: Mode; you?: Color }) => {
-      if (!game || !d || !liveActive()) return
-      const live = d.plies > 0 && !d.over
-      if (!live) {
-        newMatch(patch)
-        return
-      }
-      let title = 'Start a new game?'
-      let action = 'New game'
-      if (patch?.mode && patch.mode !== game.mode) {
-        title = patch.mode === 'local' ? 'Switch to two players?' : 'Switch to solo?'
-        action = 'Switch'
-      } else if (patch?.you && patch.you !== game.you) {
-        title = `Play as ${patch.you === 'b' ? 'Black' : 'White'}?`
-        action = 'Start over'
-      }
-      askConfirm({
-        title,
-        body: 'The match in progress will be lost.',
-        action,
-        run: () => newMatch(patch)
-      })
-    },
-    [game, d, askConfirm, newMatch]
-  )
+  // go through the Sheet; a fresh or finished board swaps directly. Reads
+  // gameRef so a re-offered intent always sees the newest adopted match, not
+  // the render the gesture started from.
+  function requestNew(patch?: NewPatch) {
+    const g = gameRef.current
+    if (!g || !liveActive()) return
+    const guard: Guard = { id: g.id, plies: g.moves.length }
+    if (offerPlan(g) === 'confirm') askConfirm(confirmFor(patch, g, guard))
+    else newMatch(patch, guard)
+  }
 
   const place = useCallback(
     (at: number) => {
@@ -488,18 +554,24 @@ function Game() {
       void enqueueGame((base) => {
         const r = tryPlace(base, expected, at)
         return r.ok ? r.game : null
-      }).then((ok) => {
-        if (!ok) {
-          // The wire moved past the board this tap was aimed at: reject it,
-          // never overwrite the foreign moves that landed meanwhile.
+      })
+        .then((ok) => {
+          if (!ok) {
+            // The wire moved past the board this tap was aimed at: reject it,
+            // never overwrite the foreign moves that landed meanwhile.
+            play('reject')
+            if (liveActive()) navigator.vibrate?.(18)
+            return
+          }
+          play('flip')
+          setFocusCell(at)
+          setHover(null)
+        })
+        .catch(() => {
+          // The write itself never landed: same honest reject as a stale tap.
           play('reject')
           if (liveActive()) navigator.vibrate?.(18)
-          return
-        }
-        play('flip')
-        setFocusCell(at)
-        setHover(null)
-      })
+        })
     },
     [game, d, thinking, view.active, play, enqueueGame]
   )
@@ -510,18 +582,20 @@ function Game() {
     void enqueueGame((base) => {
       const r = tryUndo(base, expected)
       return r.ok ? r.game : null
-    }).then((ok) => {
-      if (!ok) return
-      play('undo')
-      setHover(null)
     })
+      .then((ok) => {
+        if (!ok) return
+        play('undo')
+        setHover(null)
+      })
+      .catch(() => play('reject'))
   }, [game, d, thinking, play, enqueueGame])
 
   const setLevel = useCallback(
     (level: Level) => {
       if (!game || !liveActive() || level === game.level) return
       const expected = game
-      void enqueueGame((base) => (base.id === expected.id ? { ...base, level } : null))
+      void enqueueGame((base) => (base.id === expected.id ? { ...base, level } : null)).catch(() => {})
     },
     [game, enqueueGame]
   )
@@ -566,10 +640,68 @@ function Game() {
     boardRef.current?.querySelector<HTMLElement>(`[data-cell="${next}"]`)?.focus()
   }
 
+  const gameGate = storeGate(saved.status, recovered)
+
+  // Recovery re-reads every key once, on the serial queue: each answer
+  // confirms its own key, the game read re-opens the gate, and a confirmed
+  // empty answer seeds the shared opening. A failed batch adopts nothing and
+  // the error card stays for the next attempt. Runs only while live.
+  const recoverAll = useCallback(async () => {
+    const reads = await recoverReads((k) => os.storage.get(k), {
+      record: RECORD_KEY,
+      prefs: PREFS_KEY,
+      game: GAME_KEY
+    })
+    lastRecord.current = reads.record
+    setRecord(parseTally(reads.record))
+    lastPrefs.current = reads.prefs
+    setPrefs(parsePrefs(reads.prefs))
+    setRecovered(true)
+    settleStored(adoptGame(reads.game, ME))
+  }, [settleStored])
+
+  const recover = useCallback(() => {
+    if (!liveActive()) return
+    void enqueue(recoverAll).catch(() => {})
+  }, [enqueue, recoverAll])
+
   if (!game || !d) {
     // The shell still renders while the store hydrates: useWide's observer
-    // needs the element on the first commit.
-    return <main ref={rootRef} {...stylex.props(dark, styles.root)} />
+    // needs the element on the first commit. A failed hydrate is 'unknown',
+    // never 'empty': the card says so honestly and offers a real re-read.
+    return (
+      <main ref={rootRef} {...stylex.props(dark, styles.root)}>
+        <section {...stylex.props(styles.loadWrap)}>
+          <div {...stylex.props(styles.card, styles.loadCard)}>
+            {gameGate === 'error' ? (
+              <>
+                <span {...stylex.props(styles.sheetTitle)}>Could not load your saved game</span>
+                <span {...stylex.props(styles.sheetBody)}>
+                  Your match and tally are kept safe - the store did not answer. Check the connection and try again.
+                </span>
+                <button
+                  type="button"
+                  onClick={recover}
+                  {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
+                >
+                  <Sym name="reload" size={13} />
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>
+                <span {...stylex.props(styles.sheetTitle)}>Loading saved game</span>
+                <span aria-hidden="true" {...stylex.props(styles.thinkDots)}>
+                  <i {...stylex.props(styles.thinkDot)} />
+                  <i {...stylex.props(styles.thinkDot, styles.delay(140))} />
+                  <i {...stylex.props(styles.thinkDot, styles.delay(280))} />
+                </span>
+              </>
+            )}
+          </div>
+        </section>
+      </main>
+    )
   }
 
   const solo = game.mode === 'solo'
