@@ -666,6 +666,12 @@ function Jigsaw() {
     </button>
   )
 
+  const progressChip = (
+    <span {...stylex.props(styles.chip)}>
+      <span {...stylex.props(styles.chipValue)}>{placed}</span>/{game.pieces.length}
+    </span>
+  )
+
   const boardEl = (
     <BoardPane
       api={boardApi}
@@ -752,15 +758,16 @@ function Jigsaw() {
 
   return (
     <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)}>
-      <header {...stylex.props(styles.header)}>
-        <div {...stylex.props(styles.brand)}>
-          <span {...stylex.props(styles.kicker)}>Jigsaw</span>
-          <h1 {...stylex.props(styles.title, cover && styles.titleCover)}>{art.name}</h1>
+      <header {...stylex.props(styles.header, cover && styles.headerCover)}>
+        <div {...stylex.props(styles.titleLine)}>
+          <div {...stylex.props(styles.brand)}>
+            <span {...stylex.props(styles.kicker)}>Jigsaw</span>
+            <h1 {...stylex.props(styles.title, cover && styles.titleCover)}>{art.name}</h1>
+          </div>
+          {cover ? progressChip : null}
         </div>
         <div {...stylex.props(styles.headerSide)}>
-          <span {...stylex.props(styles.chip)}>
-            <span {...stylex.props(styles.chipValue)}>{placed}</span>/{game.pieces.length}
-          </span>
+          {!cover ? progressChip : null}
           {!cover ? (
             <span {...stylex.props(styles.chip)}>
               <span {...stylex.props(styles.chipValue)}>{formatTime(elapsedMs(game, now))}</span>

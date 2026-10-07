@@ -47,6 +47,16 @@ export const styles = stylex.create({
     paddingBottom: space.sm,
     paddingLeft: space.lg
   },
+  // Cover: the four 44pt actions plus the title do not share 387pt, so the
+  // header stacks - title and progress on top, actions on the second row.
+  headerCover: { flexDirection: 'column', alignItems: 'stretch' },
+  titleLine: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    minWidth: 0
+  },
   brand: { display: 'flex', flexDirection: 'column', minWidth: 0 },
   kicker: {
     fontSize: typeScale.caption2,
@@ -54,7 +64,7 @@ export const styles = stylex.create({
     letterSpacing: tracking.caption2,
     textTransform: 'uppercase',
     fontWeight: weight.semibold,
-    color: app.label3
+    color: app.label2
   },
   title: {
     fontSize: typeScale.title2,
@@ -67,9 +77,17 @@ export const styles = stylex.create({
     fontSize: typeScale.title3,
     lineHeight: leading.title3
   },
-  headerSide: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: space.sm },
+  headerSide: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: space.sm
+  },
   chip: {
     display: 'flex',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
     alignItems: 'baseline',
     gap: space.xs,
     paddingTop: space.xs,
@@ -247,7 +265,7 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     color: app.label2
   },
-  railCount: { marginLeft: 'auto', color: app.label3, fontVariantNumeric: 'tabular-nums' },
+  railCount: { marginLeft: 'auto', color: app.label2, fontVariantNumeric: 'tabular-nums' },
   trayBox: {
     flexGrow: 1,
     minHeight: 0,
@@ -266,7 +284,7 @@ export const styles = stylex.create({
     paddingTop: space.xl,
     paddingBottom: space.xl,
     textAlign: 'center',
-    color: app.label3,
+    color: app.label2,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote
@@ -352,7 +370,7 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
-    color: app.label3,
+    color: app.label2,
     textAlign: 'center'
   },
 
@@ -401,7 +419,7 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
     letterSpacing: tracking.caption1,
-    color: app.label3
+    color: app.label2
   },
   confirmCard: { display: 'flex', flexDirection: 'column', gap: space.md },
   confirmTitle: {
@@ -526,7 +544,7 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     zIndex: 4
   },
-  savedTag: { display: 'inline-flex', alignItems: 'center', gap: space.xs, color: app.label3 },
+  savedTag: { display: 'inline-flex', alignItems: 'center', gap: space.xs, color: app.label2 },
   segWrap: { paddingRight: space.md, paddingLeft: space.md, display: 'flex', flexShrink: 0 },
   // The piece riding the pointer mid-drag: floats above everything, never
   // receives the pointer itself.
