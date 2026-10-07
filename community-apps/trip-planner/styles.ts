@@ -392,7 +392,10 @@ export const styles = stylex.create({
     paddingBottom: space.xxl,
     paddingLeft: space.lg
   },
-  grow: { flexGrow: 1, minWidth: 0 },
+  // basis 0, not auto: an auto basis lets a long nowrap label inflate the
+  // row's shrink math until the accessory group clamps at min-content and
+  // the header overflows the viewport.
+  grow: { flexGrow: 1, flexBasis: 0, minWidth: 0 },
   // -- travel -----------------------------------------------------------------------
   // The Travel/Pack bodies pad horizontally so rows keep a real space.lg
   // margin off the viewport edge; section titles align with the card edge.

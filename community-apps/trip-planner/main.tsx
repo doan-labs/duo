@@ -186,11 +186,15 @@ function useFocusTrap(
       // row, a closed menu). The real failure this bounds: focus() on a
       // control inside the still-exiting, still-inert sheet region silently
       // no-ops, so a fixed rAF count can be exhausted before the exit ends
-      // and focus strands on BODY. Retry on a timer until focus actually
-      // lands, the user has already moved it, or ~800ms passes - well past
-      // the 200ms exit plus inert teardown on a slow frame. Each attempt
-      // re-resolves the fallback so an anchor on an exiting Push sheet is
-      // skipped once it detaches.
+      // and focus strands on BODY. A cold mount is the other window: the
+      // host's view state may not have landed when the first sheet closes,
+      // so canFocus() reads false and a one-shot restore dies immediately.
+      // Retry on a timer until focus actually lands, the user has already
+      // moved it, or ~800ms passes - well past the 200ms exit plus inert
+      // teardown on a slow frame, and past the late view delivery on a cold
+      // copy. A hidden copy burns its 800ms harmlessly: it never focuses.
+      // Each attempt re-resolves the fallback so an anchor on an exiting
+      // Push sheet is skipped once it detaches.
       const deadline = Date.now() + 800
       // The exiting layer is our sheet's dialog plus its scrim sibling:
       // focus sitting on either dies with the unmount, so it counts as
@@ -201,14 +205,29 @@ function useFocusTrap(
       const layerScrim = prev instanceof HTMLElement && prev.getAttribute('aria-label') === 'Close' ? prev : null
       const inLayer = (el: Element | null) => !!el && (layerDialog?.contains(el) === true || el === layerScrim)
       const restore = () => {
-        if (!canFocus()) return
+        // Not yet the live copy? Keep waiting inside the deadline: a cold
+        // mount can deliver `os.view` after the first close, and returning
+        // here would strand focus on BODY forever. A genuinely hidden copy
+        // simply retries until the deadline - it never calls focus().
+        if (!canFocus()) {
+          if (Date.now() < deadline) setTimeout(restore, 60)
+          return
+        }
         const at = document.activeElement
         // The user (or a new layer) already owns focus - do not steal it.
-        if (at && at !== document.body && at.isConnected && !inLayer(at)) return
-        const el = trigger.current?.isConnected ? trigger.current : anchorFallback((c) => inLayer(c))
-        if (!el?.isConnected || inLayer(el)) return
-        el.focus()
-        if (document.activeElement !== el && Date.now() < deadline) setTimeout(restore, 60)
+        // Only stranded focus gets a target: BODY, a detached node, or a
+        // control inside the exiting layer.
+        if (!at || at === document.body || !at.isConnected || inLayer(at)) {
+          const el = trigger.current?.isConnected ? trigger.current : anchorFallback((c) => inLayer(c))
+          if (el?.isConnected && !inLayer(el)) el.focus()
+        }
+        // Poll for the whole deadline even after a landed focus: the element
+        // just restored to can still die underneath focus (a deleted row's
+        // own screen unmounts when the deferred write commits, or an exiting
+        // Push sheet detaches late). Its detach drops activeElement back to
+        // BODY, which the next tick reads as stranded and re-resolves
+        // against the new screen.
+        if (Date.now() < deadline) setTimeout(restore, 60)
       }
       setTimeout(restore, 0)
     }
@@ -218,7 +237,10 @@ function useFocusTrap(
 /** Stable chrome buttons that survive a deleted record: the trip screen's
  * actions menu first, then any marked control, then any button. */
 const anchorFallback = (exclude?: (el: HTMLElement) => boolean) => {
-  const pick = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].find((el) => !exclude?.(el))
+  // Screen-level targets only: nothing inside a dialog, so an exiting or
+  // still-open sheet's own controls can never be mistaken for an anchor.
+  const pick = (sel: string) =>
+    [...document.querySelectorAll<HTMLElement>(sel)].find((el) => !el.closest('dialog') && !exclude?.(el))
   return (
     pick('main [data-focus-anchor="trip"]:not([disabled])') ??
     pick('main [data-focus-anchor]:not([disabled])') ??
@@ -1411,9 +1433,12 @@ function TripPlanner() {
   // Finite removal feedback: ids marked leaving render a short fade before
   // the delete write lands. The deferred commit runs as an authorized step:
   // the delete was accepted at tap time, so it commits once even across a
-  // fold, on the freshest library.
+  // fold, on the freshest library. Admission is the gate: only a mutation
+  // accepted on the live copy may schedule the fade and its authorized
+  // completion - a hidden caller reaches neither.
   const markLeaving = useCallback(
     (ids: string | string[], mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void) => {
+      if (!liveVis() || !storage.readyNow()) return
       const list = Array.isArray(ids) ? ids : [ids]
       setLeaving((s) => {
         const n = new Set(s)
@@ -1429,7 +1454,7 @@ function TripPlanner() {
         mutateLib(mutate, after, true)
       }, 190)
     },
-    [mutateLib]
+    [mutateLib, liveVis, storage.readyNow]
   )
 
   const pushUndo = useCallback(
