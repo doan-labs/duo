@@ -269,18 +269,22 @@ function Solitaire() {
   const railBodyRef = useRef<HTMLDivElement>(null)
   const [railScrolls, setRailScrolls] = useState(false)
   useLayoutEffect(() => {
+    // The rail only exists once `wide` settles true; on the inner display the
+    // first commit is still the narrow layout, so this must re-run when it
+    // lands or the observer never arms and the fade can never appear.
     const el = railScrollRef.current
     const body = railBodyRef.current
-    if (!el || !body) return
+    if (!wide || !el || !body) {
+      setRailScrolls(false)
+      return
+    }
     const check = () => setRailScrolls(el.scrollHeight - el.clientHeight > 4)
     check()
-    // The scrollport's own box never grows; the overflow arrives as the
-    // body inside it growing - so the body is what must be observed.
     const ro = new ResizeObserver(check)
     ro.observe(el)
     ro.observe(body)
     return () => ro.disconnect()
-  }, [])
+  }, [wide])
 
   const stopAuto = useCallback(() => {
     if (autoTimer.current !== null) {

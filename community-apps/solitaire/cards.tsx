@@ -139,21 +139,23 @@ function CourtArt({ rank, suit }: { rank: number; suit: Suit }) {
 }
 
 /** The card's face: corner indices top-left and bottom-right, pips or a medallion in the middle.
-    `bare` strips the corner to the rank alone for a mostly-covered card,
-    where a clipped suit glyph reads worse than none. */
+    `bare` renders only the corner index for a mostly-covered card, where the
+    centre art would be clipped by the next card in the fan anyway. */
 export function CardFace({ card, small, bare }: { card: Card; small?: boolean; bare?: boolean }) {
   const ink = suitColor(card.suit)
   const rank = RANK_NAMES[card.rank]!
   const court = card.rank >= 10 // J, Q, K
   if (bare)
+    // A covered fan card shows only its left strip: rank and suit sit
+    // side by side in the corner so the strip alone identifies the card.
     return (
       <span {...stylex.props(styles.face)} aria-hidden="true">
-        <span {...stylex.props(styles.corner, styles.cornerTop, styles.suitInk(ink))}>
+        <span {...stylex.props(styles.corner, styles.cornerTop)}>
           <b {...stylex.props(styles.cornerRank)}>{rank}</b>
+          <i {...stylex.props(styles.cornerSuit, styles.suitInk(ink))}>
+            <SuitGlyph suit={card.suit} />
+          </i>
         </span>
-        <i {...stylex.props(styles.soloPip, styles.suitInk(ink))}>
-          <SuitGlyph suit={card.suit} />
-        </i>
       </span>
     )
   return (

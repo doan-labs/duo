@@ -296,10 +296,10 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
         <span
           key={card.id}
           aria-hidden="true"
-          {...stylex.props(styles.faceSide, styles.faceFront, styles.cardFont(fit.font), place(x, 0, 10 + i))}
+          {...stylex.props(styles.faceSide, styles.faceFront, styles.cardFont(fit.font * 0.68), place(x, 0, 10 + i))}
         >
-          {/* Covered fan cards show their rank only: the overlap hides the
-              rest, and a clipped half-suit reads worse than a bare index. */}
+          {/* Covered fan cards carry a compact rank+suit corner sized to the
+              visible strip, so the overlap never clips the suit's identity. */}
           <CardFace card={card} small={fit.cardW < 52} bare />
         </span>
       )
