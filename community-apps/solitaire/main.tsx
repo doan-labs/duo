@@ -763,11 +763,12 @@ function Solitaire() {
     const el = returnFocus.current
     returnFocus.current = null
     // The trigger sits inside the inert subtree until the close commits, so
-    // retry across frames until inert lifts and it takes focus again.
+    // retry across frames until inert lifts and it takes focus again. A copy
+    // that loses the display between frames must not steal focus back.
     if (el instanceof HTMLElement) {
       let tries = 0
       const restore = () => {
-        if (!el.isConnected) return
+        if (!el.isConnected || !activeRef.current) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
@@ -963,6 +964,7 @@ function Solitaire() {
       shake={shake}
       dealing={dealing}
       won={ended}
+      active={view.active}
       onSpot={onSpot}
       onCard={onCard}
       onCardDouble={onCardDouble}

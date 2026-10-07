@@ -83,14 +83,18 @@ export interface BoardProps {
   /** 0 while settled; bumped to a deal index base on a fresh deal. */
   dealing: boolean
   won: boolean
+  /** Only the display-owning copy may move focus inside the table. */
+  active: boolean
   onSpot: (spot: Spot) => void
   onCard: (id: number, spot: Spot, index: number) => void
   /** Double-tap on a card sends it to its best legal home. */
   onCardDouble: (id: number, spot: Spot, index: number) => void
 }
 
-export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onCardDouble }: BoardProps) {
+export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onCard, onCardDouble }: BoardProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const activeRef = useRef(active)
+  activeRef.current = active
   const [size, setSize] = useState({ w: 0, h: 0 })
   useLayoutEffect(() => {
     const el = ref.current
@@ -110,6 +114,7 @@ export function Board({ game, sel, hot, shake, dealing, won, onSpot, onCard, onC
     const el = ref.current
     if (!el) return
     const onFocusOut = (event: FocusEvent) => {
+      if (!activeRef.current) return // a hidden copy never takes focus
       const dead = event.relatedTarget === null || !el.contains(event.relatedTarget as Node)
       if (dead && (document.activeElement === document.body || document.activeElement === document.documentElement))
         el.focus()
