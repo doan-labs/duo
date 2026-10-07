@@ -256,6 +256,14 @@ function Solitaire() {
   const pendingStats = useRef<{ next: Stats; issued?: string } | null>(null)
   const ioRetry = useRef<number | null>(null)
   const ioFails = useRef(0)
+  // Every game record this copy has issued, adopted or been delivered. The
+  // mirror lags the store and re-serves superseded records verbatim; lastSeen
+  // alone cannot spot them once a newer raw took its place, so a redelivered
+  // old record would pass as 'foreign' and regress the table. Content dedup
+  // is sound because `by` and the whole move log sit inside the record - a
+  // genuinely new peer write never repeats a raw byte for byte, while a stale
+  // echo always does.
+  const seenRaws = useRef<Set<string>>(new Set())
   // noteWriteFault's timer calls the latest flush through this ref, dodging
   // the declaration cycle between the two callbacks.
   const flushIORef = useRef<() => void>(() => {})
@@ -354,12 +362,13 @@ function Solitaire() {
       void flushWrite(game, {
         get: () => os.storage.get('game'),
         foreign: (cur) => {
-          if (cur === lastSeen.current) return false
+          if (cur === lastSeen.current || seenRaws.current.has(cur)) return false
           const next = adoptGame(cur)
           if (!next || next.by === ME) return false
           pendingGame.current = null
           mirrorBehind.current = true
           lastSeen.current = cur
+          seenRaws.current.add(cur)
           const t = { ...next.deal, game: next.game }
           setTable(t)
           tableRef.current = t
@@ -371,14 +380,22 @@ function Solitaire() {
           // The mirror still serves the superseded record and will re-deliver
           // it as a fresh foreign write - after a relaunch it even parses
           // foreign (a new ME) - which would bounce the table straight back.
-          // Settle the adopted record so it converges.
-          void saved.set(cur)
+          // Settle the adopted record so it converges - but only while the
+          // store still holds it: a repair write landing after a newer record
+          // would revert that newer deal, so the store gets re-read first.
+          void os.storage
+            .get('game')
+            .then((now) => {
+              if (now === cur) void saved.set(cur)
+            })
+            .catch(() => {})
           setStatus('Game restored - the other screen moved first.')
           return true
         },
         stale: () => tableRef.current !== game.next,
         issue: (raw) => {
           lastSeen.current = raw
+          seenRaws.current.add(raw)
           void saved.set(raw)
         },
         fault: () => {
@@ -432,10 +449,11 @@ function Solitaire() {
   const freshBase = useCallback((): { table: Table; foreign: boolean } => {
     const raw = savedValRef.current
     if (raw === lastSeen.current) mirrorBehind.current = false
-    if (!mirrorBehind.current && raw && raw !== lastSeen.current) {
+    if (!mirrorBehind.current && raw && raw !== lastSeen.current && !seenRaws.current.has(raw)) {
       const next = adoptGame(raw)
       if (next && next.by !== ME) {
         lastSeen.current = raw
+        seenRaws.current.add(raw)
         const t = { ...next.deal, game: next.game }
         setTable(t)
         tableRef.current = t
@@ -479,6 +497,10 @@ function Solitaire() {
       mirrorBehind.current = false
       return
     }
+    // A raw this copy already consumed proves nothing new: the mirror
+    // re-serves superseded records while it lags, and treating one as a
+    // fresh foreign write reverts the table to an older deal.
+    if (raw !== null && seenRaws.current.has(raw)) return
     // While the mirror is behind the store, a value that does not parse to a
     // foreign record - the stale deal it keeps serving, or our own optimistic
     // echo - is not a write and must not re-stamp lastSeen. Only a genuinely
@@ -489,6 +511,7 @@ function Solitaire() {
     }
     mirrorBehind.current = false
     lastSeen.current = raw
+    if (raw !== null) seenRaws.current.add(raw)
     if (!raw) {
       // Seeding the first deal is new work only the live copy may do; an
       // unanswerable store ('error') is not an empty record either, so a
