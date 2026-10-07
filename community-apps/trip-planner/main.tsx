@@ -48,6 +48,7 @@ import {
 import { createRoot } from 'react-dom/client'
 import { cue, setCueGate, setMuted } from './audio.ts'
 import { styles } from './styles.ts'
+import { applyWatch, clearPending, queuePending, WriteQueue } from './sync.ts'
 import {
   addLeg,
   addPack,
@@ -180,19 +181,27 @@ function useFocusTrap(
     return () => {
       cancelAnimationFrame(frame)
       document.removeEventListener('keydown', onKey, true)
-      // Restore to the control that opened the layer. If it is gone (a deleted
-      // row, a closed menu), fall back to the surviving screen's stable anchor,
-      // re-querying each frame so an anchor on an exiting Push sheet is skipped
-      // once it detaches instead of stranding focus on BODY.
-      let tries = 0
+      // Restore to the control that opened the layer, falling back to the
+      // surviving screen's stable anchor when the trigger is gone (a deleted
+      // row, a closed menu). The real failure this bounds: focus() on a
+      // control inside the still-exiting, still-inert sheet region silently
+      // no-ops, so a fixed rAF count can be exhausted before the exit ends
+      // and focus strands on BODY. Retry on a timer until focus actually
+      // lands, the user has already moved it, or ~800ms passes - well past
+      // the 200ms exit plus inert teardown on a slow frame. Each attempt
+      // re-resolves the fallback so an anchor on an exiting Push sheet is
+      // skipped once it detaches.
+      const deadline = Date.now() + 800
       const restore = () => {
         if (!canFocus()) return
+        // The user (or a new layer) already owns focus - do not steal it.
+        if (document.activeElement && document.activeElement !== document.body) return
         const el = trigger.current?.isConnected ? trigger.current : anchorFallback()
         if (!el) return
         el.focus()
-        if (document.activeElement !== el && ++tries < 12) requestAnimationFrame(restore)
+        if (document.activeElement !== el && Date.now() < deadline) setTimeout(restore, 60)
       }
-      requestAnimationFrame(restore)
+      setTimeout(restore, 0)
     }
   }, [active, initial])
 }
@@ -248,7 +257,7 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   const [values, setValues] = useState<Map<string, string> | null>(null)
   const [error, setError] = useState(false)
   const pending = useRef(new Map<string, (string | null)[]>())
-  const queue = useRef<Promise<void>>(Promise.resolve())
+  const writes = useRef(new WriteQueue())
   const bootRef = useRef<() => void>(() => {})
   // Live mirror of the space's truth: every snapshot, watch event and own
   // optimistic write lands here synchronously, so mutation chains can rebase
@@ -282,17 +291,16 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
             return
           }
           if (!owns(e.k)) return
-          const q = pending.current.get(e.k)
-          if (q?.length && q[0] === e.v) {
-            q.shift()
-            if (!q.length) pending.current.delete(e.k)
-          }
-          if (e.v === null) latest.current.delete(e.k)
-          else latest.current.set(e.k, e.v)
+          // Merge through applyWatch: an older own echo must not roll the
+          // effective value back while newer own writes are still queued,
+          // and foreign values are adopted only when nothing is pending.
+          const eff = applyWatch(pending.current, e.k, e.v)
+          if (eff === null) latest.current.delete(e.k)
+          else latest.current.set(e.k, eff)
           setValues((cur) => {
             const next = new Map(cur ?? [])
-            if (e.v === null) next.delete(e.k)
-            else next.set(e.k, e.v)
+            if (eff === null) next.delete(e.k)
+            else next.set(e.k, eff)
             return next
           })
         })
@@ -309,11 +317,11 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
     }
   }, [space, owns])
 
+  // Resolves true once the port accepted this write, false on rejection -
+  // 'applied' callers distinguish a landed commit from an enqueued hope.
   const write = useCallback(
-    (k: string, v: string | null) => {
-      const q = pending.current.get(k) ?? []
-      q.push(v)
-      pending.current.set(k, q)
+    (k: string, v: string | null): Promise<boolean> => {
+      queuePending(pending.current, k, v)
       if (v === null) latest.current.delete(k)
       else latest.current.set(k, v)
       setValues((cur) => {
@@ -322,18 +330,16 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
         else next.set(k, v)
         return next
       })
-      queue.current = queue.current.then(async () => {
-        try {
-          if (v === null) await space.del(k)
-          else await space.set(k, v)
-        } catch {
+      return writes.current.send(
+        () => (v === null ? space.del(k) : space.set(k, v)),
+        () => {
           // The write never landed: drop this copy's pending mask for the key
           // and re-snapshot so the display converges on the stored truth.
-          pending.current.delete(k)
+          clearPending(pending.current, k)
           setError(true)
           bootRef.current()
         }
-      })
+      )
     },
     [space]
   )
@@ -351,10 +357,11 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       /** Live readiness check - unlike `ready` state this stays true in a
        * callback captured before the first snapshot resolved. */
       readyNow: () => readyNow.current,
+      /** True once the port accepted the write; false on rejection. */
       put: (k: string, v: string) => write(k, v),
       del: (k: string) => write(k, null),
-      /** Resolves once every write queued so far has been flushed to the port. */
-      settled: () => queue.current
+      /** Resolves once every write queued so far finished; true iff all landed. */
+      settled: () => writes.current.settled()
     }),
     [values, error, write]
   )
@@ -492,7 +499,7 @@ function parseDraft(raw: string | null): Draft | null {
 }
 
 /** Outcome reported to a mutateLib `after` hook (see TripPlanner). */
-type MutateResult = 'applied' | 'noop' | 'dropped'
+type MutateResult = 'applied' | 'noop' | 'dropped' | 'failed'
 
 /** Undo slot: the payload needed to restore what a delete removed. */
 type Undo = {
@@ -1326,13 +1333,16 @@ function TripPlanner() {
     [session, liveVis]
   )
 
-  /** One storage write per changed trip plus the index. */
+  /** One storage write per changed trip plus the index; resolves true only
+   * when the port accepted every write in the diff. */
   const writeLibDiff = useCallback(
-    (prev: Library, next: Library) => {
+    async (prev: Library, next: Library) => {
       const prevById = new Map(prev.trips.map((t) => [t.id, t]))
-      for (const id of prev.order) if (!next.order.includes(id)) storage.del(`trip.${id}`)
-      for (const t of next.trips) if (prevById.get(t.id) !== t) storage.put(`trip.${t.id}`, serializeTrip(t))
-      if (next.order.join('') !== prev.order.join('')) storage.put('index', serializeIndex(next.order))
+      const out: Promise<boolean>[] = []
+      for (const id of prev.order) if (!next.order.includes(id)) out.push(storage.del(`trip.${id}`))
+      for (const t of next.trips) if (prevById.get(t.id) !== t) out.push(storage.put(`trip.${t.id}`, serializeTrip(t)))
+      if (next.order.join('') !== prev.order.join('')) out.push(storage.put('index', serializeIndex(next.order)))
+      return (await Promise.all(out)).every(Boolean)
     },
     [storage]
   )
@@ -1348,31 +1358,34 @@ function TripPlanner() {
     return assembleLibrary(storage.now('index'), records)
   }, [storage])
 
-  /** Every library mutation runs through one serialized chain. Entry is
-   * gated on the live view; each step re-gates at execution, rebases the
-   * pure mutation onto `libNow()`, diffs, writes, then runs `after` so
-   * follow-ups (arming Undo, clearing locks) happen only after the write.
-   * 'noop' means the mutation found nothing to change; 'dropped' means this
-   * copy hid before the step ran - callers arm Undo only on 'applied' and
-   * dismiss it on 'applied'|'noop'. */
+  /** Every library mutation runs through one serialized read/mutate/write
+   * chain: each step rebases the pure mutation onto `libNow()`, diffs and
+   * AWAITS the diff writes, then runs `after` so follow-ups (arming Undo,
+   * clearing locks) observe the durable outcome. Admission is gated on the
+   * live view for new input; `authorized` completions of already-accepted
+   * mutations may finish after a fold.
+   * 'noop' means the mutation found nothing to change; 'applied' means the
+   * port accepted every diff write; 'failed' means a write was rejected
+   * (the space re-snapshots itself) - callers arm Undo or claim success
+   * only on 'applied' and surface 'failed' as an error. */
   const libWrites = useRef<Promise<void>>(Promise.resolve())
   const mutateLib = useCallback(
-    (mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void) => {
-      if (!liveVis() || !storage.readyNow()) return
+    (mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void, authorized = false) => {
+      // Admission gate: NEW input must come through the live copy. An
+      // `authorized` step is the completion of a mutation the live copy
+      // already accepted (a deferred fade commit) - it must finish even
+      // if this copy has since folded, or a tapped Delete would vanish.
+      if ((!authorized && !liveVis()) || !storage.readyNow()) return
       libWrites.current = libWrites.current
-        .then(() => {
-          if (!liveVis()) {
-            after?.('dropped')
-            return
-          }
+        .then(async () => {
           const cur = libNow()
           const next = mutate(cur)
           if (!next || next === cur) {
             after?.('noop')
             return
           }
-          writeLibDiff(cur, next)
-          after?.('applied')
+          const landed = await writeLibDiff(cur, next)
+          after?.(landed ? 'applied' : 'failed')
         })
         .catch(() => {})
     },
@@ -1380,8 +1393,9 @@ function TripPlanner() {
   )
 
   // Finite removal feedback: ids marked leaving render a short fade before
-  // the delete write lands. The deferred commit goes through mutateLib, so
-  // it rebases on the freshest library and is dropped if this copy hides.
+  // the delete write lands. The deferred commit runs as an authorized step:
+  // the delete was accepted at tap time, so it commits once even across a
+  // fold, on the freshest library.
   const markLeaving = useCallback(
     (ids: string | string[], mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void) => {
       const list = Array.isArray(ids) ? ids : [ids]
@@ -1396,15 +1410,17 @@ function TripPlanner() {
           for (const id of list) n.delete(id)
           return n
         })
-        mutateLib(mutate, after)
+        mutateLib(mutate, after, true)
       }, 190)
     },
     [mutateLib]
   )
 
   const pushUndo = useCallback(
-    (u: Omit<Undo, 'v' | 'by' | 'at'>) => {
-      if (!liveVis()) return
+    (u: Omit<Undo, 'v' | 'by' | 'at'>, authorized = false) => {
+      // Arming Undo after a committed delete is part of that authorized
+      // mutation; a user-driven arm stays gated on the live copy.
+      if (!authorized && !liveVis()) return
       session.put('undo', JSON.stringify({ ...u, v: 1, by: ME, at: Date.now() } satisfies Undo))
     },
     [session, liveVis]
@@ -1431,21 +1447,28 @@ function TripPlanner() {
   const doUndo = useCallback(() => {
     if (!liveVis() || !undo) return
     const u = undo
-    // Apply the inverse against the freshest library, then consume the slot
-    // only once the write queue has settled - and only if it still holds
-    // this undo (a fresher one may have arrived meanwhile).
+    // Apply the inverse against the freshest library. The slot is consumed
+    // only when the mutation is durably applied (or a verified noop) and
+    // the slot still holds this same undo - a failed write keeps it so the
+    // user can retry, and surfaces an error instead of a success cue.
+    const consume = () => {
+      const cur2 = parseUndo(session.now('undo'))
+      if (cur2 && cur2.at === u.at) session.del('undo')
+    }
     mutateLib(
       (cur) => applyUndo(cur, u),
       (r) => {
-        if (r === 'dropped') return
-        void storage.settled().then(() => {
-          const cur2 = parseUndo(session.now('undo'))
-          if (cur2 && cur2.at === u.at) session.del('undo')
-        })
-        if (r === 'applied') cue('undo')
+        if (r === 'applied') {
+          consume()
+          cue('undo')
+        } else if (r === 'noop') {
+          consume()
+        } else if (r === 'failed') {
+          cue('error')
+        }
       }
     )
-  }, [undo, mutateLib, storage, session, liveVis])
+  }, [undo, mutateLib, session, liveVis])
 
   // One auto-dismiss timer, armed by the live copy only - a hidden copy must
   // not expire a slot it cannot display.
@@ -1507,11 +1530,16 @@ function TripPlanner() {
         return 'err' in r2 ? cur : r2.lib
       },
       (r) => {
+        // Clear this commit's save lock once the mutation is durably done
+        // (applied or failed) - a stale lock must never block the editor.
         if (r === 'dropped') return
-        void storage.settled().then(async () => {
-          const cur2 = await os.session.get('draft').catch(() => null)
-          if (parseDraft(cur2)?.saving === stamp) session.del('draft')
-        })
+        void os.session
+          .get('draft')
+          .then((cur2) => {
+            if (parseDraft(cur2)?.saving === stamp) session.del('draft')
+          })
+          .catch(() => {})
+        if (r === 'failed') cue('error')
       }
     )
     cue('save')
@@ -1618,8 +1646,9 @@ function TripPlanner() {
       },
       (r) => {
         if (r === 'dropped') return
-        if (r === 'applied' && payload) pushUndo(payload)
+        if (r === 'applied' && payload) pushUndo(payload, true)
         if (r === 'applied') cue('delete')
+        if (r === 'failed') cue('error')
       }
     )
   }
@@ -1848,13 +1877,17 @@ function TripPlanner() {
                 },
                 (r) => {
                   if (r === 'applied')
-                    pushUndo({
-                      kind: 'pack',
-                      tripId: t.id,
-                      label: `Removed "${p.label}"`,
-                      item: p,
-                      index: t.packing.indexOf(p)
-                    })
+                    pushUndo(
+                      {
+                        kind: 'pack',
+                        tripId: t.id,
+                        label: `Removed "${p.label}"`,
+                        item: p,
+                        index: t.packing.indexOf(p)
+                      },
+                      true
+                    )
+                  if (r === 'failed') cue('error')
                 }
               )
             }
@@ -1873,13 +1906,17 @@ function TripPlanner() {
                 },
                 (r) => {
                   if (r === 'applied' && cleared)
-                    pushUndo({
-                      kind: 'packs',
-                      tripId: t.id,
-                      label: `Cleared ${cleared.items.length} packed`,
-                      items: cleared.items,
-                      indexes: cleared.indexes
-                    })
+                    pushUndo(
+                      {
+                        kind: 'packs',
+                        tripId: t.id,
+                        label: `Cleared ${cleared.items.length} packed`,
+                        items: cleared.items,
+                        indexes: cleared.indexes
+                      },
+                      true
+                    )
+                  if (r === 'failed') cue('error')
                 }
               )
             }}
