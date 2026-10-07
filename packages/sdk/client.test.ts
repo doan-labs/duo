@@ -130,25 +130,78 @@ async function connected(h: ReturnType<typeof harness>) {
   return client
 }
 
-test('a hidden copy still receives view updates when rAF never runs', async () => {
+test('a hidden copy hears lifecycle changes on receipt, never waiting on rAF or timers', async () => {
   const h = harness()
   try {
     const client = await connected(h)
     const seen: ViewInfo[] = []
     client.onView((v) => seen.push(v))
-    // Host marks the folded-away copy hidden. No flushFrames(): the occluded
-    // document never produces a frame, but subscribers must still hear it.
+    // Host marks the folded-away copy hidden. No flushFrames() and no tick():
+    // the occluded document produces no frames and its timers are throttled,
+    // so the lifecycle flip must reach subscribers synchronously on receipt.
     h.feedView({ visible: false, active: false, focused: false, angle: 0 })
     assert.equal(client.view.visible, false)
-    h.tick(400)
     assert.equal(seen.length, 1)
     assert.equal(seen[0]!.visible, false)
+    assert.equal(seen[0]!.active, false)
+    // Nothing is owed a repaint or a timer fire for the lifecycle delivery.
+    assert.equal(h.frames.size, 0)
+    assert.equal(h.timers.size, 0)
+    // Geometry-only updates still coalesce and still get the bounded fallback.
+    h.feedView({ angle: 45, visible: false, active: false, focused: false })
+    assert.equal(seen.length, 1)
+    h.tick(400)
+    assert.equal(seen.length, 2)
+    assert.equal(seen[1]!.angle, 45)
   } finally {
     h.restore()
   }
 })
 
-test('rapid fold/unfold delivers the latest snapshot, once', async () => {
+test('a copy that boots hidden reads the truthful state and hears its first show at once', async () => {
+  const h = harness()
+  try {
+    const client = createClient()
+    const c = client.connect()
+    h.welcome(view({ display: 'cover', width: 0, height: 0, visible: false, active: false, focused: false, angle: 0 }))
+    await c
+    assert.equal(client.view.visible, false)
+    assert.equal(client.view.active, false)
+    const seen: ViewInfo[] = []
+    client.onView((v) => seen.push(v))
+    h.feedView({ visible: true, active: true, focused: true })
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0]!.visible, true)
+    assert.equal(seen[0]!.active, true)
+  } finally {
+    h.restore()
+  }
+})
+
+test('a lifecycle flip inside a coalesced geometry stream delivers the latest snapshot at once', async () => {
+  const h = harness()
+  try {
+    const client = await connected(h)
+    const seen: ViewInfo[] = []
+    client.onView((v) => seen.push(v))
+    for (let i = 0; i < 20; i++) h.feedView({ angle: 180 - i })
+    assert.equal(seen.length, 0)
+    h.feedView({ visible: false, active: false })
+    // The pending frame is consumed by the synchronous delivery: no stale
+    // geometry snapshot can overtake the lifecycle observation afterwards.
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0]!.visible, false)
+    assert.equal(seen[0]!.angle, 180)
+    assert.equal(h.frames.size, 0)
+    h.tick(400)
+    h.flushFrames()
+    assert.equal(seen.length, 1)
+  } finally {
+    h.restore()
+  }
+})
+
+test('rapid lifecycle alternation delivers each transition once with the latest snapshot', async () => {
   const h = harness()
   try {
     const client = await connected(h)
@@ -156,10 +209,14 @@ test('rapid fold/unfold delivers the latest snapshot, once', async () => {
     client.onView((v) => seen.push(v))
     h.feedView({ visible: false, angle: 40 })
     h.feedView({ visible: true, angle: 170 })
+    h.feedView({ visible: false, angle: 0 })
     h.tick(400)
-    assert.equal(seen.length, 1)
-    assert.equal(seen[0]!.visible, true)
-    assert.equal(seen[0]!.angle, 170)
+    assert.equal(seen.length, 3)
+    assert.equal(seen[0]!.visible, false)
+    assert.equal(seen[1]!.visible, true)
+    assert.equal(seen[1]!.angle, 170)
+    assert.equal(seen[2]!.visible, false)
+    assert.equal(seen[2]!.angle, 0)
   } finally {
     h.restore()
   }
@@ -192,7 +249,8 @@ test('a subscribed callback that unsubscribed while a delivery is pending is not
     const b: ViewInfo[] = []
     const offA = client.onView((v) => a.push(v))
     client.onView((v) => b.push(v))
-    h.feedView({ visible: false })
+    // Geometry-only so the delivery stays pending until the fallback fires.
+    h.feedView({ angle: 90 })
     offA()
     h.tick(400)
     assert.equal(a.length, 0)
@@ -208,7 +266,7 @@ test('stop cancels a pending view delivery entirely', async () => {
     const client = await connected(h)
     const seen: ViewInfo[] = []
     client.onView((v) => seen.push(v))
-    h.feedView({ visible: false, active: false })
+    h.feedView({ angle: 90 })
     h.feed({ ev: 'bye' })
     h.tick(400)
     h.flushFrames()
@@ -241,7 +299,7 @@ test('teardown leaves no delivery timers behind', async () => {
   try {
     const client = await connected(h)
     client.onView(() => {})
-    h.feedView({ visible: false })
+    h.feedView({ angle: 30 })
     h.feed({ ev: 'bye' })
     assert.equal(h.frames.size, 0)
     assert.equal(h.timers.size, 0)

@@ -45,10 +45,16 @@ type Command = { type: string; payload: string }
 type Listener = (e: unknown) => void
 /** Device events that are a state, not a moment: a new listener hears the current value first. */
 const STATES: DeviceEvent[] = ['orientation', 'switches']
-/** View updates still coalesce to one callback per frame; this is only the floor for
- * occluded copies whose frames never run. A hidden iframe keeps its timers, so a
- * modest delay still reaches subscribers instead of leaving the last frame pending. */
+/** Geometry-only view updates still coalesce to one callback per frame; this is only
+ * the floor for occluded copies whose frames never run. A hidden iframe keeps its
+ * timers, so a modest delay still reaches subscribers instead of leaving the last
+ * frame pending. Lifecycle fields are never gated on it. */
 const VIEW_FALLBACK_MS = 250
+
+/** View fields that gate hidden-copy work: subscribers must observe a change
+ * synchronously, not on a repaint callback or throttled timer that may never fire
+ * in an occluded document. Only width/height/angle stay frame-coalesced. */
+const VIEW_LIFECYCLE: (keyof ViewInfo)[] = ['display', 'placement', 'visible', 'active', 'focused']
 
 /** One client per app document; importing host-only types has no side effects. */
 export function createClient() {
@@ -59,6 +65,7 @@ export function createClient() {
   let argSeq = 0
   let frame = 0
   let wake: ReturnType<typeof setTimeout> | undefined
+  let delivered: ViewInfo | null = null
   const pending = new Map<number, Pending>()
   const views = new Set<(v: ViewInfo) => void>()
   const owners = new Set<(o: { epoch: number } | null) => void>()
@@ -100,6 +107,7 @@ export function createClient() {
     frame = 0
     clearTimeout(wake)
     wake = undefined
+    delivered = client.view
     for (const cb of views) cb(client.view)
   }
   function request<T>(m: Method, p?: unknown): Promise<T> {
@@ -209,15 +217,23 @@ export function createClient() {
       case 'bye':
         stop('E_CLOSED')
         break
-      case 'view':
+      case 'view': {
         if (!viewValid(event.p)) return stop('E_PROTOCOL')
         client.view = event.p
-        // One pending delivery whichever fires first: the frame keeps per-frame
-        // coalescing where frames run, the timer keeps the delivery guarantee in
-        // an occluded document where requestAnimationFrame never ticks.
-        if (!frame) frame = requestAnimationFrame(deliver)
-        if (wake === undefined) wake = setTimeout(deliver, VIEW_FALLBACK_MS)
+        // Lifecycle transitions cannot wait on a paint callback or a throttled
+        // timer: a hidden copy's gates (timers, audio, input, writes) key off
+        // visible/active/focused, so any change since the last delivered snapshot
+        // reaches subscribers on receipt. Geometry updates keep the per-frame
+        // coalescing, with the timer as the occluded-document delivery floor.
+        const prev = delivered
+        if (!prev || VIEW_LIFECYCLE.some((k) => prev[k] !== client.view[k])) {
+          deliver()
+        } else {
+          if (!frame) frame = requestAnimationFrame(deliver)
+          if (wake === undefined) wake = setTimeout(deliver, VIEW_FALLBACK_MS)
+        }
         break
+      }
       case 'owner':
         if (event.p !== null && (!record(event.p) || !Number.isSafeInteger(event.p.epoch))) return stop('E_PROTOCOL')
         client.owner = event.p
@@ -307,6 +323,7 @@ export function createClient() {
           }
           clean()
           client.view = data.view
+          delivered = client.view
           client.owner = data.owner
           argSeq = data.session.argSeq
           Object.assign(client.session, data.session)
