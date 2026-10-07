@@ -3,6 +3,7 @@ import {
   colors,
   fonts,
   leading,
+  motion,
   radius,
   shadow,
   space,
@@ -343,12 +344,17 @@ export const styles = stylex.create({
     backgroundColor: { default: app.surface, ':active': app.fill }
   },
   // shared.press/pill carry no reduced-motion override (platform gap, reported).
-  // Applied after them so the scale flatten wins under prefers-reduced-motion;
-  // state/tint feedback (stepItemOn, rowTap) still marks the press.
+  // StyleX replaces a property's whole condition map on merge, so the :active
+  // scale is restated here and flattened only inside the reduce branch; the
+  // media rule sorts after the base rule and wins under reduced motion.
   pressCalm: {
     transform: {
       default: null,
-      '@media (prefers-reduced-motion: reduce)': 'none'
+      ':active': motion.press,
+      '@media (prefers-reduced-motion: reduce)': {
+        default: null,
+        ':active': 'none'
+      }
     }
   },
   soundBtn: {
