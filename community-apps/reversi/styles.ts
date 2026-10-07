@@ -410,9 +410,9 @@ export const styles = stylex.create({
     textTransform: 'uppercase',
     color: app.label2
   },
-  // The moves card owns the rail's leftover height and scrolls inside itself
-  // so a long match can never push the layout past the display edge.
-  movesCard: { flexGrow: 1, minHeight: 0, overflow: 'hidden' },
+  // The moves card owns the rail's leftover height, but never less than a
+  // readable floor - when the rail overflows it scrolls to reveal the log.
+  movesCard: { flexGrow: 1, minHeight: '176px', overflow: 'hidden' },
   tally: { display: 'flex', gap: space.sm, alignItems: 'center', fontSize: typeScale.subheadline },
   tallyItem: { display: 'flex', alignItems: 'center', gap: space.xs, fontVariantNumeric: 'tabular-nums' },
   log: {
