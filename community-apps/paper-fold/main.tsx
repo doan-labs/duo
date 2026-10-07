@@ -78,7 +78,7 @@ function SoundButton({ muted, onToggle }: { muted: boolean; onToggle: () => void
       aria-label={muted ? 'Unmute sound effects' : 'Mute sound effects'}
       aria-pressed={muted}
       onClick={onToggle}
-      {...stylex.props(styles.soundBtn, shared.press)}
+      {...stylex.props(styles.soundBtn, shared.press, styles.pressCalm)}
     >
       <SpeakerGlyph off={muted} />
     </button>
@@ -269,7 +269,7 @@ function StepRail({
             data-current={cur}
             tabIndex={cur ? 0 : -1}
             onClick={() => onStep(i)}
-            {...stylex.props(styles.stepItem, shared.press, cur && styles.stepItemOn)}
+            {...stylex.props(styles.stepItem, shared.press, styles.pressCalm, cur && styles.stepItemOn)}
           >
             <span {...stylex.props(styles.stepThumb)}>
               <StepDiagram els={s.els} still eager />
@@ -288,7 +288,7 @@ function StepRail({
         data-current={result}
         tabIndex={result ? 0 : -1}
         onClick={() => onStep(total)}
-        {...stylex.props(styles.stepItem, shared.press, result && styles.stepItemOn)}
+        {...stylex.props(styles.stepItem, shared.press, styles.pressCalm, result && styles.stepItemOn)}
       >
         <span {...stylex.props(styles.stepThumb)}>
           <StepDiagram els={model.result} still eager />
@@ -344,7 +344,7 @@ function Coach({
           <button
             type="button"
             aria-label="Back to models"
-            {...stylex.props(shared.bk, styles.bkTap, shared.press)}
+            {...stylex.props(shared.bk, styles.bkTap, shared.press, styles.pressCalm)}
             onClick={onBack}
           >
             <Sym name="back" size={20} />
@@ -370,14 +370,18 @@ function Coach({
                 Nice folding. Try it with different paper - small sheets are trickier.
               </div>
               <div {...stylex.props(styles.resultBtns)}>
-                <Button xstyle={styles.navBtn} onClick={onReplay}>
+                <Button xstyle={[styles.navBtn, styles.pressCalm]} onClick={onReplay}>
                   <Sym name="reload" size={14} /> Fold again
                 </Button>
-                <Button xstyle={styles.navBtn} onClick={onBack}>
+                <Button xstyle={[styles.navBtn, styles.pressCalm]} onClick={onBack}>
                   <Sym name="grid" size={14} /> All models
                 </Button>
                 {nextModel && (
-                  <Button variant="filled" xstyle={styles.navBtn} onClick={() => onNextModel(nextModel)}>
+                  <Button
+                    variant="filled"
+                    xstyle={[styles.navBtn, styles.pressCalm]}
+                    onClick={() => onNextModel(nextModel)}
+                  >
                     Next: {nextModel.name}
                   </Button>
                 )}
@@ -401,7 +405,11 @@ function Coach({
                 Step {at + 1} of {total} - {current!.text}
               </div>
               <div {...stylex.props(styles.transport)}>
-                <Button xstyle={styles.navBtn} onClick={() => onStep(at - 1, 'back')} disabled={at === 0}>
+                <Button
+                  xstyle={[styles.navBtn, styles.pressCalm]}
+                  onClick={() => onStep(at - 1, 'back')}
+                  disabled={at === 0}
+                >
                   <Sym name="back" size={14} /> Back
                 </Button>
                 <span {...stylex.props(styles.transportMid)} aria-hidden="true">
@@ -409,7 +417,7 @@ function Coach({
                 </span>
                 <Button
                   variant="filled"
-                  xstyle={styles.navBtn}
+                  xstyle={[styles.navBtn, styles.pressCalm]}
                   onClick={() => onStep(at + 1, at + 1 === total ? 'done' : 'fold')}
                 >
                   {at + 1 === total ? 'Finish' : 'Next'} <Sym name="forward" size={14} />

@@ -342,6 +342,15 @@ export const styles = stylex.create({
     transitionDuration: '.15s',
     backgroundColor: { default: app.surface, ':active': app.fill }
   },
+  // shared.press/pill carry no reduced-motion override (platform gap, reported).
+  // Applied after them so the scale flatten wins under prefers-reduced-motion;
+  // state/tint feedback (stepItemOn, rowTap) still marks the press.
+  pressCalm: {
+    transform: {
+      default: null,
+      '@media (prefers-reduced-motion: reduce)': 'none'
+    }
+  },
   soundBtn: {
     display: 'flex',
     alignItems: 'center',
