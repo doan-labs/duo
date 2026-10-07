@@ -6,6 +6,7 @@ import * as stylex from '@stylexjs/stylex'
 import { type RefObject, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
+import { admitSeed, LIB_KEY, readLib, writeLib } from './library.ts'
 import {
   addItem,
   CATALOG,
@@ -23,9 +24,7 @@ import {
   isOlderEdit,
   itemRect,
   itemSize,
-  type Library,
   latestDoc,
-  mergeLib,
   moveItem,
   newPlan,
   PIECE,
@@ -41,7 +40,6 @@ import {
   renameDoc,
   resizeRoom,
   rotateItem,
-  serializeLibrary,
   serializeMirror,
   serializePrefs,
   setView,
@@ -50,7 +48,6 @@ import {
   type Units,
   undoHistory,
   wallGaps,
-  welcomePlan,
   withCore,
   withDoc,
   withoutDoc,
@@ -64,7 +61,6 @@ import { COVER_PEEK, HUES, HUES_DARK, styles } from './styles.ts'
 // settled plan - adopting it unconditionally is what converges the two
 // displays, including the race where both seed a fresh session at once.
 const ME = crypto.randomUUID()
-const LIB_KEY = 'roomplanner-library'
 const DOC_KEY = 'roomplanner-doc'
 const PREF_KEY = 'roomplanner-prefs'
 
@@ -83,52 +79,6 @@ type Drag = {
 // finger landed; every later frame keeps that point fixed under the moving
 // midpoint. Storing live view values here instead would drift.
 type Pinch = { ids: [number, number]; d0: number; zoom0: number; x0: number; y0: number; mcx: number; mcy: number }
-
-// os.storage.get resolves null for a missing key; a rejection means the read
-// itself failed. Keeping them apart matters: treated as empty, a failed read
-// becomes a rev-0 seed whose delayed set can land after a peer's newer write
-// and clobber it. null marks 'could not read' - writeLib retries the read and
-// never writes on top of a library it has not seen.
-const readLib = (): Promise<Library | null> => os.storage.get(LIB_KEY).then(parseLibrary, () => null)
-
-let libQueue = Promise.resolve()
-// Library writes funnel through one queue so two quick edits cannot each merge
-// into the same stale snapshot and overwrite one another's plans.
-const enqueue = (job: () => Promise<void>) => {
-  libQueue = libQueue.then(job).catch(() => {})
-}
-
-const sameLib = (a: Library, b: Library) =>
-  Object.keys(a.plans).length === Object.keys(b.plans).length &&
-  Object.keys(a.gone).length === Object.keys(b.gone).length &&
-  Object.entries(a.plans).every(([id, d]) => b.plans[id] === d) &&
-  Object.entries(a.gone).every(([id, ts]) => b.gone[id] === ts)
-
-// os.storage has no cross-copy compare-and-set: the other display can commit
-// between our get and set and we would clobber it. Every write instead
-// re-reads, applies the mutation and merges per plan/tombstone (order-
-// independent), then loops - a peer's intervening write shows up in the next
-// read and the mutation is replayed on top of it, so concurrent edits from
-// both displays survive. `mutate` returning null means no write is needed.
-const writeLib = (mutate: (lib: Library) => Library | null): Promise<Library> =>
-  new Promise<Library>((resolve) => {
-    enqueue(async () => {
-      let out = parseLibrary(null)
-      for (let i = 0; i < 5; i++) {
-        const cur = await readLib()
-        if (!cur) continue
-        const mine = mutate(cur)
-        const merged = mergeLib(cur, mine ?? cur)
-        if (!mine || sameLib(cur, merged)) {
-          out = merged
-          break
-        }
-        out = { ...merged, rev: Math.max(cur.rev, mine.rev) + 1 }
-        await os.storage.set(LIB_KEY, serializeLibrary(out))
-      }
-      resolve(out)
-    })
-  })
 
 // Registered before os.connect() so it fires ahead of the SDK's window-capture
 // Escape-to-home forward: while any app sheet is open, Escape cancels the top
@@ -463,7 +413,7 @@ function RoomPlanner() {
   // the merge on top of any peer write that lands mid-flight, so the other
   // display's save cannot be clobbered by this one.
   const saveDoc = (next: PlanDoc) => {
-    void writeLib((lib) => {
+    void writeLib(os.storage, (lib) => {
       const existing = lib.plans[next.id]
       return !existing || existing.updated <= next.updated ? withDoc(lib, next) : null
     })
@@ -574,10 +524,24 @@ function RoomPlanner() {
       if (!seeded.current && stored.status === 'ready') {
         seeded.current = true
         void (async () => {
-          const open = latestDoc((await readLib()) ?? parseLibrary(null)) ?? welcomePlan()
+          const open = admitSeed(await readLib(os.storage), docRef.current !== null || remoteDoc.current !== null)
+          if (open === 'retry') {
+            // The read failed: the library's true state is unknown, never
+            // empty. Leave the gate open so a later fold pass can seed once a
+            // read succeeds - seeding over 'unknown' risks overwriting real
+            // plans when storage recovers.
+            seeded.current = false
+            return
+          }
+          if (!open) return
           setDoc(open)
           setSel(null)
-          await writeLib((lib) => ((lib.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(lib, open)))
+          const wrote = await writeLib(os.storage, (lib) =>
+            (lib.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(lib, open)
+          )
+          // An unconfirmed write or a peer doc adopted meanwhile must not be
+          // stamped over the fold's settled plan.
+          if (!wrote || docRef.current !== open || remoteDoc.current !== null) return
           await os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
         })()
       }
@@ -624,7 +588,7 @@ function RoomPlanner() {
       else if (spun) soundRef.current('rotate')
       else if (moved) soundRef.current('settle')
     }
-    void writeLib((lib) => {
+    void writeLib(os.storage, (lib) => {
       const existing = lib.plans[next.doc.id]
       return !existing || existing.updated < next.doc.updated ? withDoc(lib, next.doc) : null
     })
@@ -665,7 +629,7 @@ function RoomPlanner() {
       setDoc(next)
       // Framing a stale doc must not push it back over a newer remote write.
       if (!isOlderEdit(doc, remoteDoc.current)) {
-        void writeLib((lib) => {
+        void writeLib(os.storage, (lib) => {
           const existing = lib.plans[next.id]
           return !existing || existing.updated < next.updated ? withDoc(lib, next) : null
         })
@@ -890,7 +854,7 @@ function RoomPlanner() {
     // Read the library fresh: the KV mirror can lag while this copy is
     // occluded, so a plan the other display just made may not be listed yet.
     void (async () => {
-      const next = (await readLib())?.plans[id]
+      const next = (await readLib(os.storage))?.plans[id]
       if (next && next.id !== docRef.current?.id) {
         // The stored view may have been fit for the other display's canvas:
         // opening a plan is a fresh first sight, so this copy frames it again.
@@ -902,7 +866,7 @@ function RoomPlanner() {
   }
   const makePlan = () => {
     void (async () => {
-      const n = Object.keys((await readLib())?.plans ?? {}).length + 1
+      const n = Object.keys((await readLib(os.storage))?.plans ?? {}).length + 1
       framedDoc.current = null
       publish(newPlan(`Layout ${n}`), { sel: null })
       sound('save')
@@ -932,10 +896,13 @@ function RoomPlanner() {
     const id = confirm.drop
     setConfirm(null)
     void (async () => {
-      const lib = await writeLib((l) => withoutDoc(l, id))
+      const lib = await writeLib(os.storage, (l) => withoutDoc(l, id))
+      // null means the delete never landed: keep the current doc rather than
+      // adopting a fresh one over an unconfirmed write.
+      if (!lib) return
       const open = docRef.current?.id === id ? (latestDoc(lib) ?? newPlan('Layout 1')) : null
       if (open) {
-        await writeLib((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
+        await writeLib(os.storage, (l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
         framedDoc.current = null
         setHist(emptyHistory())
         setDoc(open)
