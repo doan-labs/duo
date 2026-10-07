@@ -60,11 +60,14 @@ clobber a deal it could not see. The mirror's `ready`/`error` state is the
 acknowledgement that clears or requeues the intent, so an accepted move is
 never silently lost and never double-applied. Stats merge the same way:
 play/win counters union over the confirmed base instead of overwriting it.
-Because the mirror lags and re-serves superseded records verbatim, every
-record this copy issues, adopts or receives joins a `seenRaws` set and a
-re-delivered old raw can never pass for a new foreign write; the repair
-write that settles an adopted record re-reads the store first so it cannot
-revert a newer deal.
+Because the mirror lags and re-serves superseded records verbatim, each
+record carries a per-writer write ordinal `n`, and every record this copy
+issues, adopts or receives joins a `seenIds` set keyed by `(by, n)` - a
+re-delivered echo shares the pair while a genuinely new write never does,
+so an Undo that returns the deal to an earlier state still counts as new
+(records without `n` dedupe by their raw bytes, the only identity they
+have); the repair write that settles an adopted record re-reads the store
+first so it cannot revert a newer deal.
 
 ## Engine
 

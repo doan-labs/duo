@@ -23,6 +23,7 @@ import {
   mergeStats,
   newGame,
   normalizeStats,
+  recordId,
   recordPlay,
   recordWin,
   type Stats,
@@ -256,14 +257,20 @@ function Solitaire() {
   const pendingStats = useRef<{ next: Stats; issued?: string } | null>(null)
   const ioRetry = useRef<number | null>(null)
   const ioFails = useRef(0)
-  // Every game record this copy has issued, adopted or been delivered. The
-  // mirror lags the store and re-serves superseded records verbatim; lastSeen
-  // alone cannot spot them once a newer raw took its place, so a redelivered
-  // old record would pass as 'foreign' and regress the table. Content dedup
-  // is sound because `by` and the whole move log sit inside the record - a
-  // genuinely new peer write never repeats a raw byte for byte, while a stale
-  // echo always does.
-  const seenRaws = useRef<Set<string>>(new Set())
+  // Write ordinal: every record this copy publishes carries `n`, a per-writer
+  // counter that only grows. Two writes of the same deal state - an Undo
+  // returning to an earlier log is exactly that - get different n, while a
+  // stale mirror echo re-serves the identical (by, n) pair. Dedup therefore
+  // keys on write identity, never record content: a new acknowledged record
+  // that happens to equal an older one still adopts, and only a byte-echo of
+  // a consumed write is skipped.
+  const writeSeq = useRef(0)
+  // Every game record this copy has issued, adopted or been delivered, keyed
+  // by write identity (`by:n`; legacy records without n fall back to their
+  // raw bytes, which keeps the same echo protection for them). The mirror
+  // lags the store and re-serves superseded records verbatim; lastSeen alone
+  // cannot spot an old echo once a newer raw took its place.
+  const seenIds = useRef<Set<string>>(new Set())
   // noteWriteFault's timer calls the latest flush through this ref, dodging
   // the declaration cycle between the two callbacks.
   const flushIORef = useRef<() => void>(() => {})
@@ -362,13 +369,14 @@ function Solitaire() {
       void flushWrite(game, {
         get: () => os.storage.get('game'),
         foreign: (cur) => {
-          if (cur === lastSeen.current || seenRaws.current.has(cur)) return false
+          if (cur === lastSeen.current || seenIds.current.has(recordId(cur))) return false
           const next = adoptGame(cur)
           if (!next || next.by === ME) return false
           pendingGame.current = null
           mirrorBehind.current = true
           lastSeen.current = cur
-          seenRaws.current.add(cur)
+          seenIds.current.add(recordId(cur))
+          writeSeq.current = Math.max(writeSeq.current, next.n)
           const t = { ...next.deal, game: next.game }
           setTable(t)
           tableRef.current = t
@@ -395,7 +403,7 @@ function Solitaire() {
         stale: () => tableRef.current !== game.next,
         issue: (raw) => {
           lastSeen.current = raw
-          seenRaws.current.add(raw)
+          seenIds.current.add(recordId(raw))
           void saved.set(raw)
         },
         fault: () => {
@@ -431,7 +439,7 @@ function Solitaire() {
       tableRef.current = next
       // auto:true tells the other display a sweep is in flight here, so a fold
       // mid-Auto hands it off instead of silently dropping the timer.
-      const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null))
+      const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null, ++writeSeq.current))
       // The store, not the mirror, is the authority: a foreign write this copy
       // has not been notified of yet still wins. The intent parks until a read
       // confirms the record - a rejected read is unknown peer state, never a
@@ -449,11 +457,12 @@ function Solitaire() {
   const freshBase = useCallback((): { table: Table; foreign: boolean } => {
     const raw = savedValRef.current
     if (raw === lastSeen.current) mirrorBehind.current = false
-    if (!mirrorBehind.current && raw && raw !== lastSeen.current && !seenRaws.current.has(raw)) {
+    if (!mirrorBehind.current && raw && raw !== lastSeen.current && !seenIds.current.has(recordId(raw))) {
       const next = adoptGame(raw)
       if (next && next.by !== ME) {
         lastSeen.current = raw
-        seenRaws.current.add(raw)
+        seenIds.current.add(recordId(raw))
+        writeSeq.current = Math.max(writeSeq.current, next.n)
         const t = { ...next.deal, game: next.game }
         setTable(t)
         tableRef.current = t
@@ -497,10 +506,12 @@ function Solitaire() {
       mirrorBehind.current = false
       return
     }
-    // A raw this copy already consumed proves nothing new: the mirror
-    // re-serves superseded records while it lags, and treating one as a
-    // fresh foreign write reverts the table to an older deal.
-    if (raw !== null && seenRaws.current.has(raw)) return
+    // A write identity this copy already consumed proves nothing new: the
+    // mirror re-serves superseded records while it lags, and treating one as
+    // a fresh foreign write reverts the table to an older deal. Identity -
+    // not content - is the key, so a new record returning to an earlier
+    // deal state (an Undo) still adopts.
+    if (raw !== null && seenIds.current.has(recordId(raw))) return
     // While the mirror is behind the store, a value that does not parse to a
     // foreign record - the stale deal it keeps serving, or our own optimistic
     // echo - is not a write and must not re-stamp lastSeen. Only a genuinely
@@ -511,7 +522,7 @@ function Solitaire() {
     }
     mirrorBehind.current = false
     lastSeen.current = raw
-    if (raw !== null) seenRaws.current.add(raw)
+    if (raw !== null) seenIds.current.add(recordId(raw))
     if (!raw) {
       // Seeding the first deal is new work only the live copy may do; an
       // unanswerable store ('error') is not an empty record either, so a
@@ -524,6 +535,7 @@ function Solitaire() {
     }
     const next = adoptGame(raw)
     if (!next || next.by === ME) return
+    writeSeq.current = Math.max(writeSeq.current, next.n)
     const t = { ...next.deal, game: next.game }
     setTable(t)
     tableRef.current = t

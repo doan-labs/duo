@@ -408,11 +408,16 @@ export function autoMoves(g: Game): Move[] {
 
 // The wire record is the deal plus the move log: complete undo state by
 // construction, a few hundred bytes for a long game.
-export type SavedGame = { v: 1; by: string; mode: Mode; seed: number; moves: string; auto?: true }
+export type SavedGame = { v: 1; by: string; mode: Mode; seed: number; moves: string; auto?: true; n?: number }
 
-export function serializeGame(by: string, deal: Deal, auto = false): SavedGame {
+export function serializeGame(by: string, deal: Deal, auto = false, n = 0): SavedGame {
   const out: SavedGame = { v: 1, by, mode: deal.mode, seed: deal.seed, moves: encodeLog(deal.log) }
   if (auto) out.auto = true
+  // `n` is this writer's write ordinal: two writes of the same deal state
+  // (an Undo returning to an earlier log) still differ, while a stale mirror
+  // echo carries the identical pair - which is what makes the echo tellable
+  // from a new record without trusting content equality.
+  if (n > 0) out.n = n
   return out
 }
 
@@ -490,7 +495,7 @@ export function buildGame(mode: Mode, seed: number, log: Move[]): Game | null {
 }
 
 /** Rebuilds from the stored string form. Null means malformed or corrupt. */
-export function adoptGame(raw: string): { by: string; deal: Deal; game: Game; auto: boolean } | null {
+export function adoptGame(raw: string): { by: string; deal: Deal; game: Game; auto: boolean; n: number } | null {
   let saved: SavedGame
   try {
     saved = JSON.parse(raw) as SavedGame
@@ -508,7 +513,37 @@ export function adoptGame(raw: string): { by: string; deal: Deal; game: Game; au
   const seed = saved.seed >>> 0
   const game = buildGame(saved.mode, seed, log)
   if (!game) return null
-  return { by: saved.by, deal: { mode: saved.mode, seed, log }, game, auto: saved.auto === true }
+  // Records written before `n` existed, or by a peer that never stamps it,
+  // read as 0 - identity dedup falls back to content for those.
+  const n = typeof saved.n === 'number' && Number.isInteger(saved.n) && saved.n > 0 ? saved.n : 0
+  return { by: saved.by, deal: { mode: saved.mode, seed, log }, game, auto: saved.auto === true, n }
+}
+
+/**
+ * The dedup identity of a raw record: `by:n` when the writer stamped an
+ * ordinal, the raw bytes otherwise. A stale mirror echo re-serves the same
+ * pair verbatim while a genuinely new write never repeats one, so this - not
+ * record content - is what tells an old echo apart from an acknowledged
+ * return to an earlier deal state.
+ */
+export function recordId(raw: string): string {
+  try {
+    const p = JSON.parse(raw) as { by?: unknown; n?: unknown }
+    if (
+      p &&
+      typeof p === 'object' &&
+      !Array.isArray(p) &&
+      typeof p.by === 'string' &&
+      typeof p.n === 'number' &&
+      Number.isInteger(p.n) &&
+      p.n > 0
+    ) {
+      return `${p.by}:${p.n}`
+    }
+  } catch {
+    // Unparseable raws dedupe by content below.
+  }
+  return `raw:${raw}`
 }
 
 // --- Match statistics -------------------------------------------------------

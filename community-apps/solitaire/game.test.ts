@@ -18,10 +18,12 @@ import {
   isRed,
   isRun,
   legalMoves,
+  type Mode,
   type Move,
   newGame,
   normalizeStats,
   parseLog,
+  recordId,
   recordPlay,
   recordWin,
   serializeGame
@@ -241,6 +243,30 @@ check('the wire record round-trips, rejects corrupt and foreign shapes', () => {
   // Wrong version or shape never parses into a game.
   eq(adoptGame(JSON.stringify({ v: 2, by: 'x', mode: 'draw1', seed: 9, moves: '' })), null)
   eq(adoptGame('not json'), null)
+})
+
+check('write ordinal makes identical-content writes distinct, echoes identical', () => {
+  // The regression: draw twice, move, Undo - the Undo record's deal state is
+  // byte-for-byte the earlier consumed one. Content dedup called it a stale
+  // echo and a peer committed over it; write identity must keep them apart.
+  const deal = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move, { t: 'draw' } as Move] }
+  const first = JSON.stringify(serializeGame('peer', deal, false, 1))
+  const undo = JSON.stringify(serializeGame('peer', deal, false, 3))
+  // Same moves/seed/mode, different write ordinals: a new record, not an echo.
+  eq(recordId(first) === recordId(undo), false)
+  // A stale mirror re-delivery of the same write keeps the pair: dedup holds.
+  eq(recordId(first), recordId(first))
+  // The echo is identical even serialized by a different writer's copy.
+  eq(recordId(JSON.stringify(serializeGame('peer', deal, false, 1))), 'peer:1')
+  // adoptGame surfaces the ordinal, and unstamped legacy records read as 0.
+  eq(adoptGame(undo)!.n, 3)
+  eq(adoptGame(JSON.stringify(serializeGame('peer', deal)))!.n, 0)
+  // Legacy records still dedupe - by their bytes, the only identity they have.
+  const legacy = JSON.stringify(serializeGame('peer', deal))
+  eq(recordId(legacy), `raw:${legacy}`)
+  // Non-integer or negative n is not a real ordinal: content fallback.
+  const negRaw = JSON.stringify({ ...JSON.parse(undo), n: -1 })
+  eq(recordId(negRaw), `raw:${negRaw}`)
 })
 
 check('isRun only accepts descending alternating face-up runs', () => {
