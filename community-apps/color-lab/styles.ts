@@ -151,8 +151,7 @@ export const styles = stylex.create({
     color: app.fg,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
-    fontVariantNumeric: 'tabular-nums',
-    opacity: 0.72
+    fontVariantNumeric: 'tabular-nums'
   },
   navRowChev: { color: app.label3, display: 'inline-flex', flexShrink: 0 },
   scroll: {
@@ -259,7 +258,7 @@ export const styles = stylex.create({
   fieldRow: { display: 'flex', alignItems: 'flex-start', gap: space.sm },
   field: { flexGrow: 1, minWidth: 0 },
   fieldInput: { fontFamily: fonts.mono, minHeight: 44 },
-  fieldHint: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote, opacity: 0.72 },
+  fieldHint: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote },
   fieldErr: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -292,7 +291,7 @@ export const styles = stylex.create({
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
   },
   chipLabel: {
-    color: app.label2,
+    color: app.fg,
     fontWeight: weight.semibold,
     fontSize: typeScale.caption1,
     lineHeight: leading.caption1,
@@ -471,7 +470,7 @@ export const styles = stylex.create({
   },
   ratioWrap: { display: 'flex', alignItems: 'baseline', gap: space.xxs },
   ratioVerdicts: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, minWidth: 0 },
-  ratioCaption: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote, opacity: 0.72 },
+  ratioCaption: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote },
   badgeGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -491,7 +490,7 @@ export const styles = stylex.create({
     lineHeight: leading.caption1,
     fontWeight: weight.semibold,
     backgroundColor: app.fill3,
-    color: app.label2
+    color: app.fg
   },
   badgePass: { color: colors.green },
   badgeFail: { color: colors.red },
@@ -586,8 +585,7 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     fontVariantNumeric: 'tabular-nums',
-    paddingInline: space.xs,
-    opacity: 0.72
+    paddingInline: space.xs
   },
   palStrip: { display: 'flex', gap: space.sm, flexWrap: 'wrap' },
   // The inline confirm replaces the row's content at full row height.
@@ -654,8 +652,7 @@ export const styles = stylex.create({
     marginBlock: 0,
     color: app.fg,
     fontSize: typeScale.subheadline,
-    lineHeight: leading.subheadline,
-    opacity: 0.72
+    lineHeight: leading.subheadline
   },
   sheetField: { width: '100%', boxSizing: 'border-box' },
   sheetStrip: { display: 'flex', gap: space.xs, borderRadius: radius.md, overflow: 'hidden' },
@@ -675,8 +672,7 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     letterSpacing: tracking.footnote,
-    textAlign: 'center',
-    opacity: 0.72
+    textAlign: 'center'
   },
   statusIn: {
     animationName: { default: fadeIn, [reduce]: 'none' },
