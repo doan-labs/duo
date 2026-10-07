@@ -396,7 +396,7 @@ export const styles = stylex.create({
     width: 300,
     flexShrink: 0,
     minHeight: 0,
-    padding: space.md,
+    padding: space.lg,
     borderRadius: radius.xxl,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
@@ -444,7 +444,7 @@ export const styles = stylex.create({
     ':focus-visible': { outline: `2px solid ${ACCENT}`, outlineOffset: 1 }
   },
   segBtnOn: { backgroundColor: { default: app.control, ':hover': app.control }, boxShadow: shadow.card },
-  paletteGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: space.xs },
+  paletteGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: space.sm },
   tile: {
     display: 'flex',
     flexDirection: 'column',
@@ -472,7 +472,7 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: space.sm,
-    padding: space.sm,
+    padding: space.lg,
     maxHeight: '44%',
     borderRadius: radius.xxl,
     backgroundColor: glass.tintDark,
@@ -522,7 +522,7 @@ export const styles = stylex.create({
     },
     color: colors.redDark
   },
-  list: { display: 'flex', flexDirection: 'column', gap: space.xxs, minHeight: 0 },
+  list: { display: 'flex', flexDirection: 'column', gap: space.xs, minHeight: 0 },
   listRow: { display: 'flex', alignItems: 'center', gap: space.xs, minWidth: 0 },
   rowBtn: {
     display: 'flex',
@@ -564,7 +564,7 @@ export const styles = stylex.create({
   th: {
     position: 'sticky',
     top: 0,
-    paddingBlock: space.xxs,
+    paddingBlock: space.xs,
     paddingInline: space.sm,
     color: app.label2,
     fontSize: typeScale.caption2,
@@ -574,7 +574,7 @@ export const styles = stylex.create({
   },
   thOut: { color: colors.yellowDark, borderLeftWidth: 1, borderLeftStyle: 'solid', borderLeftColor: app.separator },
   td: {
-    paddingBlock: space.xxs,
+    paddingBlock: space.xs,
     paddingInline: space.sm,
     textAlign: 'center',
     color: app.label3,
