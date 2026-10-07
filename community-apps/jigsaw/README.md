@@ -61,6 +61,13 @@ that differ from a single-display app:
   in another game.
 - First boot seeds inside the queued step, after the confirmed reads: a peer
   that already seeded or saved wins by adoption, never by being overwritten.
+- Repairs are heals, not blind writes: a stale foreign doc on the mirror
+  queues `heal()`/`healSaves()`/`healPrefs()`, each re-reading its own doc
+  first. A peer doc already at-or-past our clock is adopted and nothing is
+  written; otherwise exactly one write at `max(clock, store) + 1` lands. A
+  repair that wrote `clock + 1` straight off the mirror event regresses
+  below whatever the peer just landed, and each regression re-wakes the
+  peer's stale check - an endless cross-doc ping-pong.
 - `queue.ts` keeps the serial chain alive after a failed step; a step that
   genuinely never settles only delays later writes - do not add timeouts or
   reload workarounds on top of it.

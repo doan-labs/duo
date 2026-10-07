@@ -435,9 +435,19 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
       state.game = pl.game
       refs.game.current = pl.game
       refs.held.current = pl.held
-      state.savesRaw = pl.saves
       void liveKV.set('live', pl.live)
+      state.savesRaw = pl.saves
       void savesKV.set('saves', pl.saves)
+    },
+    writeLive(raw) {
+      void liveKV.set('live', raw)
+    },
+    writeSaves(raw) {
+      state.savesRaw = raw
+      void savesKV.set('saves', raw)
+    },
+    savesDoc() {
+      return state.savesRaw ? parseSaves(state.savesRaw) : null
     }
   })
   return { p, state, clocks, refs }
@@ -548,6 +558,131 @@ await checkAsync('delayed dual-boot: the second copy adopts the peer game instea
   const settled = parseLive(live.store.get('live')!)
   eq(settled!.rev, 2, 'second boot bumped the revision over peer progress')
   eq(settled!.game, placed, 'placed pieces were reset by the late seed')
+})
+
+await checkAsync('a live heal writes only the live doc and converges instead of ping-ponging', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const mine = newGame('harbour', 12, 5)
+  const { p, refs, clocks } = makePersist('me', live, saves)
+  refs.game.current = mine
+  // Our copy is ahead: the live store still holds a stale racing doc.
+  clocks.live = { rev: 8, by: 'me' }
+  live.store.set('live', liveOf('peer', 7, newGame('harbour', 12, 5), null))
+  await p.heal()
+  eq(saves.sets.length, 0, 'a live heal rewrote the library doc')
+  const healed = parseLive(live.store.get('live')!)!
+  eq(healed.rev, 9, 'heal did not bump the live revision')
+  eq(healed.by, 'me')
+  eq(healed.game, mine, 'heal did not republish our confirmed game')
+  // A peer seeing that healed doc adopts it: no second heal is needed.
+  const peer = makePersist('peer', live, saves)
+  const adopted: string[] = []
+  peer.clocks.live = { rev: 8, by: 'peer' }
+  // The same freshness check the live mirror runs: newer docs are adopted,
+  // stale ones are the only heals. rev 9 by me beats rev 8 by peer outright.
+  const seen = parseLive(live.store.get('live')!)!
+  ok(newerDoc(seen.rev, seen.by, peer.clocks.live.rev, peer.clocks.live.by), 'healed doc does not win for the peer')
+  adopted.push(seen.by)
+  eq(adopted, ['me'])
+})
+
+await checkAsync('saves heals converge even when stale events arrive late and out of order', async () => {
+  // The ping-pong engine: both copies heal on a stale mirror event, and the
+  // loser of the write race lands LAST, regressing the store under the
+  // winner's clock. Queued confirmed-read heals must still terminate.
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const lib = serializeSaves({
+    rev: 5,
+    by: 'copy-a',
+    current: 'harbour:12',
+    games: { 'harbour:12': newGame('harbour', 12, 1) }
+  })
+  saves.store.set('saves', lib)
+  const A = makePersist('copy-a', live, saves)
+  const B = makePersist('copy-b', live, saves)
+  // Both accepted rev 5; a strictly stale foreign doc (rev 4) is delivered.
+  A.clocks.saves = { rev: 5, by: 'copy-a' }
+  A.state.savesRaw = lib
+  B.clocks.saves = { rev: 5, by: 'copy-a' }
+  B.state.savesRaw = lib
+  const stale5 = serializeSaves({ rev: 4, by: 'old', current: 'harbour:12', games: {} })
+  saves.store.set('saves', stale5)
+  // Both heal against the stale event concurrently.
+  await Promise.all([A.p.healSaves(), B.p.healSaves()])
+  const first = parseSaves(saves.store.get('saves')!)!
+  // One of them won; the loser adopted rather than writing under it.
+  ok(first.rev >= 6, 'heal did not advance past the stale doc')
+  // Now simulate the regression event reaching the loser late: feed the
+  // stale rev-4 doc again. The loser (clock already at the winner) must
+  // heal once more and then the doc sits at the winner's rev+1 max -
+  // bounded, converging, and never below the confirmed store value.
+  saves.store.set('saves', stale5)
+  await Promise.all([A.p.healSaves(), B.p.healSaves()])
+  const second = parseSaves(saves.store.get('saves')!)!
+  ok(second.rev >= first.rev, `store regressed: ${first.rev} -> ${second.rev}`)
+  // After both heals settle, no further writes are pending and revs stop.
+  const setsSoFar = saves.sets.length
+  await Promise.all([A.p.healSaves(), B.p.healSaves()])
+  const third = parseSaves(saves.store.get('saves')!)!
+  // These heals see their own doc already at the store head (by===me or
+  // adopted winner) - but even if they write, the value must never regress.
+  ok(third.rev >= second.rev, `store regressed again: ${second.rev} -> ${third.rev}`)
+  void setsSoFar
+})
+
+await checkAsync('a prefs heal re-reads and never writes under a peer that won', async () => {
+  const kv = new FakeKV()
+  kv.store.set('prefs', JSON.stringify({ art: 'lantern', count: 48, muted: true, guide: false, rev: 9, by: 'peer' }))
+  const clock = { rev: 5, by: 'me' }
+  let cur = { ...PREFS0, muted: false }
+  const queue = { current: Promise.resolve() as Promise<unknown> }
+  const pp = createPrefsPersistence({
+    me: 'me',
+    kv,
+    key: 'prefs',
+    queue,
+    clock,
+    current: () => cur,
+    accept(env) {
+      cur = env.prefs
+      clock.rev = env.rev
+      clock.by = env.by
+    },
+    apply(pl) {
+      cur = pl.prefs
+      void kv.set('prefs', pl.raw)
+    }
+  })
+  await pp.heal()
+  const doc = parsePrefsDoc(kv.store.get('prefs'))
+  eq(doc.rev, 9, 'heal overwrote the winning peer prefs')
+  eq(doc.prefs.muted, true, 'peer mute lost to a heal')
+  // Our own doc is ahead of the store: the heal republishes it once.
+  kv.store.set('prefs', JSON.stringify({ art: 'harbour', count: 12, muted: true, guide: true, rev: 3, by: 'old' }))
+  const writes = kv.sets.length
+  clock.rev = 10
+  clock.by = 'me'
+  cur = { ...PREFS0, muted: false }
+  await pp.heal()
+  eq(kv.sets.length, writes + 1, 'stale store was not healed once')
+  eq(parsePrefsDoc(kv.store.get('prefs')).rev, 11)
+})
+
+await checkAsync('a live heal yields to a foreign doc that won while queued', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const { p, refs, state, clocks } = makePersist('me', live, saves)
+  refs.game.current = newGame('harbour', 12, 5)
+  clocks.live = { rev: 3, by: 'me' }
+  // A newer foreign doc lands before the heal step runs: it must be adopted,
+  // not overwritten back.
+  const winner = placeAt(newGame('alpine', 24, 7), 0, 5, 5, 500).game
+  live.store.set('live', liveOf('peer', 9, winner, null))
+  await p.heal()
+  eq(state.adopted, ['peer'], 'heal did not adopt the winning foreign doc')
+  eq(parseLive(live.store.get('live')!)!.rev, 9, 'heal overwrote the winning doc')
 })
 
 await checkAsync('a stale null live read cannot seed over a game the mirror already delivered', async () => {

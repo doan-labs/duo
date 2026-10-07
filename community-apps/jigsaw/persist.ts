@@ -120,12 +120,70 @@ export function createGamePersistence(deps: {
   acceptSaves(sd: Saves): void
   /** Persist the mutation: state setters plus both KV writes. */
   apply(payload: GameApply): void
+  /** Publish only the live doc (heals never touch the library). */
+  writeLive(raw: string): void
+  /** Publish only the saves doc. */
+  writeSaves(raw: string): void
+  /** The last accepted saves envelope, for republishing on a heal. */
+  savesDoc(): Saves | null
 }): {
   /** Runs a mutation after confirmed reads. `bind` is the gameKeyOf the intent
    * was admitted against: a different puzzle live by step time drops it. */
   act(fn: (ctx: MutationCtx) => MutationResult, bind?: string): Promise<void>
+  /** Heals a stale racing live doc with our newer one. Same queue and same
+   * confirmed-read rule as act, but it writes ONLY the live doc: routing a
+   * repair through act would also bump the saves revision, and each foreign
+   * saves echo can trigger a peer heal - an infinite cross-doc ping-pong. */
+  heal(): Promise<void>
+  /** Heals a stale saves doc the same way: a confirmed read first (a doc
+   * already at-or-past our clock is adopted, never overwritten), then at
+   * most one higher-revision write. Unqueued blind repairs regress below
+   * whatever the peer just landed, and each regression re-triggers its
+   * stale check - the other half of the ping-pong. */
+  healSaves(): Promise<void>
 } {
   return {
+    heal() {
+      return enqueue(deps.queue, async () => {
+        const liveRaw = await deps.liveKV.get(deps.liveKey)
+        const doc = parseLive(liveRaw)
+        if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
+          deps.adopt(doc)
+          return
+        }
+        const game = deps.refs.game.current
+        if (!game) return
+        deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
+        deps.clocks.live.by = deps.me
+        deps.writeLive(
+          JSON.stringify({
+            v: 1,
+            by: deps.me,
+            rev: deps.clocks.live.rev,
+            held: deps.refs.held.current,
+            game
+          } satisfies Live)
+        )
+      })
+    },
+    healSaves() {
+      return enqueue(deps.queue, async () => {
+        const raw = await deps.savesKV.get(deps.savesKey)
+        const sd = parseSaves(raw)
+        // The confirmed doc is already at-or-past our clock: adopt it and
+        // write nothing. Healing on top of a peer's newer doc is what a
+        // stale mirror event makes the unwary write path do.
+        if (sd.by !== deps.me && newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) {
+          deps.acceptSaves(sd)
+          return
+        }
+        const mine = deps.savesDoc()
+        if (!mine) return
+        deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
+        deps.clocks.saves.by = deps.me
+        deps.writeSaves(serializeSaves({ ...mine, rev: deps.clocks.saves.rev, by: deps.me }))
+      })
+    },
     act(fn, bind) {
       return enqueue(deps.queue, async () => {
         const [liveRaw, savesRaw] = await Promise.all([deps.liveKV.get(deps.liveKey), deps.savesKV.get(deps.savesKey)])
@@ -192,8 +250,29 @@ export function createPrefsPersistence(deps: {
   accept(env: PrefsDoc): void
   /** Persist the merged prefs: state setter plus the KV write. */
   apply(payload: PrefsApply): void
-}): { setPrefs(patch: Partial<Prefs>): Promise<void> } {
+}): { setPrefs(patch: Partial<Prefs>): Promise<void>; heal(): Promise<void> } {
   return {
+    // A stale racing prefs doc is healed like the others: queued, confirmed
+    // read, adopt if a peer already won, else one higher-revision write of
+    // our current prefs. Never a blind clock+1 write off a mirror event.
+    heal() {
+      return enqueue(deps.queue, async () => {
+        const env = parsePrefsDoc(await deps.kv.get(deps.key))
+        if (env.by !== deps.me && newerDoc(env.rev, env.by, deps.clock.rev, deps.clock.by)) {
+          deps.clock.rev = env.rev
+          deps.clock.by = env.by
+          deps.accept(env)
+          return
+        }
+        if (deps.clock.rev === 0) return
+        deps.clock.rev = Math.max(deps.clock.rev, env.rev) + 1
+        deps.clock.by = deps.me
+        deps.apply({
+          prefs: deps.current(),
+          raw: JSON.stringify({ ...deps.current(), rev: deps.clock.rev, by: deps.me })
+        })
+      })
+    },
     setPrefs(patch) {
       return enqueue(deps.queue, async () => {
         const env = parsePrefsDoc(await deps.kv.get(deps.key))

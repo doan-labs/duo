@@ -194,7 +194,13 @@ function Jigsaw() {
           liveMirror.current.set(p.live)
           savesRaw.current = p.saves
           savesMirror.current.set(p.saves)
-        }
+        },
+        writeLive: (raw) => liveMirror.current.set(raw),
+        writeSaves: (raw) => {
+          savesRaw.current = raw
+          savesMirror.current.set(raw)
+        },
+        savesDoc: () => (savesRaw.current ? parseSaves(savesRaw.current) : null)
       }),
     [adoptLive]
   )
@@ -206,9 +212,12 @@ function Jigsaw() {
   // (repair, hydrate, boot seeding) is not input and never passes here.
   const liveNow = useCallback(() => admitInput(os.view), [])
 
+  // Every repair is a queued confirmed-read heal on its own doc only. A
+  // blind clock+1 write off a delayed mirror event regresses below whatever
+  // the peer just landed, and each regression wakes the peer's stale check.
   const repairLive = useCallback(() => {
-    act((ctx) => (ctx.game ? { next: ctx.game, held: ctx.held } : null))
-  }, [act])
+    void persistence.heal()
+  }, [persistence])
 
   // Session mirror adoption: a foreign doc wins only by revision. A stale
   // racing write is dropped and the store is healed with our newer doc.
@@ -226,21 +235,39 @@ function Jigsaw() {
     adoptLive(doc)
   }, [live.value, live.status, adoptLive, repairLive])
 
+  // Prefs writes run the same confirmed-read rebase as game writes, and every
+  // caller is a gesture: rejected while this copy is hidden.
+  const prefsQueue = useRef(Promise.resolve())
+  const prefsPersist = useMemo(
+    () =>
+      createPrefsPersistence({
+        me: ME,
+        kv: os.storage,
+        key: PREFS_KEY,
+        queue: prefsQueue,
+        clock: prefsClock.current,
+        current: () => prefsRef.current ?? PREFS0,
+        accept: (env) => {
+          prefsClock.current.rev = env.rev
+          prefsClock.current.by = env.by
+        },
+        apply: (p) => {
+          prefsRef.current = p.prefs
+          setPrefsState(p.prefs)
+          setMuted(p.prefs.muted)
+          prefsMirror.current.set(p.raw)
+        }
+      }),
+    []
+  )
+
   const repairPrefs = useCallback(() => {
-    if (prefsClock.current.rev === 0 || !prefsRef.current) return
-    prefsClock.current.rev += 1
-    prefsClock.current.by = ME
-    prefsKV.set(JSON.stringify({ ...prefsRef.current, rev: prefsClock.current.rev, by: ME }))
-  }, [prefsKV])
+    void prefsPersist.heal()
+  }, [prefsPersist])
 
   const repairSaves = useCallback(() => {
-    const saves = parseSaves(savesRaw.current)
-    if (!savesRaw.current) return
-    savesClock.current.rev += 1
-    savesClock.current.by = ME
-    savesRaw.current = serializeSaves({ ...saves, rev: savesClock.current.rev, by: ME })
-    savesKV.set(savesRaw.current)
-  }, [savesKV])
+    void persistence.healSaves()
+  }, [persistence])
 
   // Saves follow the same revision order: a newer foreign library (a sibling
   // puzzle saved on the other display) is adopted; a stale write is healed.
@@ -288,31 +315,6 @@ function Jigsaw() {
     setMuted(env.prefs.muted)
   }, [prefsKV.value, prefsKV.status, repairPrefs])
 
-  // Prefs writes run the same confirmed-read rebase as game writes, and every
-  // caller is a gesture: rejected while this copy is hidden.
-  const prefsQueue = useRef(Promise.resolve())
-  const prefsPersist = useMemo(
-    () =>
-      createPrefsPersistence({
-        me: ME,
-        kv: os.storage,
-        key: PREFS_KEY,
-        queue: prefsQueue,
-        clock: prefsClock.current,
-        current: () => prefsRef.current ?? PREFS0,
-        accept: (env) => {
-          prefsClock.current.rev = env.rev
-          prefsClock.current.by = env.by
-        },
-        apply: (p) => {
-          prefsRef.current = p.prefs
-          setPrefsState(p.prefs)
-          setMuted(p.prefs.muted)
-          prefsMirror.current.set(p.raw)
-        }
-      }),
-    []
-  )
   const setPrefs = useCallback(
     (patch: Partial<Prefs>) => {
       if (!liveNow()) return
