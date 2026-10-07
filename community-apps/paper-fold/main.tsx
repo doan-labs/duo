@@ -30,15 +30,14 @@ import {
   type Prefs,
   type ProgressMap,
   parsePrefs,
-  parseProgress,
   parseUi,
-  progressSubset,
   recordProgress,
   resumeStep,
   type UiState
 } from './engine.ts'
 import { live, stepTarget, stillBound } from './live.ts'
 import { MODELS, type Model, modelById } from './models.ts'
+import { progressWrite, receiptKey, reconcileProgress } from './progress.ts'
 import { styles } from './styles.ts'
 
 // New user intent is admitted only on a copy that is both visible and active
@@ -46,6 +45,9 @@ import { styles } from './styles.ts'
 // here, so an occluded or parked copy rejects input even when a stale render
 // or a leaked event suggests otherwise.
 const liveNow = () => live(os.view)
+
+// Receipt keys are per catalog id, so the durable causal record stays bounded.
+const MODEL_IDS = MODELS.map((m) => m.id)
 
 // The pre-connect window guard only needs a live callback while the legend
 // sheet is open; everywhere else Escape falls through to the shell's go-home.
@@ -501,11 +503,10 @@ function PaperFold() {
   const progressBest = useRef(progress)
   const liveRef = useRef(false)
   liveRef.current = view.active && view.visible
-  // Dedupe for repair writes: useKV's set is a fresh closure per render so
-  // these effects re-fire freely; each distinct payload repairs at most once.
-  const uiWritten = useRef<string | null>(null)
-  const prefsWritten = useRef<string | null>(null)
-  const progWritten = useRef<string | null>(null)
+  // Repair dedupe keys on the durable state actually observed, never on our own
+  // optimistic payload: a stale foreign write that lands after ours is a fresh
+  // deficiency and must be repaired again.
+  const repairSig = useRef<{ sig: string | null }>({ sig: null })
   const progJson = useRef('{}')
 
   // Adopt a strictly newer foreign position; when the shared doc lands behind
@@ -521,8 +522,7 @@ function PaperFold() {
     if (!liveRef.current || !newerSeq(uiBest.current, f)) return
     if (f.seq === 0 && f.model === null) return // nothing stored - do not create it
     const s = JSON.stringify(uiBest.current)
-    if (ui.value === s || uiWritten.current === s) return
-    uiWritten.current = s
+    if (ui.value === s) return
     ui.set(s)
   }, [ui.value, ui.status, ui.set])
 
@@ -536,29 +536,41 @@ function PaperFold() {
     }
     if (!liveRef.current || !newerSeq(prefsBest.current, f) || f.seq === 0) return
     const s = JSON.stringify(prefsBest.current)
-    if (prefsKV.value === s || prefsWritten.current === s) return
-    prefsWritten.current = s
+    if (prefsKV.value === s) return
     prefsKV.set(s)
   }, [prefsKV.value, prefsKV.status, prefsKV.set])
 
-  // Progress is a grow-only map: merge keeps every foreign entry (a stale
-  // whole-map write loses nothing on read), and the active copy re-emits the
-  // superset when the store doc is missing entries.
+  // Progress is a grow-only map over a durable aggregate plus bounded per-model
+  // receipts (progress.ts). Every observed durable change folds aggregate and
+  // receipts into best - both copies adopt - and a live copy repairs what the
+  // durable evidence actually lacks, keyed on the durable read instead of our
+  // own optimistic payload so a stale whole-doc write landing late is repaired.
   useEffect(() => {
     if (progressKV.status === 'hydrating') return
-    const f = parseProgress(progressKV.value)
-    const merged = mergeProgress(progressBest.current, f)
-    progressBest.current = merged
-    const mJson = JSON.stringify(merged)
-    if (mJson !== progJson.current) {
-      progJson.current = mJson
-      setProgress(merged)
+    let cancelled = false
+    void reconcileProgress(os.storage, MODEL_IDS, progressBest.current, live(view) && liveNow(), repairSig.current)
+      .then(({ merged, plan }) => {
+        if (cancelled) return
+        progressBest.current = merged
+        const mJson = JSON.stringify(merged)
+        if (mJson !== progJson.current) {
+          progJson.current = mJson
+          setProgress(merged)
+        }
+        if (plan.aggregate && progressKV.value !== plan.aggregate) progressKV.set(plan.aggregate)
+        for (const [id, rec] of Object.entries(plan.receipts))
+          void os.storage
+            .set(receiptKey(id), JSON.stringify(rec))
+            .catch((e) => console.warn('paperfold: repair receipt failed', e))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
     }
-    if (!liveRef.current || progressSubset(merged, f)) return
-    if (progressKV.value === mJson || progWritten.current === mJson) return
-    progWritten.current = mJson
-    progressKV.set(mJson)
-  }, [progressKV.value, progressKV.status, progressKV.set])
+    // `view` joins the gate and the deps so a copy turning live re-runs the
+    // pass: a reconcile that ran while hidden skips durable repair, and the
+    // live transition re-arms it.
+  }, [progressKV.value, progressKV.status, progressKV.set, view])
 
   const still = !prefs.motion
 
@@ -567,12 +579,21 @@ function PaperFold() {
   const model = modelById(uiState.model)
   const hydrated = ui.status !== 'hydrating'
 
+  // Readiness reports only once every durable key has hydrated (or failed), so
+  // a host that gates input on os.ready cannot admit a write before this copy
+  // has seen the stored facts it would merge with.
   const readySent = useRef(false)
   useEffect(() => {
-    if (readySent.current || ui.status === 'hydrating') return
+    if (
+      readySent.current ||
+      ui.status === 'hydrating' ||
+      prefsKV.status === 'hydrating' ||
+      progressKV.status === 'hydrating'
+    )
+      return
     readySent.current = true
     requestAnimationFrame(() => os.ready())
-  }, [ui.status])
+  }, [ui.status, prefsKV.status, progressKV.status])
 
   const ping = useCallback((kind: Cue) => {
     if (liveNow()) cue(kind)
@@ -583,9 +604,7 @@ function PaperFold() {
       const next: UiState = { ...uiBest.current, ...patch, seq: uiBest.current.seq + 1, by: byId }
       uiBest.current = next
       setUiState(next)
-      const s = JSON.stringify(next)
-      uiWritten.current = s
-      ui.set(s)
+      ui.set(JSON.stringify(next))
     },
     [ui.set, byId]
   )
@@ -595,25 +614,33 @@ function PaperFold() {
       const next: Prefs = { ...prefsBest.current, ...patch, seq: prefsBest.current.seq + 1, by: byId }
       prefsBest.current = next
       setPrefs(next)
-      const s = JSON.stringify(next)
-      prefsWritten.current = s
-      prefsKV.set(s)
+      prefsKV.set(JSON.stringify(next))
     },
     [prefsKV.set, byId]
   )
 
+  // An admitted write merges the freshest durable doc before publishing, so a
+  // copy that never observed a peer's facts emits their union instead of
+  // dropping them; the per-model receipt lands first (progress.ts).
   const writeProgress = useCallback(
     (modelId: string, step: number, steps: number) => {
-      const merged = mergeProgress(
+      const pre = mergeProgress(
         progressBest.current,
         recordProgress(progressBest.current, modelId, step, steps, Date.now())
       )
-      progressBest.current = merged
-      const mJson = JSON.stringify(merged)
-      progJson.current = mJson
-      progWritten.current = mJson
-      setProgress(merged)
-      progressKV.set(mJson)
+      progressBest.current = pre
+      progJson.current = JSON.stringify(pre)
+      setProgress(pre)
+      void progressWrite(os.storage, pre, modelId, step, steps, Date.now(), (mJson) => progressKV.set(mJson))
+        .then((merged) => {
+          progressBest.current = mergeProgress(progressBest.current, merged)
+          const mJson = JSON.stringify(progressBest.current)
+          if (mJson !== progJson.current) {
+            progJson.current = mJson
+            setProgress(progressBest.current)
+          }
+        })
+        .catch(() => {})
     },
     [progressKV.set]
   )

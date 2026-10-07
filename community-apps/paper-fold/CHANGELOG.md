@@ -19,3 +19,10 @@
   switched away from.
 - Shared step position across both displays via session state; progress and
   preferences persist in device storage.
+- Durable progress: the aggregate doc is backed by bounded per-model
+  receipts so a stale or foreign whole-doc overwrite (peer write landing
+  late, an old acknowledged flight, a reload mid-flight) can no longer
+  erase completed models. Every write re-reads and unions durable state
+  first; `hi` only grows and `done` never unlatches; a live copy repairs
+  whichever durable side lacks the facts, deduped by the observed durable
+  content and re-armed when a copy becomes live.
