@@ -165,13 +165,16 @@ function CircuitLab() {
   const dragRef = useRef<Drag | null>(null)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
-  // Fork accounting: lastRev is the newest session revision this copy has seen;
-  // ourBase is the rev the currently displayed doc was adopted or confirmed at.
-  // A mirror whose base is older than ourBase for the same doc id forked from
-  // state the holder already moved past - it must not overwrite.
-  const lastRev = useRef(0)
-  const ourBase = useRef(0)
+  // Fork accounting: docRev is the session revision of the write that
+  // produced the doc content this copy holds - its freshness watermark. A
+  // mirror for the same doc declaring an older base forked from state that
+  // predates our doc's producing write, so it must not overwrite it.
+  // healedFor caps the corrective republish at once per content revision so
+  // two disagreeing copies cannot bounce heals forever.
+  const docRev = useRef(0)
   const lastWritten = useRef<string | null>(null)
+  const healedFor = useRef(-1)
+  const bootRef = useRef<() => void>(() => {})
   const returnFocus = useRef<HTMLElement | null>(null)
   // The doc id this copy framed for its own canvas: one stored view cannot
   // serve a 387pt cover and a 790pt inner, so each display fits the circuit to
@@ -220,20 +223,27 @@ function CircuitLab() {
     docRef.current = next
     if (selNow !== selRef.current) setSel(selNow)
     saveDoc(next)
-    const raw = serializeMirror(ME, next, selNow, lastRev.current)
+    const raw = serializeMirror(ME, next, selNow, docRev.current)
     lastWritten.current = raw
     void os.session.set(DOC_KEY, raw).catch(() => {})
   }
 
+  // View-only edits (pan, zoom, fit) are per-display state: they persist to
+  // the library for relaunch but never touch the session mirror, where a
+  // mechanical write could fork the doc against the peer's real edits.
+  const publishView = (next: Doc) => {
+    setDoc(next)
+    docRef.current = next
+    saveDoc(next)
+  }
+
   // Selection alone never writes storage - it rides the session mirror only.
+  // Its echo is untracked on purpose: a selection write carries no new doc
+  // content, so it must not advance docRev and make real peer edits read stale.
   const publishSel = (s: Sel) => {
     const current = docRef.current
     setSel(s)
-    if (current) {
-      const raw = serializeMirror(ME, current, s, lastRev.current)
-      lastWritten.current = raw
-      void os.session.set(DOC_KEY, raw).catch(() => {})
-    }
+    if (current) void os.session.set(DOC_KEY, serializeMirror(ME, current, s, docRev.current)).catch(() => {})
   }
 
   const setMuted = (next: boolean) => {
@@ -263,16 +273,16 @@ function CircuitLab() {
           cursor = page.cursor
         } while (cursor)
         if (dead) return
-        lastRev.current = Math.max(lastRev.current, rev)
         setLive({ raw: seen.get(DOC_KEY) ?? null, rev, known: true })
         off()
         off = os.session.watch(rev, (e) => {
           if (e.rev < 0) void boot()
           else {
-            lastRev.current = Math.max(lastRev.current, e.rev)
             // Our own write's echo confirms the session position the doc we
             // display now holds - the freshness watermark the fork gate needs.
-            if (e.v === lastWritten.current) ourBase.current = e.rev
+            // Heal writes are not tracked here: a republish confirms position
+            // but must not advance it, or stale heals would inflate into wins.
+            if (e.v === lastWritten.current) docRev.current = e.rev
             if (e.k === DOC_KEY) setLive({ raw: e.v, rev: e.rev, known: true })
           }
         })
@@ -280,12 +290,19 @@ function CircuitLab() {
         if (!dead) setTimeout(() => void boot(), 2000)
       }
     }
+    bootRef.current = boot
     void boot()
     return () => {
       dead = true
       off()
     }
   }, [])
+
+  // A copy frozen on the occluded display can miss session events; on becoming
+  // the visible display again, re-snapshot so its doc can never lag the peer.
+  useEffect(() => {
+    if (view.active) void bootRef.current()
+  }, [view.active])
 
   // A write this copy did not make is the new settled circuit; adopting it is
   // what carries the build across the fold. Own writes are already on screen.
@@ -306,7 +323,7 @@ function CircuitLab() {
           docRef.current = open
           setSel(null)
           stored.set(serializeLibrary(withDoc(lib, open)))
-          const raw = serializeMirror(ME, open, null, lastRev.current)
+          const raw = serializeMirror(ME, open, null, docRev.current)
           lastWritten.current = raw
           await os.session.set(DOC_KEY, raw).catch(() => {})
         })
@@ -316,20 +333,22 @@ function CircuitLab() {
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
     const cur = docRef.current
-    if (cur && next.doc.id === cur.id && next.base < ourBase.current) {
-      // A fold-race fork: the writer derived its doc from session state this
-      // copy already moved past. Refuse the overwrite and republish the
-      // fresher doc so both copies converge on it instead of splitting.
-      const heal = serializeMirror(ME, cur, selRef.current, lastRev.current)
-      lastWritten.current = heal
-      void os.session.set(DOC_KEY, heal).catch(() => {})
-      enqueue(async () => {
-        const lib = await readLib()
-        stored.set(serializeLibrary(withDoc(lib, cur)))
-      })
+    if (cur && next.doc.id === cur.id && next.base < docRev.current) {
+      // Stale fork: the writer derived its doc from before the write that
+      // produced ours. Refuse the overwrite and republish ours once so the
+      // session converges on the fresher lineage instead of splitting.
+      if (healedFor.current !== docRev.current) {
+        healedFor.current = docRev.current
+        const heal = serializeMirror(ME, cur, selRef.current, docRev.current)
+        void os.session.set(DOC_KEY, heal).catch(() => {})
+        enqueue(async () => {
+          const lib = await readLib()
+          stored.set(serializeLibrary(withDoc(lib, cur)))
+        })
+      }
       return
     }
-    ourBase.current = live.rev
+    docRev.current = live.rev
     // Keep this copy's own view for the doc it already framed: a remote fit
     // was computed for a different canvas and must not replace the local one.
     const keep = cur?.id === next.doc.id && framedDoc.current === next.doc.id
@@ -525,7 +544,7 @@ function CircuitLab() {
     if (d.moved) {
       if (d.kind === 'node' && d.id) {
         publish(commitMove(now, d.id, d.ox, d.oy), { kind: 'node', id: d.id })
-      } else publish(now)
+      } else publishView(now)
       return
     }
     setArming(null)
@@ -662,13 +681,13 @@ function CircuitLab() {
     publish(next)
   }
 
-  const zoomBy = (factor: number) => publish(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
+  const zoomBy = (factor: number) => publishView(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
   const fit = () => {
     const box = canvasRef.current?.getBoundingClientRect()
     if (!box?.width || !box.height) return
     const b = docBounds(doc)
     const zoom = Math.min(1.15, Math.min((box.width - 40) / b.w, (box.height - 40) / b.h))
-    publish(setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom }))
+    publishView(setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom }))
   }
 
   // ---- library & challenges --------------------------------------------------

@@ -293,7 +293,10 @@ export const styles = stylex.create({
   pinArmed: { outline: `2px solid ${ACCENT}`, outlineOffset: 2 },
   pinCandidate: { outline: `1.5px dashed color-mix(in srgb, ${ACCENT} 55%, transparent)`, outlineOffset: 2 },
   pinBad: { outline: `1.5px dashed color-mix(in srgb, ${colors.redDark} 60%, transparent)`, outlineOffset: 2 },
-  pinAt: (x: number, y: number) => ({ transform: `translate(${x - 17}px,${y - 9}px)` }),
+  // left/top, not a transform: shared.press animates transform and would
+  // override a translate() in the same stylex.props call, leaving every pin
+  // parked at the node centre.
+  pinAt: (x: number, y: number) => ({ left: x - 17, top: y - 9 }),
   banner: {
     position: 'absolute',
     top: space.sm,
