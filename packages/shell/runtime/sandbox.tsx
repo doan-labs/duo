@@ -26,8 +26,11 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
     const refresh = () => {
       const el = root.current
       if (!el) return
-      releaseHiddenFocus(el)
-      live.current?.update(viewInfo(el, wide ? 'inner' : 'cover', placement.current ?? 'full'))
+      const info = viewInfo(el, wide ? 'inner' : 'cover', placement.current ?? 'full')
+      // Focus follows the same truth the frame is about to receive; a blur
+      // changes `focused`, so recompute it before posting.
+      if (releaseHiddenFocus(el, info)) info.focused = el.contains(document.activeElement)
+      live.current?.update(info)
     }
     const unwatch = observeDisplay(refresh)
     // A parked or covered scene hides the frame's ancestors without a display

@@ -82,7 +82,9 @@ view's own DOM: a scene parked for Home, the lock screen or the switcher stays m
 but is hidden, so its view flips false when the element stops rendering - a
 MutationObserver on the frame's ancestors pushes the flip, not the frame loop. The same
 refresh drops DOM focus out of a hidden view; otherwise real key events keep landing in a
-copy nobody can see. Apps reclaim focus when the view shows again.
+copy nobody can see. Hidden means exactly what `visible` reports: DOM-hidden, asleep,
+away-facing or clipped past the placement threshold. Apps reclaim focus when the view
+shows again.
 
 `os.device.on(type, cb)` hears volume, Camera Control and the side button, the phone's
 pose and the read-only switches. A button press goes to the first watching view that is

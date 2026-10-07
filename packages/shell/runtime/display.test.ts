@@ -56,32 +56,48 @@ test('a mounted but display:none scene reads hidden like a person sees it', () =
   assert.equal(viewInfo(element, 'inner', 'full').visible, true)
 })
 
-test('a hidden view loses the DOM focus it would route keys through', () => {
-  updateDisplays({ ...live }, { ...parked })
-  let blurs = 0
-  const focused = { blur: () => blurs++ } as unknown as HTMLElement
-  const hiddenEl = {
-    clientWidth: 0,
-    clientHeight: 0,
-    contains: (x: unknown) => x === focused,
-    checkVisibility: () => false
-  } as unknown as HTMLElement
-  const shownEl = {
-    clientWidth: 320,
-    clientHeight: 640,
-    contains: (x: unknown) => x === focused,
-    checkVisibility: () => true
-  } as unknown as HTMLElement
-  Object.assign(globalThis, { document: { activeElement: focused, body: {} } })
-  releaseHiddenFocus(hiddenEl)
-  assert.equal(blurs, 1)
-  // A visible view keeps its focus.
-  releaseHiddenFocus(shownEl)
-  assert.equal(blurs, 1)
-  // Sleep hides every view, displayed or not.
-  device.sleep()
-  releaseHiddenFocus(shownEl)
-  assert.equal(blurs, 2)
+test('focus release follows the same visibility the frame is sent', () => {
+  const cases: {
+    name: string
+    rendered: boolean
+    shown: boolean
+    clip: number
+    placement: 'full' | 'left'
+    asleep: boolean
+  }[] = [
+    { name: 'shown_control', rendered: true, shown: true, clip: 0, placement: 'full', asleep: false },
+    { name: 'dom_parked_control', rendered: false, shown: true, clip: 0, placement: 'full', asleep: false },
+    { name: 'sleep_control', rendered: true, shown: true, clip: 0, placement: 'full', asleep: true },
+    { name: 'physically_hidden_glass', rendered: true, shown: false, clip: 0, placement: 'full', asleep: false },
+    { name: 'fully_clipped_inner', rendered: true, shown: true, clip: 1, placement: 'full', asleep: false },
+    { name: 'fully_clipped_left_split', rendered: true, shown: true, clip: 0.5, placement: 'left', asleep: false }
+  ]
+  for (const c of cases) {
+    device.wake()
+    updateDisplays(
+      { visible: c.shown, active: true, angle: 0, clip: c.clip },
+      { visible: !c.shown, active: false, angle: 0, clip: 0 }
+    )
+    if (c.asleep) device.sleep()
+    let blurs = 0
+    const focused = { blur: () => blurs++ } as unknown as HTMLElement
+    const el = {
+      clientWidth: 320,
+      clientHeight: 640,
+      contains: (x: unknown) => x === focused,
+      checkVisibility: () => c.rendered
+    } as unknown as HTMLElement
+    Object.assign(globalThis, { document: { activeElement: focused, body: {} } })
+    const info = viewInfo(el, 'inner', c.placement)
+    const blurred = releaseHiddenFocus(el, info)
+    if (info.visible) {
+      assert.equal(blurred, false, `${c.name}: a shown view must keep focus`)
+      assert.equal(blurs, 0, c.name)
+    } else {
+      assert.equal(blurred, true, `${c.name}: a hidden view must lose focus`)
+      assert.equal(blurs, 1, c.name)
+    }
+  }
   device.wake()
 })
 

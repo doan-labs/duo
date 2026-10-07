@@ -590,7 +590,10 @@ export type ViewInfo = {
   /**
    * This view has keyboard focus. Only one view on a display has it when two
    * apps split it. A view that stops being shown cannot keep focus: hiding
-   * moves focus out, and showing it again lets the app reclaim it.
+   * moves focus out, and showing it again lets the app reclaim it. Shown is
+   * the same predicate `visible` reports - DOM-rendered, awake, facing and
+   * unclipped - so a parked, asleep, away-facing or fully clipped view loses
+   * focus with it.
    */
   focused: boolean
   /** Hinge angle, 0 closed to 180 flat. */

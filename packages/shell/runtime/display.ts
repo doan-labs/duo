@@ -39,12 +39,17 @@ export function maskDisplays(asleep: boolean) {
   emit()
 }
 /**
- * Drops DOM focus out of a view no person can see. A hidden copy that keeps
- * focus still receives real key events; hiding the view must move focus.
+ * Drops DOM focus out of a view no person can see - the same truth `viewInfo`
+ * reports to the frame, so hidden covers DOM-hidden, sleep-masked,
+ * away-facing and fully clipped states alike. A hidden copy that keeps focus
+ * still receives real key events; hiding the view must move focus.
+ * Returns true when it blurred, so the caller can refresh `focused`.
  */
-export function releaseHiddenFocus(element: HTMLElement) {
+export function releaseHiddenFocus(element: HTMLElement, info: ViewInfo) {
   const active = document.activeElement
-  if (active && element.contains(active) && (sleeping || !element.checkVisibility())) (active as HTMLElement).blur()
+  if (!active || !element.contains(active) || info.visible) return false
+  ;(active as HTMLElement).blur()
+  return true
 }
 
 export function viewInfo(
