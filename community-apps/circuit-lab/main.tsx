@@ -319,6 +319,17 @@ function CircuitLab() {
     return () => clearTimeout(t)
   }, [arming, view.active])
 
+  // The inner panel's scroll holds tools and the list together; jumping the
+  // list into view when its tab is picked keeps the section out of the fold.
+  // The initial mount stays put so PARTS greets the build view.
+  const listRef = useRef<HTMLDivElement>(null)
+  const prevTab = useRef(panelTab)
+  useEffect(() => {
+    if (prevTab.current === panelTab) return
+    prevTab.current = panelTab
+    listRef.current?.scrollIntoView({ block: 'start' })
+  }, [panelTab])
+
   // A write this copy did not make is the new settled circuit; adopting it is
   // what carries the build across the fold. Own writes are already on screen.
   useEffect(() => {
@@ -1290,11 +1301,15 @@ function CircuitLab() {
           <section {...stylex.props(styles.stage)}>
             {canvas}
             <div {...stylex.props(styles.panel)}>
-              {palette}
-              {inspector}
-              <div {...stylex.props(styles.sepH)} />
+              <div {...stylex.props(styles.panelScroll)}>
+                {palette}
+                {inspector}
+                <div {...stylex.props(styles.sepH)} />
+                <div ref={listRef} {...stylex.props(styles.anchor)}>
+                  {tabContent(panelTab)}
+                </div>
+              </div>
               {seg(panelTab, setPanelTab, ['Table', 'Tasks', 'Saved'] as Tab[])}
-              <div {...stylex.props(styles.panelScroll)}>{tabContent(panelTab)}</div>
             </div>
           </section>
         ) : (

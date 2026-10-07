@@ -413,6 +413,7 @@ export const styles = stylex.create({
     scrollbarWidth: 'none'
   },
   section: { display: 'flex', flexDirection: 'column', gap: space.sm, minWidth: 0, flexShrink: 0 },
+  anchor: { display: 'flex', flexDirection: 'column', minHeight: 0, flexShrink: 0 },
   fieldLabel: {
     color: app.label2,
     fontSize: typeScale.caption2,
