@@ -338,6 +338,11 @@ function Solitaire() {
               stopAuto()
               resumeAuto.current = foreign.auto === true
               tryResume()
+              // The mirror still serves the superseded record and will
+              // re-deliver it as a fresh foreign write - after a relaunch it
+              // even parses foreign (a new ME) - which would bounce the table
+              // straight back. Settle the adopted record so it converges.
+              void saved.set(cur)
               setStatus('Game restored - the other screen moved first.')
               return
             }
