@@ -61,6 +61,16 @@ class Backend {
   rev = 0
   watchers = new Set<{ cb: (e: Change) => void; space: Space }>()
   writes: [string, string][] = []
+  inflight = 0
+  maxInflight = 0
+  ops = 0
+  enter() {
+    this.ops++
+    this.maxInflight = Math.max(this.maxInflight, ++this.inflight)
+    return () => {
+      this.inflight--
+    }
+  }
   /** Commit like an ended peer's in-flight write landing late. */
   async inject(k: string, v: string) {
     const e: Change = { rev: ++this.rev, k, v }
@@ -80,11 +90,15 @@ class Space {
     if (this.latency) await new Promise((r) => setTimeout(r, this.latency))
   }
   async get(k: string) {
+    const done = this.backend.enter()
     await this.tick()
+    done()
     return this.backend.data.get(k) ?? null
   }
   async set(k: string, v: string) {
+    const done = this.backend.enter()
     await this.tick()
+    done()
     if (this.failSets > 0) {
       this.failSets--
       throw new Error('E_QUOTA')
@@ -200,6 +214,9 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
   const progressBest = { current: {} as ProgressMap }
   const progJson = { current: '{}' }
   const repairSig = { current: { sig: null as string | null } }
+  const progBusy = { current: false }
+  const progAgain = { current: false }
+  const progPass = { current: () => {} }
   let rendered: ProgressMap = {}
   const setProgress = (p: ProgressMap) => {
     rendered = p
@@ -245,6 +262,9 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     'mergeProgress',
     'live',
     'view',
+    'progBusy',
+    'progAgain',
+    'progPass',
     `return () => {${effectBody[1]}\n}`
   )(
     progressKV,
@@ -263,7 +283,10 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     progWritten,
     mergeProgress,
     live,
-    os.view
+    os.view,
+    progBusy,
+    progAgain,
+    progPass
   ) as () => () => void
 
   let cleanup: (() => void) | undefined
@@ -543,6 +566,30 @@ await check('watch suppression: reconcile verifies durable by get, not echo', as
     MODEL_IDS.every((id) => d[id]?.done),
     'suppressed watch never let the clobber stand'
   )
+})
+
+await check('rapid write burst keeps concurrent requests bounded', async () => {
+  // The host rejects a view with >=64 in-flight requests ('Too many
+  // requests'): reconciles must tail-coalesce instead of stacking.
+  const b = new Backend()
+  const a = makeCopy(b, { latency: 40 })
+  const c = makeCopy(b, { latency: 40 })
+  await settle(120)
+  const models = ['dart', 'boat', 'cup', 'helmet', 'tulip', 'balloon']
+  for (let round = 0; round < 3; round++)
+    for (const m of models) {
+      a.writeProgress(m, round + 2, stepsOf(m))
+      c.writeProgress(m, round + 3, stepsOf(m))
+    }
+  await settle(1200)
+  // Each reconcile pass reads 7 keys; every own-write echo re-fires it. Without
+  // coalescing a 36-write burst runs dozens of overlapping passes and the host
+  // starts rejecting requests once 64 are in flight. A coalesced copy needs a
+  // handful of passes, not one per echo.
+  ok(b.ops < 300, `durable ops ${b.ops} stayed bounded under the burst`)
+  ok(b.maxInflight < 64, `peak in-flight ${b.maxInflight} stayed under the host cap`)
+  const facts = await durableProgress(a.space as never, MODEL_IDS)
+  eq(Object.keys(facts.facts).length, 6, 'all six facts survived the burst')
 })
 
 await check('no idle write storm or repair ping-pong', async () => {

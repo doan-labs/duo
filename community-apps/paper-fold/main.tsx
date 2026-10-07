@@ -508,6 +508,9 @@ function PaperFold() {
   // deficiency and must be repaired again.
   const repairSig = useRef<{ sig: string | null }>({ sig: null })
   const progJson = useRef('{}')
+  const progBusy = useRef(false)
+  const progAgain = useRef(false)
+  const progPass = useRef<() => void>(() => {})
 
   // Adopt a strictly newer foreign position; when the shared doc lands behind
   // our best (a stale foreign write), the active copy repairs it once.
@@ -545,28 +548,44 @@ function PaperFold() {
   // receipts into best - both copies adopt - and a live copy repairs what the
   // durable evidence actually lacks, keyed on the durable read instead of our
   // own optimistic payload so a stale whole-doc write landing late is repaired.
+  // Passes are tail-coalesced: only one runs at a time per copy and every
+  // trigger during it folds into a single follow-up, so a burst of own-write
+  // echoes cannot stack durable reads and repairs past the host's in-flight
+  // request cap and starve ordinary writes out.
   useEffect(() => {
     if (progressKV.status === 'hydrating') return
-    let cancelled = false
-    void reconcileProgress(os.storage, MODEL_IDS, progressBest.current, live(view) && liveNow(), repairSig.current)
-      .then(({ merged, plan }) => {
-        if (cancelled) return
-        progressBest.current = merged
-        const mJson = JSON.stringify(merged)
-        if (mJson !== progJson.current) {
-          progJson.current = mJson
-          setProgress(merged)
-        }
-        if (plan.aggregate && progressKV.value !== plan.aggregate) progressKV.set(plan.aggregate)
-        for (const [id, rec] of Object.entries(plan.receipts))
-          void os.storage
-            .set(receiptKey(id), JSON.stringify(rec))
-            .catch((e) => console.warn('paperfold: repair receipt failed', e))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
+    progPass.current = () => {
+      progBusy.current = true
+      void reconcileProgress(os.storage, MODEL_IDS, progressBest.current, live(view) && liveNow(), repairSig.current)
+        .then(({ merged, plan }) => {
+          // Union the pass result with best at adopt time: an optimistic write
+          // landed during the await must never be overwritten by older state.
+          progressBest.current = mergeProgress(merged, progressBest.current)
+          const mJson = JSON.stringify(progressBest.current)
+          if (mJson !== progJson.current) {
+            progJson.current = mJson
+            setProgress(progressBest.current)
+          }
+          if (plan.aggregate && progressKV.value !== plan.aggregate) progressKV.set(plan.aggregate)
+          for (const [id, rec] of Object.entries(plan.receipts))
+            void os.storage
+              .set(receiptKey(id), JSON.stringify(rec))
+              .catch((e) => console.warn('paperfold: repair receipt failed', e))
+        })
+        .catch(() => {})
+        .finally(() => {
+          progBusy.current = false
+          if (progAgain.current) {
+            progAgain.current = false
+            progPass.current()
+          }
+        })
     }
+    if (progBusy.current) {
+      progAgain.current = true
+      return
+    }
+    progPass.current()
     // `view` joins the gate and the deps so a copy turning live re-runs the
     // pass: a reconcile that ran while hidden skips durable repair, and the
     // live transition re-arms it.
