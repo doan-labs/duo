@@ -54,7 +54,12 @@ that differ from a single-display app:
   hydrating and reconciling shared docs but drops gestures before they
   schedule work. Internal reconciliation (repair, boot seeding) is not input
   and never passes the gate. The clock and the audio path obey the same two
-  flags.
+  flags. Callbacks that resolve later (sheet onClose, cancel/play, hover,
+  the timer tick) re-read the synchronous `os.view` snapshot at fire time,
+  not the admission captured when they were scheduled.
+- Escape is consumed at the pre-connect guard while a sheet or a held piece
+  is on top, so the SDK's later capture listener never forwards it to Home;
+  with nothing open it stays unconsumed and parks the copy as designed.
 - Gestures that outlive their admission bind to the puzzle they were aimed
   at (`gameKeyOf` - art, count and seed): if a different puzzle is live when
   the step runs, the intent is dropped rather than applied to a piece index
@@ -71,6 +76,12 @@ that differ from a single-display app:
 - `queue.ts` keeps the serial chain alive after a failed step; a step that
   genuinely never settles only delays later writes - do not add timeouts or
   reload workarounds on top of it.
+- The chain serializes reads and rebases, NOT durable delivery: a confirmed
+  read can still lag writes this copy already accepted. Rebases therefore
+  merge on the last-accepted envelope (`savesDoc()`) when the store read is
+  not newer, and `healSaves` republishes the union of store keys and our
+  pending keys. Without that, a fast second mutation drops an accepted but
+  still-in-flight puzzle from the durable library.
 
 ## Verification
 
