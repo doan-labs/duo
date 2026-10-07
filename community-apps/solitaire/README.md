@@ -60,6 +60,11 @@ clobber a deal it could not see. The mirror's `ready`/`error` state is the
 acknowledgement that clears or requeues the intent, so an accepted move is
 never silently lost and never double-applied. Stats merge the same way:
 play/win counters union over the confirmed base instead of overwriting it.
+Because the mirror lags and re-serves superseded records verbatim, every
+record this copy issues, adopts or receives joins a `seenRaws` set and a
+re-delivered old raw can never pass for a new foreign write; the repair
+write that settles an adopted record re-reads the store first so it cannot
+revert a newer deal.
 
 ## Engine
 
