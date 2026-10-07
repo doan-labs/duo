@@ -40,6 +40,27 @@ move log persist in `os.storage`, so the other display (or tomorrow) rebuilds
 the exact table - undo history included. Sound and timers only run on the copy
 you are looking at, and the mute flag persists too.
 
+### Admission and persistence invariants
+
+The copy that owns the screen is the one the shell reports live. Every point
+of player-driven change - taps, keyboard input, the Auto tick, sound, focus
+restores - reads `os.view.visible && os.view.active` synchronously before
+acting (`viewLive` in `io.ts`), never the render's cached pair: the SDK swaps
+`os.view` a frame before React hears the event, so a hidden copy can
+otherwise accept one last input nobody sees. Going hidden parks Auto (the
+record's `auto` flag hands it to the other display) and clears every timer;
+coming live flushes what parked.
+
+Writes are intents, not fire-and-forget. A move's serialized record parks
+until `os.storage.get` confirms what is there: a foreign record is adopted
+(the pending intent is superseded), a confirmed slot issues `saved.set`, and
+a *rejected* read means the peer's state is unknown - the intent retries
+with backoff and the status line says so, rather than a blind set that could
+clobber a deal it could not see. The mirror's `ready`/`error` state is the
+acknowledgement that clears or requeues the intent, so an accepted move is
+never silently lost and never double-applied. Stats merge the same way:
+play/win counters union over the confirmed base instead of overwriting it.
+
 ## Engine
 
 `game.ts` is the whole ruleset with no UI: a seeded deal, every legal-move

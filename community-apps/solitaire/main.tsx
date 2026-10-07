@@ -28,6 +28,7 @@ import {
   type Stats,
   serializeGame
 } from './game.ts'
+import { ackWrite, faultDelay, flushWrite, viewLive } from './io.ts'
 import { styles } from './styles.ts'
 
 // Why a writer id: both displays share one storage key whose store is
@@ -158,6 +159,7 @@ const smartMoves = (game: Game, s: Sel): Move[] => {
 function useRadioNav(count: number, current: number, pick: (index: number) => void) {
   const refs = useRef<Array<HTMLElement | null>>([])
   const onKeyDown = (event: React.KeyboardEvent) => {
+    if (!viewLive(os.view)) return
     let next = current
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % count
     else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (current + count - 1) % count
@@ -239,8 +241,24 @@ function Solitaire() {
   // 'new best' honest - equal moves do not reannounce, and neither does a
   // relaunched won game (this ref is empty there).
   const winMark = useRef<{ seed: number; prevBest: number | null } | null>(null)
-  const activeRef = useRef(view.active)
-  activeRef.current = view.active
+  // Both flags make the screen-owning copy: a slept or fully clipped view
+  // reports active without visible, a folded-away display reports neither.
+  // This render's pair drives effects; admission checks instead read
+  // os.view synchronously at call time (viewLive), since the SDK swaps it a
+  // frame before React hears the event.
+  const liveView = view.active && view.visible
+  // Own intents not yet confirmed against the store: the game record parks
+  // the newest publish, stats the newest commit. A rejected read leaves the
+  // peer record unknown - it is not an empty slot, so the intent retries
+  // rather than write blind; the mirror's own 'ready'/'error' state is the
+  // acknowledgement that clears or requeues it.
+  const pendingGame = useRef<{ next: Table; raw: string; issued?: string } | null>(null)
+  const pendingStats = useRef<{ next: Stats; issued?: string } | null>(null)
+  const ioRetry = useRef<number | null>(null)
+  const ioFails = useRef(0)
+  // noteWriteFault's timer calls the latest flush through this ref, dodging
+  // the declaration cycle between the two callbacks.
+  const flushIORef = useRef<() => void>(() => {})
 
   // Durable stores: the match (deal plus every move) and the sound flag
   // survive a relaunch; stats sit apart so a corrupt board never costs them.
@@ -297,7 +315,7 @@ function Solitaire() {
   // hands them the current copy without reordering the component.
   const doAutoRef = useRef<(quiet?: boolean) => void>(() => {})
   const tryResume = useCallback(() => {
-    if (activeRef.current && resumeAuto.current && autoTimer.current === null) {
+    if (viewLive(os.view) && resumeAuto.current && autoTimer.current === null) {
       resumeAuto.current = false
       doAutoRef.current(true)
     }
@@ -306,11 +324,89 @@ function Solitaire() {
   const play = useCallback(
     (kind: Cue) => {
       // Only the copy the player is looking at makes sound.
-      if (muted || !activeRef.current) return
+      if (muted || !viewLive(os.view)) return
       cue(kind)
     },
     [muted]
   )
+
+  // A store fault parks the intent instead of resolving it: retry while this
+  // copy is live, surface the stall after a few misses, and stop counting
+  // once any read confirms the store answers again.
+  const noteWriteFault = useCallback(() => {
+    ioFails.current += 1
+    if (ioFails.current === 3) setStatus('Save unavailable - moves stay on this screen until storage responds.')
+    if (ioRetry.current !== null || !viewLive(os.view)) return
+    ioRetry.current = window.setTimeout(() => {
+      ioRetry.current = null
+      // A hide between scheduling and firing leaves the intent parked; the
+      // live edge's flushIO picks it back up.
+      if (viewLive(os.view)) flushIORef.current()
+    }, faultDelay(ioFails.current))
+  }, [])
+
+  // Runs the parked game/stats intents through one read-confirmed attempt
+  // each. Safe to fire any time: intents already issued wait on the mirror's
+  // acknowledgement, and a newer publish replaces a parked one wholesale.
+  const flushIO = useCallback(() => {
+    const game = pendingGame.current
+    if (game && game.issued === undefined) {
+      void flushWrite(game, {
+        get: () => os.storage.get('game'),
+        foreign: (cur) => {
+          if (cur === lastSeen.current) return false
+          const next = adoptGame(cur)
+          if (!next || next.by === ME) return false
+          pendingGame.current = null
+          mirrorBehind.current = true
+          lastSeen.current = cur
+          const t = { ...next.deal, game: next.game }
+          setTable(t)
+          tableRef.current = t
+          setSel(null)
+          setPending(null)
+          stopAuto()
+          resumeAuto.current = next.auto === true
+          tryResume()
+          // The mirror still serves the superseded record and will re-deliver
+          // it as a fresh foreign write - after a relaunch it even parses
+          // foreign (a new ME) - which would bounce the table straight back.
+          // Settle the adopted record so it converges.
+          void saved.set(cur)
+          setStatus('Game restored - the other screen moved first.')
+          return true
+        },
+        stale: () => tableRef.current !== game.next,
+        issue: (raw) => {
+          lastSeen.current = raw
+          void saved.set(raw)
+        },
+        fault: () => {
+          if (pendingGame.current === game) noteWriteFault()
+        }
+      }).then((result) => {
+        // Stale intent never writes and never retries; adoption already
+        // consumed it inside `foreign`.
+        if (result === 'stale' && pendingGame.current === game) pendingGame.current = null
+      })
+    }
+    const stats = pendingStats.current
+    if (stats && stats.issued === undefined) {
+      // Stats merge instead of adopting: readStats union keeps whichever copy
+      // wrote in between inside the committed record.
+      void os.storage
+        .get('stats')
+        .then((cur) => {
+          if (pendingStats.current !== stats) return
+          stats.issued = JSON.stringify({ v: 1, by: ME, ...mergeStats(readStats(cur), stats.next) })
+          void statsRaw.set(stats.issued)
+        })
+        .catch(() => {
+          if (pendingStats.current === stats) noteWriteFault()
+        })
+    }
+  }, [saved, statsRaw, stopAuto, tryResume, noteWriteFault])
+  flushIORef.current = flushIO
 
   const publish = useCallback(
     (next: Table) => {
@@ -320,47 +416,13 @@ function Solitaire() {
       // mid-Auto hands it off instead of silently dropping the timer.
       const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null))
       // The store, not the mirror, is the authority: a foreign write this copy
-      // has not been notified of yet still wins. Read before writing so a
-      // superseded deal is adopted rather than silently overwritten.
-      void os.storage
-        .get('game')
-        .then((cur) => {
-          if (cur && cur !== lastSeen.current) {
-            const foreign = adoptGame(cur)
-            if (foreign && foreign.by !== ME) {
-              mirrorBehind.current = true
-              lastSeen.current = cur
-              const t = { ...foreign.deal, game: foreign.game }
-              setTable(t)
-              tableRef.current = t
-              setSel(null)
-              setPending(null)
-              stopAuto()
-              resumeAuto.current = foreign.auto === true
-              tryResume()
-              // The mirror still serves the superseded record and will
-              // re-deliver it as a fresh foreign write - after a relaunch it
-              // even parses foreign (a new ME) - which would bounce the table
-              // straight back. Settle the adopted record so it converges.
-              void saved.set(cur)
-              setStatus('Game restored - the other screen moved first.')
-              return
-            }
-          }
-          // Queued behind an adoption this write is stale intent: the live
-          // table has already moved on, so only the publish that still owns
-          // it commits.
-          if (tableRef.current !== next) return
-          lastSeen.current = raw
-          void saved.set(raw)
-        })
-        .catch(() => {
-          if (tableRef.current !== next) return
-          lastSeen.current = raw
-          void saved.set(raw)
-        })
+      // has not been notified of yet still wins. The intent parks until a read
+      // confirms the record - a rejected read is unknown peer state, never a
+      // licence to overwrite it.
+      pendingGame.current = { next, raw }
+      flushIO()
     },
-    [saved, stopAuto, tryResume]
+    [flushIO]
   )
 
   // The shared record must never regress to an older base. When the other
@@ -384,6 +446,8 @@ function Solitaire() {
         stopAuto()
         resumeAuto.current = next.auto === true
         tryResume()
+        // The adopted record supersedes any parked write of ours.
+        pendingGame.current = null
         return { table: t, foreign: true }
       }
     }
@@ -394,6 +458,21 @@ function Solitaire() {
   // other display. A write this copy did not make is the newer settled deal;
   // the raw string is the guard so the effect never re-fires on its own echo.
   useEffect(() => {
+    // A parked intent resolves only through the mirror's acknowledgement:
+    // 'ready' with the issued value confirms it, 'error' requeues the intent
+    // for another read before anything else runs.
+    const io = pendingGame.current
+    if (io) {
+      const ack = ackWrite(io, saved.status, saved.value)
+      if (ack === 'confirmed') {
+        pendingGame.current = null
+        ioFails.current = 0
+      } else if (ack === 'requeue') {
+        io.issued = undefined
+        noteWriteFault()
+        return
+      }
+    }
     if (saved.status === 'hydrating' || saved.status === 'saving') return
     const raw = saved.value
     if (raw !== null && raw === lastSeen.current) {
@@ -411,7 +490,10 @@ function Solitaire() {
     mirrorBehind.current = false
     lastSeen.current = raw
     if (!raw) {
-      if (!seeded.current) {
+      // Seeding the first deal is new work only the live copy may do; an
+      // unanswerable store ('error') is not an empty record either, so a
+      // failed hydrate can never seed over a deal it could not see.
+      if (!seeded.current && saved.status !== 'error' && viewLive(os.view)) {
         seeded.current = true
         publish(initial.current!)
       }
@@ -425,6 +507,8 @@ function Solitaire() {
     setSel(null)
     setPending(null)
     stopAuto()
+    // The adopted record supersedes any parked write of ours.
+    pendingGame.current = null
     // The other copy was mid-sweep when this one took the display: pick it up.
     // A record without the flag also clears any stale resume request.
     resumeAuto.current = next.auto === true
@@ -433,7 +517,22 @@ function Solitaire() {
     // again; the per-tap mirror check is trustworthy once more.
     mirrorBehind.current = false
     setStatus('Game restored.')
-  }, [saved.value, saved.status, saved, publish, stopAuto, tryResume])
+  }, [saved.value, saved.status, saved, publish, stopAuto, tryResume, noteWriteFault])
+
+  // Same acknowledgement watch for the stats key, kept apart so a stats
+  // store fault never blocks or fakes a deal adoption.
+  useEffect(() => {
+    const io = pendingStats.current
+    if (!io) return
+    const ack = ackWrite(io, statsRaw.status, statsRaw.value)
+    if (ack === 'confirmed') {
+      pendingStats.current = null
+      ioFails.current = 0
+    } else if (ack === 'requeue') {
+      io.issued = undefined
+      noteWriteFault()
+    }
+  }, [statsRaw.status, statsRaw.value, noteWriteFault])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -443,17 +542,12 @@ function Solitaire() {
     (next: Stats) => {
       // Both copies write this key; merge with the freshest shared value so a
       // commit on a stale base unions deals instead of erasing the other
-      // display's increments. Read the store, not the mirror, for the base.
-      const write = (base: Stats) => {
-        const merged = mergeStats(base, next)
-        void statsRaw.set(JSON.stringify({ v: 1, by: ME, ...merged }))
-      }
-      void os.storage
-        .get('stats')
-        .then((cur) => write(readStats(cur)))
-        .catch(() => write(readStats(statsRaw.value)))
+      // display's increments. The intent parks until a read confirms the
+      // base - like the game record, a rejected read never merges blind.
+      pendingStats.current = { next }
+      flushIO()
     },
-    [statsRaw]
+    [flushIO]
   )
 
   const clearShake = useRef<number | null>(null)
@@ -515,6 +609,7 @@ function Solitaire() {
 
   /** The undo step: the log loses its last move and the deal replays cleanly. */
   const undo = useCallback(() => {
+    if (!viewLive(os.view)) return
     const base = freshBase()
     if (base.foreign) {
       // Undo takes back a move on the shared deal - but the shared deal just
@@ -536,6 +631,7 @@ function Solitaire() {
 
   const restart = useCallback(
     (mode: Mode = tableRef.current.mode) => {
+      if (!viewLive(os.view)) return
       const next = freshTable(mode)
       setPending(null)
       setSel(null)
@@ -555,6 +651,7 @@ function Solitaire() {
   const hasProgress = table.log.length > 0
   const requestNew = useCallback(
     (mode: Mode = table.mode) => {
+      if (!viewLive(os.view)) return
       if (ended || !hasProgress) {
         restart(mode)
         return
@@ -579,7 +676,7 @@ function Solitaire() {
 
   /** A stock tap draws, or flips the waste back once the stock ran out. */
   const tapStock = useCallback(() => {
-    if (ended) return
+    if (ended || !viewLive(os.view)) return
     const n = game.stock.length ? Math.min(game.mode === 'draw3' ? 3 : 1, game.stock.length) : game.waste.length
     if (game.stock.length) {
       doMove({ t: 'draw' }, `Drew ${n} card${n === 1 ? '' : 's'}.`)
@@ -592,7 +689,7 @@ function Solitaire() {
 
   const onCard = useCallback(
     (_id: number, spot: Spot, index: number) => {
-      if (ended) return
+      if (ended || !viewLive(os.view)) return
       stopAuto()
       if (spot === 's') {
         tapStock()
@@ -632,7 +729,7 @@ function Solitaire() {
 
   const onSpot = useCallback(
     (spot: Spot) => {
-      if (ended) return
+      if (ended || !viewLive(os.view)) return
       stopAuto()
       if (spot === 's') {
         tapStock()
@@ -661,7 +758,7 @@ function Solitaire() {
   /** Double-tap sends a card to its best home: foundation first, then tableau. */
   const onCardDouble = useCallback(
     (_id: number, spot: Spot, index: number) => {
-      if (ended) return
+      if (ended || !viewLive(os.view)) return
       const s = selForTap(game, spot, index)
       if (!s) return
       for (const m of smartMoves(game, s)) {
@@ -686,7 +783,7 @@ function Solitaire() {
 
   /** An honest hint: the best move's cards lift and its landing lights. */
   const doHint = useCallback(() => {
-    if (ended) return
+    if (ended || !viewLive(os.view)) return
     const h = hint(game)
     if (!h) {
       setStatus('No moves left - undo, or start a new game.')
@@ -715,7 +812,7 @@ function Solitaire() {
       // can fire in the same commit an adoption landed, when `game` still shows
       // the pre-adoption table and would compute zero steps.
       const live = tableRef.current
-      if (live.game.status !== 'playing' || autoTimer.current !== null || !activeRef.current) return
+      if (live.game.status !== 'playing' || autoTimer.current !== null || !viewLive(os.view)) return
       const steps = autoMoves(live.game)
       if (!steps.length) {
         // A resumed handoff that finds nothing left just ends quietly; only a
@@ -726,7 +823,14 @@ function Solitaire() {
       setStatus('Sending eligible cards home...')
       let i = 0
       autoTimer.current = window.setInterval(() => {
-        if (!activeRef.current) return
+        if (!viewLive(os.view)) {
+          // The screen went away mid-sweep: park, flag the handoff, and let
+          // the live edge resume it. A hidden copy runs no timer at all, not
+          // even a no-op one waiting on React to catch up.
+          resumeAuto.current = true
+          stopAuto()
+          return
+        }
         const m = steps[i]
         if (!m) {
           stopAuto()
@@ -770,32 +874,47 @@ function Solitaire() {
           setStatus(`Auto-finish: ${nextTable.log.length} moves.`)
         }
       }, 110)
+      // Stamp the sweep on the record at its first breath: a hide between the
+      // button press and the first tick would otherwise carry no auto flag
+      // and the handoff would die with the parked timer.
+      publish({ ...live, game: live.game })
     },
     [stopAuto, publish, play, commitStats, freshBase]
   )
   doAutoRef.current = doAuto
 
   // DESIGN2: a hidden copy runs no timer at all. Going hidden mid-sweep clears
-  // the interval and flags a resume; becoming visible again (or adopting a
-  // foreign deal whose record still says auto) restarts the sweep from the
-  // shared truth - never a no-op loop ticking where nobody can see it.
+  // the interval and flags a resume; becoming the live view again (or
+  // adopting a foreign deal whose record still says auto) restarts the sweep
+  // from the shared truth - never a no-op loop ticking where nobody can see
+  // it. Hidden also parks the write-retry timer; becoming live flushes any
+  // intents that were parked on store faults.
   useEffect(() => {
-    if (!view.active) {
+    if (!liveView) {
       if (autoTimer.current !== null) {
         resumeAuto.current = true
         stopAuto()
       }
+      // No retry timer may fire hidden either: parked intents keep their
+      // state and the live edge below flushes them.
+      if (ioRetry.current !== null) {
+        window.clearTimeout(ioRetry.current)
+        ioRetry.current = null
+      }
       return
     }
     tryResume()
-  }, [view.active, tryResume, stopAuto])
+    flushIO()
+  }, [liveView, tryResume, stopAuto, flushIO])
 
   const toggleMute = useCallback(() => {
+    if (!viewLive(os.view)) return
     void prefs.set(JSON.stringify({ v: 1, by: ME, muted: !muted }))
     if (muted) play('pickup')
   }, [prefs, muted, play])
 
   const closeConfirm = useCallback(() => {
+    if (!viewLive(os.view)) return
     setPending(null)
     const el = returnFocus.current
     returnFocus.current = null
@@ -805,7 +924,7 @@ function Solitaire() {
     if (el instanceof HTMLElement) {
       let tries = 0
       const restore = () => {
-        if (!el.isConnected || !activeRef.current) return
+        if (!el.isConnected || !viewLive(os.view)) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
@@ -824,7 +943,7 @@ function Solitaire() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return
-      if (pending) return
+      if (!viewLive(os.view) || pending) return
       if (event.key === 'r' || event.key === 'R' || event.key === 'n' || event.key === 'N') requestNew()
       else if (event.key === 'u' || event.key === 'U') undo()
       else if (event.key === 'h' || event.key === 'H') doHint()
@@ -1001,7 +1120,7 @@ function Solitaire() {
       shake={shake}
       dealing={dealing}
       won={ended}
-      active={view.active}
+      active={liveView}
       onSpot={onSpot}
       onCard={onCard}
       onCardDouble={onCardDouble}
