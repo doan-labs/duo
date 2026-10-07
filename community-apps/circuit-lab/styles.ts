@@ -544,9 +544,11 @@ export const styles = stylex.create({
   },
   // The Build tab pins Parts above the inspector's own scroller: a selection
   // reveal scrolls only the pane, never the controls under the user's finger.
+  // Each pane floors at two rows so a short cover tray cannot starve either -
+  // the tight case scrolls inside the pane instead of hiding it whole.
   trayBodyBuild: { overflowY: 'hidden' },
-  buildPin: { flexShrink: 0 },
-  buildScroll: { minHeight: 0, flexGrow: 1, overflowY: 'auto', scrollbarWidth: 'none' },
+  buildPin: { flexShrink: 1, minHeight: 88, overflowY: 'auto', scrollbarWidth: 'none' },
+  buildScroll: { minHeight: 88, flexGrow: 1, overflowY: 'auto', scrollbarWidth: 'none' },
   rowBtns: { display: 'flex', gap: space.xs, flexWrap: 'wrap' },
   // One input pin of the selected part: name and feed, tappable to land an
   // armed wire or cut the one already there - the non-canvas wiring path.
