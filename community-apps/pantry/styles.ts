@@ -130,7 +130,7 @@ export const styles = stylex.create({
     paddingBlock: space.sm,
     paddingInline: space.md,
     color: app.fg,
-    backgroundColor: app.fill3,
+    backgroundColor: { default: app.fill3, ':active': app.fill2 },
     fontFamily: fonts.system,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
@@ -155,7 +155,9 @@ export const styles = stylex.create({
     paddingBlock: space.lg,
     paddingInline: space.lg,
     borderRadius: radius.xl,
-    backgroundColor: glass.tintDark,
+    // app.glass is themed per appearance (tint in light, tintDark in dark);
+    // the raw glass.tintDark const left light cards murky under dark text.
+    backgroundColor: app.glass,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim},${shadow.float}`,
@@ -228,7 +230,7 @@ export const styles = stylex.create({
     minHeight: `calc(${space.xxxl} + ${space.md})`,
     boxSizing: 'border-box',
     color: app.fg,
-    backgroundColor: app.fill3,
+    backgroundColor: { default: app.fill3, ':active': app.fill2 },
     fontFamily: fonts.system,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
@@ -258,7 +260,7 @@ export const styles = stylex.create({
     minWidth: `calc(${space.xxxl} + ${space.md})`,
     justifyContent: 'center',
     color: app.label2,
-    backgroundColor: 'transparent',
+    backgroundColor: { default: 'transparent', ':active': app.fill3 },
     fontFamily: fonts.system,
     fontSize: typeScale.caption2,
     fontWeight: weight.semibold,
@@ -314,7 +316,7 @@ export const styles = stylex.create({
     borderRadius: radius.circle,
     padding: 0,
     color: app.label2,
-    backgroundColor: { default: 'transparent', ':hover': app.fill2 },
+    backgroundColor: { default: 'transparent', ':hover': app.fill2, ':active': app.fill2 },
     cursor: 'pointer',
     flexShrink: 0,
     touchAction: 'manipulation'
@@ -365,7 +367,7 @@ export const styles = stylex.create({
     paddingBlock: space.xs,
     paddingInline: space.xs,
     color: app.fg,
-    backgroundColor: 'transparent',
+    backgroundColor: { default: 'transparent', ':active': app.fill2 },
     fontFamily: fonts.system,
     fontSize: typeScale.subheadline,
     lineHeight: leading.subheadline,
@@ -417,7 +419,7 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: radius.circle,
     color: app.fg,
-    backgroundColor: { default: app.fill3, ':hover': app.fill2 },
+    backgroundColor: { default: app.fill3, ':hover': app.fill2, ':active': app.fill2 },
     cursor: 'pointer',
     touchAction: 'manipulation',
     transitionProperty: 'transform,background-color',
@@ -428,7 +430,10 @@ export const styles = stylex.create({
     outlineColor: { default: 'transparent', ':focus-visible': app.link },
     outlineOffset: 1
   },
-  stepBtnOff: { color: app.label3, backgroundColor: { default: 'transparent', ':hover': app.fill3 } },
+  stepBtnOff: {
+    color: app.label3,
+    backgroundColor: { default: 'transparent', ':hover': app.fill3, ':active': app.fill3 }
+  },
   stepQty: {
     minWidth: `calc(${space.xxxl} * 2)`,
     textAlign: 'center',
@@ -482,7 +487,7 @@ export const styles = stylex.create({
     paddingBlock: space.xs,
     paddingInline: space.xs,
     color: app.fg,
-    backgroundColor: 'transparent',
+    backgroundColor: { default: 'transparent', ':active': app.fill3 },
     fontFamily: fonts.system,
     fontSize: typeScale.subheadline,
     textAlign: 'start',
@@ -506,7 +511,7 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: radius.circle,
     color: { default: app.label3, ':hover': colors.redDark },
-    backgroundColor: { default: 'transparent', ':hover': app.fill3 },
+    backgroundColor: { default: 'transparent', ':hover': app.fill3, ':active': app.fill3 },
     cursor: 'pointer',
     flexShrink: 0,
     touchAction: 'manipulation',
@@ -527,7 +532,7 @@ export const styles = stylex.create({
     paddingBlock: space.xs,
     paddingInline: space.md,
     color: app.link,
-    backgroundColor: { default: 'transparent', ':hover': app.fill3 },
+    backgroundColor: { default: 'transparent', ':hover': app.fill3, ':active': app.fill3 },
     fontFamily: fonts.system,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
@@ -556,12 +561,13 @@ export const styles = stylex.create({
     paddingBlock: space.xl,
     paddingInline: space.xl
   },
-  // shared.press has no reduced-motion branch (platform gap, reported): pressCalm
-  // stills the scale and keeps a held fill, so reduced feedback is colour, not motion.
+  // shared.press has no reduced-motion branch (platform gap, reported), and
+  // StyleX merges a conditional map last-wins: every branch is restated so the
+  // reduce override stills only the scale while the normal press feedback
+  // survives. Held colour lives in each control's own backgroundColor map.
   pressCalm: {
-    transform: { [reduce]: 'scale(1)', ':active': { [reduce]: 'scale(1)' } },
-    transitionDuration: { [reduce]: '0s' },
-    backgroundColor: { ':active': app.fill2 }
+    transform: { default: 'scale(1)', ':active': { default: motion.press, [reduce]: 'scale(1)' } },
+    transitionDuration: { default: `${motion.pressDuration}, .2s, .2s`, [reduce]: '0s, 0s, 0s' }
   },
   sheetActions: { display: 'flex', alignItems: 'center', gap: space.sm, justifyContent: 'flex-end' },
   dangerZone: {
