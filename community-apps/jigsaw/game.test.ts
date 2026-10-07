@@ -656,7 +656,7 @@ await checkAsync('a prefs heal re-reads and never writes under a peer that won',
     }
   })
   await pp.heal()
-  const doc = parsePrefsDoc(kv.store.get('prefs'))
+  const doc = parsePrefsDoc(kv.store.get('prefs')!)
   eq(doc.rev, 9, 'heal overwrote the winning peer prefs')
   eq(doc.prefs.muted, true, 'peer mute lost to a heal')
   // Our own doc is ahead of the store: the heal republishes it once.
@@ -667,7 +667,7 @@ await checkAsync('a prefs heal re-reads and never writes under a peer that won',
   cur = { ...PREFS0, muted: false }
   await pp.heal()
   eq(kv.sets.length, writes + 1, 'stale store was not healed once')
-  eq(parsePrefsDoc(kv.store.get('prefs')).rev, 11)
+  eq(parsePrefsDoc(kv.store.get('prefs')!).rev, 11)
 })
 
 await checkAsync('a live heal yields to a foreign doc that won while queued', async () => {
