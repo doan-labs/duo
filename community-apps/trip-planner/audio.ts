@@ -7,10 +7,18 @@ export type Cue = 'check' | 'uncheck' | 'save' | 'delete' | 'undo' | 'move' | 'e
 
 let audio: AudioContext | undefined
 let muted = false
+// Only the visible copy may cue (or even create the AudioContext); a folded
+// display's stray events must not start sound. TripPlanner installs the
+// current `view.visible` value.
+let gate: () => boolean = () => true
 
 /** Called with the persisted preference on boot and whenever it changes. */
 export const setMuted = (value: boolean) => {
   muted = value
+}
+
+export const setCueGate = (f: () => boolean) => {
+  gate = f
 }
 
 function ensure(): AudioContext | undefined {
@@ -111,7 +119,7 @@ const CUES: Record<Cue, () => void> = {
 }
 
 export function cue(kind: Cue) {
-  if (muted) return
+  if (muted || !gate()) return
   try {
     CUES[kind]()
   } catch {

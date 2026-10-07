@@ -20,7 +20,6 @@ import {
   Placeholder,
   Push,
   Screen,
-  Segmented,
   Select,
   Sheet,
   Sym,
@@ -45,7 +44,7 @@ import {
   useState
 } from 'react'
 import { createRoot } from 'react-dom/client'
-import { cue, setMuted } from './audio.ts'
+import { cue, setCueGate, setMuted } from './audio.ts'
 import { styles } from './styles.ts'
 import {
   addLeg,
@@ -69,6 +68,7 @@ import {
   type LegKind,
   type Library,
   legKindLabel,
+  MAX_TRIP_DAYS,
   moveStop,
   newId,
   type PackItem,
@@ -144,12 +144,16 @@ function useFocusTrap(
   boxRef: RefObject<HTMLElement | null>,
   active: boolean,
   initial: 'first' | 'last' = 'first',
-  explicitTrigger?: HTMLElement | null
+  explicitTrigger?: HTMLElement | null,
+  mayFocus?: () => boolean
 ) {
   const trigger = useRef<HTMLElement | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: ref contents are read live during the trap, not captured as deps
   useEffect(() => {
     if (!active) return
+    // A session-mirrored sheet exists on BOTH copies; only the visible one may
+    // move DOM focus, or a folded display would steal it from the live one.
+    const canFocus = mayFocus ?? (() => true)
     trigger.current = explicitTrigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
@@ -167,29 +171,36 @@ function useFocusTrap(
     }
     document.addEventListener('keydown', onKey, true)
     const frame = requestAnimationFrame(() => {
+      if (!canFocus()) return
       const els = boxRef.current ? focusablesIn(boxRef.current) : []
       ;(initial === 'last' ? els[els.length - 1] : els[0])?.focus()
     })
     return () => {
       cancelAnimationFrame(frame)
       document.removeEventListener('keydown', onKey, true)
-      const el = trigger.current
-      if (el?.isConnected) {
-        // The trigger sits inside the inert subtree until the close commits,
-        // so retry across frames until inert lifts and it takes focus again.
-        let tries = 0
-        const restore = () => {
-          if (!el.isConnected) return
-          el.focus()
-          if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
-        }
-        requestAnimationFrame(restore)
-      } else {
-        document.querySelector<HTMLElement>('main button:not([disabled])')?.focus()
+      // Restore to the control that opened the layer. If it is gone (a deleted
+      // row, a closed menu), fall back to the surviving screen's stable anchor,
+      // re-querying each frame so an anchor on an exiting Push sheet is skipped
+      // once it detaches instead of stranding focus on BODY.
+      let tries = 0
+      const restore = () => {
+        if (!canFocus()) return
+        const el = trigger.current?.isConnected ? trigger.current : anchorFallback()
+        if (!el) return
+        el.focus()
+        if (document.activeElement !== el && ++tries < 12) requestAnimationFrame(restore)
       }
+      requestAnimationFrame(restore)
     }
   }, [active, initial])
 }
+
+/** Stable chrome buttons that survive a deleted record: the trip screen's
+ * actions menu first, then any marked control, then any button. */
+const anchorFallback = () =>
+  document.querySelector<HTMLElement>('main [data-focus-anchor="trip"]:not([disabled])') ??
+  document.querySelector<HTMLElement>('main [data-focus-anchor]:not([disabled])') ??
+  document.querySelector<HTMLElement>('main button:not([disabled])')
 
 /** A destructive confirmation: the kit card plus the modality it leaves out. */
 function DestructiveSheet({
@@ -197,16 +208,18 @@ function DestructiveSheet({
   label,
   onClose,
   restoreTo,
+  mayFocus,
   children
 }: {
   open: boolean
   label: string
   onClose: () => void
   restoreTo?: HTMLElement | null
+  mayFocus?: () => boolean
   children: React.ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
-  useFocusTrap(box, open, 'last', restoreTo)
+  useFocusTrap(box, open, 'last', restoreTo, mayFocus)
   useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
   return (
     <Sheet open={open} onClose={onClose} aria-label={label}>
@@ -225,7 +238,7 @@ function DestructiveSheet({
 // back in order; a failed write marks the space and rehydrates.
 
 const ownsStorage = (k: string) => k === 'index' || k === 'prefs' || k.startsWith('trip.')
-const ownsSession = (k: string) => k === 'ui' || k === 'draft' || k === 'undo'
+const ownsSession = (k: string) => k === 'ui' || k === 'draft' || k === 'undo' || k === 'confirm'
 
 function useSpace(space: KV, owns: (k: string) => boolean) {
   const [values, setValues] = useState<Map<string, string> | null>(null)
@@ -333,6 +346,34 @@ const tabFor = (v: unknown): Tab => (v === 'Travel' || v === 'Pack' ? v : 'Plan'
 
 type Ui = { v: 1; tripId?: string; day?: number; sel?: string; tab: Tab; arrange?: boolean }
 
+/**
+ * The live destructive confirmation, mirrored through os.session so a fold
+ * mid-confirm shows (or clears) the same sheet on the other display. `by`
+ * names the copy that opened it: only that copy remembers the DOM trigger for
+ * focus restore - the element itself is never persisted.
+ */
+type Confirm = { v: 1; kind: 'trip' | 'stop' | 'leg' | 'stay'; tripId: string; id?: string; label: string; by?: string }
+const CONFIRM_KINDS = ['trip', 'stop', 'leg', 'stay'] as const
+
+function parseConfirm(raw: string | null): Confirm | null {
+  if (!raw) return null
+  try {
+    const p = JSON.parse(raw) as Partial<Confirm>
+    if (p.v !== 1 || typeof p.tripId !== 'string' || typeof p.label !== 'string') return null
+    if (!(CONFIRM_KINDS as readonly string[]).includes(String(p.kind))) return null
+    return {
+      v: 1,
+      kind: p.kind as Confirm['kind'],
+      tripId: p.tripId,
+      id: typeof p.id === 'string' ? p.id : undefined,
+      label: p.label,
+      by: typeof p.by === 'string' ? p.by : undefined
+    }
+  } catch {
+    return null
+  }
+}
+
 function parseUi(raw: string | null): Ui {
   const base: Ui = { v: 1, tab: 'Plan' }
   if (!raw) return base
@@ -368,6 +409,7 @@ type Draft = {
   createdId?: string
   saving?: number
   err?: string
+  by?: string
   name?: string
   start?: string
   end?: string
@@ -420,6 +462,8 @@ type Undo = {
   item?: Trip | Stop | Leg | Stay | PackItem
   items?: PackItem[]
   index?: number
+  /** Recorded packing positions for a batch clear, parallel to `items`. */
+  indexes?: number[]
 }
 
 function parseUndo(raw: string | null): Undo | null {
@@ -454,10 +498,10 @@ function applyUndo(lib: Library, u: Undo): Library {
         : lib
     case 'pack':
       return trip && u.item && !trip.packing.some((p) => p.id === (u.item as PackItem).id)
-        ? insertPack(lib, u.tripId, [u.item as PackItem])
+        ? insertPack(lib, u.tripId, [u.item as PackItem], u.index === undefined ? undefined : [u.index])
         : lib
     case 'packs':
-      return trip && u.items ? insertPack(lib, u.tripId, u.items) : lib
+      return trip && u.items ? insertPack(lib, u.tripId, u.items, u.indexes) : lib
   }
 }
 
@@ -521,8 +565,33 @@ function TripCard({ trip, index, today, onOpen }: { trip: Trip; index: number; t
   )
 }
 
+/** Roving-focus radio helpers: arrows/Home/End move BOTH selection and focus
+ * (per the radiogroup pattern), scrolling the new chip into view. */
+function useRovingKeys<T>(
+  options: readonly T[],
+  selected: T,
+  refs: RefObject<Map<T, HTMLButtonElement>>,
+  onPick: (t: T) => void
+) {
+  return (e: React.KeyboardEvent) => {
+    const at = options.indexOf(selected)
+    let next: T | undefined
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = options[Math.min(options.length - 1, at + 1)]
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = options[Math.max(0, at - 1)]
+    else if (e.key === 'Home') next = options[0]
+    else if (e.key === 'End') next = options[options.length - 1]
+    else return
+    e.preventDefault()
+    const el = refs.current.get(next!)
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    onPick(next!)
+  }
+}
+
 /** The day strip: a radio group of the trip's days plus a "Later" slot. */
 function DayChips({ trip, day, onPick }: { trip: Trip; day: number; onPick: (d: number) => void }) {
+  const refs = useRef(new Map<number, HTMLButtonElement>())
   const n = dayCount(trip)
   const days = Array.from({ length: n }, (_, i) => i)
   const options: { d: number; label: string; sub: string }[] = days.map((i) => ({
@@ -531,41 +600,88 @@ function DayChips({ trip, day, onPick }: { trip: Trip; day: number; onPick: (d: 
     sub: shortDay(dayDate(trip, i))
   }))
   options.push({ d: -1, label: 'Later', sub: `${unscheduled(trip).length}` })
-  const pick = (d: number) => onPick(d)
-  const onKey = (e: React.KeyboardEvent) => {
-    const list = options.map((o) => o.d)
-    const at = list.indexOf(day)
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault()
-      pick(list[Math.min(list.length - 1, at + 1)]!)
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault()
-      pick(list[Math.max(0, at - 1)]!)
-    } else if (e.key === 'Home') {
-      e.preventDefault()
-      pick(list[0]!)
-    } else if (e.key === 'End') {
-      e.preventDefault()
-      pick(list[list.length - 1]!)
-    }
-  }
+  const onKey = useRovingKeys(
+    options.map((o) => o.d),
+    day,
+    refs,
+    onPick
+  )
   return (
     <div role="radiogroup" aria-label="Trip day" onKeyDown={onKey} {...stylex.props(styles.chipRow)}>
       {options.map((o) => (
         <button
           key={o.d}
+          ref={(el) => {
+            if (el) refs.current.set(o.d, el)
+            else refs.current.delete(o.d)
+          }}
           type="button"
           role="radio"
           aria-checked={o.d === day}
           tabIndex={o.d === day ? 0 : -1}
           onClick={() => {
-            pick(o.d)
+            onPick(o.d)
             cue('move')
           }}
           {...stylex.props(styles.chip, shared.press, o.d === day && styles.chipOn)}
         >
           <span {...stylex.props(styles.chipDay)}>{o.label}</span>
           <span {...stylex.props(styles.chipDate)}>{o.sub}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Plan/Travel/Pack switcher: the kit segmented look with 44pt targets and
+ * focus-following arrows. */
+function SegTabs({ options, value, onChange }: { options: readonly Tab[]; value: Tab; onChange: (v: Tab) => void }) {
+  const refs = useRef(new Map<Tab, HTMLButtonElement>())
+  const onKey = useRovingKeys(options, value, refs, onChange)
+  return (
+    <div role="radiogroup" aria-label="Trip sections" onKeyDown={onKey} {...stylex.props(styles.segTrack)}>
+      {options.map((o) => (
+        <button
+          key={o}
+          ref={(el) => {
+            if (el) refs.current.set(o, el)
+            else refs.current.delete(o)
+          }}
+          type="button"
+          role="radio"
+          aria-checked={o === value}
+          tabIndex={o === value ? 0 : -1}
+          onClick={() => onChange(o)}
+          {...stylex.props(styles.segBtn, shared.press, o === value && styles.segOn)}
+        >
+          {o}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Transport-kind radio chips inside the leg editor. */
+function LegKindChips({ value, onChange }: { value: LegKind; onChange: (k: LegKind) => void }) {
+  const refs = useRef(new Map<LegKind, HTMLButtonElement>())
+  const onKey = useRovingKeys(LEG_KINDS_UI, value, refs, onChange)
+  return (
+    <div role="radiogroup" aria-label="Transport kind" onKeyDown={onKey} {...stylex.props(styles.kindChips)}>
+      {LEG_KINDS_UI.map((k) => (
+        <button
+          key={k}
+          ref={(el) => {
+            if (el) refs.current.set(k, el)
+            else refs.current.delete(k)
+          }}
+          type="button"
+          role="radio"
+          aria-checked={value === k}
+          tabIndex={value === k ? 0 : -1}
+          onClick={() => onChange(k)}
+          {...stylex.props(styles.kindChip, shared.press, value === k && styles.kindChipOn)}
+        >
+          <Sym name={LEG_ICON[k]} size={12} /> {legKindLabel(k)}
         </button>
       ))}
     </div>
@@ -661,18 +777,18 @@ function Timeline({
                   <IconButton
                     name="up"
                     size={13}
-                    variant="round"
                     aria-label={`Move ${s.title} earlier`}
                     disabled={i === 0}
                     onClick={() => move(s, -1)}
+                    xstyle={styles.stepHit}
                   />
                   <IconButton
                     name="down"
                     size={13}
-                    variant="round"
                     aria-label={`Move ${s.title} later`}
                     disabled={i === stops.length - 1}
                     onClick={() => move(s, 1)}
+                    xstyle={styles.stepHit}
                   />
                 </span>
               </span>
@@ -846,14 +962,17 @@ function PackTab({
         <ul {...stylex.props(styles.packList)}>
           {trip.packing.map((p) => (
             <li key={p.id} {...stylex.props(styles.packRow)}>
-              <Checkbox
-                checked={p.done}
-                onChange={() => {
-                  onToggle(p)
-                  cue(p.done ? 'uncheck' : 'check')
-                }}
-                aria-label={`Packed: ${p.label}`}
-              />
+              <label htmlFor={`pk-${p.id}`} {...stylex.props(styles.packCheck)}>
+                <Checkbox
+                  id={`pk-${p.id}`}
+                  checked={p.done}
+                  onChange={() => {
+                    onToggle(p)
+                    cue(p.done ? 'uncheck' : 'check')
+                  }}
+                  aria-label={`Packed: ${p.label}`}
+                />
+              </label>
               <span {...stylex.props(styles.packLabel, p.done && styles.packDone)}>{p.label}</span>
               <IconButton
                 name="close"
@@ -878,15 +997,15 @@ function PackTab({
           }}
           placeholder="Add to the list…"
           aria-label="New packing item"
-          xstyle={styles.grow}
+          xstyle={[styles.grow, styles.fieldCtl]}
         />
-        <Button variant="tinted" onClick={add} disabled={!text.trim()}>
+        <Button variant="tinted" onClick={add} disabled={!text.trim()} xstyle={styles.segAction}>
           Add
         </Button>
       </div>
       {done > 0 && (
         <div {...stylex.props(styles.packAdd)}>
-          <Button variant="plain" onClick={onClear}>
+          <Button variant="plain" onClick={onClear} xstyle={styles.segAction}>
             Clear packed items
           </Button>
         </div>
@@ -1039,22 +1158,27 @@ const LEG_KINDS_UI: readonly LegKind[] = ['flight', 'train', 'drive', 'bus', 'fe
 
 // --- the app -----------------------------------------------------------------------
 
-type Confirm = {
-  kind: 'trip' | 'stop' | 'leg' | 'stay'
-  tripId: string
-  id?: string
-  label: string
-  trigger?: HTMLElement | null
-}
-
 function TripPlanner() {
   const [rootRef, wide] = useWide<HTMLElement>()
   const view = useDisplay()
+  const vis = view.visible
   const [darkMode, setDarkMode] = useState(false)
   const [today, setToday] = useState(todayISO)
-  const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const editorBox = useRef<HTMLDivElement>(null)
+
+  // The control that opened the current sheet - kept locally (never written
+  // to session) for focus restore. The last activated control under main is
+  // tracked on pointerdown/focusin so a menu item that unmounts on open still
+  // names a trigger.
+  const lastControl = useRef<HTMLElement | null>(null)
+  const draftTrigger = useRef<HTMLElement | null>(null)
+  const confirmTrigger = useRef<HTMLElement | null>(null)
+  // `vis` captured per render is enough for handlers; the cue gate needs a
+  // stable accessor for the audio module.
+  const visRef = useRef(vis)
+  visRef.current = vis
+  useEffect(() => setCueGate(() => visRef.current), [])
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
 
@@ -1073,6 +1197,7 @@ function TripPlanner() {
   const ui = useMemo(() => parseUi(session.get('ui')), [session])
   const draft = useMemo(() => parseDraft(session.get('draft')), [session])
   const undo = useMemo(() => parseUndo(session.get('undo')), [session])
+  const confirm = useMemo(() => parseConfirm(session.get('confirm')), [session])
   const prefs = useMemo(() => {
     try {
       const p = JSON.parse(storage.get('prefs') ?? '{}') as { muted?: boolean } | null
@@ -1099,8 +1224,14 @@ function TripPlanner() {
     requestAnimationFrame(() => os.ready())
   }, [storage.ready, session.ready])
 
+  // A folded-away copy must not steer shared state: every user-path write
+  // (navigation, drafts, confirmations, undo, library mutations) is ignored
+  // when this display is hidden. Corrective effect writes (stale save lock,
+  // undo expiry, confirm whose target vanished) bypass the gate so either
+  // copy can keep the space clean.
   const setUi = useCallback(
     (patch: Partial<Ui>) => {
+      if (!vis) return
       const next: Ui = {
         ...parseUi(session.get('ui')),
         ...patch,
@@ -1109,36 +1240,55 @@ function TripPlanner() {
       }
       session.put('ui', JSON.stringify(next))
     },
-    [session]
+    [session, vis]
   )
 
   const setDraft = useCallback(
     (d: Draft | null) => {
+      if (!vis) return
       if (d) session.put('draft', JSON.stringify(d))
       else session.del('draft')
     },
-    [session]
+    [session, vis]
   )
 
   /** Apply a new library: one storage write per changed trip plus the index. */
   const applyLib = useCallback(
     (next: Library, prev: Library) => {
+      if (!vis) return
       const prevById = new Map(prev.trips.map((t) => [t.id, t]))
       for (const id of prev.order) if (!next.order.includes(id)) storage.del(`trip.${id}`)
       for (const t of next.trips) if (prevById.get(t.id) !== t) storage.put(`trip.${t.id}`, serializeTrip(t))
       if (next.order.join('') !== prev.order.join('')) storage.put('index', serializeIndex(next.order))
     },
-    [storage]
+    [storage, vis]
   )
 
   const pushUndo = useCallback(
     (u: Omit<Undo, 'v' | 'by' | 'at'>) => {
+      if (!vis) return
       session.put('undo', JSON.stringify({ ...u, v: 1, by: ME, at: Date.now() } satisfies Undo))
     },
-    [session]
+    [session, vis]
   )
 
-  const dismissUndo = useCallback(() => session.del('undo'), [session])
+  const dismissUndo = useCallback(() => {
+    if (!vis) return
+    session.del('undo')
+  }, [session, vis])
+
+  const openConfirm = useCallback(
+    (c: Omit<Confirm, 'v'>) => {
+      if (!vis) return
+      confirmTrigger.current = lastControl.current
+      session.put('confirm', JSON.stringify({ ...c, v: 1, by: ME } satisfies Confirm))
+    },
+    [session, vis]
+  )
+  const closeConfirm = useCallback(() => {
+    if (!vis) return
+    session.del('confirm')
+  }, [session, vis])
 
   const doUndo = useCallback(() => {
     if (!undo) return
@@ -1160,7 +1310,14 @@ function TripPlanner() {
     return () => clearTimeout(t)
   }, [undoAt, view.visible, session])
 
-  const openDraft = useCallback((d: Omit<Draft, 'v'>) => setDraft({ ...d, v: 1 }), [setDraft])
+  const openDraft = useCallback(
+    (d: Omit<Draft, 'v'>) => {
+      if (!vis) return
+      draftTrigger.current = lastControl.current
+      setDraft({ ...d, v: 1, by: ME })
+    },
+    [setDraft, vis]
+  )
 
   const openStopNew = (trip: Trip, day: number) =>
     openDraft({
@@ -1178,7 +1335,7 @@ function TripPlanner() {
 
   /** Validate + commit the current draft. The save lock prevents doubles. */
   const commitDraft = () => {
-    if (!draft || draft.saving) return
+    if (!vis || !draft || draft.saving) return
     const res = buildCommit(draft, lib)
     if ('err' in res) {
       setDraft({ ...draft, err: res.err, saving: undefined })
@@ -1211,11 +1368,28 @@ function TripPlanner() {
 
   // The editor only makes sense against an existing trip for edit kinds; a
   // peer that deleted the trip mid-draft gets the sheet closed cleanly.
+  // Maintenance writes run even on a hidden copy, so they del directly.
   useEffect(() => {
     if (!draft || draft.saving) return
     const needsTrip = draft.kind !== 'trip-new'
-    if (needsTrip && draft.tripId && !getTrip(lib, draft.tripId)) setDraft(null)
-  }, [draft, lib, setDraft])
+    if (needsTrip && draft.tripId && !getTrip(lib, draft.tripId)) session.del('draft')
+  }, [draft, lib, session])
+
+  // A live confirm whose target disappeared (deleted on the other display, or
+  // the trip itself is gone) closes instead of keeping a stale action alive.
+  useEffect(() => {
+    if (!confirm) return
+    const t = getTrip(lib, confirm.tripId)
+    const live =
+      t &&
+      (confirm.kind === 'trip' ||
+        (confirm.kind === 'stop'
+          ? t.stops.some((s) => s.id === confirm.id)
+          : confirm.kind === 'leg'
+            ? t.legs.some((l) => l.id === confirm.id)
+            : t.stays.some((s) => s.id === confirm.id)))
+    if (!live) session.del('confirm')
+  }, [confirm, lib, session])
 
   const trip = getTrip(lib, ui.tripId)
   const day = trip ? clampDay(trip, ui.day ?? todayIndex(trip, today) ?? 0) : 0
@@ -1230,6 +1404,7 @@ function TripPlanner() {
   const shownStop = selStop ?? lastStop.current
 
   const removeStopNow = (t: Trip, s: Stop) => {
+    if (!vis) return
     const res = removeStop(lib, t.id, s.id)
     applyLib(res.lib, lib)
     pushUndo({ kind: 'stop', tripId: t.id, label: `Deleted "${s.title}"`, item: res.stop, index: res.index })
@@ -1238,6 +1413,7 @@ function TripPlanner() {
   }
 
   const removeTripNow = (t: Trip) => {
+    if (!vis) return
     const res = removeTrip(lib, t.id)
     applyLib(res.lib, lib)
     pushUndo({ kind: 'trip', tripId: t.id, label: `Deleted "${t.name}"`, item: res.trip, index: res.index })
@@ -1246,9 +1422,9 @@ function TripPlanner() {
   }
 
   const confirmGo = () => {
-    if (!confirm) return
+    if (!vis || !confirm) return
     const t = getTrip(lib, confirm.tripId)
-    setConfirm(null)
+    closeConfirm()
     if (!t) return
     if (confirm.kind === 'trip') removeTripNow(t)
     else if (confirm.kind === 'stop') {
@@ -1280,13 +1456,22 @@ function TripPlanner() {
   }
 
   const modalOpen = !!draft || !!confirm
-  useFocusTrap(editorBox, !!draft, 'first')
+  useFocusTrap(editorBox, !!draft, 'first', draft?.by === ME ? draftTrigger.current : null, () => vis)
   useEffect(() => (draft ? pushEscape(() => setDraft(null)) : undefined), [draft, setDraft])
   useEffect(() => (menuOpen ? pushEscape(() => setMenuOpen(false)) : undefined), [menuOpen])
 
   const mute = (m: boolean) => {
+    if (!vis) return
     storage.put('prefs', JSON.stringify({ v: 1, muted: m }))
     if (!m) cue('check')
+  }
+
+  // Track the last activated control so a sheet opened from it can return
+  // focus even when the control itself never took focus (Safari/Chrome mouse
+  // clicks do not focus buttons) or has since unmounted.
+  const rememberControl = (e: React.SyntheticEvent) => {
+    const el = (e.target as HTMLElement | null)?.closest?.('button, select, input, textarea, a, [tabindex]')
+    if (el instanceof HTMLElement) lastControl.current = el
   }
 
   const statusText = !storage.ready
@@ -1305,7 +1490,13 @@ function TripPlanner() {
         Trip Planner
         <Title variant="accessory">
           <MuteButton muted={muted} onToggle={() => mute(!muted)} />
-          <IconButton name="plus" aria-label="New trip" onClick={openTripNew} xstyle={styles.hit} />
+          <IconButton
+            name="plus"
+            aria-label="New trip"
+            onClick={openTripNew}
+            xstyle={styles.hit}
+            data-focus-anchor="trips"
+          />
         </Title>
       </Title>
       <Screen>
@@ -1347,7 +1538,7 @@ function TripPlanner() {
           label: 'Delete trip',
           icon: 'trash',
           name: 'Delete trip',
-          onSelect: () => setConfirm({ kind: 'trip', tripId: shownTrip.id, label: shownTrip.name })
+          onSelect: () => openConfirm({ kind: 'trip', tripId: shownTrip.id, label: shownTrip.name })
         }
       ]
     : []
@@ -1368,9 +1559,9 @@ function TripPlanner() {
     <>
       <DayChips trip={t} day={day} onPick={(d) => setUi({ day: d, sel: undefined })} />
       <div {...stylex.props(styles.tabsWrap)}>
-        <Segmented options={TABS} value={ui.tab} onChange={(v) => setUi({ tab: v })} />
+        <SegTabs options={TABS} value={ui.tab} onChange={(v) => setUi({ tab: v })} />
         {ui.tab === 'Plan' && stopsForDay(t, day).length > 1 && (
-          <Button variant="plain" onClick={() => setUi({ arrange: !ui.arrange })}>
+          <Button variant="plain" onClick={() => setUi({ arrange: !ui.arrange })} xstyle={styles.segAction}>
             {ui.arrange ? 'Done' : 'Arrange'}
           </Button>
         )}
@@ -1436,7 +1627,7 @@ function TripPlanner() {
               })
             }
             onDelLeg={(l) =>
-              setConfirm({
+              openConfirm({
                 kind: 'leg',
                 tripId: t.id,
                 id: l.id,
@@ -1467,7 +1658,7 @@ function TripPlanner() {
                 notes: s.notes
               })
             }
-            onDelStay={(s) => setConfirm({ kind: 'stay', tripId: t.id, id: s.id, label: s.name })}
+            onDelStay={(s) => openConfirm({ kind: 'stay', tripId: t.id, id: s.id, label: s.name })}
           />
         )}
         {ui.tab === 'Pack' && (
@@ -1487,7 +1678,13 @@ function TripPlanner() {
               const res = clearPacked(lib, t.id)
               applyLib(res.lib, lib)
               if (res.items.length)
-                pushUndo({ kind: 'packs', tripId: t.id, label: `Cleared ${res.items.length} packed`, items: res.items })
+                pushUndo({
+                  kind: 'packs',
+                  tripId: t.id,
+                  label: `Cleared ${res.items.length} packed`,
+                  items: res.items,
+                  indexes: res.indexes
+                })
             }}
           />
         )}
@@ -1511,7 +1708,7 @@ function TripPlanner() {
           notes: s.notes
         })
       }
-      onDelete={() => setConfirm({ kind: 'stop', tripId: t.id, id: s.id, label: s.title })}
+      onDelete={() => openConfirm({ kind: 'stop', tripId: t.id, id: s.id, label: s.title })}
     />
   )
 
@@ -1548,7 +1745,7 @@ function TripPlanner() {
             xstyle={styles.hitStart}
           />
           <span {...stylex.props(styles.grow, styles.tripName)}>{shownTrip.name}</span>
-          <Title variant="accessory">
+          <Title variant="accessory" xstyle={styles.hdrAcc}>
             <MuteButton muted={muted} onToggle={() => mute(!muted)} />
             <IconButton
               name="ellipsis"
@@ -1556,6 +1753,7 @@ function TripPlanner() {
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen(true)}
               xstyle={styles.hit}
+              data-focus-anchor="trip"
             />
           </Title>
         </Title>
@@ -1574,6 +1772,8 @@ function TripPlanner() {
       ref={rootRef}
       data-app="trip-planner"
       data-display={view.width ? view.display : undefined}
+      onPointerDownCapture={rememberControl}
+      onFocusCapture={rememberControl}
       {...stylex.props(darkMode ? dark : light, styles.root)}
     >
       <div inert={modalOpen} {...stylex.props(styles.stage)}>
@@ -1595,12 +1795,14 @@ function TripPlanner() {
         {storage.ready && wide && (
           <>
             <Title as="h1">
-              Trip Planner
-              <Title variant="accessory">
+              <span {...stylex.props(styles.hdrText)}>Trip Planner</span>
+              <Title variant="accessory" xstyle={styles.hdrAcc}>
                 {lib.trips.length > 0 && (
                   <Select
                     aria-label="Trip"
                     value={trip?.id ?? ''}
+                    data-focus-anchor="trip"
+                    xstyle={styles.selectCap}
                     onChange={(e) =>
                       setUi({ tripId: (e.target as HTMLSelectElement).value || undefined, sel: undefined })
                     }
@@ -1614,7 +1816,13 @@ function TripPlanner() {
                   </Select>
                 )}
                 <MuteButton muted={muted} onToggle={() => mute(!muted)} />
-                <IconButton name="plus" aria-label="New trip" onClick={openTripNew} xstyle={styles.hit} />
+                <IconButton
+                  name="plus"
+                  aria-label="New trip"
+                  onClick={openTripNew}
+                  xstyle={styles.hit}
+                  data-focus-anchor="trips"
+                />
               </Title>
             </Title>
             <div {...stylex.props(styles.split)}>
@@ -1665,7 +1873,7 @@ function TripPlanner() {
                         trip={trip}
                         today={today}
                         onEdit={() => openTripEdit(trip)}
-                        onDelete={() => setConfirm({ kind: 'trip', tripId: trip.id, label: trip.name })}
+                        onDelete={() => openConfirm({ kind: 'trip', tripId: trip.id, label: trip.name })}
                       />
                     )
                   ) : (
@@ -1690,7 +1898,13 @@ function TripPlanner() {
         <div ref={editorBox} {...stylex.props(styles.sheetBody)}>
           <div {...stylex.props(styles.sheetHead)}>
             <span {...stylex.props(styles.sheetTitle)}>{draft ? EDITOR_TITLE[draft.kind] : ''}</span>
-            <IconButton name="close" size={13} aria-label="Close editor" onClick={() => setDraft(null)} />
+            <IconButton
+              name="close"
+              size={13}
+              aria-label="Close editor"
+              onClick={() => setDraft(null)}
+              xstyle={styles.stepHit}
+            />
           </div>
           {draft && (
             <EditorFields
@@ -1705,10 +1919,10 @@ function TripPlanner() {
             </div>
           )}
           <div {...stylex.props(styles.actionRow)}>
-            <Button variant="tinted" onClick={() => setDraft(null)} xstyle={styles.grow}>
+            <Button variant="tinted" onClick={() => setDraft(null)} xstyle={styles.actionBtn}>
               Cancel
             </Button>
-            <Button variant="filled" onClick={commitDraft} disabled={!!draft?.saving} xstyle={styles.grow}>
+            <Button variant="filled" onClick={commitDraft} disabled={!!draft?.saving} xstyle={styles.actionBtn}>
               {draft?.saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
@@ -1718,8 +1932,9 @@ function TripPlanner() {
       <DestructiveSheet
         open={!!confirm}
         label={confirm ? `Delete ${confirm.label}` : 'Delete'}
-        onClose={() => setConfirm(null)}
-        restoreTo={confirm?.trigger}
+        onClose={closeConfirm}
+        restoreTo={confirm?.by === ME ? confirmTrigger.current : null}
+        mayFocus={() => vis}
       >
         {confirm && (
           <>
@@ -1740,10 +1955,10 @@ function TripPlanner() {
                 : `"${confirm.label}" is removed. You can undo right after.`}
             </span>
             <div {...stylex.props(styles.actionRow)}>
-              <Button variant="tinted" onClick={() => setConfirm(null)} xstyle={styles.grow}>
+              <Button variant="tinted" onClick={closeConfirm} xstyle={styles.actionBtn}>
                 Cancel
               </Button>
-              <Button variant="filled" onClick={confirmGo} xstyle={[styles.grow, styles.dangerFill]}>
+              <Button variant="filled" onClick={confirmGo} xstyle={[styles.actionBtn, styles.dangerFill]}>
                 Delete
               </Button>
             </div>
@@ -1768,6 +1983,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
               value={tf(draft.name)}
               onChange={(e) => set({ name: (e.target as HTMLInputElement).value })}
               placeholder="Kyoto in autumn"
+              xstyle={styles.fieldCtl}
             />
           </Field>
           <div {...stylex.props(styles.fieldRow)}>
@@ -1808,6 +2024,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
               value={tf(draft.title)}
               onChange={(e) => set({ title: (e.target as HTMLInputElement).value })}
               placeholder="Fushimi Inari shrine"
+              xstyle={styles.fieldCtl}
             />
           </Field>
           <div {...stylex.props(styles.fieldRow)}>
@@ -1816,7 +2033,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
                 value={String(draft.day ?? 0)}
                 onChange={(e) => set({ day: Number((e.target as HTMLSelectElement).value) })}
                 aria-label="Day"
-                xstyle={styles.grow}
+                xstyle={styles.fieldCtl}
               >
                 {[...Array(n).keys()].map((d) => (
                   <option key={d} value={d}>
@@ -1841,6 +2058,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
               value={tf(draft.address)}
               onChange={(e) => set({ address: (e.target as HTMLInputElement).value })}
               placeholder="68 Fukakusa Yabunouchicho"
+              xstyle={styles.fieldCtl}
             />
           </Field>
           <Field label="Notes">
@@ -1858,37 +2076,14 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
     case 'leg-edit':
       return (
         <>
-          <div {...stylex.props(styles.kindChips)} role="radiogroup" aria-label="Transport kind">
-            {LEG_KINDS_UI.map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="radio"
-                aria-checked={draft.kindLeg === k}
-                tabIndex={draft.kindLeg === k ? 0 : -1}
-                onClick={() => set({ kindLeg: k })}
-                onKeyDown={(e) => {
-                  const at = LEG_KINDS_UI.indexOf(draft.kindLeg ?? 'flight')
-                  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    set({ kindLeg: LEG_KINDS_UI[Math.min(LEG_KINDS_UI.length - 1, at + 1)] })
-                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                    e.preventDefault()
-                    set({ kindLeg: LEG_KINDS_UI[Math.max(0, at - 1)] })
-                  }
-                }}
-                {...stylex.props(styles.kindChip, shared.press, draft.kindLeg === k && styles.kindChipOn)}
-              >
-                <Sym name={LEG_ICON[k]} size={12} /> {legKindLabel(k)}
-              </button>
-            ))}
-          </div>
+          <LegKindChips value={draft.kindLeg ?? 'flight'} onChange={(k) => set({ kindLeg: k })} />
           <div {...stylex.props(styles.fieldRow)}>
             <Field label="From">
               <TextField
                 value={tf(draft.from)}
                 onChange={(e) => set({ from: (e.target as HTMLInputElement).value })}
                 placeholder="SFO"
+                xstyle={styles.fieldCtl}
               />
             </Field>
             <Field label="To">
@@ -1896,6 +2091,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
                 value={tf(draft.to)}
                 onChange={(e) => set({ to: (e.target as HTMLInputElement).value })}
                 placeholder="KIX"
+                xstyle={styles.fieldCtl}
               />
             </Field>
           </div>
@@ -1930,6 +2126,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
               value={tf(draft.ref)}
               onChange={(e) => set({ ref: (e.target as HTMLInputElement).value })}
               placeholder="Confirmation or flight no."
+              xstyle={styles.fieldCtl}
             />
           </Field>
           <Field label="Notes">
@@ -1950,6 +2147,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
               value={tf(draft.name)}
               onChange={(e) => set({ name: (e.target as HTMLInputElement).value })}
               placeholder="Hotel Granvia"
+              xstyle={styles.fieldCtl}
             />
           </Field>
           <Field label="Address">
@@ -1957,6 +2155,7 @@ function EditorFields({ draft, trip, setDraft }: { draft: Draft; trip?: Trip; se
               value={tf(draft.address)}
               onChange={(e) => set({ address: (e.target as HTMLInputElement).value })}
               placeholder="Kyoto Station"
+              xstyle={styles.fieldCtl}
             />
           </Field>
           <div {...stylex.props(styles.fieldRow)}>
@@ -2010,11 +2209,11 @@ function UndoToast({ undo, onUndo, onDismiss }: { undo: Undo | null; onUndo: () 
       role="status"
       {...stylex.props(styles.toast, closing ? animations.floatOut : settled ? undefined : animations.float)}
     >
-      <span>{undo.label}</span>
+      <span {...stylex.props(styles.toastText)}>{undo.label}</span>
       <button type="button" onClick={onUndo} {...stylex.props(styles.toastBtn, shared.press)}>
         Undo
       </button>
-      <IconButton name="close" size={11} aria-label="Dismiss" onClick={onDismiss} />
+      <IconButton name="close" size={11} aria-label="Dismiss" onClick={onDismiss} xstyle={styles.iconFix} />
     </div>
   )
 }
@@ -2041,6 +2240,8 @@ function buildCommit(d: Draft, lib: Library): { lib: Library } | { err: string }
       if (!validDate(start)) return { err: 'The start date is not a real date.' }
       if (!validDate(end)) return { err: 'The end date is not a real date.' }
       if (diffDays(start, end) < 0) return { err: 'The trip ends before it starts.' }
+      if (diffDays(start, end) >= MAX_TRIP_DAYS)
+        return { err: `A trip can be up to ${MAX_TRIP_DAYS} days - shorten the range.` }
       if (d.kind === 'trip-new') {
         const r = addTrip(lib, { name, start, end, notes: blank(d.notes) }, Date.now(), d.createdId)
         return { lib: r.lib }

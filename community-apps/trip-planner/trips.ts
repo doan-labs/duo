@@ -65,21 +65,38 @@ export const newLibrary = (): Library => ({ order: [], trips: [] })
 
 export const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 
-const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate()
+/* `new Date(y, m, d)` and `Date.UTC(y, ...)` coerce years 0-99 onto
+ * 1900-1999; setFullYear/setUTCFullYear take the literal year. The math stays
+ * correct even for inputs like '0050-01-01' before validDate rejects them. */
+const localDay = (y: number, m: number, d: number) => {
+  const t = new Date(0)
+  t.setFullYear(y, m, d)
+  t.setHours(0, 0, 0, 0)
+  return t
+}
+const utcMs = (y: number, m: number, d: number) => {
+  const t = new Date(0)
+  t.setUTCFullYear(y, m, d)
+  t.setUTCHours(0, 0, 0, 0)
+  return t.getTime()
+}
+const daysInMonth = (y: number, m: number) => localDay(y, m, 0).getDate()
 
-/** Strict calendar validation: a real month/day combination, leap-aware. */
+/** Strict calendar validation: a real month/day combination, leap-aware.
+ * Years below 100 are refused: the JS Date constructor maps them onto
+ * 1900-1999 and the editor's native date field cannot express them anyway. */
 export function validDate(s: string): boolean {
   const m = DATE_RE.exec(s)
   if (!m) return false
   const y = Number(m[1])
   const mo = Number(m[2])
   const d = Number(m[3])
-  return mo >= 1 && mo <= 12 && d >= 1 && d <= daysInMonth(y, mo)
+  return y >= 100 && mo >= 1 && mo <= 12 && d >= 1 && d <= daysInMonth(y, mo)
 }
 
 /** 'YYYY-MM-DD' for a Date in its LOCAL calendar day - the user's "today". */
 export function dateISO(date: Date): string {
-  const y = date.getFullYear()
+  const y = String(date.getFullYear()).padStart(4, '0')
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
@@ -87,18 +104,17 @@ export function dateISO(date: Date): string {
 
 export const todayISO = () => dateISO(new Date())
 
-/** Add `n` calendar days to an ISO date. Noon-local math keeps DST edges out. */
+/** Add `n` calendar days to an ISO date. Local-day math keeps DST edges out. */
 export function addDays(iso: string, n: number): string {
   const [y, m, d] = iso.split('-').map(Number)
-  const date = new Date(y!, m! - 1, d! + n)
-  return dateISO(date)
+  return dateISO(localDay(y!, m! - 1, d! + n))
 }
 
 /** Whole days between two ISO dates. UTC component math, immune to DST. */
 export function diffDays(a: string, b: string): number {
   const [ya, ma, da] = a.split('-').map(Number)
   const [yb, mb, db] = b.split('-').map(Number)
-  return Math.round((Date.UTC(yb!, mb! - 1, db!) - Date.UTC(ya!, ma! - 1, da!)) / 86_400_000)
+  return Math.round((utcMs(yb!, mb! - 1, db!) - utcMs(ya!, ma! - 1, da!)) / 86_400_000)
 }
 
 /** Days covered by the range, inclusive. 0 when the range is invalid. */
@@ -107,13 +123,20 @@ export const dayCount = (t: Trip) => Math.max(0, diffDays(t.start, t.end) + 1)
 /** ISO date of day index `i` (0-based) in the trip. */
 export const dayDate = (t: Trip, i: number) => addDays(t.start, i)
 
+/**
+ * Longest span a trip may cover: one year including its leap day. Enforced at
+ * save (visible validation) and again in readTrip so a torn or hostile record
+ * can never force a day-strip allocation in the millions.
+ */
+export const MAX_TRIP_DAYS = 366
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** 'Tue, Oct 7' from an ISO date, locale-free and deterministic. */
 export function dayLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
-  const w = new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay()
+  const w = new Date(utcMs(y!, m! - 1, d!)).getUTCDay()
   return `${WEEKDAYS[w]}, ${MONTHS[m! - 1]} ${d}`
 }
 
@@ -262,9 +285,16 @@ export function updateTrip(
     end: patch.end ?? trip.end,
     notes: patch.notes !== undefined ? patch.notes.trim() : trip.notes
   }
-  // A shorter range parks out-of-range stops in "Later" rather than losing them.
+  // Stops keep their calendar dates: rebase each stored day index by the
+  // start delta. A stop pushed outside the new range parks in "Later" (-1),
+  // which matches the fixed-date legs/stays and the documented shrink rule.
+  const delta = diffDays(trip.start, next.start)
   const n = dayCount(next)
-  next.stops = trip.stops.map((s) => (s.day >= n ? { ...s, day: -1 } : s))
+  next.stops = trip.stops.map((s) => {
+    if (s.day < 0) return s
+    const d = s.day - delta
+    return d >= 0 && d < n ? (d === s.day ? s : { ...s, day: d }) : { ...s, day: -1 }
+  })
   return replaceTrip(lib, next)
 }
 
@@ -298,7 +328,15 @@ export function addStop(
     notes: (fields.notes ?? '').trim()
   }
   const dayStops = stopsForDay(trip, stop.day)
-  const insertAt = dayStops.length ? trip.stops.indexOf(dayStops.at(-1)!) + 1 : trip.stops.length
+  // Untimed stops append to the day's list. A timed stop slots in before the
+  // first same-day stop with a later time, so the timeline reads chronology
+  // unless the user reorders it by hand in Arrange.
+  const nextTimed = stop.time ? dayStops.find((s) => s.time !== null && s.time > stop.time!) : undefined
+  const insertAt = nextTimed
+    ? trip.stops.indexOf(nextTimed)
+    : dayStops.length
+      ? trip.stops.indexOf(dayStops.at(-1)!) + 1
+      : trip.stops.length
   const stops = [...trip.stops]
   stops.splice(insertAt, 0, stop)
   return { lib: replaceTrip(lib, { ...trip, stops }), stop }
@@ -333,12 +371,15 @@ export function removeStop(
   return { lib: replaceTrip(lib, { ...trip, stops: trip.stops.filter((s) => s.id !== stopId) }), stop, index }
 }
 
-/** Re-insert a removed stop at an absolute position (undo of a delete). */
+/** Re-insert a removed stop at an absolute position (undo of a delete). A
+ * day that no longer exists (the trip shrank since) parks in Later, not on
+ * the new last day. */
 export function insertStop(lib: Library, tripId: string, stop: Stop, index: number): Library {
   const trip = getTrip(lib, tripId)
   if (!trip) return lib
+  const day = stop.day < 0 || stop.day >= dayCount(trip) ? -1 : stop.day
   const stops = [...trip.stops]
-  stops.splice(Math.max(0, Math.min(index, stops.length)), 0, { ...stop, day: clampDay(trip, stop.day) })
+  stops.splice(Math.max(0, Math.min(index, stops.length)), 0, { ...stop, day })
   return replaceTrip(lib, { ...trip, stops })
 }
 
@@ -496,22 +537,36 @@ export function removePack(
   return { lib: replaceTrip(lib, { ...trip, packing: trip.packing.filter((p) => p.id !== itemId) }), item, index }
 }
 
-/** Remove every packed item; returns them so a single undo can restore the set. */
-export function clearPacked(lib: Library, tripId: string): { lib: Library; items: PackItem[] } {
+/** Remove every packed item; returns them with their list positions so a
+ * single undo can put the set back exactly. */
+export function clearPacked(lib: Library, tripId: string): { lib: Library; items: PackItem[]; indexes: number[] } {
   const trip = getTrip(lib, tripId)
-  if (!trip) return { lib, items: [] }
-  const items = trip.packing.filter((p) => p.done)
-  return { lib: replaceTrip(lib, { ...trip, packing: trip.packing.filter((p) => !p.done) }), items }
+  if (!trip) return { lib, items: [], indexes: [] }
+  const items: PackItem[] = []
+  const indexes: number[] = []
+  trip.packing.forEach((p, i) => {
+    if (p.done) {
+      items.push(p)
+      indexes.push(i)
+    }
+  })
+  return { lib: replaceTrip(lib, { ...trip, packing: trip.packing.filter((p) => !p.done) }), items, indexes }
 }
 
-export function insertPack(lib: Library, tripId: string, items: PackItem[]): Library {
+/** Undo-insert items at their recorded positions (earliest first), so both a
+ * single delete and a batch clear land back exactly where the list was.
+ * Items with no recorded position append, keeping order. */
+export function insertPack(lib: Library, tripId: string, items: PackItem[], indexes?: number[]): Library {
   const trip = getTrip(lib, tripId)
   if (!trip) return lib
-  const gone = items.filter((p) => !trip.packing.some((x) => x.id === p.id))
-  if (!gone.length) return lib
-  // Untracked position is fine: restored items land in their original order at
-  // the end of the list, ahead of nothing.
-  return replaceTrip(lib, { ...trip, packing: [...trip.packing, ...gone] })
+  const back = items
+    .map((item, i) => ({ item, at: indexes?.[i] ?? Number.MAX_SAFE_INTEGER }))
+    .filter((p) => !trip.packing.some((x) => x.id === p.item.id))
+    .sort((a, b) => a.at - b.at)
+  if (!back.length) return lib
+  const packing = [...trip.packing]
+  for (const p of back) packing.splice(Math.min(p.at, packing.length), 0, p.item)
+  return replaceTrip(lib, { ...trip, packing })
 }
 
 // --- wire format ---------------------------------------------------------------
@@ -576,7 +631,12 @@ export function readTrip(v: unknown): Trip | null {
   if (!isRec(v) || typeof v.id !== 'string' || !v.id) return null
   const start = str(v.start, 10)
   const end = str(v.end, 10)
-  if (!validDate(start) || !validDate(end) || diffDays(start, end) < 0) return null
+  if (!validDate(start) || !validDate(end)) return null
+  const span = diffDays(start, end)
+  // Inverted or over-long ranges are rejected whole: the trip is simply never
+  // loaded, so nothing allocates per-day structures and healthy trips and the
+  // stored record itself are left untouched.
+  if (span < 0 || span >= MAX_TRIP_DAYS) return null
   const trip: Trip = {
     id: v.id,
     name: str(v.name, 120) || 'Trip',
@@ -593,7 +653,8 @@ export function readTrip(v: unknown): Trip | null {
     trip.stops = v.stops
       .map(readStop)
       .filter((s): s is Stop => !!s)
-      .map((s) => ({ ...s, day: clampDay(trip, s.day) }))
+      // Out-of-range days park in Later rather than clamping onto the last day.
+      .map((s) => ({ ...s, day: s.day >= 0 && s.day < dayCount(trip) ? s.day : -1 }))
   if (Array.isArray(v.legs)) trip.legs = v.legs.map(readLeg).filter((l): l is Leg => !!l)
   if (Array.isArray(v.stays)) trip.stays = v.stays.map(readStay).filter((s): s is Stay => !!s)
   if (Array.isArray(v.packing)) trip.packing = v.packing.map(readPack).filter((p): p is PackItem => !!p)

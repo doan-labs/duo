@@ -118,7 +118,9 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     minWidth: 56,
+    minHeight: 44,
     paddingTop: space.xs,
     paddingBottom: space.xs,
     paddingLeft: space.sm,
@@ -137,8 +139,55 @@ export const styles = stylex.create({
   chipDay: { fontSize: typeScale.footnote, lineHeight: leading.footnote, fontWeight: weight.semibold },
   chipDate: { fontSize: typeScale.caption2, lineHeight: leading.caption2, opacity: 0.75 },
   // -- tabs ---------------------------------------------------------------------
-  tabsWrap: { paddingRight: space.lg, paddingLeft: space.lg, paddingBottom: space.sm, flexShrink: 0 },
-  tabsFull: { display: 'flex', width: '100%' },
+  tabsWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingRight: space.lg,
+    paddingLeft: space.lg,
+    paddingBottom: space.sm,
+    flexShrink: 0
+  },
+  /* The tab strip mirrors the kit segmented control but with 44pt hit targets
+   * and focus-following arrows; the raised segment uses the control token,
+   * no shadow, per the design rules. */
+  segTrack: {
+    display: 'flex',
+    flexGrow: 1,
+    minWidth: 0,
+    paddingTop: space.xxs,
+    paddingBottom: space.xxs,
+    paddingLeft: space.xxs,
+    paddingRight: space.xxs,
+    borderRadius: radius.md,
+    backgroundColor: app.fill
+  },
+  segBtn: {
+    flexGrow: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingLeft: space.sm,
+    paddingRight: space.sm,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    fontFamily: fonts.system,
+    fontSize: typeScale.footnote,
+    fontWeight: weight.regular,
+    whiteSpace: 'nowrap',
+    cursor: 'pointer'
+  },
+  segOn: { backgroundColor: app.control, fontWeight: weight.medium },
+  segAction: {
+    flexShrink: 0,
+    minHeight: 44,
+    paddingLeft: space.sm,
+    paddingRight: space.sm,
+    fontSize: typeScale.footnote
+  },
   // -- timeline ------------------------------------------------------------------
   tl: {
     listStyleType: 'none',
@@ -194,6 +243,7 @@ export const styles = stylex.create({
     alignItems: 'center',
     gap: space.sm,
     minWidth: 0,
+    minHeight: 44,
     marginBottom: space.sm,
     marginLeft: space.xs,
     paddingTop: space.sm,
@@ -226,13 +276,36 @@ export const styles = stylex.create({
   hit: {
     minWidth: 44,
     minHeight: 44,
+    flexShrink: 0,
     display: 'grid',
     placeItems: 'center',
     marginTop: `-${space.sm}`,
     marginBottom: `-${space.sm}`,
     marginRight: `-${space.md}`
   },
-  hitStart: { minWidth: 44, minHeight: 44, display: 'grid', placeItems: 'center', marginLeft: `-${space.md}` },
+  hitStart: {
+    minWidth: 44,
+    minHeight: 44,
+    flexShrink: 0,
+    display: 'grid',
+    placeItems: 'center',
+    marginLeft: `-${space.md}`
+  },
+  // The arrange steppers and the pack checkbox keep their small glyphs but
+  // gain a 44pt hit ring pulled tight by negative margins.
+  stepHit: { minWidth: 44, minHeight: 44 },
+  packCheck: {
+    display: 'grid',
+    placeItems: 'center',
+    minWidth: 44,
+    minHeight: 44,
+    marginTop: `-${space.xs}`,
+    marginBottom: `-${space.xs}`,
+    marginLeft: `-${space.md}`,
+    borderRadius: radius.sm,
+    cursor: 'pointer',
+    flexShrink: 0
+  },
   addRow: {
     display: 'flex',
     alignItems: 'center',
@@ -283,7 +356,7 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: space.sm,
-    minHeight: 40,
+    minHeight: 44,
     paddingTop: space.xs,
     paddingRight: space.md,
     paddingBottom: space.xs,
@@ -393,6 +466,7 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: space.md,
+    maxWidth: 'min(88vw, 22rem)',
     paddingTop: space.sm,
     paddingRight: space.md,
     paddingBottom: space.sm,
@@ -401,10 +475,13 @@ export const styles = stylex.create({
     backgroundColor: app.elevated,
     boxShadow: shadow.float,
     fontSize: typeScale.footnote,
-    whiteSpace: 'nowrap',
     zIndex: 30
   },
-  toastBtn: { color: app.link, fontWeight: weight.semibold, fontSize: typeScale.footnote },
+  // The deleted row's label can be arbitrarily long: the toast clamps to the
+  // viewport, the label ellipsizes, and Undo never shrinks offscreen.
+  toastText: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1 },
+  toastBtn: { color: app.link, fontWeight: weight.semibold, fontSize: typeScale.footnote, flexShrink: 0 },
+  iconFix: { flexShrink: 0 },
   // -- sheets ---------------------------------------------------------------------------------
   sheetHead: {
     display: 'flex',
@@ -418,15 +495,20 @@ export const styles = stylex.create({
   },
   sheetTitle: { fontSize: typeScale.headline, lineHeight: leading.headline, fontWeight: weight.semibold },
   sheetBody: { display: 'flex', flexDirection: 'column', gap: space.sm, padding: space.lg, paddingTop: space.xs },
-  field: { display: 'flex', flexDirection: 'column', gap: space.xxs },
+  // Fields share a row two across at most; on the 320px sheet a third wraps
+  // to its own line instead of clipping.
+  field: { display: 'flex', flexDirection: 'column', gap: space.xxs, flexGrow: 1, flexBasis: '45%', minWidth: 0 },
   fieldLabel: { fontSize: typeScale.caption1, lineHeight: leading.caption1, color: app.label2 },
-  fieldRow: { display: 'flex', gap: space.sm },
+  fieldRow: { display: 'flex', gap: space.sm, flexWrap: 'wrap' },
+  // Single-line controls inside fields fill the column and meet the 44pt bar.
+  fieldCtl: { width: '100%', minWidth: 0, minHeight: 44 },
   errorText: { fontSize: typeScale.footnote, lineHeight: leading.footnote, color: colors.red },
   kindChips: { display: 'flex', flexWrap: 'wrap', gap: space.xs },
   kindChip: {
     display: 'flex',
     alignItems: 'center',
     gap: space.xxs,
+    minHeight: 44,
     paddingTop: space.xs,
     paddingBottom: space.xs,
     paddingLeft: space.sm,
@@ -515,8 +597,17 @@ export const styles = stylex.create({
   },
   dangerText: { color: colors.red },
   dangerFill: { backgroundColor: colors.red, color: colors.white },
+  // Save / Cancel / Delete and the destructive row meet the 44pt bar.
+  actionBtn: { minHeight: 44, flexGrow: 1 },
+  // Standalone buttons (Add, Clear, placeholder CTAs) keep their look at 44pt.
+  minTall: { minHeight: 44 },
+  // A long trip name must not stretch the header select past the viewport;
+  // the accessory row may shrink, the icon hits may not.
+  hdrText: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 },
+  hdrAcc: { minWidth: 0, flexShrink: 1 },
+  selectCap: { maxWidth: '12rem', minWidth: 0, flexShrink: 1 },
   dateInput: {
-    height: 28,
+    height: 44,
     width: '100%',
     paddingInline: space.sm,
     borderWidth: 0,

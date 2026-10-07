@@ -12,6 +12,7 @@ import {
   dayCount,
   dayDate,
   diffDays,
+  getTrip,
   insertLeg,
   insertPack,
   insertStay,
@@ -383,6 +384,164 @@ eq('timeLabel null', timeLabel(null), '')
   // A trip whose stored range inverted (tampered) is dropped.
   const inverted = serializeTrip({ ...t1, start: '2026-10-09', end: '2026-10-05' })
   eq('inverted range rejected', readTrip(JSON.parse(inverted)), null)
+}
+
+// --- duration bound + year guard ------------------------------------------------
+{
+  // Save-side bound lives in buildCommit (UI); the model bound guards every
+  // reader: an over-long or hostile range must never reach a per-day loop.
+  const edge = readTrip({ id: 'e', start: '2026-01-01', end: '2026-12-31' }) // 365 days
+  const maxLeap = readTrip({ id: 'l', start: '2024-01-01', end: '2024-12-31' }) // 366, leap year
+  const over = readTrip({ id: 'o', start: '2026-01-01', end: '2027-01-01' }) // span 366 -> 367 days? no: span = 365, 366 days total
+  const huge = readTrip({ id: 'h', start: '2026-01-01', end: '9999-12-31' })
+  eq('366-day leap trip accepted', dayCount(maxLeap!), 366)
+  eq('365-day trip accepted', dayCount(edge!), 365)
+  eq('day after a full year still in bound', dayCount(over!), 366)
+  eq('multi-millennium range rejected', huge, null)
+  const overByOne = readTrip({ id: 'o2', start: '2026-01-01', end: '2027-01-02' })
+  eq('367-day range rejected', overByOne, null)
+
+  // Years below 100 are rejected consistently at parse and date helpers.
+  eq('year 50 rejected', validDate('0050-01-01'), false)
+  eq('year 99 rejected', validDate('0099-12-31'), false)
+  eq('year 100 accepted', validDate('0100-01-01'), true)
+  eq('addDays on year-50 stays year-50', addDays('0050-01-01', 1), '0050-01-02')
+  eq('diffDays on year-50', diffDays('0050-01-01', '0050-01-02'), 1)
+  eq('year 0 leap day rejected', validDate('0000-02-29'), false)
+
+  // Local-time DST boundaries stay calendar-exact in both directions.
+  eq('spring forward', addDays('2026-03-08', 1), '2026-03-09')
+  eq('fall back', addDays('2026-11-01', 1), '2026-11-02')
+  eq('dst span counted in days', diffDays('2026-03-07', '2026-03-09'), 2)
+  eq('leap rollover', addDays('2024-02-28', 1), '2024-02-29')
+  eq('year rollover', addDays('2026-12-31', 1), '2027-01-01')
+  eq(
+    'readTrip day out of range parks in Later',
+    readTrip({ id: 'q', start: '2026-10-05', end: '2026-10-06', stops: [{ id: 's', day: 9, title: 'far' }] })?.stops[0]
+      ?.day,
+    -1
+  )
+}
+
+// --- updateTrip rebases stops on the calendar ------------------------------------
+{
+  let L = newLibrary()
+  const r = addTrip(L, { name: 'A', start: '2026-10-05', end: '2026-10-07' }, 1, 't1')
+  L = r.lib
+  L = addStop(L, 't1', { day: 1, title: 'Oct6 stop' }, 's1')!.lib
+  L = addStop(L, 't1', { day: 2, title: 'Oct7 stop' }, 's2')!.lib
+  L = addLeg(
+    L,
+    't1',
+    { kind: 'flight', from: 'A', to: 'B', date: '2026-10-06', depart: '', arrive: '', ref: '', notes: '' },
+    'l1'
+  )!.lib
+
+  // Start moves later by one: stops keep their calendar dates (day index
+  // minus delta), while fixed-date legs stay as entered.
+  const fwd = getTrip(updateTrip(L, 't1', { start: '2026-10-06' }), 't1')!
+  eq(
+    'start later keeps Oct6 on its date',
+    fwd.stops.map((s) => s.day),
+    [0, 1]
+  )
+  eq('leg keeps calendar date', fwd.legs[0]!.date, '2026-10-06')
+
+  // Whole-trip shift +1 day: same calendar pinning.
+  const whole = getTrip(updateTrip(L, 't1', { start: '2026-10-06', end: '2026-10-08' }), 't1')!
+  eq(
+    'shift both ends keeps dates',
+    whole.stops.map((s) => s.day),
+    [0, 1]
+  )
+
+  // Start moves earlier by one: indexes grow to keep Oct6/Oct7.
+  const back = getTrip(updateTrip(L, 't1', { start: '2026-10-04' }), 't1')!
+  eq(
+    'start earlier keeps dates',
+    back.stops.map((s) => s.day),
+    [2, 3]
+  )
+
+  // Shrinking past a stop's day parks it in Later rather than clamping.
+  const shrunk = getTrip(updateTrip(L, 't1', { end: '2026-10-06' }), 't1')!
+  eq(
+    'shrunk-out stop parks in Later',
+    shrunk.stops.map((s) => s.day),
+    [1, -1]
+  )
+  eq(
+    'Later lists parked stop',
+    unscheduled(shrunk).map((s) => s.id),
+    ['s2']
+  )
+
+  // Undo a stop deleted from a day that no longer exists: lands in Later.
+  const del = removeStop(L, 't1', 's2')
+  const cut = updateTrip(del.lib, 't1', { end: '2026-10-05' })
+  const undid = getTrip(insertStop(cut, 't1', del.stop!, del.index), 't1')!
+  eq('undo after shrink goes to Later', undid.stops.find((s) => s.id === 's2')!.day, -1)
+
+  // A Later stop stays Later across a start shift.
+  const l2 = addStop(L, 't1', { day: -1, title: 'Idea' }, 's9')!.lib
+  eq(
+    'Later stop stays Later',
+    getTrip(updateTrip(l2, 't1', { start: '2026-10-06' }), 't1')!.stops.find((s) => s.id === 's9')!.day,
+    -1
+  )
+}
+
+// --- packing undo restores exact positions -----------------------------------------
+{
+  let P = newLibrary()
+  P = addTrip(P, { name: 'P', start: '2026-06-01', end: '2026-06-03' }, 1, 'tp').lib
+  for (const label of ['Alpha', 'Bravo', 'Charlie']) P = addPack(P, 'tp', label, `p${label[0]}`)!.lib
+
+  const rm = removePack(P, 'tp', 'pB')
+  const single = getTrip(insertPack(rm.lib, 'tp', [rm.item!], [rm.index]), 'tp')!
+  eq(
+    'single pack undo restores position',
+    single.packing.map((p) => p.label),
+    ['Alpha', 'Bravo', 'Charlie']
+  )
+
+  // Batch clear: Alpha + Charlie packed, restored at positions 0 and 2.
+  const marked = togglePack(togglePack(P, 'tp', 'pA'), 'tp', 'pC')
+  const cp = clearPacked(marked, 'tp')
+  eq('clear returns positions', cp.indexes, [0, 2])
+  const batch = getTrip(insertPack(cp.lib, 'tp', cp.items, cp.indexes), 'tp')!
+  eq(
+    'clear undo restores order',
+    batch.packing.map((p) => p.label),
+    ['Alpha', 'Bravo', 'Charlie']
+  )
+
+  // Interleaved new items survive: pack a new item after clearing, then undo.
+  const withNew = addPack(cp.lib, 'tp', 'Delta', 'pD')!.lib
+  const mixed = getTrip(insertPack(withNew, 'tp', cp.items, cp.indexes), 'tp')!
+  eq(
+    'undo restores around new items',
+    mixed.packing.map((p) => p.label),
+    ['Alpha', 'Bravo', 'Charlie', 'Delta']
+  )
+}
+
+// --- addStop stays chronological among timed stops ---------------------------------
+{
+  let S = newLibrary()
+  S = addTrip(S, { name: 'S', start: '2026-07-01', end: '2026-07-02' }, 1, 'ts').lib
+  S = addStop(S, 'ts', { day: 0, title: 'Lunch', time: '15:00' }, 'a')!.lib
+  S = addStop(S, 'ts', { day: 0, title: 'Museum', time: '08:00' }, 'b')!.lib
+  S = addStop(S, 'ts', { day: 0, title: 'Untimed' }, 'c')!.lib
+  const order = stopsForDay(getTrip(S, 'ts')!, 0).map((s) => s.id)
+  eq('timed stop slots in chronological order', order, ['b', 'a', 'c'])
+  // Manual Arrange order still wins: move b after a.
+  const manual = moveStop(S, 'ts', 'b', 0, 1)
+  eq(
+    'manual reorder preserved',
+    stopsForDay(getTrip(manual, 'ts')!, 0).map((s) => s.id),
+    ['a', 'b', 'c']
+  )
 }
 
 console.log(`trip-planner: ${passes} passed, ${failures} failed`)
