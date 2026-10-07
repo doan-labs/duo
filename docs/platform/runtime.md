@@ -77,7 +77,12 @@ and darkened; the bake draws the shell. `os.view` provides display, placement, b
 visibility, activity, focus and angle. Layout should follow the box; a split half is as
 narrow as the cover. Visibility derives from render-loop state and sleep, not angle alone.
 Sleep and wake apply to the derived state when they happen and reach views at once;
-fold-driven changes still ride the loop's per-frame updates.
+fold-driven changes still ride the loop's per-frame updates. `visible` also follows the
+view's own DOM: a scene parked for Home, the lock screen or the switcher stays mounted
+but is hidden, so its view flips false when the element stops rendering - a
+MutationObserver on the frame's ancestors pushes the flip, not the frame loop. The same
+refresh drops DOM focus out of a hidden view; otherwise real key events keep landing in a
+copy nobody can see. Apps reclaim focus when the view shows again.
 
 `os.device.on(type, cb)` hears volume, Camera Control and the side button, the phone's
 pose and the read-only switches. A button press goes to the first watching view that is

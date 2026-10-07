@@ -579,13 +579,19 @@ export type ViewInfo = {
   height: number
   /**
    * The shell is actually showing this view: the panel is facing the camera,
-   * not clipped away entirely, opacity above zero, and the device is awake.
-   * Derived from the render loop's own visibility and opacity writes, not from the angle.
+   * not clipped away entirely, opacity above zero, the device is awake, and the
+   * view's own box is rendered. A parked or covered scene stays mounted but is
+   * `display:none`, so it reads false. Derived from the render loop's own
+   * visibility and opacity writes plus the element's rendered visibility, not from the angle.
    */
   visible: boolean
   /** This display is the one in use; frame buttons go here. Flips at 40°. */
   active: boolean
-  /** This view has keyboard focus. Only one view on a display has it when two apps split it. */
+  /**
+   * This view has keyboard focus. Only one view on a display has it when two
+   * apps split it. A view that stops being shown cannot keep focus: hiding
+   * moves focus out, and showing it again lets the app reclaim it.
+   */
   focused: boolean
   /** Hinge angle, 0 closed to 180 flat. */
   angle: number

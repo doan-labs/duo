@@ -84,7 +84,11 @@ updates coalesce to a frame, with a bounded timer fallback (~250 ms, throttled
 to ~1 s in a 0-size frame). Compare the live `os.view` read against the
 committed snapshot when reproducing "app thinks it is still visible" reports;
 any lifecycle gap is a delivery bug, a converging geometry gap is the
-documented coalescing.
+documented coalescing. The same hides apply to DOM-hidden scenes: parking for
+Home, lock or the switcher keeps the frame mounted under `display:none`, so
+`visible` reads false and DOM focus is released out of it - check
+`document.activeElement` when reproducing "keys reach a parked copy" reports;
+an app reclaims focus once the view shows again.
 
 For fold continuity, mark nodes/view IDs and assert identity through close/open. Poll the
 actual bend angle instead of fixed waits; SwiftShader may need ~10 s. Do not reparent a

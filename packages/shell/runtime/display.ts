@@ -38,6 +38,15 @@ export function maskDisplays(asleep: boolean) {
   displays.cover = masked(physical.cover)
   emit()
 }
+/**
+ * Drops DOM focus out of a view no person can see. A hidden copy that keeps
+ * focus still receives real key events; hiding the view must move focus.
+ */
+export function releaseHiddenFocus(element: HTMLElement) {
+  const active = document.activeElement
+  if (active && element.contains(active) && (sleeping || !element.checkVisibility())) (active as HTMLElement).blur()
+}
+
 export function viewInfo(
   element: HTMLElement,
   display: ViewInfo['display'],
@@ -51,7 +60,7 @@ export function viewInfo(
     height: element.clientHeight,
     angle: glass.angle,
     active: glass.active,
-    visible: glass.visible && glass.clip < (placement === 'left' ? 0.5 : 1),
+    visible: glass.visible && glass.clip < (placement === 'left' ? 0.5 : 1) && element.checkVisibility(),
     focused: element.contains(document.activeElement)
   }
 }
