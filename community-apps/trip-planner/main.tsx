@@ -1316,16 +1316,19 @@ function TripPlanner() {
   /** Apply a new library: one storage write per changed trip plus the index. */
   const applyLibRef = useRef<(n: Library, p: Library) => void>(() => {})
 
-  /** Apply a new library: one storage write per changed trip plus the index. */
+  /** Apply a new library: one storage write per changed trip plus the index.
+   *  The vis write-gate lives at the event entry points (pushUndo/confirmGo/
+   *  doUndo/commitDraft/mute are all vis-gated), not here: markLeaving commits
+   *  the delete ~190ms after the tap, and dropping it when the copy folds
+   *  mid-fade would arm an Undo for a row that was never removed. */
   const applyLib = useCallback(
     (next: Library, prev: Library) => {
-      if (!vis) return
       const prevById = new Map(prev.trips.map((t) => [t.id, t]))
       for (const id of prev.order) if (!next.order.includes(id)) storage.del(`trip.${id}`)
       for (const t of next.trips) if (prevById.get(t.id) !== t) storage.put(`trip.${t.id}`, serializeTrip(t))
       if (next.order.join('') !== prev.order.join('')) storage.put('index', serializeIndex(next.order))
     },
-    [storage, vis]
+    [storage]
   )
   applyLibRef.current = applyLib
 
