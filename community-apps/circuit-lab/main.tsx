@@ -28,11 +28,15 @@ import {
   displayName,
   docBounds,
   evaluate,
+  gatesOf,
   hasOutput,
   inPin,
   inputCount,
   type Library,
   latestDoc,
+  MAX_BULBS,
+  MAX_GATES,
+  MAX_SWITCHES,
   moveNode,
   NODE_H,
   NODE_W,
@@ -300,9 +304,20 @@ function CircuitLab() {
 
   // A copy frozen on the occluded display can miss session events; on becoming
   // the visible display again, re-snapshot so its doc can never lag the peer.
+  // A visibility flip also drops any armed delete - destructive intent never
+  // survives a fold.
   useEffect(() => {
+    setArming(null)
     if (view.active) void bootRef.current()
   }, [view.active])
+
+  // Even while visible, an armed confirm is a momentary intent - disarm after
+  // a few idle seconds. Only ever ticks on the visible copy.
+  useEffect(() => {
+    if (arming === null || !view.active) return
+    const t = setTimeout(() => setArming(null), 6000)
+    return () => clearTimeout(t)
+  }, [arming, view.active])
 
   // A write this copy did not make is the new settled circuit; adopting it is
   // what carries the build across the fold. Own writes are already on screen.
@@ -954,13 +969,19 @@ function CircuitLab() {
         {paletteKinds.map((kind) => {
           const locked = doc.challenge !== null && (kind === 'switch' || kind === 'bulb')
           const forbidden = activeChallenge?.forbid.includes(kind) ?? false
-          const disabled = locked || forbidden
+          const capped =
+            kind === 'switch'
+              ? switchesOf(doc).length >= MAX_SWITCHES
+              : kind === 'bulb'
+                ? bulbsOf(doc).length >= MAX_BULBS
+                : gatesOf(doc).length >= MAX_GATES
+          const disabled = locked || forbidden || capped
           return (
             <button
               key={kind}
               type="button"
               disabled={disabled}
-              aria-label={`Add ${KIND_LABEL[kind]}${forbidden ? ' (off the shelf for this challenge)' : ''}`}
+              aria-label={`Add ${KIND_LABEL[kind]}${forbidden ? ' (off the shelf for this challenge)' : capped ? ' (limit reached)' : ''}`}
               onClick={() => addPart(kind)}
               {...stylex.props(styles.tile, shared.press)}
             >
