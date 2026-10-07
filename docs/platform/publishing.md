@@ -103,14 +103,18 @@ The website build runs `packages/web/scripts/catalog.ts`: it unpacks `origin/cat
 `public/catalog/` when reachable and merges the bundled official releases from
 `dist/cdn` with the same publisher, so the hosted Store lists official and community apps
 from one origin. The Store loads `/catalog/index.json`, then `/cdn`, then `/preinstalled`.
-`packages/web/public/_headers` pins the serving contract on the release trees
-(`/catalog/apps/*`, `/cdn/apps/*`, `/preinstalled/apps/*`): `Cache-Control:
-no-transform` forbids edge rewriting of the responses - an injected analytics
-snippet changes the bytes and fails the downloader's hash check, which is how the
-hosted production symptom presented - and content-addressed paths get the
-documented immutable long-term caching. `scripts/checks/publish/headers.mjs`
-proves every release path carries both, without leaking onto catalog indexes or
-site pages.
+The release trees run through the site Worker (`run_worker_first` in
+wrangler.jsonc, `packages/web/worker.ts`) because their Cache-Control must be
+status-conditional, which the asset layer's `_headers` cannot express: a flat
+immutable rule would stamp year-long freshness on a 404 and let a client cache
+the absence of a release it asked for before publication. Committed hits get
+`Cache-Control: public, max-age=31536000, immutable, no-transform` - `no-transform`
+forbids edge rewriting of the bytes the downloader hashes, which is how the
+hosted production symptom presented; misses, redirects and errors get
+`no-store`. Only Cache-Control is overridden; bodies and other headers pass
+through. `scripts/checks/publish/headers.mjs` asserts the routing contract,
+validates any `_headers` rules present, and drives the real Worker handler over
+canned statuses; live edge behavior is verified against the deploy itself.
 Site Created/Updated dates are the release `build.at` for community apps but the first
 and last package commit for official apps: their `dist/cdn` release is rebuilt on every
 site build, so its timestamp is only the deploy minute. For the same reason the script

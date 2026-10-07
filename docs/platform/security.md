@@ -47,8 +47,9 @@ Installed documents execute verified stored bytes through `srcdoc`. Preview docu
 execute verified bytes through an owned Blob `src`, avoiding a validation/second-fetch
 gap. Replacement/removal revokes old URLs under the app lock. Shell hosting policy must
 permit these frames and selected-source downloads; the served bytes must also reach
-the downloader untransformed for every request class - `no-transform` on the release
-trees holds that line (`_headers`). See [website deployment](web.md#deployment).
+the downloader untransformed for every request class - the site Worker stamps
+`no-transform` on release-tree hits to hold that line. See [website
+deployment](web.md#deployment).
 
 ## Storage and lifecycle
 
