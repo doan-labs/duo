@@ -446,6 +446,13 @@ function PaperFold() {
     if (legend && !view.visible) setLegend(false)
   }, [legend, view.visible])
 
+  // Folding strands DOM focus inside the hidden copy's iframe (its sheet also
+  // unmounts its focused node), so keys keep landing on the invisible copy.
+  // Landing focus on the visible copy's root restores keyboard control to it.
+  useEffect(() => {
+    if (view.visible) rootRef.current?.focus({ preventScroll: true })
+  }, [view.visible, rootRef])
+
   // Audio unlock needs a real gesture once per copy.
   useEffect(() => {
     const on = () => unlockAudio()
@@ -698,6 +705,7 @@ function PaperFold() {
   return (
     <main
       ref={rootRef}
+      tabIndex={-1}
       data-app="paper-fold"
       data-display={view.display}
       {...stylex.props(darkMode ? dark : light, styles.root)}

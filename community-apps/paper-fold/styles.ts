@@ -22,7 +22,10 @@ export const styles = stylex.create({
     color: app.fg,
     fontFamily: fonts.system,
     overflow: 'hidden',
-    position: 'relative'
+    position: 'relative',
+    // Programmatic focus landing pad only (fold restores focus here) - never
+    // meant to show a ring; interactive children keep their own focus styles.
+    outlineWidth: 0
   },
 
   // ---------- split layout ----------
