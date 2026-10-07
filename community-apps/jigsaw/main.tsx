@@ -913,11 +913,12 @@ function Jigsaw() {
             ))}
           </div>
           <div {...stylex.props(styles.confirmActions)}>
-            <Button variant="tinted" onClick={() => setPicker(false)}>
+            <Button variant="tinted" xstyle={styles.sheetBtn} onClick={() => setPicker(false)}>
               Cancel
             </Button>
             <Button
               variant="filled"
+              xstyle={styles.sheetBtn}
               onClick={() => {
                 if (prefs.art !== game.art || prefs.count !== game.count) chooseConfig(prefs.art, prefs.count)
                 setPicker(false)
@@ -949,10 +950,10 @@ function Jigsaw() {
               The {placed} placed {placed === 1 ? 'piece returns' : 'pieces return'} to the tray and the timer restarts.
             </p>
             <div {...stylex.props(styles.confirmActions)}>
-              <Button variant="tinted" autoFocus onClick={() => setConfirmReset(false)}>
+              <Button variant="tinted" autoFocus xstyle={styles.sheetBtn} onClick={() => setConfirmReset(false)}>
                 Cancel
               </Button>
-              <Button variant="filled" xstyle={styles.danger} onClick={doReset}>
+              <Button variant="filled" xstyle={[styles.sheetBtn, styles.danger]} onClick={doReset}>
                 Start over
               </Button>
             </div>

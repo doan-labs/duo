@@ -253,10 +253,10 @@ export const styles = stylex.create({
     borderRadius: radius.xl,
     backgroundColor: app.surface,
     boxShadow: shadow.rim,
-    paddingTop: space.sm,
-    paddingRight: space.sm,
-    paddingBottom: space.sm,
-    paddingLeft: space.sm,
+    paddingTop: space.md,
+    paddingRight: space.md,
+    paddingBottom: space.md,
+    paddingLeft: space.md,
     WebkitOverflowScrolling: 'touch'
   },
   trayGrid: { display: 'flex', flexWrap: 'wrap', gap: space.sm, alignContent: 'flex-start' },
@@ -363,13 +363,13 @@ export const styles = stylex.create({
     borderWidth: 0,
     borderRadius: radius.lg,
     backgroundColor: app.fill3,
-    paddingTop: space.sm,
-    paddingRight: space.sm,
-    paddingBottom: space.sm,
-    paddingLeft: space.sm,
+    paddingTop: space.md,
+    paddingRight: space.md,
+    paddingBottom: space.md,
+    paddingLeft: space.md,
     display: 'flex',
     flexDirection: 'column',
-    gap: space.xs,
+    gap: space.sm,
     cursor: 'pointer',
     textAlign: 'left'
   },
@@ -409,6 +409,7 @@ export const styles = stylex.create({
     margin: 0
   },
   confirmActions: { display: 'flex', gap: space.sm, justifyContent: 'flex-end' },
+  sheetBtn: { minHeight: 44 },
 
   // Completion veil over the board.
   veil: {
@@ -465,7 +466,7 @@ export const styles = stylex.create({
   },
   veilActions: { display: 'flex', gap: space.sm, paddingTop: space.sm },
   veilBtn: {
-    height: 36,
+    minHeight: 44,
     display: 'inline-flex',
     alignItems: 'center',
     gap: space.xs,
