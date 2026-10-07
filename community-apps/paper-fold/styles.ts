@@ -117,8 +117,9 @@ export const styles = stylex.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    paddingTop: space.xs,
-    paddingBottom: space.xs,
+    // 34px thumb + 2x sm padding keeps the tap target at/above 44pt.
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
     paddingLeft: space.xs,
     paddingRight: space.sm,
     borderRadius: radius.md,
@@ -333,6 +334,13 @@ export const styles = stylex.create({
   },
   rowOn: {
     backgroundColor: app.fill3
+  },
+  // Tappable grouped rows get a fill press (kit Row ships none); app.fill
+  // stays visible even over the selected row's fill3.
+  rowTap: {
+    transitionProperty: 'background-color',
+    transitionDuration: '.15s',
+    backgroundColor: { default: app.surface, ':active': app.fill }
   },
   soundBtn: {
     display: 'flex',

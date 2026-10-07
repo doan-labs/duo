@@ -136,7 +136,7 @@ function ModelRow({
       chevron={!current}
       onClick={() => onOpen(model)}
       aria-current={current ? 'true' : undefined}
-      xstyle={current ? styles.rowOn : undefined}
+      xstyle={current ? [styles.rowTap, styles.rowOn] : styles.rowTap}
     />
   )
 }
@@ -660,6 +660,7 @@ function PaperFold() {
             icon={<Sym name="bookOutline" size={16} />}
             chevron
             as="button"
+            xstyle={styles.rowTap}
             onClick={() => setLegend(true)}
           />
         </Section>
