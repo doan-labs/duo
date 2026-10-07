@@ -97,6 +97,9 @@ addEventListener(
   'keydown',
   (event) => {
     if (event.key !== 'Escape' || !sheetCancel) return
+    // Admission comes before the hidden-origin handling: a folded-away copy
+    // must not consume the key at all - Escape still belongs to the shell.
+    if (!admitLive(os.view, document)) return
     event.preventDefault()
     event.stopImmediatePropagation()
     sheetCancel()
@@ -442,7 +445,9 @@ function Pantry() {
     if (editDraft !== null) return
     const el = sheetTrigger.current
     sheetTrigger.current = null
-    if (!el) return
+    // Denied copies schedule no focus work at all: the gate runs before the
+    // first frame is requested, not just inside the callback.
+    if (!el || !live()) return
     let tries = 0
     const restore = () => {
       // Only the live display may take focus - a copy that was folded away

@@ -85,7 +85,12 @@ if (gate) {
 
 const sites: [RegExp, string][] = [
   [/if \(!live\(\)\) return\n\s+setToday/, 'midnight tick checks live at execution before re-arming'],
+  [/if \(!el \|\| !live\(\)\) return/, 'sheet focus restore gates before the first RAF is scheduled'],
   [/if \(!el\.isConnected \|\| !live\(\)\) return/, 'deferred sheet focus restore checks live at execution'],
+  [
+    /if \(!admitLive\(os\.view, document\)\) return\n\s+event\.preventDefault\(\)\n\s+event\.stopImmediatePropagation\(\)/,
+    'pre-connect Escape guard gates before preventDefault/stopImmediatePropagation'
+  ],
   [/if \(!live\(\)\) return\n\s+window\.clearTimeout/, 'announce drops notice+timer on hidden copies'],
   [
     /if \(!admitLive\(os\.view, document\)\) return\n\s+event\.preventDefault/,

@@ -228,11 +228,14 @@ export const styles = stylex.create({
   chip: {
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: space.xs,
     borderWidth: 0,
     borderRadius: radius.pill,
     paddingBlock: space.sm,
     paddingInline: space.md,
+    // 44pt in both axes: short labels like "All" measured 42pt wide.
+    minWidth: `calc(${space.xxxl} + ${space.md})`,
     minHeight: `calc(${space.xxxl} + ${space.md})`,
     boxSizing: 'border-box',
     color: app.fg,

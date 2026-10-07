@@ -535,5 +535,360 @@ await (async () => {
   eq(parseDoc(store.value).items.length, 1, 'committed doc carries the admitted item')
 })()
 
+// --- stale set flight cannot erase a confirmed peer op (the reviewer's probe) -------
+//
+// Per-writer adapters over one shared wire, mirroring the reviewer's probe:
+// the held writer's first set parks until released; the peer's write commits
+// and its event reaches the held copy before its own ack (watchBeforeAck) or
+// only after (delayedPeerEvent). Either way the stale payload must not erase
+// the confirmed row: the echo merges it back and a repair write re-commits it.
+
+async function heldFlightCase(heldWriter: string, peerWriter: string, watchBeforeAck: boolean): Promise<void> {
+  let wireNow: string | null = null
+  let revNow = 0
+  let heldText: string | null = null
+  let held = false
+  const release = Promise.withResolvers<void>()
+  const inFlight = Promise.withResolvers<void>()
+  const watchers = new Map<string, (e: Event) => void>()
+  let delayedPeerEvent: Event | null = null
+  const mkStore = (writer: string): DocStore => ({
+    get: async () => wireNow,
+    set: async (v) => {
+      if (writer === heldWriter && !held) {
+        held = true
+        heldText = v
+        inFlight.resolve()
+        await release.promise
+      }
+      wireNow = v
+      const n = ++revNow
+      for (const [who, cb] of watchers) {
+        if (writer === peerWriter && who === heldWriter && !watchBeforeAck) delayedPeerEvent = { rev: n, v }
+        else cb({ rev: n, v })
+      }
+      return n
+    },
+    watch: (cb) => {
+      watchers.set(writer, cb)
+      return () => {
+        watchers.delete(writer)
+      }
+    }
+  })
+  const sa = mkSink()
+  const sb = mkSink()
+  const a = new PantrySync({
+    me: heldWriter,
+    store: mkStore(heldWriter),
+    retryMs: 5,
+    onDoc: (d) => {
+      sa.doc = d
+    },
+    onStatus: (s) => sa.statuses.push(s)
+  })
+  const b = new PantrySync({
+    me: peerWriter,
+    store: mkStore(peerWriter),
+    retryMs: 5,
+    onDoc: (d) => {
+      sb.doc = d
+    },
+    onStatus: (s) => sb.statuses.push(s)
+  })
+  stops.push(a.start(), b.start())
+  for (let i = 0; i < 200 && (sa.statuses.at(-1) !== 'synced' || sb.statuses.at(-1) !== 'synced'); i++) await sleep(2)
+
+  a.submit(opAdd(draft('Admitted before fold')))
+  await inFlight.promise // A's whole-doc payload is parked in flight
+  b.submit(opAdd(draft('Confirmed after fold')))
+  for (let i = 0; i < 200 && sb.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  eq(parseDoc(heldText!).items.length, 1, 'held payload is provably stale: it predates the peer op')
+  ok(
+    parseDoc(wireNow!).items.some((i) => i.name === 'Confirmed after fold'),
+    'peer op durable before held ack'
+  )
+  eq(b.pendingCount(), 0, 'peer reports zero pending at synced')
+  if (watchBeforeAck) {
+    ok(
+      sa.doc!.items.some((i) => i.name === 'Confirmed after fold'),
+      'held copy observed the peer before its own ack'
+    )
+    eq(sa.doc!.items.length, 2, 'held copy renders both rows pre-ack')
+  }
+  b.dispose()
+  release.resolve() // A's stale payload lands at a newer revision over B's
+  for (let i = 0; i < 400 && sa.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  if (delayedPeerEvent) watchers.get(heldWriter)?.(delayedPeerEvent)
+  for (let i = 0; i < 400 && sa.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  eq(sa.statuses.at(-1), 'synced', 'held copy settles after its stale write')
+
+  // A fresh engine reads only the committed wire - the row must be durable.
+  const sc = mkSink()
+  const c = new PantrySync({
+    me: 'relaunch',
+    store: mkStore('relaunch'),
+    retryMs: 5,
+    onDoc: (d) => (sc.doc = d),
+    onStatus: (s) => sc.statuses.push(s)
+  })
+  stops.push(c.start())
+  for (let i = 0; i < 200 && sc.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  const durable = parseDoc(wireNow!).items.map((i) => i.name)
+  const reloaded = (sc.doc?.items ?? []).map((i) => i.name)
+  ok(durable.includes('Admitted before fold'), 'held op still durable')
+  ok(durable.includes('Confirmed after fold'), 'confirmed peer op survived the stale flight')
+  ok(reloaded.includes('Confirmed after fold'), 'fresh relaunch recovers the peer op')
+  eq(reloaded.length, durable.length, 'reloaded view matches durable rows')
+}
+
+for (const [held, peer] of [
+  ['cover', 'inner'],
+  ['inner', 'cover']
+] as const) {
+  for (const watch of [true, false]) {
+    await heldFlightCase(held, peer, watch)
+  }
+}
+
+// --- same-item race: delete beats the stale write that still carried the row ---------
+
+await (async () => {
+  let wireNow: string | null = null
+  let revNow = 0
+  const watchers = new Map<string, (e: Event) => void>()
+  let watcherSeq = 0
+  const release = Promise.withResolvers<void>()
+  const inFlight = Promise.withResolvers<void>()
+  let held = false
+  const mkStore = (writer: string): DocStore => ({
+    get: async () => wireNow,
+    set: async (v) => {
+      if (writer === 'cover' && !held) {
+        held = true
+        inFlight.resolve()
+        await release.promise
+      }
+      wireNow = v
+      const n = ++revNow
+      for (const cb of watchers.values()) cb({ rev: n, v })
+      return n
+    },
+    watch: (cb) => {
+      const w = `w${watcherSeq++}`
+      watchers.set(w, cb)
+      return () => watchers.delete(w)
+    }
+  })
+  const sa = mkSink()
+  const sb = mkSink()
+  const a = new PantrySync({
+    me: 'cover',
+    store: mkStore('cover'),
+    retryMs: 5,
+    onDoc: (d) => (sa.doc = d),
+    onStatus: (s) => sa.statuses.push(s)
+  })
+  const b = new PantrySync({
+    me: 'inner',
+    store: mkStore('inner'),
+    retryMs: 5,
+    onDoc: (d) => (sb.doc = d),
+    onStatus: (s) => sb.statuses.push(s)
+  })
+  stops.push(a.start(), b.start())
+  for (let i = 0; i < 200 && (sa.statuses.at(-1) !== 'synced' || sb.statuses.at(-1) !== 'synced'); i++) await sleep(2)
+
+  // The contested row must be durably committed for a peer delete to be a real
+  // op; seed it through a foreign writer first.
+  const contested = newItem('contested', 1000, 'pcs', 'pantry', null, 8)
+  const seed: Doc = { ...EMPTY_DOC, items: [contested], by: 'seed', s: 1, high: { seed: 1 } }
+  revNow++
+  const seedV = serializeDoc(seed)
+  wireNow = seedV
+  for (const cb of [...watchers.values()]) cb({ rev: revNow, v: seedV })
+  await sleep(15)
+  ok(
+    sa.doc!.items.some((i) => i.id === contested.id),
+    'both copies hold the contested row'
+  )
+  ok(
+    sb.doc!.items.some((i) => i.id === contested.id),
+    'peer holds the contested row'
+  )
+
+  a.submit(opAdd(draft('holder')))
+  await inFlight.promise // held write still carries the contested row
+  b.submit(opRemove(contested.id)) // peer deletes while A's write is parked
+  for (let i = 0; i < 200 && sb.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  release.resolve() // stale payload with the row lands at a newer rev
+  for (let i = 0; i < 400 && sa.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  for (let i = 0; i < 400 && sb.statuses.at(-1) !== 'synced'; i++) await sleep(2)
+  const durable = parseDoc(wireNow!)
+  eq(
+    durable.items.some((i) => i.id === contested.id),
+    false,
+    'delete wins over the stale row payload'
+  )
+  ok(durable.gone.includes(contested.id), 'peer tombstone persisted through the merge')
+  eq(
+    sa.doc!.items.some((i) => i.id === contested.id),
+    false,
+    'held copy converged to the delete'
+  )
+  eq(
+    sb.doc!.items.some((i) => i.id === contested.id),
+    false,
+    'deleting copy converged'
+  )
+})()
+
+// --- a delayed stale event recovers a confirmed op nobody had seen yet --------------
+
+await (async () => {
+  const store = new FakeStore()
+  const sink = mkSink()
+  const sync = engine(store, 'cover', sink)
+  await sleep(10)
+  sync.submit(opAdd(draft('mine')))
+  await settle(sync, sink, 'own write settles')
+  // An older-revision event arrives carrying committed content this copy never
+  // saw: delivery order is not causal order, so its rows merge into the view
+  // and the repair write makes them durable again.
+  const peerDoc: Doc = {
+    ...EMPTY_DOC,
+    items: [newItem('recovered', 2000, 'pcs', 'pantry', null, 7)],
+    by: 'inner',
+    s: 1,
+    high: { inner: 1 }
+  }
+  store.push({ rev: 1, v: serializeDoc(peerDoc) })
+  await settle(sync, sink, 'stale event merge settles')
+  const durable = parseDoc(store.value!)
+  ok(
+    durable.items.some((i) => i.name === 'recovered'),
+    'unseen committed row merged into storage'
+  )
+  ok(
+    durable.items.some((i) => i.name === 'mine'),
+    'own row preserved alongside'
+  )
+  eq(durable.high.inner, 1, 'merged doc claims the peer mark it now carries')
+  ok(durable.gone.length === 0, 'merge invented no tombstones')
+})()
+
+// --- a stale event carrying a tombstone still kills the row it covers ----------------
+
+await (async () => {
+  const store = new FakeStore()
+  const sink = mkSink()
+  engine(store, 'cover', sink)
+  await sleep(10)
+  const dead = newItem('doomed', 1000, 'pcs', 'pantry', null, 3)
+  const live = newItem('safe', 1000, 'pcs', 'pantry', null, 4)
+  store.foreign(serializeDoc({ ...EMPTY_DOC, items: [dead, live], by: 'seed', s: 1, high: { seed: 1 } }))
+  await sleep(15)
+  eq(sink.doc?.items.length, 2, 'both seeded rows visible')
+
+  // A stale event whose doc tombstones `dead` - even though this copy already
+  // renders it - applies the delete, and no later merge resurrects the row.
+  const killer: Doc = {
+    ...EMPTY_DOC,
+    items: [live],
+    gone: [dead.id],
+    by: 'inner',
+    s: 2,
+    high: { inner: 2 }
+  }
+  store.push({ rev: 99, v: serializeDoc(killer) })
+  await sleep(15)
+  eq(
+    sink.doc?.items.some((i) => i.id === dead.id),
+    false,
+    'tombstoned row removed by merge'
+  )
+  eq(
+    sink.doc?.items.some((i) => i.id === live.id),
+    true,
+    'untouched row survives'
+  )
+  store.push({ rev: 3, v: serializeDoc({ ...EMPTY_DOC, items: [dead, live], by: 'seed', s: 1, high: { seed: 1 } }) })
+  await sleep(15)
+  eq(
+    sink.doc?.items.some((i) => i.id === dead.id),
+    false,
+    'replay of the pre-delete doc cannot resurrect the row'
+  )
+})()
+
+// --- dispose with a write in flight and a re-kick parked: no recursive re-entry ------
+
+await (async () => {
+  const store = new FakeStore()
+  const sink = mkSink()
+  const sync = engine(store, 'cover', sink)
+  await sleep(10)
+
+  store.holdSets = true
+  sync.submit(opAdd(draft('inflight')))
+  await sleep(10)
+  eq(store.heldCount, 1, 'write parked in flight')
+  // A foreign event while the drain is parked sets `again`; disposing then
+  // releasing must not recurse kick->drain->finally->kick into a RangeError.
+  store.foreign(
+    serializeDoc({ ...EMPTY_DOC, items: [newItem('x', 1, 'pcs', 'pantry', null, 1)], by: 'o', s: 1, high: { o: 1 } })
+  )
+  sync.dispose()
+  const commits = store.commits
+  store.releaseSets()
+  await sleep(20)
+  eq(store.commits - commits, 1, 'the released write commits once, no post-dispose drain')
+  eq(sink.statuses.at(-1), 'saving', 'disposed mid-save never flips to a false terminal')
+})()
+
+// --- replayed stale echoes cause no churn: merged unions are idempotent --------------
+
+await (async () => {
+  const store = new FakeStore()
+  const sink = mkSink()
+  const sync = engine(store, 'cover', sink)
+  await sleep(10)
+  sync.submit(opAdd(draft('steady')))
+  await settle(sync, sink, 'initial write settles')
+  const committed = store.commits
+  const old = serializeDoc({ ...EMPTY_DOC, by: 'seed', s: 1, high: { seed: 1 } })
+  for (let i = 0; i < 10; i++) store.push({ rev: 1, v: old }) // stale replays
+  await sleep(20)
+  eq(store.commits, committed, 'stale replay storm writes nothing new')
+  eq(sink.doc?.items.length, 1, 'view unchanged by replays')
+})()
+
+// --- pre-protocol legacy document still adopts wholesale ------------------------------
+
+await (async () => {
+  const store = new FakeStore()
+  const sink = mkSink()
+  const sync = engine(store, 'cover', sink)
+  await sleep(10)
+  // A v1 blob has no marks or tombstones: opaque last-writer-wins bytes.
+  const v1 = JSON.stringify({
+    v: 1,
+    items: [newItem('legacy-tin', 1000, 'pcs', 'pantry', null, 5)],
+    list: [],
+    muted: false
+  })
+  store.foreign(v1)
+  await sleep(15)
+  eq(sink.doc?.items.length, 1, 'legacy doc adopts whole')
+  eq(sink.doc?.items[0]?.name, 'legacy-tin', 'legacy row renders')
+
+  sync.submit(opAdd(draft('new-crop')))
+  await settle(sync, sink, 'op on legacy base settles')
+  const durable = parseDoc(store.value!)
+  eq(durable.items.length, 2, 'write upgrades the doc with both rows')
+  eq(durable.v, 2, 'wire now carries the protocol shape')
+  eq(durable.high.cover !== undefined, true, 'write stamps this copy on upgrade')
+})()
+
 for (const stop of stops) stop()
 console.log(`sync: ${n} checks passed`)

@@ -44,10 +44,29 @@ watch events may arrive late, replayed or out of order. `sync.ts` owns the
 invariant: every accepted mutation is a journaled intent stamped with this
 copy's `seq`; a write commits base + replayed intents plus per-writer
 high-watermarks (`high`), so a settled document provably shows which ops it
-contains. A storage event is adopted only at a newer `rev`, covered intents
-confirm, and every uncovered intent is replayed on top - a stale echo, a
-racing write or a rejected get/set can never lose an accepted op, and deletes
-survive through the document's tombstones (`gone`).
+contains.
+
+Adoption is a causal union, never a wholesale replacement. A whole-blob write
+commits the payload it was staged on, so a set flight staged before a peer's
+commit landed can physically erase rows the store had already confirmed.
+The engine keeps the last settled base separate from the view; when a newer
+`rev` folds in, the view's attested rows, tombstones and coverage union into
+the base rather than regressing, and an event at an older `rev` still merges
+any committed content the view lacks - delivery order is not causal order.
+When the view then carries rows, tombstones or muted state the base lacks, a
+repair write re-commits them, so a peer's confirmed op stays immortal in
+every copy that observed it (and in any copy its surviving peers keep
+carrying). Two edges stay honest: only attested documents adopt or merge -
+every protocol write stamps `{by, s}` and `high`, so a blob with rows but no
+marks is forged or corrupt and folds empty - and legacy pre-protocol
+documents (`v != 2`) still adopt wholesale, because last-writer-wins is the
+only honest reading of a blob that cannot say what it covered. Bare mark
+advances never trigger a write on their own, so two copies cannot ping-pong
+over provenance. The one residual hole is inherent to a mutable whole blob
+with no per-writer keys: an op committed on the wire and then erased by a
+stale flight cannot be recovered if no surviving copy ever observed it and
+its own event never reaches a live engine - durability lives in what live
+copies have seen.
 
 Admission is decided by `admission.ts` from the SDK's synchronous `os.view`
 (visible AND active) with `document.visibilityState` as a supplemental
@@ -70,7 +89,10 @@ persistence is what `synced` reports, not what a tap claims.
 
 `sync.test.ts` drives the same `DocStore` surface deterministically: delayed
 echoes, out-of-order delivery, interleaved writers, delete-vs-edit, rejected
-calls, resync, reload, raced-out refreshes and admitted-before-hide
-completion. `.tests/admission.test.ts` pins the admission contract: the truth
-table, same-turn flips, and the committed `live` callback evaluated against a
-stale React ref - the reviewer's original probe shape.
+calls, resync, reload, raced-out refreshes, admitted-before-hide completion,
+the held-set-flight peer-loss cases in both writer orders and both watch
+timings, delete-vs-stale-write, tombstone recovery through merges, a dispose
+with an in-flight write plus a re-kick parked, replay storms and a mixed
+legacy boot. `.tests/admission.test.ts` pins the admission contract: the
+truth table, same-turn flips, and the committed `live` callback evaluated
+against a stale React ref - the reviewer's original probe shape.

@@ -49,6 +49,12 @@ export type Doc = {
   high: Record<string, number>
   /** Tombstoned row ids, newest last: a delete beats a racing edit on any base. */
   gone: string[]
+  /**
+   * Internal adoption hint, never serialized: true when the raw blob predates
+   * this protocol (a `v != 2` document that cannot say what it covered, so
+   * adoption treats it as opaque last-writer-wins bytes and never merges).
+   */
+  legacy?: boolean
 }
 
 export const EMPTY_DOC: Doc = { v: 2, items: [], list: [], muted: false, by: '', s: 0, high: {}, gone: [] }
@@ -436,6 +442,11 @@ export function parseDoc(raw: string | null): Doc {
   if (!raw) return { ...EMPTY_DOC }
   try {
     const parsed = JSON.parse(raw) as Partial<Doc>
+    // A blob that does not declare v:2 is a pre-protocol document: adopt it
+    // wholesale rather than merging, because without marks/tombstones there
+    // is no honest way to tell a stale copy from a real delete. Requires a
+    // doc-shaped payload so arbitrary JSON cannot masquerade as one.
+    const legacy = parsed.v !== 2 && (Array.isArray(parsed.items) || Array.isArray(parsed.list))
     const seen = new Set<string>()
     const items = (Array.isArray(parsed.items) ? parsed.items : [])
       .filter(isItem)
@@ -456,7 +467,8 @@ export function parseDoc(raw: string | null): Doc {
       by: typeof parsed.by === 'string' ? parsed.by : '',
       s: Number.isSafeInteger(parsed.s) && (parsed.s as number) > 0 ? (parsed.s as number) : 0,
       high: parseHigh(parsed.high),
-      gone
+      gone,
+      ...(legacy ? { legacy: true } : {})
     }
   } catch {
     return { ...EMPTY_DOC }
