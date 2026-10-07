@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, IconButton, Push, Sheet, Sym, TextField, useWide } from '@doan-labs/duo-uikit'
+import { Button, IconButton, Push, Sheet, Sym, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { type MutableRefObject, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -249,13 +249,19 @@ function HarmonyPicker(props: {
 function GuardedSheet(props: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
   const dialogId = useId()
   const bodyId = `${dialogId}-body`
+  const view = useDisplay()
+  const shown = props.open && view.visible && view.active
   useEffect(() => {
-    if (!props.open) return
+    if (!shown) return
     focusIfActive(document.getElementById(bodyId)?.querySelector<HTMLElement>('input, button'))
     // Focus restore lives in ColorLab on the sheet-stack closing edge: a
     // swap between sibling sheets must not drop the original row trigger.
-  }, [props.open, bodyId])
-  if (!props.open) return null
+  }, [shown, bodyId])
+  // Sheet state mirrors across displays, but the kit Sheet focuses its dialog
+  // on mount, which would steal frame focus from the visible copy. A hidden
+  // copy must not mount it at all; the state survives and the sheet remounts
+  // with correct autofocus when this copy becomes visible again.
+  if (!shown) return null
   return (
     <Sheet
       open
