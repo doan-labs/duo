@@ -192,12 +192,21 @@ function useFocusTrap(
       // re-resolves the fallback so an anchor on an exiting Push sheet is
       // skipped once it detaches.
       const deadline = Date.now() + 800
+      // The exiting layer is our sheet's dialog plus its scrim sibling:
+      // focus sitting on either dies with the unmount, so it counts as
+      // stranded rather than user-owned, and neither may serve as the
+      // fallback target.
+      const layerDialog = boxRef.current?.closest('dialog') ?? null
+      const prev = layerDialog?.previousElementSibling
+      const layerScrim = prev instanceof HTMLElement && prev.getAttribute('aria-label') === 'Close' ? prev : null
+      const inLayer = (el: Element | null) => !!el && (layerDialog?.contains(el) === true || el === layerScrim)
       const restore = () => {
         if (!canFocus()) return
+        const at = document.activeElement
         // The user (or a new layer) already owns focus - do not steal it.
-        if (document.activeElement && document.activeElement !== document.body) return
-        const el = trigger.current?.isConnected ? trigger.current : anchorFallback()
-        if (!el) return
+        if (at && at !== document.body && at.isConnected && !inLayer(at)) return
+        const el = trigger.current?.isConnected ? trigger.current : anchorFallback((c) => inLayer(c))
+        if (!el?.isConnected || inLayer(el)) return
         el.focus()
         if (document.activeElement !== el && Date.now() < deadline) setTimeout(restore, 60)
       }
@@ -208,10 +217,14 @@ function useFocusTrap(
 
 /** Stable chrome buttons that survive a deleted record: the trip screen's
  * actions menu first, then any marked control, then any button. */
-const anchorFallback = () =>
-  document.querySelector<HTMLElement>('main [data-focus-anchor="trip"]:not([disabled])') ??
-  document.querySelector<HTMLElement>('main [data-focus-anchor]:not([disabled])') ??
-  document.querySelector<HTMLElement>('main button:not([disabled])')
+const anchorFallback = (exclude?: (el: HTMLElement) => boolean) => {
+  const pick = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].find((el) => !exclude?.(el))
+  return (
+    pick('main [data-focus-anchor="trip"]:not([disabled])') ??
+    pick('main [data-focus-anchor]:not([disabled])') ??
+    pick('main button:not([disabled])')
+  )
+}
 
 /** A destructive confirmation: the kit card plus the modality it leaves out. */
 function DestructiveSheet({
