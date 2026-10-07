@@ -48,7 +48,7 @@ import {
 import { createRoot } from 'react-dom/client'
 import { cue, setCueGate, setMuted } from './audio.ts'
 import { styles } from './styles.ts'
-import { applyWatch, clearPending, queuePending, WriteQueue } from './sync.ts'
+import { applyWatch, clearPending, commitLibWrites, queuePending, WriteQueue } from './sync.ts'
 import {
   addLeg,
   addPack,
@@ -77,6 +77,7 @@ import {
   type PackItem,
   packProgress,
   parseTime,
+  planLibWrites,
   rangeLabel,
   removeLeg,
   removePack,
@@ -86,7 +87,6 @@ import {
   restoreTrip,
   type Stay,
   type Stop,
-  serializeIndex,
   serializeTrip,
   shortDay,
   stopsForDay,
@@ -148,7 +148,8 @@ function useFocusTrap(
   active: boolean,
   initial: 'first' | 'last' = 'first',
   explicitTrigger?: HTMLElement | null,
-  mayFocus?: () => boolean
+  mayFocus?: () => boolean,
+  deferRestore?: (restore: () => void) => void
 ) {
   const trigger = useRef<HTMLElement | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: ref contents are read live during the trap, not captured as deps
@@ -186,16 +187,14 @@ function useFocusTrap(
       // row, a closed menu). The real failure this bounds: focus() on a
       // control inside the still-exiting, still-inert sheet region silently
       // no-ops, so a fixed rAF count can be exhausted before the exit ends
-      // and focus strands on BODY. A cold mount is the other window: the
-      // host's view state may not have landed when the first sheet closes,
-      // so canFocus() reads false and a one-shot restore dies immediately.
-      // Retry on a timer until focus actually lands, the user has already
-      // moved it, or ~800ms passes - well past the 200ms exit plus inert
-      // teardown on a slow frame, and past the late view delivery on a cold
-      // copy. A hidden copy burns its 800ms harmlessly: it never focuses.
-      // Each attempt re-resolves the fallback so an anchor on an exiting
-      // Push sheet is skipped once it detaches.
-      const deadline = Date.now() + 800
+      // and focus strands on BODY. Retry on a timer until focus actually
+      // lands, the user has already moved it, or ~800ms passes - well past
+      // the 200ms exit plus inert teardown on a slow frame. A copy that is
+      // not live (folded, or a cold mount still waiting on its first view
+      // delivery) never runs the poll: it parks the restore on the app's
+      // live-activation signal instead. Each attempt re-resolves the
+      // fallback so an anchor on an exiting Push sheet is skipped once it
+      // detaches.
       // The exiting layer is our sheet's dialog plus its scrim sibling:
       // focus sitting on either dies with the unmount, so it counts as
       // stranded rather than user-owned, and neither may serve as the
@@ -204,13 +203,19 @@ function useFocusTrap(
       const prev = layerDialog?.previousElementSibling
       const layerScrim = prev instanceof HTMLElement && prev.getAttribute('aria-label') === 'Close' ? prev : null
       const inLayer = (el: Element | null) => !!el && (layerDialog?.contains(el) === true || el === layerScrim)
+      let deadline = Date.now() + 800
       const restore = () => {
-        // Not yet the live copy? Keep waiting inside the deadline: a cold
-        // mount can deliver `os.view` after the first close, and returning
-        // here would strand focus on BODY forever. A genuinely hidden copy
-        // simply retries until the deadline - it never calls focus().
+        // Not yet the live copy? Park the restore on the app's live-
+        // activation signal instead of polling a hidden frame: no timers
+        // run while hidden, and the intent fires once when (and only when)
+        // this copy turns live - the cold-mount window lands there too,
+        // since a first close on a copy whose view has not arrived is
+        // indistinguishable from a folded one.
         if (!canFocus()) {
-          if (Date.now() < deadline) setTimeout(restore, 60)
+          deferRestore?.(() => {
+            deadline = Date.now() + 800
+            setTimeout(restore, 0)
+          })
           return
         }
         const at = document.activeElement
@@ -255,6 +260,7 @@ function DestructiveSheet({
   onClose,
   restoreTo,
   mayFocus,
+  deferRestore,
   xstyle,
   children
 }: {
@@ -263,11 +269,12 @@ function DestructiveSheet({
   onClose: () => void
   restoreTo?: HTMLElement | null
   mayFocus?: () => boolean
+  deferRestore?: (restore: () => void) => void
   xstyle?: stylex.StyleXStyles
   children: React.ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
-  useFocusTrap(box, open, 'first', restoreTo, mayFocus)
+  useFocusTrap(box, open, 'first', restoreTo, mayFocus, deferRestore)
   useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
   return (
     <Sheet open={open} onClose={onClose} aria-label={label} xstyle={xstyle}>
@@ -1315,6 +1322,28 @@ function TripPlanner() {
   // so unlike the rAF-batched `view` render prop this never lags a fold.
   const liveVis = useCallback(() => os.view.visible && os.view.active, [])
 
+  // Sheet-close focus restores never poll a hidden copy: the trap parks the
+  // restore here, and it runs once when this copy turns live - still only if
+  // it is the newest parked intent (a later sheet lifecycle overwrites the
+  // slot) and focus is still stranded inside the restore itself.
+  const deferredRestore = useRef<(() => void) | null>(null)
+  const deferRestore = useCallback((restore: () => void) => {
+    deferredRestore.current = restore
+  }, [])
+  useEffect(() => {
+    // os.onView, not the `vis` render prop: the prop is rAF-batched and can
+    // sit stale-true on a folded copy, so it never flips on activation. The
+    // subscription callback still reaches this copy on activation - once it
+    // is live again its frames run - and under synchronous view delivery it
+    // arrives with the event itself.
+    return os.onView((v) => {
+      if (!v.visible || !v.active) return
+      const restore = deferredRestore.current
+      deferredRestore.current = null
+      restore?.()
+    })
+  }, [])
+
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
 
   const prefs = useMemo(() => {
@@ -1371,16 +1400,17 @@ function TripPlanner() {
     [session, liveVis]
   )
 
-  /** One storage write per changed trip plus the index; resolves true only
-   * when the port accepted every write in the diff. */
+  /** Persist a library diff in semantic order (commitLibWrites): records
+   * before index before record deletes, repairing already-landed keys when
+   * a reachability write fails, so 'failed' never means half-applied.
+   * Resolves true only when every reachability write landed. */
   const writeLibDiff = useCallback(
-    async (prev: Library, next: Library) => {
-      const prevById = new Map(prev.trips.map((t) => [t.id, t]))
-      const out: Promise<boolean>[] = []
-      for (const id of prev.order) if (!next.order.includes(id)) out.push(storage.del(`trip.${id}`))
-      for (const t of next.trips) if (prevById.get(t.id) !== t) out.push(storage.put(`trip.${t.id}`, serializeTrip(t)))
-      if (next.order.join('') !== prev.order.join('')) out.push(storage.put('index', serializeIndex(next.order)))
-      return (await Promise.all(out)).every(Boolean)
+    (prev: Library, next: Library) => {
+      const prevById = new Map(prev.trips.map((t) => [`trip.${t.id}`, t]))
+      return commitLibWrites(storage, planLibWrites(prev, next), (k) => {
+        const t = prevById.get(k)
+        return t ? serializeTrip(t) : undefined
+      })
     },
     [storage]
   )
@@ -1413,9 +1443,17 @@ function TripPlanner() {
       // `authorized` step is the completion of a mutation the live copy
       // already accepted (a deferred fade commit) - it must finish even
       // if this copy has since folded, or a tapped Delete would vanish.
-      if ((!authorized && !liveVis()) || !storage.readyNow()) return
+      if (!authorized && (!liveVis() || !storage.readyNow())) return
       libWrites.current = libWrites.current
         .then(async () => {
+          // An admitted write can reach this deferred step while the space
+          // is mid-resnapshot: give the outage one bounded beat, then report
+          // an explicit terminal - an accepted intent never vanishes.
+          if (!storage.readyNow()) await new Promise((r) => setTimeout(r, 250))
+          if (!storage.readyNow()) {
+            after?.('failed')
+            return
+          }
           const cur = libNow()
           const next = mutate(cur)
           if (!next || next === cur) {
@@ -1695,7 +1733,14 @@ function TripPlanner() {
   }
 
   const modalOpen = !!draft || !!confirm
-  useFocusTrap(editorBox, !!draft, 'first', draft?.by === ME ? draftTrigger.current : null, () => liveVis())
+  useFocusTrap(
+    editorBox,
+    !!draft,
+    'first',
+    draft?.by === ME ? draftTrigger.current : null,
+    () => liveVis(),
+    deferRestore
+  )
   useEffect(() => (draft ? pushEscape(() => setDraft(null)) : undefined), [draft, setDraft])
   useEffect(() => (menuOpen ? pushEscape(() => setMenuOpen(false)) : undefined), [menuOpen])
 
@@ -2229,6 +2274,7 @@ function TripPlanner() {
             onClose={closeConfirm}
             restoreTo={confirm?.by === ME ? confirmTrigger.current : null}
             mayFocus={() => liveVis()}
+            deferRestore={deferRestore}
             xstyle={styles.sheetCard}
           >
             {viewConfirm && (

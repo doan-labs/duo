@@ -671,6 +671,31 @@ export function readIndex(v: unknown): string[] {
 
 export const serializeIndex = (order: string[]) => JSON.stringify({ v: 1, order })
 
+export type LibWrite = { kind: 'put' | 'del'; key: string; value?: string }
+
+/**
+ * Ordered storage writes for a library diff. The index is the authoritative
+ * reachability switch, so the sequence is deliberate rather than parallel:
+ * 1. created or changed records first - an index written after them can
+ *    never reference a missing record, and a rejected record write aborts
+ *    the diff before the index moves;
+ * 2. the index put - the single write that flips create, delete and reorder
+ *    reachability atomically at the platform level;
+ * 3. removed records last - by then the index no longer points at them, so
+ *    a rejected cleanup leaves an orphan (retryable garbage) instead of a
+ *    delete half-applied.
+ */
+export function planLibWrites(prev: Library, next: Library): LibWrite[] {
+  const prevById = new Map(prev.trips.map((t) => [t.id, t]))
+  const out: LibWrite[] = []
+  for (const t of next.trips)
+    if (prevById.get(t.id) !== t) out.push({ kind: 'put', key: `trip.${t.id}`, value: serializeTrip(t) })
+  if (next.order.join('|') !== prev.order.join('|'))
+    out.push({ kind: 'put', key: 'index', value: serializeIndex(next.order) })
+  for (const id of prev.order) if (!next.order.includes(id)) out.push({ kind: 'del', key: `trip.${id}` })
+  return out
+}
+
 /** Assemble a library from the raw key set (index + every `trip.` record). */
 export function assembleLibrary(index: string | null, records: Map<string, string>): Library {
   const lib = newLibrary()

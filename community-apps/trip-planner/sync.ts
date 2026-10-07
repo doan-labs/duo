@@ -86,3 +86,85 @@ export class WriteQueue {
     return Promise.all([...this.live]).then((rs) => rs.every(Boolean))
   }
 }
+
+/**
+ * A minimal boolean storage adapter - the exact surface `commitLibWrites`
+ * needs from useSpace. Resolves false when the port rejects; may throw.
+ */
+export type LibStore = {
+  put: (k: string, v: string) => Promise<boolean>
+  del: (k: string) => Promise<boolean>
+}
+
+const beat = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** Try once, wait, try once more. Resolves false only when both attempts fail. */
+async function attempt(op: () => Promise<boolean>): Promise<boolean> {
+  try {
+    if (await op()) return true
+  } catch {
+    // rejected by the port - fall through to the retry
+  }
+  await beat(120)
+  try {
+    return await op()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Persist one library mutation against a boolean storage adapter in
+ * semantic order, from `planLibWrites`:
+ *
+ * - Changed records land BEFORE the index, so the index can never be made
+ *   to reference a record that is not stored (a dangling reachable ref).
+ * - The index lands BEFORE record deletes, so a deletion is authoritative
+ *   once the index commits; surviving records are cleanup, not truth.
+ * - A rejected reachability write repairs the keys this diff already
+ *   landed - re-putting each record's previous value, or deleting a record
+ *   that did not exist before (nothing can reference it yet) - then
+ *   resolves false. 'failed' therefore never means half-applied.
+ * - Record deletes run afterwards as retried best-effort cleanup (three
+ *   bounded attempts). A permanent failure leaves an orphan record, which
+ *   resurfaces through `assembleLibrary` on next load - recoverable data,
+ *   never a wrong index.
+ *
+ * Resolves true only when every reachability write landed.
+ */
+export async function commitLibWrites(
+  io: LibStore,
+  plan: { kind: 'put' | 'del'; key: string; value?: string }[],
+  prevValues: (key: string) => string | undefined
+): Promise<boolean> {
+  const cleanup: string[] = []
+  const applied: { key: string; value?: string }[] = []
+  for (const w of plan) {
+    if (w.kind === 'del') {
+      cleanup.push(w.key)
+      continue
+    }
+    if (!(await attempt(() => io.put(w.key, w.value ?? '')))) {
+      for (const a of applied) {
+        const old = prevValues(a.key)
+        if (old !== undefined) await attempt(() => io.put(a.key, old))
+        else await attempt(() => io.del(a.key))
+      }
+      return false
+    }
+    applied.push(w)
+  }
+  for (const key of cleanup) {
+    void (async () => {
+      for (const delay of [0, 250, 2000]) {
+        if (delay) await beat(delay)
+        try {
+          if (await io.del(key)) return
+        } catch {
+          // rejected by the port - next attempt
+        }
+      }
+    })()
+  }
+  return true
+}
