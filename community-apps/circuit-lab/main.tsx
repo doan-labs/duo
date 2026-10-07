@@ -1238,10 +1238,12 @@ function CircuitLab() {
     setConfirmDelete(null)
     const el = returnFocus.current
     returnFocus.current = null
-    if (el instanceof HTMLElement) {
+    // Only the live copy may move focus: a deferred rAF restore on the hidden
+    // display would steal it from whichever copy the user is actually on.
+    if (el instanceof HTMLElement && viewActiveRef.current) {
       let tries = 0
       const restore = () => {
-        if (!el.isConnected) return
+        if (!el.isConnected || !viewActiveRef.current) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
