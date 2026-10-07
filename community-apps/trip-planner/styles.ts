@@ -134,7 +134,7 @@ export const styles = stylex.create({
     cursor: 'pointer',
     flexShrink: 0,
     transitionProperty: 'background-color, color',
-    transitionDuration: '.18s'
+    transitionDuration: { default: '.18s', [reduce]: '0s' }
   },
   // Selected chip: surface card on the gray track (the segmented control
   // contract) - white-on-accent small text could not hold 4.5:1.
@@ -264,7 +264,7 @@ export const styles = stylex.create({
     cursor: 'pointer',
     // Reorder FLIP: main.tsx sets transform inline during the move.
     transitionProperty: 'transform, box-shadow',
-    transitionDuration: '.26s',
+    transitionDuration: { default: '.26s', [reduce]: '0s' },
     transitionTimingFunction: easing.spring
   },
   tlTitle: {
@@ -350,7 +350,7 @@ export const styles = stylex.create({
     borderRadius: radius.pill,
     backgroundColor: colors.green,
     transitionProperty: 'width',
-    transitionDuration: '.3s',
+    transitionDuration: { default: '.3s', [reduce]: '0s' },
     transitionTimingFunction: easing.out
   }),
   packList: {
@@ -394,11 +394,14 @@ export const styles = stylex.create({
   },
   grow: { flexGrow: 1, minWidth: 0 },
   // -- travel -----------------------------------------------------------------------
+  // The Travel/Pack bodies pad horizontally so rows keep a real space.lg
+  // margin off the viewport edge; section titles align with the card edge.
+  tabPad: { paddingRight: space.lg, paddingBottom: space.xxl, paddingLeft: space.lg },
   sectionTitle: {
     paddingTop: space.md,
-    paddingRight: space.lg,
+    paddingRight: 0,
     paddingBottom: space.xs,
-    paddingLeft: space.lg,
+    paddingLeft: 0,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     fontWeight: weight.semibold,

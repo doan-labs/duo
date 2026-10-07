@@ -862,7 +862,7 @@ function TravelTab({
   onDelStay: (s: Stay) => void
 }) {
   return (
-    <div>
+    <div {...stylex.props(styles.tabPad)}>
       <div {...stylex.props(styles.sectionTitle)}>Getting there</div>
       {trip.legs.length === 0 ? (
         <Placeholder>
@@ -1236,8 +1236,10 @@ function TripPlanner() {
   const draft = useMemo(() => parseDraft(session.get('draft')), [session])
   const undo = useMemo(() => parseUndo(session.get('undo')), [session])
   const confirm = useMemo(() => parseConfirm(session.get('confirm')), [session])
-  const viewDraft = useHeld(draft)
-  const viewConfirm = useHeld(confirm)
+  // Held snapshots exist only for the visible copy's sheet exits - a hidden
+  // copy keeps held null, so no exit timers ever arm on it.
+  const viewDraft = useHeld(vis ? draft : null)
+  const viewConfirm = useHeld(vis ? confirm : null)
 
   // Finite removal feedback: ids marked leaving render a short fade before
   // the delete write lands. libRef keeps the deferred write on latest state.
