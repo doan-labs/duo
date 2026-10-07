@@ -17,7 +17,7 @@
  *   enqueued write as committed.
  */
 
-import { isTombValue } from './trips'
+import { TOMB_VALUE } from './trips'
 
 export type PendingMap = Map<string, (string | null)[]>
 
@@ -92,14 +92,18 @@ export class WriteQueue {
 /**
  * A minimal boolean storage adapter - the exact surface `commitLibWrites`
  * needs from useSpace. Resolves false when the port rejects; may throw.
+ * There is deliberately no `del`: `trip.<id>` records are never deleted,
+ * only overwritten or tombed, so no finite post-commit cleanup can race a
+ * newer same-id incarnation (a verify-read + delete pair is not atomic on
+ * this port and a late-arriving peer write would be erased by old work).
  */
 export type LibStore = {
   put: (k: string, v: string) => Promise<boolean>
-  del: (k: string) => Promise<boolean>
   /** Authoritative read of the stored value - a real storage read, not the
-   * optimistic mirror. Repair and tomb reclamation verify write ownership
-   * through it: without it an unreadable key degrades the outcome to
-   * 'partial' or leaves tomb debris instead of risking a live record. */
+   * optimistic mirror. Repair verifies write ownership through it: an
+   * unreadable key degrades the outcome to 'partial' instead of risking a
+   * live record. The verify->put gap is inherent LWW on this port; it is
+   * bounded to this commit's in-flight window, never post-commit. */
   get?: (k: string) => Promise<string | null>
 }
 
@@ -143,19 +147,19 @@ async function attempt(op: () => Promise<boolean>): Promise<boolean> {
  *   landed, in reverse and only while this commit still owns each slot
  *   (verified by an authoritative read): a foreign value that landed in
  *   between is peer data and is left alone, which downgrades the outcome
- *   to 'partial' rather than silently half-applying.
- * - `del` writes are tomb reclamation, deferred until after acknowledgment
- *   and retried boundedly. Each attempt re-reads the authoritative value
- *   and deletes only while the record is still a tomb (or already gone):
- *   a live record means a restore, recreate or peer write owns the key,
- *   so this old generation must not erase it. Tomb debris left behind is
- *   permanently unreachable - `assembleLibrary` never recovers it.
+ *   to 'partial' rather than silently half-applying. A record the commit
+ *   created and must roll back is TOMBED, not deleted - the marker leaves
+ *   it permanently unreachable without ever issuing a delete.
+ * - Nothing is written after the commit returns: there is no deferred
+ *   cleanup to be poisoned by a stale read or a peer that lands between a
+ *   snapshot and a delete. The tomb stays - bounded debris, never
+ *   resurrected, never erased by old work.
  *
  * Resolves 'applied' only when every reachability write landed.
  */
 export async function commitLibWrites(
   io: LibStore,
-  plan: { kind: 'put' | 'tomb' | 'del'; key: string; value?: string }[],
+  plan: { kind: 'put' | 'tomb'; key: string; value?: string }[],
   prevValues: (key: string) => string | undefined
 ): Promise<CommitOutcome> {
   // Authoritative read for repair/reclamation guards. {ok:false} on a
@@ -169,13 +173,8 @@ export async function commitLibWrites(
       return { ok: false }
     }
   }
-  const cleanup: string[] = []
   const applied: { key: string; value?: string }[] = []
   for (const w of plan) {
-    if (w.kind === 'del') {
-      cleanup.push(w.key)
-      continue
-    }
     if (await attempt(() => io.put(w.key, w.value ?? ''))) {
       applied.push(w)
       continue
@@ -191,29 +190,17 @@ export async function commitLibWrites(
       const old = prevValues(a.key)
       const cur = await read(a.key)
       if (cur.ok && cur.value === (a.value ?? '')) {
-        const ok = old !== undefined ? await attempt(() => io.put(a.key, old)) : await attempt(() => io.del(a.key))
+        // Roll back to the pre-write value; a record this commit created is
+        // tombed rather than deleted so the repair itself can never race a
+        // same-id incarnation that lands later.
+        const ok =
+          old !== undefined ? await attempt(() => io.put(a.key, old)) : await attempt(() => io.put(a.key, TOMB_VALUE))
         if (!ok) repaired = false
       } else if (!cur.ok || cur.value !== (old ?? null)) {
         repaired = false
       }
     }
     return repaired ? 'failed' : 'partial'
-  }
-  for (const key of cleanup) {
-    void (async () => {
-      for (const delay of [0, 250, 2000]) {
-        if (delay) await beat(delay)
-        const cur = await read(key)
-        if (!cur.ok) continue
-        // Live value: a restore/recreate/peer owns the key now - stop.
-        if (cur.value !== null && !isTombValue(cur.value)) return
-        try {
-          if (await io.del(key)) return
-        } catch {
-          // rejected by the port - next attempt
-        }
-      }
-    })()
   }
   return 'applied'
 }

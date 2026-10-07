@@ -1437,23 +1437,19 @@ function TripPlanner() {
   )
 
   /** Persist a library diff in semantic order (commitLibWrites): records
-   * before index before tomb markers before guarded cleanup deletes,
-   * repairing already-landed keys when a reachability write fails.
+   * before index before tomb markers, which are retained (records are never
+   * deleted), repairing already-landed keys when a reachability write fails.
    * 'applied' is a durable commit, 'failed' a verified rollback, and
    * 'partial' an honestly-reported incomplete repair - never half-applied
    * under a clean label. */
   const writeLibDiff = useCallback(
     (prev: Library, next: Library) => {
       const prevById = new Map(prev.trips.map((t) => [`trip.${t.id}`, t]))
-      return commitLibWrites(
-        { put: storage.put, del: storage.del, get: storage.getLive },
-        planLibWrites(prev, next),
-        (k) => {
-          if (k === 'index') return serializeIndex(prev.order)
-          const t = prevById.get(k)
-          return t ? serializeTrip(t) : undefined
-        }
-      )
+      return commitLibWrites({ put: storage.put, get: storage.getLive }, planLibWrites(prev, next), (k) => {
+        if (k === 'index') return serializeIndex(prev.order)
+        const t = prevById.get(k)
+        return t ? serializeTrip(t) : undefined
+      })
     },
     [storage]
   )
