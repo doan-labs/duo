@@ -5,6 +5,7 @@ import {
   fonts,
   glass,
   leading,
+  motion,
   radius,
   shadow,
   space,
@@ -383,7 +384,11 @@ export const styles = stylex.create({
     gap: space.sm,
     width: '268px',
     flexShrink: 0,
-    alignSelf: 'stretch',
+    // The rail can outgrow the display (a finished match adds the result
+    // card), so it scrolls inside itself rather than losing cards.
+    maxHeight: '100%',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
     minHeight: 0
   },
   card: {
@@ -459,9 +464,12 @@ export const styles = stylex.create({
   // UIKit's shared.press always applies its :active scale and has no
   // reduced-motion override; under reduced motion this swaps the shrink for
   // an instant brightness nudge so presses still register without movement.
+  // StyleX merges transform at the property level, so the normal-motion
+  // :active scale must be redeclared here - the reduce rule only wins inside
+  // its media query, and presses keep their shrink under normal motion.
   pressCalm: {
-    transform: { [reduce]: { ':active': 'none' } },
-    filter: { [reduce]: { ':active': 'brightness(1.3)' } }
+    transform: { default: 'scale(1)', ':active': { default: motion.press, [reduce]: 'none' } },
+    filter: { ':active': { [reduce]: 'brightness(1.3)' } }
   },
   resultTitle: {
     fontFamily: fonts.rounded,
