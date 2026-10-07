@@ -807,10 +807,9 @@ renderer.setAnimationLoop((now) => {
   outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
   coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) : 0)
   // The clip is what keeps the inner panel inside the half that is still
-  // facing you, so it holds all the way to closed — and once it covers the
-  // whole display the panel shows nothing, so it is culled: a composited
-  // element clipped at its edge can raster a mirrored copy of itself at the
-  // boundary, and the fully clipped copy also took taps meant for the page.
+  // facing you, so it holds all the way to closed - and once it covers the
+  // whole display the panel shows nothing, so it is culled rather than kept
+  // as a zero-pixel composited layer for the rest of the travel.
   body.worldToLocal(camLocal.copy(camera.position))
   const clip = foldClip(bend.value, camLocal.x, camLocal.z, INNER_PANEL, HINGE_Z)
   innerLive.visible = facing(innerLive) && (angle > FLAT || app) && !panelGone(clip)

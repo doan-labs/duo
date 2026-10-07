@@ -15,16 +15,16 @@ export type FoldPanel = {
  * How much of the inner display the fold has taken, as a fraction of its width
  * from the moving half's free edge: 0 flat, 1 gone. The edge is rotated about
  * the hinge exactly as shaders/fold.ts does it, then projected back onto the
- * flat glass plane along the ray it leaves the eye on — the trip the screen
+ * flat glass plane along the ray it leaves the eye on - the trip the screen
  * shader makes per fragment. So the folded display shows the flat picture cut
  * off at this edge, and a flat live panel clipped here is that picture, live:
  * the app keeps running while the phone folds instead of being swapped for a
  * baked home screen.
  *
- * `camX`/`camZ` are the camera's position in body space — from the camera's own
+ * `camX`/`camZ` are the camera's position in body space - from the camera's own
  * position rather than the shader's fixed eye. The two agree at the default
  * pose, and away from it this one still cuts the panel exactly where the
- * folding half hides it — which is what keeps a panel with no depth test from
+ * folding half hides it - which is what keeps a panel with no depth test from
  * spilling over the fold.
  */
 export const foldClip = (bend: number, camX: number, camZ: number, panel: FoldPanel, hingeZ: number) => {
@@ -34,7 +34,7 @@ export const foldClip = (bend: number, camX: number, camZ: number, panel: FoldPa
   const edge = c * panel.x + s * dz
   const depth = -s * panel.x + c * dz + hingeZ
   // Eye on the fold plane: the projection degenerates and `t` is infinite, so
-  // take the limit — the edge covers the glass in the direction it leans.
+  // take the limit - the edge covers the glass in the direction it leans.
   if (depth === camZ) return edge >= camX ? 1 : 0
   const t = (panel.z - camZ) / (depth - camZ)
   if (t <= 0) return 1
