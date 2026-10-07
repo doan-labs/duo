@@ -7,14 +7,21 @@ import {
   addNode,
   bulbsOf,
   type CircuitNode,
+  cleanDoc,
   commitMove,
   connect,
   type Doc,
+  decideRemote,
   evaluate,
   latestDoc,
+  layoutPads,
+  MAX_SWITCHES,
+  type Mirror,
   moveNode,
   type NodeKind,
   newDoc,
+  PIN_PAD,
+  PIN_PAD_ZOOM,
   parseLibrary,
   parseMirror,
   reaches,
@@ -24,6 +31,7 @@ import {
   serializeLibrary,
   serializeMirror,
   switchesOf,
+  TABLE_INPUT_LIMIT,
   toggleSwitch,
   truthTable,
   undo,
@@ -490,6 +498,186 @@ check('every challenge can be solved', () => {
     const run = challengeRun(d, ch)
     ok(run.solved, `${ch.id} solution rejected; first mismatch row ${run.mismatch}`)
   }
+})
+
+// ---- integrity: ports, caps, merge ----------------------------------------
+
+check('connect requires an integer in-range port', () => {
+  const a = mk('switch', 'A')
+  const g = mk('and')
+  const d = mkDoc([a, g])
+  eq(connect(d, a.id, g.id, 0.5).error, 'bad-pin')
+  eq(connect(d, a.id, g.id, 0.9).error, 'bad-pin')
+  eq(connect(d, a.id, g.id, 2.1).error, 'bad-pin')
+  eq(connect(d, a.id, g.id, 0).error, undefined)
+})
+
+check('stored docs drop fractional ports and overflow kinds', () => {
+  const nodes: Record<string, unknown> = {}
+  for (let i = 0; i < 30; i++) nodes[`s${i}`] = { kind: 'switch', x: 0, y: i * 60, on: i % 2 === 0, label: `S${i}` }
+  for (let i = 0; i < 25; i++) nodes[`g${i}`] = { kind: 'and', x: 300, y: i * 60, on: false, label: '' }
+  nodes.out = { kind: 'bulb', x: 600, y: 0, on: false, label: 'OUT' }
+  const cleaned = cleanDoc({
+    id: 't',
+    name: 'tampered',
+    nodes,
+    wires: {
+      w1: { from: 's0', to: 'out', port: 0.9 },
+      w2: { from: 's1', to: 'out', port: 0 }
+    },
+    view: { x: 0, y: 0, zoom: 1 },
+    past: [],
+    future: [],
+    challenge: null,
+    updated: 1
+  })!
+  ok(cleaned !== null, 'doc normalizes instead of failing')
+  eq(switchesOf(cleaned).length, MAX_SWITCHES)
+  eq(cleaned.nodes.out !== undefined, true)
+  // The fractional port is dropped, not floored: s0 does not secretly wire.
+  eq(Object.keys(cleaned.wires).length, 1)
+  eq(Object.values(cleaned.wires)[0]!.from, 's1')
+})
+
+check('truthTable is bounded on oversized input sets', () => {
+  const sw = Array.from({ length: 30 }, (_, i) => mk('switch', `S${i}`, false, 0, i * 60))
+  const d = mkDoc(sw)
+  const start = Date.now()
+  const t = truthTable(d)
+  const ms = Date.now() - start
+  ok(ms < 1000, `truth table took ${ms}ms`)
+  eq(t.ins.length, TABLE_INPUT_LIMIT)
+  eq(t.rows.length, 1 << TABLE_INPUT_LIMIT)
+  eq(t.truncated, true)
+})
+
+check('mirror ops round-trip through the wire format', () => {
+  const a = mk('switch', 'A')
+  const d = mkDoc([a])
+  const m = parseMirror(serializeMirror('peer', d, null, 4, { t: 'toggle', id: a.id }))!
+  eq(m!.base, 4)
+  eq(m!.op, { t: 'toggle', id: a.id })
+  // Absent, junk and unsafe ops all hydrate to null, never to a crash.
+  eq(parseMirror(serializeMirror('peer', d, null, 4))!.op, null)
+  const bad = JSON.parse(serializeMirror('peer', d, null, 4, { t: 'wire', from: a.id, to: a.id, port: 0 }))
+  bad.op = { t: 'wire', from: 'x', to: 'y', port: 1.5 }
+  eq(parseMirror(JSON.stringify(bad))!.op, null)
+})
+
+// A pair of copies plus a session counter drives the merge protocol through
+// the same decideRemote the app calls - not a reimplementation of it. Revs
+// are explicit in each test so stale bases and positions are unambiguous.
+const mkPair = () => {
+  let rev = 0
+  const side = (name: string) => ({ name, doc: null as Doc | null, docRev: 0, answered: -1 })
+  const a = side('A')
+  const b = side('B')
+  const deliver = (to: typeof a, m: Mirror, mRev: number): void => {
+    rev = Math.max(rev, mRev)
+    const d = decideRemote(to.doc, to.docRev, m, mRev, to.answered)
+    if (d.kind === 'drop') return
+    if (d.kind === 'adopt') {
+      to.doc = d.doc
+      to.docRev = mRev
+      return
+    }
+    to.answered = mRev
+    to.doc = d.doc
+    rev++
+    deliver(to === a ? b : a, { by: to.name, sel: null, doc: d.doc, base: d.base, op: null }, rev)
+    to.docRev = rev
+  }
+  return {
+    a,
+    b,
+    deliver,
+    get rev() {
+      return rev
+    }
+  }
+}
+
+check('a stale fork merges its op instead of overwriting or winning', () => {
+  const a = mk('switch', 'A')
+  const b = mk('switch', 'B')
+  const g = mk('and')
+  const shared = { ...mkDoc([a, b, g]), id: 'shared' }
+  const pair = mkPair()
+  pair.a.doc = shared
+  pair.b.doc = shared
+  // A's toggle write lands at rev5 and both copies hold it.
+  const aDoc = toggleSwitch(shared, a.id)
+  pair.a.doc = aDoc
+  pair.a.docRev = 5
+  pair.deliver(pair.b, { by: 'A', sel: null, doc: aDoc, base: 4, op: { t: 'toggle', id: a.id } }, 5)
+  eq(pair.b.docRev, 5)
+  eq(pair.b.doc!.nodes[a.id]!.on, true)
+  // B's copy was frozen at rev4 and writes anyway: the stale fork.
+  pair.b.doc = shared
+  pair.b.docRev = 4
+  const bDoc = connect(shared, b.id, g.id, 0).doc
+  const stale: Mirror = {
+    by: 'B',
+    sel: null,
+    doc: bDoc,
+    base: 4,
+    op: { t: 'wire', from: b.id, to: g.id, port: 0 }
+  }
+  pair.deliver(pair.a, stale, 6)
+  // A healed, and the merged doc carries both edits.
+  ok(wireAt(pair.a.doc!, g.id, 0) !== undefined, 'B wire merged onto A doc')
+  eq(pair.a.doc!.nodes[a.id]!.on, true)
+  // B adopted the heal - converged on the union, nothing lost.
+  eq(pair.b.doc!.nodes[a.id]!.on, true)
+  ok(wireAt(pair.b.doc!, g.id, 0) !== undefined, 'B adopted the merged doc')
+  ok(pair.b.docRev >= 6, `B docRev ${pair.b.docRev} did not move past the heal`)
+})
+
+check('a stale unmergeable op converges without losing the holder doc', () => {
+  const a = mk('switch', 'A')
+  const shared = { ...mkDoc([a]), id: 'shared2' }
+  const pair = mkPair()
+  pair.a.doc = shared
+  pair.b.doc = shared
+  pair.a.docRev = 5
+  pair.b.docRev = 4
+  // B's stale write is an undo - a whole-doc op that cannot merge.
+  const staleDoc = { ...undo({ ...shared, past: [{ nodes: {}, wires: {} }] }), id: 'shared2' }
+  const stale: Mirror = { by: 'B', sel: null, doc: staleDoc, base: 4, op: { t: 'doc' } }
+  pair.deliver(pair.a, stale, 6)
+  eq(pair.a.doc!.nodes[a.id]!.id, a.id)
+  eq(pair.b.doc!.nodes[a.id]!.id, a.id)
+  // A replay of the same stale write is dropped, not re-healed.
+  const before = pair.rev
+  pair.deliver(pair.a, stale, 6)
+  eq(pair.rev, before)
+})
+
+check('pin pads repel to unambiguous 44pt targets', () => {
+  // Two input pins 18.67 world units apart, seen at cover zoom ~0.47:
+  // pads must end up at least PIN_PAD apart centre-to-centre.
+  const pins = [
+    { key: 'a:0', x: 0, y: 0 },
+    { key: 'a:1', x: 0, y: 18.67 }
+  ]
+  const pads = layoutPads(pins, 0.47)
+  const dScreen = Math.hypot((pads[0]!.x - pads[1]!.x) * 0.47, (pads[0]!.y - pads[1]!.y) * 0.47)
+  ok(dScreen >= PIN_PAD - 0.5, `pads only ${dScreen.toFixed(1)}px apart`)
+  ok(!pads[0]!.off && !pads[1]!.off, 'both pads active at cover zoom')
+  // Well separated pins keep their true positions.
+  const wide = layoutPads(
+    [
+      { key: 'a', x: 0, y: 0 },
+      { key: 'b', x: 500, y: 0 }
+    ],
+    1
+  )
+  eq([wide[0]!.x, wide[0]!.y], [0, 0])
+  // Deep in the weeds every pad is off - dots render instead.
+  ok(
+    layoutPads(pins, 0.3).every((p) => p.off),
+    'pads off below PIN_PAD_ZOOM'
+  )
 })
 
 check('the welcome circuit is a working half adder', () => {

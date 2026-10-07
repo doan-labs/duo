@@ -14,20 +14,26 @@ voltage, current, timing hazards or any real hardware.
 
 - **Cover (closed):** the canvas fills the display and a bottom tray switches
   between Build (parts palette plus the selected part's controls), Table (the
-  live truth table), Tasks (challenges) and Saved (the circuit library).
+  live truth table), Tasks (challenges) and Saved (the circuit library). A
+  chevron grows the tray when the inspector or the table needs room.
 - **Unfolded:** the canvas grows beside a floating panel holding the palette,
   the inspector, and a segmented Table/Tasks/Saved switch.
 - Both layouts recompose at any width, and the open circuit follows the fold
-  through `os.session` so a mid-build fold never splits the work.
+  through `os.session` so a mid-build fold never splits the work. Node cards
+  counter-scale so labels stay readable at fit zoom, and first sight opens at
+  a legible zoom rather than a whole-graph overview.
 
 ## Controls
 
 - **Tap a switch** to flip it. Its wires light amber and the HIGH state
   ripples downstream, gate by gate.
 - **Tap an output pin** (right side of a part) to arm a wire - it follows
-  your finger - then **tap an input pin** on another part to land it.
-  Candidate pins glow, pins that would close a loop refuse. Landing on a
-  wired pin replaces its wire.
+  your finger - then **tap an input pin** on another part to land it. Every
+  pin is a constant 44pt target at any zoom; crowded pads repel so no tap is
+  ambiguous, and zoomed-out pins still land through the inspector.
+- The inspector also wires without the canvas: pick a part, tap **Wire from
+  output**, then pick the target and tap its input row. Tapping a fed input
+  row disconnects it.
 - **Tap a part or a wire** to select it; the inspector renames parts and
   deletes the selection (with a second-tap confirm for parts, a sheet for
   whole circuits). **Tap bare canvas** to clear the selection.
@@ -36,7 +42,10 @@ voltage, current, timing hazards or any real hardware.
 - **Undo/redo** buttons or Cmd/Ctrl+Z, +Shift/Ctrl+Y: every structural edit
   is one step. Switch positions are play state and stay put through undo.
 - **Keyboard:** Delete/Backspace removes the selection; Escape drops an armed
-  wire or closes a sheet, otherwise goes home.
+  wire or closes a sheet, otherwise goes home. Tab through pins and Enter to
+  arm and land wires without a pointer.
+- Only the visible copy takes input: gestures, keys and armed intent on the
+  folded display cancel instead of mutating, so a fold mid-gesture is safe.
 
 ## Rules of the board
 
@@ -60,4 +69,6 @@ live and banks a solve stamp the moment every row agrees.
 Circuits, solve stamps and the mute switch persist in `os.storage`; the open
 circuit, selection and undo history ride `os.session` across the fold and
 survive app relaunch through the library. Both displays run their own copy of
-the app - whichever copy is visible owns sound and the marching signal dashes.
+the app - whichever copy is visible owns sound, the marching signal dashes
+and every input. If an occluded copy still writes from an older revision, the
+holder merges that write's edit into the newer doc instead of losing it.

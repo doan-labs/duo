@@ -13,7 +13,7 @@ import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Sheet, Sym, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { type Cue, cue } from './audio.ts'
@@ -25,6 +25,7 @@ import {
   commitMove,
   connect,
   type Doc,
+  decideRemote,
   displayName,
   docBounds,
   evaluate,
@@ -34,6 +35,7 @@ import {
   inputCount,
   type Library,
   latestDoc,
+  layoutPads,
   MAX_BULBS,
   MAX_GATES,
   MAX_SWITCHES,
@@ -43,7 +45,9 @@ import {
   newDoc,
   nextBulbLabel,
   nextSwitchLabel,
+  type Op,
   outPin,
+  PIN_PAD_ZOOM,
   parseLibrary,
   parseMirror,
   reaches,
@@ -164,6 +168,7 @@ function CircuitLab() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [arming, setArming] = useState<string | null>(null)
   const [gesturing, setGesturing] = useState(false)
+  const [trayOpen, setTrayOpen] = useState(false)
   const [note, setNote] = useState('')
   const canvasRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag | null>(null)
@@ -172,12 +177,12 @@ function CircuitLab() {
   // Fork accounting: docRev is the session revision of the write that
   // produced the doc content this copy holds - its freshness watermark. A
   // mirror for the same doc declaring an older base forked from state that
-  // predates our doc's producing write, so it must not overwrite it.
-  // healedFor caps the corrective republish at once per content revision so
-  // two disagreeing copies cannot bounce heals forever.
+  // predates our doc's producing write, so it is merged in and healed over
+  // rather than overwriting. answeredRev is the newest remote revision this
+  // copy already healed, so a replayed stale write is never answered twice.
   const docRev = useRef(0)
   const lastWritten = useRef<string | null>(null)
-  const healedFor = useRef(-1)
+  const answeredRev = useRef(-1)
   const bootRef = useRef<() => void>(() => {})
   const returnFocus = useRef<HTMLElement | null>(null)
   // The doc id this copy framed for its own canvas: one stored view cannot
@@ -190,16 +195,18 @@ function CircuitLab() {
   selRef.current = sel
   const armedRef = useRef(armed)
   armedRef.current = armed
-  const viewActiveRef = useRef(view.active)
-  viewActiveRef.current = view.active
 
   const library = parseLibrary(stored.value)
   const muted = library.muted
   const mutedRef = useRef(muted)
   mutedRef.current = muted
 
+  // view.active from useDisplay is batched through rAF, so on the occluded
+  // copy it can lag a fold behind; the SDK's os.view property updates on the
+  // message itself. Anything that mutates, plays, focuses or moves input must
+  // read os.view at execution time - the hidden copy then always refuses.
   const play = (c: Cue) => {
-    if (mutedRef.current || !viewActiveRef.current) return
+    if (mutedRef.current || !os.view.active) return
     cue(c)
   }
 
@@ -220,14 +227,17 @@ function CircuitLab() {
 
   // Every structural edit lands in both places: the session key carries the
   // live circuit across the fold, the library key keeps it durable. A drag
-  // writes once on release - the moving frames only repaint locally.
-  const publish = (next: Doc, nextSel?: Sel) => {
+  // writes once on release - the moving frames only repaint locally. `op`
+  // describes the edit so a holder can merge this write if it was a stale
+  // fork. Gated on the live view: nothing on the hidden copy may write.
+  const publish = (next: Doc, nextSel?: Sel, op: Op | null = null) => {
+    if (!os.view.active) return
     const selNow = pruneSel(nextSel === undefined ? selRef.current : nextSel, next)
     setDoc(next)
     docRef.current = next
     if (selNow !== selRef.current) setSel(selNow)
     saveDoc(next)
-    const raw = serializeMirror(ME, next, selNow, docRev.current)
+    const raw = serializeMirror(ME, next, selNow, docRev.current, op)
     lastWritten.current = raw
     void os.session.set(DOC_KEY, raw).catch(() => {})
   }
@@ -236,6 +246,7 @@ function CircuitLab() {
   // the library for relaunch but never touch the session mirror, where a
   // mechanical write could fork the doc against the peer's real edits.
   const publishView = (next: Doc) => {
+    if (!os.view.active) return
     setDoc(next)
     docRef.current = next
     saveDoc(next)
@@ -245,12 +256,14 @@ function CircuitLab() {
   // Its echo is untracked on purpose: a selection write carries no new doc
   // content, so it must not advance docRev and make real peer edits read stale.
   const publishSel = (s: Sel) => {
+    if (!os.view.active) return
     const current = docRef.current
     setSel(s)
-    if (current) void os.session.set(DOC_KEY, serializeMirror(ME, current, s, docRev.current)).catch(() => {})
+    if (current) void os.session.set(DOC_KEY, serializeMirror(ME, current, s, docRev.current, null)).catch(() => {})
   }
 
   const setMuted = (next: boolean) => {
+    if (!os.view.active) return
     enqueue(async () => {
       const lib = await readLib()
       stored.set(serializeLibrary({ ...lib, muted: next }))
@@ -284,8 +297,8 @@ function CircuitLab() {
           else {
             // Our own write's echo confirms the session position the doc we
             // display now holds - the freshness watermark the fork gate needs.
-            // Heal writes are not tracked here: a republish confirms position
-            // but must not advance it, or stale heals would inflate into wins.
+            // Heals count too: a heal is the producing write of the merged doc
+            // this copy then holds, so it must advance docRev like an edit.
             if (e.v === lastWritten.current) docRev.current = e.rev
             if (e.k === DOC_KEY) setLive({ raw: e.v, rev: e.rev, known: true })
           }
@@ -304,18 +317,26 @@ function CircuitLab() {
 
   // A copy frozen on the occluded display can miss session events; on becoming
   // the visible display again, re-snapshot so its doc can never lag the peer.
-  // A visibility flip also drops any armed delete - destructive intent never
-  // survives a fold.
+  // A visibility flip also drops every armed intent - a wire half-drawn or a
+  // delete half-confirmed never survives the fold either way around.
   useEffect(() => {
     setArming(null)
+    setArmed(null)
+    setGhost(null)
+    dragRef.current = null
+    setGesturing(false)
     if (view.active) void bootRef.current()
   }, [view.active])
 
   // Even while visible, an armed confirm is a momentary intent - disarm after
-  // a few idle seconds. Only ever ticks on the visible copy.
+  // a few idle seconds. The tick re-reads os.view at fire time: the effect's
+  // view.active is rAF-batched, so a copy folded mid-window keeps its arming
+  // frozen until the flip effect above clears it on return.
   useEffect(() => {
     if (arming === null || !view.active) return
-    const t = setTimeout(() => setArming(null), 6000)
+    const t = setTimeout(() => {
+      if (os.view.active) setArming(null)
+    }, 6000)
     return () => clearTimeout(t)
   }, [arming, view.active])
 
@@ -330,8 +351,22 @@ function CircuitLab() {
     listRef.current?.scrollIntoView({ block: 'start' })
   }, [panelTab])
 
-  // A write this copy did not make is the new settled circuit; adopting it is
-  // what carries the build across the fold. Own writes are already on screen.
+  // On the cover, selecting a part scrolls the inspector into view inside the
+  // tray so the Selected section is never stranded below the Parts grid.
+  const inspectorRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (wide || coverTab !== 'Build' || sel === null) return
+    inspectorRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [sel, wide, coverTab])
+
+  // A write this copy did not make is the settled circuit to converge on;
+  // adopting it is what carries the build across the fold. Own writes are
+  // already on screen. When a foreign write is a stale fork - its base predates
+  // the write that produced our doc - decideRemote answers by republishing our
+  // doc with the stale write's op merged in, at a base past the stale write's
+  // own revision, so the writer reads the heal as fresher than itself and
+  // adopts. Every mergeable edit is preserved on both sides; nothing escalates
+  // base counters to duel for the top slot.
   useEffect(() => {
     if (!live.known) return
     const raw = live.raw
@@ -349,7 +384,7 @@ function CircuitLab() {
           docRef.current = open
           setSel(null)
           stored.set(serializeLibrary(withDoc(lib, open)))
-          const raw = serializeMirror(ME, open, null, docRev.current)
+          const raw = serializeMirror(ME, open, null, docRev.current, { t: 'doc' })
           lastWritten.current = raw
           await os.session.set(DOC_KEY, raw).catch(() => {})
         })
@@ -359,19 +394,23 @@ function CircuitLab() {
     const next = parseMirror(raw)
     if (!next || next.by === ME) return
     const cur = docRef.current
-    if (cur && next.doc.id === cur.id && next.base < docRev.current) {
-      // Stale fork: the writer derived its doc from before the write that
-      // produced ours. Refuse the overwrite and republish ours once so the
-      // session converges on the fresher lineage instead of splitting.
-      if (healedFor.current !== docRev.current) {
-        healedFor.current = docRev.current
-        const heal = serializeMirror(ME, cur, selRef.current, docRev.current)
-        void os.session.set(DOC_KEY, heal).catch(() => {})
-        enqueue(async () => {
-          const lib = await readLib()
-          stored.set(serializeLibrary(withDoc(lib, cur)))
-        })
-      }
+    const decision = decideRemote(cur, docRev.current, next, live.rev, answeredRev.current)
+    if (decision.kind === 'drop') return
+    if (decision.kind === 'heal') {
+      // Stale fork answered: our doc plus whatever the stale write changed,
+      // republished so the session's last value carries the union of edits.
+      answeredRev.current = live.rev
+      const merged = decision.doc
+      const selNow = pruneSel(selRef.current, merged)
+      setDoc(merged)
+      docRef.current = merged
+      enqueue(async () => {
+        const lib = await readLib()
+        stored.set(serializeLibrary(withDoc(lib, merged)))
+      })
+      const heal = serializeMirror(ME, merged, selNow, decision.base, null)
+      lastWritten.current = heal
+      void os.session.set(DOC_KEY, heal).catch(() => {})
       return
     }
     docRev.current = live.rev
@@ -407,14 +446,17 @@ function CircuitLab() {
       if (!box.width || !box.height) return
       framedDoc.current = doc.id
       const b = docBounds(doc)
-      const zoom = Math.min(1.15, Math.min((box.width - 40) / b.w, (box.height - 40) / b.h))
+      // First sight floors at a legible zoom rather than a whole-graph
+      // overview: 55% still shows the whole I/O row of any scaffold while the
+      // counter-scaled bodies keep labels readable. Fit-all stays a tap away.
+      const zoom = Math.min(1.15, Math.max(0.55, Math.min((box.width - 40) / b.w, (box.height - 40) / b.h)))
       const next = setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom, framed: true })
       setDoc(next)
       enqueue(async () => {
         const lib = await readLib()
         stored.set(serializeLibrary(withDoc(lib, next)))
       })
-      void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
+      if (os.view.active) void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
     }
     const f = requestAnimationFrame(fitLocal)
     const ro = new ResizeObserver(() => {
@@ -436,7 +478,7 @@ function CircuitLab() {
   const solvedNow = run?.solved === true && !!activeChallenge && !library.solved.includes(activeChallenge.id)
   useEffect(() => {
     if (!solvedNow || !doc || !activeChallenge) return
-    if (!mutedRef.current && viewActiveRef.current) cue('solve')
+    if (!mutedRef.current && os.view.active) cue('solve')
     setNote(`${activeChallenge.title} solved`)
     enqueue(async () => {
       const lib = await readLib()
@@ -459,7 +501,10 @@ function CircuitLab() {
   // focus and captures Escape, so no shortcut may act behind it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (confirmDelete !== null) return
+      // Keyboard input on the hidden copy - only reachable through forced
+      // dispatch - must not mutate; os.view is the live read, not the batched
+      // hook value.
+      if (confirmDelete !== null || !os.view.active) return
       const current = docRef.current
       if (!current) return
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -469,10 +514,10 @@ function CircuitLab() {
         event.preventDefault()
         if (s.kind === 'wire') {
           play('cut')
-          publish(removeWire(current, s.id), null)
+          publish(removeWire(current, s.id), null, { t: 'drop-wire', id: s.id })
         } else if (canDelete(current, s.id)) {
           play('cut')
-          publish(removeNode(current, s.id), null)
+          publish(removeNode(current, s.id), null, { t: 'drop-node', id: s.id })
         }
         return
       }
@@ -482,7 +527,7 @@ function CircuitLab() {
         if (next !== current) {
           play('undo')
           setArmed(null)
-          publish(next)
+          publish(next, undefined, { t: 'doc' })
         }
       } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
         event.preventDefault()
@@ -490,7 +535,7 @@ function CircuitLab() {
         if (next !== current) {
           play('undo')
           setArmed(null)
-          publish(next)
+          publish(next, undefined, { t: 'doc' })
         }
       }
     }
@@ -523,7 +568,8 @@ function CircuitLab() {
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return
+    // Forced input delivered to the folded copy must not start a gesture.
+    if (e.button !== 0 || !os.view.active) return
     const target = e.target as HTMLElement
     // Pins answer their own taps; dock and tray controls are not the board.
     if (target.closest('[data-pin]')) return
@@ -547,6 +593,7 @@ function CircuitLab() {
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!os.view.active) return
     if (armedRef.current) setGhost(toWorld(e.clientX, e.clientY))
     const d = dragRef.current
     const now = docRef.current
@@ -566,10 +613,20 @@ function CircuitLab() {
     dragRef.current = null
     setGesturing(false)
     const now = docRef.current
-    if (!now) return
+    if (!now || !os.view.active) return
     if (d.moved) {
       if (d.kind === 'node' && d.id) {
-        publish(commitMove(now, d.id, d.ox, d.oy), { kind: 'node', id: d.id })
+        const moved = commitMove(now, d.id, d.ox, d.oy)
+        publish(
+          moved,
+          { kind: 'node', id: d.id },
+          {
+            t: 'move',
+            id: d.id,
+            x: moved.nodes[d.id]!.x,
+            y: moved.nodes[d.id]!.y
+          }
+        )
       } else publishView(now)
       return
     }
@@ -581,7 +638,7 @@ function CircuitLab() {
       if (!n) return
       if (n.kind === 'switch') {
         play('flip')
-        publish(toggleSwitch(now, d.id), { kind: 'node', id: d.id })
+        publish(toggleSwitch(now, d.id), { kind: 'node', id: d.id }, { t: 'toggle', id: d.id })
       } else {
         publishSel({ kind: 'node', id: d.id })
       }
@@ -594,6 +651,7 @@ function CircuitLab() {
   // ---- wiring --------------------------------------------------------------
 
   const armOut = (nodeId: string) => {
+    if (!os.view.active) return
     play(armed === nodeId ? 'cut' : 'arm')
     setArmed(armed === nodeId ? null : nodeId)
     publishSel(null)
@@ -601,7 +659,7 @@ function CircuitLab() {
 
   const tapIn = (nodeId: string, port: number) => {
     const now = docRef.current
-    if (!now) return
+    if (!now || !os.view.active) return
     if (armedRef.current) {
       const from = armedRef.current
       const result = connect(now, from, nodeId, port)
@@ -613,9 +671,9 @@ function CircuitLab() {
       play('connect')
       setArmed(null)
       setNote(
-        `Wired ${displayName(now.nodes[from]!)} to ${displayName(now.nodes[nodeId]!)}${inputCount(now.nodes[nodeId]!.kind) > 1 ? ` ${PIN_A[port]}` : ''}`
+        `Wired ${now.nodes[from] ? displayName(now.nodes[from]!) : 'pin'} to ${displayName(now.nodes[nodeId]!)}${inputCount(now.nodes[nodeId]!.kind) > 1 ? ` ${PIN_A[port]}` : ''}`
       )
-      publish(result.doc, { kind: 'wire', id: result.wire!.id })
+      publish(result.doc, { kind: 'wire', id: result.wire!.id }, { t: 'wire', from, to: nodeId, port })
       return
     }
     // Not armed: tapping a fed pin selects the wire on it, so Disconnect is
@@ -640,6 +698,7 @@ function CircuitLab() {
   const targets = pinTargets(armed)
 
   const addPart = (kind: CircuitNode['kind']) => {
+    if (!os.view.active) return
     const v = doc.view
     // New parts land near the visible centre, columned by role.
     const cx = -v.x / v.zoom
@@ -673,45 +732,55 @@ function CircuitLab() {
       return
     }
     play('place')
-    publish(next, { kind: 'node', id })
+    publish(next, { kind: 'node', id }, { t: 'add', n: next.nodes[id]! })
   }
 
   const dropNode = (id: string) => {
+    if (!os.view.active) return
     if (!canDelete(doc, id)) {
       play('reject')
       setNote('Challenge inputs and bulbs stay put')
       return
     }
     play('cut')
-    publish(removeNode(doc, id), null)
+    publish(removeNode(doc, id), null, { t: 'drop-node', id })
     setArming(null)
   }
 
   const dropWire = (id: string) => {
+    if (!os.view.active) return
     play('cut')
-    publish(removeWire(doc, id), null)
+    publish(removeWire(doc, id), null, { t: 'drop-wire', id })
   }
 
   const doUndo = () => {
+    if (!os.view.active) return
     const next = undo(doc)
     if (next === doc) return
     play('undo')
     setArmed(null)
-    publish(next)
+    publish(next, undefined, { t: 'doc' })
   }
   const doRedo = () => {
+    if (!os.view.active) return
     const next = redo(doc)
     if (next === doc) return
     play('undo')
     setArmed(null)
-    publish(next)
+    publish(next, undefined, { t: 'doc' })
   }
 
-  const zoomBy = (factor: number) => publishView(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
+  const zoomBy = (factor: number) => {
+    if (!os.view.active) return
+    publishView(setView(doc, { ...doc.view, zoom: doc.view.zoom * factor }))
+  }
   const fit = () => {
+    if (!os.view.active) return
     const box = canvasRef.current?.getBoundingClientRect()
     if (!box?.width || !box.height) return
     const b = docBounds(doc)
+    // Explicit Fit keeps the true fit-all: even a wide circuit packs in whole
+    // below the legibility floor first sight enforces.
     const zoom = Math.min(1.15, Math.min((box.width - 40) / b.w, (box.height - 40) / b.h))
     publishView(setView(doc, { x: -b.cx * zoom, y: -b.cy * zoom, zoom }))
   }
@@ -719,6 +788,7 @@ function CircuitLab() {
   // ---- library & challenges --------------------------------------------------
 
   const openCircuit = (id: string) => {
+    if (!os.view.active) return
     setArming(null)
     if (id === doc.id) return
     // Read the library fresh: the KV mirror can lag while this copy is
@@ -727,19 +797,21 @@ function CircuitLab() {
       const next = (await readLib()).circuits[id]
       if (next && next.id !== docRef.current?.id) {
         framedDoc.current = null
-        publish(next, null)
+        publish(next, null, { t: 'doc' })
       }
     })()
   }
   const makeCircuit = () => {
+    if (!os.view.active) return
     setArming(null)
     void (async () => {
       const next = newDoc(`Circuit ${Object.keys((await readLib()).circuits).length + 1}`)
       framedDoc.current = null
-      publish(next, null)
+      publish(next, null, { t: 'doc' })
     })()
   }
   const startChallenge = (id: string) => {
+    if (!os.view.active) return
     setArming(null)
     void (async () => {
       const lib = await readLib()
@@ -747,10 +819,11 @@ function CircuitLab() {
       const ch = challengeById(id)
       if (!ch) return
       framedDoc.current = null
-      publish(existing ?? scaffold(ch), null)
+      publish(existing ?? scaffold(ch), null, { t: 'doc' })
     })()
   }
   const dropCircuit = (id: string) => {
+    if (!os.view.active) return
     setConfirmDelete(null)
     enqueue(async () => {
       const lib = withoutDoc(await readLib(), id)
@@ -760,72 +833,22 @@ function CircuitLab() {
         framedDoc.current = null
         setDoc(open)
         setSel(null)
-        void os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
+        void os.session.set(DOC_KEY, serializeMirror(ME, open, null, 0, { t: 'doc' })).catch(() => {})
       }
     })
   }
 
   // ---- pieces ---------------------------------------------------------------
 
+  // Nodes counter-scale against the canvas zoom so first-sight and Fit zooms
+  // never shrink a chip below a legible floor; pins ride a separate layer so
+  // their 44pt targets stay constant at every zoom.
+  const nodeScale = Math.min(1.6, Math.max(1, 0.8 / doc.view.zoom))
+  const zoom = doc.view.zoom
+
   const nodeView = (n: CircuitNode) => {
     const dead = ev.dead.has(n.id)
     const on = ev.value[n.id] === true
-    const pins: ReactNode[] = []
-    if (hasOutput(n.kind)) {
-      pins.push(
-        <button
-          key="out"
-          type="button"
-          data-pin="out"
-          aria-label={`Output of ${displayName(n)}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            armOut(n.id)
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          {...stylex.props(
-            styles.pin,
-            // Pin coords relative to the node's own box origin (top-left).
-            styles.pinAt(NODE_W[n.kind], NODE_H / 2),
-            shared.press
-          )}
-        >
-          <i
-            aria-hidden="true"
-            {...stylex.props(styles.pinDot, on ? styles.pinHigh : styles.pinLow, armed === n.id && styles.pinArmed)}
-          />
-        </button>
-      )
-    }
-    for (let port = 0; port < inputCount(n.kind); port++) {
-      const p = inPin(n, port)
-      const key = `${n.id}:${port}`
-      const fed = wireAt(doc, n.id, port)
-      pins.push(
-        <button
-          key={`in${port}`}
-          type="button"
-          data-pin="in"
-          aria-label={`Input ${inputCount(n.kind) > 1 ? `${PIN_A[port]} ` : ''}of ${displayName(n)}${fed ? ', wired' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            tapIn(n.id, port)
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          {...stylex.props(styles.pin, styles.pinAt(0, p.y - n.y + NODE_H / 2), shared.press)}
-        >
-          <i
-            aria-hidden="true"
-            {...stylex.props(
-              styles.pinDot,
-              fed && ev.value[fed.from] ? styles.pinHigh : styles.pinLow,
-              armed !== null && targets.ok.has(key) && styles.pinCandidate,
-              armed !== null && targets.bad.has(key) && styles.pinBad
-            )}
-          />
-        </button>
-      )
-    }
     return (
       <div key={n.id} {...stylex.props(styles.nodeBox, styles.nodeAt(n.x, n.y, NODE_W[n.kind], NODE_H))}>
         <button
@@ -835,6 +858,7 @@ function CircuitLab() {
           aria-pressed={sel?.kind === 'node' && sel.id === n.id}
           {...stylex.props(
             styles.body,
+            styles.bodyScale(nodeScale),
             sel?.kind === 'node' && sel.id === n.id && styles.bodySel,
             dead && styles.bodyDead
           )}
@@ -856,12 +880,24 @@ function CircuitLab() {
               <span {...stylex.props(styles.gateLabel)}>{n.label || KIND_LABEL[n.kind]}</span>
             </>
           )}
+          {n.kind !== 'switch' && n.label ? <span {...stylex.props(styles.nodeLabel)}>{n.label}</span> : null}
         </button>
-        {pins}
-        {n.kind !== 'switch' && n.label ? <span {...stylex.props(styles.nodeLabel)}>{n.label}</span> : null}
       </div>
     )
   }
+
+  // Every pin as a constant 44pt pad plus a pip pinned to the true wire
+  // endpoint. layoutPads repels colliding pads in screen space; a pad that
+  // still collides (or sits under PIN_PAD_ZOOM) renders its dot only, and the
+  // inspector's wire rows stay the always-reachable path onto that pin.
+  const pinDefs = Object.values(doc.nodes).flatMap((n) => {
+    const defs: { key: string; node: CircuitNode; port: number; x: number; y: number }[] = []
+    if (hasOutput(n.kind)) defs.push({ key: `${n.id}:out`, node: n, port: -1, ...outPin(n) })
+    for (let port = 0; port < inputCount(n.kind); port++)
+      defs.push({ key: `${n.id}:${port}`, node: n, port, ...inPin(n, port) })
+    return defs
+  })
+  const pads = zoom >= PIN_PAD_ZOOM ? layoutPads(pinDefs, zoom) : []
 
   const canvas = (
     <div
@@ -924,6 +960,53 @@ function CircuitLab() {
             : null}
         </svg>
         {Object.values(doc.nodes).map(nodeView)}
+        {zoom >= PIN_PAD_ZOOM ? (
+          <>
+            {pinDefs.map((def) => {
+              const fed = def.port >= 0 ? wireAt(doc, def.node.id, def.port) : undefined
+              const on =
+                def.port < 0 ? ev.value[def.node.id] === true : fed !== undefined && ev.value[fed.from] === true
+              return (
+                <i
+                  key={`d${def.key}`}
+                  aria-hidden="true"
+                  {...stylex.props(
+                    styles.pinDot,
+                    styles.pinDotAt(def.x, def.y, zoom),
+                    on ? styles.pinHigh : styles.pinLow,
+                    def.port < 0 && armed === def.node.id && styles.pinArmed,
+                    def.port >= 0 && armed !== null && targets.ok.has(def.key) && styles.pinCandidate,
+                    def.port >= 0 && armed !== null && targets.bad.has(def.key) && styles.pinBad
+                  )}
+                />
+              )
+            })}
+            {pads.map((pad, i) => {
+              if (pad.off) return null
+              const def = pinDefs[i]!
+              const n = def.node
+              return (
+                <button
+                  key={pad.key}
+                  type="button"
+                  data-pin={def.port < 0 ? 'out' : 'in'}
+                  aria-label={
+                    def.port < 0
+                      ? `Output of ${displayName(n)}`
+                      : `Input ${inputCount(n.kind) > 1 ? `${PIN_A[def.port]} ` : ''}of ${displayName(n)}${wireAt(doc, n.id, def.port) ? ', wired' : ''}`
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (def.port < 0) armOut(n.id)
+                    else tapIn(n.id, def.port)
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  {...stylex.props(styles.pinPad, styles.pinPadAt(pad.x, pad.y, zoom))}
+                />
+              )
+            })}
+          </>
+        ) : null}
       </div>
       {activeChallenge ? (
         <div {...stylex.props(styles.banner, run?.solved && styles.bannerSolved)} role="status">
@@ -933,40 +1016,42 @@ function CircuitLab() {
           <span {...stylex.props(styles.bannerText)}>{activeChallenge.brief}</span>
         </div>
       ) : null}
-      <div role="toolbar" aria-label="Zoom" {...stylex.props(styles.zoomDock)}>
-        <button
-          type="button"
-          aria-label="Zoom out"
-          onClick={() => zoomBy(1 / 1.25)}
-          {...stylex.props(styles.iconBtn, shared.press)}
-        >
-          <Sym name="minus" size={13} />
-        </button>
-        <button
-          type="button"
-          aria-label="Reset zoom"
-          onClick={() => publish(setView(doc, { ...doc.view, zoom: 1 }))}
-          {...stylex.props(styles.zoomPct, shared.press)}
-        >
-          {Math.round(doc.view.zoom * 100)}%
-        </button>
-        <button
-          type="button"
-          aria-label="Zoom in"
-          onClick={() => zoomBy(1.25)}
-          {...stylex.props(styles.iconBtn, shared.press)}
-        >
-          <Sym name="plus" size={13} />
-        </button>
-        <button type="button" aria-label="Fit circuit" onClick={fit} {...stylex.props(styles.iconBtn, shared.press)}>
-          <Sym name="expand" size={13} />
-        </button>
+      <div {...stylex.props(styles.chromeBottom)}>
+        <span {...stylex.props(styles.hint)}>
+          {armed
+            ? 'Tap an input pin to land the wire'
+            : 'Tap a switch to flip it. Tap an output pin, then an input, to wire.'}
+        </span>
+        <div role="toolbar" aria-label="Zoom" {...stylex.props(styles.zoomDock)}>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={() => zoomBy(1 / 1.25)}
+            {...stylex.props(styles.iconBtn, shared.press)}
+          >
+            <Sym name="minus" size={13} />
+          </button>
+          <button
+            type="button"
+            aria-label="Reset zoom"
+            onClick={() => publishView(setView(doc, { ...doc.view, zoom: 1 }))}
+            {...stylex.props(styles.zoomPct, shared.press)}
+          >
+            {Math.round(doc.view.zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={() => zoomBy(1.25)}
+            {...stylex.props(styles.iconBtn, shared.press)}
+          >
+            <Sym name="plus" size={13} />
+          </button>
+          <button type="button" aria-label="Fit circuit" onClick={fit} {...stylex.props(styles.iconBtn, shared.press)}>
+            <Sym name="expand" size={13} />
+          </button>
+        </div>
       </div>
-      <span {...stylex.props(styles.hint)}>
-        {armed
-          ? 'Tap an input pin to land the wire'
-          : 'Tap a switch to flip it. Tap an output pin, then an input, to wire.'}
-      </span>
     </div>
   )
 
@@ -1013,7 +1098,7 @@ function CircuitLab() {
   )
 
   const inspector = (
-    <div {...stylex.props(styles.section)}>
+    <div ref={inspectorRef} {...stylex.props(styles.section)}>
       <span {...stylex.props(styles.fieldLabel)}>Selected</span>
       {selNode ? (
         <>
@@ -1022,14 +1107,64 @@ function CircuitLab() {
               aria-label="Part label"
               value={selNode.label}
               placeholder={KIND_LABEL[selNode.kind]}
-              onChange={(e) => publish(setLabel(doc, selNode.id, e.target.value))}
+              onChange={(e) =>
+                publish(setLabel(doc, selNode.id, e.target.value), undefined, {
+                  t: 'label',
+                  id: selNode.id,
+                  label: e.target.value
+                })
+              }
             />
           </div>
+          {inputCount(selNode.kind) > 0 ? (
+            <div role="group" aria-label={`Inputs of ${displayName(selNode)}`} {...stylex.props(styles.list)}>
+              {Array.from({ length: inputCount(selNode.kind) }, (_, port) => {
+                const fed = wireAt(doc, selNode.id, port)
+                const land = armed !== null && armed !== selNode.id && !reaches(doc, selNode.id, armed)
+                const pinName = inputCount(selNode.kind) > 1 ? `Input ${PIN_A[port]}` : 'Input'
+                return (
+                  <button
+                    key={pinName}
+                    type="button"
+                    disabled={!fed && !land}
+                    aria-label={
+                      land
+                        ? `Wire ${armed && doc.nodes[armed] ? displayName(doc.nodes[armed]!) : ''} to ${pinName.toLowerCase()} of ${displayName(selNode)}`
+                        : fed
+                          ? `Disconnect ${pinName.toLowerCase()} of ${displayName(selNode)}`
+                          : `${pinName} of ${displayName(selNode)} is open`
+                    }
+                    onClick={() => (fed && !land ? dropWire(fed.id) : tapIn(selNode.id, port))}
+                    {...stylex.props(styles.pinRow, land && styles.pinRowOn, !fed && !land && styles.pinRowDim)}
+                  >
+                    <span {...stylex.props(styles.rowName)}>
+                      {pinName}
+                      {fed && doc.nodes[fed.from] ? ` · from ${displayName(doc.nodes[fed.from]!)}` : ' · open'}
+                    </span>
+                    {land ? <Sym name="plus" size={12} /> : fed ? <Sym name="trash" size={12} /> : null}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
           <div {...stylex.props(styles.rowBtns)}>
+            {hasOutput(selNode.kind) ? (
+              <button
+                type="button"
+                aria-pressed={armed === selNode.id}
+                onClick={() => armOut(selNode.id)}
+                {...stylex.props(styles.btn, armed === selNode.id && styles.btnAccent, shared.press)}
+              >
+                <Sym name="plus" size={12} />
+                {armed === selNode.id ? 'Cancel wire' : 'Wire from output'}
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={!canDelete(doc, selNode.id)}
-              onClick={() => (arming === selNode.id ? dropNode(selNode.id) : setArming(selNode.id))}
+              onClick={() =>
+                os.view.active ? (arming === selNode.id ? dropNode(selNode.id) : setArming(selNode.id)) : undefined
+              }
               {...stylex.props(styles.btn, arming === selNode.id && styles.btnWarn, shared.press)}
             >
               <Sym name="trash" size={12} />
@@ -1101,6 +1236,9 @@ function CircuitLab() {
         </table>
       </div>
       {!outs.length ? <span {...stylex.props(styles.meta)}>Add a bulb to read the table.</span> : null}
+      {table.truncated ? (
+        <span {...stylex.props(styles.meta)}>This doc carries more than 8 switches; the table shows the first 8.</span>
+      ) : null}
     </div>
   )
 
@@ -1155,6 +1293,7 @@ function CircuitLab() {
                 type="button"
                 aria-label={`Delete ${c.name}`}
                 onClick={(e) => {
+                  if (!os.view.active) return
                   returnFocus.current = e.currentTarget
                   setConfirmDelete(c.id)
                 }}
@@ -1194,7 +1333,9 @@ function CircuitLab() {
           type="button"
           role="radio"
           aria-checked={o === value}
-          onClick={() => onChange(o)}
+          onClick={() => {
+            if (os.view.active) onChange(o)
+          }}
           {...stylex.props(styles.segBtn, o === value && styles.segBtnOn, shared.press)}
         >
           {o}
@@ -1267,15 +1408,16 @@ function CircuitLab() {
     }
   }
   const closeConfirm = () => {
+    if (!os.view.active) return
     setConfirmDelete(null)
     const el = returnFocus.current
     returnFocus.current = null
     // Only the live copy may move focus: a deferred rAF restore on the hidden
     // display would steal it from whichever copy the user is actually on.
-    if (el instanceof HTMLElement && viewActiveRef.current) {
+    if (el instanceof HTMLElement) {
       let tries = 0
       const restore = () => {
-        if (!el.isConnected || !viewActiveRef.current) return
+        if (!el.isConnected || !os.view.active) return
         el.focus()
         if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
       }
@@ -1315,8 +1457,19 @@ function CircuitLab() {
         ) : (
           <section {...stylex.props(styles.stage, styles.stageCover)}>
             {canvas}
-            <div {...stylex.props(styles.tray)}>
-              {seg(coverTab, setCoverTab, ['Build', 'Table', 'Tasks', 'Saved'] as Tab[])}
+            <div {...stylex.props(styles.tray, trayOpen && styles.trayOpen)}>
+              <div {...stylex.props(styles.trayTop)}>
+                {seg(coverTab, setCoverTab, ['Build', 'Table', 'Tasks', 'Saved'] as Tab[])}
+                <button
+                  type="button"
+                  aria-label={trayOpen ? 'Shrink panel' : 'Grow panel'}
+                  aria-expanded={trayOpen}
+                  onClick={() => os.view.active && setTrayOpen(!trayOpen)}
+                  {...stylex.props(styles.iconBtn, styles.iconBtnLg, shared.press)}
+                >
+                  <Sym name={trayOpen ? 'down' : 'up'} size={14} />
+                </button>
+              </div>
               <div {...stylex.props(styles.trayBody)}>{tabContent(coverTab)}</div>
             </div>
           </section>
@@ -1362,7 +1515,9 @@ let cancelTop: (() => void) | null = null
 addEventListener(
   'keydown',
   (event) => {
-    if (event.key !== 'Escape' || !cancelTop) return
+    // os.view is read live: an Escape forced into the folded copy falls
+    // through to the SDK's own forwarder instead of cancelling phantom state.
+    if (event.key !== 'Escape' || !cancelTop || !os.view.active) return
     event.preventDefault()
     event.stopImmediatePropagation()
     cancelTop()

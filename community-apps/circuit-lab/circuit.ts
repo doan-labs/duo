@@ -47,12 +47,30 @@ export type Library = {
 }
 export type Sel = { kind: 'node' | 'wire'; id: string } | null
 /**
+ * The content-changing edit a session write carried, described opaquely so a
+ * holder can replay it on top of its own doc when the write proves to be a
+ * stale fork. Whole-document changes (open, undo, challenge start) carry
+ * `{ t: 'doc' }` and never merge; a stale write without an op merges nothing.
+ */
+export type Op =
+  | { t: 'add'; n: CircuitNode }
+  | { t: 'drop-node'; id: string }
+  | { t: 'move'; id: string; x: number; y: number }
+  | { t: 'wire'; from: string; to: string; port: number }
+  | { t: 'drop-wire'; id: string }
+  | { t: 'toggle'; id: string }
+  | { t: 'label'; id: string; label: string }
+  | { t: 'name'; name: string }
+  | { t: 'doc' }
+/**
  * `base` is the session revision the doc was derived from: the fork detector.
  * A copy that writes without having seen the peer's last write carries a base
- * older than the holder's own, so the holder can refuse the stale fork instead
- * of letting last-writer-wins erase a fresher edit.
+ * older than the holder's own, so the holder refuses the overwrite and heals
+ * the session instead of letting last-writer-wins erase a fresher edit. `op`
+ * is what the stale write changed, replayed onto the holder's doc so the
+ * merged result keeps every accepted edit from both sides.
  */
-export type Mirror = { by: string; sel: Sel; doc: Doc; base: number }
+export type Mirror = { by: string; sel: Sel; doc: Doc; base: number; op: Op | null }
 
 export const MAX_SWITCHES = 4
 export const MAX_BULBS = 4
@@ -61,6 +79,12 @@ export const MAX_WIRES = 64
 export const HISTORY_LIMIT = 48
 export const GRID = 22
 export const WORLD_LIMIT = 2400
+/** Truth tables never enumerate past this many inputs (256 rows) whatever the stored doc claims. */
+export const TABLE_INPUT_LIMIT = 8
+/** Screen-point size of a pin's tap pad: the 44pt primary wiring target. */
+export const PIN_PAD = 44
+/** Below this zoom pads would collide faster than they can repel; pins show as dots only. */
+export const PIN_PAD_ZOOM = 0.45
 const LABEL_LIMIT = 24
 
 /** Footprint per kind, in world units, centred on the node's x/y. */
@@ -277,7 +301,8 @@ export function connect(
 ): { doc: Doc; wire?: Wire; error?: ConnectError; replaced?: Wire } {
   const a = doc.nodes[from]
   const b = doc.nodes[to]
-  if (!a || !b || !hasOutput(a.kind) || port < 0 || port >= inputCount(b.kind)) return { doc, error: 'bad-pin' }
+  if (!a || !b || !hasOutput(a.kind) || !Number.isInteger(port) || port < 0 || port >= inputCount(b.kind))
+    return { doc, error: 'bad-pin' }
   if (from === to) return { doc, error: 'self' }
   const occupied = wireAt(doc, to, port)
   const wires = { ...doc.wires }
@@ -366,12 +391,17 @@ export function evaluate(doc: CircuitState, states?: Record<string, boolean>): E
 // ---- truth table ---------------------------------------------------------
 
 export type TableRow = { ins: boolean[]; outs: boolean[] }
-export type Table = { ins: CircuitNode[]; outs: CircuitNode[]; rows: TableRow[] }
+export type Table = { ins: CircuitNode[]; outs: CircuitNode[]; rows: TableRow[]; truncated: boolean }
 
-/** Enumerates every input combination (2^rows, at most 16 for four switches). */
+/**
+ * Enumerates input combinations (2^rows, at most 16 for the 4-switch limit).
+ * A stored doc that somehow carries more inputs than the build limit is cut to
+ * TABLE_INPUT_LIMIT columns - bounded work, never a hang - and flags the cut.
+ */
 export function truthTable(doc: CircuitState): Table {
-  const ins = switchesOf(doc)
-  const outs = bulbsOf(doc)
+  const allIns = switchesOf(doc)
+  const ins = allIns.slice(0, TABLE_INPUT_LIMIT)
+  const outs = bulbsOf(doc).slice(0, MAX_BULBS)
   const rows: TableRow[] = []
   const count = 1 << ins.length
   for (let mask = 0; mask < count; mask++) {
@@ -382,7 +412,7 @@ export function truthTable(doc: CircuitState): Table {
     const { value } = evaluate(doc, states)
     rows.push({ ins: ins.map((sw) => states[sw.id]!), outs: outs.map((b) => value[b.id] ?? false) })
   }
-  return { ins, outs, rows }
+  return { ins, outs, rows, truncated: allIns.length > ins.length }
 }
 
 // ---- constructors --------------------------------------------------------
@@ -497,14 +527,20 @@ function cleanNode(id: string, v: unknown): CircuitNode | null {
   }
 }
 
-function cleanState(v: unknown, gateBudget = MAX_GATES + MAX_SWITCHES + MAX_BULBS): CircuitState {
+function cleanState(v: unknown): CircuitState {
   const nodes: Record<string, CircuitNode> = {}
   const raw = record(v) && record(v.nodes) ? v.nodes : {}
+  // Per-kind budgets, not one pool: a tampered doc cannot front-load 30
+  // switches to crowd out the gates, or ask the truth table for 2^30 rows.
+  const room = { switch: MAX_SWITCHES, bulb: MAX_BULBS, gate: MAX_GATES }
   for (const [id, nv] of Object.entries(raw)) {
-    if (Object.keys(nodes).length >= gateBudget) break
     if (!/^[\w-]+$/.test(id)) continue
     const n = cleanNode(id, nv)
-    if (n) nodes[id] = n
+    if (!n) continue
+    const bucket = isIo(n.kind) ? n.kind : 'gate'
+    if (room[bucket] <= 0) continue
+    room[bucket]--
+    nodes[id] = n
   }
   const wires: Record<string, Wire> = {}
   const rawW = record(v) && record(v.wires) ? v.wires : {}
@@ -514,8 +550,9 @@ function cleanState(v: unknown, gateBudget = MAX_GATES + MAX_SWITCHES + MAX_BULB
     const from = nodes[wv.from]
     const to = nodes[wv.to]
     if (!from || !to || !hasOutput(from.kind)) continue
-    const port = Math.floor(num(wv.port, -1))
-    if (port < 0 || port >= inputCount(to.kind)) continue
+    // A port is an index, not a fraction: 0.9 reads as an error, not as 0.
+    const port = num(wv.port, -1)
+    if (!Number.isInteger(port) || port < 0 || port >= inputCount(to.kind)) continue
     const pinKey = `${wv.to}:${port}`
     if (usedPins.has(pinKey)) continue
     usedPins.add(pinKey)
@@ -582,6 +619,43 @@ export function serializeLibrary(lib: Library) {
   return JSON.stringify(lib)
 }
 
+function cleanOp(v: unknown): Op | null {
+  if (!record(v) || typeof v.t !== 'string') return null
+  switch (v.t) {
+    case 'add': {
+      const raw = v.n
+      if (!record(raw) || typeof raw.id !== 'string' || !/^[\w-]+$/.test(raw.id)) return null
+      const n = cleanNode(raw.id, raw)
+      return n ? { t: 'add', n } : null
+    }
+    case 'drop-node':
+      return typeof v.id === 'string' ? { t: 'drop-node', id: v.id } : null
+    case 'move':
+      return typeof v.id === 'string' ? { t: 'move', id: v.id, x: num(v.x, 0), y: num(v.y, 0) } : null
+    case 'wire':
+      return typeof v.from === 'string' &&
+        typeof v.to === 'string' &&
+        typeof v.port === 'number' &&
+        Number.isInteger(v.port)
+        ? { t: 'wire', from: v.from, to: v.to, port: v.port }
+        : null
+    case 'drop-wire':
+      return typeof v.id === 'string' ? { t: 'drop-wire', id: v.id } : null
+    case 'toggle':
+      return typeof v.id === 'string' ? { t: 'toggle', id: v.id } : null
+    case 'label':
+      return typeof v.id === 'string' && typeof v.label === 'string'
+        ? { t: 'label', id: v.id, label: v.label.slice(0, LABEL_LIMIT) }
+        : null
+    case 'name':
+      return typeof v.name === 'string' ? { t: 'name', name: v.name.slice(0, 60) } : null
+    case 'doc':
+      return { t: 'doc' }
+    default:
+      return null
+  }
+}
+
 export function parseMirror(raw: string | null): Mirror | null {
   if (!raw) return null
   try {
@@ -592,6 +666,7 @@ export function parseMirror(raw: string | null): Mirror | null {
     // Older payloads without a base read as -1: older than any live rev, so a
     // holder always outranks them.
     const base = num(parsed.base, -1)
+    const op = cleanOp(parsed.op)
     const s = record(parsed.sel) ? parsed.sel : null
     const sel: Sel =
       s && (s.kind === 'node' || s.kind === 'wire') && typeof s.id === 'string'
@@ -603,14 +678,140 @@ export function parseMirror(raw: string | null): Mirror | null {
             ? { kind: 'wire', id: s.id }
             : null
         : null
-    return { by: parsed.by, sel, doc, base }
+    return { by: parsed.by, sel, doc, base, op }
   } catch {
     return null
   }
 }
 
-export function serializeMirror(by: string, doc: Doc, sel: Sel, base = 0) {
-  return JSON.stringify({ by, sel, doc, base } satisfies Mirror)
+export function serializeMirror(by: string, doc: Doc, sel: Sel, base = 0, op: Op | null = null) {
+  return JSON.stringify({ by, sel, doc, base, op } satisfies Mirror)
+}
+
+// ---- merge ---------------------------------------------------------------
+
+/**
+ * Replays a remote write's op onto the holder's doc. Every variant is
+ * content-keyed or idempotent enough to replay once per remote revision; an
+ * op that no longer applies (its node is gone, the pin errored) is a no-op
+ * rather than an error, and `{ t: 'doc' }` - a whole-doc change like undo or
+ * opening another circuit - merges nothing by design.
+ */
+export function applyOp(doc: Doc, op: Op | null): Doc {
+  switch (op?.t) {
+    case 'add':
+      return doc.nodes[op.n.id] ? doc : commit(doc, { nodes: { ...doc.nodes, [op.n.id]: op.n }, wires: doc.wires })
+    case 'drop-node':
+      return removeNode(doc, op.id)
+    case 'move': {
+      const n = doc.nodes[op.id]
+      if (!n) return doc
+      // The merged move keeps an undo step back to where this copy had it.
+      return commitMove(moveNode(doc, op.id, op.x, op.y), op.id, n.x, n.y)
+    }
+    case 'wire': {
+      const r = connect(doc, op.from, op.to, op.port)
+      return r.error ? doc : r.doc
+    }
+    case 'drop-wire':
+      return removeWire(doc, op.id)
+    case 'toggle':
+      return toggleSwitch(doc, op.id)
+    case 'label':
+      return setLabel(doc, op.id, op.label)
+    case 'name':
+      return renameDoc(doc, op.name)
+    default:
+      return doc
+  }
+}
+
+export type RemoteDecision =
+  | { kind: 'adopt'; doc: Doc; sel: Sel }
+  | { kind: 'heal'; doc: Doc; base: number }
+  | { kind: 'drop' }
+
+/**
+ * Fork arbitration for one incoming foreign mirror, pure so it is directly
+ * testable. `curRev` is the session revision of the write that produced this
+ * copy's doc; `answeredRev` is the newest remote revision already healed, so
+ * answering the same stale write twice cannot happen.
+ *
+ * - A write whose base is at least our producing revision has seen everything
+ *   we did: adopt it outright. A different doc id is an open-pointer, same
+ *   rule.
+ * - A write whose base is older forked before our producing write. The holder
+ *   republishes with the stale op merged in, at a base past the stale write's
+ *   own revision, so the stale side reads the heal as fresher than itself and
+ *   adopts - no escalated-base duel, no lost mergeable edit.
+ */
+export function decideRemote(
+  cur: Doc | null,
+  curRev: number,
+  next: Mirror,
+  nextRev: number,
+  answeredRev: number
+): RemoteDecision {
+  if (!cur || next.doc.id !== cur.id) return { kind: 'adopt', doc: next.doc, sel: next.sel }
+  if (next.base >= curRev) return { kind: 'adopt', doc: next.doc, sel: next.sel }
+  if (nextRev <= answeredRev) return { kind: 'drop' }
+  const merged = applyOp(cur, next.op)
+  return { kind: 'heal', doc: merged, base: Math.max(curRev, nextRev) }
+}
+
+// ---- pin hit pads ----------------------------------------------------------
+
+export type Pad = { key: string; x: number; y: number; off: boolean }
+
+/**
+ * Lays out PIN_PAD-screen-point hit pads over world-space pin centres. Pads
+ * that overlap (two input pins sit 18.7 world units apart - under 9 px at
+ * cover zoom) are repelled along the axis of least overlap, capped so a pad
+ * never drifts so far its pin lies outside it. A pad that still collides after
+ * the pass comes back `off`: it renders as a dot only, so no tap ever lands on
+ * an ambiguous boundary, and the inspector's wire rows stay the reachable
+ * path. Below PIN_PAD_ZOOM every pad is off.
+ */
+export function layoutPads(pins: { key: string; x: number; y: number }[], zoom: number): Pad[] {
+  const size = PIN_PAD
+  const maxOff = size * 0.45
+  const pts = pins.map((p) => ({ key: p.key, sx: p.x * zoom, sy: p.y * zoom, ox: 0, oy: 0 }))
+  const eff = (p: (typeof pts)[number]) => ({ x: p.sx + p.ox, y: p.sy + p.oy })
+  for (let it = 0; it < 12; it++) {
+    let moved = false
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const a = pts[i]!
+        const b = pts[j]!
+        const pa = eff(a)
+        const pb = eff(b)
+        const dx = pb.x - pa.x
+        const dy = pb.y - pa.y
+        const ox = size - Math.abs(dx)
+        const oy = size - Math.abs(dy)
+        if (ox <= 0 || oy <= 0) continue
+        moved = true
+        // Push on the axis that resolves fastest: stacked input pins part
+        // vertically, a neighbouring node's pads part sideways.
+        const axis = oy <= ox ? ('y' as const) : ('x' as const)
+        const push = (axis === 'y' ? oy : ox) / 2
+        const dir = axis === 'y' ? (dy >= 0 ? 1 : -1) : dx >= 0 ? 1 : -1
+        if (axis === 'y') {
+          a.oy = clamp(a.oy - dir * push, -maxOff, maxOff)
+          b.oy = clamp(b.oy + dir * push, -maxOff, maxOff)
+        } else {
+          a.ox = clamp(a.ox - dir * push, -maxOff, maxOff)
+          b.ox = clamp(b.ox + dir * push, -maxOff, maxOff)
+        }
+      }
+    }
+    if (!moved) break
+  }
+  return pts.map((p) => {
+    const pos = eff(p)
+    const blocked = pts.some((q) => q !== p && Math.abs(eff(q).x - pos.x) < size && Math.abs(eff(q).y - pos.y) < size)
+    return { key: p.key, x: pos.x / zoom, y: pos.y / zoom, off: blocked || zoom < PIN_PAD_ZOOM }
+  })
 }
 
 export const latestDoc = (lib: Library): Doc | null =>

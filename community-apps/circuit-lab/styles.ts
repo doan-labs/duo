@@ -206,16 +206,16 @@ export const styles = stylex.create({
   bodySel: { outline: `2px solid color-mix(in srgb, ${ACCENT} 85%, transparent)`, outlineOffset: 2 },
   bodyDead: { outline: `2px solid color-mix(in srgb, ${colors.redDark} 75%, transparent)`, outlineOffset: 2 },
   gateLabel: {
-    fontSize: typeScale.caption2,
+    fontSize: typeScale.caption1,
     fontWeight: weight.bold,
-    letterSpacing: tracking.caption2,
+    letterSpacing: tracking.caption1,
     color: app.label2
   },
   nodeLabel: {
     position: 'absolute',
     top: '100%',
     marginTop: space.xxs,
-    fontSize: typeScale.caption2,
+    fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
     color: app.label2,
     whiteSpace: 'nowrap',
@@ -247,9 +247,9 @@ export const styles = stylex.create({
   },
   knobOn: { transform: 'translateX(12px)' },
   switchLetter: {
-    fontSize: typeScale.caption1,
+    fontSize: typeScale.footnote,
     fontWeight: weight.bold,
-    letterSpacing: tracking.caption1,
+    letterSpacing: tracking.footnote,
     fontFamily: fonts.mono
   },
   bulbCircle: {
@@ -265,69 +265,104 @@ export const styles = stylex.create({
   },
   bulbOn: { backgroundColor: HIGH, color: colors.grey6Dark },
   bulbOff: { backgroundColor: `color-mix(in srgb, ${colors.grey5Dark} 85%, transparent)`, color: app.label3 },
-  pin: {
+  // Pin pads: the real wiring target is an invisible square rendered at a
+  // constant 44pt on screen - the element lives in world coordinates with its
+  // box sized 1/zoom, so zoom never shrinks the target. layoutPads repels
+  // colliding pads apart so no tap is ambiguous; hover/focus paint a faint
+  // ring so the zone is discoverable by pointer and keyboard alike.
+  pinPad: {
     position: 'absolute',
-    display: 'grid',
-    placeItems: 'center',
-    // Wide and short: a 26px circle would collide with the neighbouring input
-    // pin on two-input gates (18.7px of spacing), so the target reaches
-    // sideways into open canvas instead of vertically into the other pin.
-    width: 34,
-    height: 18,
     borderWidth: 0,
-    borderRadius: radius.pill,
+    borderRadius: radius.circle,
     padding: 0,
-    backgroundColor: 'transparent',
-    cursor: 'crosshair'
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': `color-mix(in srgb, ${colors.white} 10%, transparent)`,
+      ':active': `color-mix(in srgb, ${colors.white} 16%, transparent)`
+    },
+    cursor: 'crosshair',
+    touchAction: 'none',
+    ':focus-visible': { outline: `2px solid ${ACCENT}`, outlineOffset: 0 }
   },
+  pinPadAt: (x: number, y: number, zoom: number) => ({
+    left: x - 22 / zoom,
+    top: y - 22 / zoom,
+    width: 44 / zoom,
+    height: 44 / zoom
+  }),
+  // The visible pip always sits at the true pin coordinate - pads repel, dots
+  // do not - and is counter-scaled to stay a constant 12px on screen.
   pinDot: {
-    width: 10,
-    height: 10,
+    position: 'absolute',
     borderRadius: radius.circle,
     boxShadow: shadow.rim,
+    pointerEvents: 'none',
     transitionProperty: 'background-color,outline-color',
     transitionDuration: '.22s'
   },
+  pinDotAt: (x: number, y: number, zoom: number) => ({
+    left: x - 6 / zoom,
+    top: y - 6 / zoom,
+    width: 12 / zoom,
+    height: 12 / zoom
+  }),
   pinLow: { backgroundColor: `color-mix(in srgb, ${LOW} 55%, transparent)` },
   pinHigh: { backgroundColor: HIGH },
   pinArmed: { outline: `2px solid ${ACCENT}`, outlineOffset: 2 },
   pinCandidate: { outline: `1.5px dashed color-mix(in srgb, ${ACCENT} 55%, transparent)`, outlineOffset: 2 },
   pinBad: { outline: `1.5px dashed color-mix(in srgb, ${colors.redDark} 60%, transparent)`, outlineOffset: 2 },
-  // left/top, not a transform: shared.press animates transform and would
-  // override a translate() in the same stylex.props call, leaving every pin
-  // parked at the node centre.
-  pinAt: (x: number, y: number) => ({ left: x - 17, top: y - 9 }),
+  // The counter-scale floor: nodes never render smaller than ~80% of their
+  // drawn size, so labels stay legible at cover/inner fit zoom without the
+  // layout changing. Above zoom 1 the scale stays 1; deep zoom-outs clamp.
+  bodyScale: (cs: number) => ({ transform: `scale(${cs})` }),
+  // Canvas chrome is docked in strips that can never overlap: the status
+  // banner owns the whole top inset of the board, the hint and the zoom dock
+  // share one bottom row as flex siblings.
   banner: {
     position: 'absolute',
     top: space.sm,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 2,
+    left: space.sm,
+    right: space.sm,
+    zIndex: 3,
     display: 'flex',
     alignItems: 'center',
     gap: space.sm,
-    maxWidth: '86%',
     paddingBlock: space.xs,
     paddingInline: space.md,
-    borderRadius: radius.pill,
+    borderRadius: radius.xl,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim},${shadow.float}`,
     fontSize: typeScale.caption1,
     fontWeight: weight.semibold,
-    whiteSpace: 'nowrap',
     overflow: 'hidden'
   },
   bannerSolved: { color: colors.greenDark },
-  bannerText: { overflow: 'hidden', textOverflow: 'ellipsis', color: app.label2 },
+  bannerText: {
+    flex: 1,
+    minWidth: 0,
+    color: app.label2,
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2,
+    overflow: 'hidden'
+  },
   bannerOk: { color: colors.greenDark, fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
   bannerMiss: { color: colors.orangeDark, fontVariantNumeric: 'tabular-nums', flexShrink: 0 },
-  zoomDock: {
+  chromeBottom: {
     position: 'absolute',
-    top: space.sm,
+    left: space.sm,
     right: space.sm,
-    zIndex: 2,
+    bottom: space.sm,
+    zIndex: 3,
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: space.sm,
+    // The strip itself never swallows board taps; only its children hit-test.
+    pointerEvents: 'none'
+  },
+  zoomDock: {
     display: 'flex',
     alignItems: 'center',
     gap: space.xxs,
@@ -336,7 +371,9 @@ export const styles = stylex.create({
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
-    boxShadow: `${shadow.rim},${shadow.float}`
+    boxShadow: `${shadow.rim},${shadow.float}`,
+    flexShrink: 0,
+    pointerEvents: 'auto'
   },
   zoomPct: {
     minWidth: 48,
@@ -372,13 +409,11 @@ export const styles = stylex.create({
   iconBtnTintOn: { color: colors.yellowDark },
   iconBtnMuted: { color: app.label3 },
   hint: {
-    position: 'absolute',
-    left: space.sm,
-    bottom: space.sm,
-    zIndex: 2,
+    flex: 1,
+    minWidth: 0,
     paddingBlock: space.xs,
     paddingInline: space.md,
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     color: app.label2,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
@@ -386,7 +421,11 @@ export const styles = stylex.create({
     boxShadow: shadow.rim,
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
-    pointerEvents: 'none'
+    pointerEvents: 'none',
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2,
+    overflow: 'hidden'
   },
   // The side panel on the inner display.
   panel: {
@@ -428,7 +467,9 @@ export const styles = stylex.create({
     padding: space.xxs,
     borderRadius: radius.md,
     backgroundColor: app.fill,
-    flexShrink: 0
+    flexShrink: 0,
+    flexGrow: 1,
+    minWidth: 0
   },
   segBtn: {
     flex: 1,
@@ -467,26 +508,34 @@ export const styles = stylex.create({
     ':focus-visible': { outline: `2px solid ${ACCENT}`, outlineOffset: 1 }
   },
   tileLock: { color: app.label3 },
-  // The cover tray.
+  // The cover tray is a sheet with two heights: collapsed keeps the whole
+  // Parts grid and a peek at the inspector above the fold line, open trades
+  // canvas for room to work the inspector, table and lists without scrolling.
   tray: {
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: space.sm,
     padding: space.lg,
-    maxHeight: '44%',
+    height: '54%',
     borderRadius: radius.xxl,
     backgroundColor: glass.tintDark,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim},${shadow.float}`,
+    transitionProperty: 'height',
+    transitionDuration: '.3s',
+    transitionTimingFunction: easing.spring,
     animationName: { default: trayIn, [reduce]: 'none' },
     animationDuration: '.34s',
     animationTimingFunction: easing.pop,
     animationFillMode: 'both'
   },
+  trayOpen: { height: '72%' },
+  trayTop: { display: 'flex', alignItems: 'center', gap: space.sm, flexShrink: 0 },
   trayBody: {
     minHeight: 0,
+    flexGrow: 1,
     overflowY: 'auto',
     scrollbarWidth: 'none',
     display: 'flex',
@@ -494,6 +543,36 @@ export const styles = stylex.create({
     gap: space.sm
   },
   rowBtns: { display: 'flex', gap: space.xs, flexWrap: 'wrap' },
+  // One input pin of the selected part: name and feed, tappable to land an
+  // armed wire or cut the one already there - the non-canvas wiring path.
+  pinRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 44,
+    minWidth: 0,
+    borderWidth: 0,
+    borderRadius: radius.lg,
+    paddingBlock: space.xs,
+    paddingInline: space.sm,
+    backgroundColor: { default: 'transparent', ':hover': app.fill3, ':active': app.fill3 },
+    color: colors.white,
+    fontFamily: fonts.system,
+    fontSize: typeScale.caption1,
+    fontWeight: weight.semibold,
+    textAlign: 'start',
+    cursor: 'pointer',
+    ':disabled': { cursor: 'default' },
+    ':focus-visible': { outline: `2px solid ${ACCENT}`, outlineOffset: 1 }
+  },
+  pinRowOn: {
+    backgroundColor: {
+      default: `color-mix(in srgb, ${ACCENT} 12%, transparent)`,
+      ':hover': `color-mix(in srgb, ${ACCENT} 18%, transparent)`,
+      ':active': `color-mix(in srgb, ${ACCENT} 18%, transparent)`
+    }
+  },
+  pinRowDim: { color: app.label3 },
   btn: {
     display: 'flex',
     alignItems: 'center',
