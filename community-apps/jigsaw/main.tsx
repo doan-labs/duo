@@ -1,6 +1,6 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
-import { Button, IconButton, Segmented, Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
+import { Button, IconButton, Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -741,7 +741,8 @@ function Jigsaw() {
                 type="button"
                 {...stylex.props(styles.veilBtn, styles.veilBtnAccent, shared.press)}
                 onClick={() => {
-                  setVeilDown(false)
+                  // Dismiss the veil first: the picker sheet must stack above it.
+                  setVeilDown(true)
                   setPicker(true)
                 }}
               >
@@ -775,6 +776,7 @@ function Jigsaw() {
             variant="round"
             aria-label={prefs.guide ? 'Hide picture guide' : 'Show picture guide'}
             aria-pressed={prefs.guide}
+            xstyle={styles.iconHit}
             onClick={() => setPrefs({ guide: !prefs.guide })}
           />
           <IconButton
@@ -782,31 +784,46 @@ function Jigsaw() {
             variant="round"
             aria-label={prefs.muted ? 'Unmute sounds' : 'Mute sounds'}
             aria-pressed={prefs.muted}
-            xstyle={prefs.muted ? styles.iconBtnWarn : undefined}
+            xstyle={prefs.muted ? [styles.iconHit, styles.iconBtnWarn] : styles.iconHit}
             onClick={toggleMute}
           />
           <IconButton
             name="reload"
             variant="round"
             aria-label="Start this puzzle over"
+            xstyle={styles.iconHit}
             onClick={() => {
               armedGameRef.current = `${game.art}:${game.count}:${game.seed}`
               setConfirmReset(true)
             }}
           />
-          <IconButton name="photo" variant="round" aria-label="Choose a puzzle" onClick={() => setPicker(true)} />
+          <IconButton
+            name="photo"
+            variant="round"
+            aria-label="Choose a puzzle"
+            xstyle={styles.iconHit}
+            onClick={() => setPicker(true)}
+          />
         </div>
       </header>
 
       {cover ? (
         <div {...stylex.props(styles.segWrap)}>
-          <Segmented
-            options={['Board', 'Pieces'] as const}
-            value={pane === 'board' ? 'Board' : 'Pieces'}
-            onChange={(v: 'Board' | 'Pieces') => setPane(v === 'Board' ? 'board' : 'pieces')}
-            xstyle={styles.segFill}
-            aria-label="Board or tray"
-          />
+          <div role="radiogroup" aria-label="Board or tray" {...stylex.props(styles.segTrack, styles.segFill)}>
+            {(['board', 'pieces'] as const).map((p) => (
+              // biome-ignore lint/a11y/useSemanticElements: Segmented-style labelled segments, not bare inputs
+              <button
+                key={p}
+                type="button"
+                role="radio"
+                aria-checked={pane === p}
+                {...stylex.props(styles.segBtn, styles.paneSegBtn, shared.press, pane === p && styles.segOn)}
+                onClick={() => setPane(p)}
+              >
+                {p === 'board' ? 'Board' : 'Pieces'}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 

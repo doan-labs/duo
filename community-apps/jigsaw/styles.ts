@@ -236,7 +236,7 @@ export const styles = stylex.create({
     gap: space.sm,
     minHeight: 0
   },
-  railCover: { width: 'auto', flexGrow: 1, minHeight: 0 },
+  railCover: { width: 'auto', flexGrow: 1, flexShrink: 1, minHeight: 0 },
   railHead: { display: 'flex', alignItems: 'center', gap: space.sm },
   railTitle: {
     fontSize: typeScale.footnote,
@@ -315,7 +315,14 @@ export const styles = stylex.create({
     cursor: 'pointer',
     flexGrow: 1
   },
+  paneSegBtn: {
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    letterSpacing: tracking.subheadline,
+    fontWeight: weight.semibold
+  },
   segOn: { backgroundColor: app.control, color: app.fg, boxShadow: shadow.card },
+  iconHit: { width: 44, height: 44 },
   action: {
     minHeight: 44,
     display: 'inline-flex',
@@ -509,7 +516,7 @@ export const styles = stylex.create({
     zIndex: 4
   },
   savedTag: { display: 'inline-flex', alignItems: 'center', gap: space.xs, color: app.label3 },
-  segWrap: { paddingRight: space.md, paddingLeft: space.md, display: 'flex' },
+  segWrap: { paddingRight: space.md, paddingLeft: space.md, display: 'flex', flexShrink: 0 },
   // The piece riding the pointer mid-drag: floats above everything, never
   // receives the pointer itself.
   ghost: {
