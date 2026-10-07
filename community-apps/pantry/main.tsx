@@ -394,7 +394,9 @@ function Pantry() {
     if (!el) return
     let tries = 0
     const restore = () => {
-      if (!el.isConnected) return
+      // Only the live display may take focus - a copy that was folded away
+      // mid-restore must not steal it back from the active one.
+      if (!el.isConnected || !viewRef.current.active) return
       el.focus()
       if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
     }
