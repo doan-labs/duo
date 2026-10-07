@@ -28,6 +28,26 @@ for where a flap lands.
 `prefs` holds `{ muted, motion }`. No network, no accounts, no other
 permissions.
 
+## Two copies, one session
+
+The app runs on both displays at once and shares state. Admission and
+completion are deliberately different:
+
+- **Admission**: a copy takes new user intent - taps, clicks, transport,
+  rail jumps, arrow keys, Escape, toggles, legend, audio unlock - only
+  while `os.view.visible && os.view.active` at the instant the event
+  arrives (`live.ts`). An occluded, parked, or zero-area copy rejects the
+  intent before any ref, UI, KV, session, progress or audio state moves.
+  Converged shared state is not authorization.
+- **Completion**: an intent admitted while live finishes its storage
+  writes even if the copy hides a moment later. Hydration and foreign
+  adoption keep rendering on both copies; only repair writes also require
+  the copy to be live.
+- Relative transport (`Next`/`Back`/arrows) resolves against the
+  best-known step so rapid accepted inputs cannot reuse a stale rendered
+  step, and every model-bound intent is dropped if a peer has since moved
+  the session to another model.
+
 ## Sequences
 
 The fold sequences are the traditional, widely published ones; all diagrams

@@ -13,5 +13,9 @@
   display pairs the diagram with a tappable steps overview rail.
 - Gentle paper-step sound cues with a visible, persisted mute toggle; a
   persisted motion toggle joins the OS reduced-motion setting.
+- Admission gate: a hidden or inactive copy rejects new user intent
+  (input, steps, prefs, legend, audio unlock) before any state moves;
+  transport resolves from the best-known step and drops intents a peer
+  switched away from.
 - Shared step position across both displays via session state; progress and
   preferences persist in device storage.

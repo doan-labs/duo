@@ -37,16 +37,24 @@ import {
   resumeStep,
   type UiState
 } from './engine.ts'
+import { live, stepTarget } from './live.ts'
 import { MODELS, type Model, modelById } from './models.ts'
 import { styles } from './styles.ts'
 
+// New user intent is admitted only on a copy that is both visible and active
+// at dispatch time (see live.ts): the SDK view snapshot is read synchronously
+// here, so an occluded or parked copy rejects input even when a stale render
+// or a leaked event suggests otherwise.
+const liveNow = () => live(os.view)
+
 // The pre-connect window guard only needs a live callback while the legend
 // sheet is open; everywhere else Escape falls through to the shell's go-home.
+// It is user intent like any other, so the same admission gate applies.
 let escapeBack: (() => void) | null = null
 addEventListener(
   'keydown',
   (event) => {
-    if (event.key !== 'Escape' || !escapeBack) return
+    if (event.key !== 'Escape' || !escapeBack || !liveNow()) return
     event.preventDefault()
     event.stopImmediatePropagation()
     escapeBack()
@@ -310,6 +318,7 @@ function Coach({
   canGoBack,
   onBack,
   onStep,
+  onStepBy,
   onReplay,
   onNextModel,
   muted,
@@ -325,6 +334,7 @@ function Coach({
   canGoBack: boolean
   onBack: () => void
   onStep: (step: number, kind?: Cue) => void
+  onStepBy: (delta: number, kind?: Cue) => void
   onReplay: () => void
   onNextModel: (m: Model) => void
   muted: boolean
@@ -407,7 +417,7 @@ function Coach({
               <div {...stylex.props(styles.transport)}>
                 <Button
                   xstyle={[styles.navBtn, styles.pressCalm]}
-                  onClick={() => onStep(at - 1, 'back')}
+                  onClick={() => onStepBy(-1, 'back')}
                   disabled={at === 0}
                 >
                   <Sym name="back" size={14} /> Back
@@ -415,11 +425,7 @@ function Coach({
                 <span {...stylex.props(styles.transportMid)} aria-hidden="true">
                   {at + 1} / {total}
                 </span>
-                <Button
-                  variant="filled"
-                  xstyle={[styles.navBtn, styles.pressCalm]}
-                  onClick={() => onStep(at + 1, at + 1 === total ? 'done' : 'fold')}
-                >
+                <Button variant="filled" xstyle={[styles.navBtn, styles.pressCalm]} onClick={() => onStepBy(1, 'fold')}>
                   {at + 1 === total ? 'Finish' : 'Next'} <Sym name="forward" size={14} />
                 </Button>
               </div>
@@ -450,12 +456,15 @@ function PaperFold() {
   // unmounts its focused node), so keys keep landing on the invisible copy.
   // Landing focus on the visible copy's root restores keyboard control to it.
   useEffect(() => {
-    if (view.visible) rootRef.current?.focus({ preventScroll: true })
-  }, [view.visible, rootRef])
+    if (view.visible && view.active) rootRef.current?.focus({ preventScroll: true })
+  }, [view.visible, view.active, rootRef])
 
-  // Audio unlock needs a real gesture once per copy.
+  // Audio unlock needs a real gesture once per copy - and only on the live
+  // copy, so an event landing on a hidden one cannot unlock its context.
   useEffect(() => {
-    const on = () => unlockAudio()
+    const on = () => {
+      if (liveNow()) unlockAudio()
+    }
     addEventListener('pointerdown', on)
     addEventListener('keydown', on)
     return () => {
@@ -476,8 +485,8 @@ function PaperFold() {
   const uiBest = useRef(uiState)
   const prefsBest = useRef(prefs)
   const progressBest = useRef(progress)
-  const activeRef = useRef(false)
-  activeRef.current = view.active
+  const liveRef = useRef(false)
+  liveRef.current = view.active && view.visible
   // Dedupe for repair writes: useKV's set is a fresh closure per render so
   // these effects re-fire freely; each distinct payload repairs at most once.
   const uiWritten = useRef<string | null>(null)
@@ -495,7 +504,7 @@ function PaperFold() {
       setUiState(f)
       return
     }
-    if (!activeRef.current || !newerSeq(uiBest.current, f)) return
+    if (!liveRef.current || !newerSeq(uiBest.current, f)) return
     if (f.seq === 0 && f.model === null) return // nothing stored - do not create it
     const s = JSON.stringify(uiBest.current)
     if (ui.value === s || uiWritten.current === s) return
@@ -511,7 +520,7 @@ function PaperFold() {
       setPrefs(f)
       return
     }
-    if (!activeRef.current || !newerSeq(prefsBest.current, f) || f.seq === 0) return
+    if (!liveRef.current || !newerSeq(prefsBest.current, f) || f.seq === 0) return
     const s = JSON.stringify(prefsBest.current)
     if (prefsKV.value === s || prefsWritten.current === s) return
     prefsWritten.current = s
@@ -531,7 +540,7 @@ function PaperFold() {
       progJson.current = mJson
       setProgress(merged)
     }
-    if (!activeRef.current || progressSubset(merged, f)) return
+    if (!liveRef.current || progressSubset(merged, f)) return
     if (progressKV.value === mJson || progWritten.current === mJson) return
     progWritten.current = mJson
     progressKV.set(mJson)
@@ -551,13 +560,9 @@ function PaperFold() {
     requestAnimationFrame(() => os.ready())
   }, [ui.status])
 
-  const active = view.active
-  const ping = useCallback(
-    (kind: Cue) => {
-      if (active) cue(kind)
-    },
-    [active]
-  )
+  const ping = useCallback((kind: Cue) => {
+    if (liveNow()) cue(kind)
+  }, [])
 
   const go = useCallback(
     (patch: { model: string | null; step: number }) => {
@@ -601,6 +606,7 @@ function PaperFold() {
 
   const openModel = useCallback(
     (m: Model) => {
+      if (!liveNow()) return
       const p = progressBest.current[m.id]
       go({ model: m.id, step: resumeStep(m.steps.length, p) })
       ping('select')
@@ -610,6 +616,10 @@ function PaperFold() {
 
   const goStep = useCallback(
     (m: Model, s: number, kind: Cue = 'fold') => {
+      if (!liveNow()) return
+      // The intent was issued on this rendered model; if a peer has since
+      // switched the session to another model, drop it instead of replaying.
+      if (uiBest.current.model !== m.id) return
       const step = clampStep(m.steps.length, s)
       go({ model: m.id, step })
       writeProgress(m.id, step, m.steps.length)
@@ -618,21 +628,41 @@ function PaperFold() {
     [go, ping, writeProgress]
   )
 
+  // Relative transport (Next/Back, arrow keys): resolved from the best-known
+  // step, so two rapid admitted inputs advance two steps even when the render
+  // still shows the first one's source.
+  const goStepBy = useCallback(
+    (m: Model, delta: number, kind: Cue = 'fold') => {
+      if (!liveNow()) return
+      const target = stepTarget(uiBest.current, m.id, delta, m.steps.length)
+      if (target === null) return
+      go({ model: m.id, step: target })
+      writeProgress(m.id, target, m.steps.length)
+      ping(target === m.steps.length ? 'done' : kind)
+    },
+    [go, ping, writeProgress]
+  )
+
   const toModels = useCallback(() => {
+    if (!liveNow()) return
     go({ model: null, step: 0 })
     ping('back')
   }, [go, ping])
 
   const toggleSound = useCallback(() => {
+    if (!liveNow()) return
     commitPrefs({ muted: !prefsBest.current.muted })
     ping('select')
   }, [commitPrefs, ping])
 
   const toggleMotion = useCallback(() => {
+    if (!liveNow()) return
     commitPrefs({ motion: !prefsBest.current.motion })
   }, [commitPrefs])
 
-  // Arrow keys step through a model on whichever copy has focus.
+  // Arrow keys step through a model on whichever copy has focus. Relative
+  // intent from the best-known step; hidden/inactive copies reject inside the
+  // admission gate, so a key landing there moves nothing.
   useEffect(() => {
     if (!model || legend) return
     const onKey = (e: KeyboardEvent) => {
@@ -640,15 +670,15 @@ function PaperFold() {
       if (target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
       if (e.key === 'ArrowRight') {
         e.preventDefault()
-        goStep(model, uiState.step + 1, uiState.step + 1 === model.steps.length ? 'done' : 'fold')
+        goStepBy(model, 1, 'fold')
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        goStep(model, uiState.step - 1, 'back')
+        goStepBy(model, -1, 'back')
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [model, legend, uiState.step, goStep])
+  }, [model, legend, goStepBy])
 
   // The cover keeps the kit's grouped insets; the narrow rail trades the
   // doubled section margins for label room (see listWrapRail).
@@ -678,7 +708,9 @@ function PaperFold() {
             chevron
             as="button"
             xstyle={styles.rowTap}
-            onClick={() => setLegend(true)}
+            onClick={() => {
+              if (liveNow()) setLegend(true)
+            }}
           />
         </Section>
       </div>
@@ -696,11 +728,14 @@ function PaperFold() {
       canGoBack={!wide}
       onBack={toModels}
       onStep={(s, kind) => goStep(model, s, kind)}
+      onStepBy={(d, kind) => goStepBy(model, d, kind)}
       onReplay={() => goStep(model, 0, 'turn')}
       onNextModel={openModel}
       muted={prefs.muted}
       onToggleSound={toggleSound}
-      onLegend={() => setLegend(true)}
+      onLegend={() => {
+        if (liveNow()) setLegend(true)
+      }}
     />
   ) : null
 
@@ -741,7 +776,12 @@ function PaperFold() {
           </Push>
         )}
       </div>
-      <LegendSheet open={legend} onClose={() => setLegend(false)} />
+      <LegendSheet
+        open={legend}
+        onClose={() => {
+          if (liveNow()) setLegend(false)
+        }}
+      />
     </main>
   )
 }
