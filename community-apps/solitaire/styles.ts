@@ -650,5 +650,14 @@ export const styles = stylex.create({
     paddingBlock: space.lg,
     paddingInline: space.lg
   },
-  confirmActions: { display: 'flex', gap: space.sm, flexShrink: 0, flexWrap: 'wrap' }
+  confirmActions: { display: 'flex', gap: space.sm, flexShrink: 0, flexWrap: 'wrap' },
+  // shared.press has no reduced-motion override (UIKit gap, reported): under
+  // prefers-reduced-motion the :active scale is cancelled and the press reads
+  // as an instantaneous brightness cue instead. Pair after shared.press.
+  pressRm: {
+    transform: { '@media (prefers-reduced-motion: reduce)': { ':active': 'none' } },
+    filter: {
+      '@media (prefers-reduced-motion: reduce)': { default: null, ':active': 'brightness(0.9)' }
+    }
+  }
 })

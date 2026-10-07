@@ -213,7 +213,8 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
           won && spot.startsWith('f') && styles.delayAt(120 + Number(spot.slice(1)) * 90),
           shake === key && styles.shake,
           picked && styles.selected,
-          shared.press
+          shared.press,
+          styles.pressRm
         )}
       >
         <span {...stylex.props(styles.cardInner, !card.up && styles.cardInnerDown)}>

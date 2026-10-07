@@ -199,7 +199,7 @@ function Seg({
           aria-checked={o === value}
           tabIndex={o === value ? 0 : -1}
           onClick={() => onChange(o)}
-          {...stylex.props(styles.segBtn, o === value && styles.segOn, shared.press)}
+          {...stylex.props(styles.segBtn, o === value && styles.segOn, shared.press, styles.pressRm)}
         >
           <span {...stylex.props(styles.segLabel)}>{o}</span>
         </button>
@@ -858,7 +858,7 @@ function Solitaire() {
               aria-checked={m.id === table.mode}
               tabIndex={m.id === table.mode ? 0 : -1}
               onClick={() => requestMode(m.id)}
-              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep, shared.press)}
+              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep, shared.press, styles.pressRm)}
             >
               <span {...stylex.props(styles.pickLabel)}>{m.label}</span>
               <span {...stylex.props(styles.pickMeta)}>{m.id === 'draw1' ? 'relaxed' : 'classic'}</span>
@@ -886,7 +886,8 @@ function Solitaire() {
             styles.tool,
             wide && styles.toolWide,
             !table.log.length && styles.toolDisabled,
-            shared.press
+            shared.press,
+            styles.pressRm
           )}
         >
           <Sym name="undo" size={wide ? 15 : 13} />
@@ -896,7 +897,7 @@ function Solitaire() {
           type="button"
           onClick={doHint}
           aria-label="Show a hint"
-          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press, styles.pressRm)}
         >
           <Sym name="star" size={wide ? 15 : 13} />
           Hint
@@ -906,7 +907,13 @@ function Solitaire() {
           onClick={() => doAuto()}
           disabled={ended}
           aria-label="Auto-play every card that can go home"
-          {...stylex.props(styles.tool, wide && styles.toolWide, ended && styles.toolDisabled, shared.press)}
+          {...stylex.props(
+            styles.tool,
+            wide && styles.toolWide,
+            ended && styles.toolDisabled,
+            shared.press,
+            styles.pressRm
+          )}
         >
           <Sym name="bolt" size={wide ? 15 : 13} />
           Auto
@@ -916,7 +923,7 @@ function Solitaire() {
           onClick={toggleMute}
           aria-pressed={muted}
           aria-label={muted ? 'Unmute card sounds' : 'Mute card sounds'}
-          {...stylex.props(styles.tool, wide && styles.toolWide, muted && styles.toolOn, shared.press)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, muted && styles.toolOn, shared.press, styles.pressRm)}
         >
           <span {...stylex.props(styles.muteWrap)}>
             <Sym name="volume" size={wide ? 15 : 13} />
@@ -928,7 +935,7 @@ function Solitaire() {
           type="button"
           onClick={() => requestNew()}
           aria-label="Start a new game"
-          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press, styles.pressRm)}
         >
           <Sym name="reload" size={wide ? 15 : 13} />
           New
@@ -996,12 +1003,12 @@ function Solitaire() {
         </span>
       </div>
       <div {...stylex.props(styles.resultActions)}>
-        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press)}>
+        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press, styles.pressRm)}>
           <Sym name="reload" size={13} />
           New game
         </button>
         {/* The card floats over the narrow toolbar, so undo lives here too. */}
-        <button type="button" onClick={undo} {...stylex.props(styles.action, shared.press)}>
+        <button type="button" onClick={undo} {...stylex.props(styles.action, shared.press, styles.pressRm)}>
           <Sym name="undo" size={13} />
           Take back
         </button>
@@ -1050,7 +1057,7 @@ function Solitaire() {
             </span>
           </div>
           <div {...stylex.props(styles.confirmActions)}>
-            <button type="button" onClick={closeConfirm} {...stylex.props(styles.action, shared.press)}>
+            <button type="button" onClick={closeConfirm} {...stylex.props(styles.action, shared.press, styles.pressRm)}>
               Keep playing
             </button>
             <button
@@ -1059,7 +1066,7 @@ function Solitaire() {
                 restart(shown.mode)
                 closeConfirm()
               }}
-              {...stylex.props(styles.primary, shared.press)}
+              {...stylex.props(styles.primary, shared.press, styles.pressRm)}
             >
               {shown.mode === table.mode ? 'New game' : `Start ${shown.label}`}
             </button>
