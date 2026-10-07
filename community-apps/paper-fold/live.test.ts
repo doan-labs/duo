@@ -129,6 +129,13 @@ check('stillBound keeps deferred work only on a live copy of the bound model', (
 // refs/snapshots and a virtual RAF, so a regression in the real handler (not a
 // copy of it) fails here. Extraction mirrors the reviewer's probe.
 
+// The submission gate typechecks this file without @types/bun installed, so
+// the few Bun APIs the adapter harness needs are declared module-locally.
+declare const Bun: {
+  file(path: string): { text(): Promise<string> }
+  Transpiler: new (opts: { loader: string }) => { transformSync(src: string): string }
+}
+
 const source = await Bun.file(new URL('./main.tsx', import.meta.url).pathname).text()
 const transpiler = new Bun.Transpiler({ loader: 'tsx' })
 
@@ -233,13 +240,14 @@ const rootLine = source.match(
   /useEffect\(\(\) => \{[\s\S]*?(if \(view\.visible && view\.active && liveNow\(\)\) rootRef[^\n]+)/
 )
 if (!rootLine) throw new Error('root focus effect line not found in main.tsx')
+const rootCode = rootLine[1] as string
 
 check('root focus uses current os.view, not a stale React snapshot', () => {
   const os = { view: { visible: false, active: true } }
   // A React-render view still says live; the effect must consult os.view.
   const staleRenderView = { visible: true, active: true }
   let focusCalls = 0
-  const run = new Function('view', 'liveNow', 'rootRef', 'os', rootLine[1])
+  const run = new Function('view', 'liveNow', 'rootRef', 'os', rootCode)
   const rootRef = { current: { focus: () => focusCalls++ } }
   // Stale render says live, synchronous SDK says occluded: no focus work.
   run(staleRenderView, () => live(os.view), rootRef, os)
