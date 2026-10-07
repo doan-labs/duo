@@ -374,18 +374,25 @@ export const ratioFloor = (r: number, digits: number) => {
 // ---- Shared palette writes ----
 
 /**
- * One palette mutation as a wire operation. Ops carry a unique id so a copy
- * can tell whether an adopted state already contains its own write; ops that
- * a foreign state missed are replayed onto it (in order) and republished,
- * which serializes overlapping writes from both displays through the wire's
- * total order instead of letting each cached list clobber the other.
+ * One palette mutation as a wire operation. Each op carries its writer's id
+ * inside `id` (`writer:seq`) plus a per-writer monotonically increasing `seq`,
+ * so settlement is causal, not cosmetic: an op is settled exactly when a
+ * foreign publish's watermark `acks[writer]` covers `seq` (or the op echoes
+ * back inside the wire's `ops` window). Unsettled ops replay onto the adopted
+ * list in seq order and republish, which serializes overlapping writes from
+ * both displays through the wire's last-writer-wins register.
  */
 export type PalOp =
-  | { id: string; kind: 'add'; palette: SavedPalette }
-  | { id: string; kind: 'rename'; target: string; name: string }
-  | { id: string; kind: 'delete'; target: string }
+  | { id: string; seq: number; kind: 'add'; palette: SavedPalette }
+  | { id: string; seq: number; kind: 'rename'; target: string; name: string }
+  | { id: string; seq: number; kind: 'delete'; target: string }
 
+/** The trailing ops window each publish echoes for fast id settlement. */
 export const PAL_OP_WINDOW = 24
+/** Bound on one copy's own unacknowledged ops awaiting wire echo. */
+export const PAL_PENDING_LIMIT = 128
+/** Bound on the per-writer watermark map carried on the wire. */
+export const PAL_ACK_LIMIT = 32
 
 export function applyPalOp(items: SavedPalette[], op: PalOp): SavedPalette[] {
   if (op.kind === 'add') return upsertPalette(items, op.palette)
@@ -393,16 +400,67 @@ export function applyPalOp(items: SavedPalette[], op: PalOp): SavedPalette[] {
   return removePalette(items, op.target)
 }
 
-/** True when `items` already reflects `op`'s effect: the write landed or the
- *  target is genuinely gone. */
-export function palOpDone(items: SavedPalette[], op: PalOp): boolean {
-  if (op.kind === 'add') return items.some((p) => p.id === op.palette.id)
-  if (op.kind === 'rename')
-    return items.some((p) => p.id === op.target && p.name === (op.name.trim().slice(0, MAX_PALETTE_NAME) || p.name))
-  return items.every((p) => p.id !== op.target)
+/**
+ * Fold learned watermarks: `acks` are monotone per writer, so a higher claim
+ * always wins. Acks only ever describe ops whose effects the claimant's list
+ * already contains, so they can be propagated transitively; the map stays
+ * bounded by evicting the lowest watermark of a writer that is not `me`.
+ */
+export function mergeAcks(into: Record<string, number>, from: Record<string, number> | undefined, me: string) {
+  if (!from) return
+  for (const [w, s] of Object.entries(from)) {
+    if (Number.isInteger(s) && s >= 0 && s > (into[w] ?? 0)) into[w] = s
+  }
+  const writers = Object.keys(into)
+  while (writers.length > PAL_ACK_LIMIT) {
+    let worst: string | null = null
+    let worstSeq = Number.MAX_SAFE_INTEGER
+    for (const w of writers) {
+      if (w === me) continue
+      if (into[w]! < worstSeq) {
+        worstSeq = into[w]!
+        worst = w
+      }
+    }
+    if (worst === null) break
+    delete into[worst]
+    writers.splice(writers.indexOf(worst), 1)
+  }
 }
 
 export const palListEq = (a: SavedPalette[], b: SavedPalette[]) => serializePalettes(a) === serializePalettes(b)
+
+/**
+ * Merge one foreign publish's library into mine: the wire list is adopted
+ * wholesale, then each of my ops the publisher has not incorporated replays
+ * onto it in seq order. An op stops needing replay exactly when the
+ * publisher's watermark for `me` covers its seq or the op echoes inside the
+ * wire's `ops` window - never by whether its target exists. `maxAck` is the
+ * highest watermark any foreign publish has ever claimed for `me`; the
+ * returned `ops` keeps every still-unacked op plus a settled tail one window
+ * deep, so a publish that regresses below it still re-replays those writes.
+ */
+export function mergePalWire(
+  shared: { pals: SavedPalette[]; ops?: PalOp[]; acks?: Record<string, number> },
+  myOps: PalOp[],
+  me: string,
+  maxAck: number
+): { merged: SavedPalette[]; replayed: PalOp[]; ops: PalOp[]; maxAck: number } {
+  const myAck = shared.acks?.[me] ?? 0
+  const nextAck = Math.max(myAck, maxAck)
+  const seen = new Set((shared.ops ?? []).map((o) => o.id))
+  let merged = shared.pals
+  const replayed: PalOp[] = []
+  for (const op of myOps) {
+    if (op.seq <= myAck || seen.has(op.id)) continue
+    const next = applyPalOp(merged, op)
+    if (palListEq(next, merged)) continue
+    merged = next
+    replayed.push(op)
+  }
+  const floor = nextAck - PAL_OP_WINDOW
+  return { merged, replayed, ops: myOps.filter((o) => o.seq > floor), maxAck: nextAck }
+}
 
 // ---- Wire parsing and serialization ----
 
@@ -410,7 +468,7 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const isByte = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 255
 export const parseRgb = (v: unknown): Rgb | null =>
   isObj(v) && isByte(v.r) && isByte(v.g) && isByte(v.b) ? { r: v.r, g: v.g, b: v.b } : null
-const parseCore = (v: unknown): Core | null => {
+export const parseCore = (v: unknown): Core | null => {
   if (!isObj(v)) return null
   const color = parseRgb(v.color)
   const harmony =
@@ -419,7 +477,17 @@ const parseCore = (v: unknown): Core | null => {
       : null
   const pair = isObj(v.pair) ? { fg: parseRgb(v.pair.fg), bg: parseRgb(v.pair.bg) } : null
   if (!color || !harmony || !pair?.fg || !pair.bg) return null
-  return { color, hsl: parseHsl(v.hsl) ?? rgbToHsl(color), harmony, pair: { fg: pair.fg, bg: pair.bg } }
+  // Stored intent is only trusted when it still paints the stored colour:
+  // authored hue/saturation at achromatic stops quantizes to the same bytes,
+  // while a hsl that disagrees with the rgb is a corrupt wire value and is
+  // repaired to the colour's own derivation instead of surviving as a lie.
+  const intent = parseHsl(v.hsl)
+  return {
+    color,
+    hsl: intent && rgbEq(hslToRgb(intent), color) ? intent : rgbToHsl(color),
+    harmony,
+    pair: { fg: pair.fg, bg: pair.bg }
+  }
 }
 const parseHsl = (v: unknown): Hsl | null =>
   isObj(v) &&
@@ -489,20 +557,26 @@ export function parsePaletteEntry(i: unknown): SavedPalette | null {
   }
 }
 
+/** One entry per palette id wins; the library never grows past the cap. */
+const dedupePalettes = (list: unknown[]): SavedPalette[] => {
+  const seen = new Set<string>()
+  const out: SavedPalette[] = []
+  for (const raw of list) {
+    const i = parsePaletteEntry(raw)
+    if (!i || seen.has(i.id)) continue
+    seen.add(i.id)
+    out.push(i)
+    if (out.length >= MAX_PALETTES) break
+  }
+  return out
+}
+
 export function parsePalettes(raw: string | null): SavedPalette[] {
   if (!raw) return []
   try {
     const v: unknown = JSON.parse(raw)
     if (!isObj(v) || !Array.isArray(v.items)) return []
-    const seen = new Set<string>()
-    return v.items
-      .map(parsePaletteEntry)
-      .filter((i): i is SavedPalette => {
-        if (i === null || seen.has(i.id)) return false
-        seen.add(i.id)
-        return true
-      })
-      .slice(0, MAX_PALETTES)
+    return dedupePalettes(v.items)
   } catch {
     return []
   }
@@ -536,6 +610,12 @@ export interface SharedState {
   pals?: SavedPalette[]
   /** The trailing window of palette ops the writer has seen, newest last. */
   ops?: PalOp[]
+  /** Per-writer high-water mark: the highest `seq` of each writer's palette
+   *  ops whose effects this publish's `pals` already contains. Watermarks are
+   *  contiguous prefixes (seq n implies ops 1..n landed), so a copy can drop
+   *  a pending op the moment a foreign publish covers it - even after the op
+   *  itself scrolled out of the `ops` window. */
+  acks?: Record<string, number>
 }
 export const serializeShared = (s: SharedState) => JSON.stringify({ v: 1, ...s })
 export function parseShared(raw: string | null): SharedState | null {
@@ -545,25 +625,29 @@ export function parseShared(raw: string | null): SharedState | null {
     if (!isObj(v) || typeof v.by !== 'string') return null
     const doc = parseDoc(v.doc)
     if (!doc) return null
-    const pals = Array.isArray(v.pals)
-      ? v.pals.map(parsePaletteEntry).filter((p): p is SavedPalette => p !== null)
-      : undefined
+    const pals = Array.isArray(v.pals) ? dedupePalettes(v.pals) : undefined
     const ops = Array.isArray(v.ops)
       ? v.ops
           .map((o): PalOp | null => {
-            if (!isObj(o) || typeof o.id !== 'string') return null
+            if (!isObj(o) || typeof o.id !== 'string' || !Number.isInteger(o.seq) || (o.seq as number) < 1) return null
+            const seq = o.seq as number
             if (o.kind === 'add') {
               const palette = parsePaletteEntry(o.palette)
-              return palette ? { id: o.id, kind: 'add', palette } : null
+              return palette ? { id: o.id, seq, kind: 'add', palette } : null
             }
             if (o.kind === 'rename' && typeof o.target === 'string' && typeof o.name === 'string')
-              return { id: o.id, kind: 'rename', target: o.target, name: o.name.slice(0, MAX_PALETTE_NAME) }
+              return { id: o.id, seq, kind: 'rename', target: o.target, name: o.name.slice(0, MAX_PALETTE_NAME) }
             if (o.kind === 'delete' && typeof o.target === 'string')
-              return { id: o.id, kind: 'delete', target: o.target }
+              return { id: o.id, seq, kind: 'delete', target: o.target }
             return null
           })
           .filter((o): o is PalOp => o !== null)
           .slice(-PAL_OP_WINDOW)
+      : undefined
+    const acks = isObj(v.acks)
+      ? Object.fromEntries(
+          Object.entries(v.acks).filter((e): e is [string, number] => Number.isInteger(e[1]) && (e[1] as number) >= 0)
+        )
       : undefined
     const w = isObj(v.view) ? v.view : {}
     return {
@@ -571,6 +655,7 @@ export function parseShared(raw: string | null): SharedState | null {
       doc,
       pals,
       ops,
+      acks,
       view: {
         field: typeof w.field === 'string' ? w.field.slice(0, 80) : '',
         fieldErr: w.fieldErr === true,

@@ -4,6 +4,7 @@ import {
   easing,
   fonts,
   leading,
+  motion,
   radius,
   shadow,
   space,
@@ -29,6 +30,10 @@ const badgePop = stylex.keyframes({
   '100%': { scale: '1' }
 })
 const fadeIn = stylex.keyframes({ '0%': { opacity: 0 }, '100%': { opacity: 1 } })
+const rowIn = stylex.keyframes({
+  '0%': { opacity: 0, translate: '0 6px' },
+  '100%': { opacity: 1, translate: '0 0' }
+})
 
 export const styles = stylex.create({
   root: {
@@ -66,9 +71,9 @@ export const styles = stylex.create({
   brand: { display: 'flex', flexDirection: 'column', gap: space.xxs, minWidth: 0, flexGrow: 1 },
   kicker: {
     color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     fontWeight: weight.bold,
     textTransform: 'uppercase'
   },
@@ -84,7 +89,16 @@ export const styles = stylex.create({
   },
   headerActions: { display: 'flex', alignItems: 'center', gap: space.xs, flexShrink: 0 },
   icon44: { minWidth: 44, minHeight: 44 },
-  flipX: { transform: 'scaleX(-1)' },
+  // The redo glyph mirrors on a wrapper: the button keeps shared.press free
+  // to own the transform under :active.
+  flipWrap: { display: 'inline-flex', transform: 'scaleX(-1)' },
+  // The same press tempo as shared.press, minus the transform: under reduced
+  // motion a tappable still answers the finger, just without travelling.
+  pressPlain: {
+    transitionProperty: 'outline-color',
+    transitionDuration: motion.pressDuration,
+    ':active': { outlineWidth: 3, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
+  },
   // The mute button carries a slash while sounds are off.
   muteBtn: {
     position: 'relative',
@@ -134,10 +148,11 @@ export const styles = stylex.create({
   navRowText: { display: 'flex', flexDirection: 'column', gap: space.xxs, flexGrow: 1, minWidth: 0 },
   navRowTitle: { fontSize: typeScale.footnote, lineHeight: leading.footnote, fontWeight: weight.semibold },
   navRowSub: {
-    color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    fontVariantNumeric: 'tabular-nums'
+    color: app.fg,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    fontVariantNumeric: 'tabular-nums',
+    opacity: 0.72
   },
   navRowChev: { color: app.label3, display: 'inline-flex', flexShrink: 0 },
   scroll: {
@@ -148,11 +163,11 @@ export const styles = stylex.create({
     WebkitOverflowScrolling: 'touch',
     paddingBottom: space.xxxl
   },
-  stage: { display: 'flex', flexDirection: 'column', gap: space.md, paddingInline: space.lg },
+  stage: { display: 'flex', flexDirection: 'column', gap: space.lg, paddingInline: space.lg },
   // The unfolded split: editor on the left, inspector on the right.
   stageWide: { flexDirection: 'row', alignItems: 'flex-start' },
-  col: { display: 'flex', flexDirection: 'column', gap: space.md, flexGrow: 1, minWidth: 0 },
-  colSide: { display: 'flex', flexDirection: 'column', gap: space.md, width: 340, flexShrink: 0 },
+  col: { display: 'flex', flexDirection: 'column', gap: space.lg, flexGrow: 1, minWidth: 0 },
+  colSide: { display: 'flex', flexDirection: 'column', gap: space.lg, width: 340, flexShrink: 0 },
 
   // The hero: the colour itself at card size, its hex code set in the ink that
   // contrasts it. Tapping copies the code.
@@ -197,8 +212,8 @@ export const styles = stylex.create({
   card: {
     display: 'flex',
     flexDirection: 'column',
-    gap: space.sm,
-    padding: space.md,
+    gap: space.md,
+    padding: space.lg,
     borderRadius: radius.xl,
     backgroundColor: app.surface,
     boxShadow: shadow.rim,
@@ -213,9 +228,9 @@ export const styles = stylex.create({
     justifyContent: 'space-between',
     gap: space.sm,
     color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     fontWeight: weight.bold,
     textTransform: 'uppercase'
   },
@@ -230,9 +245,9 @@ export const styles = stylex.create({
     backgroundColor: 'transparent',
     color: app.link,
     fontFamily: fonts.system,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     fontWeight: weight.bold,
     textTransform: 'uppercase',
     cursor: 'pointer',
@@ -244,41 +259,60 @@ export const styles = stylex.create({
   fieldRow: { display: 'flex', alignItems: 'flex-start', gap: space.sm },
   field: { flexGrow: 1, minWidth: 0 },
   fieldInput: { fontFamily: fonts.mono, minHeight: 44 },
-  fieldHint: { color: app.label2, fontSize: typeScale.caption2, lineHeight: leading.caption2 },
-  fieldErr: { color: colors.red, fontSize: typeScale.caption2, lineHeight: leading.caption2 },
+  fieldHint: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote, opacity: 0.72 },
+  fieldErr: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: space.xs,
+    color: colors.red,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    fontWeight: weight.semibold
+  },
 
-  // The value chips: HEX / RGB / HSL readouts that copy on tap.
-  chipRow: { display: 'flex', gap: space.xs },
+  // The value rows: HEX / RGB / HSL readouts that copy on tap. One full-width
+  // row each so the whole value stays readable at any width instead of
+  // ellipsizing inside a squeezed chip.
+  chipRow: { display: 'flex', flexDirection: 'column', gap: space.xs },
   chip: {
-    flexGrow: 1,
-    flexBasis: 0,
-    minWidth: 0,
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: space.xxs,
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 44,
     borderWidth: 0,
     borderRadius: radius.md,
-    paddingBlock: space.sm,
-    paddingInline: space.sm,
+    paddingBlock: space.xs,
+    paddingInline: space.md,
     backgroundColor: app.fill3,
     color: app.fg,
-    fontFamily: fonts.mono,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    fontFamily: fonts.system,
     cursor: 'pointer',
     textAlign: 'start',
-    ':hover': { backgroundColor: app.fill2 }
+    ':hover': { backgroundColor: app.fill2 },
+    ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 2 }
   },
-  chipLabel: { color: app.label2, fontFamily: fonts.system, fontWeight: weight.semibold },
-  chipValue: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' },
+  chipLabel: {
+    color: app.label2,
+    fontWeight: weight.semibold,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    flexShrink: 0
+  },
+  chipValue: {
+    marginInlineStart: 'auto',
+    fontFamily: fonts.mono,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    fontVariantNumeric: 'tabular-nums',
+    overflowWrap: 'break-word',
+    textAlign: 'end'
+  },
 
   // Custom sliders: a labelled track with a sliding thumb, real slider role.
   sliderRow: { display: 'flex', alignItems: 'center', gap: space.sm },
   sliderKey: {
     width: 18,
-    color: app.label2,
+    color: app.fg,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     fontWeight: weight.semibold,
@@ -320,18 +354,18 @@ export const styles = stylex.create({
   },
   thumbAt: (pct: number) => ({ left: `${pct}%`, transform: 'translate(-50%,-50%)' }),
   sliderVal: {
-    width: 40,
-    color: app.label2,
+    width: 44,
+    color: app.fg,
     fontFamily: fonts.mono,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
     textAlign: 'end',
     flexShrink: 0,
     fontVariantNumeric: 'tabular-nums'
   },
 
   // The harmony kind chooser: a wrapping radio group of pill options.
-  segRow: { display: 'flex', flexWrap: 'wrap', gap: space.xs },
+  segRow: { display: 'flex', flexWrap: 'wrap', gap: space.sm },
   seg: {
     minHeight: 44,
     borderWidth: 0,
@@ -357,11 +391,11 @@ export const styles = stylex.create({
   // A strip of colours the harmony or ladder produced: one tall button each,
   // the current one ringed. Heights are layout, not spacing, so they type
   // them by hand.
-  strip: { display: 'flex', gap: space.xs },
+  strip: { display: 'flex', flexWrap: 'wrap', gap: space.sm },
   stripSwatch: {
     flexGrow: 1,
     flexBasis: 0,
-    minWidth: 0,
+    minWidth: 44,
     height: 52,
     borderWidth: 0,
     borderRadius: radius.md,
@@ -388,15 +422,15 @@ export const styles = stylex.create({
   pairRow: { display: 'flex', alignItems: 'center', gap: space.sm },
   pairLabel: {
     width: 58,
-    color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    color: app.fg,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     fontWeight: weight.bold,
     textTransform: 'uppercase',
     flexShrink: 0
   },
-  pairChips: { display: 'flex', gap: space.xxs, flexWrap: 'wrap', flexGrow: 1, minWidth: 0 },
+  pairChips: { display: 'flex', gap: space.sm, flexWrap: 'wrap', flexGrow: 1, minWidth: 0 },
   // A 44pt transparent hit area around the painted 26 disc: the button is the
   // reachability, the dot inside is the swatch.
   pairChip: {
@@ -437,7 +471,7 @@ export const styles = stylex.create({
   },
   ratioWrap: { display: 'flex', alignItems: 'baseline', gap: space.xxs },
   ratioVerdicts: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, minWidth: 0 },
-  ratioCaption: { color: app.label2, fontSize: typeScale.caption2, lineHeight: leading.caption2 },
+  ratioCaption: { color: app.fg, fontSize: typeScale.footnote, lineHeight: leading.footnote, opacity: 0.72 },
   badgeGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -479,7 +513,7 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     marginBlock: 0
   },
-  previewBody: { fontSize: typeScale.footnote, lineHeight: leading.footnote, letterSpacing: tracking.footnote },
+  previewBody: { fontSize: typeScale.body, lineHeight: leading.body, letterSpacing: tracking.body },
   previewBtnRow: { display: 'flex', alignItems: 'center', gap: space.sm },
   previewBtn: {
     borderWidth: 0,
@@ -498,29 +532,38 @@ export const styles = stylex.create({
     textDecorationLine: 'underline'
   },
   previewCaption: {
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
     opacity: 0.72
   },
   pvFg: (css: string) => ({ color: css }),
   pvBg: (css: string) => ({ backgroundColor: css }),
 
-  // Saved palettes.
+  // Saved palettes: each row is a breathing column - the name with its action
+  // on the top line, the count under it, then the dot strip - with real insets
+  // on all four edges so nothing kisses the rounded edge.
   palRow: {
     display: 'flex',
-    alignItems: 'center',
-    gap: space.sm,
+    flexDirection: 'column',
+    gap: space.xs,
     minWidth: 0,
     borderRadius: radius.lg,
-    paddingBlock: space.xs,
-    paddingInline: space.xs,
+    padding: space.md,
     transitionProperty: 'background-color',
     transitionDuration: '.18s',
+    animationName: { default: rowIn, [reduce]: 'none' },
+    animationDuration: '.22s',
+    animationTimingFunction: easing.out,
     ':hover': { backgroundColor: app.fill3 }
   },
-  palInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: space.xxs },
+  palHead: { display: 'flex', alignItems: 'center', gap: space.sm, minWidth: 0 },
   palName: {
+    flexGrow: 1,
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: 44,
     fontWeight: weight.semibold,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
@@ -529,9 +572,8 @@ export const styles = stylex.create({
     whiteSpace: 'nowrap',
     borderWidth: 0,
     borderRadius: radius.sm,
-    paddingBlock: space.xs,
-    paddingInline: space.xxs,
-    marginInlineStart: -2,
+    paddingBlock: 0,
+    paddingInline: space.xs,
     backgroundColor: 'transparent',
     color: app.fg,
     textAlign: 'start',
@@ -540,12 +582,28 @@ export const styles = stylex.create({
     ':focus-visible': { outlineWidth: 2, outlineStyle: 'solid', outlineColor: app.link, outlineOffset: 1 }
   },
   palMeta: {
-    color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    fontVariantNumeric: 'tabular-nums'
+    color: app.fg,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    fontVariantNumeric: 'tabular-nums',
+    paddingInline: space.xs,
+    opacity: 0.72
   },
-  palStrip: { display: 'flex', gap: space.xxs, flexWrap: 'wrap' },
+  palStrip: { display: 'flex', gap: space.sm, flexWrap: 'wrap' },
+  // The inline confirm replaces the row's content at full row height.
+  palConfirm: { display: 'flex', alignItems: 'center', gap: space.sm, minHeight: 44, minWidth: 0 },
+  palConfirmText: {
+    flexGrow: 1,
+    minWidth: 0,
+    fontWeight: weight.semibold,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    paddingInline: space.xs
+  },
+  palConfirmActions: { display: 'flex', alignItems: 'center', gap: space.sm, flexShrink: 0 },
   // Same reachability story as the pair chips: a 44pt transparent hit area
   // around the painted dot; the strip wraps when a palette is wide.
   palDotHit: {
@@ -572,17 +630,19 @@ export const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: space.xs,
-    paddingBlock: space.lg,
-    color: app.label2,
+    gap: space.sm,
+    paddingBlock: space.xl,
+    paddingInline: space.lg,
+    color: app.fg,
     textAlign: 'center',
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote
   },
   palEmptyIcon: { color: app.label3 },
 
-  // Sheets share the kit Sheet chrome; bodies stack actions full-width.
-  sheetBody: { display: 'flex', flexDirection: 'column', gap: space.md },
+  // Sheets share the kit Sheet chrome, which ships zero body insets; bodies
+  // own their padding and stack actions full-width.
+  sheetBody: { display: 'flex', flexDirection: 'column', gap: space.md, padding: space.lg },
   sheetTitle: {
     marginBlock: 0,
     fontSize: typeScale.title3,
@@ -590,11 +650,17 @@ export const styles = stylex.create({
     letterSpacing: tracking.title3,
     fontWeight: weight.bold
   },
-  sheetHint: { marginBlock: 0, color: app.label2, fontSize: typeScale.footnote, lineHeight: leading.footnote },
+  sheetHint: {
+    marginBlock: 0,
+    color: app.fg,
+    fontSize: typeScale.subheadline,
+    lineHeight: leading.subheadline,
+    opacity: 0.72
+  },
   sheetField: { width: '100%', boxSizing: 'border-box' },
   sheetStrip: { display: 'flex', gap: space.xs, borderRadius: radius.md, overflow: 'hidden' },
   sheetSwatch: { flexGrow: 1, flexBasis: 0, height: 36, minWidth: 0 },
-  actionStack: { display: 'flex', flexDirection: 'column', gap: space.xs },
+  actionStack: { display: 'flex', flexDirection: 'column', gap: space.sm },
   hit44: { minHeight: 44, justifyContent: 'center' },
   btnDanger: { color: colors.white },
 
@@ -604,12 +670,13 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 18,
-    color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
-    textAlign: 'center'
+    minHeight: 20,
+    color: app.fg,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    letterSpacing: tracking.footnote,
+    textAlign: 'center',
+    opacity: 0.72
   },
   statusIn: {
     animationName: { default: fadeIn, [reduce]: 'none' },

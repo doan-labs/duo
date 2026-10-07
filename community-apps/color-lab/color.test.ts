@@ -19,11 +19,14 @@ import {
   inkFor,
   luminance,
   MAX_PALETTES,
+  mergeAcks,
+  mergePalWire,
   newDoc,
   newPalette,
-  palOpDone,
+  PAL_OP_WINDOW,
   parseColor,
   parseColorFull,
+  parseCore,
   parseDocJson,
   parsePalettes,
   parseShared,
@@ -35,6 +38,7 @@ import {
   rgb,
   rgbEq,
   rgbToHsl,
+  type SavedPalette,
   SEED_COLOR,
   serializeDoc,
   serializePalettes,
@@ -387,27 +391,138 @@ check('palettes survive serialize/parse round trip', () => {
   )
   eq(dup.length, 1, 'duplicate ids deduped')
 })
-check('palette ops apply and settle', () => {
+check('palette ops apply', () => {
   const a = newPalette('A', [rgb(255, 0, 0)])
   const b = newPalette('B', [rgb(0, 0, 255)])
-  const addA = { id: 'o1', kind: 'add' as const, palette: a }
-  const addB = { id: 'o2', kind: 'add' as const, palette: b }
+  const addA = { id: 'o1', seq: 1, kind: 'add' as const, palette: a }
   let items = applyPalOp([], addA)
-  ok(palOpDone(items, addA), 'add settles')
   // The concurrent case: B was added onto a base that never saw A; replaying
-  // the unsettled add-A op merges it without losing B.
+  // the add-A op merges it without losing B.
   items = applyPalOp([b], addA)
   eq(items.length, 2, 'replayed add merges')
-  ok(palOpDone(items, addA) && palOpDone(items, addB), 'both settled')
-  const rn = { id: 'o3', kind: 'rename' as const, target: a.id, name: 'Renamed' }
+  const rn = { id: 'o3', seq: 3, kind: 'rename' as const, target: a.id, name: 'Renamed' }
   items = applyPalOp(items, rn)
   eq(items.find((p) => p.id === a.id)!.name, 'Renamed', 'rename applied')
-  ok(palOpDone(items, rn), 'rename settles')
-  const del = { id: 'o4', kind: 'delete' as const, target: b.id }
+  const del = { id: 'o4', seq: 4, kind: 'delete' as const, target: b.id }
   items = applyPalOp(items, del)
-  ok(palOpDone(items, del), 'delete settles')
   eq(items.length, 1, 'B gone')
-  ok(!palOpDone(items, addB), 'deleted add reports unsettled')
+})
+
+// ---- causal op settlement: mergePalWire drives the shared-library merge ----
+
+const pal = (id: string, name: string): SavedPalette => ({
+  id,
+  name,
+  colors: [rgb(9, 9, 9)],
+  updatedAt: 1
+})
+const rn = (w: string, seq: number, target: string, name: string) => ({
+  id: `${w}:${seq}`,
+  seq,
+  kind: 'rename' as const,
+  target,
+  name
+})
+const add = (w: string, seq: number, p: SavedPalette) => ({ id: `${w}:${seq}`, seq, kind: 'add' as const, palette: p })
+const del = (w: string, seq: number, target: string) => ({ id: `${w}:${seq}`, seq, kind: 'delete' as const, target })
+check('ops settle by writer watermark past the wire window', () => {
+  // The S4/S5 failures: more renames than the trailing op window. The op log
+  // must drop ops only when a foreign watermark covers them, so a publish
+  // whose window no longer echoes them still settles causally.
+  const all: { id: string; seq: number; kind: 'rename'; target: string; name: string }[] = []
+  for (let i = 1; i <= 26; i++) all.push(rn('I', i, 't', `R${i}`))
+  const theirList = all.reduce((items, op) => applyPalOp(items, op), [pal('t', 'Main')])
+  // The foreign publish saw everything, but its ops window holds only 24.
+  const first = mergePalWire({ pals: theirList, ops: all.slice(-PAL_OP_WINDOW), acks: { I: 26 } }, all, 'I', 0)
+  eq(first.merged[0]!.name, 'R26', 'final name adopted')
+  eq(first.replayed.length, 0, 'covered ops settle, none replay')
+  eq(first.ops.length, PAL_OP_WINDOW, 'one window-deep settled tail kept')
+  // A regressed publish (watermark 2, stale list) replays the settled tail.
+  // Its ops window echoes only what that older writer had actually seen.
+  const stale = mergePalWire(
+    { pals: [pal('t', 'R2')], ops: all.slice(0, 2), acks: { I: 2 } },
+    first.ops,
+    'I',
+    first.maxAck
+  )
+  eq(stale.merged[0]!.name, 'R26', 'regressed publish still lands every op')
+  eq(stale.maxAck, 26, 'watermark never goes backwards')
+})
+check('delete stays deleted after the add scrolls out of the window', () => {
+  // The S6 failure: add, fill the window with renames, delete. Existence-based
+  // settle let the evicted add replay over the delete.
+  const ops: ReturnType<typeof rn>[] = []
+  let list = applyPalOp([], add('I', 1, pal('tmp', 'Temp')))
+  ops.push(rn('I', 2, 'tmp', 'x'))
+  for (let i = 3; i <= 24; i++) ops.push(rn('I', i, 'tmp', `R${i}`))
+  list = ops.reduce((items, op) => applyPalOp(items, op), list)
+  list = applyPalOp(list, del('I', 25, 'tmp'))
+  // Foreign publish has the empty list and full coverage of writer I.
+  const r = mergePalWire(
+    {
+      pals: [],
+      ops: [add('I', 1, pal('tmp', 'Temp')), ...ops, del('I', 25, 'tmp')].slice(-PAL_OP_WINDOW),
+      acks: { I: 25 }
+    },
+    [add('I', 1, pal('tmp', 'Temp')), ...ops, del('I', 25, 'tmp')],
+    'I',
+    0
+  )
+  eq(r.merged.length, 0, 'temp stays deleted')
+  eq(r.replayed.length, 0, 'nothing replays over the delete')
+})
+check('unsettled ops replay onto foreign state in seq order', () => {
+  const mine = [add('I', 1, pal('a', 'A')), rn('I', 2, 'a', 'A2')]
+  // Foreign publish knows nothing of my ops.
+  const r = mergePalWire({ pals: [pal('b', 'B')], ops: [], acks: {} }, mine, 'I', 0)
+  eq(r.merged.length, 2, 'both lists merged')
+  eq(r.merged.find((p) => p.id === 'a')!.name, 'A2', 'rename replayed')
+  eq(r.ops.length, 2, 'unacked ops stay in the log')
+  // Now the publisher covers them: they settle on the next adopt and stay in
+  // the log only as the bounded repair tail.
+  const ack = mergePalWire({ pals: r.merged, ops: mine, acks: { I: 2 } }, r.ops, 'I', r.maxAck)
+  eq(ack.replayed.length, 0, 'covered ops never replay')
+  eq(ack.maxAck, 2, 'watermark advanced')
+})
+check('echoed ids settle even without a watermark', () => {
+  // An old publisher that never learned to emit acks still settles ops it
+  // echoes inside the window.
+  const mine = [add('I', 1, pal('a', 'A'))]
+  const r = mergePalWire(
+    { pals: mine.map((o) => (o.kind === 'add' ? o.palette : pal('x', 'x'))), ops: mine },
+    mine,
+    'I',
+    0
+  )
+  eq(r.replayed.length, 0, 'echoed op does not replay')
+})
+check('a 100-op burst converges and the log stays bounded', () => {
+  const all: ReturnType<typeof rn>[] = []
+  for (let i = 1; i <= 100; i++) all.push(rn('I', i, 't', `R${i}`))
+  const theirList = all.reduce((items, op) => applyPalOp(items, op), [pal('t', 'Main')])
+  // Two-round convergence: cover in one publish, settle on the next.
+  const a = mergePalWire({ pals: theirList, ops: all.slice(-PAL_OP_WINDOW), acks: { I: 100 } }, all, 'I', 0)
+  eq(a.merged[0]!.name, 'R100', 'all 100 applied')
+  eq(a.replayed.length, 0, 'nothing replays once the watermark covers them')
+  eq(a.ops.length, PAL_OP_WINDOW, 'log bounded to the settled tail')
+  // Alternating concurrent writes from two writers: each side's unacked ops
+  // replay over the other's publish; neither copy loses the other's data.
+  const iOps = [add('I', 1, pal('ia', 'IA'))]
+  const kOps = [add('K', 1, pal('kb', 'KB'))]
+  const kSeesI = mergePalWire({ pals: [pal('ia', 'IA')], ops: [...iOps], acks: { I: 1 } }, kOps, 'K', 0)
+  eq(kSeesI.merged.length, 2, 'peer sees both adds')
+  const iSeesK = mergePalWire({ pals: [pal('kb', 'KB')], ops: [...kOps], acks: { K: 1 } }, iOps, 'I', 0)
+  eq(iSeesK.merged.length, 2, 'both converge to two palettes')
+})
+check('mergeAcks keeps watermarks monotone and bounded', () => {
+  const into: Record<string, number> = { me: 5 }
+  mergeAcks(into, { me: 3, k: 9 }, 'me')
+  eq(into.me, 5, 'my own watermark never regresses')
+  eq(into.k, 9, 'foreign watermark learned')
+  mergeAcks(into, { k: 4 }, 'me')
+  eq(into.k, 9, 'lower foreign claim ignored')
+  mergeAcks(into, { junk: Number.NaN, neg: -2, frac: 1.5 }, 'me')
+  ok(into.junk === undefined && into.neg === undefined && into.frac === undefined, 'non-integer acks rejected')
 })
 check('shared state survives serialize/parse round trip', () => {
   const d = newDoc(rgb(10, 20, 30))
@@ -416,7 +531,8 @@ check('shared state survives serialize/parse round trip', () => {
     by: 'writer-id',
     doc: d,
     pals: [pal],
-    ops: [{ id: 'w1', kind: 'add', palette: pal }],
+    ops: [{ id: 'w1:1', seq: 1, kind: 'add', palette: pal }],
+    acks: { 'writer-id': 1 },
     view: {
       field: 'ff0000',
       fieldErr: false,
@@ -437,6 +553,7 @@ check('shared state survives serialize/parse round trip', () => {
   eq(back!.pals?.length, 1, 'library on the wire')
   eq(back!.pals?.[0]?.harmony, 'analogous', 'palette harmony on the wire')
   eq(back!.ops?.length, 1, 'op window on the wire')
+  eq(back!.acks!['writer-id'], 1, 'watermarks parsed')
   eq(parseShared('{}'), null, 'empty object rejected')
   eq(parseShared('{"by":"x","doc":null}'), null, 'missing doc rejected')
   const legacy = parseShared(
@@ -457,6 +574,57 @@ check('shared state survives serialize/parse round trip', () => {
     })
   )
   ok(legacy !== null && legacy.pals === undefined, 'writes without a library leave it alone')
+})
+check('wire payload repair keeps the shared library sound', () => {
+  const d = newDoc(rgb(1, 2, 3))
+  const mk = (extra: string) =>
+    `{"by":"w","doc":${serializeDoc(d)},"view":{"field":"","fieldErr":false,"page":false,"sheet":null,"nameInput":"","actionId":null,"deleteId":null,"copyText":null,"muted":false}${extra}}`
+  // Duplicate ids and overflow dedupe and cap rather than corrupt the list.
+  const pals = JSON.stringify([
+    { id: 'a', name: 'A', colors: [{ r: 1, g: 2, b: 3 }], updatedAt: 1 },
+    { id: 'a', name: 'A2', colors: [{ r: 4, g: 5, b: 6 }], updatedAt: 2 },
+    ...Array.from({ length: 30 }, (_, i) => ({
+      id: `x${i}`,
+      name: `X${i}`,
+      colors: [{ r: 1, g: 1, b: 1 }],
+      updatedAt: i
+    }))
+  ])
+  const s = parseShared(mk(`,"pals":${pals}`))
+  eq(s!.pals!.length, MAX_PALETTES, 'wire pals capped')
+  eq(s!.pals!.filter((p) => p.id === 'a').length, 1, 'duplicate ids deduped')
+  // Ops without a monotonic seq are dropped from the window wholesale.
+  const mixed = parseShared(
+    mk(
+      `,"pals":[],"ops":[{"id":"w:1","kind":"delete","target":"a"},{"id":"w:2","seq":2,"kind":"delete","target":"b"},{"id":"w:x","seq":"y","kind":"delete","target":"c"}]`
+    )
+  )
+  eq(mixed!.ops!.length, 1, 'seq-less ops dropped')
+  eq(mixed!.ops![0]!.id, 'w:2', 'only the sequenced op kept')
+  // Ack payloads accept integers >= 0 only.
+  const ack = parseShared(mk(',"pals":[],"acks":{"w":3,"bad":-1,"nan":"x","frac":1.2}'))
+  eq(ack!.acks!.w, 3, 'valid watermark kept')
+  ok(
+    ack!.acks!.bad === undefined && ack!.acks!.nan === undefined && ack!.acks!.frac === undefined,
+    'bad watermarks dropped'
+  )
+})
+check('wire core repair preserves intent but rejects forged hsl', () => {
+  const base = { harmony: 'analogous', pair: { fg: rgb(0, 0, 0), bg: rgb(255, 255, 255) } }
+  // A quantized color that legitimately matches the authored hsl keeps the
+  // authored intent (achromatic round trip).
+  const grey = parseCore({ ...base, color: { r: 148, g: 148, b: 148 }, hsl: { h: 30, s: 0, l: 0.58 } })!
+  eq(grey.hsl.h, 30, 'authored achromatic hue kept')
+  eq(grey.hsl.l, 0.58, 'authored lightness kept')
+  // An hsl that does not quantize to the color is a forgery: rgb wins.
+  const bad = parseCore({ ...base, color: { r: 57, g: 130, b: 239 }, hsl: { h: 10, s: 0.8, l: 0.4 } })!
+  ok(!hslEq(bad.hsl, { h: 10, s: 0.8, l: 0.4 }), 'forged hsl repaired')
+  const roundtrip = hslToRgb(bad.hsl)
+  ok(Math.abs(roundtrip.r - 57) <= 1 && Math.abs(roundtrip.g - 130) <= 1, 'repaired hsl tracks color')
+  eq(parseCore({ ...base, color: { r: Number.NaN, g: 0, b: 0 } }), null, 'non-finite color rejected')
+  eq(parseCore({ ...base, color: { r: 300, g: 0, b: 0 } }), null, 'out-of-range color rejected')
+  const broken = parseCore({ ...base, color: { r: 1, g: 2, b: 3 }, hsl: { h: Number.NaN, s: 0.5, l: 0.5 } })!
+  ok(broken !== null && hslEq(broken.hsl, rgbToHsl(rgb(1, 2, 3))), 'non-finite hsl repaired, not trusted')
 })
 check('exportCodes writes one unambiguous line', () => {
   const text = exportCodes([rgb(255, 0, 0), rgb(0, 0, 255)], 'Deck')

@@ -23,14 +23,17 @@ import {
   hslEq,
   hslToRgb,
   inkFor,
+  MAX_PALETTES,
+  mergeAcks,
+  mergePalWire,
   newDoc,
   newPalette,
   PAL_OP_WINDOW,
+  PAL_PENDING_LIMIT,
   type Pair,
   type PalOp,
   pairChoices,
   palListEq,
-  palOpDone,
   parseColorFull,
   parseDocJson,
   parsePalettes,
@@ -58,6 +61,7 @@ import { styles } from './styles.ts'
 
 type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
+/** One incarnation of this copy; also the writer id palette ops are keyed by. */
 const ME = crypto.randomUUID()
 const SESSION_KEY = 'colorlab-doc'
 const STORE_DOC = 'colorlab-doc'
@@ -104,6 +108,18 @@ addEventListener(
   },
   true
 )
+
+/**
+ * Focus is single-owner state across the two displays: a focus() inside the
+ * hidden iframe steals top-level focus from the visible copy. Every focus move
+ * goes through here so the check reads os.view.active at fire time (a callback
+ * may have been scheduled while the copy was still owning) and the target is
+ * confirmed still mounted. The hidden copy simply never calls it.
+ */
+const focusIfActive = (el: HTMLElement | null | undefined) => {
+  if (!el || !os.view.active || !document.contains(el)) return
+  el.focus()
+}
 
 /** One labelled H/S/L row: a painted track, a thumb, pointer and keyboard driven. */
 function Slider(props: {
@@ -189,7 +205,11 @@ function Slider(props: {
 }
 
 /** Wrapping radio group for the five harmonies, with roving arrow-key focus. */
-function HarmonyPicker(props: { value: HarmonyKind; onPick: (k: HarmonyKind) => void }) {
+function HarmonyPicker(props: {
+  value: HarmonyKind
+  onPick: (k: HarmonyKind) => void
+  press: typeof shared.press | typeof styles.pressPlain
+}) {
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   return (
     <div role="radiogroup" aria-label="Harmony" {...stylex.props(styles.segRow)}>
@@ -206,7 +226,7 @@ function HarmonyPicker(props: { value: HarmonyKind; onPick: (k: HarmonyKind) => 
             role="radio"
             aria-checked={on}
             tabIndex={on ? 0 : -1}
-            {...stylex.props(styles.seg, on && styles.segOn, shared.press)}
+            {...stylex.props(styles.seg, on && styles.segOn, props.press)}
             onClick={() => props.onPick(k)}
             onKeyDown={(e) => {
               let step = 0
@@ -231,7 +251,7 @@ function GuardedSheet(props: { open: boolean; onClose: () => void; label: string
   const bodyId = `${dialogId}-body`
   useEffect(() => {
     if (!props.open) return
-    document.getElementById(bodyId)?.querySelector<HTMLElement>('input, button')?.focus()
+    focusIfActive(document.getElementById(bodyId)?.querySelector<HTMLElement>('input, button'))
     // Focus restore lives in ColorLab on the sheet-stack closing edge: a
     // swap between sibling sheets must not drop the original row trigger.
   }, [props.open, bodyId])
@@ -275,6 +295,10 @@ function ColorLab() {
   const [darkMode, setDarkMode] = useState(false)
   const [note, setNote] = useState('')
   const [fieldEditing, setFieldEditing] = useState(false)
+  // shared.press animates a transform under :active with no reduced-motion
+  // override in the kit; under reduce, tappables switch to the same timing
+  // but an outline press state so press feedback stays clear without motion.
+  const [reduceMotion, setReduceMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
 
   const docRef = useRef<Doc | null>(null)
   const uiRef = useRef<UiState>(UI0)
@@ -287,12 +311,19 @@ function ColorLab() {
   const skipFinalize = useRef(false)
   const pendingShared = useRef<Doc | null>(null)
   const publishRaf = useRef(0)
-  // The palette library: wire-authoritative, plus my unconfirmed writes.
+  // The palette library: wire-authoritative, plus my own op log. Entries
+  // below the highest foreign watermark are dropped once they fall outside
+  // the window-deep settled tail that repairs regressed publishes.
   const palsRef = useRef<SavedPalette[]>([])
   const palsWireOps = useRef<PalOp[]>([])
-  const pendingPalOps = useRef<PalOp[]>([])
+  const myPalOps = useRef<PalOp[]>([])
   const persistedPals = useRef<string | null>(null)
   const palOpSeq = useRef(0)
+  const myPalAck = useRef(0)
+  // Per-writer watermarks: the highest seq of each writer's palette ops whose
+  // effects this copy's list already incorporates. My own entry always tracks
+  // palOpSeq; foreign entries fold in from adopted publishes via mergeAcks.
+  const palsAcks = useRef<Record<string, number>>({})
   const ellipsisRefs = useRef(new Map<string, HTMLElement>())
   const deleteCancelRef = useRef<HTMLButtonElement | null>(null)
   const saveActionRef = useRef<HTMLButtonElement | null>(null)
@@ -311,6 +342,12 @@ function ColorLab() {
   const [wideRef, wide] = useWide<HTMLElement>(620)
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
+  useEffect(() => {
+    const mq = matchMedia('(prefers-reduced-motion: reduce)')
+    const on = (e: MediaQueryListEvent) => setReduceMotion(e.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
   }, [])
@@ -342,7 +379,8 @@ function ColorLab() {
             muted: nextUi.muted
           },
           pals: palsRef.current,
-          ops: palsWireOps.current
+          ops: palsWireOps.current,
+          acks: { ...palsAcks.current, [ME]: palOpSeq.current }
         })
       )
       .catch(() => {})
@@ -503,25 +541,30 @@ function ColorLab() {
           muted: shared.view.muted
         })
         if (shared.pals !== undefined) {
-          // Foreign writes adopt wholesale, then any of my own ops the wire
-          // has not settled yet replay onto the adopted list in order. The
-          // merge republishes once so the library converges on both copies.
-          const seen = new Set((shared.ops ?? []).map((o) => o.id))
-          let merged = shared.pals
-          const keep: PalOp[] = []
-          for (const op of pendingPalOps.current) {
-            if (seen.has(op.id) || palOpDone(merged, op)) continue
-            const next = applyPalOp(merged, op)
-            if (palListEq(next, merged)) continue
-            merged = next
-            keep.push(op)
-          }
-          pendingPalOps.current = keep
-          palsRef.current = merged
-          setPalettes(merged)
-          persistPals(merged)
-          palsWireOps.current = [...(shared.ops ?? []), ...keep].slice(-PAL_OP_WINDOW)
-          if (keep.length && !palListEq(merged, shared.pals)) publish(shared.doc, uiRef.current)
+          // Foreign writes adopt wholesale, then my own ops the publisher has
+          // not incorporated replay onto the adopted list in seq order. An op
+          // stops needing replay exactly when a foreign watermark covers its
+          // seq or it echoes inside the wire window - never by whether its
+          // target happens to exist, which is what let ops evicted from the
+          // trailing window resurrect deleted palettes. A publish whose
+          // watermark for me regresses below what an earlier publisher
+          // already covered still re-replays those ops: the log keeps a
+          // settled tail one window deep. The merge republishes once so the
+          // library converges on both copies.
+          mergeAcks(palsAcks.current, shared.acks, ME)
+          const r = mergePalWire(
+            { pals: shared.pals, ops: shared.ops, acks: shared.acks },
+            myPalOps.current,
+            ME,
+            myPalAck.current
+          )
+          myPalAck.current = r.maxAck
+          myPalOps.current = r.ops
+          palsRef.current = r.merged
+          setPalettes(r.merged)
+          persistPals(r.merged)
+          palsWireOps.current = [...(shared.ops ?? []), ...r.replayed].slice(-PAL_OP_WINDOW)
+          if (r.replayed.length && !palListEq(r.merged, shared.pals)) publish(shared.doc, uiRef.current)
         }
       }
       return
@@ -559,16 +602,19 @@ function ColorLab() {
     persistPals
   ])
 
-  /** Queue one library write: apply to the freshest list, append the op so a
-   *  peer can settle it, then publish the whole shared state. */
+  /** Queue one library write: apply to the freshest list, stamp the op with my
+   *  incarnation id and seq, then publish the whole shared state. The op stays
+   *  in the log until a foreign publish acknowledges it through my watermark. */
   const queuePalOp = useCallback(
-    (op: DistOmit<PalOp, 'id'>) => {
-      const full = { ...op, id: `${ME}:${++palOpSeq.current}` } as PalOp
+    (op: DistOmit<PalOp, 'id' | 'seq'>) => {
+      const seq = ++palOpSeq.current
+      const full = { ...op, id: `${ME}:${seq}`, seq } as PalOp
       const next = applyPalOp(palsRef.current, full)
       palsRef.current = next
       setPalettes(next)
+      palsAcks.current[ME] = seq
       palsWireOps.current = [...palsWireOps.current, full].slice(-PAL_OP_WINDOW)
-      pendingPalOps.current = [...pendingPalOps.current, full].slice(-32)
+      myPalOps.current = [...myPalOps.current, full].slice(-PAL_PENDING_LIMIT)
       persistPals(next)
       const d = docRef.current
       if (d) publish(d, uiRef.current)
@@ -588,7 +634,7 @@ function ColorLab() {
     const id = uiRef.current.deleteId
     patchUi({ deleteId: null })
     requestAnimationFrame(() => {
-      if (id) ellipsisRefs.current.get(id)?.focus()
+      if (id) focusIfActive(ellipsisRefs.current.get(id))
     })
   }, [patchUi])
 
@@ -627,7 +673,7 @@ function ColorLab() {
       }
       try {
         const el = copyFieldRef.current
-        if (el) {
+        if (el && os.view.active) {
           el.focus()
           el.select()
           if (document.execCommand('copy')) {
@@ -689,6 +735,12 @@ function ColorLab() {
   const doSave = useCallback(() => {
     const d = docRef.current
     if (!d) return
+    if (palsRef.current.length >= MAX_PALETTES) {
+      // No silent eviction of the oldest entry: block and say why.
+      play('error')
+      announce(`Palette library is full (${MAX_PALETTES}) - delete one to save another`)
+      return
+    }
     const colors = harmonyColors(d.hsl, d.harmony).map(hslToRgb)
     const pal = newPalette(uiRef.current.nameInput || `Palette ${palsRef.current.length + 1}`, colors, d.harmony)
     queuePalOp({ kind: 'add', palette: pal })
@@ -723,7 +775,7 @@ function ColorLab() {
     play('remove')
     announce('Palette deleted')
     // The row unmounts with the delete: move focus to a stable control.
-    requestAnimationFrame(() => saveActionRef.current?.focus())
+    requestAnimationFrame(() => focusIfActive(saveActionRef.current))
   }, [queuePalOp, patchUi, play, announce])
 
   const adoptColor = useCallback(
@@ -759,7 +811,7 @@ function ColorLab() {
     if (ui.sheet === null && lastSheet.current !== null) {
       const t = sheetTrigger.current
       sheetTrigger.current = null
-      if (t && document.contains(t)) requestAnimationFrame(() => t.focus())
+      if (t && document.contains(t)) requestAnimationFrame(() => focusIfActive(t))
     }
     lastSheet.current = ui.sheet
   }, [ui.sheet])
@@ -767,9 +819,16 @@ function ColorLab() {
   // The inline delete confirm takes focus on show so keyboard users land on it.
   useEffect(() => {
     if (ui.deleteId === null) return
-    const raf = requestAnimationFrame(() => deleteCancelRef.current?.focus())
+    const raf = requestAnimationFrame(() => focusIfActive(deleteCancelRef.current))
     return () => cancelAnimationFrame(raf)
   }, [ui.deleteId])
+
+  // An armed confirm stays bound to the palette id it was armed on; if the
+  // row's palette leaves the live library while armed (peer delete or stale
+  // hydration), the confirm invalidates instead of pointing at nothing.
+  useEffect(() => {
+    if (ui.deleteId !== null && !palettes.some((p) => p.id === ui.deleteId)) patchUi({ deleteId: null })
+  }, [ui.deleteId, palettes, patchUi])
 
   // App-level undo/redo keys; text inputs keep the browser's own undo.
   useEffect(() => {
@@ -802,6 +861,7 @@ function ColorLab() {
   const ladder = variations(hslNow).map(hslToRgb)
   const ratio = contrast(doc.pair.fg, doc.pair.bg)
   const v = verdict(ratio)
+  const press = reduceMotion ? styles.pressPlain : shared.press
   const chipChoices = pairChoices(doc)
   const fg = toHex(doc.pair.fg)
   const bg = toHex(doc.pair.bg)
@@ -860,7 +920,7 @@ function ColorLab() {
     <button
       type="button"
       aria-label={`Current colour ${hex}. Activate to copy the hex code.`}
-      {...stylex.props(styles.hero, shared.press, styles.heroFill(hex))}
+      {...stylex.props(styles.hero, press, styles.heroFill(hex))}
       onClick={() => void copyText(hex, 'Hex')}
     >
       <span {...stylex.props(styles.heroHex, styles.heroInk(toHex(ink)))}>{hex}</span>
@@ -889,7 +949,9 @@ function ColorLab() {
           onFocus={() => {
             setFieldEditing(true)
             editBase.current = coreOf(doc)
-            requestAnimationFrame(() => fieldRef.current?.select())
+            requestAnimationFrame(() => {
+              if (os.view.active) fieldRef.current?.select()
+            })
           }}
           onBlur={() => {
             setFieldEditing(false)
@@ -917,9 +979,14 @@ function ColorLab() {
           spellCheck={false}
         />
       </div>
-      <span {...stylex.props(ui.fieldErr ? styles.fieldErr : styles.fieldHint)}>
-        {ui.fieldErr ? 'Not a recognised colour code' : 'Type hex, rgb() or hsl() - Enter applies'}
-      </span>
+      {ui.fieldErr ? (
+        // role=alert: the error announces the moment it appears.
+        <span role="alert" {...stylex.props(styles.fieldErr)}>
+          Not a recognised colour code
+        </span>
+      ) : (
+        <span {...stylex.props(styles.fieldHint)}>Type hex, rgb() or hsl() - Enter applies</span>
+      )}
       <div {...stylex.props(styles.chipRow)}>
         {(
           [
@@ -932,7 +999,7 @@ function ColorLab() {
             key={label}
             type="button"
             aria-label={`Copy ${label} ${value}`}
-            {...stylex.props(styles.chip, shared.press)}
+            {...stylex.props(styles.chip, press)}
             onClick={() => void copyText(value, label)}
           >
             <span {...stylex.props(styles.chipLabel)}>{label}</span>
@@ -985,6 +1052,7 @@ function ColorLab() {
       <HarmonyPicker
         value={doc.harmony}
         onPick={(k) => commitCore({ harmony: k }, 'pick', `${HARMONY_LABEL[k]} harmony`)}
+        press={press}
       />
       <div {...stylex.props(styles.strip)} role="listbox" aria-label="Harmony colours">
         {strip.map((c, i) => {
@@ -1000,7 +1068,7 @@ function ColorLab() {
               {...stylex.props(
                 styles.stripSwatch,
                 styles.stripCell,
-                shared.press,
+                press,
                 styles.paint(toHex(c)),
                 on && styles.stripOn
               )}
@@ -1029,7 +1097,7 @@ function ColorLab() {
               {...stylex.props(
                 styles.stripSwatch,
                 styles.stripCell,
-                shared.press,
+                press,
                 styles.paint(toHex(c)),
                 on && styles.stripOn
               )}
@@ -1048,7 +1116,7 @@ function ColorLab() {
         <button
           type="button"
           aria-label="Swap text and surface colours"
-          {...stylex.props(styles.sectionAction, shared.press)}
+          {...stylex.props(styles.sectionAction, press)}
           onClick={() => commitCore({ pair: { fg: doc.pair.bg, bg: doc.pair.fg } }, 'pick', 'Text and surface swapped')}
         >
           Swap
@@ -1074,7 +1142,7 @@ function ColorLab() {
                     aria-checked={on}
                     aria-label={toHex(c)}
                     title={toHex(c)}
-                    {...stylex.props(styles.pairChip, shared.press)}
+                    {...stylex.props(styles.pairChip, press)}
                     onClick={() => setPair(which, c)}
                   >
                     <span {...stylex.props(styles.pairDot, styles.paint(toHex(c)), on && styles.pairChipOn)} />
@@ -1129,7 +1197,7 @@ function ColorLab() {
         <button
           type="button"
           ref={saveActionRef}
-          {...stylex.props(styles.sectionAction, shared.press)}
+          {...stylex.props(styles.sectionAction, press)}
           onClick={() => patchUi({ sheet: 'save', nameInput: '' })}
         >
           Save current
@@ -1146,23 +1214,23 @@ function ColorLab() {
         palettes.map((p) => (
           <div key={p.id} {...stylex.props(styles.palRow)}>
             {ui.deleteId === p.id ? (
-              <>
-                <span {...stylex.props(styles.palInfo)}>
-                  <span {...stylex.props(styles.palName)}>Delete {p.name}?</span>
-                </span>
-                <Button variant="plain" ref={deleteCancelRef} onClick={dismissDelete}>
-                  Cancel
-                </Button>
-                <Button variant="filled" onClick={doDelete}>
-                  Delete
-                </Button>
-              </>
+              <div {...stylex.props(styles.palConfirm)}>
+                <span {...stylex.props(styles.palConfirmText)}>Delete {p.name}?</span>
+                <div {...stylex.props(styles.palConfirmActions)}>
+                  <Button variant="plain" ref={deleteCancelRef} xstyle={styles.hit44} onClick={dismissDelete}>
+                    Cancel
+                  </Button>
+                  <Button variant="filled" xstyle={styles.hit44} onClick={doDelete}>
+                    Delete
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
-                <div {...stylex.props(styles.palInfo)}>
+                <div {...stylex.props(styles.palHead)}>
                   <button
                     type="button"
-                    {...stylex.props(styles.palName, shared.press)}
+                    {...stylex.props(styles.palName, press)}
                     aria-label={`Open palette ${p.name}`}
                     onClick={() => {
                       const first = p.colors[0]
@@ -1171,34 +1239,34 @@ function ColorLab() {
                   >
                     {p.name}
                   </button>
-                  <span {...stylex.props(styles.palMeta)}>{p.colors.length} colours</span>
-                  <div {...stylex.props(styles.palStrip)}>
-                    {p.colors.map((c, i) => (
-                      <button
-                        // biome-ignore lint/suspicious/noArrayIndexKey: swatch position is identity and never reorders
-                        key={i}
-                        type="button"
-                        aria-label={`${p.name} colour ${toHex(c)}`}
-                        title={toHex(c)}
-                        {...stylex.props(styles.palDotHit, shared.press)}
-                        onClick={() => adoptColor(c, p.harmony)}
-                      >
-                        <span {...stylex.props(styles.palDot, styles.paint(toHex(c)))} />
-                      </button>
-                    ))}
-                  </div>
+                  <IconButton
+                    name="ellipsis"
+                    variant="plain"
+                    aria-label={`Actions for ${p.name}`}
+                    xstyle={[styles.icon44, press]}
+                    ref={(el: HTMLButtonElement | null) => {
+                      if (el) ellipsisRefs.current.set(p.id, el)
+                      else ellipsisRefs.current.delete(p.id)
+                    }}
+                    onClick={() => patchUi({ sheet: 'palette', actionId: p.id })}
+                  />
                 </div>
-                <IconButton
-                  name="ellipsis"
-                  variant="plain"
-                  aria-label={`Actions for ${p.name}`}
-                  xstyle={styles.icon44}
-                  ref={(el: HTMLButtonElement | null) => {
-                    if (el) ellipsisRefs.current.set(p.id, el)
-                    else ellipsisRefs.current.delete(p.id)
-                  }}
-                  onClick={() => patchUi({ sheet: 'palette', actionId: p.id })}
-                />
+                <span {...stylex.props(styles.palMeta)}>{p.colors.length} colours</span>
+                <div {...stylex.props(styles.palStrip)}>
+                  {p.colors.map((c, i) => (
+                    <button
+                      // biome-ignore lint/suspicious/noArrayIndexKey: swatch position is identity and never reorders
+                      key={i}
+                      type="button"
+                      aria-label={`${p.name} colour ${toHex(c)}`}
+                      title={toHex(c)}
+                      {...stylex.props(styles.palDotHit, press)}
+                      onClick={() => adoptColor(c, p.harmony)}
+                    >
+                      <span {...stylex.props(styles.palDot, styles.paint(toHex(c)))} />
+                    </button>
+                  ))}
+                </div>
               </>
             )}
           </div>
@@ -1210,7 +1278,7 @@ function ColorLab() {
   const inspectorNav = (
     <button
       type="button"
-      {...stylex.props(styles.card, styles.navRow, shared.press)}
+      {...stylex.props(styles.card, styles.navRow, press)}
       onClick={() => patchUi({ page: true })}
       aria-label="Open contrast and preview inspector"
     >
@@ -1236,7 +1304,7 @@ function ColorLab() {
           name="back"
           variant="plain"
           aria-label="Back"
-          xstyle={styles.icon44}
+          xstyle={[styles.icon44, press]}
           onClick={() => patchUi({ page: false })}
         />
         <strong {...stylex.props(styles.pageTitle)}>Contrast and preview</strong>
@@ -1261,22 +1329,24 @@ function ColorLab() {
               variant="plain"
               aria-label="Undo"
               disabled={doc.undo.length === 0}
-              xstyle={styles.icon44}
+              xstyle={[styles.icon44, press]}
               onClick={doUndo}
             />
-            <IconButton
-              name="undo"
-              variant="plain"
-              aria-label="Redo"
-              disabled={doc.redo.length === 0}
-              xstyle={[styles.icon44, styles.flipX]}
-              onClick={doRedo}
-            />
+            <span {...stylex.props(styles.flipWrap)}>
+              <IconButton
+                name="undo"
+                variant="plain"
+                aria-label="Redo"
+                disabled={doc.redo.length === 0}
+                xstyle={[styles.icon44, press]}
+                onClick={doRedo}
+              />
+            </span>
             <button
               type="button"
               aria-label="Sounds"
               aria-pressed={!ui.muted}
-              {...stylex.props(shared.press, styles.muteBtn, ui.muted && styles.muteOff)}
+              {...stylex.props(press, styles.muteBtn, ui.muted && styles.muteOff)}
               onClick={() => {
                 patchUi({ muted: !ui.muted })
                 announce(ui.muted ? 'Sounds on' : 'Sounds off')
@@ -1341,7 +1411,7 @@ function ColorLab() {
               doSave()
             }
           }}
-          xstyle={styles.sheetField}
+          xstyle={[styles.sheetField, styles.hit44]}
           autoCapitalize="words"
         />
         <div {...stylex.props(styles.actionStack)}>
@@ -1419,7 +1489,7 @@ function ColorLab() {
               doRename()
             }
           }}
-          xstyle={styles.sheetField}
+          xstyle={[styles.sheetField, styles.hit44]}
           autoCapitalize="words"
         />
         <div {...stylex.props(styles.actionStack)}>

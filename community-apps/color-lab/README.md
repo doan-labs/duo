@@ -51,3 +51,11 @@ named palette that survives the fold and relaunch.
   button mutes them, and the choice persists. The colour, harmonies, pair,
   field text, open page and palettes all follow the fold through `os.session`
   and `os.storage`.
+
+## Persistence
+
+`os.storage` writes committed state only: the applied colour document, the
+saved palette library and the mute flag. A relaunch restores exactly those.
+The half-typed code-field draft is session view state - it follows the fold
+through `os.session` so the other display keeps typing, but a hard relaunch
+returns the last committed colour rather than an unfinished draft.
