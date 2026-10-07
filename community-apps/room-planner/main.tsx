@@ -57,7 +57,7 @@ import {
   ZOOM_MAX,
   ZOOM_MIN
 } from './plan.ts'
-import { HUES, HUES_DARK, styles } from './styles.ts'
+import { COVER_PEEK, HUES, HUES_DARK, styles } from './styles.ts'
 
 // Why a writer id: both displays share one session key whose store is
 // last-writer-wins, so a value not written by this copy is always the newer
@@ -373,6 +373,10 @@ function RoomPlanner() {
   const [sel, setSel] = useState<string | null>(null)
   const [hist, setHist] = useState<History>(emptyHistory)
   const [tab, setTab] = useState<'add' | 'edit' | 'plans'>('add')
+  // Cover only: the tray docks as a sheet - collapsed it peeks tabs + saved,
+  // open it slides up over the plan. The body goes inert while tucked so
+  // keyboard focus can never land on offscreen controls.
+  const [trayOpen, setTrayOpen] = useState(false)
   const [confirm, setConfirm] = useState<null | 'clear' | { drop: string; name: string }>(null)
   // Arming is bound to the item it armed for: a selection change (keyboard,
   // pointer or a peer adoption) invalidates it so `Sure?` can only ever
@@ -384,6 +388,8 @@ function RoomPlanner() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [darkMode, setDarkMode] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const trayBodyRef = useRef<HTMLDivElement>(null)
+  const trayToggleRef = useRef<HTMLButtonElement>(null)
   const dragRef = useRef<Drag | null>(null)
   const gestureCore = useRef<Core | null>(null)
   const pointersRef = useRef(new Map<number, { x: number; y: number }>())
@@ -636,7 +642,10 @@ function RoomPlanner() {
       // so neither chrome nor callouts collide with the plan.
       const padX = 34
       const padTop = 64
-      const padBot = 34
+      // On the cover the docked tray always covers COVER_PEEK of the bottom;
+      // it never counts the open state - expanding must not re-shrink the
+      // plan, so the fit reserves only the peek.
+      const padBot = 34 + (wide ? 0 : COVER_PEEK)
       const zoom = Math.max(
         ZOOM_MIN,
         Math.min(ZOOM_MAX, Math.min((box.width - padX * 2) / doc.room.w, (box.height - padTop - padBot) / doc.room.d))
@@ -673,7 +682,7 @@ function RoomPlanner() {
       cancelAnimationFrame(f)
       ro.disconnect()
     }
-  }, [doc])
+  }, [doc, wide])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -1488,11 +1497,19 @@ function RoomPlanner() {
         </span>
       </div>
       {zoomDock}
-      <span {...stylex.props(styles.hint)}>
+      <span {...stylex.props(styles.hint, !wide && styles.hintCover)}>
         {wide ? 'Drag to pan, drag a piece to move it' : 'Drag to pan, tap a piece'}
       </span>
     </div>
   )
+
+  // Tucking the tray drops the body from tab order; if focus was inside it
+  // the chevron takes it so the caret never ends up on an inert control.
+  const tuckTray = () => {
+    setTrayOpen(false)
+    if (trayBodyRef.current?.contains(document.activeElement)) trayToggleRef.current?.focus()
+    sound('select')
+  }
 
   const muteBtn = (
     <button
@@ -1606,36 +1623,62 @@ function RoomPlanner() {
                 {muteBtn}
               </div>
             </header>
-            {canvas}
-            <div {...stylex.props(styles.tray)}>
-              <Seg
-                label="Tray"
-                options={[
-                  { v: 'add', name: 'Add' },
-                  { v: 'edit', name: 'Edit' },
-                  { v: 'plans', name: 'Plans' }
-                ]}
-                value={tab}
-                onPick={(t) => {
-                  setTab(t)
-                  sound('select')
-                }}
-              />
-              <div {...stylex.props(styles.trayBody)}>
-                {tab === 'add' && paletteSection}
-                {tab === 'edit' && (
-                  <>
-                    {selectedSection}
-                    {selectedSection && <span {...stylex.props(styles.sepH)} />}
-                    {roomSection}
-                  </>
-                )}
-                {tab === 'plans' && plansSection}
+            <div {...stylex.props(styles.stageCover)}>
+              {canvas}
+              <div {...stylex.props(styles.tray, styles.trayDock, styles.trayShift(trayOpen))}>
+                <div {...stylex.props(styles.trayHead)}>
+                  <div {...stylex.props(styles.segGrow)}>
+                    <Seg
+                      label="Tray"
+                      options={[
+                        { v: 'add', name: 'Add' },
+                        { v: 'edit', name: 'Edit' },
+                        { v: 'plans', name: 'Plans' }
+                      ]}
+                      value={tab}
+                      onPick={(t) => {
+                        if (t === tab) tuckTray()
+                        else {
+                          setTab(t)
+                          setTrayOpen(true)
+                          sound('select')
+                        }
+                      }}
+                    />
+                  </div>
+                  <button
+                    ref={trayToggleRef}
+                    type="button"
+                    aria-expanded={trayOpen}
+                    aria-label={trayOpen ? 'Tuck tray away' : 'Show tray panel'}
+                    {...stylex.props(styles.iconBtn, shared.press)}
+                    onClick={() => {
+                      if (trayOpen) tuckTray()
+                      else {
+                        setTrayOpen(true)
+                        sound('select')
+                      }
+                    }}
+                  >
+                    <Sym name={trayOpen ? 'down' : 'up'} size={13} />
+                  </button>
+                </div>
+                <span role="status" {...stylex.props(styles.saved)}>
+                  {!saving && <Sym name="check" size={10} />}
+                  {saving ? 'Saving' : 'Saved'}
+                </span>
+                <div ref={trayBodyRef} inert={!trayOpen} {...stylex.props(styles.trayBody)}>
+                  {tab === 'add' && paletteSection}
+                  {tab === 'edit' && (
+                    <>
+                      {selectedSection}
+                      {selectedSection && <span {...stylex.props(styles.sepH)} />}
+                      {roomSection}
+                    </>
+                  )}
+                  {tab === 'plans' && plansSection}
+                </div>
               </div>
-              <span role="status" {...stylex.props(styles.saved)}>
-                {!saving && <Sym name="check" size={10} />}
-                {saving ? 'Saving' : 'Saved'}
-              </span>
             </div>
           </>
         )}

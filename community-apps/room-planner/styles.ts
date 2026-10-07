@@ -16,6 +16,11 @@ import * as stylex from '@stylexjs/stylex'
 
 const reduce = '@media (prefers-reduced-motion: reduce)'
 
+// How much of the cover tray peeks above the sheet edge when collapsed:
+// padding + seg row + gap + saved + a body sliver. main.tsx uses the same
+// constant for the plan fit's bottom inset and the hint lift.
+export const COVER_PEEK = 112
+
 // Furniture hues: the catalogue indexes into this palette; fills stay soft so
 // walls, labels and flags always outrank them on the plan.
 export const HUES = [
@@ -74,6 +79,34 @@ export const styles = stylex.create({
   // On the cover the plan is the content, not a thumbnail above the tray: it
   // keeps a real floor of height and the tray yields first when space is short.
   canvasCover: { minHeight: 300 },
+  // Cover stage: the canvas fills it and the tray docks over its bottom edge
+  // as a sheet (the display cannot fit a 300px canvas and a real panel in
+  // flow). The sheet peeks 112 px - tabs, saved state and a sliver of body -
+  // and slides up over the plan when opened, iOS-style.
+  stageCover: {
+    position: 'relative',
+    flexGrow: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  trayDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: '72%',
+    transitionProperty: 'transform',
+    transitionDuration: { default: '.28s', [reduce]: '0s' },
+    transitionTimingFunction: easing.push
+  },
+  // Collapsed leaves exactly the seg row + saved + a body sliver visible;
+  // expanded shows the sheet at its cap. Same constant as the fit inset.
+  trayShift: (open: boolean) => ({
+    transform: open ? 'translateY(0)' : `translateY(calc(100% - ${COVER_PEEK}px))`
+  }),
+  trayHead: { display: 'flex', alignItems: 'center', gap: space.sm, flexShrink: 0 },
+  segGrow: { flex: 1, minWidth: 0 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.sm, flexShrink: 0 },
   brand: { display: 'flex', flexDirection: 'column', gap: space.xxs, minWidth: 0 },
   kicker: {
@@ -153,6 +186,10 @@ export const styles = stylex.create({
     minHeight: 0,
     borderRadius: radius.xxl,
     overflow: 'hidden',
+    // Own stacking context: the zoom dock and hint carry local z-indices that
+    // must never outrank a confirmation sheet or its scrim. Without one they
+    // compete in the root context against the kit card's z-index auto.
+    isolation: 'isolate',
     backgroundColor: `color-mix(in srgb, ${app.fg} 5%, ${app.bg})`,
     boxShadow: shadow.rim,
     touchAction: 'none',
@@ -358,6 +395,9 @@ export const styles = stylex.create({
     lineHeight: leading.footnote,
     pointerEvents: 'none'
   },
+  // On the cover the tray sheet peeks COVER_PEEK up the canvas bottom; the
+  // hint clears that instead of hiding under the sheet.
+  hintCover: { bottom: COVER_PEEK + 12 },
   // Inner-display inspector: one floating card of sections.
   panel: {
     display: 'flex',
