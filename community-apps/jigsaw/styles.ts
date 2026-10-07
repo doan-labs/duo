@@ -216,8 +216,8 @@ export const styles = stylex.create({
     color: `color-mix(in srgb, ${colors.white} 66%, transparent)`
   },
   heldCancel: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     display: 'grid',
     placeItems: 'center',
     borderWidth: 0,
