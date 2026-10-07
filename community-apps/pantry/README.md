@@ -47,9 +47,30 @@ high-watermarks (`high`), so a settled document provably shows which ops it
 contains. A storage event is adopted only at a newer `rev`, covered intents
 confirm, and every uncovered intent is replayed on top - a stale echo, a
 racing write or a rejected get/set can never lose an accepted op, and deletes
-survive through the document's tombstones (`gone`). Input mutates only while
-the copy is both visible and active; timers, audio and focus follow the same
-gate, and the UI reports `retrying` rather than pretending a failed write
-landed. `sync.test.ts` drives the same `DocStore` surface deterministically:
-delayed echoes, out-of-order delivery, interleaved writers, delete-vs-edit,
-rejected calls, resync and reload.
+survive through the document's tombstones (`gone`).
+
+Admission is decided by `admission.ts` from the SDK's synchronous `os.view`
+(visible AND active) with `document.visibilityState` as a supplemental
+backstop - never the React `view` state, which lags a render behind and would
+admit input the shell already disowned. Every input path (add, step, edit,
+delete, search/filter/sort, shopping, roving-chip keys, sheet traps) calls
+`live()` before touching state, refs, session, storage, rAF, focus, audio or
+timers - including inside `mutate`, so denied events have zero side effects -
+and deferred callbacks re-check at execution: the midnight tick, the sheet
+focus restore and notice timers simply do not run on a hidden copy. An op
+already admitted when its copy folds still finishes its write once; reads and
+remote convergence are never gated.
+
+Status reporting is honest about terminals: `loading` only until the first
+settled read, `synced` once a base document is adopted and the journal has
+drained (an empty journal after a successful read is genuinely done),
+`retrying` while storage calls keep failing. An optimistic submit updates the
+list immediately, so confirmations say the row was added or updated - durable
+persistence is what `synced` reports, not what a tap claims.
+
+`sync.test.ts` drives the same `DocStore` surface deterministically: delayed
+echoes, out-of-order delivery, interleaved writers, delete-vs-edit, rejected
+calls, resync, reload, raced-out refreshes and admitted-before-hide
+completion. `.tests/admission.test.ts` pins the admission contract: the truth
+table, same-turn flips, and the committed `live` callback evaluated against a
+stale React ref - the reviewer's original probe shape.

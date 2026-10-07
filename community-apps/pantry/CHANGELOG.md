@@ -22,9 +22,14 @@
   high-watermark coverage, replay over any adopted base, keep deletes through
   tombstones and retry honestly on storage failures, so rapid input, two-copy
   writes and delayed watch echoes cannot drop an accepted change.
-- Soft synth cues on add, use, restock, check and delete, gated on a visible
-  and active display (timers and focus follow the same gate), with a visible
-  persisted mute toggle.
+- Soft synth cues on add, use, restock, check and delete, gated on the SDK's
+  synchronous `os.view` visible and active pair (timers, focus and every
+  deferred callback re-check at execution; already-admitted writes still
+  finish after a fold), with a visible persisted mute toggle.
 - Legibility pass: field labels, optional hints, sort chips and badges run at
   12pt or more; badge urgency sits on a tone dot and edge with readable text
   in both themes.
+- Honest status terminals: `loading` only until the first settled read,
+  `synced` once the base lands and the journal drains - including an empty
+  journal - and `retrying` while storage calls fail; confirmations describe
+  the accepted change rather than claiming a durable save.

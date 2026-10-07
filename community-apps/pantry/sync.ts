@@ -191,7 +191,12 @@ export class PantrySync {
       this.takeBase(mark, raw)
       return
     }
-    // Events kept interleaving; the next event or submit will drive adoption.
+    // Events kept interleaving; their adoptions already folded the journal.
+    // Without a settled base this copy has never read successfully - retry
+    // rather than sit in `loading` until some unrelated event rescues it.
+    if (this.stopped) return
+    if (this.rev < 0) this.fail()
+    else this.kick()
   }
 
   /**
@@ -236,7 +241,13 @@ export class PantrySync {
       this.again = true
       return
     }
-    if (!this.needsWrite()) return
+    if (!this.needsWrite()) {
+      // Reached only after a settled base landed (takeBase/adopt) - an empty
+      // journal or a fully covering document is genuinely done, so say so.
+      // Before any base the status honestly stays `loading`/`retrying`.
+      if (this.rev >= 0) this.setStatus('synced')
+      return
+    }
     this.draining = true
     void this.drain()
   }

@@ -12,6 +12,7 @@ import {
   useState
 } from 'react'
 import { createRoot } from 'react-dom/client'
+import { admitLive } from './admission.ts'
 import { type Cue, cue } from './audio.ts'
 import {
   type AddMeta,
@@ -125,6 +126,9 @@ function GuardedSheet({
     if (!open) return
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return
+      // Focus trapping is admission-gated like every other input path: a
+      // forged keydown on a folded-away copy moves nothing.
+      if (!admitLive(os.view, document)) return
       event.preventDefault()
       const dialog = document.getElementById(dialogId)
       if (!dialog) return
@@ -179,8 +183,6 @@ function Pantry() {
   const [flashId, setFlashId] = useState<string | null>(null)
 
   const docRef = useRef(doc)
-  const viewRef = useRef(view)
-  viewRef.current = view
   const uiRef = useRef({ loc, q, sort })
   uiRef.current = { loc, q, sort }
   const noticeTimer = useRef<number | undefined>(undefined)
@@ -190,14 +192,13 @@ function Pantry() {
   const syncRef = useRef<PantrySync | null>(null)
 
   // Input, timers, audio and focus belong only to the copy the user is
-  // looking at: the shell's visible+active view AND a rendered document.
-  // `view.visible` can stay stale-true on a folded-away copy (its view notify
-  // is rAF-starved), so the document's own visibility state is the backstop -
-  // a display:none iframe reports hidden and its input is rejected untouched.
-  const live = useCallback(
-    () => viewRef.current.visible && viewRef.current.active && document.visibilityState === 'visible',
-    []
-  )
+  // looking at. Admission reads the SDK's synchronous `os.view` at call time,
+  // never the React `view` state - that value is a render behind, so a
+  // same-turn fold would admit input the shell already disowned, or deny the
+  // copy that just went live. `document.visibilityState` stays supplemental:
+  // it backs the painted-but-occluded iframe case, it cannot stand in for
+  // current SDK activity.
+  const live = useCallback(() => admitLive(os.view, document), [])
   const curDoc = () => syncRef.current?.current() ?? docRef.current
 
   // Engine lifecycle: one PantrySync per copy, watching the doc key.
@@ -239,27 +240,38 @@ function Pantry() {
 
   // Expiry ticks over at local midnight, scheduled only by the live display
   // (visible AND active) so the hidden copy never runs a timer nobody sees.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the view flags are read inside live(), and the effect must re-run on fold/unfold to clear or re-arm the timer
   useEffect(() => {
     setToday(todayKey())
-    if (!view.active || !view.visible) return
+    if (!live()) return
     let timer = 0
     const arm = () => {
       const now = new Date()
       const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 3)
       timer = window.setTimeout(() => {
+        // Checked at execution, not just at arming: a copy folded away after
+        // the timeout was set must not tick or arm another timer.
+        if (!live()) return
         setToday(todayKey())
         arm()
       }, midnight.getTime() - now.getTime())
     }
     arm()
     return () => window.clearTimeout(timer)
-  }, [view.active, view.visible])
+  }, [view.active, view.visible, live])
 
-  const announce = useCallback((tone: 'good' | 'warn', text: string) => {
-    window.clearTimeout(noticeTimer.current)
-    setNotice({ tone, text })
-    noticeTimer.current = window.setTimeout(() => setNotice(null), 4500)
-  }, [])
+  // Notice state and its clear timer exist only on the live copy: a hidden
+  // display skips both, so the retrying recovery effect below never schedules
+  // UI work where nobody is looking.
+  const announce = useCallback(
+    (tone: 'good' | 'warn', text: string) => {
+      if (!live()) return
+      window.clearTimeout(noticeTimer.current)
+      setNotice({ tone, text })
+      noticeTimer.current = window.setTimeout(() => setNotice(null), 4500)
+    },
+    [live]
+  )
 
   // A failed drain surfaces here instead of pretending the write landed.
   useEffect(() => {
@@ -302,6 +314,7 @@ function Pantry() {
   // --- inventory actions ------------------------------------------------------
 
   const add = () => {
+    if (!live()) return // denied events change nothing - no validation side effects
     const name = cleanName(draft.name)
     const milli = parseQty(draft.qty)
     const date = draft.date.trim()
@@ -332,6 +345,7 @@ function Pantry() {
   }
 
   const step = (item: Item, dir: 'use' | 'restock') => {
+    if (!live()) return
     const res = mutate(opStep(item.id, dir))
     if (!res) return
     const meta = res.meta as StepMeta | undefined
@@ -347,6 +361,7 @@ function Pantry() {
   }
 
   const remove = (id: string) => {
+    if (!live()) return
     const item = curDoc().items.find((i) => i.id === id)
     if (!item) return
     if (!mutate(opRemove(id))) return
@@ -357,6 +372,7 @@ function Pantry() {
   // --- edit sheet --------------------------------------------------------------
 
   const openEdit = (item: Item) => {
+    if (!live()) return
     sheetTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setEditing(item)
     setEditDraft({
@@ -379,6 +395,7 @@ function Pantry() {
   }, [])
 
   const saveEdit = () => {
+    if (!live()) return
     const d = editDraft
     const base = editing
     if (!d || !base) return
@@ -398,13 +415,14 @@ function Pantry() {
     const meta = res.meta as EditMeta | undefined
     if (meta?.gone) announce('warn', `${name} was already removed`)
     else {
-      announce('good', meta?.merged ? `${name} merged into its matching batch` : `${name} saved`)
+      announce('good', meta?.merged ? `${name} merged into its matching batch` : `${name} updated`)
       play('save')
     }
     closeEdit()
   }
 
   const confirmDelete = () => {
+    if (!live()) return
     const id = editing?.id
     if (!id) return
     remove(id)
@@ -429,16 +447,17 @@ function Pantry() {
     const restore = () => {
       // Only the live display may take focus - a copy that was folded away
       // mid-restore must not steal it back from the active one.
-      if (!el.isConnected || !viewRef.current.active || !viewRef.current.visible) return
+      if (!el.isConnected || !live()) return
       el.focus()
       if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
     }
     requestAnimationFrame(restore)
-  }, [editDraft])
+  }, [editDraft, live])
 
   // --- shopping list --------------------------------------------------------------
 
   const addShopItem = () => {
+    if (!live()) return
     const name = cleanName(shopDraft.name)
     if (!name) {
       setShopError('Name what to buy')
@@ -458,6 +477,7 @@ function Pantry() {
   }
 
   const toggleBought = (id: string) => {
+    if (!live()) return
     const item = curDoc().list.find((s) => s.id === id)
     if (!item) return
     if (!mutate(opToggleShop(id))) return
@@ -465,6 +485,7 @@ function Pantry() {
   }
 
   const dropShopItem = (id: string) => {
+    if (!live()) return
     const item = curDoc().list.find((s) => s.id === id)
     if (!item) return
     if (!mutate(opRemoveShop(id))) return
@@ -473,6 +494,7 @@ function Pantry() {
   }
 
   const sweepBought = () => {
+    if (!live()) return
     const bought = curDoc().list.filter((s) => s.done).length
     if (!bought) return
     if (!mutate(opClearBought())) return
@@ -492,6 +514,7 @@ function Pantry() {
   // --- render helpers -------------------------------------------------------------------
 
   const chipKeys = <T extends string>(event: ReactKeyboardEvent, ids: T[], current: T, pick: (id: T) => void) => {
+    if (!live()) return // denied keys move neither state nor focus
     const at = ids.indexOf(current)
     let next = at
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (at + 1) % ids.length
@@ -698,6 +721,7 @@ function Pantry() {
         {draftFields(
           draft,
           (patch) => {
+            if (!live()) return
             setDraft({ ...draft, ...patch })
             stripErrors(patch, setErrors)
           },
@@ -868,6 +892,7 @@ function Pantry() {
             {...stylex.props(styles.input, shopError !== '' && styles.inputBad)}
             value={shopDraft.name}
             onChange={(e) => {
+              if (!live()) return
               setShopDraft({ ...shopDraft, name: e.target.value })
               setShopError('')
             }}
@@ -885,7 +910,10 @@ function Pantry() {
           <input
             {...stylex.props(styles.input)}
             value={shopDraft.note}
-            onChange={(e) => setShopDraft({ ...shopDraft, note: e.target.value })}
+            onChange={(e) => {
+              if (!live()) return
+              setShopDraft({ ...shopDraft, note: e.target.value })
+            }}
             onKeyDown={enterKey(addShopItem)}
             placeholder="2 bottles"
             autoComplete="off"
@@ -1026,6 +1054,7 @@ function Pantry() {
             {draftFields(
               editDraft,
               (patch) => {
+                if (!live()) return
                 setEditDraft({ ...editDraft, ...patch })
                 stripErrors(patch, setEditErrors)
               },
@@ -1058,7 +1087,11 @@ function Pantry() {
               </div>
             ) : (
               <div {...stylex.props(styles.sheetActions)}>
-                <Button variant="plain" onClick={() => setConfirming(true)} xstyle={[styles.dangerText, styles.btnH]}>
+                <Button
+                  variant="plain"
+                  onClick={() => live() && setConfirming(true)}
+                  xstyle={[styles.dangerText, styles.btnH]}
+                >
                   Delete
                 </Button>
                 <Button variant="tinted" onClick={closeEdit} xstyle={styles.btnH}>

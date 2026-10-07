@@ -50,16 +50,25 @@ class FakeStore implements DocStore {
   failSet = 0
   quiet = false
   holdSets = false
+  blockGet = false
+  commits = 0
   private listeners = new Set<(e: Event) => void>()
   private queued: Event[] = []
   private held: { v: string; res: (r: number) => void; rej: (e: Error) => void }[] = []
+  private getWaiters: { res: (v: string | null) => void }[] = []
 
   get(): Promise<string | null> {
     if (this.failGet > 0) {
       this.failGet--
       return Promise.reject(new Error('get rejected'))
     }
+    if (this.blockGet) return new Promise((res) => this.getWaiters.push({ res }))
     return Promise.resolve(this.value)
+  }
+
+  /** Resolve every parked get with the current value. */
+  unblockGets(): void {
+    for (const w of this.getWaiters.splice(0)) w.res(this.value)
   }
 
   set(v: string): Promise<number> {
@@ -78,6 +87,7 @@ class FakeStore implements DocStore {
 
   private commit(v: string | null): number {
     this.rev++
+    this.commits++
     this.value = v
     this.emit({ rev: this.rev, v: v ?? undefined })
     return this.rev
@@ -443,6 +453,86 @@ await (async () => {
   eq(second.doc?.list.length, 1, 'reload restores the shopping list')
   await sleep(20) // let any echo drain through
   eq(names(second.doc).join(','), 'oats', 'no flap after reload')
+})()
+
+// --- honest terminals: successful initial read with no journal reports synced -------------
+
+await (async () => {
+  const store = new FakeStore()
+  store.foreign(
+    serializeDoc({
+      ...EMPTY_DOC,
+      items: [newItem('figs', 1000, 'pcs', 'pantry', null)],
+      by: 'other',
+      s: 3,
+      high: { other: 3 }
+    })
+  )
+  const sink = mkSink()
+  engine(store, 'cover', sink)
+  await sleep(15)
+  eq(sink.statuses[sink.statuses.length - 1], 'synced', 'initial read with empty journal reaches synced')
+  eq(sink.doc?.items.length, 1, 'initial read adopted the stored document')
+
+  const empty = mkSink()
+  const store2 = new FakeStore()
+  engine(store2, 'inner', empty)
+  await sleep(15)
+  eq(empty.statuses[empty.statuses.length - 1], 'synced', 'empty store initial read reaches synced too')
+})()
+
+// --- honest terminals: failed initial get retries, then reports synced without any op ------
+
+await (async () => {
+  const store = new FakeStore()
+  store.failGet = 2 // boot read + one retry both reject
+  const sink = mkSink()
+  engine(store, 'cover', sink)
+  await sleep(30)
+  ok(sink.statuses.includes('retrying'), 'failed initial read surfaces retrying')
+  for (let i = 0; i < 60 && sink.statuses[sink.statuses.length - 1] !== 'synced'; i++) await sleep(5)
+  eq(sink.statuses[sink.statuses.length - 1], 'synced', 'recovered initial read reaches synced with no new op')
+})()
+
+// --- honest terminals: refresh that keeps racing events still lands a truthful synced -------
+
+await (async () => {
+  const store = new FakeStore()
+  store.blockGet = true
+  const sink = mkSink()
+  engine(store, 'cover', sink)
+  await sleep(10)
+  // Each parked get is superseded by an adopting event before it resolves.
+  let pushed = 0
+  for (let i = 0; i < 6; i++) {
+    store.push({ rev: ++pushed, v: serializeDoc({ ...EMPTY_DOC, by: 'other', s: i, high: { other: i } }) })
+    store.unblockGets()
+    await sleep(5)
+  }
+  store.unblockGets()
+  store.blockGet = false
+  for (let i = 0; i < 40 && sink.statuses[sink.statuses.length - 1] !== 'synced'; i++) await sleep(5)
+  eq(sink.statuses[sink.statuses.length - 1], 'synced', 'raced-out refresh still lands synced')
+})()
+
+// --- admitted op whose copy folds away mid-write commits exactly once -----------------------
+
+await (async () => {
+  const store = new FakeStore()
+  const sink = mkSink()
+  const sync = engine(store, 'cover', sink)
+  await sleep(10)
+  const before = store.commits
+
+  store.holdSets = true
+  sync.submit(opAdd(draft('rice'))) // admitted live; copy 'hides' here - no further submits
+  await sleep(10)
+  eq(store.heldCount, 1, 'admitted op has one write in flight')
+  store.holdSets = false
+  store.releaseSets()
+  await settle(sync, sink, 'hidden-completion settle')
+  eq(store.commits - before, 1, 'admitted-before-hide write commits exactly once')
+  eq(parseDoc(store.value).items.length, 1, 'committed doc carries the admitted item')
 })()
 
 for (const stop of stops) stop()
