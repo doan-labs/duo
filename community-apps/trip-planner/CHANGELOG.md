@@ -19,10 +19,12 @@
   toggle, unlocked on first gesture and silent when audio is unavailable.
 - Light and dark themes, reduced-motion support, roving-arrow day chips and
   44pt targets throughout.
-- Ordered, repairable storage commits: record writes land before the index
-  and the index before tomb markers, which are retained permanently -
-  records are never deleted, so old cleanup can never erase a restored
-  same-id trip behind a stale read. Already-applied keys are restored on
-  failure with honest applied/failed/partial terminals - nothing accepted
+- Ordered storage commits with no reads and no rollback: record writes land
+  first, then retained tomb markers, then the index - a peer edit landing
+  mid-commit is preserved (orphan recovery), never erased by old work.
+  Records are never deleted; a commit reports 'applied', 'failed' (provably
+  nothing landed) or 'partial' (landed data preserved, honestly reported).
+  Tombs are ~16 bytes each but retained per historical delete - the
+  platform quota, not the trip cap, is the bound. Nothing accepted
   silently vanishes across a fold or a storage outage, and an acknowledged
   delete can never resurrect.

@@ -35,19 +35,23 @@ storage value degrades to an empty list instead of a crash. The trip library
 lives in `os.storage` under one record per trip plus an ordering index, so two
 displays can edit different trips without clobbering each other.
 
-Writes commit in semantic order (`commitLibWrites`): changed records before
-the index, then the index, then a tomb marker under each removed `trip.<id>`.
-A tomb marks an acknowledged delete so it can never resurrect, while an
-unmarked orphan (a partial create) still recovers. Tombs are retained -
-records are never deleted at all, because no read-then-delete pair is
-atomic on the port and old reclamation could erase a newer same-id
-incarnation restored in between; a tomb is a small permanent marker the
-assembler always skips. When a reachability write fails, already-landed
-keys are repaired only while the commit still owns each slot - verified by
-an authoritative storage read - and a rolled-back create is tombed rather
-than deleted; the outcome is 'applied', 'failed' (verified rollback) or
-'partial' (incomplete repair), never a clean failure over half-applied
-data. Every mutation rebases on the storage mirror (never the render
+Writes commit in semantic order (`commitLibWrites`): changed records first,
+then a tomb marker under each removed `trip.<id>`, then the index - so a
+peer restore landing mid-commit ends up a recoverable orphan instead of
+being erased by a late step. A tomb marks an acknowledged delete so it can
+never resurrect, while an unmarked orphan (a partial create) still
+recovers. Tombs are retained - records are never deleted at all, because
+no read-then-delete pair is atomic on the port and old reclamation could
+erase a newer same-id incarnation restored in between. Each tomb is a
+~16-byte permanent marker the assembler always skips; the count grows with
+delete history (not bounded by the trip cap), so the platform's per-app
+key/byte quota is the real bound and exhausting it surfaces as an ordinary
+write failure - an honest error, never silent loss. A commit performs no
+reads and issues no rollback: a verify-read's value is only valid at its
+captured revision, so a snapshot-driven write could erase a peer's
+acknowledged edit. Instead the outcome is 'applied', 'failed' (provably
+nothing landed) or 'partial' (landed data preserved, honestly reported).
+Every mutation rebases on the storage mirror (never the render
 snapshot), and watch echoes keep the newest still-pending own write so
 older acknowledgements
 cannot roll state back. New input is admitted only on the live display; an

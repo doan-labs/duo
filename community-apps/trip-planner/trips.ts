@@ -695,28 +695,34 @@ export type LibWrite = { kind: 'put' | 'tomb'; key: string; value?: string }
  * 1. created or changed records first - an index written after them can
  *    never reference a missing record, and a rejected record write aborts
  *    the diff before the index moves;
- * 2. the index put - the single write that flips create, delete and reorder
- *    reachability atomically at the platform level;
- * 3. a tomb under each removed id - converts the now-unindexed record into
- *    an acknowledged deletion the assembler skips, so a failed cleanup can
- *    never resurrect an authorized delete.
+ * 2. a tomb under each removed id - BEFORE the index removal, so a peer
+ *    restore or edit landing inside this commit's window ends up an
+ *    unindexed live record that the assembler still recovers, instead of
+ *    being erased by a tomb written after it;
+ * 3. the index put last - the single write that flips create, delete and
+ *    reorder reachability atomically at the platform level, issued only
+ *    after every record and tomb it relies on has landed.
  *
- * No cleanup del follows: the tomb is RETAINED, never reclaimed. A read-then
- * -delete pair can never be atomic on this port - a peer restore landing
- * between the verify read and the del would be erased by old work no matter
- * how the check is written - so reclamation would trade a guaranteed race
- * for a few bytes. Tomb debris is bounded (one ~16-byte marker per
- * acknowledged delete) and permanently unreachable to the assembler.
+ * No cleanup del and no repair reads follow: a read->write pair can never
+ * be atomic on this port - a peer write landing between the read's capture
+ * and the mutating write would be erased by old work no matter how the
+ * check is written. The tomb is RETAINED, never reclaimed: a delete under
+ * a shared mutable key would race newer same-id incarnations. Tomb debris
+ * is one ~16-byte marker per acknowledged delete, kept forever - the count
+ * grows with delete history (NOT bounded by the live trip cap); the
+ * platform's per-app key/byte quota is the real bound, and hitting it
+ * surfaces as ordinary write failures - honest 'failed'/'partial'
+ * terminals, never silent loss.
  */
 export function planLibWrites(prev: Library, next: Library): LibWrite[] {
   const prevById = new Map(prev.trips.map((t) => [t.id, t]))
   const out: LibWrite[] = []
   for (const t of next.trips)
     if (prevById.get(t.id) !== t) out.push({ kind: 'put', key: `trip.${t.id}`, value: serializeTrip(t) })
-  if (next.order.join('|') !== prev.order.join('|'))
-    out.push({ kind: 'put', key: 'index', value: serializeIndex(next.order) })
   for (const id of prev.order)
     if (!next.order.includes(id)) out.push({ kind: 'tomb', key: `trip.${id}`, value: TOMB_VALUE })
+  if (next.order.join('|') !== prev.order.join('|'))
+    out.push({ kind: 'put', key: 'index', value: serializeIndex(next.order) })
   return out
 }
 

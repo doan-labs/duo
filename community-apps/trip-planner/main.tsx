@@ -87,8 +87,6 @@ import {
   restoreTrip,
   type Stay,
   type Stop,
-  serializeIndex,
-  serializeTrip,
   shortDay,
   stopsForDay,
   type Trip,
@@ -378,21 +376,9 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
     }
   }, [space, owns])
 
-  // Authoritative per-key read through the snapshot port: write repair and
-  // tomb reclamation must verify the stored value, not the optimistic
-  // mirror (a pending own write can still mask a landed foreign one).
-  const getLive = useCallback(
-    async (k: string): Promise<string | null> => {
-      let cursor: string | undefined
-      do {
-        const page = await space.snapshot(cursor)
-        for (const [ek, ev] of page.entries) if (ek === k) return ev
-        cursor = page.cursor
-      } while (cursor)
-      return null
-    },
-    [space]
-  )
+  // (No authoritative per-key read is exposed to the write path: a commit
+  // performs no reads - a verify-read's value is only valid at its captured
+  // revision, and a read->write pair cannot be atomic on this port.)
 
   // Resolves true once the port accepted this write, false on rejection -
   // 'applied' callers distinguish a landed commit from an enqueued hope.
@@ -439,12 +425,10 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       readyNow: () => readyNow.current,
       /** True once the port accepted the write; false on rejection. */
       put: (k: string, v: string) => write(k, v),
-      del: (k: string) => write(k, null),
-      getLive,
       /** Resolves once every write queued so far finished; true iff all landed. */
       settled: () => writes.current.settled()
     }),
-    [values, error, write, getLive]
+    [values, error, write]
   )
 }
 
@@ -1436,21 +1420,14 @@ function TripPlanner() {
     [session, liveVis]
   )
 
-  /** Persist a library diff in semantic order (commitLibWrites): records
-   * before index before tomb markers, which are retained (records are never
-   * deleted), repairing already-landed keys when a reachability write fails.
-   * 'applied' is a durable commit, 'failed' a verified rollback, and
-   * 'partial' an honestly-reported incomplete repair - never half-applied
-   * under a clean label. */
+  /** Persist a library diff in semantic order (commitLibWrites): records,
+   * then retained tomb markers, then the index - no reads and no rollback,
+   * so a commit can never erase a peer write that lands mid-window.
+   * 'applied' is a durable commit; 'failed' means provably nothing landed;
+   * 'partial' preserves landed data and reports honestly - never
+   * half-applied under a clean label. */
   const writeLibDiff = useCallback(
-    (prev: Library, next: Library) => {
-      const prevById = new Map(prev.trips.map((t) => [`trip.${t.id}`, t]))
-      return commitLibWrites({ put: storage.put, get: storage.getLive }, planLibWrites(prev, next), (k) => {
-        if (k === 'index') return serializeIndex(prev.order)
-        const t = prevById.get(k)
-        return t ? serializeTrip(t) : undefined
-      })
-    },
+    (prev: Library, next: Library) => commitLibWrites({ put: storage.put }, planLibWrites(prev, next)),
     [storage]
   )
 
@@ -1472,11 +1449,11 @@ function TripPlanner() {
    * live view for new input; `authorized` completions of already-accepted
    * mutations may finish after a fold.
    * 'noop' means the mutation found nothing to change; 'applied' means the
-   * port accepted every diff write; 'failed' means a write was rejected
-   * and the commit verifiably rolled back; 'partial' means the commit
-   * aborted but could not fully restore prior state (the space re-snapshots
-   * itself) - callers arm Undo or claim success only on 'applied' and
-   * surface 'failed'/'partial' as an error. */
+   * port accepted every diff write; 'failed' means every write was cleanly
+   * rejected before anything could land; 'partial' means the commit aborted
+   * with landed (or ambiguously-landed) writes preserved - the space
+   * re-snapshots itself. Callers arm Undo or claim success only on
+   * 'applied' and surface 'failed'/'partial' as an error. */
   const libWrites = useRef<Promise<void>>(Promise.resolve())
   const mutateLib = useCallback(
     (mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void, authorized = false) => {

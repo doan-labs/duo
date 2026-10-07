@@ -17,8 +17,6 @@
  *   enqueued write as committed.
  */
 
-import { TOMB_VALUE } from './trips'
-
 export type PendingMap = Map<string, (string | null)[]>
 
 /**
@@ -91,116 +89,106 @@ export class WriteQueue {
 
 /**
  * A minimal boolean storage adapter - the exact surface `commitLibWrites`
- * needs from useSpace. Resolves false when the port rejects; may throw.
- * There is deliberately no `del`: `trip.<id>` records are never deleted,
- * only overwritten or tombed, so no finite post-commit cleanup can race a
- * newer same-id incarnation (a verify-read + delete pair is not atomic on
- * this port and a late-arriving peer write would be erased by old work).
+ * needs from useSpace. `put` resolves false when the port rejects the write
+ * and throws when the outcome is ambiguous (e.g. a transport timeout where
+ * the write may still have landed).
+ *
+ * There is deliberately no `del` and no `get`:
+ * - `trip.<id>` records are never deleted, only overwritten or tombed, so
+ *   no post-commit cleanup can race a newer same-id incarnation.
+ * - A commit performs NO reads. A verify-read's value is authoritative only
+ *   at its captured revision; on this no-CAS port a read->write pair is not
+ *   atomic, so a snapshot that drives a later write (a repair re-put or a
+ *   conditional delete) can always erase a peer's acknowledged write that
+ *   landed between the capture and the reply. Every commit step is a
+ *   fixed-intent write computed at plan time - LWW on the same key - never
+ *   a write derived from a stale stored value.
  */
 export type LibStore = {
   put: (k: string, v: string) => Promise<boolean>
-  /** Authoritative read of the stored value - a real storage read, not the
-   * optimistic mirror. Repair verifies write ownership through it: an
-   * unreadable key degrades the outcome to 'partial' instead of risking a
-   * live record. The verify->put gap is inherent LWW on this port; it is
-   * bounded to this commit's in-flight window, never post-commit. */
-  get?: (k: string) => Promise<string | null>
 }
 
 /**
  * 'applied': every planned write durably landed.
- * 'failed': the commit aborted AND every write it already landed was
- * verifiably rolled back - the caller may honestly say nothing applied.
- * 'partial': the commit aborted but durable state could not be fully
- * restored (a repair write failed, or a foreign value now owns a key) -
- * the caller must not claim a clean failure; the resnapshot shows truth.
+ * 'failed': the commit aborted and provably nothing landed - every write
+ *   attempt was cleanly rejected (the port refused it), so the caller may
+ *   honestly say nothing applied.
+ * 'partial': the commit aborted with a landed prefix (some writes durable,
+ *   at least one failed), or an ambiguous write outcome where landing
+ *   cannot be disproved. Landed data is PRESERVED: no rollback is issued
+ *   because rollback would have to write values derived from a read that
+ *   could be stale - the classic verify-read -> mutate race. The caller
+ *   reports 'partial' honestly and re-snapshots; the durable truth is what
+ *   the storage shows.
  */
 export type CommitOutcome = 'applied' | 'failed' | 'partial'
 
 const beat = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-/** Try once, wait, try once more. Resolves false only when both attempts fail. */
-async function attempt(op: () => Promise<boolean>): Promise<boolean> {
-  try {
-    if (await op()) return true
-  } catch {
-    // rejected by the port - fall through to the retry
+type Attempt = 'landed' | 'missed' | 'unknown'
+
+/**
+ * Try once, wait, try once more.
+ * 'landed': the port accepted a write.
+ * 'missed': BOTH attempts were cleanly rejected - the value was never
+ *   accepted, so nothing landed.
+ * 'unknown': at least one attempt threw ambiguously (timeout/transport) and
+ *   no later clean rejection proved it never landed - the durable value is
+ *   uncertain, so the commit must not claim a clean failure.
+ */
+async function attempt(op: () => Promise<boolean>): Promise<Attempt> {
+  let ambiguous = false
+  for (let i = 0; i < 2; i++) {
+    if (i > 0) await beat(120)
+    try {
+      if (await op()) return 'landed'
+      // A clean false means the port refused this attempt. If an earlier
+      // attempt threw ambiguously, landing cannot be ruled out.
+    } catch {
+      ambiguous = true
+    }
   }
-  await beat(120)
-  try {
-    return await op()
-  } catch {
-    return false
-  }
+  return ambiguous ? 'unknown' : 'missed'
 }
 
 /**
- * Persist one library mutation against a boolean storage adapter in
- * semantic order, from `planLibWrites`:
+ * Persist one library mutation against a boolean storage adapter in the
+ * semantic order `planLibWrites` emits (changed records, then tomb markers,
+ * then the index):
  *
  * - Changed records land BEFORE the index, so the index can never be made
  *   to reference a record that is not stored (a dangling reachable ref).
- * - The index lands BEFORE tomb writes, so a deletion is authoritative once
- *   the index commits; a rejected tomb then leaves an ordinary orphan that
- *   still recovers - the commit reports failure instead of half-applying.
- * - A rejected reachability write repairs the keys this diff already
- *   landed, in reverse and only while this commit still owns each slot
- *   (verified by an authoritative read): a foreign value that landed in
- *   between is peer data and is left alone, which downgrades the outcome
- *   to 'partial' rather than silently half-applying. A record the commit
- *   created and must roll back is TOMBED, not deleted - the marker leaves
- *   it permanently unreachable without ever issuing a delete.
- * - Nothing is written after the commit returns: there is no deferred
- *   cleanup to be poisoned by a stale read or a peer that lands between a
- *   snapshot and a delete. The tomb stays - bounded debris, never
- *   resurrected, never erased by old work.
+ * - Tomb markers land BEFORE the index removal, so a peer restore that
+ *   lands inside this commit's window ends up an unindexed live record -
+ *   recovered by the assembler - instead of being erased by a late step.
+ * - The index lands LAST: reachability flips only after every record and
+ *   tomb write it references has landed.
+ * - The first failed step ABORTS the rest of the plan: remaining writes
+ *   were computed assuming the earlier ones landed.
+ * - No repair/rollback writes exist. A repair would have to write a value
+ *   derived from a read, and a read->write pair is not atomic on this port:
+ *   a peer's acknowledged edit landing between the read's capture and the
+ *   repair's put would be erased. Instead the commit reports the truthful
+ *   terminal - 'partial' when anything landed or might have - and the
+ *   caller re-snapshots to the durable state.
+ * - Nothing is written after the commit returns.
  *
- * Resolves 'applied' only when every reachability write landed.
+ * Resolves 'applied' only when every planned write landed.
  */
 export async function commitLibWrites(
   io: LibStore,
-  plan: { kind: 'put' | 'tomb'; key: string; value?: string }[],
-  prevValues: (key: string) => string | undefined
+  plan: { kind: 'put' | 'tomb'; key: string; value?: string }[]
 ): Promise<CommitOutcome> {
-  // Authoritative read for repair/reclamation guards. {ok:false} on a
-  // missing or failing read keeps callers on the safe side: never delete
-  // or overwrite a key whose current value is unknown.
-  const read = async (k: string): Promise<{ ok: true; value: string | null } | { ok: false }> => {
-    if (!io.get) return { ok: false }
-    try {
-      return { ok: true, value: await io.get(k) }
-    } catch {
-      return { ok: false }
-    }
-  }
-  const applied: { key: string; value?: string }[] = []
+  let landed = 0
+  let uncertain = false
   for (const w of plan) {
-    if (await attempt(() => io.put(w.key, w.value ?? ''))) {
-      applied.push(w)
+    const r = await attempt(() => io.put(w.key, w.value ?? ''))
+    if (r === 'landed') {
+      landed++
       continue
     }
-    // A required write failed: unwind everything this commit already
-    // landed, in reverse. Three cases per key, verified by the read:
-    // still our value -> restore the pre-write value (re-put, or delete a
-    // record that did not exist before); already the old value -> nothing
-    // to do; anything else or unreadable -> a foreign write owns the key
-    // or the truth is unknown, so the outcome is honestly partial.
-    let repaired = true
-    for (const a of [...applied].reverse()) {
-      const old = prevValues(a.key)
-      const cur = await read(a.key)
-      if (cur.ok && cur.value === (a.value ?? '')) {
-        // Roll back to the pre-write value; a record this commit created is
-        // tombed rather than deleted so the repair itself can never race a
-        // same-id incarnation that lands later.
-        const ok =
-          old !== undefined ? await attempt(() => io.put(a.key, old)) : await attempt(() => io.put(a.key, TOMB_VALUE))
-        if (!ok) repaired = false
-      } else if (!cur.ok || cur.value !== (old ?? null)) {
-        repaired = false
-      }
-    }
-    return repaired ? 'failed' : 'partial'
+    if (r === 'unknown') uncertain = true
+    return landed > 0 || uncertain ? 'partial' : 'failed'
   }
   return 'applied'
 }
