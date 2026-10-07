@@ -158,7 +158,14 @@ function useFocusTrap(
     // A session-mirrored sheet exists on BOTH copies; only the visible one may
     // move DOM focus, or a folded display would steal it from the live one.
     const canFocus = mayFocus ?? (() => true)
-    trigger.current = explicitTrigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
+    // BODY/documentElement are the focus resting state, not an invoker: a
+    // session-mirrored open (or any open raced ahead of the click's focus)
+    // would otherwise capture them, and since BODY is always connected the
+    // restore below would "restore" to BODY instead of the fallback anchor.
+    const ael = document.activeElement
+    trigger.current =
+      explicitTrigger ??
+      (ael instanceof HTMLElement && ael !== document.body && ael !== document.documentElement ? ael : null)
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
       const box = boxRef.current
@@ -223,7 +230,11 @@ function useFocusTrap(
         // Only stranded focus gets a target: BODY, a detached node, or a
         // control inside the exiting layer.
         if (!at || at === document.body || !at.isConnected || inLayer(at)) {
-          const el = trigger.current?.isConnected ? trigger.current : anchorFallback((c) => inLayer(c))
+          const trg = trigger.current
+          const el =
+            trg && trg.isConnected && trg !== document.body && trg !== document.documentElement && !inLayer(trg)
+              ? trg
+              : anchorFallback((c) => inLayer(c))
           if (el?.isConnected && !inLayer(el)) el.focus()
         }
         // Poll for the whole deadline even after a landed focus: the element
