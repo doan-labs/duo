@@ -84,7 +84,12 @@ type Drag = {
 // midpoint. Storing live view values here instead would drift.
 type Pinch = { ids: [number, number]; d0: number; zoom0: number; x0: number; y0: number; mcx: number; mcy: number }
 
-const readLib = (): Promise<Library> => os.storage.get(LIB_KEY).then(parseLibrary, () => parseLibrary(null))
+// os.storage.get resolves null for a missing key; a rejection means the read
+// itself failed. Keeping them apart matters: treated as empty, a failed read
+// becomes a rev-0 seed whose delayed set can land after a peer's newer write
+// and clobber it. null marks 'could not read' - writeLib retries the read and
+// never writes on top of a library it has not seen.
+const readLib = (): Promise<Library | null> => os.storage.get(LIB_KEY).then(parseLibrary, () => null)
 
 let libQueue = Promise.resolve()
 // Library writes funnel through one queue so two quick edits cannot each merge
@@ -111,6 +116,7 @@ const writeLib = (mutate: (lib: Library) => Library | null): Promise<Library> =>
       let out = parseLibrary(null)
       for (let i = 0; i < 5; i++) {
         const cur = await readLib()
+        if (!cur) continue
         const mine = mutate(cur)
         const merged = mergeLib(cur, mine ?? cur)
         if (!mine || sameLib(cur, merged)) {
@@ -568,7 +574,7 @@ function RoomPlanner() {
       if (!seeded.current && stored.status === 'ready') {
         seeded.current = true
         void (async () => {
-          const open = latestDoc(await readLib()) ?? welcomePlan()
+          const open = latestDoc((await readLib()) ?? parseLibrary(null)) ?? welcomePlan()
           setDoc(open)
           setSel(null)
           await writeLib((lib) => ((lib.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(lib, open)))
@@ -884,7 +890,7 @@ function RoomPlanner() {
     // Read the library fresh: the KV mirror can lag while this copy is
     // occluded, so a plan the other display just made may not be listed yet.
     void (async () => {
-      const next = (await readLib()).plans[id]
+      const next = (await readLib())?.plans[id]
       if (next && next.id !== docRef.current?.id) {
         // The stored view may have been fit for the other display's canvas:
         // opening a plan is a fresh first sight, so this copy frames it again.
@@ -896,7 +902,7 @@ function RoomPlanner() {
   }
   const makePlan = () => {
     void (async () => {
-      const n = Object.keys((await readLib()).plans).length + 1
+      const n = Object.keys((await readLib())?.plans ?? {}).length + 1
       framedDoc.current = null
       publish(newPlan(`Layout ${n}`), { sel: null })
       sound('save')
