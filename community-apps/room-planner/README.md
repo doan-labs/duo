@@ -39,8 +39,32 @@ Arrows nudge the selection by one snap step (or 1 cm, Shift for 10 cm), `R`
 rotates (Shift+R the other way), `Delete` removes, `Cmd/Ctrl+Z` undoes and
 `Cmd/Ctrl+Shift+Z` or `Cmd/Ctrl+Y` redoes.
 
+## Persistence
+
+`os.storage` writes are whole-blob last-writer-wins with no compare-and-set,
+so the library lives behind `LibStore` (`library.ts`): mutations are pure
+intents that stay pending until observed inside the stored value, every
+drain re-offers this copy's committed union (`mine`), and `repair()` runs on
+each library-key change event so a delayed foreign set that lands on top of
+a local commit is folded back instead of silently lost. A failed read is
+'unknown' (never an implied-empty library to seed over), and the bootstrap
+shows a plan only after the seed write is confirmed.
+
+Input admission follows the live view flags: keys, pointer, buttons, sheets,
+prefs, plan selection, audio and focus are admitted only while
+`os.view.visible && os.view.active`, checked synchronously at the call site.
+Work admitted while live - a drag in flight, the wheel-zoom settle, a queued
+storage write - still completes across a hide; storage adoption and repair
+stay ungated.
+
 ## Testing
 
 `bun community-apps/room-planner/plan.test.ts` - pure checks for units,
 rotated bounds, snapping, containment/overlap, undo/redo, identifiers and
 persistence.
+
+`bun community-apps/room-planner/library.test.ts` - adapter checks for the
+convergence protocol: delayed successful-set races (foreign add and foreign
+delete acknowledged inside a gated set, both landing orders), independent
+queues per copy, dual cold seeds after a welcome tombstone, failed-read vs
+missing-key, unconfirmed-write honesty and throwing-intent terminals.

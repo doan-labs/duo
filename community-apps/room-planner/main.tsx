@@ -371,6 +371,10 @@ function RoomPlanner() {
   // not compute (adopt, open, delete-fallback), so the frame effect cannot
   // mistake the foreign view for a local fit.
   const framedDoc = useRef<string | null>(null)
+  // Last canvas box the observer saw: ResizeObserver re-fires on every
+  // observe(), so only a real size change may trigger a refit - refitting on
+  // the initial callback loops setDoc -> effect -> observe -> refit forever.
+  const lastBox = useRef<{ w: number; h: number } | null>(null)
   const docRef = useRef(doc)
   // Newest foreign doc write seen on the wire, for the stale-base publish guard.
   const remoteDoc = useRef<{ id: string; updated: number } | null>(null)
@@ -633,6 +637,7 @@ function RoomPlanner() {
     const fitLocal = () => {
       const box = el.getBoundingClientRect()
       if (!box.width || !box.height) return
+      lastBox.current = { w: box.width, h: box.height }
       framedDoc.current = doc.id
       // The zoom dock and the room's top dimension label ride the canvas's
       // upper edge: the fit reserves more headroom up top than at the sides
@@ -653,6 +658,16 @@ function RoomPlanner() {
         zoom,
         framed: true
       })
+      // A fit that lands where the view already is carries no information:
+      // skipping it keeps an adopted remote view from echoing straight back.
+      const v = doc.view
+      if (
+        v.framed === next.view.framed &&
+        Math.abs(v.x - next.view.x) < 0.01 &&
+        Math.abs(v.y - next.view.y) < 0.01 &&
+        Math.abs(v.zoom - next.view.zoom) < 0.001
+      )
+        return
       setDoc(next)
       // Framing a stale doc must not push it back over a newer remote write.
       if (!isOlderEdit(doc, remoteDoc.current)) {
@@ -669,6 +684,13 @@ function RoomPlanner() {
     const ro = new ResizeObserver(() => {
       const now = docRef.current
       if (!now || now.id !== doc.id) return
+      // Ignore the observer's initial callback and sub-pixel churn: only a
+      // genuinely different canvas size may refit.
+      const box = el.getBoundingClientRect()
+      const last = lastBox.current
+      if (last && Math.abs(box.width - last.w) < 1 && Math.abs(box.height - last.h) < 1) return
+      lastBox.current = box.width && box.height ? { w: box.width, h: box.height } : last
+      if (!box.width || !box.height) return
       if (framedDoc.current !== doc.id) return fitLocal()
       // Refit on a canvas resize only while the camera is still in auto-fit:
       // a manual pan or zoom sets framed:false and keeps its crop.
