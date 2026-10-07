@@ -96,6 +96,14 @@ function Game() {
   const d = useMemo<Derived | null>(() => (game ? derive(game.moves) : null), [game])
   const fit = useMemo(() => fitLayout(view, wide), [view, wide])
 
+  // Undo/reset shrink the move list: suppress placement/flip animations so a
+  // restoration never reads as a fresh move (this also covers foreign undos).
+  const prevLen = useRef(0)
+  const restored = (game?.moves.length ?? 0) < prevLen.current
+  useEffect(() => {
+    prevLen.current = game?.moves.length ?? 0
+  }, [game?.moves.length])
+
   // Discs flipped by the last move cascade outward per direction run.
   const flipDelays = useMemo(() => {
     const map = new Map<number, number>()
@@ -577,7 +585,7 @@ function Game() {
           </div>
         </div>
       ) : null}
-      <div {...stylex.props(styles.row)}>
+      <div {...stylex.props(styles.row, wide && styles.rowStack)}>
         <button
           type="button"
           onClick={() => requestNew()}
@@ -651,8 +659,10 @@ function Game() {
     </div>
   )
 
+  // Finished-match card lives in flow: the rail on the inner display, the
+  // cover scroll region on the cover - it never occludes the board.
   const result = d.over ? (
-    <div role="status" {...stylex.props(styles.result, !wide && styles.resultCover)}>
+    <div role="status" {...stylex.props(styles.result)}>
       <span {...stylex.props(styles.cardKicker)}>Game over</span>
       <strong {...stylex.props(styles.resultTitle)}>
         {d.over.winner === 'draw'
@@ -717,9 +727,9 @@ function Game() {
                   {...stylex.props(
                     styles.disc,
                     piece === 'b' ? styles.discB : styles.discW,
-                    flipDelay !== undefined && (piece === 'b' ? styles.discFlipB : styles.discFlipW),
-                    flipDelay !== undefined && styles.delay(flipDelay),
-                    isLast && styles.discIn,
+                    !restored && flipDelay !== undefined && (piece === 'b' ? styles.discFlipB : styles.discFlipW),
+                    !restored && flipDelay !== undefined && styles.delay(flipDelay),
+                    !restored && isLast && styles.discIn,
                     willFlip && styles.discWillFlip
                   )}
                 />
@@ -830,6 +840,7 @@ function Game() {
               {boardEl}
             </div>
             <div {...stylex.props(styles.rail)}>
+              {result}
               {tallyCard}
               <div {...stylex.props(styles.card)}>
                 <span {...stylex.props(styles.cardKicker)}>Game</span>
@@ -848,6 +859,7 @@ function Game() {
             {/* The board keeps the full cover width; everything else lives in
                 a scroll region below it so nothing is lost on the small pane. */}
             <div {...stylex.props(styles.coverScroll)}>
+              {result}
               {controls}
               <div {...stylex.props(styles.card)}>
                 <div {...stylex.props(styles.tally)}>
@@ -875,7 +887,6 @@ function Game() {
             </div>
           </section>
         )}
-        {result}
       </div>
       {confirmSheet}
     </main>

@@ -39,10 +39,6 @@ const discIn = stylex.keyframes({
   '60%': { transform: 'scale(1.08)', opacity: 1 },
   '100%': { transform: 'scale(1)', opacity: 1 }
 })
-const ghostPulse = stylex.keyframes({
-  '0%, 100%': { transform: 'scale(0.92)' },
-  '50%': { transform: 'scale(1)' }
-})
 const thinkPulse = stylex.keyframes({
   '0%, 100%': { transform: 'scale(1)', opacity: 0.55 },
   '50%': { transform: 'scale(1.35)', opacity: 1 }
@@ -85,7 +81,8 @@ export const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    gap: space.sm
+    gap: space.sm,
+    flexWrap: 'wrap'
   },
   brand: { display: 'flex', flexDirection: 'column', gap: space.xxs },
   kicker: {
@@ -147,7 +144,13 @@ export const styles = stylex.create({
     backgroundColor: app.fill,
     transitionProperty: { default: 'background-color, transform', [reduce]: 'none' },
     transitionDuration: '.25s',
-    transitionTimingFunction: easing.out
+    transitionTimingFunction: easing.out,
+    ':focus-visible': {
+      outlineStyle: 'solid',
+      outlineWidth: space.xxs,
+      outlineOffset: space.xxs,
+      outlineColor: app.link
+    }
   },
   muteSlash: {
     position: 'absolute',
@@ -196,7 +199,7 @@ export const styles = stylex.create({
       outlineStyle: 'solid',
       outlineWidth: space.xxs,
       outlineOffset: space.xxs,
-      outlineColor: colors.green
+      outlineColor: app.link
     }
   },
   cellAlt: { backgroundColor: `color-mix(in srgb, ${colors.greenDark} 40%, ${colors.grey6Dark})` },
@@ -233,16 +236,14 @@ export const styles = stylex.create({
     animationTimingFunction: easing.pop,
     animationFillMode: 'backwards'
   },
+  // The hover ghost is a static preview of the placed disc: a constant
+  // translucent circle reads instantly and never moves on its own.
   discGhost: {
     position: 'absolute',
     width: '82%',
     aspectRatio: '1',
     borderRadius: radius.circle,
     opacity: 0.42,
-    animationName: { default: ghostPulse, [reduce]: 'none' },
-    animationDuration: '1.1s',
-    animationTimingFunction: easing.inOut,
-    animationIterationCount: 'infinite',
     pointerEvents: 'none'
   },
   discWillFlip: {
@@ -322,7 +323,7 @@ export const styles = stylex.create({
     fontWeight: weight.semibold,
     color: colors.white,
     backgroundColor: app.fill,
-    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: colors.green }
+    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: app.link }
   },
   segTrack: {
     display: 'flex',
@@ -330,7 +331,9 @@ export const styles = stylex.create({
     padding: space.xxs,
     borderRadius: radius.pill,
     backgroundColor: app.fill,
-    boxShadow: shadow.rim
+    boxShadow: shadow.rim,
+    flexWrap: 'wrap',
+    justifyContent: 'center'
   },
   segBtn: {
     display: 'flex',
@@ -345,10 +348,13 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     fontWeight: weight.semibold,
     color: app.label2,
-    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: colors.green }
+    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: app.link }
   },
-  segOn: { backgroundColor: `color-mix(in srgb, ${colors.greenDark} 70%, ${colors.grey5Dark})`, color: colors.white },
+  segOn: { backgroundColor: app.link, color: colors.white },
   row: { display: 'flex', gap: space.sm, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' },
+  // The inner rail stacks its actions full width so a narrow rail never
+  // strands one button alone on a row.
+  rowStack: { flexDirection: 'column', alignItems: 'stretch', width: '100%' },
   btn: {
     display: 'flex',
     alignItems: 'center',
@@ -363,11 +369,11 @@ export const styles = stylex.create({
     fontSize: typeScale.subheadline,
     fontWeight: weight.semibold,
     color: colors.white,
-    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: colors.green },
+    ':focus-visible': { outlineStyle: 'solid', outlineWidth: space.xxs, outlineColor: app.link },
     ':disabled': { opacity: 0.45 }
   },
   btnPrimary: {
-    backgroundColor: `color-mix(in srgb, ${colors.greenDark} 78%, ${colors.black})`,
+    backgroundColor: app.link,
     boxShadow: shadow.card
   },
   btnGhost: { backgroundColor: app.fill, boxShadow: shadow.rim },
@@ -392,17 +398,18 @@ export const styles = stylex.create({
     boxShadow: `${shadow.rim}, ${shadow.float}`
   },
   cardKicker: {
-    fontSize: typeScale.caption2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
     letterSpacing: tracking.caption2,
     fontWeight: weight.semibold,
     textTransform: 'uppercase',
-    color: app.label3
+    color: app.label2
   },
   // The moves card owns the rail's leftover height and scrolls inside itself
   // so a long match can never push the layout past the display edge.
   movesCard: { flexGrow: 1, minHeight: 0, overflow: 'hidden' },
   tally: { display: 'flex', gap: space.sm, alignItems: 'center', fontSize: typeScale.subheadline },
-  tallyItem: { display: 'flex', alignItems: 'center', gap: space.xxs, fontVariantNumeric: 'tabular-nums' },
+  tallyItem: { display: 'flex', alignItems: 'center', gap: space.xs, fontVariantNumeric: 'tabular-nums' },
   log: {
     display: 'flex',
     flexDirection: 'column',
@@ -416,13 +423,13 @@ export const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: space.xs,
-    paddingTop: space.xxs,
-    paddingBottom: space.xxs,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
     paddingLeft: space.sm,
     paddingRight: space.sm,
     borderRadius: radius.xs,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
     color: app.label2,
     fontVariantNumeric: 'tabular-nums'
   },
@@ -432,20 +439,16 @@ export const styles = stylex.create({
     animationDuration: '.3s',
     animationTimingFunction: easing.out
   },
-  // The end-of-match card overlays the board's lower edge instead of growing
-  // the document: each display is a fixed viewport and nothing may scroll.
+  // The end-of-match card sits in flow (rail on the inner display, the cover
+  // scroll region on the cover) so it never occludes the finished board.
   result: {
-    position: 'absolute',
-    insetInline: space.lg,
-    bottom: space.xxxl,
-    zIndex: 2,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: space.xs,
     padding: space.lg,
     borderRadius: radius.lg,
-    backgroundColor: `color-mix(in srgb, ${glass.tintDark} 78%, transparent)`,
+    backgroundColor: `color-mix(in srgb, ${glass.tintDark} 70%, transparent)`,
     backdropFilter: glass.blur,
     WebkitBackdropFilter: glass.blur,
     boxShadow: `${shadow.rim}, ${shadow.float}`,
@@ -453,7 +456,6 @@ export const styles = stylex.create({
     animationDuration: '.4s',
     animationTimingFunction: easing.spring
   },
-  resultCover: { insetInline: space.sm, bottom: space.xxxl, padding: space.md },
   // UIKit's shared.press always applies its :active scale and has no
   // reduced-motion override; under reduced motion this swaps the shrink for
   // an instant brightness nudge so presses still register without movement.
@@ -475,7 +477,13 @@ export const styles = stylex.create({
     borderRadius: radius.xl,
     backgroundColor: `color-mix(in srgb, ${colors.grey5Dark} 88%, ${colors.black})`,
     boxShadow: `${shadow.rim}, ${shadow.float}`,
-    width: '300px',
+    // The kit Sheet supplies the chrome only: size the body to the surface so
+    // it stays centered and inside the pane on the narrowest split view.
+    width: '100%',
+    maxWidth: '300px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    boxSizing: 'border-box',
     color: colors.white
   },
   sheetTitle: {
@@ -484,8 +492,8 @@ export const styles = stylex.create({
     fontWeight: weight.bold,
     lineHeight: leading.headline
   },
-  sheetBody: { fontSize: typeScale.subheadline, lineHeight: leading.subheadline, color: app.label2 },
-  sheetRow: { display: 'flex', gap: space.xs, justifyContent: 'flex-end', paddingTop: space.xs },
+  sheetBody: { fontSize: typeScale.body, lineHeight: leading.body, color: app.label2 },
+  sheetRow: { display: 'flex', gap: space.sm, justifyContent: 'flex-end', paddingTop: space.xs },
   delay: (ms: number) => ({ animationDelay: `${ms}ms` }),
   fitBoard: (size: number) => ({ width: `${size}px`, height: `${size}px` })
 })
