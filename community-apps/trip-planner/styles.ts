@@ -595,6 +595,14 @@ export const styles = stylex.create({
     cursor: 'pointer',
     borderRadius: radius.sm
   },
+  /** shared.press has no reduced-motion branch (UIKit gap). Applied after it
+   * on every tappable: under reduce the scale never leaves 1 and the press
+   * reads as an instant dim instead of a shrink. */
+  pressRm: {
+    transform: { '@media (prefers-reduced-motion: reduce)': { ':active': 'scale(1)' } },
+    opacity: { '@media (prefers-reduced-motion: reduce)': { ':active': 0.72 } },
+    transitionDuration: { '@media (prefers-reduced-motion: reduce)': '0s' }
+  },
   dangerText: { color: colors.red },
   dangerFill: { backgroundColor: colors.red, color: colors.white },
   // Save / Cancel / Delete and the destructive row meet the 44pt bar.

@@ -551,7 +551,11 @@ function TripCard({ trip, index, today, onOpen }: { trip: Trip; index: number; t
     .filter(Boolean)
     .join(' · ')
   return (
-    <button type="button" onClick={onOpen} {...stylex.props(styles.tripCard, shared.press, animations.rise)}>
+    <button
+      type="button"
+      onClick={onOpen}
+      {...stylex.props(styles.tripCard, shared.press, styles.pressRm, animations.rise)}
+    >
       <span aria-hidden="true" {...stylex.props(styles.tripIcon, styles.tripTint(tripHue(index)))}>
         <Sym name="mapOutline" size={17} />
       </span>
@@ -623,7 +627,7 @@ function DayChips({ trip, day, onPick }: { trip: Trip; day: number; onPick: (d: 
             onPick(o.d)
             cue('move')
           }}
-          {...stylex.props(styles.chip, shared.press, o.d === day && styles.chipOn)}
+          {...stylex.props(styles.chip, shared.press, styles.pressRm, o.d === day && styles.chipOn)}
         >
           <span {...stylex.props(styles.chipDay)}>{o.label}</span>
           <span {...stylex.props(styles.chipDate)}>{o.sub}</span>
@@ -652,7 +656,7 @@ function SegTabs({ options, value, onChange }: { options: readonly Tab[]; value:
           aria-checked={o === value}
           tabIndex={o === value ? 0 : -1}
           onClick={() => onChange(o)}
-          {...stylex.props(styles.segBtn, shared.press, o === value && styles.segOn)}
+          {...stylex.props(styles.segBtn, shared.press, styles.pressRm, o === value && styles.segOn)}
         >
           {o}
         </button>
@@ -679,7 +683,7 @@ function LegKindChips({ value, onChange }: { value: LegKind; onChange: (k: LegKi
           aria-checked={value === k}
           tabIndex={value === k ? 0 : -1}
           onClick={() => onChange(k)}
-          {...stylex.props(styles.kindChip, shared.press, value === k && styles.kindChipOn)}
+          {...stylex.props(styles.kindChip, shared.press, styles.pressRm, value === k && styles.kindChipOn)}
         >
           <Sym name={LEG_ICON[k]} size={12} /> {legKindLabel(k)}
         </button>
@@ -793,7 +797,11 @@ function Timeline({
                 </span>
               </span>
             ) : (
-              <button type="button" onClick={() => onOpen(s)} {...stylex.props(styles.tlCard, shared.press)}>
+              <button
+                type="button"
+                onClick={() => onOpen(s)}
+                {...stylex.props(styles.tlCard, shared.press, styles.pressRm)}
+              >
                 <span {...stylex.props(styles.grow)}>
                   <div {...stylex.props(styles.tlTitle)}>{s.title}</div>
                   {s.address ? <div {...stylex.props(styles.tlSub)}>{s.address}</div> : null}
@@ -843,7 +851,7 @@ function TravelTab({
           ))}
         </ul>
       )}
-      <button type="button" onClick={onNewLeg} {...stylex.props(styles.addRow, shared.press)}>
+      <button type="button" onClick={onNewLeg} {...stylex.props(styles.addRow, shared.press, styles.pressRm)}>
         <Sym name="plus" size={14} /> Add transport
       </button>
       <div {...stylex.props(styles.sectionTitle)}>Staying</div>
@@ -861,7 +869,7 @@ function TravelTab({
           ))}
         </ul>
       )}
-      <button type="button" onClick={onNewStay} {...stylex.props(styles.addRow, shared.press)}>
+      <button type="button" onClick={onNewStay} {...stylex.props(styles.addRow, shared.press, styles.pressRm)}>
         <Sym name="plus" size={14} /> Add stay
       </button>
     </div>
@@ -879,7 +887,7 @@ function LegRow({ leg, onEdit, onDel }: { leg: Leg; onEdit: () => void; onDel: (
   const title = [leg.from, leg.to].filter(Boolean).join(' → ') || legKindLabel(leg.kind)
   return (
     <li {...stylex.props(styles.entityRow)}>
-      <button type="button" onClick={onEdit} {...stylex.props(styles.entityMain, shared.press)}>
+      <button type="button" onClick={onEdit} {...stylex.props(styles.entityMain, shared.press, styles.pressRm)}>
         <span aria-hidden="true" {...stylex.props(styles.legIcon, styles.tripTint(colors.indigo))}>
           <Sym name={LEG_ICON[leg.kind]} size={15} />
         </span>
@@ -904,7 +912,7 @@ function StayRow({ stay, onEdit, onDel }: { stay: Stay; onEdit: () => void; onDe
         : ''
   return (
     <li {...stylex.props(styles.entityRow)}>
-      <button type="button" onClick={onEdit} {...stylex.props(styles.entityMain, shared.press)}>
+      <button type="button" onClick={onEdit} {...stylex.props(styles.entityMain, shared.press, styles.pressRm)}>
         <span aria-hidden="true" {...stylex.props(styles.legIcon, styles.tripTint(colors.teal))}>
           <Sym name="building" size={15} />
         </span>
@@ -1587,7 +1595,11 @@ function TripPlanner() {
               />
             )}
             <div {...stylex.props(styles.listPad)}>
-              <button type="button" onClick={() => openStopNew(t, day)} {...stylex.props(styles.addRow, shared.press)}>
+              <button
+                type="button"
+                onClick={() => openStopNew(t, day)}
+                {...stylex.props(styles.addRow, shared.press, styles.pressRm)}
+              >
                 <Sym name="plus" size={14} /> Add stop
               </button>
             </div>
@@ -2210,7 +2222,7 @@ function UndoToast({ undo, onUndo, onDismiss }: { undo: Undo | null; onUndo: () 
       {...stylex.props(styles.toast, closing ? animations.floatOut : settled ? undefined : animations.float)}
     >
       <span {...stylex.props(styles.toastText)}>{undo.label}</span>
-      <button type="button" onClick={onUndo} {...stylex.props(styles.toastBtn, shared.press)}>
+      <button type="button" onClick={onUndo} {...stylex.props(styles.toastBtn, shared.press, styles.pressRm)}>
         Undo
       </button>
       <IconButton name="close" size={11} aria-label="Dismiss" onClick={onDismiss} xstyle={styles.iconFix} />
