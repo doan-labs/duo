@@ -35,8 +35,10 @@ import { colors } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import {
   type ComponentProps,
+  createContext,
   type RefObject,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -209,6 +211,7 @@ function DestructiveSheet({
   onClose,
   restoreTo,
   mayFocus,
+  xstyle,
   children
 }: {
   open: boolean
@@ -216,13 +219,14 @@ function DestructiveSheet({
   onClose: () => void
   restoreTo?: HTMLElement | null
   mayFocus?: () => boolean
+  xstyle?: stylex.StyleXStyles
   children: React.ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
   useFocusTrap(box, open, 'last', restoreTo, mayFocus)
   useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
   return (
-    <Sheet open={open} onClose={onClose} aria-label={label}>
+    <Sheet open={open} onClose={onClose} aria-label={label} xstyle={xstyle}>
       <div ref={box} {...stylex.props(styles.confirm)}>
         {children}
       </div>
@@ -354,6 +358,24 @@ type Ui = { v: 1; tripId?: string; day?: number; sel?: string; tab: Tab; arrange
  */
 type Confirm = { v: 1; kind: 'trip' | 'stop' | 'leg' | 'stay'; tripId: string; id?: string; label: string; by?: string }
 const CONFIRM_KINDS = ['trip', 'stop', 'leg', 'stay'] as const
+
+/**
+ * Keeps the last non-null value mounted briefly after it clears, so a kit
+ * Sheet's 200ms presence-exit never plays over an empty card.
+ */
+function useHeld<T>(value: T | null, ms = 260): T | null {
+  const [held, setHeld] = useState<T | null>(null)
+  useEffect(() => {
+    if (value !== null) {
+      setHeld(value)
+      return
+    }
+    if (held === null) return
+    const t = setTimeout(() => setHeld(null), ms)
+    return () => clearTimeout(t)
+  }, [value, held, ms])
+  return value ?? held
+}
 
 function parseConfirm(raw: string | null): Confirm | null {
   if (!raw) return null
@@ -513,6 +535,9 @@ const UNDO_MS = 8_000
 const TRIP_HUES = [colors.indigo, colors.teal, colors.orange, colors.pink, colors.green, colors.purple]
 const tripHue = (index: number) => TRIP_HUES[index % TRIP_HUES.length] ?? colors.indigo
 
+/** Ids currently playing their removal fade - rows render `styles.leaving`. */
+const LeavingCtx = createContext<ReadonlySet<string>>(new Set())
+
 const LEG_ICON: Record<LegKind, ComponentProps<typeof Sym>['name']> = {
   flight: 'airplane',
   train: 'tram',
@@ -540,6 +565,7 @@ function MuteButton({ muted, onToggle }: { muted: boolean; onToggle: () => void 
 
 /** One trip card on the trips list. */
 function TripCard({ trip, index, today, onOpen }: { trip: Trip; index: number; today: string; onOpen: () => void }) {
+  const exiting = useContext(LeavingCtx).has(trip.id)
   const days = dayCount(trip)
   const status = tripStatus(trip, today)
   const { done, total } = packProgress(trip)
@@ -554,7 +580,7 @@ function TripCard({ trip, index, today, onOpen }: { trip: Trip; index: number; t
     <button
       type="button"
       onClick={onOpen}
-      {...stylex.props(styles.tripCard, shared.press, styles.pressRm, animations.rise)}
+      {...stylex.props(styles.tripCard, shared.press, styles.pressRm, animations.rise, exiting && styles.leaving)}
     >
       <span aria-hidden="true" {...stylex.props(styles.tripIcon, styles.tripTint(tripHue(index)))}>
         <Sym name="mapOutline" size={17} />
@@ -713,6 +739,7 @@ function Timeline({
   onMove: (s: Stop, toIndex: number) => void
 }) {
   const stops = stopsForDay(trip, day)
+  const leaving = useContext(LeavingCtx)
   const tops = useRef<Map<string, number> | null>(null)
   const rowRefs = useRef(new Map<string, HTMLElement>())
   const reduced = useRef(false)
@@ -772,7 +799,7 @@ function Timeline({
             {...stylex.props(styles.tlCardWrap)}
           >
             {arrange ? (
-              <span {...stylex.props(styles.tlCard, styles.tlCardFlat)}>
+              <span {...stylex.props(styles.tlCard, styles.tlCardFlat, leaving.has(s.id) && styles.leaving)}>
                 <span {...stylex.props(styles.grow)}>
                   <div {...stylex.props(styles.tlTitle)}>{s.title}</div>
                   {s.address ? <div {...stylex.props(styles.tlSub)}>{s.address}</div> : null}
@@ -800,7 +827,7 @@ function Timeline({
               <button
                 type="button"
                 onClick={() => onOpen(s)}
-                {...stylex.props(styles.tlCard, shared.press, styles.pressRm)}
+                {...stylex.props(styles.tlCard, shared.press, styles.pressRm, leaving.has(s.id) && styles.leaving)}
               >
                 <span {...stylex.props(styles.grow)}>
                   <div {...stylex.props(styles.tlTitle)}>{s.title}</div>
@@ -885,8 +912,9 @@ function LegRow({ leg, onEdit, onDel }: { leg: Leg; onEdit: () => void; onDel: (
     .filter(Boolean)
     .join(' · ')
   const title = [leg.from, leg.to].filter(Boolean).join(' → ') || legKindLabel(leg.kind)
+  const exiting = useContext(LeavingCtx).has(leg.id)
   return (
-    <li {...stylex.props(styles.entityRow)}>
+    <li {...stylex.props(styles.entityRow, exiting && styles.leaving)}>
       <button type="button" onClick={onEdit} {...stylex.props(styles.entityMain, shared.press, styles.pressRm)}>
         <span aria-hidden="true" {...stylex.props(styles.legIcon, styles.tripTint(colors.indigo))}>
           <Sym name={LEG_ICON[leg.kind]} size={15} />
@@ -910,8 +938,9 @@ function StayRow({ stay, onEdit, onDel }: { stay: Stay; onEdit: () => void; onDe
       : stay.checkIn
         ? `from ${shortDay(stay.checkIn)}`
         : ''
+  const exiting = useContext(LeavingCtx).has(stay.id)
   return (
-    <li {...stylex.props(styles.entityRow)}>
+    <li {...stylex.props(styles.entityRow, exiting && styles.leaving)}>
       <button type="button" onClick={onEdit} {...stylex.props(styles.entityMain, shared.press, styles.pressRm)}>
         <span aria-hidden="true" {...stylex.props(styles.legIcon, styles.tripTint(colors.teal))}>
           <Sym name="building" size={15} />
@@ -941,6 +970,7 @@ function PackTab({
   onClear: () => void
 }) {
   const { done, total } = packProgress(trip)
+  const leaving = useContext(LeavingCtx)
   const [text, setText] = useState('')
   const add = () => {
     const label = text.trim()
@@ -969,7 +999,7 @@ function PackTab({
       {trip.packing.length > 0 && (
         <ul {...stylex.props(styles.packList)}>
           {trip.packing.map((p) => (
-            <li key={p.id} {...stylex.props(styles.packRow)}>
+            <li key={p.id} {...stylex.props(styles.packRow, leaving.has(p.id) && styles.leaving)}>
               <label htmlFor={`pk-${p.id}`} {...stylex.props(styles.packCheck)}>
                 <Checkbox
                   id={`pk-${p.id}`}
@@ -1064,10 +1094,10 @@ function StopDetail({
         </div>
       ) : null}
       <div {...stylex.props(styles.actionRow)}>
-        <Button variant="tinted" onClick={onEdit} xstyle={styles.grow}>
+        <Button variant="tinted" onClick={onEdit} xstyle={[styles.grow, styles.minTall]}>
           Edit stop
         </Button>
-        <Button variant="plain" onClick={onDelete} xstyle={styles.dangerText}>
+        <Button variant="plain" onClick={onDelete} xstyle={[styles.minTall, styles.dangerText]}>
           Delete
         </Button>
       </div>
@@ -1129,10 +1159,10 @@ function TripOverview({
         </div>
       ) : null}
       <div {...stylex.props(styles.actionRow)}>
-        <Button variant="tinted" onClick={onEdit} xstyle={styles.grow}>
+        <Button variant="tinted" onClick={onEdit} xstyle={[styles.grow, styles.minTall]}>
           Edit trip
         </Button>
-        <Button variant="plain" onClick={onDelete} xstyle={styles.dangerText}>
+        <Button variant="plain" onClick={onDelete} xstyle={[styles.minTall, styles.dangerText]}>
           Delete
         </Button>
       </div>
@@ -1206,6 +1236,27 @@ function TripPlanner() {
   const draft = useMemo(() => parseDraft(session.get('draft')), [session])
   const undo = useMemo(() => parseUndo(session.get('undo')), [session])
   const confirm = useMemo(() => parseConfirm(session.get('confirm')), [session])
+  const viewDraft = useHeld(draft)
+  const viewConfirm = useHeld(confirm)
+
+  // Finite removal feedback: ids marked leaving render a short fade before
+  // the delete write lands. libRef keeps the deferred write on latest state.
+  const libRef = useRef(lib)
+  libRef.current = lib
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set())
+  const markLeaving = useCallback((id: string, commit: (cur: Library) => Library) => {
+    setLeaving((s) => new Set(s).add(id))
+    setTimeout(() => {
+      setLeaving((s) => {
+        const n = new Set(s)
+        n.delete(id)
+        return n
+      })
+      const cur = libRef.current
+      applyLibRef.current(commit(cur), cur)
+    }, 190)
+  }, [])
+
   const prefs = useMemo(() => {
     try {
       const p = JSON.parse(storage.get('prefs') ?? '{}') as { muted?: boolean } | null
@@ -1261,6 +1312,9 @@ function TripPlanner() {
   )
 
   /** Apply a new library: one storage write per changed trip plus the index. */
+  const applyLibRef = useRef<(n: Library, p: Library) => void>(() => {})
+
+  /** Apply a new library: one storage write per changed trip plus the index. */
   const applyLib = useCallback(
     (next: Library, prev: Library) => {
       if (!vis) return
@@ -1271,6 +1325,7 @@ function TripPlanner() {
     },
     [storage, vis]
   )
+  applyLibRef.current = applyLib
 
   const pushUndo = useCallback(
     (u: Omit<Undo, 'v' | 'by' | 'at'>) => {
@@ -1364,7 +1419,7 @@ function TripPlanner() {
   // A peer's commit left a saving flag behind when its watch went quiet;
   // clear it once it is older than the lock window.
   useEffect(() => {
-    if (!draft?.saving) return
+    if (!draft?.saving || !vis) return
     const left = SAVE_LOCK_MS - (Date.now() - draft.saving)
     if (left <= 0) {
       session.del('draft')
@@ -1372,7 +1427,7 @@ function TripPlanner() {
     }
     const t = setTimeout(() => session.del('draft'), left)
     return () => clearTimeout(t)
-  }, [draft?.saving, session])
+  }, [draft?.saving, session, vis])
 
   // The editor only makes sense against an existing trip for edit kinds; a
   // peer that deleted the trip mid-draft gets the sheet closed cleanly.
@@ -1411,56 +1466,46 @@ function TripPlanner() {
   if (selStop) lastStop.current = selStop
   const shownStop = selStop ?? lastStop.current
 
-  const removeStopNow = (t: Trip, s: Stop) => {
-    if (!vis) return
-    const res = removeStop(lib, t.id, s.id)
-    applyLib(res.lib, lib)
-    pushUndo({ kind: 'stop', tripId: t.id, label: `Deleted "${s.title}"`, item: res.stop, index: res.index })
-    if (ui.sel === s.id) setUi({ sel: undefined })
-    cue('delete')
-  }
-
-  const removeTripNow = (t: Trip) => {
-    if (!vis) return
-    const res = removeTrip(lib, t.id)
-    applyLib(res.lib, lib)
-    pushUndo({ kind: 'trip', tripId: t.id, label: `Deleted "${t.name}"`, item: res.trip, index: res.index })
-    if (ui.tripId === t.id) setUi({ tripId: undefined, sel: undefined })
-    cue('delete')
-  }
-
   const confirmGo = () => {
     if (!vis || !confirm) return
     const t = getTrip(lib, confirm.tripId)
     closeConfirm()
     if (!t) return
-    if (confirm.kind === 'trip') removeTripNow(t)
-    else if (confirm.kind === 'stop') {
+    // The row fades first; the write lands when the fade ends, against the
+    // latest library so interleaved edits survive.
+    const targetId = confirm.id ?? confirm.tripId
+    if (confirm.kind === 'trip') {
+      if (ui.tripId === t.id) setUi({ tripId: undefined, sel: undefined })
+      pushUndo({ kind: 'trip', tripId: t.id, label: `Deleted "${t.name}"`, item: t, index: lib.order.indexOf(t.id) })
+    } else if (confirm.kind === 'stop') {
       const s = t.stops.find((x) => x.id === confirm.id)
-      if (s) removeStopNow(t, s)
+      if (!s) return
+      if (ui.sel === s.id) setUi({ sel: undefined })
+      pushUndo({ kind: 'stop', tripId: t.id, label: `Deleted "${s.title}"`, item: s, index: t.stops.indexOf(s) })
     } else if (confirm.kind === 'leg') {
       const l = t.legs.find((x) => x.id === confirm.id)
-      if (l) {
-        const res = removeLeg(lib, t.id, l.id)
-        applyLib(res.lib, lib)
-        pushUndo({
-          kind: 'leg',
-          tripId: t.id,
-          label: `Deleted ${[l.from, l.to].filter(Boolean).join(' → ') || 'transport'}`, // matches the confirm sheet's route label
-          item: res.leg,
-          index: res.index
-        })
-        cue('delete')
-      }
-    } else if (confirm.kind === 'stay') {
+      if (!l) return
+      pushUndo({
+        kind: 'leg',
+        tripId: t.id,
+        label: `Deleted ${[l.from, l.to].filter(Boolean).join(' → ') || 'transport'}`,
+        item: l,
+        index: t.legs.indexOf(l)
+      })
+    } else {
       const s = t.stays.find((x) => x.id === confirm.id)
-      if (s) {
-        const res = removeStay(lib, t.id, s.id)
-        applyLib(res.lib, lib)
-        pushUndo({ kind: 'stay', tripId: t.id, label: `Deleted "${s.name}"`, item: res.stay, index: res.index })
-        cue('delete')
-      }
+      if (!s) return
+      pushUndo({ kind: 'stay', tripId: t.id, label: `Deleted "${s.name}"`, item: s, index: t.stays.indexOf(s) })
     }
+    markLeaving(targetId, (cur) => {
+      const t2 = getTrip(cur, confirm.tripId)
+      if (!t2) return cur
+      if (confirm.kind === 'trip') return removeTrip(cur, t2.id).lib
+      if (confirm.kind === 'stop') return removeStop(cur, t2.id, confirm.id!).lib
+      if (confirm.kind === 'leg') return removeLeg(cur, t2.id, confirm.id!).lib
+      return removeStay(cur, t2.id, confirm.id!).lib
+    })
+    cue('delete')
   }
 
   const modalOpen = !!draft || !!confirm
@@ -1517,7 +1562,7 @@ function TripPlanner() {
             <Text size="subheadline" color="secondary">
               Plan the days, the travel and the packing - all offline.
             </Text>
-            <Button variant="filled" onClick={openTripNew}>
+            <Button variant="filled" onClick={openTripNew} xstyle={styles.minTall}>
               New trip
             </Button>
           </Placeholder>
@@ -1682,21 +1727,39 @@ function TripPlanner() {
               if (r) applyLib(r.lib, lib)
             }}
             onRemove={(p) => {
-              const res = removePack(lib, t.id, p.id)
-              applyLib(res.lib, lib)
-              pushUndo({ kind: 'pack', tripId: t.id, label: `Removed "${p.label}"`, item: res.item, index: res.index })
+              pushUndo({
+                kind: 'pack',
+                tripId: t.id,
+                label: `Removed "${p.label}"`,
+                item: p,
+                index: t.packing.indexOf(p)
+              })
+              markLeaving(p.id, (cur) => removePack(cur, t.id, p.id).lib)
             }}
             onClear={() => {
               const res = clearPacked(lib, t.id)
-              applyLib(res.lib, lib)
-              if (res.items.length)
-                pushUndo({
-                  kind: 'packs',
-                  tripId: t.id,
-                  label: `Cleared ${res.items.length} packed`,
-                  items: res.items,
-                  indexes: res.indexes
-                })
+              if (!res.items.length) return
+              pushUndo({
+                kind: 'packs',
+                tripId: t.id,
+                label: `Cleared ${res.items.length} packed`,
+                items: res.items,
+                indexes: res.indexes
+              })
+              for (const [i, it] of res.items.entries()) {
+                setLeaving((s) => new Set(s).add(it.id))
+                // One write after the fade clears all marked rows at once.
+                if (i === res.items.length - 1)
+                  setTimeout(() => {
+                    setLeaving((s) => {
+                      const n = new Set(s)
+                      for (const it2 of res.items) n.delete(it2.id)
+                      return n
+                    })
+                    const cur = libRef.current
+                    applyLibRef.current(clearPacked(cur, t.id).lib, cur)
+                  }, 190)
+              }
             }}
           />
         )}
@@ -1780,204 +1843,224 @@ function TripPlanner() {
   // -- render ------------------------------------------------------------------
 
   return (
-    <main
-      ref={rootRef}
-      data-app="trip-planner"
-      data-display={view.width ? view.display : undefined}
-      onPointerDownCapture={rememberControl}
-      onFocusCapture={rememberControl}
-      {...stylex.props(darkMode ? dark : light, styles.root)}
-    >
-      <div inert={modalOpen} {...stylex.props(styles.stage)}>
-        {!storage.ready && (
-          <Screen>
-            <Placeholder>
-              <Sym name="mapOutline" size={28} />
-              <Text size="subheadline" color="secondary">
-                Loading trips…
-              </Text>
-            </Placeholder>
-          </Screen>
-        )}
-        {storage.ready && !wide && (
-          <Push open={!!trip} sheet={coverTrip ?? <div {...stylex.props(styles.detailPage)} />}>
-            {tripsScreen}
-          </Push>
-        )}
-        {storage.ready && wide && (
-          <>
-            <Title as="h1">
-              <span {...stylex.props(styles.hdrText)}>Trip Planner</span>
-              <Title variant="accessory" xstyle={styles.hdrAcc}>
-                {lib.trips.length > 0 && (
-                  <Select
-                    aria-label="Trip"
-                    value={trip?.id ?? ''}
-                    data-focus-anchor="trip"
-                    xstyle={styles.selectCap}
-                    onChange={(e) =>
-                      setUi({ tripId: (e.target as HTMLSelectElement).value || undefined, sel: undefined })
-                    }
-                  >
-                    {!trip && <option value="">Pick a trip</option>}
-                    {lib.trips.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-                <MuteButton muted={muted} onToggle={() => mute(!muted)} />
-                <IconButton
-                  name="plus"
-                  aria-label="New trip"
-                  onClick={openTripNew}
-                  xstyle={styles.hit}
-                  data-focus-anchor="trips"
-                />
+    <LeavingCtx.Provider value={leaving}>
+      <main
+        ref={rootRef}
+        data-app="trip-planner"
+        data-display={view.width ? view.display : undefined}
+        onPointerDownCapture={rememberControl}
+        onFocusCapture={rememberControl}
+        {...stylex.props(darkMode ? dark : light, styles.root)}
+      >
+        <div inert={modalOpen} {...stylex.props(styles.stage)}>
+          {!storage.ready && (
+            <Screen>
+              <Placeholder>
+                <Sym name="mapOutline" size={28} />
+                <Text size="subheadline" color="secondary">
+                  Loading trips…
+                </Text>
+              </Placeholder>
+            </Screen>
+          )}
+          {storage.ready && !wide && (
+            <Push open={!!trip} sheet={coverTrip ?? <div {...stylex.props(styles.detailPage)} />}>
+              {tripsScreen}
+            </Push>
+          )}
+          {storage.ready && wide && (
+            <>
+              <Title as="h1">
+                <span {...stylex.props(styles.hdrText)}>Trip Planner</span>
+                <Title variant="accessory" xstyle={styles.hdrAcc}>
+                  {lib.trips.length > 0 && (
+                    <Select
+                      aria-label="Trip"
+                      value={trip?.id ?? ''}
+                      data-focus-anchor="trip"
+                      xstyle={styles.selectCap}
+                      onChange={(e) =>
+                        setUi({ tripId: (e.target as HTMLSelectElement).value || undefined, sel: undefined })
+                      }
+                    >
+                      {!trip && <option value="">Pick a trip</option>}
+                      {lib.trips.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                  <MuteButton muted={muted} onToggle={() => mute(!muted)} />
+                  <IconButton
+                    name="plus"
+                    aria-label="New trip"
+                    onClick={openTripNew}
+                    xstyle={styles.hit}
+                    data-focus-anchor="trips"
+                  />
+                </Title>
               </Title>
-            </Title>
-            <div {...stylex.props(styles.split)}>
-              <div {...stylex.props(styles.pane)}>
-                {trip ? (
-                  tripScreenBody(trip)
-                ) : (
-                  <Screen>
-                    {lib.trips.length === 0 ? (
-                      <Placeholder>
-                        <Sym name="mapOutline" size={32} />
-                        <Text size="headline" weight="semibold">
-                          No trips yet
-                        </Text>
-                        <Text size="subheadline" color="secondary">
-                          Plan the days, the travel and the packing - all offline.
-                        </Text>
-                        <Button variant="filled" onClick={openTripNew}>
-                          New trip
-                        </Button>
-                      </Placeholder>
-                    ) : (
-                      <div {...stylex.props(styles.listPad)}>
-                        {lib.trips.map((t, i) => (
-                          <TripCard
-                            key={t.id}
-                            trip={t}
-                            index={i}
-                            today={today}
-                            onOpen={() => setUi({ tripId: t.id, sel: undefined, day: undefined })}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </Screen>
-                )}
-              </div>
-              <div {...stylex.props(styles.rail)}>
-                <div {...stylex.props(styles.railHead)}>
-                  <span {...stylex.props(styles.railTitle)}>{selStop && trip ? 'Stop' : 'Details'}</span>
-                </div>
-                <div {...stylex.props(styles.railBody)}>
+              <div {...stylex.props(styles.split)}>
+                <div {...stylex.props(styles.pane)}>
                   {trip ? (
-                    selStop ? (
-                      stopDetail(trip, selStop)
-                    ) : (
-                      <TripOverview
-                        trip={trip}
-                        today={today}
-                        onEdit={() => openTripEdit(trip)}
-                        onDelete={() => openConfirm({ kind: 'trip', tripId: trip.id, label: trip.name })}
-                      />
-                    )
+                    tripScreenBody(trip)
                   ) : (
-                    <Placeholder>
-                      <Sym name="map" size={26} />
-                      <Text size="subheadline" color="secondary">
-                        {lib.trips.length ? 'Pick a trip to see its details.' : 'Create a trip to get started.'}
-                      </Text>
-                    </Placeholder>
+                    <Screen>
+                      {lib.trips.length === 0 ? (
+                        <Placeholder>
+                          <Sym name="mapOutline" size={32} />
+                          <Text size="headline" weight="semibold">
+                            No trips yet
+                          </Text>
+                          <Text size="subheadline" color="secondary">
+                            Plan the days, the travel and the packing - all offline.
+                          </Text>
+                          <Button variant="filled" onClick={openTripNew} xstyle={styles.minTall}>
+                            New trip
+                          </Button>
+                        </Placeholder>
+                      ) : (
+                        <div {...stylex.props(styles.listPad)}>
+                          {lib.trips.map((t, i) => (
+                            <TripCard
+                              key={t.id}
+                              trip={t}
+                              index={i}
+                              today={today}
+                              onOpen={() => setUi({ tripId: t.id, sel: undefined, day: undefined })}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </Screen>
                   )}
                 </div>
+                <div {...stylex.props(styles.rail)}>
+                  <div {...stylex.props(styles.railHead)}>
+                    <span {...stylex.props(styles.railTitle)}>{selStop && trip ? 'Stop' : 'Details'}</span>
+                  </div>
+                  <div {...stylex.props(styles.railBody)}>
+                    {trip ? (
+                      selStop ? (
+                        stopDetail(trip, selStop)
+                      ) : (
+                        <TripOverview
+                          trip={trip}
+                          today={today}
+                          onEdit={() => openTripEdit(trip)}
+                          onDelete={() => openConfirm({ kind: 'trip', tripId: trip.id, label: trip.name })}
+                        />
+                      )
+                    ) : (
+                      <Placeholder>
+                        <Sym name="map" size={26} />
+                        <Text size="subheadline" color="secondary">
+                          {lib.trips.length ? 'Pick a trip to see its details.' : 'Create a trip to get started.'}
+                        </Text>
+                      </Placeholder>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+          <div {...stylex.props(styles.status)}>{statusText}</div>
+        </div>
+
+        {/* Sheets and the toast mount only on the visible copy: a folded-away
+         * display must not run their presence timers, focus work or Escape. */}
+        {vis ? <UndoToast undo={undo} onUndo={doUndo} onDismiss={dismissUndo} /> : null}
+
+        {vis && (
+          <Sheet
+            open={!!draft}
+            onClose={() => setDraft(null)}
+            aria-label={viewDraft ? EDITOR_TITLE[viewDraft.kind] : 'Editor'}
+            xstyle={styles.sheetCard}
+          >
+            <div ref={editorBox} {...stylex.props(styles.sheetBody)}>
+              <div {...stylex.props(styles.sheetHead)}>
+                <span {...stylex.props(styles.sheetTitle)}>{viewDraft ? EDITOR_TITLE[viewDraft.kind] : ''}</span>
+                <IconButton
+                  name="close"
+                  size={13}
+                  aria-label="Close editor"
+                  onClick={() => setDraft(null)}
+                  xstyle={styles.stepHit}
+                />
+              </div>
+              {/* inert while the sheet is exiting: the held snapshot is for
+               * pixels only, it must not take input or a stray write. */}
+              <div {...stylex.props(styles.sheetScroll)} inert={!draft ? true : undefined}>
+                {viewDraft && (
+                  <EditorFields
+                    draft={viewDraft}
+                    trip={viewDraft.tripId ? getTrip(lib, viewDraft.tripId) : undefined}
+                    setDraft={(d) => {
+                      if (draft) setDraft(d)
+                    }}
+                  />
+                )}
+                {viewDraft?.err && (
+                  <div role="alert" {...stylex.props(styles.errorText)}>
+                    {viewDraft.err}
+                  </div>
+                )}
+              </div>
+              <div {...stylex.props(styles.actionPad)}>
+                <div {...stylex.props(styles.actionRow)}>
+                  <Button variant="tinted" onClick={() => setDraft(null)} xstyle={styles.actionBtn}>
+                    Cancel
+                  </Button>
+                  <Button variant="filled" onClick={commitDraft} disabled={!!draft?.saving} xstyle={styles.actionBtn}>
+                    {draft?.saving ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
               </div>
             </div>
-          </>
+          </Sheet>
         )}
-        <div {...stylex.props(styles.status)}>{statusText}</div>
-      </div>
 
-      <UndoToast undo={undo} onUndo={doUndo} onDismiss={dismissUndo} />
-
-      <Sheet open={!!draft} onClose={() => setDraft(null)} aria-label={draft ? EDITOR_TITLE[draft.kind] : 'Editor'}>
-        <div ref={editorBox} {...stylex.props(styles.sheetBody)}>
-          <div {...stylex.props(styles.sheetHead)}>
-            <span {...stylex.props(styles.sheetTitle)}>{draft ? EDITOR_TITLE[draft.kind] : ''}</span>
-            <IconButton
-              name="close"
-              size={13}
-              aria-label="Close editor"
-              onClick={() => setDraft(null)}
-              xstyle={styles.stepHit}
-            />
-          </div>
-          {draft && (
-            <EditorFields
-              draft={draft}
-              trip={draft.tripId ? getTrip(lib, draft.tripId) : undefined}
-              setDraft={setDraft}
-            />
-          )}
-          {draft?.err && (
-            <div role="alert" {...stylex.props(styles.errorText)}>
-              {draft.err}
-            </div>
-          )}
-          <div {...stylex.props(styles.actionRow)}>
-            <Button variant="tinted" onClick={() => setDraft(null)} xstyle={styles.actionBtn}>
-              Cancel
-            </Button>
-            <Button variant="filled" onClick={commitDraft} disabled={!!draft?.saving} xstyle={styles.actionBtn}>
-              {draft?.saving ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-        </div>
-      </Sheet>
-
-      <DestructiveSheet
-        open={!!confirm}
-        label={confirm ? `Delete ${confirm.label}` : 'Delete'}
-        onClose={closeConfirm}
-        restoreTo={confirm?.by === ME ? confirmTrigger.current : null}
-        mayFocus={() => vis}
-      >
-        {confirm && (
-          <>
-            <span {...stylex.props(styles.confirmTitle)}>
-              Delete{' '}
-              {confirm.kind === 'trip'
-                ? 'trip'
-                : confirm.kind === 'stop'
-                  ? 'stop'
-                  : confirm.kind === 'leg'
-                    ? 'transport'
-                    : 'stay'}
-              ?
-            </span>
-            <span {...stylex.props(styles.confirmBody)}>
-              {confirm.kind === 'trip'
-                ? `"${confirm.label}" and all its stops, travel and packing go away. You can undo right after.`
-                : `"${confirm.label}" is removed. You can undo right after.`}
-            </span>
-            <div {...stylex.props(styles.actionRow)}>
-              <Button variant="tinted" onClick={closeConfirm} xstyle={styles.actionBtn}>
-                Cancel
-              </Button>
-              <Button variant="filled" onClick={confirmGo} xstyle={[styles.actionBtn, styles.dangerFill]}>
-                Delete
-              </Button>
-            </div>
-          </>
+        {vis && (
+          <DestructiveSheet
+            open={!!confirm}
+            label={viewConfirm ? `Delete ${viewConfirm.label}` : 'Delete'}
+            onClose={closeConfirm}
+            restoreTo={confirm?.by === ME ? confirmTrigger.current : null}
+            mayFocus={() => vis}
+            xstyle={styles.sheetCard}
+          >
+            {viewConfirm && (
+              <>
+                <span {...stylex.props(styles.confirmTitle)}>
+                  {viewConfirm.kind === 'trip'
+                    ? 'Delete trip?'
+                    : viewConfirm.kind === 'stop'
+                      ? 'Delete stop?'
+                      : viewConfirm.kind === 'leg'
+                        ? 'Delete transport?'
+                        : 'Delete stay?'}
+                </span>
+                <span {...stylex.props(styles.confirmBody)}>
+                  {viewConfirm.kind === 'trip'
+                    ? `"${viewConfirm.label}" and all its stops, travel and packing go away. You can undo right after.`
+                    : `"${viewConfirm.label}" is removed. You can undo right after.`}
+                </span>
+                <div {...stylex.props(styles.actionRow)}>
+                  <Button variant="tinted" onClick={closeConfirm} xstyle={styles.actionBtn}>
+                    Cancel
+                  </Button>
+                  <Button variant="filled" onClick={confirmGo} xstyle={[styles.actionBtn, styles.dangerFill]}>
+                    Delete
+                  </Button>
+                </div>
+              </>
+            )}
+          </DestructiveSheet>
         )}
-      </DestructiveSheet>
-    </main>
+      </main>
+    </LeavingCtx.Provider>
   )
 }
 

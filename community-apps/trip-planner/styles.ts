@@ -46,9 +46,9 @@ export const styles = stylex.create({
     alignItems: 'center',
     gap: space.md,
     width: '100%',
-    paddingTop: space.md,
+    paddingTop: space.lg,
     paddingRight: space.lg,
-    paddingBottom: space.md,
+    paddingBottom: space.lg,
     paddingLeft: space.lg,
     marginBottom: space.md,
     borderWidth: 0,
@@ -82,6 +82,7 @@ export const styles = stylex.create({
     whiteSpace: 'nowrap'
   },
   tripSub: {
+    marginTop: space.xxs,
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     color: app.label2,
@@ -105,7 +106,7 @@ export const styles = stylex.create({
   // -- day chips ---------------------------------------------------------------
   chipRow: {
     display: 'flex',
-    gap: space.xs,
+    gap: space.sm,
     paddingTop: space.xs,
     paddingRight: space.lg,
     paddingBottom: space.sm,
@@ -121,8 +122,8 @@ export const styles = stylex.create({
     justifyContent: 'center',
     minWidth: 56,
     minHeight: 44,
-    paddingTop: space.xs,
-    paddingBottom: space.xs,
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
     paddingLeft: space.sm,
     paddingRight: space.sm,
     borderWidth: 0,
@@ -135,9 +136,11 @@ export const styles = stylex.create({
     transitionProperty: 'background-color, color',
     transitionDuration: '.18s'
   },
-  chipOn: { backgroundColor: app.link, color: colors.white },
+  // Selected chip: surface card on the gray track (the segmented control
+  // contract) - white-on-accent small text could not hold 4.5:1.
+  chipOn: { backgroundColor: app.surface, color: app.fg, fontWeight: weight.medium },
   chipDay: { fontSize: typeScale.footnote, lineHeight: leading.footnote, fontWeight: weight.semibold },
-  chipDate: { fontSize: typeScale.caption2, lineHeight: leading.caption2, opacity: 0.75 },
+  chipDate: { fontSize: typeScale.caption2, lineHeight: leading.caption2, color: app.label2 },
   // -- tabs ---------------------------------------------------------------------
   tabsWrap: {
     display: 'flex',
@@ -246,10 +249,10 @@ export const styles = stylex.create({
     minHeight: 44,
     marginBottom: space.sm,
     marginLeft: space.xs,
-    paddingTop: space.sm,
-    paddingRight: space.md,
-    paddingBottom: space.sm,
-    paddingLeft: space.md,
+    paddingTop: space.md,
+    paddingRight: space.lg,
+    paddingBottom: space.md,
+    paddingLeft: space.lg,
     borderWidth: 0,
     borderRadius: radius.lg,
     backgroundColor: app.surface,
@@ -270,9 +273,17 @@ export const styles = stylex.create({
     fontWeight: weight.medium,
     overflowWrap: 'break-word'
   },
-  tlSub: { fontSize: typeScale.caption1, lineHeight: leading.caption1, color: app.label2, overflowWrap: 'break-word' },
+  tlSub: {
+    marginTop: space.xxs,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    color: app.label2,
+    overflowWrap: 'break-word'
+  },
   arrangeCol: { display: 'flex', flexDirection: 'column', gap: space.xxs, alignSelf: 'center', flexShrink: 0 },
   // -- shared rows ----------------------------------------------------------------
+  // 44pt hit ring grown only along the column (vertical negatives are free
+  // space); outward horizontal insets pushed edge controls off the viewport.
   hit: {
     minWidth: 44,
     minHeight: 44,
@@ -280,16 +291,14 @@ export const styles = stylex.create({
     display: 'grid',
     placeItems: 'center',
     marginTop: `-${space.sm}`,
-    marginBottom: `-${space.sm}`,
-    marginRight: `-${space.md}`
+    marginBottom: `-${space.sm}`
   },
   hitStart: {
     minWidth: 44,
     minHeight: 44,
     flexShrink: 0,
     display: 'grid',
-    placeItems: 'center',
-    marginLeft: `-${space.md}`
+    placeItems: 'center'
   },
   // The arrange steppers and the pack checkbox keep their small glyphs but
   // gain a 44pt hit ring pulled tight by negative margins.
@@ -357,11 +366,11 @@ export const styles = stylex.create({
     alignItems: 'center',
     gap: space.sm,
     minHeight: 44,
-    paddingTop: space.xs,
+    paddingTop: space.sm,
     paddingRight: space.md,
-    paddingBottom: space.xs,
+    paddingBottom: space.sm,
     paddingLeft: space.md,
-    marginBottom: space.xs,
+    marginBottom: space.sm,
     borderRadius: radius.md,
     backgroundColor: app.surface,
     animationName: { default: riseIn, [reduce]: 'none' },
@@ -393,7 +402,7 @@ export const styles = stylex.create({
     fontSize: typeScale.footnote,
     lineHeight: leading.footnote,
     fontWeight: weight.semibold,
-    color: app.label2,
+    color: app.fg,
     textTransform: 'uppercase',
     letterSpacing: tracking.caption2
   },
@@ -432,9 +441,9 @@ export const styles = stylex.create({
     overflowWrap: 'break-word'
   },
   metaRow: { display: 'flex', alignItems: 'baseline', gap: space.md, paddingTop: space.sm },
-  metaKey: { width: 72, flexShrink: 0, fontSize: typeScale.footnote, color: app.label3 },
+  metaKey: { width: 72, flexShrink: 0, fontSize: typeScale.footnote, color: app.label2 },
   metaVal: { flexGrow: 1, fontSize: typeScale.subheadline, overflowWrap: 'break-word' },
-  actionRow: { display: 'flex', gap: space.sm, width: '100%', marginTop: space.lg },
+  actionRow: { display: 'flex', gap: space.sm, width: '100%', flexShrink: 0 },
   notesBox: {
     padding: space.md,
     borderRadius: radius.md,
@@ -453,9 +462,9 @@ export const styles = stylex.create({
     gap: space.xs,
     paddingTop: space.xs,
     paddingBottom: space.xxl,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    color: app.label3
+    fontSize: typeScale.footnote,
+    lineHeight: leading.footnote,
+    color: app.label2
   },
   // -- toast -------------------------------------------------------------------------------
   toast: {
@@ -480,8 +489,23 @@ export const styles = stylex.create({
   // The deleted row's label can be arbitrarily long: the toast clamps to the
   // viewport, the label ellipsizes, and Undo never shrinks offscreen.
   toastText: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1 },
-  toastBtn: { color: app.link, fontWeight: weight.semibold, fontSize: typeScale.footnote, flexShrink: 0 },
-  iconFix: { flexShrink: 0 },
+  toastBtn: {
+    color: app.link,
+    fontWeight: weight.semibold,
+    fontSize: typeScale.subheadline,
+    flexShrink: 0,
+    minHeight: 44,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
+    paddingLeft: space.sm,
+    paddingRight: space.sm,
+    borderWidth: 0,
+    borderRadius: radius.sm,
+    backgroundColor: 'transparent',
+    fontFamily: fonts.system,
+    cursor: 'pointer'
+  },
+  iconFix: { flexShrink: 0, minWidth: 44, minHeight: 44 },
   // -- sheets ---------------------------------------------------------------------------------
   sheetHead: {
     display: 'flex',
@@ -494,10 +518,37 @@ export const styles = stylex.create({
     paddingLeft: space.lg
   },
   sheetTitle: { fontSize: typeScale.headline, lineHeight: leading.headline, fontWeight: weight.semibold },
-  sheetBody: { display: 'flex', flexDirection: 'column', gap: space.sm, padding: space.lg, paddingTop: space.xs },
+  // The card is bounded by the viewport (it once overran a 503pt display);
+  // only the field body scrolls, head and actions stay put.
+  sheetCard: {
+    maxHeight: 'calc(100dvh - 4rem)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden'
+  },
+  sheetScroll: {
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.sm,
+    paddingTop: space.xs,
+    paddingRight: space.lg,
+    paddingBottom: space.sm,
+    paddingLeft: space.lg
+  },
+  sheetBody: { display: 'flex', flexDirection: 'column', minHeight: 0, flexGrow: 1 },
+  actionPad: {
+    paddingTop: space.sm,
+    paddingRight: space.lg,
+    paddingBottom: space.lg,
+    paddingLeft: space.lg,
+    flexShrink: 0
+  },
   // Fields share a row two across at most; on the 320px sheet a third wraps
   // to its own line instead of clipping.
-  field: { display: 'flex', flexDirection: 'column', gap: space.xxs, flexGrow: 1, flexBasis: '45%', minWidth: 0 },
+  field: { display: 'flex', flexDirection: 'column', gap: space.xs, flexGrow: 1, flexBasis: '45%', minWidth: 0 },
   fieldLabel: { fontSize: typeScale.caption1, lineHeight: leading.caption1, color: app.label2 },
   fieldRow: { display: 'flex', gap: space.sm, flexWrap: 'wrap' },
   // Single-line controls inside fields fill the column and meet the 44pt bar.
@@ -521,7 +572,7 @@ export const styles = stylex.create({
     fontSize: typeScale.caption1,
     cursor: 'pointer'
   },
-  kindChipOn: { backgroundColor: app.link, color: colors.white },
+  kindChipOn: { backgroundColor: app.surface, color: app.fg, fontWeight: weight.medium },
   confirm: { display: 'flex', flexDirection: 'column', gap: space.sm, padding: space.lg },
   confirmTitle: { fontSize: typeScale.headline, lineHeight: leading.headline, fontWeight: weight.semibold },
   confirmBody: { fontSize: typeScale.subheadline, lineHeight: leading.subheadline, color: app.label2 },
@@ -603,6 +654,14 @@ export const styles = stylex.create({
     opacity: { '@media (prefers-reduced-motion: reduce)': { ':active': 0.72 } },
     transitionDuration: { '@media (prefers-reduced-motion: reduce)': '0s' }
   },
+  // Finite removal feedback: the row fades and settles for ~180ms before the
+  // write lands, then list FLIP takes the hole.
+  leaving: {
+    opacity: 0,
+    transform: 'scale(.97)',
+    transitionProperty: 'opacity, transform',
+    transitionDuration: { default: '.18s', '@media (prefers-reduced-motion: reduce)': '0s' }
+  },
   dangerText: { color: colors.red },
   dangerFill: { backgroundColor: colors.red, color: colors.white },
   // Save / Cancel / Delete and the destructive row meet the 44pt bar.
@@ -613,7 +672,7 @@ export const styles = stylex.create({
   // the accessory row may shrink, the icon hits may not.
   hdrText: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 },
   hdrAcc: { minWidth: 0, flexShrink: 1 },
-  selectCap: { maxWidth: '12rem', minWidth: 0, flexShrink: 1 },
+  selectCap: { maxWidth: '12rem', minWidth: 0, flexShrink: 1, minHeight: 44 },
   dateInput: {
     height: 44,
     width: '100%',
