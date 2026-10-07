@@ -76,6 +76,13 @@ StyleX sets width through classes, not inline style. Both roots stay attached, s
 computed display/opacity/clip and SDK visibility rather than DOM presence. A screenshot
 thumbnail clones the display and can double data-app matches.
 
+An occluded app document gets no animation frames but keeps timers running, so a
+committed `useDisplay()`/`useSyncExternalStore` snapshot can sit a fold behind
+`os.view` until the bounded fallback fires (~250 ms, throttled to ~1 s in a
+0-size frame). Compare the live `os.view` read against the committed snapshot
+when reproducing "app thinks it is still visible" reports; a persistent gap is
+a delivery bug, a converging gap is the documented coalescing.
+
 For fold continuity, mark nodes/view IDs and assert identity through close/open. Poll the
 actual bend angle instead of fixed waits; SwiftShader may need ~10 s. Do not reparent a
 frame to expose it: that reloads the document. Evaluating script inside a frame from the

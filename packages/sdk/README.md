@@ -35,7 +35,10 @@ tolerate unknown keys, and finish migration before calling ready. The host
 delivers migration context only to the designated owner.
 
 `os.view` and `os.onView` expose actual display, placement, visibility, focus,
-size and hinge angle. Ownership stays with the first view across folding;
+size and hinge angle. Updates are delivered once per animation frame, and a
+folded-away view whose frames never run still hears each change after a short
+bounded delay - never trust a cached copy over `os.view` for gating work.
+Ownership stays with the first view across folding;
 `os.onOwner` reports handover if that view closes. Session storage is shared
 between an app's views and persistent storage is private to its app id.
 

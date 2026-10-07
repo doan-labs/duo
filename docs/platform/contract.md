@@ -602,6 +602,9 @@ Accepted: `view` events are coalesced to one per view per animation frame and
 sent only when a field changed. The SDK stores the latest and notifies
 subscribers once per frame; the kit's layout hooks read `width`/`height` and
 ignore `angle`, so an angle sweep rerenders nothing that did not ask for it.
+When a view's document stops producing frames (occluded, folded away), a
+bounded timer delivers the pending update instead: a hide must still reach
+subscribers, since visibility is what gates timers, effects and input work.
 If a view's port backlog exceeds 60 undelivered `view` events, the host drops
 the older ones; only the latest matters.
 

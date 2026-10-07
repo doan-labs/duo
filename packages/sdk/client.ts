@@ -45,6 +45,10 @@ type Command = { type: string; payload: string }
 type Listener = (e: unknown) => void
 /** Device events that are a state, not a moment: a new listener hears the current value first. */
 const STATES: DeviceEvent[] = ['orientation', 'switches']
+/** View updates still coalesce to one callback per frame; this is only the floor for
+ * occluded copies whose frames never run. A hidden iframe keeps its timers, so a
+ * modest delay still reaches subscribers instead of leaving the last frame pending. */
+const VIEW_FALLBACK_MS = 250
 
 /** One client per app document; importing host-only types has no side effects. */
 export function createClient() {
@@ -54,6 +58,7 @@ export function createClient() {
   let seq = 0
   let argSeq = 0
   let frame = 0
+  let wake: ReturnType<typeof setTimeout> | undefined
   const pending = new Map<number, Pending>()
   const views = new Set<(v: ViewInfo) => void>()
   const owners = new Set<(o: { epoch: number } | null) => void>()
@@ -77,6 +82,9 @@ export function createClient() {
     closed = true
     port?.close()
     cancelAnimationFrame(frame)
+    frame = 0
+    clearTimeout(wake)
+    wake = undefined
     for (const p of pending.values()) {
       clearTimeout(p.timer)
       p.reject(new PlatformError(code))
@@ -84,6 +92,15 @@ export function createClient() {
     pending.clear()
     for (const waiter of commandWaiters.values()) waiter.reject(new PlatformError(code))
     commandWaiters.clear()
+  }
+  /** Single delivery point so the frame and the fallback timer cannot double-report. */
+  function deliver() {
+    if (closed) return
+    cancelAnimationFrame(frame)
+    frame = 0
+    clearTimeout(wake)
+    wake = undefined
+    for (const cb of views) cb(client.view)
   }
   function request<T>(m: Method, p?: unknown): Promise<T> {
     if (closed || !port) return Promise.reject(new PlatformError('E_CLOSED'))
@@ -195,11 +212,11 @@ export function createClient() {
       case 'view':
         if (!viewValid(event.p)) return stop('E_PROTOCOL')
         client.view = event.p
-        if (!frame)
-          frame = requestAnimationFrame(() => {
-            frame = 0
-            for (const cb of views) cb(client.view)
-          })
+        // One pending delivery whichever fires first: the frame keeps per-frame
+        // coalescing where frames run, the timer keeps the delivery guarantee in
+        // an occluded document where requestAnimationFrame never ticks.
+        if (!frame) frame = requestAnimationFrame(deliver)
+        if (wake === undefined) wake = setTimeout(deliver, VIEW_FALLBACK_MS)
         break
       case 'owner':
         if (event.p !== null && (!record(event.p) || !Number.isSafeInteger(event.p.epoch))) return stop('E_PROTOCOL')
