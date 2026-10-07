@@ -199,7 +199,7 @@ function Seg({
           aria-checked={o === value}
           tabIndex={o === value ? 0 : -1}
           onClick={() => onChange(o)}
-          {...stylex.props(styles.segBtn, o === value && styles.segOn, shared.press, styles.pressRm)}
+          {...stylex.props(styles.segBtn, o === value && styles.segOn, styles.press)}
         >
           <span {...stylex.props(styles.segLabel)}>{o}</span>
         </button>
@@ -266,14 +266,19 @@ function Solitaire() {
   // Whether the rail's contents overflow its scrollport: only then does the
   // bottom fade appear - a fitted rail gets no fake affordance.
   const railScrollRef = useRef<HTMLDivElement>(null)
+  const railBodyRef = useRef<HTMLDivElement>(null)
   const [railScrolls, setRailScrolls] = useState(false)
   useLayoutEffect(() => {
     const el = railScrollRef.current
-    if (!el) return
+    const body = railBodyRef.current
+    if (!el || !body) return
     const check = () => setRailScrolls(el.scrollHeight - el.clientHeight > 4)
     check()
+    // The scrollport's own box never grows; the overflow arrives as the
+    // body inside it growing - so the body is what must be observed.
     const ro = new ResizeObserver(check)
     ro.observe(el)
+    ro.observe(body)
     return () => ro.disconnect()
   }, [])
 
@@ -871,7 +876,7 @@ function Solitaire() {
               aria-checked={m.id === table.mode}
               tabIndex={m.id === table.mode ? 0 : -1}
               onClick={() => requestMode(m.id)}
-              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep, shared.press, styles.pressRm)}
+              {...stylex.props(styles.pickRow, i > 0 && styles.pickRowSep, styles.press)}
             >
               <span {...stylex.props(styles.pickLabel)}>{m.label}</span>
               <span {...stylex.props(styles.pickMeta)}>{m.id === 'draw1' ? 'relaxed' : 'classic'}</span>
@@ -899,8 +904,7 @@ function Solitaire() {
             styles.tool,
             wide && styles.toolWide,
             !table.log.length && styles.toolDisabled,
-            shared.press,
-            styles.pressRm
+            styles.press
           )}
         >
           <Sym name="undo" size={wide ? 15 : 13} />
@@ -910,7 +914,7 @@ function Solitaire() {
           type="button"
           onClick={doHint}
           aria-label="Show a hint"
-          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press, styles.pressRm)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, styles.press)}
         >
           <Sym name="star" size={wide ? 15 : 13} />
           Hint
@@ -920,13 +924,7 @@ function Solitaire() {
           onClick={() => doAuto()}
           disabled={ended}
           aria-label="Auto-play every card that can go home"
-          {...stylex.props(
-            styles.tool,
-            wide && styles.toolWide,
-            ended && styles.toolDisabled,
-            shared.press,
-            styles.pressRm
-          )}
+          {...stylex.props(styles.tool, wide && styles.toolWide, ended && styles.toolDisabled, styles.press)}
         >
           <Sym name="bolt" size={wide ? 15 : 13} />
           Auto
@@ -936,7 +934,7 @@ function Solitaire() {
           onClick={toggleMute}
           aria-pressed={muted}
           aria-label={muted ? 'Unmute card sounds' : 'Mute card sounds'}
-          {...stylex.props(styles.tool, wide && styles.toolWide, muted && styles.toolOn, shared.press, styles.pressRm)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, muted && styles.toolOn, styles.press)}
         >
           <span {...stylex.props(styles.muteWrap)}>
             <Sym name="volume" size={wide ? 15 : 13} />
@@ -948,7 +946,7 @@ function Solitaire() {
           type="button"
           onClick={() => requestNew()}
           aria-label="Start a new game"
-          {...stylex.props(styles.tool, wide && styles.toolWide, shared.press, styles.pressRm)}
+          {...stylex.props(styles.tool, wide && styles.toolWide, styles.press)}
         >
           <Sym name="reload" size={wide ? 15 : 13} />
           New
@@ -1016,12 +1014,12 @@ function Solitaire() {
         </span>
       </div>
       <div {...stylex.props(styles.resultActions)}>
-        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, shared.press, styles.pressRm)}>
+        <button type="button" onClick={() => restart()} {...stylex.props(styles.primary, styles.press)}>
           <Sym name="reload" size={13} />
           New game
         </button>
         {/* The card floats over the narrow toolbar, so undo lives here too. */}
-        <button type="button" onClick={undo} {...stylex.props(styles.action, shared.press, styles.pressRm)}>
+        <button type="button" onClick={undo} {...stylex.props(styles.action, styles.press)}>
           <Sym name="undo" size={13} />
           Take back
         </button>
@@ -1070,7 +1068,7 @@ function Solitaire() {
             </span>
           </div>
           <div {...stylex.props(styles.confirmActions)}>
-            <button type="button" onClick={closeConfirm} {...stylex.props(styles.action, shared.press, styles.pressRm)}>
+            <button type="button" onClick={closeConfirm} {...stylex.props(styles.action, styles.press)}>
               Keep playing
             </button>
             <button
@@ -1079,7 +1077,7 @@ function Solitaire() {
                 restart(shown.mode)
                 closeConfirm()
               }}
-              {...stylex.props(styles.primary, shared.press, styles.pressRm)}
+              {...stylex.props(styles.primary, styles.press)}
             >
               {shown.mode === table.mode ? 'New game' : `Start ${shown.label}`}
             </button>
@@ -1111,7 +1109,7 @@ function Solitaire() {
                   more below. The status line stays pinned below. */}
               <div {...stylex.props(styles.railWrap)}>
                 <div ref={railScrollRef} {...stylex.props(styles.railScroll)}>
-                  <div {...stylex.props(styles.railBody)}>
+                  <div ref={railBodyRef} {...stylex.props(styles.railBody)}>
                     {controls}
                     {statsCard}
                   </div>

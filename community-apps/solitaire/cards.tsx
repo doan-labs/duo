@@ -138,11 +138,24 @@ function CourtArt({ rank, suit }: { rank: number; suit: Suit }) {
   )
 }
 
-/** The card's face: corner indices top-left and bottom-right, pips or a medallion in the middle. */
-export function CardFace({ card, small }: { card: Card; small?: boolean }) {
+/** The card's face: corner indices top-left and bottom-right, pips or a medallion in the middle.
+    `bare` strips the corner to the rank alone for a mostly-covered card,
+    where a clipped suit glyph reads worse than none. */
+export function CardFace({ card, small, bare }: { card: Card; small?: boolean; bare?: boolean }) {
   const ink = suitColor(card.suit)
   const rank = RANK_NAMES[card.rank]!
   const court = card.rank >= 10 // J, Q, K
+  if (bare)
+    return (
+      <span {...stylex.props(styles.face)} aria-hidden="true">
+        <span {...stylex.props(styles.corner, styles.cornerTop, styles.suitInk(ink))}>
+          <b {...stylex.props(styles.cornerRank)}>{rank}</b>
+        </span>
+        <i {...stylex.props(styles.soloPip, styles.suitInk(ink))}>
+          <SuitGlyph suit={card.suit} />
+        </i>
+      </span>
+    )
   return (
     <span {...stylex.props(styles.face)} aria-hidden="true">
       <span {...stylex.props(styles.corner, styles.cornerTop)}>

@@ -1,4 +1,3 @@
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CardBack, CardFace } from './cards.tsx'
@@ -38,7 +37,7 @@ export function fitBoard(w: number, h: number): Fit {
   const rowGap = Math.max(6, Math.min(16, h * 0.028))
   const tabY = cardH + rowGap
   // The draw-3 fan must keep a two-digit rank fully readable on the waste.
-  const wasteStep = cardW * 0.42
+  const wasteStep = cardW * 0.5
   const font = Math.max(9, cardW * 0.3)
   return { w, h, cardW, cardH, gapX, rowGap, tabY, wasteStep, font }
 }
@@ -209,6 +208,9 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
         onDoubleClick={down ? undefined : () => onCardDouble(card.id, spot, index)}
         onKeyDown={down ? undefined : (e) => nav(e, key)}
         {...stylex.props(
+          // press first: card's transition list wins and keeps transform, so
+          // the press scale still eases while left/top carry the travel.
+          !down && styles.press,
           styles.card,
           down && styles.cardDown,
           styles.cardFont(fit.font),
@@ -220,9 +222,7 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
           won && spot.startsWith('f') && styles.hop,
           won && spot.startsWith('f') && styles.delayAt(120 + Number(spot.slice(1)) * 90),
           shake === key && styles.shake,
-          picked && styles.selected,
-          !down && shared.press,
-          styles.pressRm
+          picked && styles.selected
         )}
       >
         <span {...stylex.props(styles.cardInner, !card.up && styles.cardInnerDown)}>
@@ -246,11 +246,11 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
       onClick={() => onSpot(spot)}
       onKeyDown={(e) => nav(e, spot)}
       {...stylex.props(
+        styles.press,
         styles.slot,
         place(x, y, 0),
         hot.has(spot) && styles.slotHot,
-        shake === spot && styles.shake,
-        shared.press
+        shake === spot && styles.shake
       )}
       tabIndex={-1}
     >
@@ -298,7 +298,9 @@ export function Board({ game, sel, hot, shake, dealing, won, active, onSpot, onC
           aria-hidden="true"
           {...stylex.props(styles.faceSide, styles.faceFront, styles.cardFont(fit.font), place(x, 0, 10 + i))}
         >
-          <CardFace card={card} small={fit.cardW < 52} />
+          {/* Covered fan cards show their rank only: the overlap hides the
+              rest, and a clipped half-suit reads worse than a bare index. */}
+          <CardFace card={card} small={fit.cardW < 52} bare />
         </span>
       )
     }

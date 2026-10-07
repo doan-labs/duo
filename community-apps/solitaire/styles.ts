@@ -5,6 +5,7 @@ import {
   fonts,
   glass,
   leading,
+  motion,
   radius,
   shadow,
   space,
@@ -151,7 +152,7 @@ export const styles = stylex.create({
     placeItems: 'center',
     cursor: 'pointer',
     touchAction: 'manipulation',
-    transitionProperty: 'outline-color,background-color',
+    transitionProperty: 'outline-color, background-color, transform',
     transitionDuration: '.18s',
     ':focus-visible': { outline: `2px solid ${colors.white}`, outlineOffset: 2 }
   },
@@ -176,7 +177,9 @@ export const styles = stylex.create({
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
-    transitionProperty: { default: 'left, top', [reduce]: 'none' },
+    // The merged transition list must win over styles.press's own: order
+    // card after press in the props call so travel glides and presses ease.
+    transitionProperty: { default: 'left, top, transform, color, background-color', [reduce]: 'none' },
     transitionDuration: '.24s',
     transitionTimingFunction: easing.push,
     ':focus-visible': { zIndex: 4000 }
@@ -659,13 +662,19 @@ export const styles = stylex.create({
     paddingInline: space.lg
   },
   confirmActions: { display: 'flex', gap: space.sm, flexShrink: 0, flexWrap: 'wrap' },
-  // shared.press has no reduced-motion override (UIKit gap, reported): under
-  // prefers-reduced-motion the :active scale is cancelled and the press reads
-  // as an instantaneous brightness cue instead. Pair after shared.press.
-  pressRm: {
-    transform: { '@media (prefers-reduced-motion: reduce)': { ':active': 'none' } },
-    filter: {
-      '@media (prefers-reduced-motion: reduce)': { default: null, ':active': 'brightness(0.9)' }
-    }
+  // shared.press inlined: StyleX resolves a property last-wins per style
+  // object, so a separate reduced-motion override would erase the :active
+  // scale everywhere. The RM branches merge inside this one declaration:
+  // normal presses keep the scale ease, reduced motion snaps to a static
+  // brightness cue instead (UIKit gap - shared.press has no RM override).
+  press: {
+    transitionProperty: 'transform, color, background-color',
+    transitionDuration: `${motion.pressDuration}, .2s, .2s`,
+    transform: {
+      default: 'scale(1)',
+      ':active': motion.press,
+      [reduce]: { ':active': 'none' }
+    },
+    filter: { [reduce]: { default: null, ':active': 'brightness(0.9)' } }
   }
 })
