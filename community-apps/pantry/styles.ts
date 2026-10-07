@@ -186,13 +186,19 @@ export const styles = stylex.create({
   fieldRow: { display: 'flex', alignItems: 'flex-end', gap: space.sm },
   fieldLabel: {
     color: app.label2,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     fontWeight: weight.semibold,
     textTransform: 'uppercase'
   },
-  optional: { color: app.label3, textTransform: 'none', fontWeight: weight.regular },
+  optional: {
+    color: app.label2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    textTransform: 'none',
+    fontWeight: weight.regular
+  },
   input: {
     boxSizing: 'border-box',
     width: '100%',
@@ -262,7 +268,9 @@ export const styles = stylex.create({
     color: app.label2,
     backgroundColor: { default: 'transparent', ':active': app.fill3 },
     fontFamily: fonts.system,
-    fontSize: typeScale.caption2,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
+    letterSpacing: tracking.caption1,
     fontWeight: weight.semibold,
     cursor: 'pointer',
     touchAction: 'manipulation',
@@ -397,19 +405,23 @@ export const styles = stylex.create({
   badge: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: space.xxs,
+    gap: space.xs,
     borderRadius: radius.pill,
     paddingBlock: space.xxs,
     paddingInline: space.sm,
     backgroundColor: app.fill3,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
+    color: app.fg,
+    fontSize: typeScale.caption1,
+    lineHeight: leading.caption1,
     fontWeight: weight.bold,
     outlineStyle: 'solid',
     outlineWidth: 1,
     flexShrink: 0,
     whiteSpace: 'nowrap'
   },
+  // The tone lives on the dot and the edge; the words stay readable ink in
+  // both themes, so the badge never asks colour to carry contrast.
+  badgeDot: { width: space.sm, height: space.sm, borderRadius: radius.pill, flexShrink: 0 },
   steppers: { display: 'flex', alignItems: 'center', gap: space.xxs, flexShrink: 0 },
   stepBtn: {
     display: 'grid',
@@ -586,13 +598,5 @@ export const styles = stylex.create({
   dangerBody: { marginBlock: 0, color: app.label2, fontSize: typeScale.footnote, lineHeight: leading.footnote },
   hint: { marginBlock: 0, color: app.label2, fontSize: typeScale.footnote, lineHeight: leading.footnote },
   // uikit Buttons stay 34pt tall on their own; actions get the full 44pt tap target.
-  btnH: { minHeight: `calc(${space.xxxl} + ${space.md})` },
-  saved: {
-    alignSelf: 'center',
-    flexShrink: 0,
-    color: app.label3,
-    fontSize: typeScale.caption2,
-    lineHeight: leading.caption2,
-    letterSpacing: tracking.caption2
-  }
+  btnH: { minHeight: `calc(${space.xxxl} + ${space.md})` }
 })

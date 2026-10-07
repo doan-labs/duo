@@ -14,13 +14,13 @@ import {
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
 import {
-  addItem,
-  addShop,
+  type AddMeta,
   badgeFor,
   cleanName,
-  clearBought,
   countOut,
   type Doc,
+  type EditMeta,
+  EMPTY_DOC,
   FILTERS,
   type Filter,
   filterItems,
@@ -32,35 +32,53 @@ import {
   locationOf,
   metaLine,
   NAME_CAP,
-  parseDoc,
+  opAdd,
+  opAddShop,
+  opClearBought,
+  opMute,
+  opRemove,
+  opRemoveShop,
+  opStep,
+  opToggleShop,
+  opUpdate,
   parseMirror,
   parseQty,
   qtyText,
-  removeItem,
-  removeShop,
   type Sort,
-  serializeDoc,
+  type StepMeta,
   serializeMirror,
   soonItems,
   sortItems,
   stepFor,
-  stepItem,
   todayKey,
-  toggleShop,
   UNITS,
   type Unit,
   USE_SOON_DAYS,
   unitOf,
-  updateItem,
   validDay
 } from './pantry.ts'
-import { schemeDark, schemeLight, styles, toneEdge, toneText, toneTile } from './styles.ts'
+import { schemeDark, schemeLight, styles, toneEdge, toneTile } from './styles.ts'
+import { type DocStore, PantrySync, type SyncStatus } from './sync.ts'
 
 // Both displays run this file as separate copies. Stock lives in os.storage
-// (last writer wins, so a foreign value is always the newer settled doc and is
-// adopted unconditionally); the cover/inner "where you are looking" state -
-// shelf filter, search text, sort - rides os.session so a fold keeps it.
+// through PantrySync: every accepted tap becomes a replayable intent that
+// survives stale watch echoes, fold transitions and the other display writing
+// at the same time (see sync.ts). The cover/inner "where you are looking"
+// state - shelf filter, search text, sort - rides os.session so a fold keeps it.
 const ME = crypto.randomUUID()
+
+// The engine's storage adapter: the real os.storage channel, scoped to the
+// app's document key. Deterministic tests drive the same interface.
+const docStore: DocStore = {
+  get: () => os.storage.get('pantry-v1'),
+  set: (v) => os.storage.set('pantry-v1', v).then((c) => c.rev),
+  watch: (cb) =>
+    os.storage.watch(0, (c) => {
+      // The resync sentinel (rev -1) has no key; anything else must be ours.
+      if (c.rev !== -1 && c.k !== 'pantry-v1') return
+      cb({ rev: c.rev, v: c.v ?? undefined })
+    })
+}
 
 type Draft = { name: string; qty: string; unit: Unit; location: Location; date: string }
 type EditDraft = Draft & { id: string }
@@ -134,16 +152,14 @@ function GuardedSheet({
 function Pantry() {
   const [rootRef, wide] = useWide<HTMLElement>()
   const view = useDisplay()
-  const stored = useKV(os.storage, 'pantry-v1')
   const mirror = useKV(os.session, 'pantry-view')
 
-  // Two read paths. `doc` renders whatever the mirror has settled: foreign
-  // writes land inside a React transition, so a copy that was hidden may lag a
-  // few hundred ms behind storage. docRef.current is the write-side truth -
-  // publishes update it synchronously and a raw space.watch keeps it aligned
-  // with every storage change regardless of render timing, so a tap right
-  // after a fold computes from the freshest document, not the lagging render.
-  const doc = parseDoc(stored.value)
+  // `doc` renders the engine's view document: the settled base plus this
+  // copy's still-unconfirmed intents on top. The engine owns all storage
+  // reads/writes; docRef mirrors it synchronously so a tap in the same event
+  // batch still steps from the freshest quantity.
+  const [doc, setDoc] = useState<Doc>(() => ({ ...EMPTY_DOC }))
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading')
 
   const [darkMode, setDarkMode] = useState(false)
   const [today, setToday] = useState(todayKey)
@@ -163,7 +179,6 @@ function Pantry() {
   const [flashId, setFlashId] = useState<string | null>(null)
 
   const docRef = useRef(doc)
-  const docRev = useRef(0)
   const viewRef = useRef(view)
   viewRef.current = view
   const uiRef = useRef({ loc, q, sort })
@@ -172,24 +187,28 @@ function Pantry() {
   const sheetTrigger = useRef<HTMLElement | null>(null)
   const mirrorWrite = useRef(mirror.set)
   mirrorWrite.current = mirror.set
-  const storedWrite = useRef(stored.set)
-  storedWrite.current = stored.set
+  const syncRef = useRef<PantrySync | null>(null)
 
-  // Live doc for the write path: the socket watch fires on every storage
-  // change even while this copy is hidden, so docRef never falls a transition
-  // behind the truth.
+  // The live gate: a copy must be both visible and active before its input can
+  // mutate the document. Stale or forged input from a hidden copy is rejected
+  // here, before any side effect; ops already admitted while live keep
+  // draining to storage even if this copy is folded away mid-write.
+  const live = useCallback(() => viewRef.current.visible && viewRef.current.active, [])
+  const curDoc = () => syncRef.current?.current() ?? docRef.current
+
+  // Engine lifecycle: one PantrySync per copy, watching the doc key.
   useEffect(() => {
-    void os.storage
-      .get('pantry-v1')
-      .then((v) => {
-        if (docRev.current === 0) docRef.current = parseDoc(v)
-      })
-      .catch(() => {})
-    return os.storage.watch(0, (c) => {
-      if (c.k !== 'pantry-v1' || c.rev <= docRev.current) return
-      docRev.current = c.rev
-      docRef.current = parseDoc(c.v)
+    const sync = new PantrySync({
+      me: ME,
+      store: docStore,
+      onDoc: (d) => {
+        docRef.current = d
+        setDoc(d)
+      },
+      onStatus: setSyncStatus
     })
+    syncRef.current = sync
+    return sync.start()
   }, [])
 
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
@@ -214,11 +233,11 @@ function Pantry() {
     }
   }, [mirror.value, mirror.status])
 
-  // Expiry ticks over at local midnight, scheduled only by the live display so
-  // the hidden copy never runs a timer nobody sees.
+  // Expiry ticks over at local midnight, scheduled only by the live display
+  // (visible AND active) so the hidden copy never runs a timer nobody sees.
   useEffect(() => {
     setToday(todayKey())
-    if (!view.active) return
+    if (!view.active || !view.visible) return
     let timer = 0
     const arm = () => {
       const now = new Date()
@@ -230,7 +249,7 @@ function Pantry() {
     }
     arm()
     return () => window.clearTimeout(timer)
-  }, [view.active])
+  }, [view.active, view.visible])
 
   const announce = useCallback((tone: 'good' | 'warn', text: string) => {
     window.clearTimeout(noticeTimer.current)
@@ -238,26 +257,43 @@ function Pantry() {
     noticeTimer.current = window.setTimeout(() => setNotice(null), 4500)
   }, [])
 
-  const publish = useCallback(
-    (next: Doc, snd?: Cue, note?: { tone: 'good' | 'warn'; text: string }) => {
-      // docRef follows immediately so a second tap in the same event batch
-      // still steps from the freshest quantity.
-      docRef.current = next
-      storedWrite.current(serializeDoc(next))
-      if (note) announce(note.tone, note.text)
-      if (snd && viewRef.current.active && !next.muted) cue(snd)
+  // A failed drain surfaces here instead of pretending the write landed.
+  useEffect(() => {
+    if (syncStatus === 'retrying') announce('warn', 'Could not save - retrying')
+  }, [syncStatus, announce])
+
+  /**
+   * Accept one semantic op on the live display: the engine applies it to the
+   * view document now and persists it against the settled base. Returns the
+   * op's accept metadata so callers can toast merge/step outcomes, or null
+   * when the copy is hidden or unready and the input is rejected untouched.
+   */
+  const mutate = useCallback(
+    (op: Parameters<PantrySync['submit']>[0]): { meta?: unknown } | null => {
+      if (!live()) return null
+      const sync = syncRef.current
+      if (!sync) return null
+      return sync.submit(op)
     },
-    [announce]
+    [live]
   )
 
-  const setView = useCallback((patch: { loc?: Filter; q?: string; sort?: Sort }) => {
-    const next = { ...uiRef.current, ...patch }
-    uiRef.current = next
-    if (patch.loc !== undefined) setLoc(next.loc)
-    if (patch.q !== undefined) setQ(next.q)
-    if (patch.sort !== undefined) setSort(next.sort)
-    mirrorWrite.current(serializeMirror(ME, next.loc, next.q, next.sort))
-  }, [])
+  const play = (snd: Cue) => {
+    if (live() && !curDoc().muted) cue(snd)
+  }
+
+  const setView = useCallback(
+    (patch: { loc?: Filter; q?: string; sort?: Sort }) => {
+      if (!live()) return
+      const next = { ...uiRef.current, ...patch }
+      uiRef.current = next
+      if (patch.loc !== undefined) setLoc(next.loc)
+      if (patch.q !== undefined) setQ(next.q)
+      if (patch.sort !== undefined) setSort(next.sort)
+      mirrorWrite.current(serializeMirror(ME, next.loc, next.q, next.sort))
+    },
+    [live]
+  )
 
   // --- inventory actions ------------------------------------------------------
 
@@ -274,49 +310,44 @@ function Pantry() {
       announce('warn', 'Check the highlighted fields')
       return
     }
-    const out = addItem(docRef.current, {
-      name,
-      milli: milli!,
-      unit: draft.unit,
-      location: draft.location,
-      bestBefore: date || null
-    })
-    if (out.full) {
+    const res = mutate(
+      opAdd({ name, milli: milli!, unit: draft.unit, location: draft.location, bestBefore: date || null })
+    )
+    if (!res) return
+    const meta = res.meta as AddMeta | undefined
+    if (!meta || meta.id === null) {
       setErrors({ form: 'The pantry is full; remove something first' })
       announce('warn', 'Pantry is full')
       return
     }
-    const landed = out.doc.items.find((i) => i.id === out.id)
-    publish(
-      out.doc,
-      'add',
-      out.merged && landed
-        ? { tone: 'good', text: `${name} topped up to ${qtyText(landed)}` }
-        : { tone: 'good', text: `${name} stocked` }
-    )
-    setFlashId(out.id)
+    const landed = curDoc().items.find((i) => i.id === meta.id)
+    announce('good', meta.merged && landed ? `${name} topped up to ${qtyText(landed)}` : `${name} stocked`)
+    play('add')
+    setFlashId(meta.id)
     setDraft({ ...EMPTY_DRAFT, unit: draft.unit, location: draft.location })
   }
 
   const step = (item: Item, dir: 'use' | 'restock') => {
-    const out = stepItem(docRef.current, item.id, dir)
-    if (out.milli === null) return
-    if (out.milli === item.milli) {
+    const res = mutate(opStep(item.id, dir))
+    if (!res) return
+    const meta = res.meta as StepMeta | undefined
+    const milli = meta?.milli ?? item.milli
+    if (meta?.milli === null) return // row is already gone on the settled doc
+    if (milli === meta?.before) {
       if (dir === 'use') announce('warn', `${item.name} is empty`)
       return
     }
-    publish(
-      out.doc,
-      dir === 'use' ? 'use' : 'restock',
-      out.milli === 0 ? { tone: 'warn', text: `${item.name} ran out` } : undefined
-    )
+    if (milli === 0) announce('warn', `${item.name} ran out`)
+    play(dir === 'use' ? 'use' : 'restock')
     setFlashId(item.id)
   }
 
   const remove = (id: string) => {
-    const item = docRef.current.items.find((i) => i.id === id)
+    const item = curDoc().items.find((i) => i.id === id)
     if (!item) return
-    publish(removeItem(docRef.current, id), 'trash', { tone: 'warn', text: `${item.name} removed` })
+    if (!mutate(opRemove(id))) return
+    announce('warn', `${item.name} removed`)
+    play('trash')
   }
 
   // --- edit sheet --------------------------------------------------------------
@@ -356,18 +387,16 @@ function Pantry() {
     if (date && !validDay(date)) errs.date = 'That is not a calendar day'
     setEditErrors(errs)
     if (Object.keys(errs).length) return
-    const out = updateItem(docRef.current, {
-      ...base,
-      name,
-      milli: milli!,
-      unit: d.unit,
-      location: d.location,
-      bestBefore: date || null
-    })
-    publish(out.doc, 'save', {
-      tone: 'good',
-      text: out.merged ? `${name} merged into its matching batch` : `${name} saved`
-    })
+    const res = mutate(
+      opUpdate({ ...base, name, milli: milli!, unit: d.unit, location: d.location, bestBefore: date || null })
+    )
+    if (!res) return
+    const meta = res.meta as EditMeta | undefined
+    if (meta?.gone) announce('warn', `${name} was already removed`)
+    else {
+      announce('good', meta?.merged ? `${name} merged into its matching batch` : `${name} saved`)
+      play('save')
+    }
     closeEdit()
   }
 
@@ -396,7 +425,7 @@ function Pantry() {
     const restore = () => {
       // Only the live display may take focus - a copy that was folded away
       // mid-restore must not steal it back from the active one.
-      if (!el.isConnected || !viewRef.current.active) return
+      if (!el.isConnected || !viewRef.current.active || !viewRef.current.visible) return
       el.focus()
       if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
     }
@@ -411,35 +440,40 @@ function Pantry() {
       setShopError('Name what to buy')
       return
     }
-    const out = addShop(docRef.current, name, shopDraft.note)
-    if (out.full) {
+    const res = mutate(opAddShop(name, shopDraft.note))
+    if (!res) return
+    const meta = res.meta as { id: string | null } | undefined
+    if (!meta || meta.id === null) {
       setShopError(`The list holds ${LIST_CAP} entries`)
       return
     }
     setShopError('')
     setShopDraft({ name: '', note: '' })
-    publish(out.doc, 'add', { tone: 'good', text: `${name} on the list` })
+    announce('good', `${name} on the list`)
+    play('add')
   }
 
   const toggleBought = (id: string) => {
-    const item = docRef.current.list.find((s) => s.id === id)
+    const item = curDoc().list.find((s) => s.id === id)
     if (!item) return
-    publish(toggleShop(docRef.current, id), item.done ? 'uncheck' : 'check')
+    if (!mutate(opToggleShop(id))) return
+    play(item.done ? 'uncheck' : 'check')
   }
 
   const dropShopItem = (id: string) => {
-    const item = docRef.current.list.find((s) => s.id === id)
+    const item = curDoc().list.find((s) => s.id === id)
     if (!item) return
-    publish(removeShop(docRef.current, id), 'trash', { tone: 'warn', text: `${item.name} off the list` })
+    if (!mutate(opRemoveShop(id))) return
+    announce('warn', `${item.name} off the list`)
+    play('trash')
   }
 
   const sweepBought = () => {
-    const bought = docRef.current.list.filter((s) => s.done).length
+    const bought = curDoc().list.filter((s) => s.done).length
     if (!bought) return
-    publish(clearBought(docRef.current), 'trash', {
-      tone: 'good',
-      text: `${bought} bought ${bought === 1 ? 'item' : 'items'} cleared`
-    })
+    if (!mutate(opClearBought())) return
+    announce('good', `${bought} bought ${bought === 1 ? 'item' : 'items'} cleared`)
+    play('trash')
   }
 
   // --- derived view ------------------------------------------------------------------
@@ -487,7 +521,10 @@ function Pantry() {
           <span {...stylex.props(styles.rowMetaWrap)}>
             <span {...stylex.props(styles.rowMeta)}>{metaLine(item, today)}</span>
             {badge && (
-              <span {...stylex.props(styles.badge, toneText[badge.tone], toneEdge[badge.tone])}>{badge.text}</span>
+              <span {...stylex.props(styles.badge, toneEdge[badge.tone])}>
+                <span {...stylex.props(styles.badgeDot, toneTile[badge.tone])} aria-hidden />
+                {badge.text}
+              </span>
             )}
           </span>
         </button>
@@ -877,7 +914,12 @@ function Pantry() {
                   <span {...stylex.props(styles.rowName, s.done && styles.rowNameDone)}>{s.name}</span>
                 </span>
                 <span {...stylex.props(styles.rowMetaWrap)}>
-                  {s.done && <span {...stylex.props(styles.badge, toneText.green, toneEdge.green)}>Bought</span>}
+                  {s.done && (
+                    <span {...stylex.props(styles.badge, toneEdge.green)}>
+                      <span {...stylex.props(styles.badgeDot, toneTile.green)} aria-hidden />
+                      Bought
+                    </span>
+                  )}
                   {s.note !== '' && <span {...stylex.props(styles.shopNote)}>{s.note}</span>}
                 </span>
               </button>
@@ -932,18 +974,16 @@ function Pantry() {
             role="status"
             aria-live="polite"
           >
-            {notice ? notice.text : ' '}
+            {notice ? notice.text : syncStatus === 'retrying' ? 'Could not save - retrying' : ' '}
           </p>
         </div>
         <button
           type="button"
           {...stylex.props(styles.muteBtn, shared.press, styles.pressCalm, doc.muted && styles.muteOff)}
-          onClick={() =>
-            publish({ ...docRef.current, muted: !docRef.current.muted }, undefined, {
-              tone: 'good',
-              text: docRef.current.muted ? 'Sound on' : 'Sound muted'
-            })
-          }
+          onClick={() => {
+            const res = mutate(opMute(!curDoc().muted))
+            if (res) announce('good', curDoc().muted ? 'Sound muted' : 'Sound on')
+          }}
           aria-pressed={doc.muted}
           aria-label={doc.muted ? 'Unmute sounds' : 'Mute sounds'}
         >

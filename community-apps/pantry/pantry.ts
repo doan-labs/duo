@@ -36,9 +36,22 @@ export type Doc = {
   items: Item[]
   list: ShopItem[]
   muted: boolean
+  /** Id of the copy that wrote this document; empty on a locally built one. */
+  by: string
+  /** That writer's own op sequence: the doc reflects its ops 1..s. */
+  s: number
+  /**
+   * Per-writer high-watermark: the document provably contains every op with
+   * seq <= high[w] from writer w, because only a chain of apply-on-top writes
+   * can carry the mark forward. A copy that sees high[me] below one of its
+   * pending ops knows the settled doc lost that op and must re-apply it.
+   */
+  high: Record<string, number>
+  /** Tombstoned row ids, newest last: a delete beats a racing edit on any base. */
+  gone: string[]
 }
 
-export const EMPTY_DOC: Doc = { v: 1, items: [], list: [], muted: false }
+export const EMPTY_DOC: Doc = { v: 2, items: [], list: [], muted: false, by: '', s: 0, high: {}, gone: [] }
 
 export const ITEMS_CAP = 400
 export const LIST_CAP = 200
@@ -187,6 +200,14 @@ export function shortDay(date: string): string {
 
 const byId = crypto.randomUUID.bind(crypto)
 
+/** Tombstone cap: far beyond any live list, so a delete outlives sync churn. */
+export const GONE_CAP = 512
+
+function bury(gone: string[], ids: string[]): string[] {
+  if (!ids.length) return gone
+  return [...gone, ...ids.filter((id) => !gone.includes(id))].slice(-GONE_CAP)
+}
+
 export function newItem(
   name: string,
   milli: number,
@@ -219,30 +240,43 @@ export function addItem(
   at = Date.now()
 ): { doc: Doc; id: string | null; merged: boolean; full: boolean } {
   const name = cleanName(draft.name)
-  const batch = { name, milli: draft.milli, unit: draft.unit, location: draft.location, bestBefore: draft.bestBefore }
-  const hit = doc.items.find((i) => sameBatch(i, batch))
+  return addItemAs(doc, newItem(name, draft.milli, draft.unit, draft.location, draft.bestBefore, at))
+}
+
+/**
+ * Adds a fully built item: same merge rule as `addItem`, but the row's id is
+ * fixed by the caller, so replaying the same accepted op on a rebased document
+ * can never mint a duplicate row. An id already present is the op's own
+ * earlier write and applies as a no-op.
+ */
+export function addItemAs(doc: Doc, item: Item): { doc: Doc; id: string | null; merged: boolean; full: boolean } {
+  if (doc.items.some((i) => i.id === item.id)) return { doc, id: item.id, merged: false, full: false }
+  const hit = doc.items.find((i) => sameBatch(i, item))
   if (hit) {
-    const milli = Math.min(MAX_MILLI, hit.milli + draft.milli)
+    const milli = Math.min(MAX_MILLI, hit.milli + item.milli)
     const items = doc.items.map((i) => (i.id === hit.id ? { ...i, milli } : i))
     return { doc: { ...doc, items }, id: hit.id, merged: true, full: false }
   }
   if (doc.items.length >= ITEMS_CAP) return { doc, id: null, merged: false, full: true }
-  const item = newItem(name, draft.milli, draft.unit, draft.location, draft.bestBefore, at)
   return { doc: { ...doc, items: [...doc.items, item] }, id: item.id, merged: false, full: false }
 }
 
 /**
  * Saves an edited item. If the edit makes it identical to another row, the two
- * merge: the edited row folds its quantity into the survivor and disappears.
- * An id that is already gone (deleted on the other display) is appended back.
+ * merge: the edited row folds its quantity into the survivor and is tombstoned.
+ * An id tombstoned by a racing delete stays deleted; a missing id that was
+ * never tombstoned (an older document shape) is appended back.
  */
 export function updateItem(doc: Doc, edited: Item): { doc: Doc; id: string; merged: boolean } {
   const clean = { ...edited, name: cleanName(edited.name), milli: Math.max(0, Math.min(MAX_MILLI, edited.milli)) }
+  // A tombstoned row stays deleted: a concurrent delete wins over this edit.
+  if (doc.gone.includes(clean.id)) return { doc, id: clean.id, merged: false }
   const clash = doc.items.find((i) => i.id !== clean.id && sameBatch(i, clean))
   if (clash) {
     const milli = Math.min(MAX_MILLI, clash.milli + clean.milli)
     const items = doc.items.filter((i) => i.id !== clean.id).map((i) => (i.id === clash.id ? { ...i, milli } : i))
-    return { doc: { ...doc, items }, id: clash.id, merged: true }
+    // The folded-away row is gone on purpose; tombstone it like a delete.
+    return { doc: { ...doc, items, gone: bury(doc.gone, [clean.id]) }, id: clash.id, merged: true }
   }
   const found = doc.items.some((i) => i.id === clean.id)
   const items = found
@@ -252,7 +286,8 @@ export function updateItem(doc: Doc, edited: Item): { doc: Doc; id: string; merg
 }
 
 export function removeItem(doc: Doc, id: string): Doc {
-  return { ...doc, items: doc.items.filter((i) => i.id !== id) }
+  if (!doc.items.some((i) => i.id === id)) return doc
+  return { ...doc, items: doc.items.filter((i) => i.id !== id), gone: bury(doc.gone, [id]) }
 }
 
 /**
@@ -322,8 +357,13 @@ export function addShop(
 ): { doc: Doc; id: string | null; full: boolean } {
   const clean = cleanName(name)
   if (!clean) return { doc, id: null, full: false }
+  return addShopAs(doc, { id: byId(), name: clean, note: cleanNote(note), done: false, addedAt: at })
+}
+
+/** Fixed-id counterpart of `addShop`, replayable on a rebased document. */
+export function addShopAs(doc: Doc, item: ShopItem): { doc: Doc; id: string | null; full: boolean } {
+  if (doc.list.some((s) => s.id === item.id)) return { doc, id: item.id, full: false }
   if (doc.list.length >= LIST_CAP) return { doc, id: null, full: true }
-  const item: ShopItem = { id: byId(), name: clean, note: cleanNote(note), done: false, addedAt: at }
   return { doc: { ...doc, list: [...doc.list, item] }, id: item.id, full: false }
 }
 
@@ -332,12 +372,14 @@ export function toggleShop(doc: Doc, id: string): Doc {
 }
 
 export function removeShop(doc: Doc, id: string): Doc {
-  return { ...doc, list: doc.list.filter((s) => s.id !== id) }
+  if (!doc.list.some((s) => s.id === id)) return doc
+  return { ...doc, list: doc.list.filter((s) => s.id !== id), gone: bury(doc.gone, [id]) }
 }
 
 /** Bought rows drop off the list; still-open rows keep their order. */
 export function clearBought(doc: Doc): Doc {
-  return { ...doc, list: doc.list.filter((s) => !s.done) }
+  const goneIds = doc.list.filter((s) => s.done).map((s) => s.id)
+  return { ...doc, list: doc.list.filter((s) => !s.done), gone: bury(doc.gone, goneIds) }
 }
 
 // --- wire formats ----------------------------------------------------------------
@@ -380,6 +422,16 @@ function isShopItem(v: unknown): v is ShopItem {
  * Reads the stored document. Anything unrecognised parses to a clean doc or
  * the nearest valid rows - corrupt fields drop, never crash a relaunch.
  */
+function parseHigh(v: unknown): Record<string, number> {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return {}
+  const out: Record<string, number> = {}
+  for (const [w, s] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof w === 'string' && w && Number.isSafeInteger(s) && (s as number) > 0) out[w] = s as number
+    if (Object.keys(out).length >= 32) break
+  }
+  return out
+}
+
 export function parseDoc(raw: string | null): Doc {
   if (!raw) return { ...EMPTY_DOC }
   try {
@@ -393,14 +445,35 @@ export function parseDoc(raw: string | null): Doc {
       .filter(isShopItem)
       .filter((s) => !seen.has(s.id) && seen.add(s.id))
       .slice(0, LIST_CAP)
-    return { v: 1, items, list, muted: parsed.muted === true }
+    const gone = (Array.isArray(parsed.gone) ? parsed.gone : [])
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .slice(-GONE_CAP)
+    return {
+      v: 2,
+      items,
+      list,
+      muted: parsed.muted === true,
+      by: typeof parsed.by === 'string' ? parsed.by : '',
+      s: Number.isSafeInteger(parsed.s) && (parsed.s as number) > 0 ? (parsed.s as number) : 0,
+      high: parseHigh(parsed.high),
+      gone
+    }
   } catch {
     return { ...EMPTY_DOC }
   }
 }
 
 export function serializeDoc(doc: Doc): string {
-  return JSON.stringify({ v: 1, items: doc.items, list: doc.list, muted: doc.muted })
+  return JSON.stringify({
+    v: 2,
+    items: doc.items,
+    list: doc.list,
+    muted: doc.muted,
+    by: doc.by,
+    s: doc.s,
+    high: doc.high,
+    gone: doc.gone
+  })
 }
 
 // --- session mirror ----------------------------------------------------------
@@ -426,5 +499,103 @@ export function parseMirror(raw: string | null): Mirror | null {
     return { by: parsed.by, loc, q: typeof parsed.q === 'string' ? parsed.q.slice(0, 64) : '', sort }
   } catch {
     return null
+  }
+}
+
+// --- ops: accepted mutations as replayable intents ------------------------------
+
+/**
+ * One accepted user mutation in replayable form. `run` applies the intent to
+ * any base document and reports whether it produced a change worth persisting
+ * (`commit`) plus accept-time metadata (`meta`) for toasts and flash rows.
+ * Ids and timestamps are fixed when the op is created, so replaying it on a
+ * rebased document is deterministic and can never mint duplicate rows.
+ */
+export type Op = {
+  run(d: Doc): { doc: Doc; commit: boolean; meta?: unknown }
+}
+
+const ok = (doc: Doc, meta?: unknown) => ({ doc, commit: true, meta })
+const skip = (doc: Doc, meta?: unknown) => ({ doc, commit: false, meta })
+
+export type AddMeta = { id: string | null; merged: boolean }
+export type StepMeta = { milli: number | null; before: number | null }
+export type EditMeta = { id: string; merged: boolean; gone?: boolean }
+
+export function opAdd(
+  draft: { name: string; milli: number; unit: Unit; location: Location; bestBefore: string | null },
+  at = Date.now()
+): Op {
+  const item = newItem(cleanName(draft.name), draft.milli, draft.unit, draft.location, draft.bestBefore, at)
+  return {
+    run: (d) => {
+      const out = addItemAs(d, item)
+      return out.full
+        ? skip(out.doc, { id: null, merged: false } satisfies AddMeta)
+        : ok(out.doc, { id: out.id, merged: out.merged } satisfies AddMeta)
+    }
+  }
+}
+
+export function opStep(id: string, dir: 'use' | 'restock'): Op {
+  return {
+    run: (d) => {
+      const before = d.items.find((i) => i.id === id)?.milli ?? null
+      const out = stepItem(d, id, dir)
+      return out.milli === null || out.milli === before
+        ? skip(out.doc, { milli: out.milli, before } satisfies StepMeta)
+        : ok(out.doc, { milli: out.milli, before } satisfies StepMeta)
+    }
+  }
+}
+
+export function opUpdate(item: Item): Op {
+  return {
+    run: (d) => {
+      if (d.gone.includes(item.id)) return skip(d, { id: item.id, merged: false, gone: true } satisfies EditMeta)
+      const out = updateItem(d, item)
+      return ok(out.doc, { id: out.id, merged: out.merged } satisfies EditMeta)
+    }
+  }
+}
+
+export function opRemove(id: string): Op {
+  return {
+    run: (d) => (d.items.some((i) => i.id === id) ? ok(removeItem(d, id)) : skip(d))
+  }
+}
+
+export function opMute(muted: boolean): Op {
+  return {
+    run: (d) => (d.muted === muted ? skip(d) : ok({ ...d, muted }))
+  }
+}
+
+export function opAddShop(name: string, note: string, at = Date.now()): Op {
+  const item: ShopItem = { id: byId(), name: cleanName(name), note: cleanNote(note), done: false, addedAt: at }
+  return {
+    run: (d) => {
+      if (!item.name) return skip(d, { id: null })
+      const out = addShopAs(d, item)
+      return out.full ? skip(out.doc, { id: null }) : ok(out.doc, { id: out.id })
+    }
+  }
+}
+
+export function opToggleShop(id: string): Op {
+  return {
+    run: (d) => (d.list.some((s) => s.id === id) ? ok(toggleShop(d, id)) : skip(d))
+  }
+}
+
+export function opRemoveShop(id: string): Op {
+  return {
+    run: (d) => (d.list.some((s) => s.id === id) ? ok(removeShop(d, id)) : skip(d))
+  }
+}
+
+export function opClearBought(): Op {
+  return {
+    run: (d) => (d.list.some((s) => s.done) ? ok(clearBought(d)) : skip(d))
   }
 }

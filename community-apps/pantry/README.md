@@ -36,3 +36,20 @@ The whole document persists through `os.storage` under `pantry-v1`; the shelf
 filter, search and sort travel through `os.session` under `pantry-view`, so a
 fold hands the same view to the other display. Nothing leaves the device: the
 app declares no permissions and uses no network.
+
+### Persistence protocol
+
+Both displays are separate copies writing one last-writer-wins document, and
+watch events may arrive late, replayed or out of order. `sync.ts` owns the
+invariant: every accepted mutation is a journaled intent stamped with this
+copy's `seq`; a write commits base + replayed intents plus per-writer
+high-watermarks (`high`), so a settled document provably shows which ops it
+contains. A storage event is adopted only at a newer `rev`, covered intents
+confirm, and every uncovered intent is replayed on top - a stale echo, a
+racing write or a rejected get/set can never lose an accepted op, and deletes
+survive through the document's tombstones (`gone`). Input mutates only while
+the copy is both visible and active; timers, audio and focus follow the same
+gate, and the UI reports `retrying` rather than pretending a failed write
+landed. `sync.test.ts` drives the same `DocStore` surface deterministically:
+delayed echoes, out-of-order delivery, interleaved writers, delete-vs-edit,
+rejected calls, resync and reload.
