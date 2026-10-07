@@ -166,7 +166,10 @@ function useFocusTrap(
   boxRef: RefObject<HTMLElement | null>,
   active: boolean,
   initial: 'first' | 'last' = 'first',
-  explicitTrigger?: HTMLElement | null
+  explicitTrigger?: HTMLElement | null,
+  // Focus only ever moves while this copy owns the display: a sheet left open
+  // on the folded (hidden) copy must not steal focus from the visible one.
+  allowed?: RefObject<boolean>
 ) {
   const trigger = useRef<HTMLElement | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: ref contents are read live during the trap, not captured as deps
@@ -189,6 +192,7 @@ function useFocusTrap(
     }
     document.addEventListener('keydown', onKey, true)
     const frame = requestAnimationFrame(() => {
+      if (allowed && !allowed.current) return
       const els = boxRef.current ? focusablesIn(boxRef.current) : []
       ;(initial === 'last' ? els[els.length - 1] : els[0])?.focus()
     })
@@ -201,12 +205,13 @@ function useFocusTrap(
         // so retry across frames until inert lifts and it takes focus again.
         let tries = 0
         const restore = () => {
-          if (!el.isConnected) return
+          if (!el.isConnected || (allowed && !allowed.current)) return
           el.focus()
           if (document.activeElement !== el && ++tries < 10) requestAnimationFrame(restore)
         }
         requestAnimationFrame(restore)
       } else {
+        if (allowed && !allowed.current) return
         document.querySelector<HTMLElement>('main button:not([disabled])')?.focus()
       }
     }
@@ -220,6 +225,7 @@ function DestructiveSheet({
   onClose,
   restoreTo,
   busy,
+  allowed,
   children
 }: {
   open: boolean
@@ -227,10 +233,13 @@ function DestructiveSheet({
   onClose: () => void
   restoreTo?: HTMLElement | null
   busy?: boolean
+  allowed?: RefObject<boolean>
   children: React.ReactNode
 }) {
   const box = useRef<HTMLDivElement>(null)
-  useFocusTrap(box, open, 'last', restoreTo)
+  // Focus lands on the first control (Keep), never the destructive one: an
+  // Enter that opened the sheet must not carry through into a delete.
+  useFocusTrap(box, open, 'first', restoreTo, allowed)
   useEffect(() => (open ? pushEscape(onClose) : undefined), [open, onClose])
   return (
     <Sheet open={open} onClose={onClose} aria-label={label}>
@@ -263,6 +272,10 @@ function Seg<T extends string>({
     if (next.v !== value) onPick(next.v)
     ;(e.currentTarget.parentElement?.children[j] as HTMLElement | undefined)?.focus()
   }
+  // Roving radiogroup: the WAI-ARIA segmented pattern. Native radio inputs
+  // cannot express roving-tabindex selection on styled action chips, so this
+  // keeps button[role=radio] deliberately - the lint warning is the justified
+  // exception, not a missing semantic.
   return (
     <div role="radiogroup" aria-label={label} {...stylex.props(styles.segTrack)}>
       {options.map((o, i) => (
@@ -332,6 +345,7 @@ function NumField({
         }}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => commit(e.target.value)}
+        xstyle={styles.tallField}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
         }}
@@ -360,7 +374,10 @@ function RoomPlanner() {
   const [hist, setHist] = useState<History>(emptyHistory)
   const [tab, setTab] = useState<'add' | 'edit' | 'plans'>('add')
   const [confirm, setConfirm] = useState<null | 'clear' | { drop: string; name: string }>(null)
-  const [arming, setArming] = useState(false)
+  // Arming is bound to the item it armed for: a selection change (keyboard,
+  // pointer or a peer adoption) invalidates it so `Sure?` can only ever
+  // destroy the piece it was raised against.
+  const [arming, setArming] = useState<string | null>(null)
   const [gesturing, setGesturing] = useState(false)
   // The item this copy is dragging, so its move transition can switch off:
   // a transitioning position would trail the pointer instead of tracking it.
@@ -421,6 +438,7 @@ function RoomPlanner() {
     }
     setGesturing(false)
     setDragId(null)
+    setArming(null)
   }, [view.visible])
 
   const library = parseLibrary(stored.value)
@@ -480,6 +498,7 @@ function RoomPlanner() {
   // displays. Selecting publishes the doc unchanged with the new sel.
   const pick = (id: string | null) => {
     const now = docRef.current
+    if (id !== selRef.current) setArming(null)
     if (now) publish(now, { sel: id, skipHist: true })
     else setSel(id)
   }
@@ -571,7 +590,7 @@ function RoomPlanner() {
     }
     setDoc(keep && now ? { ...next.doc, view: now.view } : next.doc)
     setSel(next.sel && next.doc.items[next.sel] ? next.sel : null)
-    setArming(false)
+    setArming(null)
     // Fold-side sound: faint cues for what the other display just did.
     if (now && now.id === next.doc.id) {
       const before = now.items
@@ -605,21 +624,26 @@ function RoomPlanner() {
   // the fold gives the element a real box; the framed view is published back
   // so it also serves as the stored starting view.
   useEffect(() => {
-    if (!doc || framedDoc.current === doc.id) return
+    if (!doc) return
     const el = canvasRef.current
     if (!el) return
     const fitLocal = () => {
       const box = el.getBoundingClientRect()
       if (!box.width || !box.height) return
       framedDoc.current = doc.id
-      const pad = 34
+      // The zoom dock and the room's top dimension label ride the canvas's
+      // upper edge: the fit reserves more headroom up top than at the sides
+      // so neither chrome nor callouts collide with the plan.
+      const padX = 34
+      const padTop = 64
+      const padBot = 34
       const zoom = Math.max(
         ZOOM_MIN,
-        Math.min(ZOOM_MAX, Math.min((box.width - pad * 2) / doc.room.w, (box.height - pad * 2) / doc.room.d))
+        Math.min(ZOOM_MAX, Math.min((box.width - padX * 2) / doc.room.w, (box.height - padTop - padBot) / doc.room.d))
       )
       const next = setView(doc, {
         x: (-doc.room.w / 2) * zoom,
-        y: (-doc.room.d / 2) * zoom,
+        y: (-doc.room.d / 2) * zoom + (padTop - padBot) / 2,
         zoom,
         framed: true
       })
@@ -633,9 +657,16 @@ function RoomPlanner() {
         void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
       }
     }
-    const f = requestAnimationFrame(fitLocal)
-    const ro = new ResizeObserver(() => {
+    const f = requestAnimationFrame(() => {
       if (framedDoc.current !== doc.id) fitLocal()
+    })
+    const ro = new ResizeObserver(() => {
+      const now = docRef.current
+      if (!now || now.id !== doc.id) return
+      if (framedDoc.current !== doc.id) return fitLocal()
+      // Refit on a canvas resize only while the camera is still in auto-fit:
+      // a manual pan or zoom sets framed:false and keeps its crop.
+      if (now.view.framed !== false) fitLocal()
     })
     ro.observe(el)
     return () => {
@@ -692,7 +723,10 @@ function RoomPlanner() {
         | undefined
       if (move) {
         e.preventDefault()
-        publishRef.current(moveItem(now, item.id, item.x + move[0], item.y + move[1], 0))
+        // Pass the active snap step through: the target lands on the snapped
+        // grid line at full precision. Rounding a 30.48 cm grid to whole
+        // centimetres on each press drifts roughly half a cm per nudge.
+        publishRef.current(moveItem(now, item.id, item.x + move[0], item.y + move[1], prefsRef.current.snap))
         return
       }
       if (e.key === 'r' || e.key === 'R') {
@@ -704,7 +738,7 @@ function RoomPlanner() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         publishRef.current(removeItem(now, item.id), { sel: null })
-        setArming(false)
+        setArming(null)
         soundRef.current('delete')
       }
     }
@@ -719,13 +753,16 @@ function RoomPlanner() {
   const count = items.length
   const saving = stored.status === 'saving'
   const zoom = doc.view.zoom
-  // Item labels shrink with the plan; wall-gap callouts counter-scale instead,
-  // so selected measurements stay readable at every zoom.
-  const cs = Math.min(2.5, Math.max(0.7, 1 / zoom))
+  // Item labels shrink with the plan; dimension and wall-gap callouts
+  // counter-scale instead, floored so they never render under 13 pt: a
+  // measurement the reader cannot read is worse than a big one.
+  const cs = Math.min(3, Math.max(1, 1 / zoom))
+  // Warning flags counter-scale less aggressively - they signal, not measure.
+  const fs = Math.min(2, cs)
 
   const zoomBy = (factor: number) => {
     const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor))
-    publish(setView(doc, { ...doc.view, zoom: z }))
+    publish(setView(doc, { ...doc.view, zoom: z, framed: false }))
   }
   const zoomAt = (px: number, py: number, factor: number) => {
     const box = canvasRef.current?.getBoundingClientRect()
@@ -736,7 +773,7 @@ function RoomPlanner() {
     const cy = box.height / 2
     const nx = px - cx - (px - cx - now.view.x) * (z / now.view.zoom)
     const ny = py - cy - (py - cy - now.view.y) * (z / now.view.zoom)
-    setDoc({ ...now, view: { ...now.view, x: nx, y: ny, zoom: z } })
+    setDoc({ ...now, view: { ...now.view, x: nx, y: ny, zoom: z, framed: false } })
     if (wheelTimer.current) clearTimeout(wheelTimer.current)
     wheelTimer.current = setTimeout(() => {
       if (docRef.current) publishRef.current(docRef.current)
@@ -759,6 +796,7 @@ function RoomPlanner() {
     if (!r.core) return
     setHist(r.h)
     const next = withCore(doc, r.core)
+    setArming(null)
     publish(next, { sel: sel && next.items[sel] ? sel : null, skipHist: true })
     sound('undo')
   }
@@ -767,6 +805,7 @@ function RoomPlanner() {
     if (!r.core) return
     setHist(r.h)
     const next = withCore(doc, r.core)
+    setArming(null)
     publish(next, { sel: sel && next.items[sel] ? sel : null, skipHist: true })
     sound('undo')
   }
@@ -793,7 +832,7 @@ function RoomPlanner() {
       return
     }
     publish(next, { sel: id })
-    setArming(false)
+    setArming(null)
     sound('place')
   }
   const rotateSel = (dir: 1 | -1) => {
@@ -804,7 +843,7 @@ function RoomPlanner() {
   const dropSel = () => {
     if (!selected) return
     publish(removeItem(doc, selected.id), { sel: null })
-    setArming(false)
+    setArming(null)
     sound('delete')
   }
   const commitRoom = (w: number, d: number) => {
@@ -827,7 +866,7 @@ function RoomPlanner() {
     setConfirm(null)
     if (!count) return
     publish(clearItems(doc), { sel: null })
-    setArming(false)
+    setArming(null)
     sound('delete')
   }
 
@@ -969,7 +1008,7 @@ function RoomPlanner() {
       const cy = box.height / 2
       const nx = mx - cx - (pinch.mcx - cx - pinch.x0) * (z / pinch.zoom0)
       const ny = my - cy - (pinch.mcy - cy - pinch.y0) * (z / pinch.zoom0)
-      setDoc({ ...now, view: { ...now.view, x: nx, y: ny, zoom: z } })
+      setDoc({ ...now, view: { ...now.view, x: nx, y: ny, zoom: z, framed: false } })
       return
     }
     const d = dragRef.current
@@ -982,12 +1021,14 @@ function RoomPlanner() {
       if (d.kind === 'item') setDragId(d.id)
     }
     d.moved = true
-    if (d.kind === 'pan') setDoc({ ...now, view: { ...now.view, x: d.ox + dx, y: d.oy + dy } })
+    if (d.kind === 'pan') setDoc({ ...now, view: { ...now.view, x: d.ox + dx, y: d.oy + dy, framed: false } })
     else if (d.id) {
       const snap = prefsRef.current.snap
       const wx = snap > 0 ? snapTo(d.ox + dx / now.view.zoom, snap) : d.ox + dx / now.view.zoom
       const wy = snap > 0 ? snapTo(d.oy + dy / now.view.zoom, snap) : d.oy + dy / now.view.zoom
-      setDoc(moveItem(now, d.id, wx, wy, 0))
+      // Snap goes through so fractional grids (30.48 cm) keep their precision
+      // instead of being rounded to whole centimetres into the stored doc.
+      setDoc(moveItem(now, d.id, wx, wy, snap))
     }
   }
   const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1029,7 +1070,7 @@ function RoomPlanner() {
       gestureCore.current = null
       return
     }
-    setArming(false)
+    setArming(null)
     if (d.kind === 'item' && d.id) {
       if (selRef.current !== d.id) {
         pick(d.id)
@@ -1068,6 +1109,14 @@ function RoomPlanner() {
   const gaps = selected ? wallGaps(doc.room, selected) : null
   const selSize = selected ? itemSize(selected) : null
   const selRect = selected ? itemRect(selected) : null
+  // A callout that cannot fit between its item and the wall flips inside the
+  // room edge instead of clipping under the wall or riding under the zoom dock.
+  const cw = 96 / zoom
+  const ch = 48 / zoom
+  const gapInL = selRect ? selRect.x0 < cw : false
+  const gapInR = selRect ? doc.room.w - (selRect?.x1 ?? 0) < cw : false
+  const gapInT = selRect ? selRect.y0 < ch : false
+  const gapInB = selRect ? doc.room.d - (selRect?.y1 ?? 0) < ch : false
   const gapCell = (name: string, v: number) => (
     <div {...stylex.props(styles.gapCell)}>
       <span {...stylex.props(styles.gapName)}>{name}</span>
@@ -1079,7 +1128,7 @@ function RoomPlanner() {
     <div {...stylex.props(styles.section)}>
       <span {...stylex.props(styles.fieldLabel)}>Selected</span>
       <div>
-        <div>{PIECE.get(selected.kind)?.name ?? selected.kind}</div>
+        <div {...stylex.props(styles.selName)}>{PIECE.get(selected.kind)?.name ?? selected.kind}</div>
         <span {...stylex.props(styles.meta)}>{fmtDims(selSize.w, selSize.d, prefs.units)}</span>
       </div>
       <fieldset {...stylex.props(styles.gapGrid)} aria-label="Distance to each wall">
@@ -1109,12 +1158,14 @@ function RoomPlanner() {
         </button>
         <button
           type="button"
-          aria-label={arming ? 'Confirm delete item' : `Delete ${PIECE.get(selected.kind)?.name ?? 'item'}`}
-          onClick={() => (arming ? dropSel() : setArming(true))}
-          {...stylex.props(styles.btn, shared.press, arming && styles.btnWarn)}
+          aria-label={
+            arming === selected.id ? 'Confirm delete item' : `Delete ${PIECE.get(selected.kind)?.name ?? 'item'}`
+          }
+          onClick={() => (arming === selected.id ? dropSel() : setArming(selected.id))}
+          {...stylex.props(styles.btn, shared.press, arming === selected.id && styles.btnWarn)}
         >
           <Sym name="trash" size={12} />
-          {arming ? 'Sure?' : 'Delete'}
+          {arming === selected.id ? 'Sure?' : 'Delete'}
         </button>
       </div>
     </div>
@@ -1126,6 +1177,7 @@ function RoomPlanner() {
       <TextField
         aria-label="Layout name"
         value={doc.name}
+        xstyle={styles.tallField}
         onChange={(e) => {
           // Whitespace alone is not a name; typing it would blank the plan
           // row everywhere, so nothing below the trim publishes.
@@ -1162,7 +1214,7 @@ function RoomPlanner() {
       </div>
       <div {...stylex.props(styles.field)}>
         <span {...stylex.props(styles.fieldLabel)}>Snap to grid</span>
-        <div {...stylex.props(styles.chipRow)} role="group" aria-label="Snap step">
+        <fieldset {...stylex.props(styles.chipRow)} aria-label="Snap step">
           {snapSteps(prefs.units).map((step) => (
             <button
               key={step}
@@ -1174,7 +1226,7 @@ function RoomPlanner() {
               {fmtSnap(step, prefs.units)}
             </button>
           ))}
-        </div>
+        </fieldset>
       </div>
       <div {...stylex.props(styles.rowBtns)}>
         <button
@@ -1198,6 +1250,7 @@ function RoomPlanner() {
       <button
         type="button"
         aria-current={p.id === doc.id}
+        title={p.name}
         onClick={() => openPlan(p.id)}
         {...stylex.props(styles.layoutRow, shared.press, styles.grow, p.id === doc.id && styles.layoutOn)}
       >
@@ -1291,7 +1344,7 @@ function RoomPlanner() {
         const p = canvasPoint(e.clientX, e.clientY)
         zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0012))
       }}
-      {...stylex.props(styles.canvas, gesturing && styles.canvasPanning)}
+      {...stylex.props(styles.canvas, gesturing && styles.canvasPanning, !wide && styles.canvasCover)}
     >
       <div {...stylex.props(styles.world, styles.worldAt(doc.view.x, doc.view.y, zoom))}>
         <div
@@ -1349,7 +1402,7 @@ function RoomPlanner() {
                     </span>
                   )}
                   {bad && (
-                    <span aria-hidden="true" {...stylex.props(styles.flag)}>
+                    <span aria-hidden="true" {...stylex.props(styles.flag, styles.flagAt(fs))}>
                       !
                     </span>
                   )}
@@ -1363,10 +1416,10 @@ function RoomPlanner() {
                   styles.gap,
                   gaps.l < -0.05 && styles.gapBad,
                   styles.calloutAt(
-                    selRect.x0 - 6,
+                    gapInL ? selRect.x0 + 6 : selRect.x0 - 6,
                     (selRect.y0 + selRect.y1) / 2,
-                    `translate(-100%,-50%) scale(${cs})`,
-                    'right center'
+                    gapInL ? `translate(0,-50%) scale(${cs})` : `translate(-100%,-50%) scale(${cs})`,
+                    gapInL ? 'left center' : 'right center'
                   )
                 )}
               >
@@ -1377,10 +1430,10 @@ function RoomPlanner() {
                   styles.gap,
                   gaps.r < -0.05 && styles.gapBad,
                   styles.calloutAt(
-                    selRect.x1 + 6,
+                    gapInR ? selRect.x1 - 6 : selRect.x1 + 6,
                     (selRect.y0 + selRect.y1) / 2,
-                    `translate(0,-50%) scale(${cs})`,
-                    'left center'
+                    gapInR ? `translate(-100%,-50%) scale(${cs})` : `translate(0,-50%) scale(${cs})`,
+                    gapInR ? 'right center' : 'left center'
                   )
                 )}
               >
@@ -1392,9 +1445,9 @@ function RoomPlanner() {
                   gaps.t < -0.05 && styles.gapBad,
                   styles.calloutAt(
                     (selRect.x0 + selRect.x1) / 2,
-                    selRect.y0 - 6,
-                    `translate(-50%,-100%) scale(${cs})`,
-                    'center bottom'
+                    gapInT ? selRect.y0 + 6 : selRect.y0 - 6,
+                    gapInT ? `translate(-50%,0) scale(${cs})` : `translate(-50%,-100%) scale(${cs})`,
+                    gapInT ? 'center top' : 'center bottom'
                   )
                 )}
               >
@@ -1406,9 +1459,9 @@ function RoomPlanner() {
                   gaps.b < -0.05 && styles.gapBad,
                   styles.calloutAt(
                     (selRect.x0 + selRect.x1) / 2,
-                    selRect.y1 + 6,
-                    `translate(-50%,0) scale(${cs})`,
-                    'center top'
+                    gapInB ? selRect.y1 - 6 : selRect.y1 + 6,
+                    gapInB ? `translate(-50%,-100%) scale(${cs})` : `translate(-50%,0) scale(${cs})`,
+                    gapInB ? 'center bottom' : 'center top'
                   )
                 )}
               >
@@ -1508,7 +1561,9 @@ function RoomPlanner() {
             <header {...stylex.props(styles.header)}>
               <div {...stylex.props(styles.brand)}>
                 <span {...stylex.props(styles.kicker)}>Room Planner</span>
-                <h1 {...stylex.props(styles.title)}>{doc.name}</h1>
+                <h1 title={doc.name} {...stylex.props(styles.title)}>
+                  {doc.name}
+                </h1>
                 <span {...stylex.props(styles.roomLine)}>
                   {fmtDims(doc.room.w, doc.room.d, prefs.units)} - {count} pieces
                 </span>
@@ -1541,7 +1596,9 @@ function RoomPlanner() {
             <header {...stylex.props(styles.header)}>
               <div {...stylex.props(styles.brand)}>
                 <span {...stylex.props(styles.kicker)}>Room Planner</span>
-                <h1 {...stylex.props(styles.title)}>{doc.name}</h1>
+                <h1 title={doc.name} {...stylex.props(styles.title)}>
+                  {doc.name}
+                </h1>
               </div>
               <div {...stylex.props(styles.headerSide)}>
                 {statusChip}
@@ -1588,6 +1645,7 @@ function RoomPlanner() {
         label="Clear room"
         onClose={() => setConfirm(null)}
         restoreTo={sheetTrigger.current}
+        allowed={activeRef}
       >
         <h2 {...stylex.props(styles.confirmTitle)}>Clear this room?</h2>
         <p {...stylex.props(styles.confirmText)}>
@@ -1608,6 +1666,7 @@ function RoomPlanner() {
         label="Delete layout"
         onClose={() => setConfirm(null)}
         restoreTo={sheetTrigger.current}
+        allowed={activeRef}
       >
         <h2 {...stylex.props(styles.confirmTitle)}>
           Delete {typeof confirm === 'object' && confirm ? confirm.name : 'layout'}?

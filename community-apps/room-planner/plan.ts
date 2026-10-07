@@ -139,13 +139,14 @@ export function fmtLength(cm: number, units: Units): string {
     return `${(cm / 100).toFixed(2).replace(/\.?0+$/, '')} m`
   }
   const inches = cm / CM_PER_IN
-  // Exact feet still read as feet at any size: `1 ft`, never `12 in`.
-  if (Math.abs(inches) >= 12 && Math.abs(inches % 12) < 0.05) return `${Math.round(inches / 12)} ft`
-  if (Math.abs(inches) < 23.5) return `${Math.round(inches)} in`
-  const ft = Math.trunc(inches / 12)
-  const rest = Math.round(Math.abs(inches) % 12)
-  if (rest === 0) return `${ft} ft`
-  return `${ft} ft ${rest} in`
+  // Round the absolute total first, then split: splitting raw inches leaves a
+  // rounded remainder of 12, printing `14 ft 12 in` for what is exactly 15 ft.
+  const total = Math.round(Math.abs(inches))
+  const sign = inches < 0 ? '-' : ''
+  if (total < 24) return total === 12 ? `${sign}1 ft` : `${sign}${total} in`
+  const ft = Math.floor(total / 12)
+  const rest = total % 12
+  return rest === 0 ? `${sign}${ft} ft` : `${sign}${ft} ft ${rest} in`
 }
 
 /** Pair of dimensions sharing one unit when both fit furniture scale: `220 × 95 cm`. */
@@ -172,9 +173,9 @@ export function parseLength(text: string, units: Units, scope: 'room' | 'item'):
   const t = text.trim().toLowerCase().replace(',', '.')
   if (!t) return null
   // Imperial compound forms first: 13'6", 13 ft 6 in, 13ft6in.
-  const compound = /^(\d+(?:\.\d+)?)\s*(?:ft|')\s*(\d+(?:\.\d+)?)\s*(?:in|")?$/.exec(t)
+  const compound = /^(\d+(?:\.\d+)?|\.\d+)\s*(?:ft|')\s*(\d+(?:\.\d+)?|\.\d+)\s*(?:in|")?$/.exec(t)
   if (compound) return Number(compound[1]) * 12 * CM_PER_IN + Number(compound[2]) * CM_PER_IN
-  const single = /^(\d+(?:\.\d+)?)\s*(mm|cm|m|in|ft|'|")?$/.exec(t)
+  const single = /^(\d+(?:\.\d+)?|\.\d+)\s*(mm|cm|m|in|ft|'|")?$/.exec(t)
   if (!single) return null
   const value = Number(single[1])
   if (!Number.isFinite(value) || value < 0) return null
@@ -194,7 +195,9 @@ export function parseLength(text: string, units: Units, scope: 'room' | 'item'):
 
 export const snapTo = (v: number, step: number) => (step > 0 ? Math.round(v / step) * step : v)
 
-const touch = (doc: PlanDoc): PlanDoc => ({ ...doc, updated: Date.now() })
+// `updated` doubles as a per-doc version: strictly increasing, so an edit
+// landing in the same millisecond as the stored copy still wins the merge.
+const touch = (doc: PlanDoc): PlanDoc => ({ ...doc, updated: Math.max(Date.now(), doc.updated + 1) })
 
 export function addItem(doc: PlanDoc, kind: string, x: number, y: number): { doc: PlanDoc; id: string } {
   if (!PIECE.has(kind) || Object.keys(doc.items).length >= ITEM_LIMIT) return { doc, id: '' }
@@ -245,10 +248,11 @@ export function resizeRoom(doc: PlanDoc, w: number, d: number): PlanDoc {
 export function renameDoc(doc: PlanDoc, name: string): PlanDoc {
   const next = name.slice(0, NAME_LIMIT)
   // A whitespace-only name would blank the plan row everywhere; keep the old
-  // one instead of committing it. The doc intentionally does not touch():
-  // history collapses same-tag renames, and a name is not layout truth.
+  // one instead of committing it. A real rename still touches: the library
+  // merge and tombstones order by `updated`, so an untouched rename loses to
+  // the stale stored copy and silently reverts on the next reload.
   if (!next.trim()) return doc
-  return next === doc.name ? doc : { ...doc, name: next }
+  return next === doc.name ? doc : touch({ ...doc, name: next })
 }
 
 export function setView(doc: PlanDoc, view: View): PlanDoc {
@@ -278,7 +282,20 @@ export type Core = { name: string; room: Room; items: Record<string, Item> }
 export const coreOf = (doc: PlanDoc): Core => ({ name: doc.name, room: doc.room, items: doc.items })
 export const withCore = (doc: PlanDoc, core: Core): PlanDoc =>
   touch({ ...doc, name: core.name, room: core.room, items: core.items })
-export const sameCore = (a: Core, b: Core) => a.name === b.name && a.room === b.room && a.items === b.items
+// Structural, not referential: a remote doc is a fresh wire clone every time,
+// so identity compares would log view/selection-only adoptions as edits and
+// arm Undo with no-op entries.
+export const sameCore = (a: Core, b: Core): boolean => {
+  if (a.name !== b.name || a.room.w !== b.room.w || a.room.d !== b.room.d) return false
+  const keys = Object.keys(a.items)
+  if (keys.length !== Object.keys(b.items).length) return false
+  for (const key of keys) {
+    const x = a.items[key]
+    const y = b.items[key]
+    if (!x || !y || x.kind !== y.kind || x.x !== y.x || x.y !== y.y || x.rot !== y.rot) return false
+  }
+  return true
+}
 
 export type History = { past: { core: Core; tag: string | null }[]; future: Core[] }
 export const emptyHistory = (): History => ({ past: [], future: [] })
@@ -424,8 +441,12 @@ export const withDoc = (lib: Library, doc: PlanDoc): Library => ({ ...lib, plans
 
 export function withoutDoc(lib: Library, id: string): Library {
   const plans = { ...lib.plans }
+  const doc = plans[id]
   delete plans[id]
-  return { ...lib, plans, gone: { ...lib.gone, [id]: Math.max(lib.gone[id] ?? 0, Date.now()) } }
+  // The tombstone must outrank every stamp this doc ever carried, including a
+  // monotonic `updated` that ran ahead of the wall clock on a rapid burst.
+  const ts = Math.max(lib.gone[id] ?? 0, Date.now(), (doc?.updated ?? 0) + 1)
+  return { ...lib, plans, gone: { ...lib.gone, [id]: ts } }
 }
 
 /**
@@ -440,7 +461,11 @@ export function mergeLib(a: Library, b: Library): Library {
   const plans: Record<string, PlanDoc> = { ...a.plans }
   for (const [id, doc] of Object.entries(b.plans)) {
     const cur = plans[id]
-    if (!cur || cur.updated < doc.updated) plans[id] = doc
+    // b is the writer's own merge side: on an equal stamp it wins, so a
+    // legitimate edit (a rename colliding in the same millisecond) lands
+    // instead of silently dropping to the stored copy. Genuinely stale
+    // writes never reach here - the mutate guard rejects them first.
+    if (!cur || cur.updated <= doc.updated) plans[id] = doc
   }
   const gone: Record<string, number> = { ...a.gone }
   for (const [id, ts] of Object.entries(b.gone)) {

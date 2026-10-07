@@ -28,6 +28,7 @@ import {
   renameDoc,
   resizeRoom,
   rotateItem,
+  sameCore,
   serializeLibrary,
   serializeMirror,
   snapTo,
@@ -313,6 +314,89 @@ check('wallGaps reads distances and goes negative outside', () => {
   near(gaps.b, 216)
   const moved = moveItem(placed, id, -20, 100, 0)
   ok(wallGaps(moved.room, moved.items[id]!).l < 0, 'gap should be negative')
+})
+
+check('imperial display never carries a 12-inch remainder', () => {
+  eq(fmtLength(457, 'imperial'), '15 ft') // was `14 ft 12 in`
+  eq(fmtLength(335.28, 'imperial'), '11 ft')
+  eq(fmtLength(396.24, 'imperial'), '13 ft')
+  eq(fmtLength(30.48, 'imperial'), '1 ft')
+  eq(fmtLength(60.96, 'imperial'), '2 ft')
+  eq(fmtLength(55, 'imperial'), '22 in')
+  eq(fmtLength(59.69, 'imperial'), '2 ft') // 23.5 in rounds up to 24
+  eq(fmtLength(-127, 'imperial'), '-4 ft 2 in')
+  eq(fmtLength(-30.48, 'imperial'), '-1 ft')
+  // Whole-foot sizes 4..98 ft plus edges: no `12 in` residue anywhere.
+  for (let ft = 4; ft <= 98; ft++) {
+    const text = fmtLength(ft * 30.48, 'imperial')
+    eq(text, `${ft} ft`)
+    ok(!text.includes('12 in'), `${text} carried a foot remainder`)
+  }
+  for (const cm of [0.1, 15.24, 213.36, 335.279, 396.241, 2899.92, -213.36]) {
+    ok(!fmtLength(cm, 'imperial').includes('12 in'), `${fmtLength(cm, 'imperial')} carried a foot remainder`)
+  }
+})
+
+check('rename moves the version and wins the library merge', () => {
+  const doc = { ...plan(), id: 'a', updated: 1000 }
+  const renamed = renameDoc(doc, 'Kitchen')
+  ok(renamed.updated > doc.updated, 'rename did not touch the doc')
+  // Same-millisecond stamp on the stored copy: the writer's merge side wins.
+  const stored = { ...doc, updated: renamed.updated }
+  const lib = mergeLib({ rev: 0, plans: { a: stored }, gone: {} }, { rev: 0, plans: { a: renamed }, gone: {} })
+  eq(lib.plans.a!.name, 'Kitchen')
+  // And against a genuinely stale stored copy.
+  const merged = mergeLib({ rev: 0, plans: { a: doc }, gone: {} }, { rev: 0, plans: { a: renamed }, gone: {} })
+  eq(merged.plans.a!.name, 'Kitchen')
+  // Strictly increasing even inside one millisecond.
+  const now = { ...plan(), updated: Date.now() }
+  const r1 = renameDoc(now, 'A')
+  const r2 = renameDoc(r1, 'AB')
+  ok(r1.updated > now.updated && r2.updated > r1.updated, 'updated must strictly increase')
+  eq(renameDoc(now, '   '), now)
+  eq(renameDoc(now, now.name), now)
+})
+
+check('a tombstone outranks even a clock-inflated doc', () => {
+  const doc = { ...plan(), id: 'a', updated: Date.now() + 100000 }
+  const lib = withoutDoc({ rev: 0, plans: { a: doc }, gone: {} }, 'a')
+  ok(lib.gone.a! > doc.updated, 'tombstone lost to the inflated doc stamp')
+  eq(mergeLib(lib, { rev: 0, plans: { a: doc }, gone: {} }).plans.a, undefined)
+})
+
+check('sameCore compares structure, so wire clones write no history', () => {
+  const doc = addItem(plan(), 'sofa', 100, 100).doc
+  // A remote adoption arrives as a fresh parse: identical truth, new objects.
+  const wire = parseMirror(serializeMirror('peer', doc, null))!.doc
+  ok(doc.items !== wire.items, 'the clone should not share references')
+  ok(sameCore(coreOf(doc), coreOf(wire)), 'structural cores should match')
+  const h = commitHistory(emptyHistory(), coreOf(doc), coreOf(wire))
+  eq(h.past.length, 0)
+  const remote = renameDoc(wire, 'Elsewhere')
+  eq(commitHistory(emptyHistory(), coreOf(doc), coreOf(remote)).past.length, 1)
+})
+
+check('parseLength accepts a leading-dot decimal only when well-formed', () => {
+  near(parseLength('.5 m', 'metric', 'room')!, 50)
+  near(parseLength('.5', 'metric', 'room')!, 50)
+  near(parseLength('.5 ft', 'imperial', 'room')!, 15.24)
+  eq(parseLength('5.', 'metric', 'room'), null)
+  eq(parseLength('.5.5', 'metric', 'room'), null)
+  eq(parseLength('..5', 'metric', 'room'), null)
+  eq(parseLength('.', 'metric', 'room'), null)
+})
+
+check('snap-stepped nudges land on the grid without drift', () => {
+  let doc = addItem(plan(), 'chair', 152, 91).doc
+  const id = Object.keys(doc.items)[0]!
+  // Five one-foot presses: each lands on a 30.48 cm line at full precision.
+  for (let i = 0; i < 5; i++) doc = moveItem(doc, id, doc.items[id]!.x + 30.48, doc.items[id]!.y, 30.48)
+  near(doc.items[id]!.x, 182.88 + 4 * 30.48)
+  eq(doc.items[id]!.x, 304.8)
+  // Back off the grid edge and a rotated piece keeps the same precision.
+  const rotated = rotateItem(doc, id)
+  const back = moveItem(rotated, id, rotated.items[id]!.x - 30.48, rotated.items[id]!.y, 30.48)
+  eq(back.items[id]!.x, 274.32)
 })
 
 check('edits bump the clock, no-ops do not', () => {
