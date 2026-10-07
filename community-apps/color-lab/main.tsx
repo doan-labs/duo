@@ -7,12 +7,14 @@ import { type MutableRefObject, type ReactNode, useCallback, useEffect, useId, u
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
 import {
-  applyPalOp,
+  admitView,
+  BootPolicy,
   type Core,
   contrast,
   coreEq,
   coreOf,
   type Doc,
+  editBound,
   exportCodes,
   HARMONY_KINDS,
   HARMONY_LABEL,
@@ -24,20 +26,17 @@ import {
   hslToRgb,
   inkFor,
   MAX_PALETTES,
-  mergeAcks,
-  mergePalWire,
   newDoc,
   newPalette,
-  PAL_OP_WINDOW,
-  PAL_PENDING_LIMIT,
   type Pair,
   type PalOp,
+  PalStore,
+  PalsLib,
   pairChoices,
   palBase,
   palListEq,
   parseColorFull,
   parseDocJson,
-  parsePalettes,
   parseShared,
   type Rgb,
   ratioFloor,
@@ -50,6 +49,7 @@ import {
   serializeDoc,
   serializePalettes,
   serializeShared,
+  sharedLib,
   toHex,
   toHslString,
   toRgbString,
@@ -93,16 +93,24 @@ const UI0: UiState = {
 }
 
 /**
+ * Synchronous live admission: the host reports the current view on `os.view`
+ * before any listener runs, so this reads the state at call time - never a
+ * lagging React mirror. A hidden or non-owning copy admits no new intent;
+ * reads and already-admitted completions are the only things it may still do.
+ */
+const admitLive = () => admitView(os.view)
+
+/**
  * Window-capture Escape guard, registered before os.connect() so it fires
  * ahead of the shell's own Escape-goes-home listener. Armed only while a
- * sheet is open or the code field is mid-edit; every other Escape still
- * leaves the app.
+ * sheet is open or the code field is mid-edit on an admitted copy; every
+ * other Escape - including any reaching a hidden copy - still leaves the app.
  */
 let escapeCancel: (() => void) | null = null
 addEventListener(
   'keydown',
   (event) => {
-    if (event.key !== 'Escape' || !escapeCancel) return
+    if (event.key !== 'Escape' || !escapeCancel || !admitLive()) return
     event.preventDefault()
     event.stopImmediatePropagation()
     escapeCancel()
@@ -113,12 +121,12 @@ addEventListener(
 /**
  * Focus is single-owner state across the two displays: a focus() inside the
  * hidden iframe steals top-level focus from the visible copy. Every focus move
- * goes through here so the check reads os.view.active at fire time (a callback
+ * goes through here so the check reads the live view at fire time (a callback
  * may have been scheduled while the copy was still owning) and the target is
  * confirmed still mounted. The hidden copy simply never calls it.
  */
 const focusIfActive = (el: HTMLElement | null | undefined) => {
-  if (!el || !os.view.active || !document.contains(el)) return
+  if (!el || !admitLive() || !document.contains(el)) return
   el.focus()
 }
 
@@ -162,13 +170,16 @@ function Slider(props: {
         aria-valuetext={text}
         {...stylex.props(styles.sliderHit)}
         onPointerDown={(e) => {
+          if (!admitLive()) return
           dragging.current = true
           e.currentTarget.setPointerCapture(e.pointerId)
           props.onDragStart()
           setFromPointer(e.clientX)
         }}
         onPointerMove={(e) => {
-          if (dragging.current) setFromPointer(e.clientX)
+          // A drag admitted while live completes bound to its incarnation in
+          // the parent; a move arriving hidden produces no new intent.
+          if (dragging.current && admitLive()) setFromPointer(e.clientX)
         }}
         onPointerUp={() => {
           if (!dragging.current) return
@@ -189,7 +200,7 @@ function Slider(props: {
           else if (e.key === 'End') next = props.max
           else if (e.key === 'PageDown') next = props.value - 10 * step
           else if (e.key === 'PageUp') next = props.value + 10 * step
-          if (next === null) return
+          if (next === null || !admitLive()) return
           e.preventDefault()
           props.onDragStart()
           props.onChange(Math.min(props.max, Math.max(props.min, next)))
@@ -228,12 +239,15 @@ function HarmonyPicker(props: {
             aria-checked={on}
             tabIndex={on ? 0 : -1}
             {...stylex.props(styles.seg, on && styles.segOn, props.press)}
-            onClick={() => props.onPick(k)}
+            onClick={() => {
+              if (admitLive()) props.onPick(k)
+            }}
             onKeyDown={(e) => {
               let step = 0
               if (e.key === 'ArrowRight' || e.key === 'ArrowDown') step = 1
               else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') step = -1
               else return
+              if (!admitLive()) return
               e.preventDefault()
               refs.current[(i + step + HARMONY_KINDS.length) % HARMONY_KINDS.length]?.focus()
             }}
@@ -270,7 +284,8 @@ function GuardedSheet(props: { open: boolean; onClose: () => void; label: string
       aria-label={props.label}
       id={dialogId}
       onKeyDown={(e) => {
-        if (e.key !== 'Tab') return
+        // The trap obeys the same live admission as every other key effect.
+        if (e.key !== 'Tab' || !admitLive()) return
         const root = document.getElementById(bodyId)
         if (!root) return
         const items = root.querySelectorAll<HTMLElement>(
@@ -318,19 +333,26 @@ function ColorLab() {
   const skipFinalize = useRef(false)
   const pendingShared = useRef<Doc | null>(null)
   const publishRaf = useRef(0)
-  // The palette library: wire-authoritative, plus my own op log. Entries
-  // below the highest foreign watermark are dropped once they fall outside
-  // the window-deep settled tail that repairs regressed publishes.
-  const palsRef = useRef<SavedPalette[]>([])
-  const palsWireOps = useRef<PalOp[]>([])
-  const myPalOps = useRef<PalOp[]>([])
-  const persistedPals = useRef<string | null>(null)
-  const palOpSeq = useRef(0)
-  const myPalAck = useRef(0)
-  // Per-writer watermarks: the highest seq of each writer's palette ops whose
-  // effects this copy's list already incorporates. My own entry always tracks
-  // palOpSeq; foreign entries fold in from adopted publishes via mergeAcks.
-  const palsAcks = useRef<Record<string, number>>({})
+  // The palette library lives in `lib`: it gains authority (ready) only from a
+  // resolved storage read - null is a true absent key - or a foreign publish
+  // carrying `pals`. Until then this copy has no library opinion, so a default
+  // empty list can neither be published nor persisted over a peer's palettes.
+  // `palStore` owns the durable writer: its `persisted` marker advances only
+  // when a setter call resolves, so a failed write neither claims durability
+  // nor suppresses the retry.
+  const lib = useRef(new PalsLib(ME))
+  const palStore = useRef<PalStore | null>(null)
+  // Bumped on every foreign adopt: edits admitted under one doc incarnation
+  // stay bound to it, so a peer switch cancels their deferred writes.
+  const editEpoch = useRef(0)
+  const editInc = useRef(0)
+  const hydratingPals = useRef(false)
+  // Admission-aware retry policies for the two bootstrap reads (the session
+  // snapshot and the palette storage read). A failed read parks while hidden
+  // instead of polling on a timer.
+  const liveBoot = useRef<BootPolicy | null>(null)
+  const storeBoot = useRef<BootPolicy | null>(null)
+  const pendingInc = useRef(0)
   const ellipsisRefs = useRef(new Map<string, HTMLElement>())
   const deleteCancelRef = useRef<HTMLButtonElement | null>(null)
   const saveActionRef = useRef<HTMLButtonElement | null>(null)
@@ -345,6 +367,15 @@ function ColorLab() {
   storedDocSet.current = storedDoc.set
   storedPalsSet.current = storedPals.set
   storedMuteSet.current = storedMute.set
+
+  if (!palStore.current) {
+    palStore.current = new PalStore(
+      (wire) => {
+        storedPalsSet.current(wire)
+      },
+      () => setNote('Palette library not saved - storage write failed')
+    )
+  }
 
   const [wideRef, wide] = useWide<HTMLElement>(620)
 
@@ -362,7 +393,7 @@ function ColorLab() {
   const announce = useCallback((text: string) => setNote(text), [])
   const play = useCallback((c: Cue) => {
     // Only the owning, on-screen copy makes noise, and only while unmuted.
-    if (os.view.active && !uiRef.current.muted) cue(c)
+    if (admitLive() && !uiRef.current.muted) cue(c)
   }, [])
 
   // ---- session mirror ----
@@ -385,15 +416,16 @@ function ColorLab() {
             copyText: nextUi.copyText,
             muted: nextUi.muted
           },
-          pals: palsRef.current,
-          ops: palsWireOps.current,
-          acks: { ...palsAcks.current, [ME]: palOpSeq.current }
+          // The library fields publish only once this copy has confirmed
+          // authority: an unhydrated write carries doc/view alone, so its
+          // empty default can never replace a peer's palettes on the wire.
+          ...sharedLib(lib.current.ready, lib.current.list, lib.current.wireOps, lib.current.wireAcks())
         })
       )
       .catch(() => {})
   }, [])
 
-  const patchUi = useCallback(
+  const applyPatchUi = useCallback(
     (patch: Partial<UiState>) => {
       const prev = uiRef.current
       // The element that opens a sheet is its focus-restore target, captured
@@ -411,8 +443,22 @@ function ColorLab() {
     [publish]
   )
 
+  // Every new user intent routes through this gate: a hidden copy refuses it
+  // before it can touch refs, ui, session, storage, audio, focus or timers.
+  const patchUi = useCallback(
+    (patch: Partial<UiState>) => {
+      if (!admitLive()) return
+      applyPatchUi(patch)
+    },
+    [applyPatchUi]
+  )
+
   const commitDoc = useCallback(
-    (next: Doc, announceText?: string) => {
+    (next: Doc, announceText?: string, inc?: number) => {
+      // Admission: either a live intent right now or a completion still bound
+      // to the doc incarnation it was admitted under. A foreign adopt bumps
+      // the incarnation, so a stale write can never land on a switched core.
+      if (inc === undefined ? !admitLive() : !editBound(inc, editEpoch.current)) return
       docRef.current = next
       setDoc(next)
       publish(next, uiRef.current)
@@ -426,7 +472,7 @@ function ColorLab() {
   const commitCore = useCallback(
     (patch: Partial<Core>, sound: Cue = 'pick', announceText?: string) => {
       const d = docRef.current
-      if (!d) return
+      if (!d || !admitLive()) return
       commitDoc(withCore(d, patch), announceText)
       play(sound)
     },
@@ -437,7 +483,7 @@ function ColorLab() {
   const replaceCore = useCallback(
     (patch: Partial<Core>) => {
       const d = docRef.current
-      if (!d) return
+      if (!d || !admitLive()) return
       const merged: Core = {
         color: patch.color ?? d.color,
         hsl: patch.hsl ?? (patch.color ? rgbToHsl(patch.color) : d.hsl),
@@ -450,25 +496,32 @@ function ColorLab() {
       setDoc(next)
       // Drags coalesce to one session write per frame.
       pendingShared.current = next
+      pendingInc.current = editEpoch.current
       if (!publishRaf.current) {
         publishRaf.current = requestAnimationFrame(() => {
           publishRaf.current = 0
           const pending = pendingShared.current
+          const inc = pendingInc.current
           pendingShared.current = null
-          if (pending) publish(pending, uiRef.current)
+          // A deferred publish still obeys current admission and the
+          // incarnation the write was admitted under.
+          if (pending && admitLive() && editBound(inc, editEpoch.current)) publish(pending, uiRef.current)
         })
       }
     },
     [publish]
   )
 
-  /** Ends a live-edit session: the pre-edit core becomes one undo step. */
+  /** Ends a live-edit session: the pre-edit core becomes one undo step. A
+   *  completion admitted earlier still lands while hidden, but only if no
+   *  foreign adopt switched the core meanwhile. */
   const endLiveEdit = useCallback(() => {
     const base = editBase.current
+    const inc = editInc.current
     editBase.current = null
     const d = docRef.current
     if (!base || !d || coreEq(base, coreOf(d))) return
-    commitDoc({ ...d, undo: [...d.undo.slice(-31), base] })
+    commitDoc({ ...d, undo: [...d.undo.slice(-31), base] }, undefined, inc)
   }, [commitDoc])
 
   // ---- boot: storage + session ----
@@ -490,6 +543,7 @@ function ColorLab() {
         } while (cursor)
         if (dead) return
         setLive({ raw: seen.get(SESSION_KEY) ?? null, known: true })
+        liveBoot.current?.ok()
         off?.()
         off = os.session.watch(rev, (e) => {
           if (e.rev < 0) {
@@ -499,9 +553,12 @@ function ColorLab() {
           if (e.k === SESSION_KEY) setLive({ raw: e.v, known: true })
         })
       } catch {
-        if (!dead) setTimeout(() => void boot(), 1500)
+        // Not a timed hidden poll: a failed snapshot re-arms through the
+        // admission-aware policy and parks until this copy is live again.
+        if (!dead) liveBoot.current?.fail()
       }
     }
+    liveBoot.current = new BootPolicy(admitLive, () => void boot())
     void boot()
     return () => {
       dead = true
@@ -517,13 +574,69 @@ function ColorLab() {
     // would spam redundant writes.
   }, [])
 
-  /** Persist the library only when its serialized form actually changed. */
+  /** Persist the library only once it has confirmed authority - a queued op
+   *  on an unconfirmed copy rides on the hydrate/adopt that lands later,
+   *  which persists the merged result instead. The store's dedupe then tracks
+   *  confirmed writes, never merely-sent ones. */
   const persistPals = useCallback((items: SavedPalette[]) => {
-    const wire = serializePalettes(items)
-    if (persistedPals.current === wire) return
-    persistedPals.current = wire
-    void storedPalsSet.current(wire)
+    if (!lib.current.ready) return
+    palStore.current?.request(serializePalettes(items))
   }, [])
+
+  /**
+   * The palette-library bootstrap read: a direct storage get, retried through
+   * the admission-aware policy. Only a resolved read (null is a true absent
+   * key) or a foreign publish carrying `pals` makes the library authoritative
+   * - a rejection is not a read, so it can never seed the empty default.
+   */
+  const ensurePalsHydrated = useCallback(() => {
+    if (lib.current.ready || hydratingPals.current) return
+    hydratingPals.current = true
+    void (async () => {
+      try {
+        const raw = await os.storage.get(STORE_PALS)
+        hydratingPals.current = false
+        storeBoot.current?.ok()
+        if (lib.current.hydrate(raw)) {
+          setPalettes(lib.current.list)
+          palStore.current?.seed(raw)
+          // Now authoritative: republish so a peer folds in whatever the
+          // pending ops replayed, and persist when the merge moved the wire.
+          const d = docRef.current
+          if (d) publish(d, uiRef.current)
+          persistPals(lib.current.list)
+        }
+      } catch {
+        hydratingPals.current = false
+        storeBoot.current?.fail()
+      }
+    })()
+  }, [publish, persistPals])
+
+  if (!storeBoot.current) storeBoot.current = new BootPolicy(admitLive, ensurePalsHydrated)
+
+  // Durable-write acknowledgement: the mirror resolves the newest sent wire
+  // into the key state later, so the store's `persisted` marker advances only
+  // here - on a real settle, never at send time.
+  useEffect(() => {
+    if (storedPals.status === 'ready' || storedPals.status === 'error') {
+      palStore.current?.settle(storedPals.value, storedPals.status === 'ready')
+    }
+  }, [storedPals.status, storedPals.value])
+
+  // The moment this copy is admitted again, a parked bootstrap read re-arms
+  // and an unconfirmed durable write retries. The view notify is batched to a
+  // frame, which never fires on a hidden copy - so nothing here runs hidden.
+  useEffect(
+    () =>
+      os.onView(() => {
+        if (!admitLive()) return
+        liveBoot.current?.wake()
+        storeBoot.current?.wake()
+        palStore.current?.retry()
+      }),
+    []
+  )
 
   // Adopt foreign writes; seed once storage is hydrated and no session exists.
   useEffect(() => {
@@ -533,6 +646,9 @@ function ColorLab() {
       lastSeen.current = live.raw
       const shared = parseShared(live.raw)
       if (shared && shared.by !== ME) {
+        // The peer switched the doc incarnation: edits admitted under the old
+        // core lose their binding instead of committing onto the new one.
+        editEpoch.current++
         docRef.current = shared.doc
         setDoc(shared.doc)
         editBase.current = null
@@ -558,55 +674,41 @@ function ColorLab() {
           // already covered still re-replays those ops: the log keeps a
           // settled tail one window deep. The merge republishes once so the
           // library converges on both copies.
-          mergeAcks(palsAcks.current, shared.acks, ME)
-          const r = mergePalWire(
-            { pals: shared.pals, ops: shared.ops, acks: shared.acks },
-            myPalOps.current,
-            ME,
-            myPalAck.current
-          )
-          myPalAck.current = r.maxAck
-          myPalOps.current = r.ops
-          palsRef.current = r.merged
-          setPalettes(r.merged)
-          persistPals(r.merged)
-          palsWireOps.current = [...(shared.ops ?? []), ...r.replayed].slice(-PAL_OP_WINDOW)
-          if (r.replayed.length && !palListEq(r.merged, shared.pals)) publish(shared.doc, uiRef.current)
+          const r = lib.current.adopt({ pals: shared.pals, ops: shared.ops, acks: shared.acks })
+          setPalettes(lib.current.list)
+          persistPals(lib.current.list)
+          if (r.replayed.length && !palListEq(lib.current.list, shared.pals)) publish(shared.doc, uiRef.current)
+        } else if (!lib.current.ready) {
+          // A doc-only or legacy publish carries no library opinion: the
+          // durable read decides, not this copy's empty default.
+          ensurePalsHydrated()
         }
       }
       return
     }
-    if (
-      seeded.current ||
-      storedDoc.status === 'hydrating' ||
-      storedMute.status === 'hydrating' ||
-      storedPals.status === 'hydrating'
-    )
-      return
+    if (seeded.current || storedDoc.status === 'hydrating' || storedMute.status === 'hydrating') return
     seeded.current = true
     const initial = parseDocJson(storedDoc.value) ?? newDoc(hslToRgb(SEED_COLOR))
     docRef.current = initial
     setDoc(initial)
-    const initialPals = parsePalettes(storedPals.value)
-    palsRef.current = initialPals
-    setPalettes(initialPals)
-    persistedPals.current = storedPals.value
     const bootUi: UiState = { ...UI0, field: toHex(initial.color), muted: storedMute.value === '1' }
     uiRef.current = bootUi
     setUi(bootUi)
     publish(initial, bootUi)
     if (!storedDoc.value) void storedDocSet.current(serializeDoc(initial))
+    // The library confirms itself: a resolved read seeds it, and only then do
+    // `pals` start travelling on this copy's publishes.
+    ensurePalsHydrated()
   }, [
     live,
     storedDoc.status,
     storedDoc.value,
     storedMute.status,
     storedMute.value,
-    storedPals.status,
-    storedPals.value,
     applyUi,
     publish,
-    persistPals
+    persistPals,
+    ensurePalsHydrated
   ])
 
   /** Queue one library write: apply to the freshest list, stamp the op with my
@@ -614,15 +716,12 @@ function ColorLab() {
    *  in the log until a foreign publish acknowledges it through my watermark. */
   const queuePalOp = useCallback(
     (op: DistOmit<PalOp, 'id' | 'seq'>) => {
-      const seq = ++palOpSeq.current
-      const full = { ...op, id: `${ME}:${seq}`, seq } as PalOp
-      const next = applyPalOp(palsRef.current, full)
-      palsRef.current = next
-      setPalettes(next)
-      palsAcks.current[ME] = seq
-      palsWireOps.current = [...palsWireOps.current, full].slice(-PAL_OP_WINDOW)
-      myPalOps.current = [...myPalOps.current, full].slice(-PAL_PENDING_LIMIT)
-      persistPals(next)
+      // A new intent enqueues only while admitted; a hidden copy can neither
+      // stamp an op nor schedule its publish.
+      if (!admitLive()) return
+      lib.current.push(op)
+      setPalettes(lib.current.list)
+      persistPals(lib.current.list)
       const d = docRef.current
       if (d) publish(d, uiRef.current)
     },
@@ -638,6 +737,7 @@ function ColorLab() {
   // Cancel or Escape an armed inline delete: clear it and put focus back on
   // the row's ellipsis, which remounts with the row.
   const dismissDelete = useCallback(() => {
+    if (!admitLive()) return
     const id = uiRef.current.deleteId
     patchUi({ deleteId: null })
     requestAnimationFrame(() => {
@@ -646,11 +746,13 @@ function ColorLab() {
   }, [patchUi])
 
   const cancelField = useCallback(() => {
+    if (!admitLive()) return
     const base = editBase.current
+    const inc = editInc.current
     editBase.current = null
     const d = docRef.current
     if (base && d && !coreEq(base, coreOf(d))) {
-      commitDoc({ ...base, v: 1, undo: d.undo, redo: [] })
+      commitDoc({ ...base, v: 1, undo: d.undo, redo: [] }, undefined, inc)
     }
     const color = docRef.current?.color
     patchUi({ field: color ? toHex(color) : '', fieldErr: false })
@@ -670,6 +772,8 @@ function ColorLab() {
 
   const tryCopy = useCallback(
     async (text: string) => {
+      // Clipboard is an admitted intent: a hidden copy never touches it.
+      if (!admitLive()) return false
       try {
         await navigator.clipboard.writeText(text)
         play('copy')
@@ -680,7 +784,7 @@ function ColorLab() {
       }
       try {
         const el = copyFieldRef.current
-        if (el && os.view.active) {
+        if (el && admitLive()) {
           el.focus()
           el.select()
           if (document.execCommand('copy')) {
@@ -699,6 +803,7 @@ function ColorLab() {
 
   const copyText = useCallback(
     async (text: string, label: string) => {
+      if (!admitLive()) return
       if (await tryCopy(text)) return
       patchUi({ sheet: 'copy', copyText: text })
       announce(`${label} did not copy automatically - copy it from the field`)
@@ -741,8 +846,8 @@ function ColorLab() {
 
   const doSave = useCallback(() => {
     const d = docRef.current
-    if (!d) return
-    if (palsRef.current.length >= MAX_PALETTES) {
+    if (!d || !admitLive()) return
+    if (lib.current.list.length >= MAX_PALETTES) {
       // No silent eviction of the oldest entry: block and say why.
       play('error')
       announce(`Palette library is full (${MAX_PALETTES}) - delete one to save another`)
@@ -751,7 +856,12 @@ function ColorLab() {
     const colors = harmonyColors(d.hsl, d.harmony).map(hslToRgb)
     // The authored base travels with the strip: analogous and split do not
     // paint the base first, so reopening cannot infer it from colors[0].
-    const pal = newPalette(uiRef.current.nameInput || `Palette ${palsRef.current.length + 1}`, colors, d.harmony, d.hsl)
+    const pal = newPalette(
+      uiRef.current.nameInput || `Palette ${lib.current.list.length + 1}`,
+      colors,
+      d.harmony,
+      d.hsl
+    )
     queuePalOp({ kind: 'add', palette: pal })
     patchUi({ sheet: null, nameInput: '' })
     play('save')
@@ -759,9 +869,10 @@ function ColorLab() {
   }, [queuePalOp, patchUi, play, announce])
 
   const doRename = useCallback(() => {
+    if (!admitLive()) return
     const id = uiRef.current.actionId
     if (!id) return
-    const live = palsRef.current.find((p) => p.id === id)
+    const live = lib.current.list.find((p) => p.id === id)
     if (!live) {
       // The peer deleted it while the sheet was open: say so, do not pretend.
       patchUi({ sheet: null, actionId: null, nameInput: '' })
@@ -776,10 +887,11 @@ function ColorLab() {
   }, [queuePalOp, patchUi, play, announce])
 
   const doDelete = useCallback(() => {
+    if (!admitLive()) return
     const id = uiRef.current.deleteId
     if (!id) return
     patchUi({ deleteId: null })
-    if (!palsRef.current.some((p) => p.id === id)) return
+    if (!lib.current.list.some((p) => p.id === id)) return
     queuePalOp({ kind: 'delete', target: id })
     play('remove')
     announce('Palette deleted')
@@ -789,6 +901,7 @@ function ColorLab() {
 
   const adoptColor = useCallback(
     (c: Rgb, harmony?: HarmonyKind) => {
+      if (!admitLive()) return
       commitCore({ color: c, harmony }, 'apply', `Colour set to ${toHex(c)}`)
       patchUi({ field: toHex(c), fieldErr: false })
     },
@@ -802,6 +915,7 @@ function ColorLab() {
   // stored colour honestly.
   const adoptPalette = useCallback(
     (p: SavedPalette) => {
+      if (!admitLive()) return
       const base = palBase(p)
       if (!base) {
         const first = p.colors[0]
@@ -816,7 +930,7 @@ function ColorLab() {
 
   const doUndo = useCallback(() => {
     const d = docRef.current
-    if (!d?.undo.length) return
+    if (!d?.undo.length || !admitLive()) return
     editBase.current = null
     const next = undoDoc(d)
     commitDoc(next, 'Undo')
@@ -825,7 +939,7 @@ function ColorLab() {
 
   const doRedo = useCallback(() => {
     const d = docRef.current
-    if (!d?.redo.length) return
+    if (!d?.redo.length || !admitLive()) return
     editBase.current = null
     const next = redoDoc(d)
     commitDoc(next, 'Redo')
@@ -853,14 +967,17 @@ function ColorLab() {
 
   // An armed confirm stays bound to the palette id it was armed on; if the
   // row's palette leaves the live library while armed (peer delete or stale
-  // hydration), the confirm invalidates instead of pointing at nothing.
+  // hydration), the confirm invalidates instead of pointing at nothing. This
+  // is a reaction to shared state, not a user intent, so it runs ungated.
   useEffect(() => {
-    if (ui.deleteId !== null && !palettes.some((p) => p.id === ui.deleteId)) patchUi({ deleteId: null })
-  }, [ui.deleteId, palettes, patchUi])
+    if (ui.deleteId !== null && !palettes.some((p) => p.id === ui.deleteId)) applyPatchUi({ deleteId: null })
+  }, [ui.deleteId, palettes, applyPatchUi])
 
   // App-level undo/redo keys; text inputs keep the browser's own undo.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // The keystroke itself is the intent: reject before any side effect.
+      if (!admitLive()) return
       const t = e.target as HTMLElement
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return
       const mod = e.metaKey || e.ctrlKey
@@ -968,6 +1085,7 @@ function ColorLab() {
           placeholder={`hex, rgb() or hsl() - ${toHex({ r: 64, g: 156, b: 255 })}`}
           aria-invalid={ui.fieldErr}
           onChange={(e) => {
+            if (!admitLive()) return
             const text = e.target.value
             const info = parseColorFull(text)
             patchUi({ field: text, fieldErr: text.trim() !== '' && !info })
@@ -975,18 +1093,19 @@ function ColorLab() {
               replaceCore({ color: info.color, hsl: info.hsl })
           }}
           onFocus={() => {
+            if (!admitLive()) return
             setFieldEditing(true)
             editBase.current = coreOf(doc)
+            editInc.current = editEpoch.current
             requestAnimationFrame(() => {
-              if (os.view.active) fieldRef.current?.select()
+              if (admitLive()) fieldRef.current?.select()
             })
           }}
           onBlur={() => {
             setFieldEditing(false)
-            // A blur on the copy that just went hidden in a fold must not
-            // finalize the shared draft: the other display is still typing.
-            if (!os.view.active) return
-            // Enter already finalized; the blur that follows must not re-run it.
+            // A blur arriving hidden completes an already-admitted edit:
+            // every write inside stays bound to the incarnation the typing
+            // was admitted under, so a peer switch drops it safely.
             if (skipFinalize.current) {
               skipFinalize.current = false
             } else {
@@ -994,7 +1113,7 @@ function ColorLab() {
             }
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && admitLive()) {
               e.preventDefault()
               skipFinalize.current = true
               finalizeField()
@@ -1051,7 +1170,10 @@ function ColorLab() {
           value={s.value}
           gradient={s.gradient}
           onDragStart={() => {
-            if (!editBase.current) editBase.current = coreOf(doc)
+            if (!editBase.current) {
+              editBase.current = coreOf(doc)
+              editInc.current = editEpoch.current
+            }
           }}
           onChange={(value) => {
             const next: Hsl =
@@ -1373,6 +1495,7 @@ function ColorLab() {
               aria-pressed={!ui.muted}
               {...stylex.props(press, styles.muteBtn, ui.muted && styles.muteOff)}
               onClick={() => {
+                if (!admitLive()) return
                 patchUi({ muted: !ui.muted })
                 announce(ui.muted ? 'Sounds on' : 'Sounds off')
               }}
@@ -1431,7 +1554,7 @@ function ColorLab() {
           maxLength={40}
           onChange={(e) => patchUi({ nameInput: e.target.value })}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && admitLive()) {
               e.preventDefault()
               doSave()
             }
@@ -1509,7 +1632,7 @@ function ColorLab() {
           maxLength={40}
           onChange={(e) => patchUi({ nameInput: e.target.value })}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && admitLive()) {
               e.preventDefault()
               doRename()
             }
@@ -1541,7 +1664,9 @@ function ColorLab() {
           value={ui.copyText ?? ''}
           aria-label="Code to copy"
           readOnly
-          onFocus={() => copyFieldRef.current?.select()}
+          onFocus={() => {
+            if (admitLive()) copyFieldRef.current?.select()
+          }}
           xstyle={styles.sheetField}
         />
         <div {...stylex.props(styles.actionStack)}>

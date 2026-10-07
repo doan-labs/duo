@@ -5,11 +5,14 @@
 // The token gate flags fixed colour literals even in strings, so test inputs
 // are built with the small helpers below rather than written as literals.
 import {
+  admitView,
   applyPalOp,
   BLACK,
+  BootPolicy,
   contrast,
   coreEq,
   coreOf,
+  editBound,
   exportCodes,
   HARMONY_KINDS,
   type Hsl,
@@ -27,6 +30,8 @@ import {
   PAL_ACK_LIMIT,
   PAL_OP_WINDOW,
   PAL_PENDING_LIMIT,
+  PalStore,
+  PalsLib,
   palBase,
   parseColor,
   parseColorFull,
@@ -47,6 +52,7 @@ import {
   serializeDoc,
   serializePalettes,
   serializeShared,
+  sharedLib,
   toHex,
   toHexShort,
   toHslString,
@@ -56,6 +62,7 @@ import {
   variations,
   verdict,
   WHITE,
+  whenLive,
   withCore,
   wrapHue
 } from './color.ts'
@@ -787,6 +794,312 @@ check('coreOf is a copy, not an alias', () => {
   const c = coreOf(d)
   c.color = rgb(1, 1, 1)
   ok(d.color.r === 7, 'doc untouched')
+})
+
+// ---- live admission ----
+
+const VIEW_HIDDEN_ASLEEP = { visible: false, active: true }
+const VIEW_HIDDEN_INERT = { visible: false, active: false }
+const VIEW_SEEN_OTHER = { visible: true, active: false }
+const VIEW_LIVE = { visible: true, active: true }
+
+check('admission requires visible AND active at call time', () => {
+  ok(admitView(VIEW_LIVE), 'visible+active admits')
+  ok(!admitView(VIEW_HIDDEN_ASLEEP), 'sleep keeps active but hides')
+  ok(!admitView(VIEW_HIDDEN_INERT), 'hidden+inactive rejected')
+  ok(!admitView(VIEW_SEEN_OTHER), 'visible on the other display is not ours')
+  // The synchronous read sees a same-turn lifecycle flip a lagging view copy
+  // would miss: the predicate reads the live view object, never a snapshot.
+  let current = VIEW_HIDDEN_ASLEEP
+  const admit = () => admitView(current)
+  ok(!admit(), 'hidden before the flip')
+  current = VIEW_LIVE
+  ok(admit(), 'the same call admits once live')
+  current = VIEW_HIDDEN_ASLEEP
+  ok(!admit(), 'and rejects again once hidden')
+})
+
+check('whenLive drops the intent before any side effect', () => {
+  let ran = 0
+  const onHidden = whenLive(VIEW_HIDDEN_ASLEEP, () => ran++)
+  const onLive = whenLive(VIEW_LIVE, () => ran++)
+  onHidden()
+  onHidden()
+  eq(ran, 0, 'hidden intent never ran')
+  onLive()
+  eq(ran, 1, 'admitted intent ran once')
+})
+
+check('editBound binds a write to its admitted incarnation', () => {
+  ok(editBound(3, 3), 'same incarnation completes')
+  ok(!editBound(3, 4), 'a peer adopt bumped the incarnation: stale write dropped')
+})
+
+// ---- palette library authority (PalsLib) ----
+
+const palNamed = (name: string, r = 1, g = 2, b = 3) =>
+  newPalette(name, [rgb(r, g, b)], 'analogous', { h: 0, s: 0, l: 0 })
+const sixPals = () => ['a', 'b', 'c', 'd', 'e', 'f'].map((n, i) => palNamed(n, i, i, i))
+
+check('sharedLib keeps the library off the wire until authority is confirmed', () => {
+  const hidden = sharedLib(false, sixPals(), [], { w: 2 })
+  ok(hidden.pals === undefined && hidden.ops === undefined && hidden.acks === undefined, 'unready: no fields')
+  const wire = serializeShared({
+    by: 'me',
+    doc: newDoc(rgb(1, 2, 3)),
+    view: {
+      field: '',
+      fieldErr: false,
+      page: false,
+      sheet: null,
+      nameInput: '',
+      actionId: null,
+      deleteId: null,
+      copyText: null,
+      muted: false
+    },
+    ...hidden
+  })
+  const parsed = parseShared(wire)!
+  ok(parsed.pals === undefined, 'unready publish parses as doc-only')
+  const shown = sharedLib(true, sixPals(), [], { w: 2 })
+  eq(shown.pals!.length, 6, 'ready publish carries the list')
+})
+
+check('PalsLib hydrate: rejected read is not a read; null is a true absent key', () => {
+  const lib = new PalsLib('me')
+  ok(!lib.ready, 'starts with no opinion')
+  // A failed read simply never calls hydrate - the library stays unpublished.
+  ok(lib.hydrate(null), 'null resolves to a legitimate empty library')
+  ok(lib.ready && lib.list.length === 0, 'first boot is empty and authoritative')
+  const six = new PalsLib('me')
+  six.hydrate(serializePalettes(sixPals()))
+  eq(six.list.length, 6, 'resolved read seeds the durable list')
+})
+
+check('PalsLib: ops queued before hydrate replay onto the read base', () => {
+  const lib = new PalsLib('me')
+  lib.push({ kind: 'add', palette: palNamed('early') })
+  eq(lib.list.length, 1, 'queued op applies to the empty opinion')
+  ok(!lib.ready, 'still unconfirmed')
+  lib.hydrate(serializePalettes(sixPals()))
+  eq(lib.list.length, 7, 'the queued add replays onto the read')
+  // A foreign watermark not yet covering our seq keeps the op pending.
+  ok(lib.ops.length > 0, 'op still pending a foreign ack')
+})
+
+check('PalsLib: a late seed cannot clobber a meanwhile-adopted wire state', () => {
+  const lib = new PalsLib('me')
+  lib.adopt({ pals: sixPals(), ops: [], acks: { peer: 4 } })
+  eq(lib.list.length, 6, 'foreign library adopted')
+  ok(!lib.hydrate(null), 'delayed storage read ignored after adopt')
+  eq(lib.list.length, 6, 'adopted list preserved')
+})
+
+check('PalsLib: adopt replays pending ops and folds watermarks', () => {
+  const lib = new PalsLib('me')
+  lib.hydrate(serializePalettes(sixPals()))
+  const op = lib.push({ kind: 'add', palette: palNamed('mine') })
+  // The peer's publish does not know about my op yet.
+  const r = lib.adopt({ pals: sixPals(), ops: [], acks: { peer: 2 } })
+  eq(r.replayed.length, 1, 'pending op replayed')
+  eq(lib.list.length, 7, 'merged list keeps the local add')
+  eq(lib.acks.peer, 2, 'foreign watermark folded')
+  // Once the peer covers my seq the op settles out of the log.
+  const r2 = lib.adopt({ pals: lib.list, ops: [op], acks: { me: op.seq } })
+  eq(r2.replayed.length, 0, 'acknowledged op no longer replays')
+  ok(
+    lib.ops.every((o) => o.seq > op.seq - PAL_OP_WINDOW || o.id !== op.id),
+    'settled op dropped from pending'
+  )
+})
+
+check('PalsLib: wire ops bound to the window, pending bound to the limit', () => {
+  const lib = new PalsLib('me')
+  lib.hydrate(null)
+  for (let i = 0; i < PAL_PENDING_LIMIT + 10; i++)
+    lib.push({ kind: 'add', palette: palNamed(`p${i}`, i % 7, i % 11, i % 13) })
+  eq(lib.wireOps.length, PAL_OP_WINDOW, 'echo window capped')
+  ok(lib.ops.length <= PAL_PENDING_LIMIT, 'pending log bounded')
+  eq(lib.seq, PAL_PENDING_LIMIT + 10, 'seq still monotonic')
+  eq(lib.wireAcks().me, lib.seq, 'own watermark published')
+})
+
+check('two copies converge across loss and recovery', () => {
+  // Copy A holds six durable palettes; copy B boots unhydrated beside it.
+  const a = new PalsLib('A')
+  a.hydrate(serializePalettes(sixPals()))
+  const b = new PalsLib('B')
+  // B's unready publish must not move A.
+  const bWire = sharedLib(b.ready, b.list, b.wireOps, b.wireAcks())
+  ok(bWire.pals === undefined, 'B has no library opinion to broadcast')
+  // A's publish carries six; B adopts them instead of erasing them.
+  const aWire = sharedLib(a.ready, a.list, a.wireOps, a.wireAcks())
+  b.adopt({ pals: aWire.pals!, ops: aWire.ops, acks: aWire.acks })
+  eq(b.list.length, 6, 'B recovered the peer library')
+  // A rename storm then a delete round-trips without resurrection.
+  for (let i = 0; i < 26; i++) a.push({ kind: 'rename', target: a.list[0]!.id, name: `r${i}` })
+  a.push({ kind: 'delete', target: a.list[1]!.id })
+  const aw2 = sharedLib(a.ready, a.list, a.wireOps, a.wireAcks())
+  b.adopt({ pals: aw2.pals!, ops: aw2.ops, acks: aw2.acks })
+  eq(b.list.length, 5, 'delete honoured after the rename storm')
+  eq(b.list[0]!.name, 'r25', 'last rename wins, no ghost row')
+  // Rapid accepted ops arriving through replays land once.
+  const c = new PalsLib('C')
+  c.hydrate(null)
+  c.push({ kind: 'add', palette: palNamed('c1') })
+  c.push({ kind: 'add', palette: palNamed('c2') })
+  c.push({ kind: 'rename', target: c.list[0]!.id, name: 'c1b' })
+  const cWire = sharedLib(c.ready, c.list, c.wireOps, c.wireAcks())
+  b.adopt({ pals: cWire.pals!, ops: cWire.ops, acks: cWire.acks })
+  const again = b.adopt({ pals: cWire.pals!, ops: cWire.ops, acks: cWire.acks })
+  eq(again.replayed.length, 0, 're-adopting the same wire replays nothing new')
+})
+
+check('empty bootstrap publish differs from an explicit delete-all', () => {
+  // A fresh, authoritative empty library may legitimately publish [].
+  const fresh = new PalsLib('new')
+  fresh.hydrate(null)
+  const wire = sharedLib(fresh.ready, fresh.list, fresh.wireOps, fresh.wireAcks())
+  ok(wire.pals !== undefined && wire.pals.length === 0, 'first boot publishes the true empty list')
+  // An explicit delete-all arrives as ops, not as a bare empty snapshot.
+  const base = sixPals()
+  const killer = new PalsLib('K')
+  killer.hydrate(serializePalettes(base))
+  for (const p of base) killer.push({ kind: 'delete', target: p.id })
+  eq(killer.list.length, 0, 'all six deleted locally')
+  const victim = new PalsLib('V')
+  victim.hydrate(serializePalettes(base))
+  const kw = sharedLib(killer.ready, killer.list, killer.wireOps, killer.wireAcks())
+  victim.adopt({ pals: kw.pals!, ops: kw.ops, acks: kw.acks })
+  eq(victim.list.length, 0, 'peer honours the explicit delete-all')
+})
+
+// ---- durable writer acknowledgements (PalStore) ----
+
+check('PalStore: persisted advances only on settle, never at send time', () => {
+  const sent: string[] = []
+  const failed: string[] = []
+  const store = new PalStore(
+    (w) => sent.push(w),
+    (w) => failed.push(w)
+  )
+  store.request('w1')
+  eq(sent.join(','), 'w1', 'wire sent')
+  ok(store.persisted !== 'w1' && store.dirty, 'sent is not durable yet')
+  store.settle('w1', true)
+  eq(store.persisted, 'w1', 'acknowledged write is durable')
+  ok(!store.dirty, 'caught up')
+})
+
+check('PalStore: rejected writes stay dirty and retry once re-armed', () => {
+  const sent: string[] = []
+  const failed: string[] = []
+  const store = new PalStore(
+    (w) => sent.push(w),
+    (w) => failed.push(w)
+  )
+  store.request('w1')
+  store.settle('w1', false)
+  eq(failed.join(','), 'w1', 'failure reported honestly')
+  ok(store.persisted !== 'w1' && store.dirty, 'uncertain write never claims durability')
+  store.retry()
+  eq(sent.join(','), 'w1,w1', 'retry resends the outstanding wire')
+  store.settle('w1', true)
+  eq(store.persisted, 'w1', 'second attempt confirms')
+})
+
+check('PalStore: coalesces rapid requests and survives a foreign wire landing', () => {
+  const sent: string[] = []
+  const store = new PalStore((w) => sent.push(w))
+  store.request('w1')
+  store.request('w2')
+  eq(sent.join(','), 'w1,w2', 'each newest wire sent once')
+  store.settle('w2', true)
+  eq(store.persisted, 'w2', 'newest confirmed')
+  // A foreign write winning the rev race is the durable truth - and must not
+  // be clobbered by our stale latest before the merge re-bases it.
+  store.request('w3')
+  store.settle('wF', true)
+  eq(store.persisted, 'wF', 'foreign wire is the durable truth')
+  eq(sent.join(','), 'w1,w2,w3', 'no blind resend of the stale wire')
+  store.request('w3')
+  eq(sent.join(','), 'w1,w2,w3,w3', 'the re-based request still goes out')
+})
+
+check('PalStore: bootstrap seed never overrides an outstanding write', () => {
+  const sent: string[] = []
+  const store = new PalStore((w) => sent.push(w))
+  store.request('wMine')
+  store.seed('wRead')
+  ok(store.persisted === null, 'in-flight write keeps the seed out')
+  store.settle('wMine', true)
+  eq(store.persisted, 'wMine', 'settled write is the authority')
+  const fresh = new PalStore((w) => sent.push(w))
+  fresh.seed('wRead')
+  eq(fresh.persisted, 'wRead', 'idle seed adopts the confirmed read')
+})
+
+// ---- admission-aware bootstrap retry (BootPolicy) ----
+
+check('BootPolicy parks while hidden and re-arms on admission', () => {
+  const runs: number[] = []
+  const timers: (() => void)[] = []
+  let live = true
+  const boot = new BootPolicy(
+    () => live,
+    () => runs.push(1),
+    (fn) => timers.push(fn)
+  )
+  boot.fail()
+  eq(timers.length, 1, 'live failure schedules a bounded retry')
+  timers[0]!()
+  eq(runs.length, 1, 'scheduled retry fired while live')
+  // Hide: failures park with no timer at all.
+  live = false
+  boot.fail()
+  ok(boot.parked, 'hidden failure parks')
+  eq(timers.length, 1, 'no hidden polling timer')
+  boot.wake()
+  eq(runs.length, 1, 'still hidden: no run')
+  // Re-admitted: the parked attempt fires at once, not on a timer.
+  live = true
+  boot.wake()
+  eq(runs.length, 2, 'wake re-arms the parked read')
+  ok(!boot.parked, 'park cleared')
+})
+
+check('BootPolicy: a timer armed while live never fires hidden', () => {
+  const runs: number[] = []
+  const timers: (() => void)[] = []
+  let live = true
+  const boot = new BootPolicy(
+    () => live,
+    () => runs.push(1),
+    (fn) => timers.push(fn)
+  )
+  boot.fail()
+  live = false
+  timers[0]!()
+  ok(boot.parked && runs.length === 0, 'same-turn flip to hidden parks the armed retry')
+  live = true
+  boot.wake()
+  eq(runs.length, 1, 're-admission runs it')
+})
+
+check('BootPolicy: progress resets the backoff', () => {
+  const delays: number[] = []
+  const boot = new BootPolicy(
+    () => true,
+    () => {},
+    (_fn, ms) => delays.push(ms)
+  )
+  boot.fail()
+  boot.fail()
+  ok(delays[1]! > delays[0]!, 'backoff grows on failure')
+  boot.ok()
+  boot.fail()
+  eq(delays[2], delays[0], 'a success resets to the base delay')
 })
 
 console.log(`color.test.ts: ${passed} checks passed`)

@@ -59,3 +59,30 @@ saved palette library and the mute flag. A relaunch restores exactly those.
 The half-typed code-field draft is session view state - it follows the fold
 through `os.session` so the other display keeps typing, but a hard relaunch
 returns the last committed colour rather than an unfinished draft.
+
+## Bootstrap authority and admission
+
+- The palette library has a confirmed-source rule (`PalsLib`): a copy only
+  has a library opinion once a storage read *resolved* - `null` is a true
+  absent key, a rejection is not a read - or a foreign publish carried
+  `pals`. Before that, its publishes omit `pals`/`ops`/`acks` entirely
+  (`sharedLib`), so a default empty list or a failed boot can never reach
+  the wire or disk over a peer's palettes. A legitimate empty first boot
+  and an explicit delete-all still travel, as a `pals: []` list and as
+  delete ops.
+- The bootstrap read is a direct `os.storage.get` retried through
+  `BootPolicy`: failures park while the copy is hidden (no timer-driven
+  polling) and re-arm on the next admitted view event, and a resolved read
+  that lands after a foreign adopt is discarded rather than clobbering it.
+- The durable writer (`PalStore`) advances its `persisted` marker only when
+  the mirror reports the sent wire settled - never at send time - so a
+  rejected or superseded write stays dirty and retries on re-admission or
+  the next request instead of masquerading as durable.
+- Every new intent is admitted synchronously on `os.view.visible &&
+  os.view.active` at its origin (`admitLive`): keys, pointers, buttons,
+  field edits, saves, deletes, undo, mute, clipboard, focus and audio. A
+  hidden copy rejects the intent before any ref, ui, session, storage or
+  timer change; it may still read and finish writes admitted earlier, but
+  only while those writes stay bound to the document incarnation they were
+  admitted under (`editEpoch`/`editBound`) - a foreign adopt bumps the
+  incarnation and cancels them.

@@ -457,6 +457,46 @@ export const PAL_PENDING_LIMIT = 128
 /** Bound on the per-writer watermark map carried on the wire. */
 export const PAL_ACK_LIMIT = 32
 
+export type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+// ---- Live admission ----
+
+/**
+ * The only view state that admits a new user intent: the host reports this
+ * copy both on-screen and the display in use. Read synchronously from
+ * `os.view` at call time: the shell stores the latest view info on receipt,
+ * while the kit's `useDisplay` mirror batches subscriber notify through a
+ * frame and can lag the real flip, so a React view is never the gate. During
+ * device sleep the shell reports `visible:false, active:true`, which is why
+ * the check needs both halves.
+ */
+export const admitView = (view: { visible: boolean; active: boolean }) => view.visible && view.active
+
+/**
+ * Reject a new intent at its origin: the wrapped function runs only while the
+ * given view admits it, so a hidden intent is never enqueued, armed, or given
+ * a ref, timer, session, storage, audio, focus or clipboard side effect to be
+ * discovered later. Callers that need the current view should rebuild the
+ * wrapper per event or read the predicate directly - the view object is
+ * rebound per host event, never mutated.
+ */
+export const whenLive = <A extends unknown[]>(
+  view: { visible: boolean; active: boolean },
+  fn: (...a: A) => void
+): ((...a: A) => void) => {
+  return (...a: A) => {
+    if (admitView(view)) fn(...a)
+  }
+}
+
+/**
+ * Whether an already-admitted edit may still write: it stays bound to the
+ * document incarnation captured at gesture start. A peer-switched adopt bumps
+ * the incarnation, cancelling the binding so a stale write never lands on the
+ * new core.
+ */
+export const editBound = (captured: number, current: number) => captured === current
+
 export function applyPalOp(items: SavedPalette[], op: PalOp): SavedPalette[] {
   if (op.kind === 'add') return upsertPalette(items, op.palette)
   if (op.kind === 'rename') return renamePalette(items, op.target, op.name)
@@ -524,6 +564,215 @@ export function mergePalWire(
   const floor = nextAck - PAL_OP_WINDOW
   return { merged, replayed, ops: myOps.filter((o) => o.seq > floor), maxAck: nextAck }
 }
+
+/**
+ * This copy's palette-library authority: the shared list plus the op log and
+ * watermarks that keep it convergent. `ready` is the bootstrap authority bit:
+ * it turns true only on a confirmed source - a resolved storage read (null is
+ * a true absent key, a rejection is not a read) or a foreign publish that
+ * carried a library. A copy that is not ready has no library opinion, so it
+ * must not publish `pals`/`ops`/`acks` and must not persist: a default empty
+ * list or a failed read can never reach the wire or the disk through it.
+ */
+export class PalsLib {
+  ready = false
+  /** The current library: the adopted wire list plus replayed pending ops. */
+  list: SavedPalette[] = []
+  /** My own ops not yet acknowledged by a foreign watermark, plus a settled tail. */
+  ops: PalOp[] = []
+  /** The trailing wire window echoed in publishes. */
+  wireOps: PalOp[] = []
+  /** Per-writer watermarks folded from foreign publishes. */
+  acks: Record<string, number> = {}
+  seq = 0
+  private maxAck = 0
+  constructor(private me: string) {}
+
+  /**
+   * A resolved storage read, applied only while unconfirmed. My pending ops
+   * replay onto the read base, so an op queued during the unconfirmed window
+   * survives the seed. Returns false once a library is already confirmed, so
+   * a delayed read cannot clobber a meanwhile-adopted wire state.
+   */
+  hydrate(raw: string | null): boolean {
+    if (this.ready) return false
+    const r = mergePalWire({ pals: parsePalettes(raw) }, this.ops, this.me, this.maxAck)
+    this.maxAck = r.maxAck
+    this.ops = r.ops
+    this.list = r.merged
+    this.wireOps = [...this.wireOps, ...r.replayed].slice(-PAL_OP_WINDOW)
+    this.ready = true
+    return true
+  }
+
+  /** Adopt a foreign publish's confirmed library: wholesale, then replay. */
+  adopt(shared: { pals: SavedPalette[]; ops?: PalOp[]; acks?: Record<string, number> }) {
+    mergeAcks(this.acks, shared.acks, this.me)
+    const r = mergePalWire(shared, this.ops, this.me, this.maxAck)
+    this.maxAck = r.maxAck
+    this.ops = r.ops
+    this.list = r.merged
+    this.wireOps = [...(shared.ops ?? []), ...r.replayed].slice(-PAL_OP_WINDOW)
+    this.ready = true
+    return r
+  }
+
+  /** Apply one admitted local op; returns the stamped op. */
+  push(op: DistOmit<PalOp, 'id' | 'seq'>): PalOp {
+    const seq = ++this.seq
+    const full = { ...op, id: `${this.me}:${seq}`, seq } as PalOp
+    this.list = applyPalOp(this.list, full)
+    this.acks[this.me] = seq
+    this.wireOps = [...this.wireOps, full].slice(-PAL_OP_WINDOW)
+    this.ops = [...this.ops, full].slice(-PAL_PENDING_LIMIT)
+    return full
+  }
+
+  /** The ack map a publish carries: folded watermarks plus my own seq. */
+  wireAcks(): Record<string, number> {
+    return { ...this.acks, [this.me]: this.seq }
+  }
+}
+
+/**
+ * The acknowledged writer for the durable library. The storage mirror's set
+ * is fire-and-forget - its acknowledgement lands later in the key state - so
+ * `persisted` advances only through `settle`, never at send time. A rejected
+ * or superseded write neither claims durability nor suppresses the retry the
+ * caller arms; requests coalesce because the mirror resolves only the newest
+ * outstanding write anyway.
+ */
+export class PalStore {
+  /** The wire the durable copy confirmed - or the confirmed bootstrap read. */
+  persisted: string | null = null
+  /** The newest wire anyone asked to make durable. */
+  latest: string | null = null
+  /** The wire whose acknowledgement is still outstanding. */
+  private sent: string | null = null
+  constructor(
+    private set: (wire: string) => void,
+    private onFail: (wire: string) => void = () => {},
+    private onDrain: () => void = () => {}
+  ) {}
+
+  /**
+   * Record the confirmed on-disk wire at bootstrap so it is not rewritten.
+   * Skipped while a write is outstanding: the read predates it, so the
+   * settle of the sent wire is the newer authority.
+   */
+  seed(wire: string | null) {
+    if (this.sent !== null || this.latest !== null) return
+    this.persisted = wire
+    this.latest = wire
+  }
+
+  /** The newest requested wire is not yet confirmed durable. */
+  get dirty() {
+    return this.latest !== this.persisted
+  }
+
+  /** Ask that `wire` become durable; skipped when it already is or is in flight. */
+  request(wire: string) {
+    this.latest = wire
+    if (wire === this.persisted || wire === this.sent) return
+    this.sent = wire
+    this.set(wire)
+  }
+
+  /**
+   * The mirror resolved the newest sent write. `ok` means the key's state is
+   * settled (not `saving`); `value` is what the durable copy now shows -
+   * `sent` means our write landed, anything else means a foreign write won
+   * the race, which is still the durable truth. A rejection keeps `latest`
+   * dirty so `retry` (or the next request) resends it.
+   */
+  settle(value: string | null, ok: boolean) {
+    if (this.sent === null) return
+    const sent = this.sent
+    this.sent = null
+    if (ok) {
+      this.persisted = value
+      if (value === sent) {
+        if (this.dirty) this.request(this.latest!)
+        else this.onDrain()
+      }
+      // A foreign wire landed over ours (`value !== sent`): the durable truth
+      // is `value`, and our `latest` stays outstanding until the adopt-driven
+      // request re-bases it - resending it now would clobber the peer write.
+      return
+    }
+    this.onFail(sent)
+  }
+
+  /** Re-enter after a reported failure or a re-admission wake. */
+  retry() {
+    if (this.sent === null && this.dirty) {
+      this.sent = this.latest
+      this.set(this.latest!)
+    }
+  }
+}
+
+/**
+ * Explicit admission-aware retry for bootstrap reads (the session snapshot
+ * and the storage bootstrap). A failed read retries on a bounded backoff only
+ * while this copy is admitted; while hidden the attempt parks with no timer
+ * and the next admitted view event re-arms it immediately. Reads themselves
+ * are always permitted - this policy decides only when a retry fires.
+ */
+export class BootPolicy {
+  /** A failed attempt is waiting for admission rather than polling hidden. */
+  parked = false
+  attempts = 0
+  constructor(
+    private live: () => boolean,
+    private run: () => void,
+    private later: (fn: () => void, ms: number) => void = (fn, ms) => {
+      setTimeout(fn, ms)
+    }
+  ) {}
+
+  /** Record a failed read. */
+  fail() {
+    this.attempts++
+    if (!this.live()) {
+      this.parked = true
+      return
+    }
+    const ms = Math.min(1200 * this.attempts, 9000)
+    this.later(() => {
+      // Hidden between scheduling and firing: park rather than poll hidden.
+      if (!this.live()) this.parked = true
+      else this.run()
+    }, ms)
+  }
+
+  /** Progress was made: the backoff resets. */
+  ok() {
+    this.attempts = 0
+    this.parked = false
+  }
+
+  /** The copy was admitted again: a parked attempt fires at once. */
+  wake() {
+    if (!this.parked || !this.live()) return
+    this.parked = false
+    this.attempts = 0
+    this.run()
+  }
+}
+
+/**
+ * The library fields a publish may carry: present only while `ready`. An
+ * unconfirmed copy publishes doc/view alone, so a default or failed-read
+ * snapshot can never replace a peer's library on the wire or on disk.
+ */
+export const sharedLib = (
+  ready: boolean,
+  pals: SavedPalette[],
+  ops: PalOp[],
+  acks: Record<string, number>
+): { pals?: SavedPalette[]; ops?: PalOp[]; acks?: Record<string, number> } => (ready ? { pals, ops, acks } : {})
 
 // ---- Wire parsing and serialization ----
 
