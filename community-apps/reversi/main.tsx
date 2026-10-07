@@ -536,7 +536,7 @@ function Game() {
               role="radio"
               aria-checked={game.mode === m.id}
               onClick={() => requestNew({ mode: m.id })}
-              {...stylex.props(styles.segBtn, game.mode === m.id && styles.segOn, shared.press)}
+              {...stylex.props(styles.segBtn, game.mode === m.id && styles.segOn, shared.press, styles.pressCalm)}
             >
               {m.label}
             </button>
@@ -551,7 +551,7 @@ function Game() {
                 role="radio"
                 aria-checked={game.level === level}
                 onClick={() => setLevel(level)}
-                {...stylex.props(styles.segBtn, game.level === level && styles.segOn, shared.press)}
+                {...stylex.props(styles.segBtn, game.level === level && styles.segOn, shared.press, styles.pressCalm)}
               >
                 {level}
               </button>
@@ -569,7 +569,7 @@ function Game() {
                 role="radio"
                 aria-checked={game.you === side.id}
                 onClick={() => requestNew({ you: side.id })}
-                {...stylex.props(styles.segBtn, game.you === side.id && styles.segOn, shared.press)}
+                {...stylex.props(styles.segBtn, game.you === side.id && styles.segOn, shared.press, styles.pressCalm)}
               >
                 {side.label}
               </button>
@@ -581,7 +581,7 @@ function Game() {
         <button
           type="button"
           onClick={() => requestNew()}
-          {...stylex.props(styles.btn, styles.btnPrimary, shared.press)}
+          {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
         >
           <Sym name="reload" size={13} />
           New game
@@ -590,7 +590,7 @@ function Game() {
           type="button"
           onClick={undo}
           disabled={!undoable}
-          {...stylex.props(styles.btn, styles.btnGhost, shared.press)}
+          {...stylex.props(styles.btn, styles.btnGhost, shared.press, styles.pressCalm)}
         >
           <Sym name="undo" size={13} />
           Undo
@@ -599,7 +599,7 @@ function Game() {
           type="button"
           aria-pressed={prefs.hints}
           onClick={() => void enqueuePrefs({ hints: !prefs.hints })}
-          {...stylex.props(styles.btn, styles.btnGhost, shared.press)}
+          {...stylex.props(styles.btn, styles.btnGhost, shared.press, styles.pressCalm)}
         >
           <Sym name={prefs.hints ? 'eye' : 'eyeSlash'} size={13} />
           Hints
@@ -666,7 +666,11 @@ function Game() {
       <span {...stylex.props(styles.sheetBody)}>
         {d.scores.b} black - {d.scores.w} white
       </span>
-      <button type="button" onClick={() => requestNew()} {...stylex.props(styles.btn, styles.btnPrimary, shared.press)}>
+      <button
+        type="button"
+        onClick={() => requestNew()}
+        {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
+      >
         <Sym name="reload" size={13} />
         Play again
       </button>
@@ -703,7 +707,8 @@ function Game() {
                 styles.cell,
                 (i + Math.floor(i / 8)) % 2 === 0 && styles.cellAlt,
                 isLast && styles.cellLast,
-                shared.press
+                shared.press,
+                styles.pressCalm
               )}
             >
               {piece ? (
@@ -770,7 +775,11 @@ function Game() {
           <span {...stylex.props(styles.sheetTitle)}>{shown.title}</span>
           <span {...stylex.props(styles.sheetBody)}>{shown.body}</span>
           <div {...stylex.props(styles.sheetRow)}>
-            <button type="button" onClick={closeConfirm} {...stylex.props(styles.btn, styles.btnGhost, shared.press)}>
+            <button
+              type="button"
+              onClick={closeConfirm}
+              {...stylex.props(styles.btn, styles.btnGhost, shared.press, styles.pressCalm)}
+            >
               Cancel
             </button>
             <button
@@ -779,7 +788,7 @@ function Game() {
                 shown.run()
                 closeConfirm()
               }}
-              {...stylex.props(styles.btn, styles.btnPrimary, shared.press)}
+              {...stylex.props(styles.btn, styles.btnPrimary, shared.press, styles.pressCalm)}
             >
               {shown.action}
             </button>
@@ -807,7 +816,7 @@ function Game() {
               aria-label={prefs.muted ? 'Unmute sounds' : 'Mute sounds'}
               aria-pressed={prefs.muted}
               onClick={toggleMute}
-              {...stylex.props(styles.iconBtn, shared.press)}
+              {...stylex.props(styles.iconBtn, shared.press, styles.pressCalm)}
             >
               <Sym name="volume" size={15} />
               {prefs.muted ? <i aria-hidden="true" {...stylex.props(styles.muteSlash)} /> : null}
@@ -854,7 +863,7 @@ function Game() {
                   type="button"
                   aria-expanded={showLog}
                   onClick={() => setShowLog((v) => !v)}
-                  {...stylex.props(styles.movesToggle, shared.press)}
+                  {...stylex.props(styles.movesToggle, shared.press, styles.pressCalm)}
                 >
                   <span>Moves</span>
                   <span {...stylex.props(styles.cardKicker)}>

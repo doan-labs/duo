@@ -454,6 +454,13 @@ export const styles = stylex.create({
     animationTimingFunction: easing.spring
   },
   resultCover: { insetInline: space.sm, bottom: space.xxxl, padding: space.md },
+  // UIKit's shared.press always applies its :active scale and has no
+  // reduced-motion override; under reduced motion this swaps the shrink for
+  // an instant brightness nudge so presses still register without movement.
+  pressCalm: {
+    transform: { [reduce]: { ':active': 'none' } },
+    filter: { [reduce]: { ':active': 'brightness(1.3)' } }
+  },
   resultTitle: {
     fontFamily: fonts.rounded,
     fontSize: typeScale.title2,
