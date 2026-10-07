@@ -477,7 +477,7 @@ function Pantry() {
         </span>
         <button
           type="button"
-          {...stylex.props(styles.rowBody, shared.press)}
+          {...stylex.props(styles.rowBody, shared.press, styles.pressCalm)}
           onClick={() => openEdit(item)}
           aria-label={`Edit ${item.name}, ${qtyText(item)}${badge ? `, ${badge.aria}` : ''}, ${l.name}`}
         >
@@ -493,7 +493,7 @@ function Pantry() {
           <span {...stylex.props(styles.steppers)}>
             <button
               type="button"
-              {...stylex.props(styles.stepBtn, shared.press, item.milli === 0 && styles.stepBtnOff)}
+              {...stylex.props(styles.stepBtn, shared.press, styles.pressCalm, item.milli === 0 && styles.stepBtnOff)}
               onClick={() => step(item, 'use')}
               aria-label={`Use ${stepText} of ${item.name}`}
             >
@@ -507,7 +507,7 @@ function Pantry() {
             </span>
             <button
               type="button"
-              {...stylex.props(styles.stepBtn, shared.press)}
+              {...stylex.props(styles.stepBtn, shared.press, styles.pressCalm)}
               onClick={() => step(item, 'restock')}
               aria-label={`Restock ${stepText} of ${item.name}`}
             >
@@ -623,7 +623,7 @@ function Pantry() {
               role="radio"
               aria-checked={d.location === l.id}
               tabIndex={d.location === l.id ? 0 : -1}
-              {...stylex.props(styles.chip, shared.press, d.location === l.id && styles.chipOn)}
+              {...stylex.props(styles.chip, shared.press, styles.pressCalm, d.location === l.id && styles.chipOn)}
               onClick={() => set({ location: l.id })}
               onKeyDown={(e) =>
                 chipKeys(
@@ -724,7 +724,7 @@ function Pantry() {
         {q !== '' && (
           <button
             type="button"
-            {...stylex.props(styles.searchClear, shared.press)}
+            {...stylex.props(styles.searchClear, shared.press, styles.pressCalm)}
             onClick={() => setView({ q: '' })}
             aria-label="Clear search"
           >
@@ -744,6 +744,7 @@ function Pantry() {
               {...stylex.props(
                 styles.chip,
                 shared.press,
+                styles.pressCalm,
                 loc === f.id && (f.id === 'soon' ? styles.chipOnSoon : styles.chipOn)
               )}
               onClick={() => setView({ loc: f.id })}
@@ -766,7 +767,7 @@ function Pantry() {
           <button
             type="button"
             aria-pressed={sort === 'soon'}
-            {...stylex.props(styles.seg, shared.press, sort === 'soon' && styles.segOn)}
+            {...stylex.props(styles.seg, shared.press, styles.pressCalm, sort === 'soon' && styles.segOn)}
             onClick={() => setView({ sort: 'soon' })}
           >
             Use soon
@@ -774,7 +775,7 @@ function Pantry() {
           <button
             type="button"
             aria-pressed={sort === 'name'}
-            {...stylex.props(styles.seg, shared.press, sort === 'name' && styles.segOn)}
+            {...stylex.props(styles.seg, shared.press, styles.pressCalm, sort === 'name' && styles.segOn)}
             onClick={() => setView({ sort: 'name' })}
           >
             A-Z
@@ -865,7 +866,7 @@ function Pantry() {
               </span>
               <button
                 type="button"
-                {...stylex.props(styles.shopBody, shared.press)}
+                {...stylex.props(styles.shopBody, shared.press, styles.pressCalm)}
                 onClick={() => toggleBought(s.id)}
                 aria-label={`${s.done ? 'Reopen' : 'Mark bought'}: ${s.name}`}
               >
@@ -877,7 +878,7 @@ function Pantry() {
               </button>
               <button
                 type="button"
-                {...stylex.props(styles.shopDel, shared.press)}
+                {...stylex.props(styles.shopDel, shared.press, styles.pressCalm)}
                 onClick={() => dropShopItem(s.id)}
                 aria-label={`Remove ${s.name} from the list`}
               >
@@ -896,7 +897,7 @@ function Pantry() {
         </div>
       )}
       {boughtList > 0 && (
-        <button type="button" {...stylex.props(styles.clearBtn, shared.press)} onClick={sweepBought}>
+        <button type="button" {...stylex.props(styles.clearBtn, shared.press, styles.pressCalm)} onClick={sweepBought}>
           Clear bought
         </button>
       )}
@@ -931,7 +932,7 @@ function Pantry() {
         </div>
         <button
           type="button"
-          {...stylex.props(styles.muteBtn, shared.press, doc.muted && styles.muteOff)}
+          {...stylex.props(styles.muteBtn, shared.press, styles.pressCalm, doc.muted && styles.muteOff)}
           onClick={() =>
             publish({ ...docRef.current, muted: !docRef.current.muted }, undefined, {
               tone: 'good',

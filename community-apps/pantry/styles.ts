@@ -543,7 +543,21 @@ export const styles = stylex.create({
   },
   noticeGood: { color: colors.greenDark },
   noticeWarn: { color: colors.redDark },
-  sheetBody: { display: 'flex', flexDirection: 'column', gap: space.md },
+  // uikit Sheet chrome ships padding 0; the app owns the card's insets.
+  sheetBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.md,
+    paddingBlock: space.xl,
+    paddingInline: space.xl
+  },
+  // shared.press has no reduced-motion branch (platform gap, reported): pressCalm
+  // stills the scale and keeps a held fill, so reduced feedback is colour, not motion.
+  pressCalm: {
+    transform: { [reduce]: 'scale(1)', ':active': { [reduce]: 'scale(1)' } },
+    transitionDuration: { [reduce]: '0s' },
+    backgroundColor: { ':active': app.fill2 }
+  },
   sheetActions: { display: 'flex', alignItems: 'center', gap: space.sm, justifyContent: 'flex-end' },
   dangerZone: {
     display: 'flex',
