@@ -365,13 +365,9 @@ function Game() {
     markCorrupt(false)
     if (w.kind === 'empty') {
       // Only a confirmed-empty store seeds a shared opening; the first real
-      // move publishes.
-      if (!seeded.current) {
-        seeded.current = true
-        const seed = openingSeed(ME)
-        setGame(seed)
-        gameRef.current = seed
-      }
+      // move publishes. settleStored applies the full decision: a stale
+      // rendered match reseeds the canonical opening too.
+      settleStored(null)
       return
     }
     const next = w.game
@@ -389,7 +385,7 @@ function Game() {
       else if (next.moves.length > prev.moves.length) play('flip')
     }
     liveRaw.current = raw
-  }, [saved.value, saved.status, play, markCorrupt])
+  }, [saved.value, saved.status, play, markCorrupt, settleStored])
 
   // Becoming visible settles this copy to the wire BEFORE any input can land:
   // the sync runs first on the serial queue, so a tap fired during a fold
