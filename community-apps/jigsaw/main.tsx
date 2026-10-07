@@ -1,7 +1,7 @@
 import { os } from '@doan-labs/duo-sdk'
 import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Button, IconButton, Sheet, Sym, useDisplay, useWide } from '@doan-labs/duo-uikit'
-import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
+import { dark, light } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -32,7 +32,7 @@ import {
   sendToTray,
   serializeSaves
 } from './puzzle.ts'
-import { styles } from './styles.ts'
+import { press, styles } from './styles.ts'
 
 // Both displays share one session key; a write this copy did not make is the
 // newer settled game, so adopting it unconditionally converges the pair -
@@ -661,12 +661,7 @@ function Jigsaw() {
   const art = ARTS.find((a) => a.id === (game.art as ArtId)) ?? ARTS[0]!
 
   const collectBtn = (
-    <button
-      type="button"
-      {...stylex.props(styles.action, shared.press)}
-      onClick={doCollect}
-      disabled={looseCount(game) === 0}
-    >
+    <button type="button" {...stylex.props(styles.action, press)} onClick={doCollect} disabled={looseCount(game) === 0}>
       Collect board pieces
     </button>
   )
@@ -711,7 +706,7 @@ function Jigsaw() {
           <button
             type="button"
             aria-label="Put piece back"
-            {...stylex.props(styles.heldCancel, shared.press)}
+            {...stylex.props(styles.heldCancel, press)}
             onClick={() => {
               setHeld(null)
               setHeldPos(null)
@@ -734,12 +729,12 @@ function Jigsaw() {
               {game.count} pieces · {formatTime(elapsedMs(game, now))} · {game.moves} moves
             </span>
             <div {...stylex.props(styles.veilActions)}>
-              <button type="button" {...stylex.props(styles.veilBtn, shared.press)} onClick={() => setVeilDown(true)}>
+              <button type="button" {...stylex.props(styles.veilBtn, press)} onClick={() => setVeilDown(true)}>
                 Keep looking
               </button>
               <button
                 type="button"
-                {...stylex.props(styles.veilBtn, styles.veilBtnAccent, shared.press)}
+                {...stylex.props(styles.veilBtn, styles.veilBtnAccent, press)}
                 onClick={() => {
                   // Dismiss the veil first: the picker sheet must stack above it.
                   setVeilDown(true)
@@ -817,7 +812,7 @@ function Jigsaw() {
                 type="button"
                 role="radio"
                 aria-checked={pane === p}
-                {...stylex.props(styles.segBtn, styles.paneSegBtn, shared.press, pane === p && styles.segOn)}
+                {...stylex.props(styles.segBtn, styles.paneSegBtn, press, pane === p && styles.segOn)}
                 onClick={() => setPane(p)}
               >
                 {p === 'board' ? 'Board' : 'Pieces'}
@@ -885,7 +880,7 @@ function Jigsaw() {
                   type="button"
                   role="radio"
                   aria-checked={prefs.art === a.id}
-                  {...stylex.props(styles.artCard, shared.press, prefs.art === a.id && styles.artCardOn)}
+                  {...stylex.props(styles.artCard, press, prefs.art === a.id && styles.artCardOn)}
                   onClick={() => setPrefs({ art: a.id })}
                 >
                   <img {...stylex.props(styles.artThumb)} src={artUri(a.id)} alt="" />
@@ -905,7 +900,7 @@ function Jigsaw() {
                 type="button"
                 role="radio"
                 aria-checked={prefs.count === n}
-                {...stylex.props(styles.segBtn, shared.press, prefs.count === n && styles.segOn)}
+                {...stylex.props(styles.segBtn, press, prefs.count === n && styles.segOn)}
                 onClick={() => setPrefs({ count: n })}
               >
                 {n} pieces

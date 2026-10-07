@@ -1,3 +1,4 @@
+import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import {
   app,
   colors,
@@ -355,7 +356,15 @@ export const styles = stylex.create({
   },
 
   // Sheet contents: picker cards and the destructive confirm.
-  sheetBody: { display: 'flex', flexDirection: 'column', gap: space.md, paddingTop: space.sm },
+  sheetBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: space.md,
+    paddingTop: space.lg,
+    paddingRight: space.lg,
+    paddingBottom: space.lg,
+    paddingLeft: space.lg
+  },
   artRow: { display: 'flex', gap: space.sm },
   artCard: {
     flexGrow: 1,
@@ -539,5 +548,12 @@ export const styles = stylex.create({
     animationDelay: `${(i % 5) * 0.28}s`,
     backgroundColor: [colors.yellow, colors.blue, colors.red, colors.green, colors.purple][i % 5]
   }),
-  danger: { backgroundColor: colors.red, color: colors.white }
+  danger: { backgroundColor: colors.red, color: colors.white },
+  // shared.press has no reduced-motion variant (platform gap): keep the press
+  // colour ease but flatten the scale so reduce truly means reduce.
+  pressCalm: {
+    transform: { [reduce]: { ':active': 'scale(1)' } }
+  }
 })
+
+export const press = [shared.press, styles.pressCalm]

@@ -1,5 +1,4 @@
 import { Sym } from '@doan-labs/duo-uikit'
-import { shared } from '@doan-labs/duo-uikit/styles.ts'
 import { app } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import {
@@ -28,7 +27,7 @@ import {
   SNAP,
   tabReach
 } from './puzzle.ts'
-import { styles } from './styles.ts'
+import { press, styles } from './styles.ts'
 
 /** The board viewport: a point in board units at the viewport centre plus zoom. */
 export type BoardView = { cx: number; cy: number; z: number }
@@ -424,7 +423,7 @@ export function BoardPane({
         <button
           type="button"
           aria-label="Zoom out"
-          {...stylex.props(styles.zoomBtn, shared.press)}
+          {...stylex.props(styles.zoomBtn, press)}
           onClick={() => zoomTo(view.z / 1.3)}
         >
           <Sym name="minus" size={13} />
@@ -432,7 +431,7 @@ export function BoardPane({
         <button
           type="button"
           aria-label="Fit board"
-          {...stylex.props(styles.zoomPct, shared.press)}
+          {...stylex.props(styles.zoomPct, press)}
           onClick={() => onView(fitView())}
         >
           {Math.round(view.z * 100)}%
@@ -440,7 +439,7 @@ export function BoardPane({
         <button
           type="button"
           aria-label="Zoom in"
-          {...stylex.props(styles.zoomBtn, shared.press)}
+          {...stylex.props(styles.zoomBtn, press)}
           onClick={() => zoomTo(view.z * 1.3)}
         >
           <Sym name="plus" size={13} />
@@ -518,7 +517,7 @@ export function TrayPane({
               type="button"
               role="radio"
               aria-checked={filter === f}
-              {...stylex.props(styles.segBtn, shared.press, filter === f && styles.segOn)}
+              {...stylex.props(styles.segBtn, press, filter === f && styles.segOn)}
               onClick={() => onFilter(f)}
             >
               {f === 'all' ? 'All' : f === 'corner' ? 'Corners' : 'Edges'}
@@ -540,7 +539,7 @@ export function TrayPane({
                 role="option"
                 aria-selected={heldId === i}
                 aria-label={`Piece ${i + 1}, ${kindOf(grid, game.pieces[i]!.r, game.pieces[i]!.c)} piece`}
-                {...stylex.props(styles.pieceBtn, shared.press, heldId === i && styles.pieceBtnHeld)}
+                {...stylex.props(styles.pieceBtn, press, heldId === i && styles.pieceBtnHeld)}
                 onPointerDown={(e) => onPress(i, e)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
