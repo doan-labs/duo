@@ -319,22 +319,24 @@ export const styles = stylex.create({
   },
 
   // ---------- header extras ----------
-  hdrCenter: {
-    position: 'absolute',
-    left: '50%',
-    transform: 'translateX(-50%)',
+  // Secondary status label in the header flow (was an absolute centre overlay,
+  // which let it collide with a flexing title). In flow it gets its own bounds
+  // plus the shared.hdr token gap, and can never overlap the title.
+  hdrStatus: {
     color: app.label2,
     fontSize: typeScale.footnote,
     fontWeight: weight.medium,
     whiteSpace: 'nowrap',
-    pointerEvents: 'none'
+    flexShrink: 0,
+    alignSelf: 'baseline'
   },
   hdrGrow: {
     flexGrow: 1,
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    alignSelf: 'baseline'
   },
   levelDots: {
     display: 'flex',

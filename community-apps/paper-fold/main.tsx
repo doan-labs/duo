@@ -351,7 +351,7 @@ function Coach({
           </button>
         )}
         <span {...stylex.props(styles.hdrGrow)}>{model.name}</span>
-        {wide && <span {...stylex.props(styles.hdrCenter)}>{result ? 'Finished' : `Step ${at + 1} of ${total}`}</span>}
+        {wide && <span {...stylex.props(styles.hdrStatus)}>{result ? 'Finished' : `Step ${at + 1} of ${total}`}</span>}
         <div {...stylex.props(shared.hdrSm)}>
           <IconButton name="info" aria-label="How to read the folds" xstyle={styles.hdrTap} onClick={onLegend} />
           <SoundButton muted={muted} onToggle={onToggleSound} />
