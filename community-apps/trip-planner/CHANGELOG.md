@@ -19,7 +19,9 @@
   toggle, unlocked on first gesture and silent when audio is unavailable.
 - Light and dark themes, reduced-motion support, roving-arrow day chips and
   44pt targets throughout.
-- Ordered, repairable storage commits: record writes land before the index
-  and the index before deletes, already-applied keys are restored on failure,
-  and deletes always reach an applied/failed terminal - nothing accepted
-  silently vanishes across a fold or a storage outage.
+- Ordered, repairable storage commits: record writes land before the index,
+  the index before tomb markers and guarded cleanup deletes, and
+  already-applied keys are restored on failure with honest
+  applied/failed/partial terminals - nothing accepted silently vanishes
+  across a fold or a storage outage, and an acknowledged delete can never
+  resurrect or erase a restored same-id trip.

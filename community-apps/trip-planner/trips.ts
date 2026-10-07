@@ -671,7 +671,23 @@ export function readIndex(v: unknown): string[] {
 
 export const serializeIndex = (order: string[]) => JSON.stringify({ v: 1, order })
 
-export type LibWrite = { kind: 'put' | 'del'; key: string; value?: string }
+/** Stored under `trip.<id>` once its delete is acknowledged (the index has
+ * already dropped the id). The marker is what separates an authorized
+ * deletion - never recoverable - from a record a partial write orphaned. */
+export const TOMB_VALUE = JSON.stringify({ v: 1, tomb: 1 })
+
+/** True when a raw `trip.<id>` value is an acknowledged-deletion tomb. */
+export const isTombValue = (raw: string | null | undefined): boolean => {
+  if (!raw) return false
+  try {
+    const v: unknown = JSON.parse(raw)
+    return isRec(v) && v.tomb === 1
+  } catch {
+    return false
+  }
+}
+
+export type LibWrite = { kind: 'put' | 'tomb' | 'del'; key: string; value?: string }
 
 /**
  * Ordered storage writes for a library diff. The index is the authoritative
@@ -681,9 +697,12 @@ export type LibWrite = { kind: 'put' | 'del'; key: string; value?: string }
  *    the diff before the index moves;
  * 2. the index put - the single write that flips create, delete and reorder
  *    reachability atomically at the platform level;
- * 3. removed records last - by then the index no longer points at them, so
- *    a rejected cleanup leaves an orphan (retryable garbage) instead of a
- *    delete half-applied.
+ * 3. a tomb under each removed id - converts the now-unindexed record into
+ *    an acknowledged deletion the assembler skips, so a failed cleanup can
+ *    never resurrect an authorized delete;
+ * 4. each tomb's guarded del - best-effort reclamation that re-verifies the
+ *    record is still a tomb before deleting, so a stale retry can never
+ *    erase a restored or recreated same-id incarnation.
  */
 export function planLibWrites(prev: Library, next: Library): LibWrite[] {
   const prevById = new Map(prev.trips.map((t) => [t.id, t]))
@@ -692,7 +711,11 @@ export function planLibWrites(prev: Library, next: Library): LibWrite[] {
     if (prevById.get(t.id) !== t) out.push({ kind: 'put', key: `trip.${t.id}`, value: serializeTrip(t) })
   if (next.order.join('|') !== prev.order.join('|'))
     out.push({ kind: 'put', key: 'index', value: serializeIndex(next.order) })
-  for (const id of prev.order) if (!next.order.includes(id)) out.push({ kind: 'del', key: `trip.${id}` })
+  for (const id of prev.order)
+    if (!next.order.includes(id)) {
+      out.push({ kind: 'tomb', key: `trip.${id}`, value: TOMB_VALUE })
+      out.push({ kind: 'del', key: `trip.${id}` })
+    }
   return out
 }
 
@@ -711,7 +734,12 @@ export function assembleLibrary(index: string | null, records: Map<string, strin
   for (const [k, raw] of records) {
     if (!k.startsWith('trip.')) continue
     try {
-      const trip = readTrip(JSON.parse(raw))
+      const parsed: unknown = JSON.parse(raw)
+      // An acknowledged deletion is never an orphan: the tomb stays
+      // unreachable until its guarded cleanup (or a same-id recreate)
+      // replaces it, while a partial write's unmarked orphan still recovers.
+      if (isRec(parsed) && parsed.tomb === 1) continue
+      const trip = readTrip(parsed)
       if (trip) byId.set(trip.id, trip)
     } catch {
       // A torn record is skipped; the rest of the library still decodes.

@@ -17,6 +17,8 @@
  *   enqueued write as committed.
  */
 
+import { isTombValue } from './trips'
+
 export type PendingMap = Map<string, (string | null)[]>
 
 /**
@@ -94,7 +96,22 @@ export class WriteQueue {
 export type LibStore = {
   put: (k: string, v: string) => Promise<boolean>
   del: (k: string) => Promise<boolean>
+  /** Authoritative read of the stored value - a real storage read, not the
+   * optimistic mirror. Repair and tomb reclamation verify write ownership
+   * through it: without it an unreadable key degrades the outcome to
+   * 'partial' or leaves tomb debris instead of risking a live record. */
+  get?: (k: string) => Promise<string | null>
 }
+
+/**
+ * 'applied': every planned write durably landed.
+ * 'failed': the commit aborted AND every write it already landed was
+ * verifiably rolled back - the caller may honestly say nothing applied.
+ * 'partial': the commit aborted but durable state could not be fully
+ * restored (a repair write failed, or a foreign value now owns a key) -
+ * the caller must not claim a clean failure; the resnapshot shows truth.
+ */
+export type CommitOutcome = 'applied' | 'failed' | 'partial'
 
 const beat = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
@@ -119,24 +136,39 @@ async function attempt(op: () => Promise<boolean>): Promise<boolean> {
  *
  * - Changed records land BEFORE the index, so the index can never be made
  *   to reference a record that is not stored (a dangling reachable ref).
- * - The index lands BEFORE record deletes, so a deletion is authoritative
- *   once the index commits; surviving records are cleanup, not truth.
+ * - The index lands BEFORE tomb writes, so a deletion is authoritative once
+ *   the index commits; a rejected tomb then leaves an ordinary orphan that
+ *   still recovers - the commit reports failure instead of half-applying.
  * - A rejected reachability write repairs the keys this diff already
- *   landed - re-putting each record's previous value, or deleting a record
- *   that did not exist before (nothing can reference it yet) - then
- *   resolves false. 'failed' therefore never means half-applied.
- * - Record deletes run afterwards as retried best-effort cleanup (three
- *   bounded attempts). A permanent failure leaves an orphan record, which
- *   resurfaces through `assembleLibrary` on next load - recoverable data,
- *   never a wrong index.
+ *   landed, in reverse and only while this commit still owns each slot
+ *   (verified by an authoritative read): a foreign value that landed in
+ *   between is peer data and is left alone, which downgrades the outcome
+ *   to 'partial' rather than silently half-applying.
+ * - `del` writes are tomb reclamation, deferred until after acknowledgment
+ *   and retried boundedly. Each attempt re-reads the authoritative value
+ *   and deletes only while the record is still a tomb (or already gone):
+ *   a live record means a restore, recreate or peer write owns the key,
+ *   so this old generation must not erase it. Tomb debris left behind is
+ *   permanently unreachable - `assembleLibrary` never recovers it.
  *
- * Resolves true only when every reachability write landed.
+ * Resolves 'applied' only when every reachability write landed.
  */
 export async function commitLibWrites(
   io: LibStore,
-  plan: { kind: 'put' | 'del'; key: string; value?: string }[],
+  plan: { kind: 'put' | 'tomb' | 'del'; key: string; value?: string }[],
   prevValues: (key: string) => string | undefined
-): Promise<boolean> {
+): Promise<CommitOutcome> {
+  // Authoritative read for repair/reclamation guards. {ok:false} on a
+  // missing or failing read keeps callers on the safe side: never delete
+  // or overwrite a key whose current value is unknown.
+  const read = async (k: string): Promise<{ ok: true; value: string | null } | { ok: false }> => {
+    if (!io.get) return { ok: false }
+    try {
+      return { ok: true, value: await io.get(k) }
+    } catch {
+      return { ok: false }
+    }
+  }
   const cleanup: string[] = []
   const applied: { key: string; value?: string }[] = []
   for (const w of plan) {
@@ -144,20 +176,37 @@ export async function commitLibWrites(
       cleanup.push(w.key)
       continue
     }
-    if (!(await attempt(() => io.put(w.key, w.value ?? '')))) {
-      for (const a of applied) {
-        const old = prevValues(a.key)
-        if (old !== undefined) await attempt(() => io.put(a.key, old))
-        else await attempt(() => io.del(a.key))
-      }
-      return false
+    if (await attempt(() => io.put(w.key, w.value ?? ''))) {
+      applied.push(w)
+      continue
     }
-    applied.push(w)
+    // A required write failed: unwind everything this commit already
+    // landed, in reverse. Three cases per key, verified by the read:
+    // still our value -> restore the pre-write value (re-put, or delete a
+    // record that did not exist before); already the old value -> nothing
+    // to do; anything else or unreadable -> a foreign write owns the key
+    // or the truth is unknown, so the outcome is honestly partial.
+    let repaired = true
+    for (const a of [...applied].reverse()) {
+      const old = prevValues(a.key)
+      const cur = await read(a.key)
+      if (cur.ok && cur.value === (a.value ?? '')) {
+        const ok = old !== undefined ? await attempt(() => io.put(a.key, old)) : await attempt(() => io.del(a.key))
+        if (!ok) repaired = false
+      } else if (!cur.ok || cur.value !== (old ?? null)) {
+        repaired = false
+      }
+    }
+    return repaired ? 'failed' : 'partial'
   }
   for (const key of cleanup) {
     void (async () => {
       for (const delay of [0, 250, 2000]) {
         if (delay) await beat(delay)
+        const cur = await read(key)
+        if (!cur.ok) continue
+        // Live value: a restore/recreate/peer owns the key now - stop.
+        if (cur.value !== null && !isTombValue(cur.value)) return
         try {
           if (await io.del(key)) return
         } catch {
@@ -166,5 +215,5 @@ export async function commitLibWrites(
       }
     })()
   }
-  return true
+  return 'applied'
 }

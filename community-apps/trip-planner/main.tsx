@@ -87,6 +87,7 @@ import {
   restoreTrip,
   type Stay,
   type Stop,
+  serializeIndex,
   serializeTrip,
   shortDay,
   stopsForDay,
@@ -149,12 +150,15 @@ function useFocusTrap(
   initial: 'first' | 'last' = 'first',
   explicitTrigger?: HTMLElement | null,
   mayFocus?: () => boolean,
-  deferRestore?: (restore: () => void) => void
+  deferRestore?: (restore: (() => void) | null) => void
 ) {
   const trigger = useRef<HTMLElement | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: ref contents are read live during the trap, not captured as deps
   useEffect(() => {
     if (!active) return
+    // A newly opened layer invalidates any restore an older sheet parked
+    // while hidden: this trap owns the focus lifecycle now.
+    deferRestore?.(null)
     // A session-mirrored sheet exists on BOTH copies; only the visible one may
     // move DOM focus, or a folded display would steal it from the live one.
     const canFocus = mayFocus ?? (() => true)
@@ -225,6 +229,10 @@ function useFocusTrap(
           })
           return
         }
+        // A different still-open dialog (a newer sheet that opened while
+        // this intent was parked or while this one exited) owns the focus
+        // lifecycle: this stale restore must not steal it.
+        for (const d of document.querySelectorAll('dialog[open]')) if (d !== layerDialog) return
         const at = document.activeElement
         // The user (or a new layer) already owns focus - do not steal it.
         // Only stranded focus gets a target: BODY, a detached node, or a
@@ -232,7 +240,7 @@ function useFocusTrap(
         if (!at || at === document.body || !at.isConnected || inLayer(at)) {
           const trg = trigger.current
           const el =
-            trg && trg.isConnected && trg !== document.body && trg !== document.documentElement && !inLayer(trg)
+            trg?.isConnected && trg !== document.body && trg !== document.documentElement && !inLayer(trg)
               ? trg
               : anchorFallback((c) => inLayer(c))
           if (el?.isConnected && !inLayer(el)) el.focus()
@@ -280,7 +288,7 @@ function DestructiveSheet({
   onClose: () => void
   restoreTo?: HTMLElement | null
   mayFocus?: () => boolean
-  deferRestore?: (restore: () => void) => void
+  deferRestore?: (restore: (() => void) | null) => void
   xstyle?: stylex.StyleXStyles
   children: React.ReactNode
 }) {
@@ -370,6 +378,22 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
     }
   }, [space, owns])
 
+  // Authoritative per-key read through the snapshot port: write repair and
+  // tomb reclamation must verify the stored value, not the optimistic
+  // mirror (a pending own write can still mask a landed foreign one).
+  const getLive = useCallback(
+    async (k: string): Promise<string | null> => {
+      let cursor: string | undefined
+      do {
+        const page = await space.snapshot(cursor)
+        for (const [ek, ev] of page.entries) if (ek === k) return ev
+        cursor = page.cursor
+      } while (cursor)
+      return null
+    },
+    [space]
+  )
+
   // Resolves true once the port accepted this write, false on rejection -
   // 'applied' callers distinguish a landed commit from an enqueued hope.
   const write = useCallback(
@@ -416,10 +440,11 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       /** True once the port accepted the write; false on rejection. */
       put: (k: string, v: string) => write(k, v),
       del: (k: string) => write(k, null),
+      getLive,
       /** Resolves once every write queued so far finished; true iff all landed. */
       settled: () => writes.current.settled()
     }),
-    [values, error, write]
+    [values, error, write, getLive]
   )
 }
 
@@ -555,7 +580,7 @@ function parseDraft(raw: string | null): Draft | null {
 }
 
 /** Outcome reported to a mutateLib `after` hook (see TripPlanner). */
-type MutateResult = 'applied' | 'noop' | 'dropped' | 'failed'
+type MutateResult = 'applied' | 'noop' | 'dropped' | 'failed' | 'partial'
 
 /** Undo slot: the payload needed to restore what a delete removed. */
 type Undo = {
@@ -1338,7 +1363,7 @@ function TripPlanner() {
   // it is the newest parked intent (a later sheet lifecycle overwrites the
   // slot) and focus is still stranded inside the restore itself.
   const deferredRestore = useRef<(() => void) | null>(null)
-  const deferRestore = useCallback((restore: () => void) => {
+  const deferRestore = useCallback((restore: (() => void) | null) => {
     deferredRestore.current = restore
   }, [])
   useEffect(() => {
@@ -1412,16 +1437,23 @@ function TripPlanner() {
   )
 
   /** Persist a library diff in semantic order (commitLibWrites): records
-   * before index before record deletes, repairing already-landed keys when
-   * a reachability write fails, so 'failed' never means half-applied.
-   * Resolves true only when every reachability write landed. */
+   * before index before tomb markers before guarded cleanup deletes,
+   * repairing already-landed keys when a reachability write fails.
+   * 'applied' is a durable commit, 'failed' a verified rollback, and
+   * 'partial' an honestly-reported incomplete repair - never half-applied
+   * under a clean label. */
   const writeLibDiff = useCallback(
     (prev: Library, next: Library) => {
       const prevById = new Map(prev.trips.map((t) => [`trip.${t.id}`, t]))
-      return commitLibWrites(storage, planLibWrites(prev, next), (k) => {
-        const t = prevById.get(k)
-        return t ? serializeTrip(t) : undefined
-      })
+      return commitLibWrites(
+        { put: storage.put, del: storage.del, get: storage.getLive },
+        planLibWrites(prev, next),
+        (k) => {
+          if (k === 'index') return serializeIndex(prev.order)
+          const t = prevById.get(k)
+          return t ? serializeTrip(t) : undefined
+        }
+      )
     },
     [storage]
   )
@@ -1445,8 +1477,10 @@ function TripPlanner() {
    * mutations may finish after a fold.
    * 'noop' means the mutation found nothing to change; 'applied' means the
    * port accepted every diff write; 'failed' means a write was rejected
-   * (the space re-snapshots itself) - callers arm Undo or claim success
-   * only on 'applied' and surface 'failed' as an error. */
+   * and the commit verifiably rolled back; 'partial' means the commit
+   * aborted but could not fully restore prior state (the space re-snapshots
+   * itself) - callers arm Undo or claim success only on 'applied' and
+   * surface 'failed'/'partial' as an error. */
   const libWrites = useRef<Promise<void>>(Promise.resolve())
   const mutateLib = useCallback(
     (mutate: (cur: Library) => Library | null, after?: (r: MutateResult) => void, authorized = false) => {
@@ -1471,8 +1505,8 @@ function TripPlanner() {
             after?.('noop')
             return
           }
-          const landed = await writeLibDiff(cur, next)
-          after?.(landed ? 'applied' : 'failed')
+          const outcome = await writeLibDiff(cur, next)
+          after?.(outcome)
         })
         .catch(() => {})
     },
@@ -1553,7 +1587,7 @@ function TripPlanner() {
           cue('undo')
         } else if (r === 'noop') {
           consume()
-        } else if (r === 'failed') {
+        } else if (r === 'failed' || r === 'partial') {
           cue('error')
         }
       }
@@ -1629,7 +1663,7 @@ function TripPlanner() {
             if (parseDraft(cur2)?.saving === stamp) session.del('draft')
           })
           .catch(() => {})
-        if (r === 'failed') cue('error')
+        if (r === 'failed' || r === 'partial') cue('error')
       }
     )
     cue('save')
@@ -1738,7 +1772,7 @@ function TripPlanner() {
         if (r === 'dropped') return
         if (r === 'applied' && payload) pushUndo(payload, true)
         if (r === 'applied') cue('delete')
-        if (r === 'failed') cue('error')
+        if (r === 'failed' || r === 'partial') cue('error')
       }
     )
   }
@@ -1984,7 +2018,7 @@ function TripPlanner() {
                       },
                       true
                     )
-                  if (r === 'failed') cue('error')
+                  if (r === 'failed' || r === 'partial') cue('error')
                 }
               )
             }
@@ -2013,7 +2047,7 @@ function TripPlanner() {
                       },
                       true
                     )
-                  if (r === 'failed') cue('error')
+                  if (r === 'failed' || r === 'partial') cue('error')
                 }
               )
             }}

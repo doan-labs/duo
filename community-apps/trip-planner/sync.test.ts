@@ -208,8 +208,10 @@ import { commitLibWrites, type LibStore } from './sync'
 import {
   addTrip,
   assembleLibrary,
+  isTombValue,
   planLibWrites,
   removeTrip,
+  restoreTrip,
   serializeIndex,
   serializeTrip,
   togglePack,
@@ -218,19 +220,29 @@ import {
 
 class Store implements LibStore {
   map = new Map<string, string>()
+  // Rejection counts are keyed per op (`put trip.x` vs `del trip.x`), so a
+  // record's forward put can be poisoned separately from its tomb's cleanup.
   rejects = new Map<string, number>()
+  // Succeed this many calls, then reject: a repair write to a key whose
+  // forward write already landed fails this way.
+  failAfter = new Map<string, number>()
   delays = new Map<string, number>()
   log: string[] = []
   foreign: ((store: Store, op: string) => Promise<void>) | null = null
+  private okCalls = new Map<string, number>()
   private async op(kind: string, key: string, v?: string) {
-    this.log.push(`${kind} ${key}`)
+    const id = `${kind} ${key}`
+    this.log.push(id)
     const d = this.delays.get(key)
     if (d) await new Promise((r) => setTimeout(r, d))
-    const left = this.rejects.get(key) ?? 0
+    const left = this.rejects.get(id) ?? 0
     if (left > 0) {
-      this.rejects.set(key, left - 1)
-      throw new Error(`rejected ${kind} ${key}`)
+      this.rejects.set(id, left - 1)
+      throw new Error(`rejected ${id}`)
     }
+    const fa = this.failAfter.get(id)
+    if (fa !== undefined && (this.okCalls.get(id) ?? 0) >= fa) throw new Error(`rejected ${id}`)
+    this.okCalls.set(id, (this.okCalls.get(id) ?? 0) + 1)
     if (kind === 'put') this.map.set(key, v ?? '')
     else this.map.delete(key)
     return true
@@ -243,10 +255,17 @@ class Store implements LibStore {
     await this.foreign?.(this, `del ${k}`)
     return this.op('del', k)
   }
-  // What a resnapshot would see: no index ref without a stored record.
+  // The authoritative read a snapshot would return.
+  async get(k: string) {
+    return this.map.has(k) ? this.map.get(k)! : null
+  }
+  // What a resnapshot would see: no index ref without a stored live record.
   dangling() {
     const order = JSON.parse(this.map.get('index') ?? '{"order":[]}').order as string[]
-    return order.filter((id) => !this.map.has(`trip.${id}`))
+    return order.filter((id) => {
+      const v = this.map.get(`trip.${id}`)
+      return v === undefined || isTombValue(v)
+    })
   }
   lib() {
     const records = new Map<string, string>()
@@ -265,19 +284,21 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   s.map.set('index', serializeIndex(lib.order))
   for (const t of lib.trips) s.map.set(`trip.${t.id}`, serializeTrip(t))
 }
-const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
+const prevOf = (lib: { order: string[]; trips: import('./trips').Trip[] }) => (k: string) => {
+  if (k === 'index') return serializeIndex(lib.order)
   const t = lib.trips.find((x) => `trip.${x.id}` === k)
   return t ? serializeTrip(t) : undefined
 }
 
-// Plan shape: a delete must put the index before deleting the record.
+// Plan shape: a delete must commit the index, then tomb the record, then
+// schedule the guarded cleanup del.
 {
   const { lib } = mk()
   const next = removeTrip(lib, 'ta').lib
   const plan = planLibWrites(lib, next)
   check(
-    'delete plan orders index before record del',
-    plan.map((w) => `${w.kind} ${w.key}`).join('|') === 'put index|del trip.ta'
+    'delete plan orders index, tomb, then record del',
+    plan.map((w) => `${w.kind} ${w.key}`).join('|') === 'put index|tomb trip.ta|del trip.ta'
   )
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const plan2 = planLibWrites(lib, c.lib)
@@ -295,7 +316,7 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   const next = removeTrip(lib, 'ta').lib
   const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
   await new Promise((r) => setTimeout(r, 30))
-  check('delete applied', ok === true)
+  check('delete applied', ok === 'applied')
   check('record deleted', !s.map.has('trip.ta'))
   check('index dropped id', !JSON.parse(s.map.get('index')!).order.includes('ta'))
   check('no dangling', s.dangling().length === 0)
@@ -307,10 +328,10 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   const { lib } = mk()
   const s = new Store()
   seed(s, lib)
-  s.rejects.set('index', 9)
+  s.rejects.set('put index', 9)
   const next = removeTrip(lib, 'ta').lib
   const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
-  check('delete reports failed', ok === false)
+  check('delete reports failed', ok === 'failed')
   check('trip survives failed delete', s.map.has('trip.ta'))
   check('index still reaches it', JSON.parse(s.map.get('index')!).order.includes('ta'))
 }
@@ -320,10 +341,10 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   const { lib } = mk()
   const s = new Store()
   seed(s, lib)
-  s.rejects.set('trip.tc', 9)
+  s.rejects.set('put trip.tc', 9)
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
-  check('create reports failed', ok === false)
+  check('create reports failed', ok === 'failed')
   check('new record not stored', !s.map.has('trip.tc'))
   check('index unchanged', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
   check('no dangling after failed create', s.dangling().length === 0)
@@ -335,10 +356,10 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   const { lib } = mk()
   const s = new Store()
   seed(s, lib)
-  s.rejects.set('index', 9)
+  s.rejects.set('put index', 9)
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
-  check('create failed terminal', ok === false)
+  check('create failed terminal', ok === 'failed')
   check('orphaned new record repaired', !s.map.has('trip.tc'))
   check('index still original', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
 }
@@ -352,9 +373,9 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   let next = updateTrip(lib, 'ta', { name: 'A2' })
   const c = addTrip(next, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   next = removeTrip(c.lib, 'tb').lib
-  s.rejects.set('trip.tc', 9)
+  s.rejects.set('put trip.tc', 9)
   const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
-  check('mixed diff reports failed', ok === false)
+  check('mixed diff reports failed', ok === 'failed')
   check('earlier edit repaired to prev', JSON.parse(s.map.get('trip.ta')!).name === 'A')
   check('removed trip still stored', s.map.has('trip.tb'))
   check('index unchanged on repair', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
@@ -365,10 +386,10 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   const { lib } = mk()
   const s = new Store()
   seed(s, lib)
-  s.rejects.set('trip.tc', 1)
+  s.rejects.set('put trip.tc', 1)
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
-  check('transient reject still applied', ok === true)
+  check('transient reject still applied', ok === 'applied')
   check('record present', s.map.has('trip.tc'))
 }
 
@@ -380,7 +401,7 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   s.delays.set('trip.tc', 150)
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
-  check('delayed step applied', ok === true)
+  check('delayed step applied', ok === 'applied')
   check('index written after slow record', s.log.indexOf('put index') > s.log.indexOf('put trip.tc'))
 }
 
@@ -396,27 +417,26 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   }
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
   check('foreign write between steps lands', s.map.get('foreign.k') === 'other-copy')
-  check('diff still applied', ok === true && s.map.has('trip.tc'))
+  check('diff still applied', ok === 'applied' && s.map.has('trip.tc'))
 }
 
-// Cleanup del rejected permanently: index already committed (authoritative),
-// the orphan resurfaces through assembleLibrary - recoverable, not dangling.
+// Cleanup del rejected permanently: the tomb stays - an acknowledged
+// deletion is never resurrected by the assembler, and the unreachable
+// debris is reclaimable by any later pass that sees it still tombed.
 {
   const { lib } = mk()
   const s = new Store()
   seed(s, lib)
-  s.rejects.set('trip.ta', 9)
+  s.rejects.set('del trip.ta', 9)
   const next = removeTrip(lib, 'ta').lib
   const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
-  check('cleanup failure still reports applied', ok === true)
+  check('cleanup failure still reports applied', ok === 'applied')
   check('index authoritative', !JSON.parse(s.map.get('index')!).order.includes('ta'))
-  await new Promise((r) => setTimeout(r, 2400))
+  await new Promise((r) => setTimeout(r, 2600))
   check('del retried to exhaustion', s.log.filter((l) => l === 'del trip.ta').length === 3)
-  check(
-    'orphan resurfaces on resnapshot',
-    s.lib().trips.some((t) => t.id === 'ta')
-  )
-  check('orphan never dangles the index', s.dangling().length === 0)
+  check('acknowledged delete never resurfaces', !s.lib().trips.some((t) => t.id === 'ta'))
+  check('tomb debris is all that remains', isTombValue(s.map.get('trip.ta')))
+  check('no dangling index ref', s.dangling().length === 0)
 }
 
 // Edit-only diff: a rejected record write leaves the previous record intact.
@@ -424,11 +444,140 @@ const prevOf = (lib: { trips: import('./trips').Trip[] }) => (k: string) => {
   const { lib } = mk()
   const s = new Store()
   seed(s, lib)
-  s.rejects.set('trip.ta', 9)
+  s.rejects.set('put trip.ta', 9)
   const next = togglePack(togglePack(lib, 'ta', 'x'), 'ta', 'x')
   const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
-  check('edit reports failed', ok === false)
+  check('edit reports failed', ok === 'failed')
   check('previous record intact', JSON.parse(s.map.get('trip.ta')!).name === 'A')
 }
+// Generation binding on cleanup: a same-id restore (Undo) committed while an
+// old cleanup retry is still pending makes the next attempt read a LIVE
+// record and skip the delete - the old generation can never erase the new
+// incarnation. Exercises two independent commit calls on one shared store.
+{
+  const { lib, ta } = mk()
+  const s = new Store()
+  seed(s, lib)
+  s.rejects.set('del trip.ta', 1) // first cleanup attempt rejected; retry at 250ms
+  const deletedLib = removeTrip(lib, 'ta').lib
+  const ok = await commitLibWrites(s, planLibWrites(lib, deletedLib), prevOf(lib))
+  check('delete applied before restore', ok === 'applied')
+  // The restore (Undo) lands inside the 250ms cleanup sleep.
+  const restored = restoreTrip(deletedLib, ta, 0)
+  const ok2 = await commitLibWrites(s, planLibWrites(deletedLib, restored), prevOf(deletedLib))
+  check('restore applied during cleanup sleep', ok2 === 'applied')
+  await new Promise((r) => setTimeout(r, 2600))
+  check(
+    'stale cleanup never erased the restore',
+    s.lib().trips.some((t) => t.id === 'ta')
+  )
+  check('restored record is live, not tomb', s.map.has('trip.ta') && !isTombValue(s.map.get('trip.ta')))
+  check('index reaches the restore', JSON.parse(s.map.get('index')!).order.includes('ta'))
+}
+
+// Same generation guard via an interleaved foreign restore: the cleanup
+// read already sees peer live data and skips - no del is even attempted.
+{
+  const { lib, ta } = mk()
+  const s = new Store()
+  seed(s, lib)
+  const origGet = s.get.bind(s)
+  let restored = false
+  s.get = async (k: string) => {
+    if (k === 'trip.ta' && !restored) {
+      restored = true
+      s.map.set('trip.ta', serializeTrip({ ...ta, name: 'RESTORED' }))
+      s.map.set('index', serializeIndex(['ta', 'tb']))
+    }
+    return origGet(k)
+  }
+  const ok = await commitLibWrites(s, planLibWrites(lib, removeTrip(lib, 'ta').lib), prevOf(lib))
+  check('delete applied with pending cleanup', ok === 'applied')
+  await new Promise((r) => setTimeout(r, 2600))
+  check(
+    'cleanup skipped the live restore',
+    s.lib().trips.some((t) => t.id === 'ta' && t.name === 'RESTORED')
+  )
+  check('no del attempted against a live record', !s.log.includes('del trip.ta'))
+}
+
+// Honest partial: the second record write is rejected and the repair of the
+// first also fails - 'partial', never a clean 'failed' over half-applied
+// state; the durable store shows exactly the half that landed.
+{
+  const { lib } = mk()
+  const s = new Store()
+  seed(s, lib)
+  const next = updateTrip(updateTrip(lib, 'ta', { name: 'A2' }), 'tb', { name: 'B2' })
+  s.rejects.set('put trip.tb', 9)
+  s.failAfter.set('put trip.ta', 1) // forward put lands; the repair re-put rejects
+  const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
+  check('unrepairable commit reports partial', ok === 'partial')
+  check('landed half remains durable', JSON.parse(s.map.get('trip.ta')!).name === 'A2')
+  check('rejected half unchanged', JSON.parse(s.map.get('trip.tb')!).name === 'B')
+  check('index untouched', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
+}
+
+// Foreign write owns a slot mid-commit: the repair must not clobber peer
+// data - outcome is partial and the peer value survives.
+{
+  const { lib } = mk()
+  const s = new Store()
+  seed(s, lib)
+  const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
+  s.rejects.set('put index', 9)
+  s.foreign = async (store, op) => {
+    if (op === 'put index') store.map.set('trip.tc', serializeTrip({ ...c.trip, name: 'PEER' }))
+  }
+  const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
+  check('foreign-owned slot reports partial', ok === 'partial')
+  check('peer value preserved, not clobbered', JSON.parse(s.map.get('trip.tc')!).name === 'PEER')
+}
+
+// Legitimate orphan recovery preserved: a create whose record landed but
+// whose index write AND repair del both failed leaves an unmarked orphan -
+// still recovered by the assembler on resnapshot.
+{
+  const { lib } = mk()
+  const s = new Store()
+  seed(s, lib)
+  s.rejects.set('put index', 9)
+  s.rejects.set('del trip.tc', 9)
+  const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
+  const ok = await commitLibWrites(s, planLibWrites(lib, c.lib), prevOf(lib))
+  check('unrepairable create reports partial', ok === 'partial')
+  check('orphan record survives', s.map.has('trip.tc'))
+  check(
+    'resnapshot recovers the orphan',
+    s.lib().trips.some((t) => t.id === 'tc')
+  )
+}
+
+// Tomb-put rejected after the index moved: repair restores the old index,
+// the live record survives - a failed delete leaves the trip intact.
+{
+  const { lib } = mk()
+  const s = new Store()
+  seed(s, lib)
+  s.rejects.set('put trip.ta', 9) // the tomb write is a put to trip.ta
+  const next = removeTrip(lib, 'ta').lib
+  const ok = await commitLibWrites(s, planLibWrites(lib, next), prevOf(lib))
+  check('tomb failure reports failed', ok === 'failed')
+  check('trip survives', s.map.has('trip.ta') && !isTombValue(s.map.get('trip.ta')))
+  check('index restored', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
+}
+
+// Index-only reorder failure: nothing was applied, clean failed.
+{
+  const { lib, ta, tb } = mk()
+  const s = new Store()
+  seed(s, lib)
+  s.rejects.set('put index', 9)
+  const reordered = { order: ['tb', 'ta'], trips: [tb, ta] }
+  const ok = await commitLibWrites(s, planLibWrites(lib, reordered), prevOf(lib))
+  check('reorder reports failed', ok === 'failed')
+  check('index unchanged on reorder failure', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
+}
+
 console.log(`\nsync: ${passed} passed, ${failed} failed`)
 if (failed) throw new Error(`${failed} checks failed`)

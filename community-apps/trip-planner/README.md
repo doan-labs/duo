@@ -36,14 +36,20 @@ lives in `os.storage` under one record per trip plus an ordering index, so two
 displays can edit different trips without clobbering each other.
 
 Writes commit in semantic order (`commitLibWrites`): changed records before
-the index, the index before record deletes, with already-landed keys repaired
-when a reachability write fails - so a reported failure never leaves the index
-pointing at a missing record or a delete half-applied. Every mutation rebases
-on the storage mirror (never the render snapshot), and watch echoes keep the
-newest still-pending own write so older acknowledgements cannot roll state
-back. New input is admitted only on the live display; an operation already
-accepted finishes through a fold and reports an explicit failure when storage
-drops out underneath it.
+the index, the index before tomb markers, and each tomb before its guarded
+cleanup delete. A tomb marks an acknowledged delete under `trip.<id>` so a
+failed cleanup can never resurrect it, while an unmarked orphan (a partial
+create) still recovers; cleanup deletes re-verify the record is still a tomb
+before reclaiming it, so a stale retry cannot erase a restored same-id trip.
+When a reachability write fails, already-landed keys are repaired only while
+the commit still owns each slot - verified by an authoritative storage read -
+and the outcome is 'applied', 'failed' (verified rollback) or 'partial'
+(incomplete repair), never a clean failure over half-applied data. Every
+mutation rebases on the storage mirror (never the render snapshot), and watch
+echoes keep the newest still-pending own write so older acknowledgements
+cannot roll state back. New input is admitted only on the live display; an
+operation already accepted finishes through a fold and reports an explicit
+failure when storage drops out underneath it.
 
 ## Interface
 
