@@ -23,15 +23,18 @@
  *    unconfirmed set only through a covering document - never through our own
  *    ack alone - so a foreign write that raced ours and lost it is healed by
  *    the next pass.
- * 4. Adoption is a union, not a replacement. A whole-blob write commits the
- *    payload it was built on, so a set flight staged before a peer's commit
- *    landed can erase rows the store had already confirmed (and this copy had
- *    already adopted). `merge` unions the previous view into the new base:
- *    any row the base neither contains nor tombstones is retained, tombstones
- *    union so real deletes stay dead, and per-writer marks take the max. A
- *    late event at an older rev merges the same way - delivery order is not
- *    causal order - so a peer's confirmed op stays alive in every copy that
- *    ever observed it.
+ * 4. Adoption is a union, not a replacement - gated by causality. A
+ *    whole-blob write commits the payload it was built on, so a set flight
+ *    staged before a peer's commit landed can erase rows the store had
+ *    already confirmed (and this copy had already adopted). `merge` unions
+ *    the previous view into the new base, but only rows that carry
+ *    information the base does not: a document whose `high` marks are wholly
+ *    covered by the current one contributes nothing (every op it attests is
+ *    already applied, so rows it has that we lack were dropped on purpose -
+ *    tombstoned or cap-evicted, never resurrected), and a row whose `src`
+ *    provenance marks are all covered was deliberately absent. Rows without
+ *    provenance are adopted conservatively. Tombstones union so real deletes
+ *    stay dead, and per-writer marks take the max.
  * 5. Only attested documents adopt or merge. Every protocol write stamps its
  *    author (`by`/`s`) and coverage (`high`), so a blob carrying rows but no
  *    stamp and no marks never passed through the protocol - a forged replay
@@ -45,19 +48,41 @@
  *    rows/tombstones a merge restored - the drain writes again, so stale
  *    flights get a repair write instead of a permanent erasure. Bare mark
  *    advances never write on their own, so copies cannot ping-pong.
- * 7. Deletes persist through doc tombstones (`gone`): a delete beats a racing
- *    edit on any base, and a tombstoned id can never be resurrected by a
- *    replayed op or a merge. Caps, merge and clamp rules live in pantry.ts and
- *    apply identically on replay.
- * 8. Nothing reports saved until storage confirms it. A failed get/set keeps
+ * 7. Operation receipts are the teardown path. A stale in-flight write that
+ *    lands after every engine disposed would erase a peer's confirmed op even
+ *    though this copy had observed it - memory journals die with their copy.
+ *    So each display slot keeps a durable op log (`os.storage` key
+ *    `pantry-ops-<slot>`, one bounded whole-value log per slot, written
+ *    before its document commit): a relaunching copy replays receipt entries
+ *    the settled document does not cover, then covers them and lets the log
+ *    trim them away. Entries covered by a committed document are dropped, so
+ *    the log stays small; entries are never evicted while uncovered unless
+ *    the bounded cap forces it.
+ * 8. `src` provenance makes same-batch convergence exact. Replaying an add
+ *    that semantically merges into a peer's row used to leave the replaying
+ *    copy's own-id row behind too - unioning by random id double-counted one
+ *    op. Every op run now stamps its `{writer: seq}` on the row it touched,
+ *    and merge folds rows in the same batch: a row whose `src` is a subset of
+ *    a sibling's is a replayed duplicate and drops; rows with disjoint
+ *    provenance are genuinely concurrent adds and sum onto the canonical
+ *    (lowest-id) row - the same result journal replay produces.
+ * 9. Deletes persist through doc tombstones (`gone`): a delete beats a racing
+ *    edit on any base, and bounded tomb trimming cannot resurrect a row
+ *    because rule 4's coverage gate - not the tombstone - is what stops a
+ *    covered document re-adding it. Caps, merge and clamp rules live in
+ *    pantry.ts and apply identically on replay.
+ * 10. Nothing reports saved until storage confirms it. A failed get/set keeps
  *    ops uncovered, surfaces `retrying` to the UI and re-runs the drain until
  *    the document converges. Legacy pre-protocol documents (`v != 2`, no
  *    marks or tombstones) still adopt wholesale: last-writer-wins is the only
- *    honest reading of a blob that cannot say what it covered.
+ *    honest reading of a blob that cannot say what it covered. A storage
+ *    adapter without the ops channel keeps full merge protection but cannot
+ *    recover an op that no surviving copy observed through a dead writer's
+ *    in-flight commit - that is a stated limit of a single-key store.
  */
 
-import type { Doc, Op } from './pantry.ts'
-import { EMPTY_DOC, GONE_CAP, ITEMS_CAP, LIST_CAP, parseDoc, serializeDoc } from './pantry.ts'
+import type { Doc, Item, Op, WireOp } from './pantry.ts'
+import { EMPTY_DOC, GONE_CAP, ITEMS_CAP, LIST_CAP, MAX_MILLI, parseDoc, serializeDoc, unpackOp } from './pantry.ts'
 
 /** The storage surface the engine needs; main.tsx binds it to os.storage. */
 export type DocStore = {
@@ -68,9 +93,20 @@ export type DocStore = {
   /**
    * Subscribe to changes. `rev` is a storage revision; `rev` -1 is the
    * platform's resync sentinel meaning history was lost and the doc must be
-   * re-read. Returns an unsubscribe.
+   * re-read. An event carrying `slot` is a receipt-log update for that
+   * display slot, not a document payload. Returns an unsubscribe.
    */
-  watch(cb: (e: { rev: number; v?: string }) => void): () => void
+  watch(cb: (e: { rev: number; v?: string; slot?: string }) => void): () => void
+  /**
+   * Optional per-slot receipt channel: one bounded op log per display,
+   * written before its document commit so a confirmed op survives even when
+   * every engine that saw it is gone. Without it, dead-writer teardown loss
+   * stays a documented single-key limit.
+   */
+  ops?: {
+    get(slot: string): Promise<string | null>
+    set(slot: string, v: string): Promise<number>
+  }
 }
 
 export type SyncStatus = 'loading' | 'synced' | 'saving' | 'retrying'
@@ -79,6 +115,13 @@ export type SyncOpts = {
   /** Stable id for this copy (both displays write; each is its own writer). */
   me: string
   store: DocStore
+  /**
+   * This copy's receipt slot (os.view.display: 'inner' | 'cover'). Required
+   * with `store.ops` for the durable receipt log.
+   */
+  slot?: string
+  /** All receipt slots to read, including this copy's own. */
+  peerSlots?: string[]
   /** New document to render, after submits and foreign adoptions. */
   onDoc(doc: Doc): void
   /** Status for the sync affordance; `retrying` means a write failed. */
@@ -89,7 +132,10 @@ export type SyncOpts = {
   retryMs?: number
 }
 
-type Intent = { seq: number; op: Op }
+type Intent = { w: string; seq: number; op: Op }
+
+/** One entry in a slot's durable op log. */
+type Receipt = { w: string; s: number; o: WireOp }
 
 /**
  * True when `a` covers every writer at least as far as `b` - the doc with
@@ -106,10 +152,97 @@ function dominates(a: Record<string, number>, b: Record<string, number>): boolea
 const GET_CLEAN_TRIES = 4
 /** Delay before a failed drain runs again while ops are still uncovered. */
 const RETRY_MS = 1_500
+/** Bound on one slot's receipt log; covered entries are dropped first. */
+const RECEIPT_CAP = 512
+
+/** Parse a slot receipt log tolerantly: malformed entries drop, never crash. */
+function parseReceipts(raw: string | null | undefined): Receipt[] {
+  if (!raw) return []
+  try {
+    const p = JSON.parse(raw) as { v?: unknown; ops?: unknown }
+    if (p.v !== 1 || !Array.isArray(p.ops)) return []
+    const out: Receipt[] = []
+    for (const e of p.ops) {
+      if (typeof e !== 'object' || e === null) continue
+      const r = e as Record<string, unknown>
+      if (typeof r.w !== 'string' || !r.w) continue
+      if (!Number.isSafeInteger(r.s) || (r.s as number) <= 0) continue
+      if (typeof r.o !== 'object' || r.o === null) continue
+      out.push({ w: r.w, s: r.s as number, o: r.o as WireOp })
+      if (out.length >= RECEIPT_CAP) break
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function serializeReceipts(entries: Receipt[]): string {
+  return JSON.stringify({ v: 1, ops: entries })
+}
+
+/** Batch key for provenance dedupe: same name/unit/shelf/date merge target. */
+function batchKey(i: Item): string {
+  return [i.name.toLowerCase(), i.unit, i.location, i.bestBefore ?? ''].join('\u0001')
+}
+
+const srcSubset = (a?: Record<string, number>, b?: Record<string, number>): boolean =>
+  a !== undefined && b !== undefined && Object.entries(a).every(([w, s]) => (b[w] ?? 0) >= s)
+
+/**
+ * Fold same-batch rows down to the canonical result op replay produces: one
+ * row per batch whose quantity is the sum of every contributing op. A row
+ * whose `src` is a subset of a sibling's is a replayed duplicate and drops.
+ * Rows with disjoint provenance are genuinely concurrent adds - they sum
+ * onto the lowest-id row so every copy converges to the same survivor.
+ * Rows sharing a writer without a subset relation, or lacking `src`, cannot
+ * be proven duplicates and stay.
+ */
+function dedupeBatches(rows: Item[]): Item[] {
+  const out: Item[] = []
+  const batchIx = new Map<string, number[]>()
+  for (const row of rows) {
+    const key = batchKey(row)
+    let group = batchIx.get(key)
+    if (!group) {
+      group = []
+      batchIx.set(key, group)
+    }
+    let absorbed = false
+    for (const ix of group) {
+      const cur = out[ix]!
+      if (srcSubset(row.src, cur.src)) {
+        absorbed = true
+        break
+      }
+      if (srcSubset(cur.src, row.src)) {
+        out[ix] = row
+        absorbed = true
+        break
+      }
+      if (row.src && cur.src && !Object.keys(row.src).some((w) => cur.src?.[w] !== undefined)) {
+        const canon = cur.id <= row.id ? cur : row
+        const other = canon === cur ? row : cur
+        const src = { ...(other.src ?? {}) }
+        for (const [w, s] of Object.entries(canon.src ?? {})) src[w] = Math.max(src[w] ?? 0, s)
+        out[ix] = { ...canon, milli: Math.min(MAX_MILLI, canon.milli + other.milli), src }
+        absorbed = true
+        break
+      }
+    }
+    if (!absorbed) {
+      group.push(out.length)
+      out.push(row)
+    }
+  }
+  return out
+}
 
 export class PantrySync {
   private me: string
   private store: DocStore
+  private slot: string | null
+  private peerSlots: string[]
   private onDoc: (doc: Doc) => void
   private onStatus: (s: SyncStatus) => void
   private onError: () => void
@@ -128,6 +261,20 @@ export class PantrySync {
    */
   private ops: Intent[] = []
   private seq = 0
+  /**
+   * Foreign ops read back from the durable per-slot receipt logs, per writer
+   * in seq order. They replay exactly like own ops: anything the settled
+   * base does not cover is pending work this copy must carry forward.
+   */
+  private receipts = new Map<string, Intent[]>()
+  /**
+   * Highest seq per writer the view has actually applied (own + receipt
+   * replays). Stamped into `high` on commit so the written document only
+   * claims coverage it really contains.
+   */
+  private appliedHigh: Record<string, number> = {}
+  /** Highest own seq already landed in the durable receipt log. */
+  private receiptWatermark = 0
   /** The settled document `doc` is built on: the last adopted or read base,
    * before journal replay and merge retention. Its marks say exactly which
    * coverage storage currently proves.
@@ -143,6 +290,8 @@ export class PantrySync {
   constructor(opts: SyncOpts) {
     this.me = opts.me
     this.store = opts.store
+    this.slot = opts.slot ?? null
+    this.peerSlots = opts.peerSlots ?? (this.slot ? [this.slot] : [])
     this.onDoc = opts.onDoc
     this.onStatus = opts.onStatus ?? (() => {})
     this.onError = opts.onError ?? (() => {})
@@ -153,6 +302,12 @@ export class PantrySync {
   start(): () => void {
     void this.refresh()
     this.unwatch = this.store.watch((e) => {
+      if (e.slot !== undefined) {
+        // A receipt log changed: ingest its ops, refold onto the same base.
+        if (e.v !== undefined) this.adoptReceipt(e.v)
+        else void this.loadReceipts().then(() => this.fold(this.base))
+        return
+      }
       if (e.rev === -1 || e.v === undefined) {
         // Resync sentinel or a bare invalidation: re-read the real bytes.
         void this.refresh()
@@ -201,9 +356,10 @@ export class PantrySync {
   submit(op: Op): { meta?: unknown } {
     if (this.stopped) return {}
     this.seq += 1
-    const out = op.run(this.doc)
+    const out = op.run(this.doc, { w: this.me, s: this.seq })
     if (out.commit) {
-      this.ops.push({ seq: this.seq, op })
+      this.ops.push({ w: this.me, seq: this.seq, op })
+      this.appliedHigh[this.me] = this.seq
       this.doc = out.doc
       this.emitDoc()
       this.kick()
@@ -216,6 +372,9 @@ export class PantrySync {
 
   /** Re-read the settled document; used on start, resync and after writes. */
   private async refresh(): Promise<void> {
+    // Receipt logs first: they carry confirmed ops the settled document may
+    // not cover yet, and the fold below needs them in place before it runs.
+    if (!(await this.loadReceipts())) return
     for (let i = 0; i < GET_CLEAN_TRIES; i++) {
       const mark = this.seen
       let raw: string | null
@@ -261,6 +420,77 @@ export class PantrySync {
     return doc.s > 0 || Object.keys(doc.high).length > 0
   }
 
+  /** Read every peer slot's receipt log into `receipts`. */
+  private async loadReceipts(): Promise<boolean> {
+    const ops = this.store.ops
+    if (!ops) return true
+    for (const slot of this.peerSlots) {
+      let raw: string | null
+      try {
+        raw = await ops.get(slot)
+      } catch {
+        this.fail()
+        return false
+      }
+      if (this.stopped) return false
+      this.ingestReceipts(raw)
+    }
+    return true
+  }
+
+  /**
+   * Merge one slot's receipt log into the pending set. Own-writer entries
+   * are skipped - the session journal is authoritative for them. Returns
+   * true when the log added something new.
+   */
+  private ingestReceipts(raw: string | null | undefined): boolean {
+    let grew = false
+    for (const e of parseReceipts(raw)) {
+      if (e.w === this.me) continue
+      const op = unpackOp(e.o)
+      if (!op) continue
+      const list = this.receipts.get(e.w) ?? []
+      if (list.some((i) => i.seq === e.s)) continue
+      list.push({ w: e.w, seq: e.s, op })
+      list.sort((a, b) => a.seq - b.seq)
+      this.receipts.set(e.w, list)
+      grew = true
+    }
+    return grew
+  }
+
+  /** A peer slot's log landed on the watch channel. */
+  private adoptReceipt(v: string): void {
+    if (this.stopped) return
+    if (this.ingestReceipts(v)) this.fold(this.base)
+  }
+
+  /**
+   * Foreign ops in receipt logs that the settled base does not cover -
+   * confirmed work a writer committed before it went away, which this copy
+   * must now carry into the document so coverage can move past it.
+   */
+  private uncoveredForeign(): Intent[] {
+    const out: Intent[] = []
+    for (const [w, list] of this.receipts) {
+      const covered = this.base.high[w] ?? 0
+      for (const i of list) if (i.seq > covered) out.push(i)
+    }
+    return out
+  }
+
+  /**
+   * Every op the view must contain beyond the settled base, in the one
+   * order every copy converges to: writer id, then seq. Deterministic
+   * ordering is what makes same-batch merges fold to the same row on both
+   * displays no matter who applied first.
+   */
+  private pendingIntents(): Intent[] {
+    return [...this.uncovered(), ...this.uncoveredForeign()].sort((a, b) =>
+      a.w < b.w ? -1 : a.w > b.w ? 1 : a.seq - b.seq
+    )
+  }
+
   /** Adopt a storage event. A newer revision folds; an older one still merges
    * any committed content the view lacks, because a set flight can land its
    * stale payload at a higher revision and physically erase confirmed rows.
@@ -288,10 +518,10 @@ export class PantrySync {
   private fold(base: Doc): void {
     if (this.stopped) return
     this.base = base
-    const covered = base.high[this.me] ?? 0
     let doc = base
-    for (const intent of this.ops) {
-      if (intent.seq > covered) doc = intent.op.run(doc).doc
+    for (const intent of this.pendingIntents()) {
+      doc = intent.op.run(doc, { w: intent.w, s: intent.seq }).doc
+      this.appliedHigh[intent.w] = Math.max(this.appliedHigh[intent.w] ?? 0, intent.seq)
     }
     this.doc = doc.legacy ? doc : this.merge(doc, this.doc)
     this.emitDoc()
@@ -329,21 +559,46 @@ export class PantrySync {
     const trimmed = gone.length > GONE_CAP ? gone.slice(-GONE_CAP) : gone
     const dead = new Set(trimmed)
     const preferFrom = dominates(from.high, into.high)
-    const pick = <T extends { id: string }>(first: T[], second: T[], cap: number): T[] => {
+    // A document wholly covered by `into` attests nothing `into` lacks, so
+    // none of its rows may enter: any row only it carries was dropped from
+    // the covering chain on purpose (deleted or evicted). This is what stops
+    // a replayed stale snapshot from resurrecting a tombstoned row whose
+    // tombstone was trimmed.
+    const fromCovered = this.attested(from) && dominates(into.high, from.high)
+    // A row whose provenance is already covered by `into`'s marks was
+    // deliberately absent from it - dropping it is what delete/merge ops did.
+    const rowCovered = (row: { src?: Record<string, number> }): boolean =>
+      row.src !== undefined && Object.entries(row.src).every(([w, s]) => (into.high[w] ?? 0) >= s)
+    const pick = <T extends { id: string; src?: Record<string, number> }>(
+      first: T[],
+      second: T[],
+      cap: number
+    ): T[] => {
       const other = new Map(second.map((r) => [r.id, r]))
       const out: T[] = []
       const ids = new Set<string>()
+      // For rows both sides carry, keep the one whose provenance covers the
+      // other's: a row rebuilt by a fresh replay must not be replaced by the
+      // stale view's copy, and a stale base must not regress an observed
+      // newer row. Only when neither src contains the other does whole-doc
+      // dominance (preferFrom) decide - the old blanket rule.
+      const pickRow = (a: T, b: T): T => {
+        if (srcSubset(a.src, b.src)) return b
+        if (srcSubset(b.src, a.src)) return a
+        return preferFrom ? b : a
+      }
       for (const row of first) {
         if (dead.has(row.id)) continue
         ids.add(row.id)
-        out.push(preferFrom ? (other.get(row.id) ?? row) : row)
+        const alt = other.get(row.id)
+        out.push(alt === undefined ? row : pickRow(row, alt))
       }
       for (const row of second) {
         if (out.length >= cap) break
-        if (!ids.has(row.id) && !dead.has(row.id)) {
-          ids.add(row.id)
-          out.push(row)
-        }
+        if (ids.has(row.id) || dead.has(row.id)) continue
+        if (fromCovered || rowCovered(row)) continue
+        ids.add(row.id)
+        out.push(row)
       }
       return out
     }
@@ -353,7 +608,7 @@ export class PantrySync {
     }
     return {
       ...into,
-      items: pick(into.items, from.items, ITEMS_CAP),
+      items: dedupeBatches(pick(into.items, from.items, ITEMS_CAP)),
       list: pick(into.list, from.list, LIST_CAP),
       muted: preferFrom ? from.muted : into.muted,
       high,
@@ -390,7 +645,7 @@ export class PantrySync {
    * two copies cannot ping-pong over provenance alone.
    */
   private needsWrite(): boolean {
-    if (this.uncovered().length > 0) return true
+    if (this.uncovered().length > 0 || this.uncoveredForeign().length > 0) return true
     const base = this.base
     if (this.doc.muted !== base.muted) return true
     if (this.doc.gone.length !== base.gone.length || this.doc.gone.some((id) => !base.gone.includes(id))) return true
@@ -442,6 +697,11 @@ export class PantrySync {
           this.setStatus('synced')
           return
         }
+        // The receipt log lands before the document: ops must be durable in
+        // the slot first so a crash or teardown between the two writes still
+        // leaves the confirmed ops recoverable by a relaunching copy.
+        if (!(await this.writeReceipt())) return
+        if (this.stopped) return
         // Commit the view document: base + every uncovered op and retained
         // foreign progress, stamped so its marks prove coverage for anyone
         // adopting it later.
@@ -474,12 +734,59 @@ export class PantrySync {
   }
 
   /**
+   * Write this slot's receipt log: the union of what's already there and
+   * this copy's whole journal, minus anything the settled base already
+   * covers (those ops are durable inside the document). Bounded to
+   * RECEIPT_CAP with newest kept. Only written when the journal grew past
+   * what the log already holds; skipped entirely without an ops channel.
+   */
+  private async writeReceipt(): Promise<boolean> {
+    const ops = this.store.ops
+    if (!ops || this.slot === null) return true
+    if (this.seq <= this.receiptWatermark) return true
+    let raw: string | null
+    try {
+      raw = await ops.get(this.slot)
+    } catch {
+      this.fail()
+      return false
+    }
+    if (this.stopped) return false
+    const entries = parseReceipts(raw)
+    const have = new Set(entries.map((e) => `${e.w}:${e.s}`))
+    for (const it of this.ops) {
+      if (have.has(`${it.w}:${it.seq}`)) continue
+      entries.push({ w: it.w, s: it.seq, o: it.op.pack() })
+    }
+    // Entries the settled base covers are durable in the document itself -
+    // drop them so the log stays bounded, then cap at RECEIPT_CAP newest.
+    const kept = entries.filter((e) => (this.base.high[e.w] ?? 0) < e.s).slice(-RECEIPT_CAP)
+    const text = kept.length === 0 ? JSON.stringify({ v: 1, ops: [] }) : serializeReceipts(kept)
+    if (text !== raw) {
+      try {
+        await ops.set(this.slot, text)
+      } catch {
+        this.fail()
+        return false
+      }
+    }
+    this.receiptWatermark = this.seq
+    return true
+  }
+
+  /**
    * Fill in the writer fields on the document about to be committed. A repair
    * write can run with no ops of its own (seq 0): it stamps authorship and the
-   * coverage it carries without claiming a seq mark it never wrote.
+   * coverage it carries without claiming a seq mark it never wrote. `high`
+   * gains every writer mark the view provably contains - own ops plus every
+   * receipt op replayed into it - so the marks claim only real coverage.
    */
   private stamp(doc: Doc): Doc {
-    const high = this.seq > 0 ? { ...doc.high, [this.me]: this.seq } : { ...doc.high }
+    const high = { ...doc.high }
+    for (const [w, s] of Object.entries(this.appliedHigh)) {
+      if (s > (high[w] ?? 0)) high[w] = s
+    }
+    if (this.seq > 0) high[this.me] = this.seq
     return { ...doc, by: this.me, s: this.seq, high }
   }
 

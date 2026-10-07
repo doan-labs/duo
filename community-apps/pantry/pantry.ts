@@ -21,6 +21,14 @@ export type Item = {
   /** Local day YYYY-MM-DD, or null when the item has no date. */
   bestBefore: string | null
   addedAt: number
+  /**
+   * Provenance: the highest op seq each writer contributed to this row.
+   * Merge uses it to tell a replayed duplicate (its ops are already inside
+   * another row's `src`) from two genuinely concurrent adds (disjoint `src`
+   * sets sum), and to keep a wholly-covered stale row from resurrecting
+   * content a covering document dropped.
+   */
+  src?: Record<string, number>
 }
 
 export type ShopItem = {
@@ -29,6 +37,8 @@ export type ShopItem = {
   note: string
   done: boolean
   addedAt: number
+  /** Same provenance rule as Item.src; only used by the merge gate. */
+  src?: Record<string, number>
 }
 
 export type Doc = {
@@ -65,6 +75,13 @@ export const NAME_CAP = 48
 export const NOTE_CAP = 40
 /** Upper bound for one item's quantity, in milli-units (999,999 units). */
 export const MAX_MILLI = 999_999_000
+
+/** Writer + seq of the op being applied, threaded through runs for src marks. */
+export type OpCtx = { w: string; s: number }
+
+/** Records the running op's mark on a row it materially touches. */
+const stampSrc = <T extends { src?: Record<string, number> }>(row: T, ctx?: OpCtx): T =>
+  ctx ? { ...row, src: { ...row.src, [ctx.w]: Math.max(row.src?.[ctx.w] ?? 0, ctx.s) } } : row
 /** A dated item is "use soon" from this many days out. */
 export const USE_SOON_DAYS = 7
 
@@ -255,16 +272,21 @@ export function addItem(
  * can never mint a duplicate row. An id already present is the op's own
  * earlier write and applies as a no-op.
  */
-export function addItemAs(doc: Doc, item: Item): { doc: Doc; id: string | null; merged: boolean; full: boolean } {
+export function addItemAs(
+  doc: Doc,
+  item: Item,
+  ctx?: OpCtx
+): { doc: Doc; id: string | null; merged: boolean; full: boolean } {
   if (doc.items.some((i) => i.id === item.id)) return { doc, id: item.id, merged: false, full: false }
   const hit = doc.items.find((i) => sameBatch(i, item))
   if (hit) {
     const milli = Math.min(MAX_MILLI, hit.milli + item.milli)
-    const items = doc.items.map((i) => (i.id === hit.id ? { ...i, milli } : i))
+    const items = doc.items.map((i) => (i.id === hit.id ? stampSrc({ ...i, milli }, ctx) : i))
     return { doc: { ...doc, items }, id: hit.id, merged: true, full: false }
   }
   if (doc.items.length >= ITEMS_CAP) return { doc, id: null, merged: false, full: true }
-  return { doc: { ...doc, items: [...doc.items, item] }, id: item.id, merged: false, full: false }
+  const minted = stampSrc(item, ctx)
+  return { doc: { ...doc, items: [...doc.items, minted] }, id: item.id, merged: false, full: false }
 }
 
 /**
@@ -273,21 +295,24 @@ export function addItemAs(doc: Doc, item: Item): { doc: Doc; id: string | null; 
  * An id tombstoned by a racing delete stays deleted; a missing id that was
  * never tombstoned (an older document shape) is appended back.
  */
-export function updateItem(doc: Doc, edited: Item): { doc: Doc; id: string; merged: boolean } {
+export function updateItem(doc: Doc, edited: Item, ctx?: OpCtx): { doc: Doc; id: string; merged: boolean } {
   const clean = { ...edited, name: cleanName(edited.name), milli: Math.max(0, Math.min(MAX_MILLI, edited.milli)) }
   // A tombstoned row stays deleted: a concurrent delete wins over this edit.
   if (doc.gone.includes(clean.id)) return { doc, id: clean.id, merged: false }
   const clash = doc.items.find((i) => i.id !== clean.id && sameBatch(i, clean))
   if (clash) {
     const milli = Math.min(MAX_MILLI, clash.milli + clean.milli)
-    const items = doc.items.filter((i) => i.id !== clean.id).map((i) => (i.id === clash.id ? { ...i, milli } : i))
+    const items = doc.items
+      .filter((i) => i.id !== clean.id)
+      .map((i) => (i.id === clash.id ? stampSrc({ ...i, milli }, ctx) : i))
     // The folded-away row is gone on purpose; tombstone it like a delete.
     return { doc: { ...doc, items, gone: bury(doc.gone, [clean.id]) }, id: clash.id, merged: true }
   }
   const found = doc.items.some((i) => i.id === clean.id)
+  const stamped = stampSrc(clean, ctx)
   const items = found
-    ? doc.items.map((i) => (i.id === clean.id ? clean : i))
-    : [...doc.items.slice(-(ITEMS_CAP - 1)), clean]
+    ? doc.items.map((i) => (i.id === clean.id ? stamped : i))
+    : [...doc.items.slice(-(ITEMS_CAP - 1)), stamped]
   return { doc: { ...doc, items }, id: clean.id, merged: false }
 }
 
@@ -300,13 +325,18 @@ export function removeItem(doc: Doc, id: string): Doc {
  * One consume or restock tap: a unit-step down or up, clamped at 0 and
  * MAX_MILLI, so quantity can never go negative or overflow.
  */
-export function stepItem(doc: Doc, id: string, dir: 'use' | 'restock'): { doc: Doc; milli: number | null } {
+export function stepItem(
+  doc: Doc,
+  id: string,
+  dir: 'use' | 'restock',
+  ctx?: OpCtx
+): { doc: Doc; milli: number | null } {
   const item = doc.items.find((i) => i.id === id)
   if (!item) return { doc, milli: null }
   const step = stepFor(item.unit)
   const milli = Math.max(0, Math.min(MAX_MILLI, item.milli + (dir === 'use' ? -step : step)))
   if (milli === item.milli) return { doc, milli }
-  const items = doc.items.map((i) => (i.id === id ? { ...i, milli } : i))
+  const items = doc.items.map((i) => (i.id === id ? stampSrc({ ...i, milli }, ctx) : i))
   return { doc: { ...doc, items }, milli }
 }
 
@@ -367,14 +397,14 @@ export function addShop(
 }
 
 /** Fixed-id counterpart of `addShop`, replayable on a rebased document. */
-export function addShopAs(doc: Doc, item: ShopItem): { doc: Doc; id: string | null; full: boolean } {
+export function addShopAs(doc: Doc, item: ShopItem, ctx?: OpCtx): { doc: Doc; id: string | null; full: boolean } {
   if (doc.list.some((s) => s.id === item.id)) return { doc, id: item.id, full: false }
   if (doc.list.length >= LIST_CAP) return { doc, id: null, full: true }
-  return { doc: { ...doc, list: [...doc.list, item] }, id: item.id, full: false }
+  return { doc: { ...doc, list: [...doc.list, stampSrc(item, ctx)] }, id: item.id, full: false }
 }
 
-export function toggleShop(doc: Doc, id: string): Doc {
-  return { ...doc, list: doc.list.map((s) => (s.id === id ? { ...s, done: !s.done } : s)) }
+export function toggleShop(doc: Doc, id: string, ctx?: OpCtx): Doc {
+  return { ...doc, list: doc.list.map((s) => (s.id === id ? stampSrc({ ...s, done: !s.done }, ctx) : s)) }
 }
 
 export function removeShop(doc: Doc, id: string): Doc {
@@ -393,6 +423,14 @@ export function clearBought(doc: Doc): Doc {
 const isLocation = (v: unknown): v is Location => typeof v === 'string' && LOCATIONS.some((l) => l.id === v)
 const isUnit = (v: unknown): v is Unit => typeof v === 'string' && UNITS.some((u) => u.id === v)
 
+const isSrc = (v: unknown): v is Record<string, number> =>
+  typeof v === 'object' &&
+  v !== null &&
+  !Array.isArray(v) &&
+  Object.entries(v as Record<string, unknown>).every(
+    ([w, s]) => typeof w === 'string' && w.length > 0 && Number.isSafeInteger(s) && (s as number) > 0
+  )
+
 function isItem(v: unknown): v is Item {
   if (typeof v !== 'object' || v === null) return false
   const i = v as Record<string, unknown>
@@ -407,7 +445,8 @@ function isItem(v: unknown): v is Item {
     isUnit(i.unit) &&
     isLocation(i.location) &&
     (i.bestBefore === null || (typeof i.bestBefore === 'string' && validDay(i.bestBefore))) &&
-    typeof i.addedAt === 'number'
+    typeof i.addedAt === 'number' &&
+    (i.src === undefined || isSrc(i.src))
   )
 }
 
@@ -420,7 +459,8 @@ function isShopItem(v: unknown): v is ShopItem {
     s.name.length > 0 &&
     typeof s.note === 'string' &&
     typeof s.done === 'boolean' &&
-    typeof s.addedAt === 'number'
+    typeof s.addedAt === 'number' &&
+    (s.src === undefined || isSrc(s.src))
   )
 }
 
@@ -524,8 +564,25 @@ export function parseMirror(raw: string | null): Mirror | null {
  * rebased document is deterministic and can never mint duplicate rows.
  */
 export type Op = {
-  run(d: Doc): { doc: Doc; commit: boolean; meta?: unknown }
+  run(d: Doc, ctx?: OpCtx): { doc: Doc; commit: boolean; meta?: unknown }
+  /** Serializable payload for the durable per-slot receipt log. */
+  pack(): WireOp
 }
+
+/**
+ * The durable receipt form of an op - plain data, fixed ids, no closures.
+ * Every factory's `pack` round-trips through `unpackOp`.
+ */
+export type WireOp =
+  | { k: 'add'; i: Item }
+  | { k: 'step'; id: string; d: 'use' | 'restock' }
+  | { k: 'update'; i: Item }
+  | { k: 'remove'; id: string }
+  | { k: 'mute'; m: boolean }
+  | { k: 'shop'; i: ShopItem }
+  | { k: 'shopT'; id: string }
+  | { k: 'shopR'; id: string }
+  | { k: 'clear' }
 
 const ok = (doc: Doc, meta?: unknown) => ({ doc, commit: true, meta })
 const skip = (doc: Doc, meta?: unknown) => ({ doc, commit: false, meta })
@@ -540,74 +597,134 @@ export function opAdd(
 ): Op {
   const item = newItem(cleanName(draft.name), draft.milli, draft.unit, draft.location, draft.bestBefore, at)
   return {
-    run: (d) => {
-      const out = addItemAs(d, item)
+    run: (d, ctx) => {
+      const out = addItemAs(d, item, ctx)
       return out.full
         ? skip(out.doc, { id: null, merged: false } satisfies AddMeta)
         : ok(out.doc, { id: out.id, merged: out.merged } satisfies AddMeta)
-    }
+    },
+    pack: () => ({ k: 'add', i: item })
   }
 }
 
 export function opStep(id: string, dir: 'use' | 'restock'): Op {
   return {
-    run: (d) => {
+    run: (d, ctx) => {
       const before = d.items.find((i) => i.id === id)?.milli ?? null
-      const out = stepItem(d, id, dir)
+      const out = stepItem(d, id, dir, ctx)
       return out.milli === null || out.milli === before
         ? skip(out.doc, { milli: out.milli, before } satisfies StepMeta)
         : ok(out.doc, { milli: out.milli, before } satisfies StepMeta)
-    }
+    },
+    pack: () => ({ k: 'step', id, d: dir })
   }
 }
 
 export function opUpdate(item: Item): Op {
   return {
-    run: (d) => {
+    run: (d, ctx) => {
       if (d.gone.includes(item.id)) return skip(d, { id: item.id, merged: false, gone: true } satisfies EditMeta)
-      const out = updateItem(d, item)
+      const out = updateItem(d, item, ctx)
       return ok(out.doc, { id: out.id, merged: out.merged } satisfies EditMeta)
-    }
+    },
+    pack: () => ({ k: 'update', i: item })
   }
 }
 
 export function opRemove(id: string): Op {
   return {
-    run: (d) => (d.items.some((i) => i.id === id) ? ok(removeItem(d, id)) : skip(d))
+    run: (d) => (d.items.some((i) => i.id === id) ? ok(removeItem(d, id)) : skip(d)),
+    pack: () => ({ k: 'remove', id })
   }
 }
 
 export function opMute(muted: boolean): Op {
   return {
-    run: (d) => (d.muted === muted ? skip(d) : ok({ ...d, muted }))
+    run: (d) => (d.muted === muted ? skip(d) : ok({ ...d, muted })),
+    pack: () => ({ k: 'mute', m: muted })
   }
 }
 
 export function opAddShop(name: string, note: string, at = Date.now()): Op {
   const item: ShopItem = { id: byId(), name: cleanName(name), note: cleanNote(note), done: false, addedAt: at }
   return {
-    run: (d) => {
+    run: (d, ctx) => {
       if (!item.name) return skip(d, { id: null })
-      const out = addShopAs(d, item)
+      const out = addShopAs(d, item, ctx)
       return out.full ? skip(out.doc, { id: null }) : ok(out.doc, { id: out.id })
-    }
+    },
+    pack: () => ({ k: 'shop', i: item })
   }
 }
 
 export function opToggleShop(id: string): Op {
   return {
-    run: (d) => (d.list.some((s) => s.id === id) ? ok(toggleShop(d, id)) : skip(d))
+    run: (d, ctx) => (d.list.some((s) => s.id === id) ? ok(toggleShop(d, id, ctx)) : skip(d)),
+    pack: () => ({ k: 'shopT', id })
   }
 }
 
 export function opRemoveShop(id: string): Op {
   return {
-    run: (d) => (d.list.some((s) => s.id === id) ? ok(removeShop(d, id)) : skip(d))
+    run: (d) => (d.list.some((s) => s.id === id) ? ok(removeShop(d, id)) : skip(d)),
+    pack: () => ({ k: 'shopR', id })
   }
 }
 
 export function opClearBought(): Op {
   return {
-    run: (d) => (d.list.some((s) => s.done) ? ok(clearBought(d)) : skip(d))
+    run: (d) => (d.list.some((s) => s.done) ? ok(clearBought(d)) : skip(d)),
+    pack: () => ({ k: 'clear' })
+  }
+}
+
+/**
+ * Rebuilds an op from its receipt payload. Anything malformed returns null -
+ * a corrupt receipt entry is dropped, never replayed half-parsed.
+ */
+export function unpackOp(w: unknown): Op | null {
+  if (typeof w !== 'object' || w === null) return null
+  const o = w as Record<string, unknown>
+  switch (o.k) {
+    case 'add':
+      if (!isItem(o.i)) return null
+      return {
+        run: (d, ctx) => {
+          const out = addItemAs(d, o.i as Item, ctx)
+          return out.full ? skip(out.doc) : ok(out.doc)
+        },
+        pack: () => ({ k: 'add', i: o.i as Item })
+      }
+    case 'step':
+      if (typeof o.id !== 'string' || (o.d !== 'use' && o.d !== 'restock')) return null
+      return opStep(o.id, o.d)
+    case 'update':
+      if (!isItem(o.i)) return null
+      return opUpdate(o.i as Item)
+    case 'remove':
+      if (typeof o.id !== 'string') return null
+      return opRemove(o.id)
+    case 'mute':
+      if (typeof o.m !== 'boolean') return null
+      return opMute(o.m)
+    case 'shop':
+      if (!isShopItem(o.i)) return null
+      return {
+        run: (d, ctx) => {
+          const out = addShopAs(d, o.i as ShopItem, ctx)
+          return out.full ? skip(out.doc) : ok(out.doc)
+        },
+        pack: () => ({ k: 'shop', i: o.i as ShopItem })
+      }
+    case 'shopT':
+      if (typeof o.id !== 'string') return null
+      return opToggleShop(o.id)
+    case 'shopR':
+      if (typeof o.id !== 'string') return null
+      return opRemoveShop(o.id)
+    case 'clear':
+      return opClearBought()
+    default:
+      return null
   }
 }

@@ -22,10 +22,18 @@
   high-watermark coverage, replay over any adopted base, keep deletes through
   tombstones and retry honestly on storage failures, so rapid input, two-copy
   writes and delayed watch echoes cannot drop an accepted change. Adoption is
-  a causal union - attested rows, tombstones and coverage merge into the new
-  base and a repair write restores what a stale whole-blob flight erased - so
-  a peer op stays immortal in every copy that observed it; unattested blobs
-  fold empty and legacy pre-protocol documents still adopt wholesale.
+  a coverage-gated causal union - a wholly-covered document contributes no
+  rows, a covered `src` provenance marks a deliberately dropped row, and a
+  repair write restores what a stale whole-blob flight erased - so a peer op
+  stays immortal in every copy that observed it; unattested blobs fold empty
+  and legacy pre-protocol documents still adopt wholesale.
+- Made same-batch merging exact under replay: ops stamp row provenance
+  (`src`), and merge folds batch siblings so a replayed duplicate drops and
+  genuinely concurrent adds sum onto the canonical row.
+- Added per-display operation receipts (`pantry-ops-cover` /
+  `pantry-ops-inner`): a bounded durable op log per display written before
+  its document commit, so a confirmed op survives even when every engine
+  that saw it was torn down before a stale write landed.
 - Soft synth cues on add, use, restock, check and delete, gated on the SDK's
   synchronous `os.view` visible and active pair (timers, focus and every
   deferred callback re-check at execution; already-admitted writes still

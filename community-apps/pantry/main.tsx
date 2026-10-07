@@ -69,16 +69,31 @@ import { type DocStore, PantrySync, type SyncStatus } from './sync.ts'
 const ME = crypto.randomUUID()
 
 // The engine's storage adapter: the real os.storage channel, scoped to the
-// app's document key. Deterministic tests drive the same interface.
+// app's document key plus one receipt key per display slot. Deterministic
+// tests drive the same interface.
+const SLOT = os.view.display
 const docStore: DocStore = {
   get: () => os.storage.get('pantry-v1'),
   set: (v) => os.storage.set('pantry-v1', v).then((c) => c.rev),
   watch: (cb) =>
     os.storage.watch(0, (c) => {
       // The resync sentinel (rev -1) has no key; anything else must be ours.
-      if (c.rev !== -1 && c.k !== 'pantry-v1') return
-      cb({ rev: c.rev, v: c.v ?? undefined })
-    })
+      if (c.rev === -1) {
+        cb({ rev: c.rev })
+        return
+      }
+      if (c.k === 'pantry-v1') {
+        cb({ rev: c.rev, v: c.v ?? undefined })
+        return
+      }
+      if (c.k.startsWith('pantry-ops-')) {
+        cb({ rev: c.rev, v: c.v ?? undefined, slot: c.k.slice('pantry-ops-'.length) })
+      }
+    }),
+  ops: {
+    get: (slot) => os.storage.get(`pantry-ops-${slot}`),
+    set: (slot, v) => os.storage.set(`pantry-ops-${slot}`, v).then((c) => c.rev)
+  }
 }
 
 type Draft = { name: string; qty: string; unit: Unit; location: Location; date: string }
@@ -209,6 +224,8 @@ function Pantry() {
     const sync = new PantrySync({
       me: ME,
       store: docStore,
+      slot: SLOT,
+      peerSlots: ['cover', 'inner'],
       onDoc: (d) => {
         docRef.current = d
         setDoc(d)

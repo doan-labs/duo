@@ -46,27 +46,50 @@ copy's `seq`; a write commits base + replayed intents plus per-writer
 high-watermarks (`high`), so a settled document provably shows which ops it
 contains.
 
-Adoption is a causal union, never a wholesale replacement. A whole-blob write
-commits the payload it was staged on, so a set flight staged before a peer's
-commit landed can physically erase rows the store had already confirmed.
-The engine keeps the last settled base separate from the view; when a newer
-`rev` folds in, the view's attested rows, tombstones and coverage union into
-the base rather than regressing, and an event at an older `rev` still merges
-any committed content the view lacks - delivery order is not causal order.
-When the view then carries rows, tombstones or muted state the base lacks, a
-repair write re-commits them, so a peer's confirmed op stays immortal in
-every copy that observed it (and in any copy its surviving peers keep
-carrying). Two edges stay honest: only attested documents adopt or merge -
-every protocol write stamps `{by, s}` and `high`, so a blob with rows but no
-marks is forged or corrupt and folds empty - and legacy pre-protocol
-documents (`v != 2`) still adopt wholesale, because last-writer-wins is the
-only honest reading of a blob that cannot say what it covered. Bare mark
-advances never trigger a write on their own, so two copies cannot ping-pong
-over provenance. The one residual hole is inherent to a mutable whole blob
-with no per-writer keys: an op committed on the wire and then erased by a
-stale flight cannot be recovered if no surviving copy ever observed it and
-its own event never reaches a live engine - durability lives in what live
-copies have seen.
+Adoption is a causal union, never a wholesale replacement - and the union is
+gated by coverage. A whole-blob write commits the payload it was staged on,
+so a set flight staged before a peer's commit landed can physically erase
+rows the store had already confirmed. The engine keeps the last settled base
+separate from the view; when a newer `rev` folds in, the view's rows merge
+into the base only where they carry information the base lacks: a document
+whose `high` marks are wholly covered by the current one contributes nothing
+(everything it attests is already applied, so a row only it carries was
+dropped on purpose - tombstoned or cap-evicted, never resurrected), and a
+row whose `src` provenance is already covered was deliberately absent. Rows
+without provenance are adopted conservatively. Tombstones union so real
+deletes stay dead, and each writer's mark takes the max. When the view then
+carries content the base lacks, a repair write re-commits it.
+
+Every op run also stamps its `{writer: seq}` onto the row it touched, which
+makes same-batch convergence exact: a replayed add that merges into a peer's
+row would otherwise leave the replaying copy's own-id row behind and
+double-count the op. Merge folds rows in the same batch (name, unit, shelf,
+date): a row whose `src` is a subset of a sibling's is a replayed duplicate
+and drops; rows with disjoint `src` are genuinely concurrent adds and sum
+onto the lowest-id canonical row - the same result journal replay produces,
+so both displays settle on one row with the exact accepted quantity.
+
+Dead-writer teardowns ride operation receipts. A stale in-flight write that
+lands after every engine disposed would erase a peer's confirmed op even
+though a copy had observed it - the in-memory journal dies with its copy.
+Each display therefore keeps one bounded whole-value receipt log
+(`pantry-ops-cover` / `pantry-ops-inner`), written *before* its document
+commit: a relaunching copy replays receipt entries the settled document does
+not cover, then covers them and the next slot write trims them. The log only
+holds what the doc has not yet covered, so it stays bounded; covered entries
+are dropped lazily on the next write.
+
+Two edges stay honest: only attested documents adopt or merge - every
+protocol write stamps `{by, s}` and `high`, so a blob with rows but no marks
+is forged or corrupt and folds empty - and legacy pre-protocol documents
+(`v != 2`) still adopt wholesale, because last-writer-wins is the only
+honest reading of a blob that cannot say what it covered. Bare mark advances
+never trigger a write on their own, so two copies cannot ping-pong over
+provenance. The residual hole is narrower now and stated: under the real
+adapter both receipt keys exist and teardown recovery works; a single-key
+store with no receipt channel cannot preserve an op that every surviving
+copy failed to observe durably before a dead writer's stale commit landed -
+that is a property of the storage shape, not a waived defect.
 
 Admission is decided by `admission.ts` from the SDK's synchronous `os.view`
 (visible AND active) with `document.visibilityState` as a supplemental
@@ -93,6 +116,12 @@ calls, resync, reload, raced-out refreshes, admitted-before-hide completion,
 the held-set-flight peer-loss cases in both writer orders and both watch
 timings, delete-vs-stale-write, tombstone recovery through merges, a dispose
 with an in-flight write plus a re-kick parked, replay storms and a mixed
-legacy boot. `.tests/admission.test.ts` pins the admission contract: the
-truth table, same-turn flips, and the committed `live` callback evaluated
-against a stale React ref - the reviewer's original probe shape.
+legacy boot. `causality.test.ts` pins the three causal regressions: same-batch
+replay dedupe in both writer orders and repeated equivalent batches,
+shared-row stepper/edit races, dead-writer teardown recovery through the
+receipt slots in both orders (plus the honest single-key limit), tombstone
+cap replay never resurrecting, receipt coverage trimming, malformed slot
+blobs and shopping-row receipts. `.tests/admission.test.ts` pins the
+admission contract: the truth table, same-turn flips, and the committed
+`live` callback evaluated against a stale React ref - the reviewer's
+original probe shape.
