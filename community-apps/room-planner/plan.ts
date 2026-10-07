@@ -34,7 +34,7 @@ export type Library = {
   gone: Record<string, number>
 }
 export type Prefs = { units: Units; snap: number; muted: boolean }
-export type Mirror = { by: string; sel: string | null; doc: PlanDoc }
+export type Mirror = { by: string; at: number; sel: string | null; doc: PlanDoc }
 
 export type Piece = { kind: string; name: string; w: number; d: number; hue: number }
 /** The furniture palette: footprint in cm, hue index into the style palette. */
@@ -428,14 +428,16 @@ export function parseMirror(raw: string | null): Mirror | null {
     const doc = cleanDoc(parsed.doc)
     if (!doc) return null
     const sel = typeof parsed.sel === 'string' && doc.items[parsed.sel] ? parsed.sel : null
-    return { by: parsed.by, sel, doc }
+    // A payload without a stamp falls back to the doc's own version: it is
+    // the best ordering hint an older writer could leave.
+    return { by: parsed.by, at: num(parsed.at, doc.updated), sel, doc }
   } catch {
     return null
   }
 }
 
-export const serializeMirror = (by: string, doc: PlanDoc, sel: string | null) =>
-  JSON.stringify({ by, sel, doc } satisfies Mirror)
+export const serializeMirror = (by: string, doc: PlanDoc, sel: string | null, at = Date.now()) =>
+  JSON.stringify({ by, at, sel, doc } satisfies Mirror)
 
 export const withDoc = (lib: Library, doc: PlanDoc): Library => ({ ...lib, plans: { ...lib.plans, [doc.id]: doc } })
 

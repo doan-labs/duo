@@ -55,6 +55,7 @@ import {
   ZOOM_MIN
 } from './plan.ts'
 import { COVER_PEEK, HUES, HUES_DARK, styles } from './styles.ts'
+import { admitEditorKey, DocSync } from './sync.ts'
 
 // Why a writer id: both displays share one session key whose store is
 // last-writer-wins, so a value not written by this copy is always the newer
@@ -67,6 +68,10 @@ const PREF_KEY = 'roomplanner-prefs'
 // One persistence adapter per copy: its pending intents and committed union
 // are the convergence state the other display's writes race against.
 const libStore = new LibStore(os.storage)
+// One session-authority marker per copy: mirrors adopt only when they beat
+// the wire state this copy last published or accepted, so a delayed or stale
+// payload can never regress the doc on screen.
+const wire = new DocSync(ME)
 
 // os.view is mutated synchronously on every view event, so reading it at
 // admission time sees the current flags - the React copy (useDisplay) can lag
@@ -378,7 +383,12 @@ function RoomPlanner() {
   const docRef = useRef(doc)
   // Newest foreign doc write seen on the wire, for the stale-base publish guard.
   const remoteDoc = useRef<{ id: string; updated: number } | null>(null)
+  // Modal authority: while a confirmation sheet is up, document-level editor
+  // shortcuts must not reach the plan beneath it. The ref is synced in render
+  // so a same-turn keydown never sees a stale value.
+  const modalRef = useRef(confirm !== null)
   docRef.current = doc
+  modalRef.current = confirm !== null
   const selRef = useRef(sel)
   selRef.current = sel
   const histRef = useRef(hist)
@@ -456,6 +466,10 @@ function RoomPlanner() {
     // unfold, before hydration settles). Adoption is already replaying the
     // fresher doc; this edit is dropped rather than clobbering the peer.
     if (before && before.id === next.id && isOlderEdit(before, remoteDoc.current)) return
+    // A callback republishing a captured doc older than the current one (a
+    // delayed fit/observer fire) would regress name/room/items on screen and
+    // back over the wire: decline it - a stale payload is not user work.
+    if (before && before.id === next.id && next.updated < before.updated) return
     if (!opts.skipHist && before && before.id === next.id) {
       const prev = opts.prev ?? coreOf(before)
       setHist((h) => commitHistory(h, prev, coreOf(next), opts.tag ?? null))
@@ -464,7 +478,8 @@ function RoomPlanner() {
     setDoc(next)
     if (opts.sel !== undefined) setSel(opts.sel)
     saveDoc(next)
-    void os.session.set(DOC_KEY, serializeMirror(ME, next, selNow)).catch(() => {})
+    const at = wire.stamp(next)
+    void os.session.set(DOC_KEY, serializeMirror(ME, next, selNow, at)).catch(() => {})
   }
   // Once-registered listeners (keyboard, session watch) call through refs so
   // they never need to re-subscribe on every render.
@@ -558,9 +573,10 @@ function RoomPlanner() {
             if (docRef.current !== null || remoteDoc.current !== null) return
             // The confirmed union can carry a newer peer doc: adopt what won.
             const openNow = latestDoc(wrote.lib) ?? open
+            const at = wire.stamp(openNow)
             setDoc(openNow)
             setSel(null)
-            await os.session.set(DOC_KEY, serializeMirror(ME, openNow, null)).catch(() => {})
+            await os.session.set(DOC_KEY, serializeMirror(ME, openNow, null, at)).catch(() => {})
             return
           }
           // Never seeded: reopen the gate so a later storage recovery or fold
@@ -576,6 +592,10 @@ function RoomPlanner() {
       remoteDoc.current = { id: next.doc.id, updated: next.doc.updated }
     }
     const now = docRef.current
+    // Wire authority before any state moves: a delayed or out-of-order payload
+    // (a peer's stale republish, a mirror that predates our plan switch) must
+    // never regress the doc, its history or the selection on screen.
+    if (!wire.admit(next, now)) return
     // Keep this copy's own view for the plan it already framed: a remote fit
     // was computed for a different canvas and must not replace the local one.
     const keep = now?.id === next.doc.id && framedDoc.current === next.doc.id
@@ -638,6 +658,12 @@ function RoomPlanner() {
       const box = el.getBoundingClientRect()
       if (!box.width || !box.height) return
       lastBox.current = { w: box.width, h: box.height }
+      // A fit that runs late must serve the doc on screen now, not the one
+      // this callback captured: edits between schedule and fire made the
+      // capture stale, and republishing its core would erase newer work on
+      // both displays (the stale frame only knows an old room and item set).
+      const cur = docRef.current
+      if (!cur || cur.id !== doc.id) return
       framedDoc.current = doc.id
       // The zoom dock and the room's top dimension label ride the canvas's
       // upper edge: the fit reserves more headroom up top than at the sides
@@ -650,17 +676,17 @@ function RoomPlanner() {
       const padBot = 34 + (wide ? 0 : COVER_PEEK)
       const zoom = Math.max(
         ZOOM_MIN,
-        Math.min(ZOOM_MAX, Math.min((box.width - padX * 2) / doc.room.w, (box.height - padTop - padBot) / doc.room.d))
+        Math.min(ZOOM_MAX, Math.min((box.width - padX * 2) / cur.room.w, (box.height - padTop - padBot) / cur.room.d))
       )
-      const next = setView(doc, {
-        x: (-doc.room.w / 2) * zoom,
-        y: (-doc.room.d / 2) * zoom + (padTop - padBot) / 2,
+      const next = setView(cur, {
+        x: (-cur.room.w / 2) * zoom,
+        y: (-cur.room.d / 2) * zoom + (padTop - padBot) / 2,
         zoom,
         framed: true
       })
       // A fit that lands where the view already is carries no information:
       // skipping it keeps an adopted remote view from echoing straight back.
-      const v = doc.view
+      const v = cur.view
       if (
         v.framed === next.view.framed &&
         Math.abs(v.x - next.view.x) < 0.01 &&
@@ -669,13 +695,14 @@ function RoomPlanner() {
       )
         return
       setDoc(next)
-      // Framing a stale doc must not push it back over a newer remote write.
-      if (!isOlderEdit(doc, remoteDoc.current)) {
+      // Framing a doc behind the newest remote write must not push it back.
+      if (!isOlderEdit(next, remoteDoc.current)) {
         void libStore.write((lib) => {
           const existing = lib.plans[next.id]
           return !existing || existing.updated < next.updated ? withDoc(lib, next) : null
         })
-        void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current)).catch(() => {})
+        const at = wire.stamp(next)
+        void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current, at)).catch(() => {})
       }
     }
     const f = requestAnimationFrame(() => {
@@ -712,10 +739,12 @@ function RoomPlanner() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // A hidden or inactive copy admits no keys: a forged keydown must not
-      // move, delete, undo or write. Gestures admitted while live still run.
-      if (!liveNow()) return
+      // move, delete, undo or write. While a confirmation sheet is up the
+      // modal owns the document: no editor shortcut reaches the plan beneath
+      // it (the sheet's own keys - focus nav, Escape, its buttons - are not
+      // consumed here). Gestures admitted while live still run.
       const at = e.target as HTMLElement
-      if (at.closest('input, textarea, select')) return
+      if (!admitEditorKey(liveNow(), modalRef.current, !!at.closest('input, textarea, select'))) return
       const now = docRef.current
       if (!now) return
       const mod = e.metaKey || e.ctrlKey
@@ -793,8 +822,10 @@ function RoomPlanner() {
 
   const zoomBy = (factor: number) => {
     if (!liveNow()) return
-    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor))
-    publish(setView(doc, { ...doc.view, zoom: z, framed: false }))
+    const now = docRef.current
+    if (!now) return
+    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, now.view.zoom * factor))
+    publish(setView(now, { ...now.view, zoom: z, framed: false }))
   }
   const zoomAt = (px: number, py: number, factor: number) => {
     if (!liveNow()) return
@@ -815,34 +846,45 @@ function RoomPlanner() {
   const fit = () => {
     if (!liveNow()) return
     const box = canvasRef.current?.getBoundingClientRect()
-    if (!box?.width || !box.height) return
-    const b = docBounds(doc)
+    const now = docRef.current
+    if (!box?.width || !box.height || !now) return
+    const b = docBounds(now)
     const pad = 34
     const z = Math.min(
       ZOOM_MAX,
       Math.max(ZOOM_MIN, Math.min((box.width - pad * 2) / b.w, (box.height - pad * 2) / b.h))
     )
-    publish(setView(doc, { x: -b.cx * z, y: -b.cy * z, zoom: z, framed: true }))
+    publish(setView(now, { x: -b.cx * z, y: -b.cy * z, zoom: z, framed: true }))
   }
 
   const undo = () => {
     if (!liveNow()) return
-    const r = undoHistory(hist, coreOf(doc))
+    const now = docRef.current
+    if (!now) return
+    const r = undoHistory(histRef.current, coreOf(now))
     if (!r.core) return
     setHist(r.h)
-    const next = withCore(doc, r.core)
+    const next = withCore(now, r.core)
     setArming(null)
-    publish(next, { sel: sel && next.items[sel] ? sel : null, skipHist: true })
+    publish(next, {
+      sel: selRef.current && next.items[selRef.current] ? selRef.current : null,
+      skipHist: true
+    })
     sound('undo')
   }
   const redo = () => {
     if (!liveNow()) return
-    const r = redoHistory(hist, coreOf(doc))
+    const now = docRef.current
+    if (!now) return
+    const r = redoHistory(histRef.current, coreOf(now))
     if (!r.core) return
     setHist(r.h)
-    const next = withCore(doc, r.core)
+    const next = withCore(now, r.core)
     setArming(null)
-    publish(next, { sel: sel && next.items[sel] ? sel : null, skipHist: true })
+    publish(next, {
+      sel: selRef.current && next.items[selRef.current] ? selRef.current : null,
+      skipHist: true
+    })
     sound('undo')
   }
 
@@ -850,7 +892,9 @@ function RoomPlanner() {
 
   const spawn = (kind: string) => {
     if (!liveNow()) return
-    if (count >= ITEM_LIMIT) {
+    const now = docRef.current
+    if (!now) return
+    if (Object.keys(now.items).length >= ITEM_LIMIT) {
       sound('error')
       return
     }
@@ -858,12 +902,12 @@ function RoomPlanner() {
     if (!piece) return
     // New pieces land at the middle of what this display is looking at,
     // snapped if snapping is on - visible placement, never a surprise corner.
-    const wx = -doc.view.x / zoom || 0
-    const wy = -doc.view.y / zoom || 0
-    const snap = prefs.snap
-    const tx = Math.min(doc.room.w - piece.w / 2, Math.max(piece.w / 2, snap > 0 ? snapTo(wx, snap) : wx))
-    const ty = Math.min(doc.room.d - piece.d / 2, Math.max(piece.d / 2, snap > 0 ? snapTo(wy, snap) : wy))
-    const { doc: next, id } = addItem(doc, kind, tx, ty)
+    const wx = -now.view.x / now.view.zoom || 0
+    const wy = -now.view.y / now.view.zoom || 0
+    const snap = prefsRef.current.snap
+    const tx = Math.min(now.room.w - piece.w / 2, Math.max(piece.w / 2, snap > 0 ? snapTo(wx, snap) : wx))
+    const ty = Math.min(now.room.d - piece.d / 2, Math.max(piece.d / 2, snap > 0 ? snapTo(wy, snap) : wy))
+    const { doc: next, id } = addItem(now, kind, tx, ty)
     if (!id) {
       sound('error')
       return
@@ -874,21 +918,27 @@ function RoomPlanner() {
   }
   const rotateSel = (dir: 1 | -1) => {
     if (!liveNow()) return
-    if (!selected) return
-    publish(rotateItem(doc, selected.id, dir))
+    const now = docRef.current
+    const id = selRef.current
+    if (!now || !id || !now.items[id]) return
+    publish(rotateItem(now, id, dir))
     sound('rotate')
   }
   const dropSel = () => {
     if (!liveNow()) return
-    if (!selected) return
-    publish(removeItem(doc, selected.id), { sel: null })
+    const now = docRef.current
+    const id = selRef.current
+    if (!now || !id || !now.items[id]) return
+    publish(removeItem(now, id), { sel: null })
     setArming(null)
     sound('delete')
   }
   const commitRoom = (w: number, d: number) => {
     if (!liveNow()) return
-    const next = resizeRoom(doc, w, d)
-    if (next === doc) return
+    const now = docRef.current
+    if (!now) return
+    const next = resizeRoom(now, w, d)
+    if (next === now) return
     publish(next, { sel: null, tag: 'room' })
     sound('settle')
   }
@@ -906,15 +956,16 @@ function RoomPlanner() {
   const doClear = () => {
     if (!liveNow()) return
     setConfirm(null)
-    if (!count) return
-    publish(clearItems(doc), { sel: null })
+    const now = docRef.current
+    if (!now || !Object.keys(now.items).length) return
+    publish(clearItems(now), { sel: null })
     setArming(null)
     sound('delete')
   }
 
   const openPlan = (id: string) => {
     if (!liveNow()) return
-    if (id === doc.id) return
+    if (id === docRef.current?.id) return
     // Read the library fresh: the KV mirror can lag while this copy is
     // occluded, so a plan the other display just made may not be listed yet.
     void (async () => {
@@ -939,10 +990,12 @@ function RoomPlanner() {
   }
   const dupPlan = () => {
     if (!liveNow()) return
+    const now = docRef.current
+    if (!now) return
     const copy: PlanDoc = {
-      ...doc,
+      ...now,
       id: crypto.randomUUID().slice(0, 8),
-      name: `${doc.name} copy`.slice(0, 48),
+      name: `${now.name} copy`.slice(0, 48),
       updated: Date.now()
     }
     framedDoc.current = null
@@ -974,9 +1027,10 @@ function RoomPlanner() {
         await libStore.write((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
         framedDoc.current = null
         setHist(emptyHistory())
+        const at = wire.stamp(open)
         setDoc(open)
         setSel(null)
-        void os.session.set(DOC_KEY, serializeMirror(ME, open, null)).catch(() => {})
+        void os.session.set(DOC_KEY, serializeMirror(ME, open, null, at)).catch(() => {})
       }
     })()
     sound('delete')
@@ -1236,7 +1290,8 @@ function RoomPlanner() {
           if (!liveNow()) return
           // Whitespace alone is not a name; typing it would blank the plan
           // row everywhere, so nothing below the trim publishes.
-          if (e.target.value.trim()) publish(renameDoc(doc, e.target.value), { tag: 'name' })
+          const now = docRef.current
+          if (now && e.target.value.trim()) publish(renameDoc(now, e.target.value), { tag: 'name' })
         }}
       />
       <div {...stylex.props(styles.fieldRow)}>
@@ -1365,7 +1420,10 @@ function RoomPlanner() {
       <button
         type="button"
         aria-label="Reset zoom to 100 percent"
-        onClick={() => publish(setView(doc, { ...doc.view, zoom: 1 }))}
+        onClick={() => {
+          const now = docRef.current
+          if (now) publish(setView(now, { ...now.view, zoom: 1, framed: false }))
+        }}
         {...stylex.props(styles.zoomPct, shared.press)}
       >
         {Math.round(zoom * 100)}%
