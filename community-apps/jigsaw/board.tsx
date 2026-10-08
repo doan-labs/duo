@@ -25,7 +25,8 @@ import {
   piecePath,
   placedCount,
   SNAP,
-  tabReach
+  tabReach,
+  trayCount
 } from './puzzle.ts'
 import { press, styles } from './styles.ts'
 
@@ -497,7 +498,10 @@ export function TrayPane({
 }) {
   const grid = useMemo(() => gridOf(game), [game])
   const list = useMemo(() => filterTray(game, filter), [game, filter])
-  const left = looseCount(game)
+  const loose = looseCount(game)
+  // The denominator is the actual tray population - felt pieces are not in
+  // the tray even when no filter hides them.
+  const total = trayCount(game)
   return (
     <div
       {...stylex.props(styles.rail, compact && styles.railCover)}
@@ -505,9 +509,16 @@ export function TrayPane({
     >
       <div {...stylex.props(styles.railHead)}>
         <span {...stylex.props(styles.railTitle)}>Tray</span>
-        <span {...stylex.props(styles.railTitle, styles.railCount)}>
-          {list.length}
-          {filter === 'all' ? '' : ` of ${left}`}
+        <span
+          {...stylex.props(styles.railTitle, styles.railCount)}
+          role="status"
+          aria-label={
+            filter === 'all'
+              ? `${total} pieces in the tray`
+              : `${list.length} of ${total} tray pieces match this filter`
+          }
+        >
+          {filter === 'all' ? total : `${list.length} of ${total}`}
         </span>
         <div role="radiogroup" aria-label="Filter pieces" {...stylex.props(styles.segTrack)}>
           {(['all', 'corner', 'edge'] as const).map((f) => (
@@ -528,7 +539,11 @@ export function TrayPane({
       <div {...stylex.props(styles.trayBox)}>
         {list.length === 0 ? (
           <p {...stylex.props(styles.trayEmpty)}>
-            {left === 0 ? 'All pieces are placed.' : 'No pieces match this filter.'}
+            {total === 0
+              ? loose === 0
+                ? 'All pieces are placed.'
+                : 'All pieces are on the board.'
+              : 'No pieces match this filter.'}
           </p>
         ) : (
           <div {...stylex.props(styles.trayGrid)} role="listbox" aria-label="Tray pieces">

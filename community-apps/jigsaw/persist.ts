@@ -16,14 +16,18 @@ import { type ArtId, isArtId } from './art.ts'
 import {
   COUNTS,
   type Count,
+  configKey,
   type Game,
   gameKeyOf,
   type Live,
   newerDoc,
+  newerGame,
   parseLive,
   parseSaves,
   type Saves,
-  serializeSaves
+  sameGame,
+  serializeSaves,
+  unionGames
 } from './puzzle.ts'
 import { enqueue } from './queue.ts'
 
@@ -83,6 +87,16 @@ export function parsePrefsDoc(raw: string | null): PrefsDoc {
 /** Lamport clock for one shared key: the revision/writer last accepted. */
 export type Clock = { rev: number; by: string }
 
+/** Merge an adopted saves envelope with the mirror's pending library. Games
+ * are per-key unioned so exclusive keys the incoming doc lacks stay pending;
+ * `missing` reports whether the adopted doc was behind that union (and thus
+ * needs one bounded heal to restore the durable copy). */
+export function mergedSaves(prevRaw: string | null, env: Saves): { doc: Saves; missing: boolean } {
+  const merged = unionGames(env.games, parseSaves(prevRaw)?.games ?? {})
+  const missing = Object.keys(merged).some((k) => !(k in env.games) || !sameGame(merged[k]!, env.games[k]!))
+  return { doc: { ...env, games: merged }, missing }
+}
+
 // ---------- live + saves pair ----------
 
 export type MutationCtx = { game: Game | null; held: number | null; saves: Record<string, Game> }
@@ -116,16 +130,23 @@ export function createGamePersistence(deps: {
   refs: { game: { current: Game | null }; held: { current: number | null } }
   /** A foreign live doc won the revision race: apply it to UI and clocks. */
   adopt(doc: Live): void
-  /** A foreign saves envelope won: bump the clock and keep the raw doc. */
+  /** A foreign saves envelope won: bump the clock and keep the raw doc.
+   * Implementations must store `mergedSaves(prev, sd).doc`, never the bare
+   * envelope, so pending keys survive adoption. */
   acceptSaves(sd: Saves): void
-  /** Persist the mutation: state setters plus both KV writes. */
-  apply(payload: GameApply): void
+  /** Persist the mutation: state setters plus both KV writes. Returned
+   * promise (if any) is awaited as the write acknowledgement before the
+   * bounded close-out read runs. */
+  apply(payload: GameApply): unknown
   /** Publish only the live doc (heals never touch the library). */
   writeLive(raw: string): void
   /** Publish only the saves doc. */
   writeSaves(raw: string): void
   /** The last accepted saves envelope, for republishing on a heal. */
   savesDoc(): Saves | null
+  /** A union repair surfaced a newer game for the current puzzle: swap it in
+   * locally so the UI follows the state that actually survived. */
+  adoptGame?(g: Game): void
 }): {
   /** Runs a mutation after confirmed reads. `bind` is the gameKeyOf the intent
    * was admitted against: a different puzzle live by step time drops it. */
@@ -183,9 +204,9 @@ export function createGamePersistence(deps: {
         deps.clocks.saves.by = deps.me
         // The store doc can hold saves our mirror never saw (a peer write
         // that landed between our last accepted envelope and this read).
-        // Republish union-style: their keys survive, our pending ones win.
+        // Republish union-style: every key survives, per-key newer wins.
         deps.writeSaves(
-          serializeSaves({ ...mine, games: { ...sd.games, ...mine.games }, rev: deps.clocks.saves.rev, by: deps.me })
+          serializeSaves({ ...mine, games: unionGames(sd.games, mine.games), rev: deps.clocks.saves.rev, by: deps.me })
         )
       })
     },
@@ -202,24 +223,33 @@ export function createGamePersistence(deps: {
         }
         const sd = parseSaves(savesRaw)
         if (newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) deps.acceptSaves(sd)
-        // A piece id admitted against one puzzle means nothing on another: if
-        // the live puzzle changed (peer switch, seed rollover) the intent dies
-        // here rather than mutating a game it was never aimed at.
-        if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
         // The queue serializes reads/rebases, not durable delivery: a
         // confirmed read can still lag behind writes this copy already
-        // accepted (mirror sets fire-and-forget). When the store doc is not
-        // newer than our last accepted envelope, that envelope is the better
-        // library - it carries the pending games a bare rebase would drop.
-        // A newer store doc has just been adopted above, so savesDoc() is the
-        // union winner in both cases; on a cold start it falls back to the
-        // confirmed read.
-        const lib = (deps.savesDoc() ?? sd).games
+        // accepted (mirror sets fire-and-forget). The library is always the
+        // per-key union of the store doc and our last accepted envelope, so
+        // an equal-revision racer's exclusive keys survive whoever wins the
+        // writer tie-break.
+        const lib = unionGames(sd.games, deps.savesDoc()?.games ?? {})
+        // The freshest base for the running puzzle can also sit in the
+        // library: a peer that advanced the same config and saved before its
+        // live doc reached us must not be overwritten by our stale state.
+        if (base) {
+          const alt = lib[configKey(base.art, base.count)]
+          if (alt && newerGame(alt, base) !== base) {
+            base = alt
+            heldBase = null
+          }
+        }
+        // A piece id admitted against one puzzle means nothing on another: if
+        // the live puzzle changed (peer switch, seed rollover, a reset that
+        // bumped the incarnation) the intent dies here rather than mutating a
+        // game it was never aimed at.
+        if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
         const r = fn({ game: base, held: heldBase, saves: lib })
         if (!r) return
         deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
         deps.clocks.live.by = deps.me
-        deps.clocks.saves.rev += 1
+        deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
         deps.clocks.saves.by = deps.me
         const key = `${r.next.art}:${r.next.count}`
         const savesDoc: Saves = {
@@ -241,7 +271,33 @@ export function createGamePersistence(deps: {
           saves: serializeSaves(savesDoc),
           savesDoc
         }
-        deps.apply(payload)
+        await deps.apply(payload)
+        // Acknowledged close-out: now that our sets have landed, read the
+        // durable doc back once. A foreign envelope that raced our confirmed
+        // read - including one whose writer has since ended - is adopted or
+        // unioned and republished once, so our write can never be the last
+        // word on a regressed library. A rejected read just skips the check:
+        // the acknowledged write stands and the heal/watch path converges.
+        try {
+          const back = parseSaves(await deps.savesKV.get(deps.savesKey))
+          if (back.rev === savesDoc.rev && back.by === deps.me) return
+          if (back.by !== deps.me && newerDoc(back.rev, back.by, deps.clocks.saves.rev, deps.clocks.saves.by))
+            deps.acceptSaves(back)
+          const unioned = unionGames(back.games, savesDoc.games)
+          const learned = Object.keys(unioned).some(
+            (k) => !(k in savesDoc.games) || !sameGame(unioned[k]!, savesDoc.games[k]!)
+          )
+          if (!learned) return
+          const missing = Object.keys(unioned).some((k) => !(k in back.games) || !sameGame(unioned[k]!, back.games[k]!))
+          const winner = unioned[key]
+          if (winner && !sameGame(winner, r.next)) deps.adoptGame?.(winner)
+          if (!missing) return
+          deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, back.rev) + 1
+          deps.clocks.saves.by = deps.me
+          deps.writeSaves(serializeSaves({ rev: deps.clocks.saves.rev, by: deps.me, current: key, games: unioned }))
+        } catch {
+          // Advisory only.
+        }
       })
     }
   }

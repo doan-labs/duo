@@ -4,7 +4,14 @@
 // reports as a failure).
 
 import { ARTS, isArtId } from './art.ts'
-import { admitInput, createGamePersistence, createPrefsPersistence, PREFS0, parsePrefsDoc } from './persist.ts'
+import {
+  admitInput,
+  createGamePersistence,
+  createPrefsPersistence,
+  mergedSaves,
+  PREFS0,
+  parsePrefsDoc
+} from './persist.ts'
 import {
   BOARD_H,
   BOARD_W,
@@ -22,6 +29,7 @@ import {
   looseCount,
   makeGrid,
   newerDoc,
+  newerGame,
   newGame,
   parseGame,
   parseLive,
@@ -33,11 +41,14 @@ import {
   resetGame,
   type Saves,
   SNAP,
+  sameGame,
   sendToTray,
   serializeGame,
   serializeSaves,
   slotX,
-  slotY
+  slotY,
+  trayCount,
+  unionGames
 } from './puzzle.ts'
 import { enqueue } from './queue.ts'
 
@@ -406,7 +417,12 @@ class FakeKV {
 }
 
 function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
-  const state = { game: null as Game | null, adopted: [] as string[], savesRaw: null as string | null }
+  const state = {
+    game: null as Game | null,
+    adopted: [] as string[],
+    adoptedGames: [] as Game[],
+    savesRaw: null as string | null
+  }
   const clocks = { live: { rev: 0, by: '' }, saves: { rev: 0, by: '' } }
   const refs = { game: { current: null as Game | null }, held: { current: null as number | null } }
   const queue = { current: Promise.resolve() as Promise<unknown> }
@@ -430,7 +446,8 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
     acceptSaves(sd) {
       clocks.saves.rev = sd.rev
       clocks.saves.by = sd.by
-      state.savesRaw = serializeSaves(sd)
+      // Mirrors main.tsx: union into the mirror, never drop pending keys.
+      state.savesRaw = serializeSaves(mergedSaves(state.savesRaw, sd).doc)
     },
     apply(pl) {
       state.game = pl.game
@@ -449,6 +466,12 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
     },
     savesDoc() {
       return state.savesRaw ? parseSaves(state.savesRaw) : null
+    },
+    adoptGame(g) {
+      state.adoptedGames.push(g)
+      state.game = g
+      refs.game.current = g
+      refs.held.current = null
     }
   })
   return { p, state, clocks, refs }
@@ -528,7 +551,7 @@ await checkAsync('a bind-bound intent dies when the live puzzle is no longer the
   refs.game.current = mine
   // The admitted bind belongs to a different puzzle than what is live now.
   live.store.set('live', liveOf('peer', 4, newGame('alpine', 24, 7), null))
-  await p.act(() => ({ next: mine, held: 0 }), `harbour:12:${mine.seed}`)
+  await p.act(() => ({ next: mine, held: 0 }), gameKeyOf(mine))
   eq(live.sets.length + saves.sets.length, 0, 'a piece intent mutated a puzzle it was not admitted against')
 })
 
@@ -832,6 +855,187 @@ await checkAsync('a saves heal preserves keys the store has that our mirror neve
   eq(Object.keys(healed.games).sort(), ['alpine:24', 'harbour:12', 'lantern:48'], 'heal dropped a key from the union')
   eq(healed.games['alpine:24'], gAlpine, 'heal let a stale store overwrite our pending save')
   eq(healed.games['lantern:48'], gLantern, 'heal dropped a store key our mirror never saw')
+})
+
+// ---------- review round 5: collision, regression, reset, tray ----------
+
+await checkAsync('an equal-revision racer keeps every exclusive key: union mirror plus heal', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const g0 = newGame('harbour', 12, 1)
+  const seedDoc = serializeSaves({ rev: 4, by: 'old', current: 'harbour:12', games: { 'harbour:12': g0 } })
+  saves.store.set('saves', seedDoc)
+  const A = makePersist('copy-a', live, saves)
+  const B = makePersist('copy-b', live, saves)
+  A.clocks.saves = { rev: 4, by: 'old' }
+  B.clocks.saves = { rev: 4, by: 'old' }
+  A.state.savesRaw = seedDoc
+  B.state.savesRaw = seedDoc
+  A.refs.game.current = g0
+  B.refs.game.current = g0
+  // Both racers confirm the same rev-4 doc (B's read pins it), then both
+  // write rev 5: A adds alpine, B adds lantern, B's map lands last without
+  // alpine.
+  await A.p.act((ctx) => ({ next: ctx.saves['alpine:24'] ?? newGame('alpine', 24, 7), held: null }))
+  saves.getHook = async () => seedDoc
+  await B.p.act((ctx) => ({ next: ctx.saves['lantern:48'] ?? newGame('lantern', 48, 9), held: null }))
+  const racer = parseSaves(saves.store.get('saves')!)
+  eq(racer.rev, 5, 'equal-revision collision not modeled')
+  // The loser of the writer tie-break (A, smaller id) still holds alpine in
+  // its unioned mirror; its next confirmed read must republish the union.
+  A.refs.game.current = parseSaves(A.state.savesRaw!).games['alpine:24']!
+  await A.p.act((ctx) => (ctx.game ? { next: ctx.game, held: null } : null))
+  const final = parseSaves(saves.store.get('saves')!)
+  ok(final.games['alpine:24'] !== undefined, 'equal-rev race lost the exclusive alpine save')
+  ok(final.games['lantern:48'] !== undefined, 'union lost the winning racer lantern save')
+  ok(final.games['harbour:12'] !== undefined, 'union lost the seeded harbour save')
+})
+
+await checkAsync('a write that lands over a racing peer doc unions and republishes once', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const g0 = newGame('harbour', 12, 1)
+  const peerDoc = serializeSaves({
+    rev: 3,
+    by: 'peer',
+    current: 'lantern:48',
+    games: { 'harbour:12': g0, 'lantern:48': newGame('lantern', 48, 3) }
+  })
+  saves.store.set('saves', serializeSaves({ rev: 2, by: 'me', current: 'harbour:12', games: { 'harbour:12': g0 } }))
+  const P = makePersist('me', live, saves)
+  P.clocks.saves = { rev: 2, by: 'me' }
+  P.state.savesRaw = saves.store.get('saves')!
+  P.refs.game.current = g0
+  // Our write lands, then the peer's rev-3 envelope lands on top of it
+  // (real last-writer store order). The acknowledged close-out read must
+  // see it, union per key and republish - the peer copy may already be gone.
+  const rawSet = saves.set.bind(saves)
+  let overlaid = false
+  saves.set = async (k: string, v: string) => {
+    await rawSet(k, v)
+    if (!overlaid && k === 'saves') {
+      overlaid = true
+      saves.store.set('saves', peerDoc)
+    }
+  }
+  await P.p.act((ctx) => ({ next: ctx.saves['alpine:24'] ?? newGame('alpine', 24, 7), held: null }))
+  const final = parseSaves(saves.store.get('saves')!)
+  eq(
+    Object.keys(final.games).sort(),
+    ['alpine:24', 'harbour:12', 'lantern:48'],
+    'the close-out republish did not restore every key'
+  )
+  ok(final.rev > 3, 'the union republish did not advance the revision')
+})
+
+await checkAsync("a racing peer's deeper save for the current key is adopted after the write", async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const g0 = newGame('harbour', 12, 1)
+  const peerHarbour = placeAt(placeAt(g0, 0, 0, 0, 7).game, 1, 200, 200, 8).game
+  const peerDoc = serializeSaves({
+    rev: 3,
+    by: 'peer',
+    current: 'harbour:12',
+    games: { 'harbour:12': peerHarbour }
+  })
+  saves.store.set('saves', serializeSaves({ rev: 2, by: 'me', current: 'harbour:12', games: { 'harbour:12': g0 } }))
+  const P = makePersist('me', live, saves)
+  P.clocks.saves = { rev: 2, by: 'me' }
+  P.state.savesRaw = saves.store.get('saves')!
+  P.refs.game.current = g0
+  const rawSet = saves.set.bind(saves)
+  let overlaid = false
+  saves.set = async (k: string, v: string) => {
+    await rawSet(k, v)
+    if (!overlaid && k === 'saves') {
+      overlaid = true
+      saves.store.set('saves', peerDoc)
+    }
+  }
+  await P.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game, 3, 500, 500, 9).game, held: null } : null))
+  const final = parseSaves(saves.store.get('saves')!)
+  eq(final.games['harbour:12'], peerHarbour, 'the newer peer game regressed to our stale copy')
+  eq(P.state.adoptedGames.length, 1, 'the newer current-key game was not adopted locally')
+  eq(P.state.adoptedGames[0], peerHarbour)
+})
+
+await checkAsync('a rejected close-out read keeps the acknowledged write standing', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+  P.refs.game.current = newGame('harbour', 12, 1)
+  let reads = 0
+  const rawGet = saves.get.bind(saves)
+  saves.get = async (k: string) => {
+    reads++
+    if (reads === 2) throw new Error('close-out read failed')
+    return rawGet(k)
+  }
+  await P.p.act((ctx) => (ctx.game ? { next: ctx.game, held: 1 } : null))
+  eq(reads, 2, 'the close-out read did not run')
+  const final = parseSaves(saves.store.get('saves')!)
+  ok(final.games['harbour:12'] !== undefined, 'a failed verify read ate the acknowledged write')
+})
+
+await checkAsync('a reset bumps the incarnation so pre-reset intents and stale saves die', async () => {
+  const g0 = newGame('harbour', 12, 5)
+  const g1 = resetGame(g0, 9)
+  ok(g1.gen === g0.gen + 1, 'reset did not bump the incarnation')
+  ok(gameKeyOf(g1) !== gameKeyOf(g0), 'reset kept the admitted bind identity')
+  // Same seed and arrangement: only the generation moved.
+  eq(g1.seed, g0.seed, 'reset must keep the intentional seed')
+  eq(
+    g1.pieces.map((p) => p.i),
+    g0.pieces.map((p) => p.i),
+    'reset must keep the piece arrangement'
+  )
+  // An intent admitted before the reset hits the bind check afterwards.
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+  P.refs.game.current = g1
+  await P.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game, 0, 5, 5, 10).game, held: null } : null), gameKeyOf(g0))
+  eq(live.sets.length + saves.sets.length, 0, 'a pre-reset intent mutated the new incarnation')
+  // The newer incarnation wins every same-key merge against its stale copy.
+  const stale = placeAt(g0, 0, 10, 20, 5).game
+  ok(newerGame(g1, stale) === g1, 'a stale pre-incarnation write would win a merge')
+  const merged = unionGames({ 'harbour:12': stale }, { 'harbour:12': g1 })
+  ok(sameGame(merged['harbour:12']!, g1), 'union kept the stale incarnation')
+  // Legacy wire docs without gen parse as incarnation 0.
+  const legacy = parseGame(JSON.stringify({ ...g0, gen: undefined }))!
+  eq(legacy.gen, 0, 'legacy save did not default to gen 0')
+})
+
+await checkAsync('tray counts report the real tray population under filters', async () => {
+  const g = newGame('harbour', 12, 5)
+  eq(trayCount(g), 12)
+  // One piece loose on the felt: the tray shrinks, loose count grows. The
+  // filtered denominator must be the tray, not the board-z count.
+  const moved = placeAt(g, 0, 400, 300, 5).game
+  eq(moved.pieces[0]!.z, 1, 'probe piece did not land loose on the felt')
+  eq(trayCount(moved), 11)
+  eq(looseCount(moved), 1)
+  const corners = filterTray(moved, 'corner')
+  ok(
+    corners.every((id) => moved.pieces[id]!.z === 0),
+    'filtered list is not tray-zoned only'
+  )
+  ok(corners.length < trayCount(moved), 'filter must subset the tray')
+  // Collect: felt pieces return to the tray; count restores.
+  const back = collectBoard(moved)
+  eq(trayCount(back), 12)
+  eq(looseCount(back), 0)
+  // Finish semantics: a complete board leaves an empty tray.
+  let done = g
+  const pw = BOARD_W / done.cols
+  const ph = BOARD_H / done.rows
+  for (let id = 0; id < done.pieces.length; id++) {
+    const p = done.pieces[id]!
+    done = placeAt(done, id, p.c * pw, p.r * ph, id + 10).game
+  }
+  ok(isComplete(done), 'probe completion did not finish')
+  eq(trayCount(done), 0)
 })
 
 if (failures.length) {

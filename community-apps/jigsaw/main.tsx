@@ -13,6 +13,7 @@ import {
   createGamePersistence,
   createPrefsPersistence,
   LIVE_KEY,
+  mergedSaves,
   PREFS_KEY,
   PREFS0,
   type Prefs,
@@ -156,6 +157,26 @@ function Jigsaw() {
     }
   }, [])
 
+  // A repair can surface a newer library copy of the running puzzle (a peer
+  // advanced the same config, or our own write lost an equal-revision race
+  // but kept the deeper save). Swap it in without touching the live clock.
+  const adoptGame = useCallback((g: Game) => {
+    gameRef.current = g
+    heldRef.current = null
+    setGame(g)
+    setHeld(null)
+    setHeldPos(null)
+    const key = gameKeyOf(g)
+    if (key !== gameKeyRef.current) {
+      gameKeyRef.current = key
+      setBoardView(fitView())
+      setVeilDown(false)
+      setFilter('all')
+      armedGameRef.current = null
+      setConfirmReset(false)
+    }
+  }, [])
+
   // Mirror handles inside refs: the queued write path needs the current
   // mirrors without rebuilding the persistence factory every render.
   const liveMirror = useRef(live)
@@ -184,25 +205,30 @@ function Jigsaw() {
         acceptSaves: (sd) => {
           savesClock.current.rev = sd.rev
           savesClock.current.by = sd.by
-          savesRaw.current = serializeSaves(sd)
+          // Union into the mirror instead of replacing it: games we have
+          // accepted or written but the adopted envelope lacks stay pending
+          // for the next write/heal instead of being silently dropped.
+          savesRaw.current = serializeSaves(mergedSaves(savesRaw.current, sd).doc)
         },
         apply: (p) => {
           gameRef.current = p.game
           heldRef.current = p.held
           setGame(p.game)
           setHeld(p.held)
-          liveMirror.current.set(p.live)
           savesRaw.current = p.saves
-          savesMirror.current.set(p.saves)
+          // The mirror sets ARE the write acknowledgement: act waits for
+          // both before its bounded close-out read.
+          return Promise.all([liveMirror.current.set(p.live), savesMirror.current.set(p.saves)])
         },
         writeLive: (raw) => liveMirror.current.set(raw),
         writeSaves: (raw) => {
           savesRaw.current = raw
           savesMirror.current.set(raw)
         },
-        savesDoc: () => (savesRaw.current ? parseSaves(savesRaw.current) : null)
+        savesDoc: () => (savesRaw.current ? parseSaves(savesRaw.current) : null),
+        adoptGame
       }),
-    [adoptLive]
+    [adoptLive, adoptGame]
   )
 
   const act = persistence.act
@@ -275,11 +301,13 @@ function Jigsaw() {
     if (savesKV.status !== 'ready') return
     const env = parseSaves(savesKV.value)
     if (env.by === ME) {
+      // An out-of-order own echo is older than the mirror we already
+      // accepted: keep the mirror, only advance the clock on the newest one.
       if (env.rev > savesClock.current.rev) {
         savesClock.current.rev = env.rev
         savesClock.current.by = env.by
+        savesRaw.current = savesKV.value
       }
-      savesRaw.current = savesKV.value
       return
     }
     // Clock at 0 means nothing accepted yet: take the doc as the baseline,
@@ -290,7 +318,13 @@ function Jigsaw() {
     }
     savesClock.current.rev = env.rev
     savesClock.current.by = env.by
-    savesRaw.current = savesKV.value
+    // Union the foreign envelope with our mirror: keys we already accepted or
+    // wrote (pending saves, an equal-revision racer's exclusive game) stay in
+    // the library instead of being dropped on adopt. When the adopted doc was
+    // missing them, one bounded heal puts the union back on the durable doc.
+    const merged = mergedSaves(savesRaw.current, env)
+    savesRaw.current = serializeSaves(merged.doc)
+    if (merged.missing) repairSaves()
   }, [savesKV.value, savesKV.status, repairSaves])
 
   // Prefs hydrate and follow the other display's switches (mute especially),
@@ -434,7 +468,7 @@ function Jigsaw() {
 
   const dropAt = useCallback(
     (id: number, x: number, y: number) => {
-      if (!liveNow()) return
+      if (!liveNow() || sheetRef.current) return
       const bind = gameRef.current ? gameKeyOf(gameRef.current) : undefined
       setHeldPos(null)
       void act((ctx) => {
@@ -452,7 +486,7 @@ function Jigsaw() {
 
   const holdPiece = useCallback(
     (id: number) => {
-      if (!liveNow()) return
+      if (!liveNow() || sheetRef.current) return
       const g = gameRef.current
       const p = g?.pieces[id]
       if (!g || !p || p.z === 2 || g.finishedAt !== null) return
@@ -470,7 +504,7 @@ function Jigsaw() {
 
   const beginDrag = useCallback(
     (id: number, clientX: number, clientY: number) => {
-      if (!liveNow()) return
+      if (!liveNow() || sheetRef.current) return
       const g = gameRef.current
       const p = g?.pieces[id]
       if (!g || !p || p.z === 2 || g.finishedAt !== null) return
@@ -497,6 +531,7 @@ function Jigsaw() {
   // piece's own option drops it at the ghost position.
   const pressPiece = useCallback(
     (id: number, pt: { x: number; y: number } | null) => {
+      if (sheetRef.current) return
       if (pt) {
         beginDrag(id, pt.x, pt.y)
         return
@@ -522,7 +557,10 @@ function Jigsaw() {
   // reject before any key does anything.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!liveNow()) return
+      // While a modal sheet is open only Escape may act (escapeTop closes it
+      // at the pre-connect guard); every other key is input under a modal
+      // and must not mutate the board underneath it.
+      if (!liveNow() || sheetRef.current) return
       const hid = heldRef.current
       const g = gameRef.current
       if (hid === null || !g) return
@@ -581,9 +619,9 @@ function Jigsaw() {
       if (!d) return
       dragRef.current = null
       setDrag(null)
-      // A release landing on a now-hidden copy is an unaccepted release: the
-      // piece simply stays where the live doc already has it.
-      if (!liveNow()) return
+      // A release landing on a now-hidden or sheet-covered copy is an
+      // unaccepted release: the piece simply stays where the doc has it.
+      if (!liveNow() || sheetRef.current) return
       const g = gameRef.current
       if (!g) return
       if (!d.moved) {
@@ -734,6 +772,7 @@ function Jigsaw() {
       onView={setBoardView}
       onPieceDown={(id, e) => beginDrag(id, e.clientX, e.clientY)}
       onPieceKey={(id, e) => {
+        if (sheetRef.current) return
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           if (held === id)
@@ -745,7 +784,7 @@ function Jigsaw() {
         if (held !== null) dropAt(held, pt.x - cw / 2, pt.y - ch / 2)
       }}
       onHover={(pt) => {
-        if (!liveNow() || held === null || !pt) return
+        if (!liveNow() || sheetRef.current || held === null || !pt) return
         setHeldPos({ x: pt.x - cw / 2, y: pt.y - ch / 2 })
       }}
     >
@@ -763,7 +802,7 @@ function Jigsaw() {
             aria-label="Put piece back"
             {...stylex.props(styles.heldCancel, press)}
             onClick={() => {
-              if (!liveNow()) return
+              if (!liveNow() || sheetRef.current) return
               const g = gameRef.current
               setHeld(null)
               setHeldPos(null)

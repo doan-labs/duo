@@ -61,9 +61,15 @@ that differ from a single-display app:
   is on top, so the SDK's later capture listener never forwards it to Home;
   with nothing open it stays unconsumed and parks the copy as designed.
 - Gestures that outlive their admission bind to the puzzle they were aimed
-  at (`gameKeyOf` - art, count and seed): if a different puzzle is live when
-  the step runs, the intent is dropped rather than applied to a piece index
-  in another game.
+  at (`gameKeyOf` - art, count, seed and incarnation): if a different puzzle
+  is live when the step runs, the intent is dropped rather than applied to a
+  piece index in another game. `resetGame` bumps the incarnation so intents
+  and stale saves admitted before the reset die at the bind check instead of
+  mutating the new puzzle - keep `gameKeyOf` on every bind.
+- While a modal sheet is open, every mutation entry point (keyboard, tray
+  and board pointer, held-piece callbacks) rejects: only Escape may act, and
+  it closes the sheet at the pre-connect guard. Gate on `sheetRef.current`,
+  not on visibility - a sheet is a modal even while fully visible.
 - First boot seeds inside the queued step, after the confirmed reads: a peer
   that already seeded or saved wins by adoption, never by being overwritten.
 - Repairs are heals, not blind writes: a stale foreign doc on the mirror
@@ -76,12 +82,19 @@ that differ from a single-display app:
 - `queue.ts` keeps the serial chain alive after a failed step; a step that
   genuinely never settles only delays later writes - do not add timeouts or
   reload workarounds on top of it.
-- The chain serializes reads and rebases, NOT durable delivery: a confirmed
-  read can still lag writes this copy already accepted. Rebases therefore
-  merge on the last-accepted envelope (`savesDoc()`) when the store read is
-  not newer, and `healSaves` republishes the union of store keys and our
-  pending keys. Without that, a fast second mutation drops an accepted but
-  still-in-flight puzzle from the durable library.
+- The library is always a per-key union of the confirmed store doc and the
+  accepted mirror (`unionGames`, newest incarnation then finished then
+  moves), and adoption merges into the mirror (`mergedSaves`) instead of
+  replacing it: pending games survive an equal-revision racer whose
+  envelope wins the writer tie-break but lacks our exclusive keys.
+- `apply` is awaited as the write acknowledgement, then the step re-reads
+  the durable doc once: a foreign envelope that raced our confirmed read -
+  including from a peer that has since ended - is unioned and republished
+  once, and a deeper save for the current key swaps in via `adoptGame`. A
+  rejected close-out read just skips that check; the acknowledged write
+  stands and the heal/watch path converges.
+- The tray count's denominator is `game.tray.length`, not the loose board
+  count: felt pieces are not in the tray even with no filter applied.
 
 ## Verification
 

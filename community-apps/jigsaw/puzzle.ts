@@ -156,6 +156,9 @@ export type Game = {
   cols: number
   rows: number
   seed: number
+  /** Incarnation: bumped on reset so stale pre-reset writes and intents can
+   * be told apart from this puzzle's lifetime. Legacy docs parse as 0. */
+  gen: number
   pieces: Piece[]
   /** Piece ids in tray order; z stays TRAY while listed. */
   tray: number[]
@@ -173,7 +176,7 @@ const cellMin = (g: Game) => Math.min(BOARD_W / g.cols, BOARD_H / g.rows)
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /** A fresh puzzle: every piece in the tray, shuffled by the seed. */
-export function newGame(art: string, count: Count, seed: number): Game {
+export function newGame(art: string, count: Count, seed: number, gen = 0): Game {
   const spec = GRIDS[count]!
   const rnd = rng32(seed ^ 0x9e3779b9)
   const pieces: Piece[] = []
@@ -192,6 +195,7 @@ export function newGame(art: string, count: Count, seed: number): Game {
     cols: spec.cols,
     rows: spec.rows,
     seed,
+    gen,
     pieces,
     tray,
     moves: 0,
@@ -258,9 +262,12 @@ export function collectBoard(g: Game): Game {
   return { ...g, pieces, tray }
 }
 
-/** A finished or fresh game re-scatters into the tray with the same edges. */
+/** A finished or fresh game re-scatters into the tray with the same edges.
+ * The same seed keeps the intentional piece arrangement, but the incarnation
+ * moves: intents and writes admitted against the pre-reset game must die
+ * rather than mutate this one. */
 export function resetGame(g: Game, seed: number): Game {
-  const fresh = newGame(g.art, g.count as Count, g.seed)
+  const fresh = newGame(g.art, g.count as Count, g.seed, g.gen + 1)
   const rnd = rng32(seed)
   const tray = fresh.tray.slice()
   for (let i = tray.length - 1; i > 0; i--) {
@@ -337,6 +344,8 @@ export function cleanGame(v: unknown): Game | null {
   const startedAt = num(v.startedAt)
   const finishedAt = num(v.finishedAt)
   const moves = num(v.moves) ?? 0
+  const rawGen = num(v.gen)
+  const gen = rawGen !== null && rawGen >= 0 ? Math.floor(rawGen) : 0
   return {
     v: 1,
     art: v.art,
@@ -344,6 +353,7 @@ export function cleanGame(v: unknown): Game | null {
     cols: spec.cols,
     rows: spec.rows,
     seed,
+    gen,
     pieces,
     tray,
     moves,
@@ -378,6 +388,37 @@ export function newerDoc(rev: number, by: string, otherRev: number, otherBy: str
   return rev > otherRev || (rev === otherRev && by > otherBy)
 }
 
+/**
+ * Per-key progress order for library unions: the newer incarnation wins,
+ * then a completed puzzle, then the deeper move count. Equal progress picks
+ * a deterministic serialization order so every copy converges on the same
+ * survivor without coordination.
+ */
+export function newerGame(a: Game, b: Game): Game {
+  if (a.gen !== b.gen) return a.gen > b.gen ? a : b
+  const fa = a.finishedAt !== null ? 1 : 0
+  const fb = b.finishedAt !== null ? 1 : 0
+  if (fa !== fb) return fa > fb ? a : b
+  if (a.moves !== b.moves) return a.moves > b.moves ? a : b
+  return JSON.stringify(a) >= JSON.stringify(b) ? a : b
+}
+
+/** Union two game maps per key: every key survives, same-key conflicts pick
+ * the newer game. Games are never deleted, so unioning can never resurrect
+ * something a copy intentionally dropped. */
+export function unionGames(a: Record<string, Game>, b: Record<string, Game>): Record<string, Game> {
+  const out: Record<string, Game> = { ...a }
+  for (const k of Object.keys(b)) out[k] = k in out ? newerGame(out[k]!, b[k]!) : b[k]!
+  return out
+}
+
+/** Content equality independent of the parsed instance: union merges compare
+ * by value so identical envelopes never ping-pong republishes. */
+export const sameGame = (a: Game, b: Game): boolean => a === b || JSON.stringify(a) === JSON.stringify(b)
+
+/** Pieces actually in the tray - the honest denominator for filtered counts. */
+export const trayCount = (g: Game) => g.tray.length
+
 export function parseLive(raw: string | null): Live | null {
   if (!raw) return null
   try {
@@ -401,8 +442,9 @@ export function parseLive(raw: string | null): Live | null {
 /** Durable save: one game per art:count config plus the last-open pointer. */
 export type Saves = { rev: number; by: string; current: string | null; games: Record<string, Game> }
 export const configKey = (art: string, count: number) => `${art}:${count}`
-/** The game identity a delayed intent binds to: art, count and its seed. */
-export const gameKeyOf = (g: Game) => `${g.art}:${g.count}:${g.seed}`
+/** The game identity a delayed intent binds to: art, count, seed and the
+ * incarnation - a reset keeps the seed but must not keep the binding. */
+export const gameKeyOf = (g: Game) => `${g.art}:${g.count}:${g.seed}:${g.gen}`
 
 const SAVES0: Saves = { rev: 0, by: '', current: null, games: {} }
 
