@@ -176,7 +176,14 @@ const mkPending = () => new Map<string, (string | null)[]>()
   check('E_RATE refuses -> missed', (await refused('E_RATE')) === 'missed')
   check('E_DENIED refuses -> missed', (await refused('E_DENIED')) === 'missed')
   check('E_STALE refuses -> missed', (await refused('E_STALE')) === 'missed')
-  check('E_GONE refuses -> missed', (await refused('E_GONE')) === 'missed')
+  check(
+    'E_GONE classifies as a refreshable conflict',
+    classifyError(Object.assign(new Error('E_GONE'), { code: 'E_GONE' })) === 'conflict'
+  )
+  check(
+    'E_CONFLICT classifies as a refreshable conflict',
+    classifyError(Object.assign(new Error('E_CONFLICT'), { code: 'E_CONFLICT' })) === 'conflict'
+  )
   check('E_UNSUPPORTED refuses -> missed', (await refused('E_UNSUPPORTED')) === 'missed')
   check('E_TIMEOUT ambiguous -> unknown', (await refused('E_TIMEOUT')) === 'unknown')
   check('E_CLOSED ambiguous -> unknown', (await refused('E_CLOSED')) === 'unknown')
@@ -260,7 +267,7 @@ const mkPending = () => new Map<string, (string | null)[]>()
 // foreign writes interleave between steps, and the backing Map is inspected
 // afterwards exactly like a resnapshot would.
 
-import { commitLibWrites, type LibStore } from './sync'
+import { type CasOutcome, classifyError, commitLibWrites, mergeIndexOrder } from './sync'
 import {
   addTrip,
   assembleLibrary,
@@ -274,44 +281,79 @@ import {
   updateTrip
 } from './trips'
 
-class Store implements LibStore {
+// Durable CAS store: a space-global `rev` counts every landed write and a
+// fixed `gen` identifies this generation. `set` is conditioned on the
+// {rev, gen} token the caller's `entry` read minted - a stale token or a
+// dead generation returns 'conflict' with zero effects, matching the
+// platform's kv.set/E_CONFLICT/E_GONE contract.
+class Store {
   map = new Map<string, string>()
-  // Clean rejections resolve false, like a refused port write. Counts are
-  // keyed per op (`put trip.x`), so a record's forward put can be poisoned
-  // separately from its tomb write.
+  rev = 0
+  gen = 1
+  // Clean refusals resolve 'missed' - a refused write provably never
+  // applied. Counts are keyed per op (`put trip.x`, `entry index`).
   rejects = new Map<string, number>()
-  // Ambiguous failures throw, like a transport timeout where the write may
-  // still have landed.
+  // Ambiguous failures return 'unknown' WITHOUT writing (request lost
+  // before the host saw it).
   throws = new Map<string, number>()
+  // ACK loss AFTER the durable write: the value lands, the caller sees
+  // 'unknown'.
+  lostAcks = new Map<string, number>()
   delays = new Map<string, number>()
+  // Reads that never answer (a held reply).
+  heldReads = new Map<string, Promise<void>>()
   log: string[] = []
+  // Peer injection: runs inside `set` BEFORE the token check, so a foreign
+  // write models exactly 'landed between this copy's entry read and its
+  // conditional write'.
   foreign: ((store: Store, op: string) => Promise<void>) | null = null
-  private async op(kind: string, key: string, v?: string) {
+  private async op(kind: string, key: string) {
     const id = `${kind} ${key}`
     this.log.push(id)
     const d = this.delays.get(key)
     if (d) await new Promise((r) => setTimeout(r, d))
-    const left = this.rejects.get(id) ?? 0
-    if (left > 0) {
-      this.rejects.set(id, left - 1)
-      return false
-    }
-    const t = this.throws.get(id) ?? 0
-    if (t > 0) {
-      this.throws.set(id, t - 1)
-      throw new Error(`ambiguous ${id}`)
-    }
-    if (kind === 'put') this.map.set(key, v ?? '')
-    else this.map.delete(key)
-    return true
   }
-  async put(k: string, v: string) {
+  async entry(k: string) {
+    await this.op('entry', k)
+    const gate = this.heldReads.get(k)
+    if (gate) {
+      this.heldReads.delete(k)
+      await gate
+    }
+    const r = this.rejects.get(`entry ${k}`) ?? 0
+    if (r > 0) {
+      this.rejects.set(`entry ${k}`, r - 1)
+      throw new Error('refused read')
+    }
+    return { v: this.map.get(k) ?? null, rev: this.rev, gen: this.gen }
+  }
+  async set(k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> {
     await this.foreign?.(this, `put ${k}`)
-    return this.op('put', k, v)
+    await this.op('put', k)
+    const r = this.rejects.get(`put ${k}`) ?? 0
+    if (r > 0) {
+      this.rejects.set(`put ${k}`, r - 1)
+      return 'missed'
+    }
+    const t = this.throws.get(`put ${k}`) ?? 0
+    if (t > 0) {
+      this.throws.set(`put ${k}`, t - 1)
+      return 'unknown'
+    }
+    if (expect.rev !== this.rev || expect.gen !== this.gen) return 'conflict'
+    this.map.set(k, v)
+    this.rev++
+    const la = this.lostAcks.get(`put ${k}`) ?? 0
+    if (la > 0) {
+      this.lostAcks.set(`put ${k}`, la - 1)
+      return 'unknown'
+    }
+    return 'landed'
   }
-  async del(k: string) {
-    await this.foreign?.(this, `del ${k}`)
-    return this.op('del', k)
+  // A direct peer write (bumps rev like the host would).
+  peerSet(k: string, v: string) {
+    this.map.set(k, v)
+    this.rev++
   }
   // The authoritative read a snapshot would return.
   async get(k: string) {
@@ -353,13 +395,13 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   const plan = planLibWrites(lib, next)
   check(
     'delete plan orders retained tomb before index - never a del',
-    plan.map((w) => `${w.kind} ${w.key}`).join('|') === 'tomb trip.ta|put index'
+    plan.map((w) => `${w.kind} ${w.key}`).join('|') === 'tomb trip.ta|index index'
   )
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   const plan2 = planLibWrites(lib, c.lib)
   check(
     'create plan orders record before index',
-    plan2.map((w) => `${w.kind} ${w.key}`).join('|') === 'put trip.tc|put index'
+    plan2.map((w) => `${w.kind} ${w.key}`).join('|') === 'put trip.tc|index index'
   )
 }
 
@@ -504,7 +546,10 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   check('index authoritative', !JSON.parse(s.map.get('index')!).order.includes('ta'))
   await new Promise((r) => setTimeout(r, 30))
   check('tomb retained - the only debris', isTombValue(s.map.get('trip.ta')))
-  check('zero post-commit writes', s.log.filter((l) => l !== 'put index' && l !== 'put trip.ta').length === 0)
+  check(
+    'zero post-commit writes - entry reads precede each conditional set',
+    s.log.filter((l) => l.startsWith('put ')).join('|') === 'put trip.ta|put index'
+  )
   check('acknowledged delete never resurfaces', !s.lib().trips.some((t) => t.id === 'ta'))
   check('no dangling index ref', s.dangling().length === 0)
 }
@@ -542,27 +587,30 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   }
   const snapshotReply = gate()
   let capturedTomb = false
+  // One shared space: the rev/generation both copies condition on.
+  const space = { rev: 0, gen: 1 }
   const adapter = (delayTombRead: boolean) => {
     const writes = new WriteQueue()
     const log: string[] = []
     return {
       log,
-      put: (k: string, v: string) =>
-        writes.send(
-          async () => {
-            data.set(k, v)
-            log.push(`put ${k}`)
-          },
-          () => {}
-        ),
-      get: async (k: string) => {
-        const v = data.get(k) ?? null
-        if (delayTombRead && k === `trip.${ta.id}` && isTombValue(v)) {
-          capturedTomb = true
-          await snapshotReply.promise
-        }
-        return v
-      }
+      entry: (k: string) =>
+        writes.run(async () => {
+          const v = data.get(k) ?? null
+          if (delayTombRead && k === `trip.${ta.id}` && isTombValue(v)) {
+            capturedTomb = true
+            await snapshotReply.promise
+          }
+          return { v, rev: space.rev, gen: space.gen }
+        }),
+      set: (k: string, v: string, expect: { rev: number; gen: number }) =>
+        writes.run(async (): Promise<CasOutcome> => {
+          log.push(`put ${k}`)
+          if (expect.rev !== space.rev || expect.gen !== space.gen) return 'conflict'
+          data.set(k, v)
+          space.rev++
+          return 'landed'
+        })
     }
   }
   const copyA = adapter(true)
@@ -655,7 +703,7 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   const c = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
   s.rejects.set('put index', 9)
   s.foreign = async (store, op) => {
-    if (op === 'put index') store.map.set('trip.tc', serializeTrip({ ...c.trip, name: 'PEER' }))
+    if (op === 'put index') store.peerSet('trip.tc', serializeTrip({ ...c.trip, name: 'PEER' }))
   }
   const ok = await commitLibWrites(s, planLibWrites(lib, c.lib))
   check('foreign-owned slot reports partial', ok === 'partial')
@@ -675,7 +723,7 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
     // CopyB's restore commit lands between our tomb and our index write.
     if (op === 'put index' && !restored) {
       restored = true
-      store.map.set('trip.ta', serializeTrip({ ...ta, name: 'RESTORED' }))
+      store.peerSet('trip.ta', serializeTrip({ ...ta, name: 'RESTORED' }))
     }
   }
   const ok = await commitLibWrites(s, planLibWrites(lib, next))
@@ -728,14 +776,13 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   s.foreign = async (store, op) => {
     if (op === 'put trip.tb' && !peerLanded) {
       peerLanded = true
-      store.map.set('trip.ta', serializeTrip({ ...ta, name: 'PEER' }))
+      store.peerSet('trip.ta', serializeTrip({ ...ta, name: 'PEER' }))
     }
   }
   const ok = await commitLibWrites(s, planLibWrites(lib, next))
   check('abort after landed prefix reports partial', ok === 'partial')
   check('peer edit on landed key preserved', JSON.parse(s.map.get('trip.ta')!).name === 'PEER')
   check('landed key written exactly once - no stale re-put', s.log.filter((l) => l === 'put trip.ta').length === 1)
-  check('commit issued no reads', !s.log.some((l) => l.startsWith('get ')))
   check('commit issued no dels', !s.log.some((l) => l.startsWith('del ')))
   check('index untouched on abort', JSON.parse(s.map.get('index')!).order.join(',') === 'ta,tb')
 }
@@ -751,7 +798,7 @@ const seed = (s: Store, lib: { order: string[]; trips: import('./trips').Trip[] 
   s.delays.set('trip.ta', 60)
   s.rejects.set('put trip.tb', 9)
   s.foreign = async (store, op) => {
-    if (op === 'put trip.tb') store.map.set('trip.ta', serializeTrip({ ...ta, name: 'PEER' }))
+    if (op === 'put trip.tb') store.peerSet('trip.ta', serializeTrip({ ...ta, name: 'PEER' }))
   }
   const ok = await commitLibWrites(s, planLibWrites(lib, next))
   check('delayed-step abort reports partial', ok === 'partial')
@@ -797,42 +844,88 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
   const records = () => new Map([...data].filter(([k]) => k.startsWith('trip.')))
   const qa = new WriteQueue()
   const qb = new WriteQueue()
+  const space = { rev: 0, gen: 1 }
   let aPuts = 0
-  const failedA = Promise.withResolvers<void>()
+  let heldOnce = false
+  const readbackA = Promise.withResolvers<void>()
+  const releasedA = Promise.withResolvers<void>()
   const a = {
-    put: (k: string, v: string) =>
-      qa.send(
-        async () => {
-          aPuts++
-          data.set(k, v)
-          if (aPuts === 1) throw new Error('ACK lost after durable set')
-        },
-        () => failedA.resolve()
-      )
+    entry: (k: string) =>
+      qa.run(async () => {
+        if (aPuts === 1 && !heldOnce) {
+          heldOnce = true
+          readbackA.resolve()
+          await releasedA.promise
+        }
+        return { v: data.get(k) ?? null, rev: space.rev, gen: space.gen }
+      }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }) =>
+      qa.run(async (): Promise<CasOutcome> => {
+        aPuts++
+        if (expect.rev !== space.rev || expect.gen !== space.gen) return 'conflict'
+        data.set(k, v)
+        space.rev++
+        // The write landed; the ACK is lost. The next op is the readback
+        // entry above - hold it so B can commit in the ambiguity window.
+        return 'unknown'
+      })
   }
   const b = {
-    put: (k: string, v: string) =>
-      qb.send(
-        async () => void data.set(k, v),
-        () => {}
-      )
+    entry: (k: string) => qb.run(async () => ({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen })),
+    set: (k: string, v: string, expect: { rev: number; gen: number }) =>
+      qb.run(async (): Promise<CasOutcome> => {
+        if (expect.rev !== space.rev || expect.gen !== space.gen) return 'conflict'
+        data.set(k, v)
+        space.rev++
+        return 'landed'
+      })
   }
   const nextA = updateTrip(lib, 'ta', { name: 'A accepted edit' })
   const receiptA = commitLibWrites(a, planLibWrites(lib, nextA))
-  await failedA.promise
-  // B reads durable state and commits a confirmed edit while A's outcome
-  // is still resolving.
+  await readbackA.promise
+  // B reads durable state and commits a confirmed edit while A's readback
+  // is still held.
   const beforeB = assembleLibrary(data.get('index') ?? null, records())
   const nextB = updateTrip(beforeB, 'ta', { name: 'B confirmed edit' })
   const receiptB = await commitLibWrites(b, planLibWrites(beforeB, nextB))
+  releasedA.resolve()
   const resultA = await receiptA
   const final = assembleLibrary(data.get('index') ?? null, records())
   check('peer durable before A resolves', tripName(data, ta.id) === 'B confirmed edit')
   check('A never re-sent the stale payload', aPuts === 1)
-  check('ambiguous write reports partial not applied', resultA === 'partial')
+  check('readback sees the peer - honest conflict for replan', resultA === 'conflict')
   check('peer edit confirmed applied', receiptB === 'applied')
   check('peer edit preserved after A settles', tripName(data, ta.id) === 'B confirmed edit')
   check('assembler agrees', final.trips.find((t) => t.id === 'ta')?.name === 'B confirmed edit')
+}
+
+// Same interleaving but A's readback arrives BEFORE B writes: the durable
+// value equals A's intended value, so the ambiguous write settles as
+// landed and A reports 'applied' - the readback is reconciliation, not
+// permission to write again.
+{
+  const { lib, ta } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let puts = 0
+  const u = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      puts++
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('unknown')
+    }
+  }
+  const next = updateTrip(lib, 'ta', { name: 'Landed-then-lost edit' })
+  const outcome = await commitLibWrites(u, planLibWrites(lib, next))
+  check('readback confirms landed write -> applied', outcome === 'applied')
+  check('exactly one conditional put', puts === 1)
+  check('durable value is the landed one', tripName(data, ta.id) === 'Landed-then-lost edit')
 }
 
 // Repeated ACK loss on every put: each write lands durably then drops the
@@ -845,22 +938,23 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
     ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
   ])
   const qu = new WriteQueue()
+  const space = { rev: 0, gen: 1 }
   let puts = 0
   const u = {
-    put: (k: string, v: string) =>
-      qu.send(
-        async () => {
-          puts++
-          data.set(k, v)
-          throw Object.assign(new Error('ACK lost after durable set'), { code: 'E_TIMEOUT' })
-        },
-        () => {}
-      )
+    entry: (k: string) => qu.run(async () => ({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen })),
+    set: (k: string, v: string, expect: { rev: number; gen: number }) =>
+      qu.run(async (): Promise<CasOutcome> => {
+        puts++
+        if (expect.rev !== space.rev || expect.gen !== space.gen) return 'conflict'
+        data.set(k, v)
+        space.rev++
+        return 'unknown'
+      })
   }
   const next = updateTrip(lib, 'ta', { name: 'Unknown-but-durable edit' })
   const outcome = await commitLibWrites(u, planLibWrites(lib, next))
   check('one put despite repeated-attempt hazard', puts === 1)
-  check('landing-with-lost-ack reports partial', outcome === 'partial')
+  check('lost-ack settled by readback -> applied', outcome === 'applied')
   check('durable value is the landed one', tripName(data, ta.id) === 'Unknown-but-durable edit')
 }
 
@@ -874,21 +968,23 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
     ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
   ])
   const qu = new WriteQueue()
+  const space = { rev: 0, gen: 1 }
   let puts = 0
   const u = {
-    put: (k: string, v: string) =>
-      qu.send(
-        async () => {
-          puts++
-          throw Object.assign(new Error('request dropped before write'), { code: 'E_TIMEOUT' })
-        },
-        () => {}
-      )
+    entry: (k: string) => qu.run(async () => ({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen })),
+    set: (k: string, v: string, expect: { rev: number; gen: number }) =>
+      qu.run(async (): Promise<CasOutcome> => {
+        void k
+        void v
+        puts++
+        if (expect.rev !== space.rev) return 'conflict'
+        return 'unknown' // request never reached the host: nothing stored
+      })
   }
   const next = updateTrip(lib, 'ta', { name: 'Dropped edit' })
   const outcome = await commitLibWrites(u, planLibWrites(lib, next))
-  check('pre-write drop also reports partial', outcome === 'partial')
-  check('no second request after ambiguous drop', puts === 1)
+  check('pre-write drop reads back as provable miss -> bounded retried miss', outcome === 'partial')
+  check('retries re-read the token, never resend frozen', puts === 4)
   check('prior value untouched', tripName(data, ta.id) === 'A')
 }
 
@@ -902,24 +998,140 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
     ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
   ])
   const qu = new WriteQueue()
+  const space = { rev: 0, gen: 1 }
   let n = 0
   const u = {
-    put: (k: string, v: string) =>
-      qu.send(
-        async () => {
-          n++
-          if (n === 2) throw new Error('ACK lost mid-plan')
-          data.set(k, v)
-        },
-        () => {}
-      )
+    entry: (k: string) => qu.run(async () => ({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen })),
+    set: (k: string, v: string, expect: { rev: number; gen: number }) =>
+      qu.run(async (): Promise<CasOutcome> => {
+        n++
+        if (expect.rev !== space.rev || expect.gen !== space.gen) return 'conflict'
+        if (n === 2) return 'unknown' // dropped before the host wrote
+        data.set(k, v)
+        space.rev++
+        return 'landed'
+      })
   }
   const next = updateTrip(updateTrip(lib, 'ta', { name: 'A2' }), 'tb', { name: 'B2' })
   const outcome = await commitLibWrites(u, planLibWrites(lib, next))
-  check('mid-plan ambiguous step stops the commit', outcome === 'partial' && n === 2)
+  // The lost write is proven missed by readback, so ONE fresh-token retry
+  // runs and lands - the commit completes honestly.
+  check('verified-miss retry completes the commit', outcome === 'applied' && n === 3)
   check('landed prefix durable', tripName(data, ta.id) === 'A2')
-  check('index never written after ambiguous step', JSON.parse(data.get('index')!).order.join(',') === 'ta,tb')
+  check('retried step durable', tripName(data, tb.id) === 'B2')
 }
+
+// --- cycle-13 CAS regressions ---------------------------------------------
+
+// Two copies seed the SAME absent key: both read entry -> v:null, both
+// issue a conditional create. The second write's stale token conflicts
+// (zero effects), its commit returns 'conflict', and only the winner's
+// value is durable - no silent double-create.
+{
+  const { lib } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  const mkCopy = () => ({
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  })
+  const a = mkCopy()
+  const b = mkCopy()
+  // Both plan an identical 'new record' put with base null (absent key).
+  const cA = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
+  const cB = addTrip(lib, { name: 'C-peer', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')
+  const okA = await commitLibWrites(a, planLibWrites(lib, cA.lib))
+  // B's plan was computed while the key was absent: its token minted AFTER
+  // A's write sees A's value, which differs from B's null base on a live
+  // record -> honest conflict, the caller replans.
+  const okB = await commitLibWrites(b, planLibWrites(lib, cB.lib))
+  check('first seed lands', okA === 'applied')
+  check('second seed on superseded base conflicts', okB === 'conflict')
+  check('winner value durable', JSON.parse(data.get('trip.tc')!).name === 'C')
+  check('no frozen-doc overwrite', space.rev >= 2)
+}
+
+// ABA: stored value changes A -> B -> A between entry and set. A pure
+// rev-token still detects the space moved even though the value matches
+// the read - the write conflicts and the step re-reads (bounded).
+{
+  const { lib, ta } = mk()
+  const s = new Store()
+  seed(s, lib)
+  let bounced = false
+  s.foreign = async (store, op) => {
+    if (op === 'put trip.ta' && !bounced) {
+      bounced = true
+      store.peerSet('trip.ta', serializeTrip({ ...ta, name: 'ABA-B' }))
+      store.peerSet('trip.ta', serializeTrip(ta))
+    }
+  }
+  const next = updateTrip(lib, 'ta', { name: 'A2' })
+  const ok = await commitLibWrites(s, planLibWrites(lib, next))
+  check('ABA token moved -> conflict resolved by retry', ok === 'applied')
+  check('ABA final value is ours', JSON.parse(s.map.get('trip.ta')!).name === 'A2')
+  check('ABA needed a second try', s.log.filter((l) => l === 'put trip.ta').length === 2)
+}
+
+// Failed READ is never a blank seed: entry() throwing is ambiguous - the
+// commit reports 'partial' and writes nothing, so a peer's confirmed value
+// is never erased by a read that could not observe it.
+{
+  const { lib } = mk()
+  const s = new Store()
+  seed(s, lib)
+  s.rejects.set('entry trip.ta', 9)
+  const next = updateTrip(lib, 'ta', { name: 'EDIT' })
+  const ok = await commitLibWrites(s, planLibWrites(lib, next))
+  check('failed read reports partial, never seeds', ok === 'partial')
+  check('peer value untouched after failed read', JSON.parse(s.map.get('trip.ta')!).name === 'A')
+}
+
+// Admitted write arriving after a peer ACK (reverse direction): B commits
+// first, then A's conditional put on the stale token conflicts and the
+// step's re-read surfaces B's value -> 'conflict' for replan instead of
+// overwriting B.
+{
+  const { lib, ta } = mk()
+  const s = new Store()
+  seed(s, lib)
+  let peerLanded = false
+  s.foreign = async (store, op) => {
+    if (op === 'put trip.ta' && !peerLanded) {
+      peerLanded = true
+      store.peerSet('trip.ta', serializeTrip({ ...ta, name: 'PEER-CONFIRMED' }))
+    }
+  }
+  const next = updateTrip(lib, 'ta', { name: 'OURS' })
+  const ok = await commitLibWrites(s, planLibWrites(lib, next))
+  // The retry's re-read sees PEER-CONFIRMED on a live record whose base
+  // was 'A' -> the plan cannot re-derive locally -> honest conflict.
+  check('post-ack peer write surfaces conflict', ok === 'conflict')
+  check('peer write preserved', JSON.parse(s.map.get('trip.ta')!).name === 'PEER-CONFIRMED')
+}
+
+// mergeIndexOrder: peer ids survive the merge at their stored positions,
+// confirmed tombs drop, our creates enter, our order applies to our ids.
+check(
+  'merge keeps peer id at its position',
+  mergeIndexOrder(['p1', 'a', 'p2'], ['a', 'b'], new Set()).join(',') === 'p1,a,p2,b'
+)
+check(
+  'merge drops confirmed tombs and keeps peer ids',
+  mergeIndexOrder(['a', 'dead', 'p1'], ['b', 'a'], new Set(['dead'])).join(',') === 'b,a,p1'
+)
+check(
+  'merge is a no-op when fresh already equals intent',
+  mergeIndexOrder(['a', 'b'], ['a', 'b'], new Set()).join(',') === 'a,b'
+)
 
 console.log(`\nsync: ${passed} passed, ${failed} failed`)
 if (failed) throw new Error(`${failed} checks failed`)

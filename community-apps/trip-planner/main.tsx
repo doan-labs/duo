@@ -48,7 +48,19 @@ import {
 import { createRoot } from 'react-dom/client'
 import { cue, setCueGate, setMuted } from './audio.ts'
 import { styles } from './styles.ts'
-import { applyWatch, clearPending, commitLibWrites, queuePending, type WriteOutcome, WriteQueue } from './sync.ts'
+import {
+  applyWatch,
+  type CasOutcome,
+  type CasStore,
+  type CommitOutcome,
+  clearPending,
+  commitLibWrites,
+  isConflict,
+  isRefusal,
+  queuePending,
+  type WriteOutcome,
+  WriteQueue
+} from './sync.ts'
 import {
   addLeg,
   addPack,
@@ -70,6 +82,7 @@ import {
   type Leg,
   type LegKind,
   type Library,
+  type LibWrite,
   legKindLabel,
   MAX_TRIP_DAYS,
   moveStop,
@@ -317,7 +330,7 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   const [error, setError] = useState(false)
   const pending = useRef(new Map<string, (string | null)[]>())
   const writes = useRef(new WriteQueue())
-  const bootRef = useRef<() => void>(() => {})
+  const bootRef = useRef<() => Promise<void>>(() => Promise.resolve())
   // Live mirror of the space's truth: every snapshot, watch event and own
   // optimistic write lands here synchronously, so mutation chains can rebase
   // on the freshest state without waiting for a React render.
@@ -372,20 +385,49 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
     return () => {
       dead = true
       off()
-      bootRef.current = () => {}
+      bootRef.current = () => Promise.resolve()
     }
   }, [space, owns])
 
-  // (No authoritative per-key read is exposed to the write path: a commit
-  // performs no reads - a verify-read's value is only valid at its captured
-  // revision, and a read->write pair cannot be atomic on this port.)
+  // Classify a thrown platform error for the conditional write path:
+  // E_CONFLICT/E_GONE are zero-effect rejections with a stale token -
+  // refreshable by reading `entry` again; a definitive refusal means the
+  // write provably never applied; anything else is ambiguous.
+  const casOutcome = useCallback((e: unknown): CasOutcome => {
+    return isConflict(e) ? 'conflict' : isRefusal(e) ? 'missed' : 'unknown'
+  }, [])
 
-  // Resolves the durable outcome: 'landed' once the port accepted the
-  // write, 'missed' on a definitive refusal, 'unknown' when the outcome is
-  // ambiguous (e.g. a timeout - the write may still have landed). Callers
-  // must never re-send the same payload after 'unknown': the SDK already
-  // retried the request with the same ID, and a new request would land
-  // LWW over any peer write in between.
+  // The conditional-write adapter commits use: `entry` performs the atomic
+  // {v, rev, gen} read the next write is conditioned on, `set` issues the
+  // checked write. Landed writes update the live mirror immediately so a
+  // chained mutation never rebases on its own echo.
+  const cas: CasStore = useMemo(
+    () => ({
+      entry: async (k: string) => {
+        const e = await space.entry(k)
+        return { v: e.v, rev: e.rev, gen: e.gen }
+      },
+      set: async (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+        try {
+          await space.set(k, v, expect)
+          latest.current.set(k, v)
+          setValues((cur) => new Map(cur ?? []).set(k, v))
+          return 'landed'
+        } catch (e) {
+          return casOutcome(e)
+        }
+      }
+    }),
+    [space, casOutcome]
+  )
+
+  // Single-key writes (prefs, session ephemerals) are also conditional:
+  // the intent is 'make k equal v', so a conflict just refreshes the token
+  // and the same value-level intent retries under the new revision - never
+  // unconditional, always bounded. An ambiguous outcome settles on the SAME
+  // key's readback: stored == desired -> the write landed before the ack
+  // was lost; stored == prior -> it provably missed and a fresh-token
+  // retry is safe; anything else means a peer owns the value now.
   const write = useCallback(
     (k: string, v: string | null): Promise<WriteOutcome> => {
       queuePending(pending.current, k, v)
@@ -399,14 +441,25 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       })
       return writes.current.send(
         async () => {
-          if (v === null) await space.del(k)
-          else await space.set(k, v)
+          for (let tries = 0; tries < 4; tries++) {
+            const e = await space.entry(k)
+            const expect = { rev: e.rev, gen: e.gen }
+            try {
+              if (v === null) await space.del(k, expect)
+              else await space.set(k, v, expect)
+              return
+            } catch (err) {
+              if (isConflict(err)) continue
+              if (isRefusal(err)) throw err
+              const after = await space.entry(k)
+              if (v === null ? after.v === null : after.v === v) return
+            }
+          }
+          throw Object.assign(new Error('conditional write loop exhausted'), { code: 'E_CAS' })
         },
         () => {
           // Refused or uncertain: drop this copy's pending mask for the key
           // and re-snapshot so the display converges on the stored truth.
-          // A 'unknown' outcome may still have landed - only the snapshot
-          // can say; it is never permission to re-send the payload.
           clearPending(pending.current, k)
           setError(true)
           bootRef.current()
@@ -430,15 +483,37 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
        * callback captured before the first snapshot resolved. */
       readyNow: () => readyNow.current,
       /** 'landed' once the port accepted the write; 'missed' on refusal;
-       * 'unknown' when ambiguous - never re-send the payload then. */
+       * 'unknown' when ambiguous - the resnapshot settles the view then. */
       put: (k: string, v: string) => write(k, v),
+      /** Serialized commit slot: the whole plan occupies one queue item so
+       * its entry->conditional-write steps never interleave with queued
+       * single-key writes. Non-'applied' commits still mark the queue's
+       * settled() accounting via the ok predicate. */
+      commit: (plan: LibWrite[]): Promise<CommitOutcome> =>
+        writes.current
+          .run(
+            () => commitLibWrites(cas, plan),
+            undefined,
+            (o) => o === 'applied'
+          )
+          .catch(() => {
+            clearPending(pending.current)
+            setError(true)
+            bootRef.current()
+            return 'partial' as CommitOutcome
+          }),
+      /** Synchronously re-snapshot the space so conflict replanning rebases
+       * on durable truth, not a possibly-lagging mirror. */
+      resyncNow: async (): Promise<void> => {
+        await bootRef.current()
+      },
       /** Session-scope ephemeral keys (undo/draft/confirm) only - library
        * records go through commitLibWrites and are never deleted. */
       del: (k: string) => write(k, null),
       /** Resolves once every write queued so far finished; true iff all landed. */
       settled: () => writes.current.settled()
     }),
-    [values, error, write]
+    [values, error, write, cas]
   )
 }
 
@@ -1430,14 +1505,17 @@ function TripPlanner() {
     [session, liveVis]
   )
 
-  /** Persist a library diff in semantic order (commitLibWrites): records,
-   * then retained tomb markers, then the index - no reads and no rollback,
-   * so a commit can never erase a peer write that lands mid-window.
-   * 'applied' is a durable commit; 'failed' means provably nothing landed;
-   * 'partial' preserves landed data and reports honestly - never
-   * half-applied under a clean label. */
+  /** Persist a library diff via conditional writes in semantic order
+   * (commitLibWrites): records, then retained tomb markers, then the index.
+   * Every step is conditioned on the {rev, gen} token read just before it,
+   * so a peer write landing mid-window can never be silently overwritten -
+   * a stale token only makes the step re-derive on fresh state. 'applied'
+   * is a durable commit; 'failed' means provably nothing landed; 'partial'
+   * preserves landed data and reports honestly; 'conflict' means the
+   * mutation's base was superseded and the caller must replan on durable
+   * state - never half-applied under a clean label. */
   const writeLibDiff = useCallback(
-    (prev: Library, next: Library) => commitLibWrites({ put: storage.put }, planLibWrites(prev, next)),
+    (prev: Library, next: Library) => storage.commit(planLibWrites(prev, next)),
     [storage]
   )
 
@@ -1482,18 +1560,46 @@ function TripPlanner() {
             after?.('failed')
             return
           }
-          const cur = libNow()
-          const next = mutate(cur)
+          let cur = libNow()
+          let next = mutate(cur)
           if (!next || next === cur) {
             after?.('noop')
             return
           }
-          const outcome = await writeLibDiff(cur, next)
-          after?.(outcome)
+          // Conditional commits can surface 'conflict': a peer's durable
+          // write owns the base our intent was computed on. The honest
+          // rebase is to re-snapshot durable state and re-run the same
+          // semantic mutation on it (editing notes on the peer's new
+          // packing state keeps both intents) - never to resubmit the
+          // frozen plan. Bounded rounds; exhaustion reports 'partial'.
+          let outcome: CommitOutcome | 'noop' = 'applied'
+          for (let round = 0; round < 3; round++) {
+            if (round > 0) {
+              await storage.resyncNow()
+              cur = libNow()
+              next = mutate(cur)
+              // The intent is no longer expressible on the fresh state
+              // (e.g. the trip it edited is gone): refuse honestly rather
+              // than claim a landed write.
+              if (!next) {
+                outcome = 'noop'
+                break
+              }
+              // Fresh state already satisfies the intent: nothing more to
+              // write, and the durable truth matches - honestly 'applied'.
+              if (next === cur) {
+                outcome = 'applied'
+                break
+              }
+            }
+            outcome = await writeLibDiff(cur, next)
+            if (outcome !== 'conflict') break
+          }
+          after?.(outcome === 'conflict' ? 'partial' : outcome)
         })
         .catch(() => {})
     },
-    [libNow, writeLibDiff, liveVis, storage.readyNow]
+    [libNow, writeLibDiff, liveVis, storage.readyNow, storage.resyncNow]
   )
 
   // Finite removal feedback: ids marked leaving render a short fade before

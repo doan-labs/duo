@@ -687,7 +687,7 @@ export const isTombValue = (raw: string | null | undefined): boolean => {
   }
 }
 
-export type LibWrite = { kind: 'put' | 'tomb'; key: string; value?: string }
+export type LibWrite = { kind: 'put' | 'tomb' | 'index'; key: string; value?: string; base?: string | null }
 
 /**
  * Ordered storage writes for a library diff. The index is the authoritative
@@ -717,12 +717,18 @@ export type LibWrite = { kind: 'put' | 'tomb'; key: string; value?: string }
 export function planLibWrites(prev: Library, next: Library): LibWrite[] {
   const prevById = new Map(prev.trips.map((t) => [t.id, t]))
   const out: LibWrite[] = []
-  for (const t of next.trips)
-    if (prevById.get(t.id) !== t) out.push({ kind: 'put', key: `trip.${t.id}`, value: serializeTrip(t) })
+  for (const t of next.trips) {
+    const p = prevById.get(t.id)
+    if (p !== t)
+      out.push({ kind: 'put', key: `trip.${t.id}`, value: serializeTrip(t), base: p ? serializeTrip(p) : null })
+  }
   for (const id of prev.order)
-    if (!next.order.includes(id)) out.push({ kind: 'tomb', key: `trip.${id}`, value: TOMB_VALUE })
+    if (!next.order.includes(id)) {
+      const p = prevById.get(id)
+      out.push({ kind: 'tomb', key: `trip.${id}`, value: TOMB_VALUE, base: p ? serializeTrip(p) : null })
+    }
   if (next.order.join('|') !== prev.order.join('|'))
-    out.push({ kind: 'put', key: 'index', value: serializeIndex(next.order) })
+    out.push({ kind: 'index', key: 'index', value: serializeIndex(next.order), base: serializeIndex(prev.order) })
   return out
 }
 

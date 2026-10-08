@@ -70,15 +70,35 @@ export type WriteOutcome = 'landed' | 'missed' | 'unknown'
 /**
  * Error codes that mean the request was refused and provably never applied:
  * host NACKs sent before any write (argument validation, quota, rate,
- * permission, stale-epoch, gone, unsupported) plus client-side pre-send
- * rejects (E_ARGS on an invalid request). E_TIMEOUT/E_CLOSED/E_PROTOCOL/
- * E_STORAGE and non-platform errors are ambiguous: the host may already
- * have applied the write before the failure was observed.
+ * permission, stale-epoch, unsupported) plus client-side pre-send rejects
+ * (E_ARGS on an invalid request). E_TIMEOUT/E_CLOSED/E_PROTOCOL/E_STORAGE
+ * and non-platform errors are ambiguous: the host may already have applied
+ * the write before the failure was observed.
+ *
+ * E_CONFLICT and E_GONE are handled separately by the CAS path, not by this
+ * classifier: both are zero-effect rejections of a conditional write, but
+ * they are REFRESHABLE - the precondition a moved space rejected can simply
+ * be re-read through `entry` - so the CAS loop treats them as 'conflict'
+ * and re-derives intent rather than reporting a terminal refusal.
  */
-const REFUSAL_CODES = new Set(['E_ARGS', 'E_QUOTA', 'E_RATE', 'E_DENIED', 'E_STALE', 'E_GONE', 'E_UNSUPPORTED'])
+const REFUSAL_CODES = new Set(['E_ARGS', 'E_QUOTA', 'E_RATE', 'E_DENIED', 'E_STALE', 'E_UNSUPPORTED'])
 
 export function isRefusal(e: unknown): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && REFUSAL_CODES.has(String((e as { code: unknown }).code))
+}
+
+/** Zero-effect conditional-write rejections whose token can be refreshed
+ * by reading `entry` again: the space moved (E_CONFLICT) or the generation
+ * the token was minted in died (E_GONE). Neither mutation took place. */
+const CONFLICT_CODES = new Set(['E_CONFLICT', 'E_GONE'])
+
+export function isConflict(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && 'code' in e && CONFLICT_CODES.has(String((e as { code: unknown }).code))
+}
+
+/** The full error classification a write can take. */
+export function classifyError(e: unknown): 'conflict' | 'missed' | 'unknown' {
+  return isConflict(e) ? 'conflict' : isRefusal(e) ? 'missed' : 'unknown'
 }
 
 /**
@@ -100,6 +120,10 @@ export class WriteQueue {
         return 'landed'
       } catch (e) {
         onFail(e)
+        // On the serialized single-key path a conflict token is refreshed
+        // inside the run loop, so a throw reaching here is never 'conflict';
+        // classify anyway so a leaked E_CONFLICT/E_GONE reads 'unknown'
+        // (ambiguous), never a false 'missed'.
         return isRefusal(e) ? 'missed' : 'unknown'
       }
     })
@@ -109,6 +133,30 @@ export class WriteQueue {
     return p
   }
 
+  /**
+   * Run one task after every earlier queued write, resolving the task's own
+   * value. Commits use this to occupy the same serialization slot as `send`
+   * while reporting a richer outcome (a thrown error propagates to the
+   * caller after onFail runs).
+   */
+  run<T>(op: () => Promise<T>, onFail?: (e: unknown) => void, ok?: (v: T) => boolean): Promise<T> {
+    const p = this.tail.then(op)
+    this.tail = p.then(
+      () => {},
+      () => {}
+    )
+    const probe: Promise<WriteOutcome> = p.then<WriteOutcome, WriteOutcome>(
+      (v) => (ok && !ok(v) ? 'unknown' : 'landed'),
+      () => 'unknown'
+    )
+    this.live.add(probe)
+    void probe.finally(() => this.live.delete(probe))
+    return p.catch((e: unknown) => {
+      onFail?.(e)
+      throw e
+    })
+  }
+
   /** Resolves once every write enqueued so far has finished; true iff all landed. */
   settled(): Promise<boolean> {
     return Promise.all([...this.live]).then((rs) => rs.every((r) => r === 'landed'))
@@ -116,108 +164,206 @@ export class WriteQueue {
 }
 
 /**
- * A minimal outcome storage adapter - the exact surface `commitLibWrites`
- * needs from useSpace. `put` resolves 'landed' when the port accepted the
- * write, 'missed' on a definitive refusal, 'unknown' (or throws) when the
- * outcome is ambiguous - e.g. a transport timeout where the write may still
- * have landed. Plain boolean true/false results from a simpler adapter are
- * accepted and read as 'landed'/'missed'.
+ * The conditional-write surface `commitLibWrites` needs from useSpace -
+ * the platform's `kv.entry`/`kv.set` CAS primitives adapted to outcomes:
  *
- * There is deliberately no `del` and no `get`:
- * - `trip.<id>` records are never deleted, only overwritten or tombed, so
- *   no post-commit cleanup can race a newer same-id incarnation.
- * - A commit performs NO reads. A verify-read's value is authoritative only
- *   at its captured revision; on this no-CAS port a read->write pair is not
- *   atomic, so a snapshot that drives a later write (a repair re-put or a
- *   conditional delete) can always erase a peer's acknowledged write that
- *   landed between the capture and the reply. Every commit step is a
- *   fixed-intent write computed at plan time - LWW on the same key - never
- *   a write derived from a stale stored value.
+ * - `entry(k)` performs the atomic read `{v, rev, gen}` the conditional
+ *   write is computed from. A THROW is a failed/ambiguous read - it is
+ *   never treated as an absent key (a failed read must not seed a write).
+ * - `set(k, v, {rev, gen})` is the checked write: 'landed' once the host
+ *   applied it inside the token's transaction, 'conflict' when the space
+ *   moved or the token's generation died (E_CONFLICT/E_GONE - zero
+ *   effects, the token is simply stale), 'missed' on a definitive
+ *   refusal, 'unknown' when the outcome is ambiguous.
  */
-export type LibStore = {
-  put: (k: string, v: string) => Promise<WriteOutcome | boolean>
+export type CasStore = {
+  entry: (k: string) => Promise<{ v: string | null; rev: number; gen: number }>
+  set: (k: string, v: string, expect: { rev: number; gen: number }) => Promise<CasOutcome>
 }
+export type CasOutcome = 'landed' | 'conflict' | 'missed' | 'unknown'
 
 /**
  * 'applied': every planned write durably landed.
  * 'failed': the commit aborted and provably nothing landed - the first
  *   write was definitively refused, so the caller may honestly say
  *   nothing applied.
- * 'partial': the commit aborted with a landed prefix (some writes durable,
- *   at least one failed), or an ambiguous write outcome where landing
- *   cannot be disproved. Landed data is PRESERVED: no rollback is issued
- *   because rollback would have to write values derived from a read that
- *   could be stale - the classic verify-read -> mutate race. The caller
- *   reports 'partial' honestly and re-snapshots; the durable truth is what
- *   the storage shows.
+ * 'partial': the commit stopped on an ambiguous outcome (a timeout whose
+ *   landing could not be settled by readback, an exhausted conflict loop,
+ *   or a refused write after a landed prefix). Landed data is PRESERVED;
+ *   the caller reports 'partial' honestly and re-snapshots.
+ * 'conflict': the plan's base was superseded by peer state on a key whose
+ *   intent cannot be re-derived locally (a changed record). Nothing more
+ *   is written; the caller re-reads durable state, re-runs its semantic
+ *   mutation on it (the field-intent rebase) and plans again.
  */
-export type CommitOutcome = 'applied' | 'failed' | 'partial'
-
-type Attempt = 'landed' | 'missed' | 'unknown'
+export type CommitOutcome = 'applied' | 'failed' | 'partial' | 'conflict'
 
 /**
- * Issue the planned write exactly once. There is deliberately NO app-level
- * retry: the SDK already retries a timed-out mutation once with the SAME
- * request ID, and its contract is 'read back before retrying with a new
- * request'. A second request carrying this commit's pre-planned payload is
- * a NEW mutation that lands LWW over any peer write which landed during the
- * backoff - the stale-retry clobber. An ambiguous outcome therefore stops
- * the commit as 'unknown' and leaves reconciliation to the resnapshot,
- * which settles the view on the durable truth without re-sending anything.
- * 'missed' means the single request was definitively refused and provably
- * never applied.
+ * What one commit step wants the stored value to become, re-derived
+ * against the value `entry` just read - never the value frozen at plan
+ * time:
+ * - `put` (a record): valid only while the stored value still equals the
+ *   `base` the mutation was computed on. Any other value means a peer
+ *   acknowledged an edit we must not overwrite: return 'rebase' and let
+ *   the caller re-run its mutation on fresh state.
+ * - `tomb`: write the marker while the stored value still equals `base`.
+ *   A different value is either an existing tomb (delete already
+ *   satisfied) or a NEWER live incarnation (a confirmed peer restore) -
+ *   both mean skip: never tomb over confirmed peer work. The index merge
+ *   below keeps the id when a tomb was skipped.
+ * - `index`: the only step whose value is a pure function of fresh state:
+ *   apply the order ops (drop confirmed-tombed ids, keep peer ids in
+ *   place, insert our created ids, apply our order) to whatever order is
+ *   currently stored. Already-equal merges write nothing.
  */
-async function attempt(op: () => Promise<WriteOutcome | boolean>): Promise<Attempt> {
-  try {
-    const r = await op()
-    return r === true || r === 'landed' ? 'landed' : r === false || r === 'missed' ? 'missed' : 'unknown'
-  } catch {
-    return 'unknown'
-  }
+export type LibWriteStep = {
+  kind: 'put' | 'tomb' | 'index'
+  key: string
+  /** Value the stored key held when the plan was computed (null = absent). */
+  base?: string | null
+  /** Planned value for `put`/`index` steps; the tomb marker for `tomb`. */
+  value?: string
 }
 
 /**
- * Persist one library mutation against a boolean storage adapter in the
- * semantic order `planLibWrites` emits (changed records, then tomb markers,
- * then the index):
- *
- * - Changed records land BEFORE the index, so the index can never be made
- *   to reference a record that is not stored (a dangling reachable ref).
- * - Tomb markers land BEFORE the index removal, so a peer restore that
- *   lands inside this commit's window ends up an unindexed live record -
- *   recovered by the assembler - instead of being erased by a late step.
- * - The index lands LAST: reachability flips only after every record and
- *   tomb write it references has landed.
- * - The first non-landed step ABORTS the rest of the plan: remaining
- *   writes were computed assuming the earlier ones landed.
- * - No repair/rollback writes exist and nothing is retried app-side. A
- *   repair would have to write a value derived from a read, and a
- *   read->write pair is not atomic on this port: a peer's acknowledged
- *   edit landing between the read's capture and the repair's put would be
- *   erased. A retried planned write is the same hazard in the other
- *   direction: the SDK already owns same-request-ID retry for timeouts,
- *   so re-sending this commit's payload as a new request could land LWW
- *   over a peer's confirmed write. Instead the commit reports the
- *   truthful terminal - 'partial' when anything landed or might have -
- *   and the caller re-snapshots to the durable state.
- * - Nothing is written after the commit returns.
- *
- * Resolves 'applied' only when every planned write landed.
+ * Merge the plan's order intent into a freshly-read index order. Pure.
+ * `next` is our planned order (our creates may not exist in `fresh` yet);
+ * ids only in `fresh` are peer work and are spliced back at their stored
+ * positions; `remove` carries ids this commit confirmed tombed.
  */
-export async function commitLibWrites(
-  io: LibStore,
-  plan: { kind: 'put' | 'tomb'; key: string; value?: string }[]
-): Promise<CommitOutcome> {
+export function mergeIndexOrder(fresh: string[], next: string[], remove: ReadonlySet<string>): string[] {
+  const result = next.filter((id) => !remove.has(id))
+  for (let i = 0; i < fresh.length; i++) {
+    const id = fresh[i]!
+    if (!result.includes(id) && !remove.has(id)) result.splice(Math.min(i, result.length), 0, id)
+  }
+  return result
+}
+
+/** A stored `{v:1,tomb:1}` marker - the acknowledged-deletion wire shape. */
+function isTombWire(v: string | null): boolean {
+  if (!v) return false
+  try {
+    const p: unknown = JSON.parse(v)
+    return typeof p === 'object' && p !== null && 'tomb' in p && (p as { tomb: unknown }).tomb === 1
+  } catch {
+    return false
+  }
+}
+
+/** Parse an index wire value into its order (corrupt/missing -> []). */
+function readIndexOrder(v: string | null | undefined): string[] {
+  if (!v) return []
+  try {
+    const p: unknown = JSON.parse(v)
+    if (typeof p === 'object' && p !== null && 'order' in p && Array.isArray((p as { order: unknown }).order))
+      return (p as { order: unknown[] }).order.filter((x): x is string => typeof x === 'string')
+  } catch {}
+  return []
+}
+
+const MAX_TRIES = 4
+
+/**
+ * Persist one library mutation via conditional writes in the semantic
+ * order `planLibWrites` emits (changed records, then tombs, then index):
+ *
+ * - Every step re-reads `entry` inside its own transaction window and
+ *   writes with the `{rev, gen}` token just minted - `rev` counts every
+ *   write in the space, so a token read before an earlier step is already
+ *   stale. The bounded loop refreshes the token on E_CONFLICT/E_GONE.
+ * - `put` on a value that no longer equals `base` stops with 'conflict':
+ *   a peer edit owns the new base; resubmitting the frozen doc would
+ *   clobber it. The caller re-runs the mutation on fresh state.
+ * - `tomb` on a value that no longer equals `base` SKIPS: the delete
+ *   intent is already satisfied (existing tomb) or superseded (a
+ *   confirmed peer restore owns a newer incarnation). Only ids this
+ *   commit actually tombed (or found already tombed) are removed from
+ *   the merged index - a peer restore keeps its reachability.
+ * - `index` merges intent into the stored order instead of overwriting
+ *   it, so a peer insert/remove landing inside the window survives.
+ * - 'unknown' is settled by reading the SAME key's entry: stored value
+ *   equals the intended value -> the write landed before the ack was
+ *   lost; equals the read value -> it provably missed and ONE retry with
+ *   a fresh token is safe; anything else -> a peer landed, 'conflict'.
+ *   The readback reconciles authority; it is never permission to resend
+ *   a frozen payload.
+ * - The first 'missed' refusal aborts the rest; nothing is written after
+ *   the commit returns.
+ */
+export async function commitLibWrites(io: CasStore, plan: LibWriteStep[]): Promise<CommitOutcome> {
   let landed = 0
-  let uncertain = false
+  const tombs = new Set<string>()
+  const tombId = (key: string) => key.slice('trip.'.length)
   for (const w of plan) {
-    const r = await attempt(() => io.put(w.key, w.value ?? ''))
-    if (r === 'landed') {
-      landed++
-      continue
+    const remove = new Set([...tombs].map(tombId))
+    let stepDone = false
+    for (let tries = 0; tries < MAX_TRIES && !stepDone; tries++) {
+      let e: { v: string | null; rev: number; gen: number }
+      try {
+        e = await io.entry(w.key)
+      } catch {
+        return 'partial'
+      }
+      const base = w.base ?? null
+      let desired: string | null = null
+      if (w.kind === 'tomb') {
+        if (e.v === base) {
+          desired = w.value ?? ''
+        } else {
+          // An existing tomb means the delete is already satisfied and
+          // the id stays out of the index merge. A NEWER live value is a
+          // confirmed peer incarnation: it keeps its reachability.
+          if (e.v === w.value) tombs.add(w.key)
+          stepDone = true
+          landed++
+          continue
+        }
+      } else if (w.kind === 'index') {
+        const fresh = readIndexOrder(e.v)
+        const nextOrder = readIndexOrder(w.value)
+        const merged = mergeIndexOrder(fresh, nextOrder, remove)
+        const mergedJson = JSON.stringify({ v: 1, order: merged })
+        if (merged.join('|') === fresh.join('|')) {
+          stepDone = true
+          landed++
+          continue
+        }
+        desired = mergedJson
+      } else {
+        // A `put` whose base is null means 'no live value here': both an
+        // absent key and a retained tomb satisfy it, so a restore (Undo)
+        // writes over the tomb like a create writes over nothing. Any
+        // other live value is a confirmed peer base - rebase, never
+        // overwrite.
+        if (e.v !== base && !(base === null && (e.v === null || isTombWire(e.v)))) return 'conflict'
+        desired = w.value ?? ''
+      }
+      const r = await io.set(w.key, desired, { rev: e.rev, gen: e.gen })
+      if (r === 'landed') {
+        if (w.kind === 'tomb') tombs.add(w.key)
+        stepDone = true
+        landed++
+        continue
+      }
+      if (r === 'conflict') continue
+      if (r === 'missed') return landed > 0 ? 'partial' : 'failed'
+      // 'unknown': settle the SAME key by readback - never blind-resend.
+      try {
+        const after = await io.entry(w.key)
+        if (after.v === desired) {
+          if (w.kind === 'tomb') tombs.add(w.key)
+          stepDone = true
+          landed++
+          continue
+        }
+        if (after.v === e.v) continue // provably missed: retry once w/ fresh token
+        return 'conflict' // a peer owns the value now
+      } catch {
+        return 'partial'
+      }
     }
-    if (r === 'unknown') uncertain = true
-    return landed > 0 || uncertain ? 'partial' : 'failed'
+    if (!stepDone) return 'partial'
   }
   return 'applied'
 }
