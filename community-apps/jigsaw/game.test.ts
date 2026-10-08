@@ -47,6 +47,7 @@ import {
   serializeSaves,
   slotX,
   slotY,
+  TRAY,
   trayCount,
   unionGames
 } from './puzzle.ts'
@@ -393,10 +394,21 @@ await checkAsync('serial queue: a still-pending step only delays later work', as
 // pair whose reads can reject or be delayed - the exact failure shapes the
 // display pair produces.
 
+// Host-faithful CAS model: rev/gen are space-level (every set/del bumps
+// rev), `expect` is checked inside the write's transaction exactly like the
+// SDK's expectMeta - E_GONE on a dead generation, E_CONFLICT on a moved rev,
+// E_TIMEOUT leaves landed-state unknown so the readback decides.
 class FakeKV {
   store = new Map<string, string>()
   sets: { k: string; v: string }[] = []
+  rev = 0
+  gen = 1
   failNext = 0
+  /** Runs inside the commit, before the token check: simulate a peer write
+   * that lands between our entry read and our set. */
+  beforeSet: (() => void) | null = null
+  /** Queued commit outcomes beyond the token check. */
+  setFaults: Array<'timeout-lost' | 'timeout-landed' | 'error'> = []
   getHook: ((k: string) => Promise<string | null>) | null = null
   async get(k: string): Promise<string | null> {
     if (this.getHook) {
@@ -410,9 +422,59 @@ class FakeKV {
     }
     return this.store.get(k) ?? null
   }
-  async set(k: string, v: string) {
+  async entry(k: string) {
+    if (this.getHook) {
+      const h = this.getHook
+      this.getHook = null
+      return { k, v: await h(k), rev: this.rev, gen: this.gen }
+    }
+    if (this.failNext > 0) {
+      this.failNext--
+      throw Object.assign(new Error('kv read failed'), { code: 'E_STORAGE' })
+    }
+    return { k, v: this.store.get(k) ?? null, rev: this.rev, gen: this.gen }
+  }
+  /** A confirmed foreign write: what a peer's commit does to the space. */
+  peerSet(k: string, v: string) {
+    this.store.set(k, v)
+    this.rev++
+  }
+  peerDel(k: string) {
+    this.store.delete(k)
+    this.rev++
+  }
+  async set(k: string, v: string, expect?: { rev: number; gen: number }) {
+    this.beforeSet?.()
+    this.beforeSet = null
+    if (expect) {
+      if (expect.gen !== this.gen) throw Object.assign(new Error('E_GONE'), { code: 'E_GONE' })
+      if (expect.rev !== this.rev) throw Object.assign(new Error('E_CONFLICT'), { code: 'E_CONFLICT' })
+    }
+    const fault = this.setFaults.shift()
+    if (fault === 'error') throw Object.assign(new Error('E_STORAGE'), { code: 'E_STORAGE' })
+    if (fault === 'timeout-lost') {
+      // Host never applied it but the ACK died: unknown until read back.
+      throw Object.assign(new Error('E_TIMEOUT'), { code: 'E_TIMEOUT' })
+    }
+    if (fault === 'timeout-landed') {
+      this.store.set(k, v)
+      this.sets.push({ k, v })
+      this.rev++
+      throw Object.assign(new Error('E_TIMEOUT'), { code: 'E_TIMEOUT' })
+    }
     this.sets.push({ k, v })
     this.store.set(k, v)
+    this.rev++
+  }
+  async del(k: string, expect?: { rev: number; gen: number }) {
+    this.beforeSet?.()
+    this.beforeSet = null
+    if (expect) {
+      if (expect.gen !== this.gen) throw Object.assign(new Error('E_GONE'), { code: 'E_GONE' })
+      if (expect.rev !== this.rev) throw Object.assign(new Error('E_CONFLICT'), { code: 'E_CONFLICT' })
+    }
+    this.store.delete(k)
+    this.rev++
   }
 }
 
@@ -453,17 +515,12 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
       state.game = pl.game
       refs.game.current = pl.game
       refs.held.current = pl.held
-      void liveKV.set('live', pl.live)
       state.savesRaw = pl.saves
-      void savesKV.set('saves', pl.saves)
     },
-    writeLive(raw) {
-      void liveKV.set('live', raw)
-    },
-    writeSaves(raw) {
+    recordSaves(raw) {
       state.savesRaw = raw
-      void savesKV.set('saves', raw)
     },
+    repairLive() {},
     savesDoc() {
       return state.savesRaw ? parseSaves(state.savesRaw) : null
     },
@@ -482,7 +539,7 @@ await checkAsync('a rejected saves read fails the step and loses no saved config
   const saves = new FakeKV()
   const gA = newGame('harbour', 12, 1)
   const gB = newGame('alpine', 24, 2)
-  saves.store.set(
+  saves.peerSet(
     'saves',
     serializeSaves({ rev: 3, by: 'peer', current: 'harbour:12', games: { 'harbour:12': gA, 'alpine:24': gB } })
   )
@@ -676,7 +733,6 @@ await checkAsync('a prefs heal re-reads and never writes under a peer that won',
     },
     apply(pl) {
       cur = pl.prefs
-      void kv.set('prefs', pl.raw)
     }
   })
   await pp.heal()
@@ -740,7 +796,6 @@ await checkAsync('prefs: a rejected read loses nothing, a confirmed read rebases
     },
     apply(pl) {
       cur = pl.prefs
-      void kv.set('prefs', pl.raw)
     }
   })
   kv.failNext = 1
@@ -909,21 +964,19 @@ await checkAsync('a write that lands over a racing peer doc unions and republish
   // Our write lands, then the peer's rev-3 envelope lands on top of it
   // (real last-writer store order). The acknowledged close-out read must
   // see it, union per key and republish - the peer copy may already be gone.
-  const rawSet = saves.set.bind(saves)
-  let overlaid = false
-  saves.set = async (k: string, v: string) => {
-    await rawSet(k, v)
-    if (!overlaid && k === 'saves') {
-      overlaid = true
-      saves.store.set('saves', peerDoc)
-    }
+  // A peer commit lands inside our write's own transaction window: the
+  // conditional set rejects E_CONFLICT, the attempt re-reads fresh entries,
+  // unions the peer's exclusive key and re-commits - our write can never be
+  // the last word on a regressed library.
+  saves.beforeSet = () => {
+    saves.peerSet('saves', peerDoc)
   }
   await P.p.act((ctx) => ({ next: ctx.saves['alpine:24'] ?? newGame('alpine', 24, 7), held: null }))
   const final = parseSaves(saves.store.get('saves')!)
   eq(
     Object.keys(final.games).sort(),
     ['alpine:24', 'harbour:12', 'lantern:48'],
-    'the close-out republish did not restore every key'
+    'the conflict-rebase republish did not restore every key'
   )
   ok(final.rev > 3, 'the union republish did not advance the revision')
 })
@@ -944,38 +997,116 @@ await checkAsync("a racing peer's deeper save for the current key is adopted aft
   P.clocks.saves = { rev: 2, by: 'me' }
   P.state.savesRaw = saves.store.get('saves')!
   P.refs.game.current = g0
-  const rawSet = saves.set.bind(saves)
-  let overlaid = false
-  saves.set = async (k: string, v: string) => {
-    await rawSet(k, v)
-    if (!overlaid && k === 'saves') {
-      overlaid = true
-      saves.store.set('saves', peerDoc)
-    }
+  saves.beforeSet = () => {
+    saves.peerSet('saves', peerDoc)
   }
   await P.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game, 3, 500, 500, 9).game, held: null } : null))
   const final = parseSaves(saves.store.get('saves')!)
-  eq(final.games['harbour:12'], peerHarbour, 'the newer peer game regressed to our stale copy')
-  eq(P.state.adoptedGames.length, 1, 'the newer current-key game was not adopted locally')
-  eq(P.state.adoptedGames[0], peerHarbour)
+  // The rebase ran our intent on the peer's deeper base: their moves and
+  // ours both survive - never a frozen doc over confirmed progress.
+  const landed = final.games['harbour:12']!
+  eq(landed.moves, peerHarbour.moves + 1, 'a peer or our own committed move was lost')
+  peerHarbour.pieces.forEach((pc, id) => {
+    if (pc.z === TRAY) return
+    const cur = landed.pieces[id]!
+    ok(cur.z !== TRAY && cur.x === pc.x && cur.y === pc.y, `peer piece ${id} regressed`)
+  })
+  ok(landed.pieces[3]!.z !== TRAY, 'our admitted placement was lost')
 })
 
-await checkAsync('a rejected close-out read keeps the acknowledged write standing', async () => {
+await checkAsync('an unknown saves ACK verifies landed-or-not by readback, never blindly', async () => {
   const live = new FakeKV()
   const saves = new FakeKV()
   const P = makePersist('me', live, saves)
   P.refs.game.current = newGame('harbour', 12, 1)
-  let reads = 0
-  const rawGet = saves.get.bind(saves)
-  saves.get = async (k: string) => {
-    reads++
-    if (reads === 2) throw new Error('close-out read failed')
-    return rawGet(k)
-  }
+  // The write landed but the ACK died: one same-operation readback finds
+  // our payload and the step resolves - no duplicate write, no retry.
+  saves.setFaults = ['timeout-landed']
   await P.p.act((ctx) => (ctx.game ? { next: ctx.game, held: 1 } : null))
-  eq(reads, 2, 'the close-out read did not run')
   const final = parseSaves(saves.store.get('saves')!)
-  ok(final.games['harbour:12'] !== undefined, 'a failed verify read ate the acknowledged write')
+  ok(final.games['harbour:12'] !== undefined, 'a landed write was dropped')
+  eq(saves.sets.filter((w) => w.k === 'saves').length, 1, 'the timed-out write was resubmitted')
+
+  const P2 = makePersist('me', live, saves)
+  P2.refs.game.current = newGame('harbour', 12, 1)
+  // The write never landed and the ACK died: readback misses our payload,
+  // the step fails honestly and the durable doc is untouched.
+  saves.setFaults = ['timeout-lost']
+  const before = saves.store.get('saves')
+  let failed = false
+  await P2.p
+    .act((ctx) => (ctx.game ? { next: placeAt(ctx.game!, 4, 60, 60, 11).game, held: null } : null))
+    .then(
+      () => {},
+      () => {
+        failed = true
+      }
+    )
+  ok(failed, 'a timed-out unlanded write resolved')
+  eq(saves.store.get('saves'), before, 'an unacknowledged write mutated the durable doc')
+})
+
+await checkAsync('two initial-null seeds race to one unioned library', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  // Two copies on one space both read a genuinely-null entry and each seed a
+  // different puzzle. Whichever commits first wins the token; the loser
+  // rebases on the peer's confirmed doc and unions - nothing is lost.
+  const A = makePersist('me', live, saves)
+  const B = makePersist('peer', live, saves)
+  saves.beforeSet = () => {}
+  await A.p.act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+  await B.p.act(() => ({ next: newGame('alpine', 24, 2), held: null }))
+  const final = parseSaves(saves.store.get('saves')!)
+  ok(final.games['harbour:12'] !== undefined, 'first seed lost')
+  ok(final.games['alpine:24'] !== undefined, 'second seed lost')
+})
+
+await checkAsync('a delete/recreate ABA still conflicts a stale token', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const doc = serializeSaves({
+    rev: 1,
+    by: 'peer',
+    current: 'harbour:12',
+    games: { 'harbour:12': newGame('harbour', 12, 1) }
+  })
+  saves.peerSet('saves', doc)
+  const P = makePersist('me', live, saves)
+  P.refs.game.current = newGame('alpine', 24, 2)
+  // Delete then recreate the same bytes: the value looks identical but the
+  // space rev moved, so our admitted-against token must still conflict.
+  saves.beforeSet = () => {
+    saves.peerDel('saves')
+    saves.peerSet('saves', doc)
+  }
+  await P.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game!, 2, 40, 40, 5).game, held: null } : null))
+  const final = parseSaves(saves.store.get('saves')!)
+  ok(final.games['alpine:24'] !== undefined, 'the rebased write lost its own save')
+  ok(final.games['harbour:12'] !== undefined, 'the ABA peer save was lost')
+})
+
+await checkAsync('a dead generation refuses the admitted write honestly', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+  P.refs.game.current = newGame('harbour', 12, 1)
+  // The generation our entry token came from dies before the commit: the
+  // intent cannot validly rebase and the step must refuse, not resurrect.
+  saves.beforeSet = () => {
+    saves.gen++
+  }
+  let code = ''
+  await P.p
+    .act((ctx) => (ctx.game ? { next: placeAt(ctx.game!, 4, 60, 60, 11).game, held: null } : null))
+    .then(
+      () => {},
+      (e) => {
+        code = e?.code ?? e?.message ?? ''
+      }
+    )
+  ok(`${code}`.includes('E_GONE'), `expected E_GONE refusal, got ${code}`)
+  ok(!saves.store.has('saves'), 'a dead-generation write mutated durable state')
 })
 
 await checkAsync('a reset bumps the incarnation so pre-reset intents and stale saves die', async () => {

@@ -177,15 +177,6 @@ function Jigsaw() {
     }
   }, [])
 
-  // Mirror handles inside refs: the queued write path needs the current
-  // mirrors without rebuilding the persistence factory every render.
-  const liveMirror = useRef(live)
-  liveMirror.current = live
-  const savesMirror = useRef(savesKV)
-  savesMirror.current = savesKV
-  const prefsMirror = useRef(prefsKV)
-  prefsMirror.current = prefsKV
-
   // The serialized write path lives in persist.ts: confirmed reads before
   // every rebase (a rejected read fails the step instead of writing a guessed
   // snapshot), foreign adoption by revision, bind keys so a delayed intent
@@ -211,20 +202,18 @@ function Jigsaw() {
           savesRaw.current = serializeSaves(mergedSaves(savesRaw.current, sd).doc)
         },
         apply: (p) => {
+          // Optimistic commit only: the conditional space.set calls inside
+          // act are the durable acknowledgement, not these state setters.
           gameRef.current = p.game
           heldRef.current = p.held
           setGame(p.game)
           setHeld(p.held)
           savesRaw.current = p.saves
-          // The mirror sets ARE the write acknowledgement: act waits for
-          // both before its bounded close-out read.
-          return Promise.all([liveMirror.current.set(p.live), savesMirror.current.set(p.saves)])
         },
-        writeLive: (raw) => liveMirror.current.set(raw),
-        writeSaves: (raw) => {
+        recordSaves: (raw) => {
           savesRaw.current = raw
-          savesMirror.current.set(raw)
         },
+        repairLive: () => void persistence.heal(),
         savesDoc: () => (savesRaw.current ? parseSaves(savesRaw.current) : null),
         adoptGame
       }),
@@ -278,10 +267,11 @@ function Jigsaw() {
           prefsClock.current.by = env.by
         },
         apply: (p) => {
+          // Optimistic commit; the conditional set inside setPrefs is the
+          // durable acknowledgement, never this hook.
           prefsRef.current = p.prefs
           setPrefsState(p.prefs)
           setMuted(p.prefs.muted)
-          prefsMirror.current.set(p.raw)
         }
       }),
     []

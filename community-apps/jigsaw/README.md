@@ -75,10 +75,11 @@ that differ from a single-display app:
 - Repairs are heals, not blind writes: a stale foreign doc on the mirror
   queues `heal()`/`healSaves()`/`healPrefs()`, each re-reading its own doc
   first. A peer doc already at-or-past our clock is adopted and nothing is
-  written; otherwise exactly one write at `max(clock, store) + 1` lands. A
-  repair that wrote `clock + 1` straight off the mirror event regresses
-  below whatever the peer just landed, and each regression re-wakes the
-  peer's stale check - an endless cross-doc ping-pong.
+  written; otherwise the heal commits a conditional write on the entry it
+  just read and retries on a moved revision. A repair that wrote
+  `clock + 1` straight off the mirror event regresses below whatever the
+  peer just landed, and each regression re-wakes the peer's stale check -
+  an endless cross-doc ping-pong.
 - `queue.ts` keeps the serial chain alive after a failed step; a step that
   genuinely never settles only delays later writes - do not add timeouts or
   reload workarounds on top of it.
@@ -87,12 +88,19 @@ that differ from a single-display app:
   moves), and adoption merges into the mirror (`mergedSaves`) instead of
   replacing it: pending games survive an equal-revision racer whose
   envelope wins the writer tie-break but lacks our exclusive keys.
-- `apply` is awaited as the write acknowledgement, then the step re-reads
-  the durable doc once: a foreign envelope that raced our confirmed read -
-  including from a peer that has since ended - is unioned and republished
-  once, and a deeper save for the current key swaps in via `adoptGame`. A
-  rejected close-out read just skips that check; the acknowledged write
-  stands and the heal/watch path converges.
+- Every durable write is a CAS attempt: the step reads `entry()` (value +
+  `{rev, gen}` token) of both spaces, commits the intent synchronously via
+  `apply` (optimistic UI only), then lands `set(v, expect)` on each space.
+  An `E_CONFLICT` means a peer committed inside our window - the step
+  re-reads fresh entries, re-unions their facts, and re-runs the intent on
+  the rebased base, never resubmitting the frozen doc. `E_GONE` means the
+  generation that admitted the intent is dead - the step refuses. An
+  `E_TIMEOUT` or other unknown failure is answered by a same-operation
+  `entry()` readback: payload present means the write landed (resolve, no
+  resubmit), absent means it never applied (fail honestly, durable
+  untouched). Writes with no `expect` - and the fire-and-forget
+  `useKV`/`KVMirror` setters - are not a durable acknowledgement and must
+  never carry committed state.
 - The tray count's denominator is `game.tray.length`, not the loose board
   count: felt pieces are not in the tray even with no filter applied.
 

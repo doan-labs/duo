@@ -1,16 +1,25 @@
-// Shared-state write path: every mutation rebases on confirmed reads straight
-// from the stores, then publishes the serialized envelopes. Two rules make it
-// safe against the failure modes the display pair produces:
+// Shared-state write path: every mutation runs as a conditional-write
+// transaction. `entry()` returns the confirmed value AND the {rev, gen}
+// token in one call; `set`/`del` with that token is the atomic check inside
+// the write's own host transaction. The rules that make it safe:
 //
-//   * A resolved read is authoritative - null means the key is genuinely
-//     empty and may seed. A REJECTED read means the settled state is unknown;
-//     the step fails instead of writing from a guessed snapshot. Writing from
-//     a null-as-empty snapshot is how a one-game library overwrites every
-//     other saved puzzle, and how stale prefs overwrite a peer's newer ones.
-//   * Rejection is loud on purpose: the enqueue caller gets the failed step's
-//     promise, the intent is dropped (never retried inside the step, so a
-//     canceled mutation cannot resurrect), and the queue itself survives -
-//     see queue.ts.
+//   * A resolved entry is authoritative - null means the key is genuinely
+//     empty and may seed. A REJECTED read means the settled state is
+//     unknown; the step fails instead of writing from a guessed snapshot.
+//   * E_CONFLICT means a peer landed first: the intent is rebased on a
+//     FRESH entry - unioned games preserve the peer's confirmed facts and
+//     the semantic mutation re-runs, never a frozen doc resubmitted under
+//     a new token. Bounded attempts, then an honest failure.
+//   * E_GONE means the generation that admitted the write is dead (a
+//     restore moved past it): the intent cannot validly rebase and the
+//     step refuses instead of resurrecting a stale mutation.
+//   * E_TIMEOUT / unknown outcomes get ONE same-operation readback: the
+//     entry must already hold our payload to count as landed. Anything
+//     else fails the step - never a blind new-id retry, never a rollback
+//     that could clobber a confirmed peer write.
+//   * Fire-and-forget mirror setters are NOT durable acknowledgement.
+//     The awaited `set` resolution is the only durable ACK; UI state still
+//     commits optimistically through `apply` before the write.
 
 import { type ArtId, isArtId } from './art.ts'
 import {
@@ -35,9 +44,50 @@ export const LIVE_KEY = 'jigsaw-live'
 export const SAVES_KEY = 'jigsaw-saves'
 export const PREFS_KEY = 'jigsaw-prefs'
 
+export type EntryToken = { v: string | null; rev: number; gen: number }
 export type KVLike = {
   get(k: string): Promise<string | null>
-  set(k: string, v: string): Promise<unknown>
+  entry(k: string): Promise<EntryToken>
+  set(k: string, v: string, expect?: { rev: number; gen: number }): Promise<unknown>
+  del?(k: string, expect?: { rev: number; gen: number }): Promise<unknown>
+}
+
+/** Rebound-and-retry cap for conditional writes: enough to absorb a real
+ * race, small enough that a dead end reports instead of spinning. */
+const CAS_ATTEMPTS = 4
+
+const errCode = (e: unknown): string =>
+  e && typeof e === 'object' && 'code' in e && typeof (e as { code: unknown }).code === 'string'
+    ? (e as { code: string }).code
+    : 'E_STORAGE'
+
+/**
+ * Awaits one conditional write and classifies the outcome. Resolves true
+ * once the payload is confirmed durable (the set resolved, or a same-op
+ * readback after an unknown result found our bytes already there).
+ * E_CONFLICT returns false so the caller rebases; everything else throws
+ * and the enqueue caller's promise fails honestly.
+ */
+async function casSet(kv: KVLike, key: string, raw: string, expect: { rev: number; gen: number }): Promise<boolean> {
+  try {
+    await kv.set(key, raw, expect)
+    return true
+  } catch (e) {
+    const code = errCode(e)
+    if (code === 'E_CONFLICT') return false
+    if (code === 'E_GONE') throw e
+    if (code === 'E_TIMEOUT') {
+      let back: EntryToken
+      try {
+        back = await kv.entry(key)
+      } catch {
+        throw e
+      }
+      if (back.v === raw) return true
+      throw e
+    }
+    throw e
+  }
 }
 /** The SDK view fields admission cares about; null-tolerant for pre-connect. */
 export type ViewSnapshot = { active: boolean; visible: boolean } | null | undefined
@@ -134,19 +184,20 @@ export function createGamePersistence(deps: {
    * Implementations must store `mergedSaves(prev, sd).doc`, never the bare
    * envelope, so pending keys survive adoption. */
   acceptSaves(sd: Saves): void
-  /** Persist the mutation: state setters plus both KV writes. Returned
-   * promise (if any) is awaited as the write acknowledgement before the
-   * bounded close-out read runs. */
+  /** Commit the mutation's optimistic UI state synchronously. Called once
+   * per CAS attempt with that attempt's rebased payload; durable truth is
+   * the awaited conditional write that follows, never this hook. */
   apply(payload: GameApply): unknown
-  /** Publish only the live doc (heals never touch the library). */
-  writeLive(raw: string): void
-  /** Publish only the saves doc. */
-  writeSaves(raw: string): void
   /** The last accepted saves envelope, for republishing on a heal. */
   savesDoc(): Saves | null
+  /** Record a durably published saves doc in local bookkeeping. */
+  recordSaves(raw: string): void
   /** A union repair surfaced a newer game for the current puzzle: swap it in
    * locally so the UI follows the state that actually survived. */
   adoptGame?(g: Game): void
+  /** Kick the live-doc heal after a write whose session half never
+   * confirmed (the saves half verified landed via readback). */
+  repairLive?(): void
 }): {
   /** Runs a mutation after confirmed reads. `bind` is the gameKeyOf the intent
    * was admitted against: a different puzzle live by step time drops it. */
@@ -166,146 +217,168 @@ export function createGamePersistence(deps: {
   return {
     heal() {
       return enqueue(deps.queue, async () => {
-        const liveRaw = await deps.liveKV.get(deps.liveKey)
-        const doc = parseLive(liveRaw)
-        if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
-          deps.adopt(doc)
-          return
-        }
-        const game = deps.refs.game.current
-        if (!game) return
-        deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
-        deps.clocks.live.by = deps.me
-        deps.writeLive(
-          JSON.stringify({
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+          const ent = await deps.liveKV.entry(deps.liveKey)
+          const doc = parseLive(ent.v)
+          if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
+            deps.adopt(doc)
+            return
+          }
+          const game = deps.refs.game.current
+          if (!game) return
+          deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
+          deps.clocks.live.by = deps.me
+          const raw = JSON.stringify({
             v: 1,
             by: deps.me,
             rev: deps.clocks.live.rev,
             held: deps.refs.held.current,
             game
           } satisfies Live)
-        )
+          if (await casSet(deps.liveKV, deps.liveKey, raw, { rev: ent.rev, gen: ent.gen })) return
+        }
+        throw new Error('E_CONFLICT: live heal could not rebase')
       })
     },
     healSaves() {
       return enqueue(deps.queue, async () => {
-        const raw = await deps.savesKV.get(deps.savesKey)
-        const sd = parseSaves(raw)
-        // The confirmed doc is already at-or-past our clock: adopt it and
-        // write nothing. Healing on top of a peer's newer doc is what a
-        // stale mirror event makes the unwary write path do.
-        if (sd.by !== deps.me && newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) {
-          deps.acceptSaves(sd)
-          return
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+          const ent = await deps.savesKV.entry(deps.savesKey)
+          const sd = parseSaves(ent.v)
+          // The confirmed doc is already at-or-past our clock: adopt it and
+          // write nothing. Healing on top of a peer's newer doc is what a
+          // stale mirror event makes the unwary write path do.
+          if (sd.by !== deps.me && newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) {
+            deps.acceptSaves(sd)
+            return
+          }
+          const mine = deps.savesDoc()
+          if (!mine) return
+          deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
+          deps.clocks.saves.by = deps.me
+          // The store doc can hold saves our mirror never saw (a peer write
+          // that landed between our last accepted envelope and this read).
+          // Republish union-style: every key survives, per-key newer wins.
+          const raw = serializeSaves({
+            ...mine,
+            games: unionGames(sd.games, mine.games),
+            rev: deps.clocks.saves.rev,
+            by: deps.me
+          })
+          if (await casSet(deps.savesKV, deps.savesKey, raw, { rev: ent.rev, gen: ent.gen })) {
+            deps.recordSaves(raw)
+            return
+          }
         }
-        const mine = deps.savesDoc()
-        if (!mine) return
-        deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
-        deps.clocks.saves.by = deps.me
-        // The store doc can hold saves our mirror never saw (a peer write
-        // that landed between our last accepted envelope and this read).
-        // Republish union-style: every key survives, per-key newer wins.
-        deps.writeSaves(
-          serializeSaves({ ...mine, games: unionGames(sd.games, mine.games), rev: deps.clocks.saves.rev, by: deps.me })
-        )
+        throw new Error('E_CONFLICT: saves heal could not rebase')
       })
     },
     act(fn, bind) {
       return enqueue(deps.queue, async () => {
-        const [liveRaw, savesRaw] = await Promise.all([deps.liveKV.get(deps.liveKey), deps.savesKV.get(deps.savesKey)])
-        const doc = parseLive(liveRaw)
-        let base = deps.refs.game.current
-        let heldBase = deps.refs.held.current
-        if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
-          deps.adopt(doc)
-          base = doc.game
-          heldBase = doc.held
-        }
-        const sd = parseSaves(savesRaw)
-        if (newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) deps.acceptSaves(sd)
-        // The queue serializes reads/rebases, not durable delivery: a
-        // confirmed read can still lag behind writes this copy already
-        // accepted (mirror sets fire-and-forget). The library is always the
-        // per-key union of the store doc and our last accepted envelope, so
-        // an equal-revision racer's exclusive keys survive whoever wins the
-        // writer tie-break.
-        const lib = unionGames(sd.games, deps.savesDoc()?.games ?? {})
-        // The freshest base for the running puzzle can also sit in the
-        // library: a peer that advanced the same config and saved before its
-        // live doc reached us must not be overwritten by our stale state.
-        if (base) {
-          const alt = lib[configKey(base.art, base.count)]
-          if (alt && newerGame(alt, base) !== base) {
-            base = alt
-            heldBase = null
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+          // One confirmed read of BOTH entries: value plus the {rev, gen}
+          // precondition token for this attempt's conditional writes.
+          const [liveEnt, savesEnt] = await Promise.all([
+            deps.liveKV.entry(deps.liveKey),
+            deps.savesKV.entry(deps.savesKey)
+          ])
+          const doc = parseLive(liveEnt.v)
+          let base = deps.refs.game.current
+          let heldBase = deps.refs.held.current
+          if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
+            deps.adopt(doc)
+            base = doc.game
+            heldBase = doc.held
+          }
+          const sd = parseSaves(savesEnt.v)
+          if (newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) deps.acceptSaves(sd)
+          // The library is always the per-key union of the store doc and
+          // our last accepted envelope, so exclusive keys a racer holds
+          // survive whoever wins the commit race.
+          const lib = unionGames(sd.games, deps.savesDoc()?.games ?? {})
+          // The freshest base for the running puzzle can also sit in the
+          // library: a peer that advanced the same config and saved before
+          // its live doc reached us must not be overwritten by our stale
+          // state.
+          if (base) {
+            const alt = lib[configKey(base.art, base.count)]
+            if (alt && newerGame(alt, base) !== base) {
+              base = alt
+              heldBase = null
+            }
+          }
+          // A piece id admitted against one puzzle means nothing on another:
+          // if the live puzzle changed (peer switch, seed rollover, a reset
+          // that bumped the incarnation) the intent dies here rather than
+          // mutating a game it was never aimed at.
+          if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
+          const r = fn({ game: base, held: heldBase, saves: lib })
+          if (!r) return
+          deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
+          deps.clocks.live.by = deps.me
+          deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
+          deps.clocks.saves.by = deps.me
+          const key = `${r.next.art}:${r.next.count}`
+          const savesDoc: Saves = {
+            rev: deps.clocks.saves.rev,
+            by: deps.me,
+            current: key,
+            games: { ...lib, [key]: r.next }
+          }
+          const payload: GameApply = {
+            game: r.next,
+            held: r.held,
+            live: JSON.stringify({
+              v: 1,
+              by: deps.me,
+              rev: deps.clocks.live.rev,
+              held: r.held,
+              game: r.next
+            } satisfies Live),
+            saves: serializeSaves(savesDoc),
+            savesDoc
+          }
+          // Optimistic UI commit for this attempt; durable truth is the
+          // awaited conditional write below.
+          deps.apply(payload)
+          try {
+            await Promise.all([
+              deps.liveKV.set(deps.liveKey, payload.live, { rev: liveEnt.rev, gen: liveEnt.gen }),
+              deps.savesKV.set(deps.savesKey, payload.saves, { rev: savesEnt.rev, gen: savesEnt.gen })
+            ])
+            return
+          } catch (e) {
+            const code = errCode(e)
+            // A peer landed between our entry read and the commit: loop
+            // back, adopt/union the fresh entries, and re-run the intent.
+            if (code === 'E_CONFLICT') continue
+            // The generation that admitted this write is dead: refuse.
+            if (code === 'E_GONE') throw e
+            if (code === 'E_TIMEOUT') {
+              // Unknown ACK: one same-operation readback decides landed-or-
+              // not. If our saves payload is already durable the write
+              // completed; if not, the step fails - never a blind retry.
+              let back: EntryToken
+              try {
+                back = await deps.savesKV.entry(deps.savesKey)
+              } catch {
+                throw e
+              }
+              if (back.v !== payload.saves) throw e
+              // Saves verified landed; a session doc that stayed behind
+              // converges through the normal heal.
+              try {
+                const liveBack = await deps.liveKV.entry(deps.liveKey)
+                if (liveBack.v !== payload.live) deps.repairLive?.()
+              } catch {
+                deps.repairLive?.()
+              }
+              return
+            }
+            throw e
           }
         }
-        // A piece id admitted against one puzzle means nothing on another: if
-        // the live puzzle changed (peer switch, seed rollover, a reset that
-        // bumped the incarnation) the intent dies here rather than mutating a
-        // game it was never aimed at.
-        if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
-        const r = fn({ game: base, held: heldBase, saves: lib })
-        if (!r) return
-        deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
-        deps.clocks.live.by = deps.me
-        deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
-        deps.clocks.saves.by = deps.me
-        const key = `${r.next.art}:${r.next.count}`
-        const savesDoc: Saves = {
-          rev: deps.clocks.saves.rev,
-          by: deps.me,
-          current: key,
-          games: { ...lib, [key]: r.next }
-        }
-        const payload: GameApply = {
-          game: r.next,
-          held: r.held,
-          live: JSON.stringify({
-            v: 1,
-            by: deps.me,
-            rev: deps.clocks.live.rev,
-            held: r.held,
-            game: r.next
-          } satisfies Live),
-          saves: serializeSaves(savesDoc),
-          savesDoc
-        }
-        await deps.apply(payload)
-        // Acknowledged close-out: now that our sets have landed, read the
-        // durable doc back once. A foreign envelope that raced our confirmed
-        // read - including one whose writer has since ended - is adopted or
-        // unioned and republished once, so our write can never be the last
-        // word on a regressed library. A rejected read just skips the check:
-        // the acknowledged write stands and the heal/watch path converges.
-        try {
-          const back = parseSaves(await deps.savesKV.get(deps.savesKey))
-          // "Our write already landed" needs the whole doc, not just the
-          // envelope: an equal rev+by from a different writer (a crashed copy
-          // relaunched under the same display id, or a racer sharing the
-          // tie-break name) must not pass for our payload and skip the union.
-          const sameSaves =
-            back.current === savesDoc.current &&
-            Object.keys(back.games).length === Object.keys(savesDoc.games).length &&
-            Object.keys(back.games).every((k) => k in savesDoc.games && sameGame(back.games[k]!, savesDoc.games[k]!))
-          if (back.rev === savesDoc.rev && back.by === deps.me && sameSaves) return
-          if (back.by !== deps.me && newerDoc(back.rev, back.by, deps.clocks.saves.rev, deps.clocks.saves.by))
-            deps.acceptSaves(back)
-          const unioned = unionGames(back.games, savesDoc.games)
-          const learned = Object.keys(unioned).some(
-            (k) => !(k in savesDoc.games) || !sameGame(unioned[k]!, savesDoc.games[k]!)
-          )
-          if (!learned) return
-          const missing = Object.keys(unioned).some((k) => !(k in back.games) || !sameGame(unioned[k]!, back.games[k]!))
-          const winner = unioned[key]
-          if (winner && !sameGame(winner, r.next)) deps.adoptGame?.(winner)
-          if (!missing) return
-          deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, back.rev) + 1
-          deps.clocks.saves.by = deps.me
-          deps.writeSaves(serializeSaves({ rev: deps.clocks.saves.rev, by: deps.me, current: key, games: unioned }))
-        } catch {
-          // Advisory only.
-        }
+        throw new Error('E_CONFLICT: act could not rebase')
       })
     }
   }
@@ -335,36 +408,48 @@ export function createPrefsPersistence(deps: {
     // our current prefs. Never a blind clock+1 write off a mirror event.
     heal() {
       return enqueue(deps.queue, async () => {
-        const env = parsePrefsDoc(await deps.kv.get(deps.key))
-        if (env.by !== deps.me && newerDoc(env.rev, env.by, deps.clock.rev, deps.clock.by)) {
-          deps.clock.rev = env.rev
-          deps.clock.by = env.by
-          deps.accept(env)
-          return
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+          const ent = await deps.kv.entry(deps.key)
+          const env = parsePrefsDoc(ent.v)
+          if (env.by !== deps.me && newerDoc(env.rev, env.by, deps.clock.rev, deps.clock.by)) {
+            deps.clock.rev = env.rev
+            deps.clock.by = env.by
+            deps.accept(env)
+            return
+          }
+          if (deps.clock.rev === 0) return
+          deps.clock.rev = Math.max(deps.clock.rev, env.rev) + 1
+          deps.clock.by = deps.me
+          const raw = JSON.stringify({ ...deps.current(), rev: deps.clock.rev, by: deps.me })
+          deps.apply({ prefs: deps.current(), raw })
+          if (await casSet(deps.kv, deps.key, raw, { rev: ent.rev, gen: ent.gen })) return
         }
-        if (deps.clock.rev === 0) return
-        deps.clock.rev = Math.max(deps.clock.rev, env.rev) + 1
-        deps.clock.by = deps.me
-        deps.apply({
-          prefs: deps.current(),
-          raw: JSON.stringify({ ...deps.current(), rev: deps.clock.rev, by: deps.me })
-        })
+        throw new Error('E_CONFLICT: prefs heal could not rebase')
       })
     },
     setPrefs(patch) {
       return enqueue(deps.queue, async () => {
-        const env = parsePrefsDoc(await deps.kv.get(deps.key))
-        let base = deps.current()
-        if (env.by !== deps.me && newerDoc(env.rev, env.by, deps.clock.rev, deps.clock.by)) {
-          deps.clock.rev = env.rev
-          deps.clock.by = env.by
-          deps.accept(env)
-          base = env.prefs
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+          const ent = await deps.kv.entry(deps.key)
+          const env = parsePrefsDoc(ent.v)
+          let base = deps.current()
+          if (env.by !== deps.me && newerDoc(env.rev, env.by, deps.clock.rev, deps.clock.by)) {
+            deps.clock.rev = env.rev
+            deps.clock.by = env.by
+            deps.accept(env)
+            base = env.prefs
+          }
+          // The intent is the patch: on a conflict the loop re-reads and
+          // re-applies it onto the peer's confirmed doc, keeping peer fields
+          // the patch never touched.
+          const next = { ...base, ...patch }
+          deps.clock.rev = Math.max(deps.clock.rev, env.rev) + 1
+          deps.clock.by = deps.me
+          const raw = JSON.stringify({ ...next, rev: deps.clock.rev, by: deps.me })
+          deps.apply({ prefs: next, raw })
+          if (await casSet(deps.kv, deps.key, raw, { rev: ent.rev, gen: ent.gen })) return
         }
-        const next = { ...base, ...patch }
-        deps.clock.rev += 1
-        deps.clock.by = deps.me
-        deps.apply({ prefs: next, raw: JSON.stringify({ ...next, rev: deps.clock.rev, by: deps.me }) })
+        throw new Error('E_CONFLICT: prefs write could not rebase')
       })
     }
   }
