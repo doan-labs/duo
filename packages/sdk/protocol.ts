@@ -172,24 +172,29 @@ export type AppEvt =
   | { ev: 'key'; p: { key: 'Escape' } }
 export type Snapshot = { rev: number; entries: [string, string][]; cursor?: string }
 /**
- * One key plus the space's global revision read in the same atomic transaction:
- * `v` and `rev` always describe the same authoritative moment. `rev` counts every
- * write in the space, not just this key's, so `expect` is conservative: any
- * sibling write since the read conflicts, even on unrelated keys.
+ * One key plus the space's global revision and generation read in the same
+ * atomic transaction: `v`, `rev` and `gen` always describe the same
+ * authoritative moment. `rev` counts every write in the space, not just this
+ * key's, so `expect` is conservative: any sibling write since the read
+ * conflicts, even on unrelated keys. `gen` binds the token to the app
+ * generation it came from, so a restore that regresses `rev` cannot make a
+ * pre-restore precondition match again.
  */
-export type Entry = { k: string; v: string | null; rev: number }
+export type Entry = { k: string; v: string | null; rev: number; gen: number }
+/** The `{ rev, gen }` of the entry a new value was computed from. */
+export type Expect = Pick<Entry, 'rev' | 'gen'>
 export type KV = {
   get(k: string): Promise<string | null>
-  /** The value and the space revision to `set`/`del` with `expect`. */
+  /** The value and precondition token to `set`/`del` with `expect`. */
   entry(k: string): Promise<Entry>
   /**
-   * `expect` is the revision the new value was computed from (from `entry` or
-   * `snapshot`). The host checks it inside the write's own transaction and
-   * rejects with `E_CONFLICT` if the space moved since; a conflict mutates
-   * nothing. Omit it for an unconditional write.
+   * `expect` is the `{ rev, gen }` token the new value was computed from
+   * (from `entry`). The host checks it inside the write's own transaction:
+   * a moved space rejects `E_CONFLICT`, a dead generation rejects `E_GONE`,
+   * and either way nothing mutates. Omit it for an unconditional write.
    */
-  set(k: string, v: string, expect?: number): Promise<{ rev: number }>
-  del(k: string, expect?: number): Promise<{ rev: number }>
+  set(k: string, v: string, expect?: Expect): Promise<{ rev: number }>
+  del(k: string, expect?: Expect): Promise<{ rev: number }>
   keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>
   snapshot(cursor?: string): Promise<Snapshot>
   watch(since: number, cb: (e: Change) => void): () => void

@@ -540,16 +540,22 @@ export type StoredFile = { name: string; size: number; type: string; at: number 
 
 export type Notice = { title: string; body?: string; arg?: string }
 
-/** The value and the space revision from one atomic read - the precondition token. */
-export type Entry = { k: string; v: string | null; rev: number }
+/** The value, space revision and app generation from one atomic read -
+    the precondition token. `gen` binds the token to the generation it was
+    minted under, so a restore that regresses `rev` cannot make an old
+    precondition match again. */
+export type Entry = { k: string; v: string | null; rev: number; gen: number }
+export type Expect = Pick<Entry, 'rev' | 'gen'>
 export type KV = {
   get(k: string): Promise<string | null>
   entry(k: string): Promise<Entry>
-  /** `expect` is the revision the new value was computed from; the host checks
-      it inside the write's own transaction and answers E_CONFLICT, changing
-      nothing, when the space moved. Omit it for an unconditional write. */
-  set(k: string, v: string, expect?: number): Promise<{ rev: number }>
-  del(k: string, expect?: number): Promise<{ rev: number }>
+  /** `expect` is the `{ rev, gen }` token the new value was computed from;
+      the host checks both halves inside the write's own transaction and
+      answers E_CONFLICT, changing nothing, when the space moved, or E_GONE
+      when the token's generation is dead. Omit it for an unconditional
+      write. */
+  set(k: string, v: string, expect?: Expect): Promise<{ rev: number }>
+  del(k: string, expect?: Expect): Promise<{ rev: number }>
   keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>
   /** Atomic snapshot with the revision it is current at. */
   snapshot(cursor?: string): Promise<{ rev: number; entries: [string, string][]; cursor?: string }>
@@ -669,20 +675,23 @@ event with `v: null`. Quota is checked inside the write transaction against
 the `meta.used` counter that the same transaction updates; an over-quota
 write aborts and nothing changes.
 
-Conditional writes (SDK 0.1.0): `entry(k)` returns `{ v, rev }` read atomically
-with the space revision, and `set`/`del` accept an optional `expect` revision.
-The host compares `expect` against `meta.rev` inside the same readwrite
-transaction that holds the authority check and the write, so a writer whose
-copy is stale loses at commit, not on the wire: it gets `E_CONFLICT` and
-nothing changes - no value, quota, rev or watch event. A successful
-conditional write returns the same `Change` and raises exactly one `kv`
-event, and its ack is durable because it posts only after the transaction
-completes. `rev` is one counter per space, not per key: a write to any key
-moves it, so `expect` is deliberately conservative across sibling keys. Every
-precondition is bound to the app generation the transaction checks, so a
-reinstall, update or checkpoint restore cannot resurrect one. Conflict
+Conditional writes (SDK 0.1.0): `entry(k)` returns `{ v, rev, gen }` read
+atomically with the space revision and app generation, and `set`/`del`
+accept an optional `expect` carrying both halves. The host compares them
+inside the same readwrite transaction that holds the authority check and
+the write, so a writer whose copy is stale loses at commit, not on the
+wire: a moved revision gets `E_CONFLICT`, a dead generation gets `E_GONE`,
+and either way nothing changes - no value, quota, rev or watch event. A
+successful conditional write returns the same `Change` and raises exactly
+one `kv` event, and its ack is durable because it posts only after the
+transaction completes. `rev` is one counter per space, not per key: a
+write to any key moves it, so `expect` is deliberately conservative
+across sibling keys. `gen` binds the token to the generation it was
+minted under, so a checkpoint restore that regresses `rev` to the same
+number still refuses a pre-restore token - the rev alone can never
+collide across generations. Conflict
 recovery is an intent rebase - `entry()` again, recompute from that value,
-write with the fresh revision - never a blind resend of the stale document.
+write with the fresh token - never a blind resend of the stale document.
 An `E_TIMEOUT` or retired-request refusal leaves the outcome unknown; read
 `entry()` to reconcile, never assume nothing landed. `useKV`, `cell` and
 `KVMirror.write` remain optimistic fire-and-forget without a durable ack and

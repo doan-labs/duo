@@ -19,6 +19,7 @@ import {
   type DeviceEvent,
   type DeviceEvents,
   type Evt,
+  type Expect,
   type KV,
   LIMITS,
   type Method,
@@ -144,10 +145,17 @@ export function createClient() {
       action: 'get' | 'set' | 'del' | 'entry',
       k: string,
       v?: string,
-      expect?: number
+      expect?: Expect
     ): Promise<T> => {
       if (!keyValid(k) || (action === 'set' && !valueValid(v))) return Promise.reject(new PlatformError('E_ARGS'))
-      if (expect !== undefined && (!Number.isSafeInteger(expect) || expect < 0))
+      if (
+        expect !== undefined &&
+        (!expect ||
+          !Number.isSafeInteger(expect.rev) ||
+          expect.rev < 0 ||
+          !Number.isSafeInteger(expect.gen) ||
+          expect.gen < 1)
+      )
         return Promise.reject(new PlatformError('E_ARGS'))
       return request(`${space}.${action}`, { k, v, expect })
     }

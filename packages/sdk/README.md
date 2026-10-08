@@ -27,18 +27,19 @@ there. `fallback` stands in until something is written, which is what a fresh
 install looks like, so an app seeds itself in one place rather than at each
 call site. Storage stays strings-only; this is the encoding, not a new type.
 
-`os.storage.entry(k)` returns `{ v, rev }` read atomically with the space's
-revision. Pass that `rev` as `expect` to `set`/`del` to make the write
-conditional: the host checks it inside the write's own transaction next to the
-authority and quota checks, and rejects with `E_CONFLICT` when the space moved
-since the read - a stale copy's write can no longer erase a newer committed
-value, and a conflict mutates nothing. `rev` counts every write in the space,
-not just the key read, so a sibling key conflicts too. Recover by reading
-`entry()` again, recomputing from that value and retrying with the fresh
-revision; never resend a stale whole-document write. `useKV`, `cell` and
-`KVMirror.write` stay optimistic fire-and-forget: they carry no durable ack
-and are not the conditional path. Conditional updates call `os.storage`
-directly.
+`os.storage.entry(k)` returns `{ v, rev, gen }` read atomically with the
+space's revision and app generation. Pass that token as `expect` to
+`set`/`del` to make the write conditional: the host checks it inside the
+write's own transaction next to the authority and quota checks, and rejects
+with `E_CONFLICT` when the space moved since the read - a stale copy's write
+can no longer erase a newer committed value, and a conflict mutates nothing.
+`rev` counts every write in the space, not just the key read, so a sibling
+key conflicts too, and `gen` keeps a pre-restore token dead even when a
+restore regresses `rev`. Recover by reading `entry()` again, recomputing
+from that value and retrying with the fresh token; never resend a stale
+whole-document write. `useKV`, `cell` and `KVMirror.write` stay optimistic
+fire-and-forget: they carry no durable ack and are not the conditional path.
+Conditional updates call `os.storage` directly.
 
 `transition(fn)` runs `fn` inside a same-document view transition, so the
 screen cross-fades to whatever it changes; it is a plain call where the API

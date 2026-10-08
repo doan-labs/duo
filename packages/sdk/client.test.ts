@@ -302,27 +302,30 @@ test('entry and conditional writes send the versioned wire shape and surface con
     const req = h.port.sent.at(-1) as { id: number; m: string; p: { k: string } }
     assert.equal(req.m, 'storage.entry')
     assert.equal(req.p.k, 'doc')
-    h.feed({ id: req.id, ok: true, v: { k: 'doc', v: 'one', rev: 7 } } as unknown as Evt)
-    assert.deepEqual(await entry, { k: 'doc', v: 'one', rev: 7 })
+    h.feed({ id: req.id, ok: true, v: { k: 'doc', v: 'one', rev: 7, gen: 3 } } as unknown as Evt)
+    assert.deepEqual(await entry, { k: 'doc', v: 'one', rev: 7, gen: 3 })
 
-    const set = client.storage.set('doc', 'two', 7)
+    const set = client.storage.set('doc', 'two', { rev: 7, gen: 3 })
     const setReq = h.port.sent.at(-1) as { id: number; m: string; p: Record<string, unknown> }
     assert.equal(setReq.m, 'storage.set')
-    assert.equal(setReq.p.expect, 7)
+    assert.deepEqual(setReq.p.expect, { rev: 7, gen: 3 })
     h.feed({ id: setReq.id, ok: false, e: 'E_CONFLICT' } as unknown as Evt)
     await assert.rejects(set, (e: unknown) => (e as { code: string }).code === 'E_CONFLICT')
 
-    const del = client.storage.del('doc', 8)
+    const del = client.storage.del('doc', { rev: 8, gen: 3 })
     const delReq = h.port.sent.at(-1) as { id: number; m: string; p: Record<string, unknown> }
     assert.equal(delReq.m, 'storage.del')
-    assert.equal(delReq.p.expect, 8)
+    assert.deepEqual(delReq.p.expect, { rev: 8, gen: 3 })
     h.feed({ id: delReq.id, ok: true, v: { rev: 9 } } as unknown as Evt)
     assert.deepEqual(await del, { rev: 9 })
 
     // A malformed precondition never reaches the wire.
     const posted = h.port.sent.length
-    await assert.rejects(client.storage.set('doc', 'x', -1), (e: unknown) => (e as { code: string }).code === 'E_ARGS')
-    await assert.rejects(client.storage.del('doc', 1.5), (e: unknown) => (e as { code: string }).code === 'E_ARGS')
+    for (const bad of [{ rev: -1, gen: 3 }, { rev: 7, gen: 0 }, { rev: 1.5, gen: 3 }, {} as never])
+      await assert.rejects(
+        client.storage.set('doc', 'x', bad),
+        (e: unknown) => (e as { code: string }).code === 'E_ARGS'
+      )
     assert.equal(h.port.sent.length, posted)
   } finally {
     h.restore()
