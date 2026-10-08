@@ -137,6 +137,16 @@ export function parsePrefsDoc(raw: string | null): PrefsDoc {
 /** Lamport clock for one shared key: the revision/writer last accepted. */
 export type Clock = { rev: number; by: string }
 
+/** A live envelope carrying a strictly older incarnation than the confirmed
+ * saves library is stale at the adoption boundary: converging on it would
+ * regress the adopted game - and every write seeded from it later - to a
+ * dead generation. Adopt the envelope (its revision still advances the
+ * clock) but substitute the newer confirmed incarnation for the game. */
+export function fenceAdoptGame(doc: Live, lib: Record<string, Game> | undefined): Live {
+  const alt = lib?.[configKey(doc.game.art, doc.game.count)]
+  return alt && alt.gen > doc.game.gen ? { ...doc, game: alt } : doc
+}
+
 /** Merge an adopted saves envelope with the mirror's pending library. Games
  * are per-key unioned so exclusive keys the incoming doc lacks stay pending;
  * `missing` reports whether the adopted doc was behind that union (and thus
@@ -188,7 +198,9 @@ export function createGamePersistence(deps: {
    * per CAS attempt with that attempt's rebased payload; durable truth is
    * the awaited conditional write that follows, never this hook. */
   apply(payload: GameApply): unknown
-  /** The last accepted saves envelope, for republishing on a heal. */
+  /** The last CONFIRMED saves envelope (foreign adoptions and acked writes
+   * only, never an optimistic payload), for the rebase baseline and heal
+   * republish. */
   savesDoc(): Saves | null
   /** Record a durably published saves doc in local bookkeeping. */
   recordSaves(raw: string): void
@@ -221,7 +233,9 @@ export function createGamePersistence(deps: {
           const ent = await deps.liveKV.entry(deps.liveKey)
           const doc = parseLive(ent.v)
           if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
-            deps.adopt(doc)
+            // Same boundary fence as act: a stale incarnation in the live
+            // doc must not pull the adopted game backwards.
+            deps.adopt(fenceAdoptGame(doc, deps.savesDoc()?.games))
             return
           }
           const game = deps.refs.game.current
@@ -282,25 +296,35 @@ export function createGamePersistence(deps: {
             deps.liveKV.entry(deps.liveKey),
             deps.savesKV.entry(deps.savesKey)
           ])
-          const doc = parseLive(liveEnt.v)
-          let base = deps.refs.game.current
-          let heldBase = deps.refs.held.current
-          if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
-            deps.adopt(doc)
-            base = doc.game
-            heldBase = doc.held
-          }
           const sd = parseSaves(savesEnt.v)
           if (newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) deps.acceptSaves(sd)
           // The library is always the per-key union of the store doc and
-          // our last accepted envelope, so exclusive keys a racer holds
-          // survive whoever wins the commit race.
+          // our last CONFIRMED envelope, so exclusive keys a racer holds
+          // survive whoever wins the commit race. savesDoc() never reports
+          // an optimistic payload - this baseline is durable truth only.
           const lib = unionGames(sd.games, deps.savesDoc()?.games ?? {})
-          // The freshest base for the running puzzle can also sit in the
-          // library: a peer that advanced the same config and saved before
-          // its live doc reached us must not be overwritten by our stale
-          // state.
-          if (base) {
+          const doc = parseLive(liveEnt.v)
+          // The rebase base is confirmed state, never the optimistic mirror:
+          // a foreign live doc wins adoption (fenced against dead
+          // incarnations), then the unioned library's same-key entry. The
+          // mirror seeds the base ONLY when no confirmed doc covers the
+          // running puzzle - otherwise the semantic intent re-runs on the
+          // confirmed copy, so a peer placement that landed mid-flight is
+          // preserved instead of overwritten by our stale whole-doc.
+          let base: Game | null = null
+          let heldBase: number | null = null
+          if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
+            const fenced = fenceAdoptGame(doc, lib)
+            deps.adopt(fenced)
+            base = fenced.game
+            heldBase = fenced === doc ? doc.held : null
+          }
+          const running = base ?? deps.refs.game.current
+          if (!base) {
+            const alt = running ? lib[configKey(running.art, running.count)] : undefined
+            base = alt ?? running
+            heldBase = alt && !sameGame(alt, running!) ? null : deps.refs.held.current
+          } else {
             const alt = lib[configKey(base.art, base.count)]
             if (alt && newerGame(alt, base) !== base) {
               base = alt
@@ -346,6 +370,7 @@ export function createGamePersistence(deps: {
               deps.liveKV.set(deps.liveKey, payload.live, { rev: liveEnt.rev, gen: liveEnt.gen }),
               deps.savesKV.set(deps.savesKey, payload.saves, { rev: savesEnt.rev, gen: savesEnt.gen })
             ])
+            deps.recordSaves(payload.saves)
             return
           } catch (e) {
             const code = errCode(e)
@@ -365,6 +390,7 @@ export function createGamePersistence(deps: {
                 throw e
               }
               if (back.v !== payload.saves) throw e
+              deps.recordSaves(payload.saves)
               // Saves verified landed; a session doc that stayed behind
               // converges through the normal heal.
               try {

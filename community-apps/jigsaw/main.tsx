@@ -12,6 +12,7 @@ import {
   admitInput,
   createGamePersistence,
   createPrefsPersistence,
+  fenceAdoptGame,
   LIVE_KEY,
   mergedSaves,
   PREFS_KEY,
@@ -83,6 +84,11 @@ function Jigsaw() {
   // The last ACCEPTED saves document. Unconditional reads of the KV mirror can
   // see a stale racing write, so this ref only moves through revision checks.
   const savesRaw = useRef<string | null>(null)
+  // The CONFIRMED baseline behind savesDoc(): foreign adoptions and acked
+  // writes only. Optimistic apply() payloads stay in savesRaw for the UI but
+  // must never feed the rebase baseline - an uncommitted doc re-read as
+  // confirmed can overwrite a peer write that landed mid-flight.
+  const savesBase = useRef<string | null>(null)
 
   const [prefs, setPrefsState] = useState<Prefs | null>(null)
   const [game, setGame] = useState<Game | null>(null)
@@ -200,6 +206,7 @@ function Jigsaw() {
           // accepted or written but the adopted envelope lacks stay pending
           // for the next write/heal instead of being silently dropped.
           savesRaw.current = serializeSaves(mergedSaves(savesRaw.current, sd).doc)
+          savesBase.current = serializeSaves(mergedSaves(savesBase.current, sd).doc)
         },
         apply: (p) => {
           // Optimistic commit only: the conditional space.set calls inside
@@ -212,9 +219,10 @@ function Jigsaw() {
         },
         recordSaves: (raw) => {
           savesRaw.current = raw
+          savesBase.current = raw
         },
         repairLive: () => void persistence.heal(),
-        savesDoc: () => (savesRaw.current ? parseSaves(savesRaw.current) : null),
+        savesDoc: () => (savesBase.current ? parseSaves(savesBase.current) : null),
         adoptGame
       }),
     [adoptLive, adoptGame]
@@ -247,8 +255,12 @@ function Jigsaw() {
       repairLive()
       return
     }
-    adoptLive(doc)
-  }, [live.value, live.status, adoptLive, repairLive])
+    // Incarnation fence at the observation boundary: a stale-gen live doc
+    // must not regress the adopted game below the confirmed library copy.
+    adoptLive(
+      fenceAdoptGame(doc, (savesBase.current ? parseSaves(savesBase.current) : parseSaves(savesKV.value))?.games)
+    )
+  }, [live.value, live.status, adoptLive, repairLive, savesKV.value])
 
   // Prefs writes run the same confirmed-read rebase as game writes, and every
   // caller is a gesture: rejected while this copy is hidden.
@@ -297,6 +309,7 @@ function Jigsaw() {
         savesClock.current.rev = env.rev
         savesClock.current.by = env.by
         savesRaw.current = savesKV.value
+        savesBase.current = serializeSaves(mergedSaves(savesBase.current, env).doc)
       }
       return
     }
@@ -314,6 +327,7 @@ function Jigsaw() {
     // missing them, one bounded heal puts the union back on the durable doc.
     const merged = mergedSaves(savesRaw.current, env)
     savesRaw.current = serializeSaves(merged.doc)
+    savesBase.current = serializeSaves(mergedSaves(savesBase.current, env).doc)
     if (merged.missing) repairSaves()
   }, [savesKV.value, savesKV.status, repairSaves])
 
@@ -361,7 +375,9 @@ function Jigsaw() {
     const remote = parseLive(live.value)
     if (remote) {
       seeded.current = true
-      adoptLive(remote)
+      // Reload boundary: a stale-incarnation live doc left by an older
+      // session must not undo a reset the durable library already moved past.
+      adoptLive(fenceAdoptGame(remote, parseSaves(savesKV.value)?.games))
       return
     }
     // savesKV.value and copyLive are re-triggers, not inputs: a failed seed

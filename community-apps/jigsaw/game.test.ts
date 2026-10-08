@@ -483,7 +483,8 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
     game: null as Game | null,
     adopted: [] as string[],
     adoptedGames: [] as Game[],
-    savesRaw: null as string | null
+    savesRaw: null as string | null,
+    savesBase: null as string | null
   }
   const clocks = { live: { rev: 0, by: '' }, saves: { rev: 0, by: '' } }
   const refs = { game: { current: null as Game | null }, held: { current: null as number | null } }
@@ -508,8 +509,10 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
     acceptSaves(sd) {
       clocks.saves.rev = sd.rev
       clocks.saves.by = sd.by
-      // Mirrors main.tsx: union into the mirror, never drop pending keys.
+      // Mirrors main.tsx: union into the mirror AND the confirmed baseline,
+      // never drop pending keys.
       state.savesRaw = serializeSaves(mergedSaves(state.savesRaw, sd).doc)
+      state.savesBase = serializeSaves(mergedSaves(state.savesBase, sd).doc)
     },
     apply(pl) {
       state.game = pl.game
@@ -519,10 +522,12 @@ function makePersist(me: string, liveKV: FakeKV, savesKV: FakeKV) {
     },
     recordSaves(raw) {
       state.savesRaw = raw
+      state.savesBase = raw
     },
     repairLive() {},
     savesDoc() {
-      return state.savesRaw ? parseSaves(state.savesRaw) : null
+      // Confirmed baseline only: optimistic apply() payloads stay out.
+      return state.savesBase ? parseSaves(state.savesBase) : null
     },
     adoptGame(g) {
       state.adoptedGames.push(g)
@@ -686,8 +691,10 @@ await checkAsync('saves heals converge even when stale events arrive late and ou
   // Both accepted rev 5; a strictly stale foreign doc (rev 4) is delivered.
   A.clocks.saves = { rev: 5, by: 'copy-a' }
   A.state.savesRaw = lib
+  A.state.savesBase = lib
   B.clocks.saves = { rev: 5, by: 'copy-a' }
   B.state.savesRaw = lib
+  B.state.savesBase = lib
   const stale5 = serializeSaves({ rev: 4, by: 'old', current: 'harbour:12', games: {} })
   saves.store.set('saves', stale5)
   // Both heal against the stale event concurrently.
@@ -901,6 +908,7 @@ await checkAsync('a saves heal preserves keys the store has that our mirror neve
     current: 'alpine:24',
     games: { 'harbour:12': g0, 'alpine:24': gAlpine }
   })
+  state.savesBase = state.savesRaw
   saves.store.set(
     'saves',
     serializeSaves({ rev: 4, by: 'old', current: 'harbour:12', games: { 'harbour:12': g0, 'lantern:48': gLantern } })
@@ -925,7 +933,9 @@ await checkAsync('an equal-revision racer keeps every exclusive key: union mirro
   A.clocks.saves = { rev: 4, by: 'old' }
   B.clocks.saves = { rev: 4, by: 'old' }
   A.state.savesRaw = seedDoc
+  A.state.savesBase = seedDoc
   B.state.savesRaw = seedDoc
+  B.state.savesBase = seedDoc
   A.refs.game.current = g0
   B.refs.game.current = g0
   // Both racers confirm the same rev-4 doc (B's read pins it), then both
@@ -960,6 +970,7 @@ await checkAsync('a write that lands over a racing peer doc unions and republish
   const P = makePersist('me', live, saves)
   P.clocks.saves = { rev: 2, by: 'me' }
   P.state.savesRaw = saves.store.get('saves')!
+  P.state.savesBase = saves.store.get('saves')!
   P.refs.game.current = g0
   // Our write lands, then the peer's rev-3 envelope lands on top of it
   // (real last-writer store order). The acknowledged close-out read must
@@ -996,6 +1007,7 @@ await checkAsync("a racing peer's deeper save for the current key is adopted aft
   const P = makePersist('me', live, saves)
   P.clocks.saves = { rev: 2, by: 'me' }
   P.state.savesRaw = saves.store.get('saves')!
+  P.state.savesBase = saves.store.get('saves')!
   P.refs.game.current = g0
   saves.beforeSet = () => {
     saves.peerSet('saves', peerDoc)
@@ -1113,6 +1125,89 @@ await checkAsync('a lost ACK never authorizes a fresh write over a confirmed pee
   ok(landed.games['lantern:12'] !== undefined, 'a landed write was dropped')
   ok(landed.games['alpine:24'] !== undefined, 'the seeded library was dropped')
   eq(saves.sets.length - writesBefore, 1, 'the control resubmitted the timed-out write')
+})
+
+await checkAsync('a same-key conflict rebases the intent onto the confirmed peer move', async () => {
+  // P2: A and B both mutate the same gen0 puzzle with different piece
+  // moves. B commits live+saves between A's entry read and A's commit.
+  // A's optimistic apply() already ran when E_CONFLICT arrives, so the
+  // retry must re-run the semantic intent on B's confirmed game - never
+  // resubmit the optimistic whole-doc that lacks B's placement.
+  for (const racing of ['both', 'saves'] as const) {
+    const live = new FakeKV()
+    const saves = new FakeKV()
+    const shared = newGame('harbour', 12, 1)
+    saves.peerSet(
+      'saves',
+      serializeSaves({ rev: 1, by: 'seed', current: 'harbour:12', games: { 'harbour:12': shared } })
+    )
+    const A = makePersist('me', live, saves)
+    A.refs.game.current = shared
+    A.state.savesBase = saves.store.get('saves')!
+    // B's confirmed commit lands inside A's write transaction window.
+    const bGame = placeAt(shared, 2, 300, 40, 50).game
+    const bSaves = serializeSaves({ rev: 2, by: 'peer', current: 'harbour:12', games: { 'harbour:12': bGame } })
+    saves.beforeSet = () => {
+      saves.peerSet('saves', bSaves)
+      if (racing === 'both') live.peerSet('live', liveOf('peer', 2, bGame, null))
+    }
+    const wanted = placeAt(bGame, 7, 120, 90, 60).game
+    await A.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game, 7, 120, 90, 60).game, held: null } : null))
+    const final = parseSaves(saves.store.get('saves')!).games['harbour:12']!
+    eq(final.pieces[2]!.x, bGame.pieces[2]!.x, `[${racing}] confirmed peer move was overwritten`)
+    eq(final.pieces[7]!.x, wanted.pieces[7]!.x, `[${racing}] our admitted move was lost`)
+    ok(final.moves >= 2, `[${racing}] rebased doc did not carry both moves`)
+  }
+  // No-peer control: the same intent commits once with nothing to rebase.
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const solo = newGame('harbour', 12, 1)
+  saves.peerSet('saves', serializeSaves({ rev: 1, by: 'seed', current: 'harbour:12', games: { 'harbour:12': solo } }))
+  const C = makePersist('me', live, saves)
+  C.refs.game.current = solo
+  C.state.savesBase = saves.store.get('saves')!
+  await C.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game, 7, 120, 90, 60).game, held: null } : null))
+  const soloFinal = parseSaves(saves.store.get('saves')!).games['harbour:12']!
+  eq(soloFinal.pieces[7]!.x, placeAt(solo, 7, 120, 90, 60).game.pieces[7]!.x, 'control move missing')
+  eq(soloFinal.moves, solo.moves + 1, 'control committed the wrong move count')
+})
+
+await checkAsync('a stale-incarnation envelope cannot regress the confirmed generation', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  // The durable library already moved past a reset: gen1 is confirmed.
+  const gen1 = resetGame(newGame('harbour', 12, 5), 9)
+  saves.peerSet('saves', serializeSaves({ rev: 3, by: 'peer', current: 'harbour:12', games: { 'harbour:12': gen1 } }))
+  const P = makePersist('me', live, saves)
+  // Hydrate the confirmed baseline first (gen1 adopted from the store doc).
+  await P.p.healSaves()
+  eq(P.state.savesBase !== null, true, 'confirmed baseline did not adopt the library')
+  // A strictly-older gen0 live envelope then arrives with a newer revision:
+  // adoption must converge on the confirmed incarnation, not regress.
+  const stale = newGame('harbour', 12, 5)
+  live.peerSet('live', liveOf('peer', 9, stale, null))
+  await P.p.heal()
+  eq(P.state.game!.gen, 1, 'adoption regressed to the dead generation')
+  eq(P.clocks.live.rev, 9, 'the live clock did not advance past the stale doc')
+  // And the fenced adoption never seeds an older write back to the store.
+  ok(
+    live.sets.every((w) => JSON.parse(w.v).game.gen >= 1),
+    'a stale incarnation reached durable'
+  )
+  // A gen0-bound intent admitted before the reset observation dies at the
+  // bind check against the confirmed gen1 base: zero durable effects.
+  P.refs.game.current = stale
+  const writesBefore = live.sets.length + saves.sets.length
+  await P.p.act(
+    (ctx) => (ctx.game ? { next: placeAt(ctx.game, 0, 10, 20, 5).game, held: null } : null),
+    gameKeyOf(stale)
+  )
+  eq(live.sets.length + saves.sets.length, writesBefore, 'a dead-incarnation intent mutated durable')
+  // Unbound intent on the confirmed incarnation still works (control).
+  await P.p.act((ctx) => (ctx.game ? { next: placeAt(ctx.game, 1, 30, 30, 6).game, held: null } : null))
+  const final = parseSaves(saves.store.get('saves')!).games['harbour:12']!
+  eq(final.gen, 1, 'final doc lost the confirmed generation')
+  ok(final.pieces[1]!.z !== TRAY, 'control intent did not land on the gen1 base')
 })
 
 await checkAsync('two initial-null seeds race to one unioned library', async () => {
