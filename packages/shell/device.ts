@@ -4,6 +4,7 @@
 // side of iOS without importing the UI.
 
 import type { CameraHooks, DeviceEvents } from '@doan-labs/duo-sdk'
+import { maskDisplays } from './runtime/display.ts'
 
 // The home bar is a 5 px pill on a panel you may be looking at edge-on, and
 // there is no swipe-up gesture here, so the page keeps a Home button.
@@ -106,11 +107,13 @@ export const device = {
     lockAll()
     device.asleep = true
     for (const d of displays) d.dark(true)
+    maskDisplays(true)
   },
   wake() {
     if (device.off) return
     device.asleep = false
     for (const d of displays) d.dark(false)
+    maskDisplays(false)
   },
   /** The side button clicked: wake to the lock screen, or sleep. Only the swipe unlocks. */
   side() {
