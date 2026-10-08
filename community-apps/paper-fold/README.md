@@ -29,28 +29,36 @@ for where a flap lands.
 permissions.
 
 Progress is stored durably, not just mirrored: each model keeps a causal
-receipt at `progress.m.<id>` with its own `{ hi, done, at }`, and receipts
-are the only records new writes touch. The whole-map `progress` aggregate
-is still read (legacy v1 docs migrate into the union) and a live copy
-repairs it if it is observed lacking facts, but it is never overwritten by
-ordinary writes - a stale writer can only clobber a whole-map value, and
-there is no whole-map write left to clobber. Every receipt write
-(`receiptWrite` in `progress.ts`) is read-modify-verify: it re-reads the
-committed record, unions it with the intent so a writer that never saw a
-peer's fact emits the union, stores once, then re-reads to catch a
-concurrent commit that raced in between. `hi` is a per-model high-water
-mark and `done` a latch, so a regressed late write (`hi 1, done false`)
-is a no-op against a durable `done: true`. On every observed receipt or
+receipt at `progress.m.<id>` with its own `{ hi, done, at, inc? }`, and
+receipts are the only records new writes touch. The whole-map `progress`
+aggregate is still read (legacy v1 docs migrate into the union) and a live
+copy repairs it if it is observed lacking facts, but it is never overwritten
+by ordinary writes - a stale writer can only clobber a whole-map value, and
+there is no whole-map write left to clobber. Every durable write goes
+through `casUpdate` in `progress.ts`: a compare-and-set against the
+`{ rev, gen }` token the `entry` read returned, so an intent is always
+rebased on the exact value it conflicts with (E_CONFLICT re-reads and
+re-unions, never a frozen doc under a fresh token) and a dead generation
+(E_GONE) stops the copy's authority outright. `hi` is a per-model
+high-water mark and `done` a latch, so a regressed late write
+(`hi 1, done false`) adopts instead of clobbering a durable `done: true`.
+An ambiguous outcome (lost ack, timeout, quota) is read back on the same
+key; only a durable doc that already covers the intent resolves it -
+anything else reports unknown and routes the same intent through the
+deduped reconcile retry rather than emitting a second write that could
+race a timed-out original. Reset is a tombstone record with a bumped
+incarnation `inc`, so a pre-reset write in flight is refused instead of
+resurrecting erased progress. `ui` and `prefs` carry `{ seq, by }` and
+commit conditionally too: a foreign doc that is newer or equal is adopted
+and the local intent honestly refused. On every observed receipt or
 aggregate change a live copy runs `reconcileProgress`: it adopts the union
 and repairs whichever durable side lacks those facts, deduped by the
 signature of what it last read so repairs fire once per observation and
-re-fire if the doc is clobbered again. A write the store never acked
-(timeout or rate limit) schedules one deduped retry through the same pass,
-never an idle storm. Receipts are bounded to the six catalog ids, the
-write path never throws (corrupt JSON and missing records parse into the
-union), and a hidden copy still adopts but writes nothing. A cold boot
-unions aggregate and receipts, so progress survives a clobbered aggregate
-as long as any receipt held the fact.
+re-fire if the doc is clobbered again. Receipts are bounded to the six
+catalog ids, the write path never throws (corrupt JSON and missing records
+parse into the union), and a hidden copy still adopts but writes nothing.
+A cold boot unions aggregate and receipts, so progress survives a
+clobbered aggregate as long as any receipt held the fact.
 
 ## Two copies, one session
 

@@ -6,6 +6,9 @@ export interface ModelProgress {
   hi: number
   done: boolean
   at: number
+  // Incarnation counter bumped by reset tombstones: a pre-reset intent in
+  // flight carries a lower inc and is refused instead of resurrecting progress.
+  inc?: number
 }
 
 export type ProgressMap = Record<string, ModelProgress>
@@ -69,15 +72,18 @@ export const modelDone = (p: ModelProgress | undefined): boolean => Boolean(p?.d
 // Progress is a grow-only map (hi only grows, done only latches), so merging
 // two copies is commutative, associative and idempotent: a stale whole-doc
 // write can never lose another model's progress once readers merge on read.
+// A reset tombstone bumps `inc`; the higher incarnation replaces the record
+// wholesale so max merge cannot resurrect progress a reset erased.
 export const mergeProgress = (a: ProgressMap, b: ProgressMap): ProgressMap => {
   const out: ProgressMap = { ...a }
   for (const [k, e] of Object.entries(b)) {
     const c = out[k]
-    out[k] = {
-      hi: Math.max(c?.hi ?? 0, e.hi),
-      done: Boolean(c?.done) || e.done,
-      at: Math.max(c?.at ?? 0, e.at)
+    if ((c?.inc ?? 0) > (e.inc ?? 0)) continue
+    if ((e.inc ?? 0) > (c?.inc ?? 0)) {
+      out[k] = e
+      continue
     }
+    out[k] = { hi: Math.max(c?.hi ?? 0, e.hi), done: Boolean(c?.done) || e.done, at: Math.max(c?.at ?? 0, e.at) }
   }
   return out
 }

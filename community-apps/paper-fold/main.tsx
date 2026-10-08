@@ -37,7 +37,15 @@ import {
 } from './engine.ts'
 import { live, stepTarget, stillBound } from './live.ts'
 import { MODELS, type Model, modelById } from './models.ts'
-import { progressWrite, receiptKey, receiptWrite, reconcileProgress } from './progress.ts'
+import {
+  casUpdate,
+  decideSeq,
+  progressWrite,
+  receiptKey,
+  receiptWrite,
+  reconcileProgress,
+  repairAggregate
+} from './progress.ts'
 import { styles } from './styles.ts'
 
 // New user intent is admitted only on a copy that is both visible and active
@@ -551,8 +559,15 @@ function PaperFold() {
     if (f.seq === 0 && f.model === null) return // nothing stored - do not create it
     const s = JSON.stringify(uiBest.current)
     if (ui.value === s) return
-    ui.set(s)
-  }, [ui.value, ui.status, ui.set])
+    // Conditional write: the mirror's set is not a durable ack, and a
+    // compare-and-set can never overwrite a foreign seq that raced in.
+    void casUpdate(os.session, 'ui', parseUi, decideSeq, uiBest.current, JSON.stringify).then((r) => {
+      if ((r.kind === 'adopted' || r.kind === 'committed') && newerSeq(r.committed, uiBest.current)) {
+        uiBest.current = r.committed
+        setUiState(r.committed)
+      }
+    })
+  }, [ui.value, ui.status])
 
   useEffect(() => {
     if (prefsKV.status === 'hydrating') return
@@ -565,8 +580,13 @@ function PaperFold() {
     if (!liveRef.current || !newerSeq(prefsBest.current, f) || f.seq === 0) return
     const s = JSON.stringify(prefsBest.current)
     if (prefsKV.value === s) return
-    prefsKV.set(s)
-  }, [prefsKV.value, prefsKV.status, prefsKV.set])
+    void casUpdate(os.storage, 'prefs', parsePrefs, decideSeq, prefsBest.current, JSON.stringify).then((r) => {
+      if ((r.kind === 'adopted' || r.kind === 'committed') && newerSeq(r.committed, prefsBest.current)) {
+        prefsBest.current = r.committed
+        setPrefs(r.committed)
+      }
+    })
+  }, [prefsKV.value, prefsKV.status])
 
   // Progress is a grow-only map over a durable aggregate plus bounded per-model
   // receipts (progress.ts). Every observed durable change folds aggregate and
@@ -594,12 +614,15 @@ function PaperFold() {
             progJson.current = mJson
             setProgress(progressBest.current)
           }
-          if (plan.aggregate && progressKV.value !== plan.aggregate) progressKV.set(plan.aggregate)
-          // Repairs go through the same read-modify-verify write as user
+          // The aggregate repair is itself a conditional write: it commits
+          // only if the durable doc still lacks facts, and a covering doc
+          // adopted in the meantime ends the repair without a write.
+          if (plan.aggregate) void repairAggregate(os.storage, plan.aggregate)
+          // Receipt repairs take the same conditional write as user
           // progress, so a repair never clobbers a concurrent peer fact.
           for (const [id, rec] of Object.entries(plan.receipts))
-            void receiptWrite(os.storage, id, rec).then(({ acked }) => {
-              if (!acked) scheduleProgRetry()
+            void receiptWrite(os.storage, id, rec).then(({ acked, gone }) => {
+              if (!acked && !gone) scheduleProgRetry()
             })
         })
         .catch(() => {})
@@ -619,7 +642,7 @@ function PaperFold() {
     // `view` joins the gate and the deps so a copy turning live re-runs the
     // pass: a reconcile that ran while hidden skips durable repair, and the
     // live transition re-arms it.
-  }, [progressWatch, progressKV.value, progressKV.status, progressKV.set, view, scheduleProgRetry])
+  }, [progressWatch, progressKV.status, view, scheduleProgRetry])
 
   const still = !prefs.motion
 
@@ -653,9 +676,14 @@ function PaperFold() {
       const next: UiState = { ...uiBest.current, ...patch, seq: uiBest.current.seq + 1, by: byId }
       uiBest.current = next
       setUiState(next)
-      ui.set(JSON.stringify(next))
+      void casUpdate(os.session, 'ui', parseUi, decideSeq, next, JSON.stringify).then((r) => {
+        if (r.kind === 'adopted' && newerSeq(r.committed, uiBest.current)) {
+          uiBest.current = r.committed
+          setUiState(r.committed)
+        }
+      })
     },
-    [ui.set, byId]
+    [byId]
   )
 
   const commitPrefs = useCallback(
@@ -663,9 +691,14 @@ function PaperFold() {
       const next: Prefs = { ...prefsBest.current, ...patch, seq: prefsBest.current.seq + 1, by: byId }
       prefsBest.current = next
       setPrefs(next)
-      prefsKV.set(JSON.stringify(next))
+      void casUpdate(os.storage, 'prefs', parsePrefs, decideSeq, next, JSON.stringify).then((r) => {
+        if (r.kind === 'adopted' && newerSeq(r.committed, prefsBest.current)) {
+          prefsBest.current = r.committed
+          setPrefs(r.committed)
+        }
+      })
     },
-    [prefsKV.set, byId]
+    [byId]
   )
 
   // An admitted write commits only this model's receipt through the
@@ -682,14 +715,14 @@ function PaperFold() {
       progJson.current = JSON.stringify(pre)
       setProgress(pre)
       void progressWrite(os.storage, modelId, pre[modelId]!)
-        .then(({ map, acked }) => {
+        .then(({ map, acked, gone }) => {
           progressBest.current = mergeProgress(progressBest.current, map)
           const mJson = JSON.stringify(progressBest.current)
           if (mJson !== progJson.current) {
             progJson.current = mJson
             setProgress(progressBest.current)
           }
-          if (!acked) scheduleProgRetry()
+          if (!acked && !gone) scheduleProgRetry()
         })
         .catch(() => scheduleProgRetry())
     },

@@ -17,6 +17,12 @@
   (input, steps, prefs, legend, audio unlock) before any state moves;
   transport resolves from the best-known step and drops intents a peer
   switched away from.
+- Durable writes are conditional on the SDK 0.1 atomic API (`entry` +
+  `{ rev, gen }` tokens): typed conflicts rebase the intent on the exact new
+  value, ambiguous outcomes report unknown and retry through the deduped
+  reconcile instead of a blind second write, E_GONE stops a dead
+  generation, and reset tombstones carry an incarnation so max merge cannot
+  resurrect erased progress.
 - Shared step position across both displays via session state; progress and
   preferences persist in device storage.
 - Durable progress: bounded per-model receipts are now the only written
