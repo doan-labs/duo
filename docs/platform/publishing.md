@@ -48,7 +48,7 @@ changed folder (or the named ones) and writes `.cache/submissions/<slug>/` with
 | Group | Verified |
 | --- | --- |
 | Developer profiles | Every profile's fields, every app's developer and `officialDeveloper` resolve; checked on every run, even when no app folder changed; the manifest `author` matches the app's developer |
-| Identity and version | Valid manifest, kebab-case folder, registry entry and folder match, reserved namespaces, id unchanged against the base branch, version above the base branch and absent from the published index (`DUO_CATALOG_URL`, default the hosted catalog; unavailable history fails in CI) |
+| Identity and version | Valid manifest, kebab-case folder, registry entry and folder match, reserved namespaces, id unchanged against the base branch, version above the base branch and absent from the published index (`DUO_CATALOG_URL`, default the hosted catalog; unavailable history fails in CI). The two version gates apply only when the authored folder changed; an untouched folder re-run at the same version is a republication candidate, decided by the publisher's provenance gate below |
 | Completeness | Required files, PNG screenshots, MIT text, changelog entry for the version |
 | Source and dependencies | CLI `check` (imports, strict types, tokens, cap); dependencies beyond sdk/kit/stylex/react need `bun.lock` and are flagged for review |
 | Release validity | Real builder output: size, hashes, SDK/kit versions, commit, empty permissions |
@@ -81,10 +81,12 @@ published → website deployed.
 
 `bun scripts/publish-catalog.ts <built> <tree> [--delist id@version+hash]` copies new
 releases into `tree/apps/<id>/<version>+<hash>/` (release.json last, staged then renamed),
-verifies uploaded hashes, refuses a version already published with different bytes, reuses an
+verifies uploaded hashes, reuses an
 identical existing release without touching its metadata or timestamp, records delisted
 identities in `delisted.json`, then assembles `index.json` from every release in the tree,
-newest version first. With `--registry community-apps/registry.json` it also snapshots the
+newest version first. A second identity under one authored version is admitted only as a
+shared-deps rebuild that proves its provenance (below); anything else at that version is
+refused as `already published`. With `--registry community-apps/registry.json` it also snapshots the
 developer profiles into `developers.json`; the index gains `developers` (handle to profile)
 and a `developer` handle on each app. Without the flag, the tree's last snapshot stands. Invalid profiles
 refuse the whole run before the index is touched. The workflow passes the registry on every
@@ -92,6 +94,43 @@ call and ends with one release-free run, so a profile edit publishes on its own.
 before the rename leaves the tree unchanged and a retry finishes. `git push` rejection is
 the conflict detection between close merges; rerun the workflow to publish on top.
 `scripts/checks/publish/publisher.mjs` exercises these cases.
+
+### Republication under one authored version
+
+Contract R4 lets a shared-code change produce a new release identity under the same
+authored version (`1.0.0+newhash` next to `1.0.0+oldhash`), which is how an SDK or UI kit
+bump republishes every app without forcing a version bump on unchanged source. The
+publisher admits the second identity only when all of these hold against the newest
+release already published at that version, and refuses otherwise:
+
+- the built `manifest.json` is byte-identical to the published one (no authored metadata moved),
+- both recorded `build.commit` values resolve to real commits and the new one is the old
+  one or a descendant (`merge-base --is-ancestor`),
+- the manifest committed at the new build commit equals the built one, so the recorded
+  commit is genuinely what the app was built from,
+- the app's source tree is identical between the two commits (`git ls-tree` hash over
+  `packages/apps/<name>` for officials or the registry folder for community apps), while
+  the commit range changed something at all,
+- `build.sdk` and `build.kit` equal the versions in `packages/sdk` and
+  `packages/uikit` `package.json` at the recorded commit, so a forged SDK claim on a
+  new hash cannot produce an identity the real toolchain never built.
+
+All checks fail closed: unresolvable folders, missing or 'local' commits, backwards
+commit order and consumer dependencies outside the in-repo tree all refuse, and the
+checks are data-only git reads - the publishing job still never executes app code.
+Identical rebuilt bytes stay on the reuse path and keep the original metadata, so a
+forged `build.sdk` on an unchanged artifact never reaches the index. Index rows list
+every admitted identity newest-build first, and the shell's `supports()` picks the first
+its host satisfies, so a host with legacy support and a pre-bump host each keep a
+compatible row. The index-level safety net still rejects one version published under
+different manifests.
+
+Deploy order for a shared-SDK republication: merge the SDK change (the host carries
+explicit legacy support), let the site build merge the rebuilt officials through the
+same provenance gate, republish the community folders via `workflow_dispatch`, then the
+workflow's redeploy commit triggers the website build that serves the updated catalog.
+With legacy support on the host the interim catalog (old-sdk rows only) stays launchable,
+so the window between the host deploy and the catalog redeploy breaks nothing.
 
 Delisting stops offering a release to new installs; it does not downgrade, revoke or delete
 installed apps or their data. A faulty release is superseded by a corrective version.
