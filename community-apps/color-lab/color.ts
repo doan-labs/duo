@@ -664,36 +664,48 @@ export class PalsLib {
   wireAcks(): Record<string, number> {
     return { ...this.acks, [this.me]: this.seq }
   }
+
+  /** My ops no foreign watermark has covered yet - the deliberate edits the
+   *  durable intent may still re-apply onto a newer stored value. Ops that
+   *  settled on the wire stay in `ops` as an echo tail but must not keep
+   *  re-asserting against the stored document. */
+  pending(): PalOp[] {
+    return this.ops.filter((o) => o.seq > this.maxAck)
+  }
 }
 
 /**
- * The durable palette merge: the confirmed local library is authoritative
- * for every id it holds, and the stored document contributes only rows the
- * local library has never seen - peer saves not yet delivered on the wire -
- * minus ids a decided delete tombstoned. A peer delete the wire has not
- * shown me yet may reappear for one write cycle, but the op that carries the
- * delete lands on adoption and the next write removes it again: the merge
- * converges because deletes ride the op log, not the snapshot.
+ * The durable palette merge: the stored document is the last confirmed
+ * write, so its row wins every shared id - an unproven local copy (adopted
+ * peer fact, hydrated seed, or simply stale) can never overwrite a peer's
+ * acknowledged edit through this merge. Deliberate local edits are not
+ * asserted here at all: they re-apply as ops in `palsIntent`, which is what
+ * keeps a lost-ack rebase from re-firing stale rows. Local rows the stored
+ * document has never seen still append - peer saves not yet durable and
+ * rows this copy must cover - minus ids a decided delete tombstoned. A peer
+ * delete the wire has not shown me yet may reappear for one write cycle,
+ * but the op that carries the delete lands on adoption and the next write
+ * removes it again: the merge converges because deletes ride the op log,
+ * not the snapshot.
  */
 export const mergeDurablePals = (
   durable: SavedPalette[],
   local: SavedPalette[],
   tombs: ReadonlySet<string>
 ): SavedPalette[] => {
-  // Order-stable: the durable order carries for rows both sides know, my
-  // own newer row wins shared ids, durable rows I lack are peer facts kept
-  // in place, and only ids durable has never seen append from my list.
-  // A fixed derivation order is what makes the merge idempotent - every
-  // copy re-derives byte-identical wire instead of reordering forever.
-  const mine = new Map(local.map((p) => [p.id, p]))
+  // Order-stable: the durable order carries, durable rows I lack are peer
+  // facts kept in place, and only ids the stored document has never seen
+  // append from my list. A fixed derivation order is what makes the merge
+  // idempotent - every copy re-derives byte-identical wire instead of
+  // reordering forever.
   const seen = new Set<string>()
   const merged: SavedPalette[] = []
   for (const p of durable) {
     if (tombs.has(p.id) || seen.has(p.id)) continue
     seen.add(p.id)
-    merged.push(mine.get(p.id) ?? p)
+    merged.push(p)
   }
-  for (const p of local) if (!seen.has(p.id)) merged.push(p)
+  for (const p of local) if (!seen.has(p.id) && !tombs.has(p.id)) merged.push(p)
   return merged
 }
 
@@ -891,11 +903,32 @@ export class CasKey {
   }
 }
 
-/** The palette intent: the merged library normalized against the normalized
- *  stored document, so only a real delta writes. */
-export const palsIntent = (list: () => SavedPalette[], tombs: () => ReadonlySet<string>): CasDerive => {
+/** One admitted op applied onto the stored document. Identical to
+ *  `applyPalOp` except a rename already visible in the stored row is a
+ *  no-op - the derive must converge to byte-identical wire, so a settled
+ *  effect can never re-stamp `updatedAt` and keep rewriting forever. */
+const applyDurablePalOp = (items: SavedPalette[], op: PalOp): SavedPalette[] => {
+  if (op.kind !== 'rename') return applyPalOp(items, op)
+  const name = op.name.trim().slice(0, MAX_PALETTE_NAME)
+  return items.map((i) => (i.id === op.target && name && i.name !== name ? { ...i, name, updatedAt: Date.now() } : i))
+}
+
+/** The palette intent: the stored document carries every peer fact (it wins
+ *  shared ids by definition - it is the last confirmed write), my unseen
+ *  rows append to cover a peer's lost write, and only my ops no foreign
+ *  watermark has covered re-apply on top. An op is the only way a local
+ *  edit is deliberate rather than stale: a same-id rename by me lands on
+ *  the peer's row, while my merely-older copy of a row the peer edited
+ *  silently defers - which is exactly what makes a lost-ack reconcile safe
+ *  to rebase instead of reporting unknown. */
+export const palsIntent = (
+  list: () => SavedPalette[],
+  tombs: () => ReadonlySet<string>,
+  ops: () => PalOp[] = () => []
+): CasDerive => {
   return (cur) => {
-    const merged = mergeDurablePals(parsePalettes(cur), list(), tombs())
+    let merged = mergeDurablePals(parsePalettes(cur), list(), tombs())
+    for (const op of ops()) merged = applyDurablePalOp(merged, op)
     const wire = serializePalettes(merged)
     return wire === serializePalettes(parsePalettes(cur)) ? CAS_SKIP : wire
   }

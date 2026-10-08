@@ -69,6 +69,15 @@ and anything else reports `unknown` instead of claiming the mutation
 applied, because a timed-out original may still commit later. The mirror
 setter is never used as a durable path: it is optimistic and carries no
 ack.
+For the palette library the stored document is the last confirmed write, so
+on a shared id the stored row always wins over a local copy that cannot
+prove it is newer - a lost-ack rebase can never re-assert a stale row over
+a peer's acknowledged rename. Local rows the store has never seen still get
+written (peer saves a crashed write never landed). Deliberate edits ride
+the op log instead: only palette ops no foreign watermark has covered
+(`PalsLib.pending()`) re-apply onto the readback, so my in-flight rename
+lands on the peer's row with causal identity while a settled op stops
+re-asserting once the wire has covered it.
 The half-typed code-field draft is session view state - it follows the fold
 through `os.session` so the other display keeps typing, but a hard relaunch
 returns the last committed colour rather than an unfinished draft.

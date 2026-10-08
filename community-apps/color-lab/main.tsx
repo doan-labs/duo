@@ -384,7 +384,8 @@ function ColorLab() {
       os.storage,
       palsIntent(
         () => lib.current.list,
-        () => lib.current.tombs
+        () => lib.current.tombs,
+        () => lib.current.pending()
       ),
       {
         mergeSafe: true,
