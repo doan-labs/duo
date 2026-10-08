@@ -38,9 +38,12 @@ class Space {
   gen = 1
   calls: string[] = []
   failReads = 0
+  goneReads = 0
   applyThenTimeout = 0
   dropThenTimeout = 0
   failSets = 0
+  /** A scripted non-contract throw on the next set: no code, or a garbled one. */
+  weirdErr: unknown = null
   onEntry: (() => void) | null = null
   async entry(): Promise<CasEntry> {
     this.calls.push('entry')
@@ -48,11 +51,20 @@ class Space {
       this.failReads--
       throw err('E_STORAGE')
     }
+    if (this.goneReads > 0) {
+      this.goneReads--
+      throw err('E_GONE')
+    }
     this.onEntry?.()
     return { v: this.v, rev: this.rev, gen: this.gen }
   }
   async set(v: string, expect?: { rev: number; gen: number }): Promise<{ rev: number }> {
     this.calls.push('set')
+    if (this.weirdErr !== null) {
+      const w = this.weirdErr
+      this.weirdErr = null
+      throw w
+    }
     if (this.failSets > 0) {
       this.failSets--
       throw err('E_STORAGE')
@@ -223,7 +235,7 @@ check('a conflict with only a sibling bump re-issues on the new token', async ()
   eq(store.calls, ['entry', 'foreign:old', 'stale?', 'set', 'entry', 'foreign:old', 'stale?', 'set', 'landed:mine'])
 })
 
-check('a dead generation re-reads into the new generation and writes', async () => {
+check('a dead generation retires the intent - never a fresh-generation replay', async () => {
   const store = new Space()
   store.v = 'old'
   const p: PendingWrite = { raw: 'mine' }
@@ -235,9 +247,24 @@ check('a dead generation re-reads into the new generation and writes', async () 
     if (setCalls === 1) store.recreate() // gen dies after the read
     return set(v, expect)
   }
-  eq(await flushCas(p, d), 'issued')
-  eq(store.v, 'mine')
+  eq(await flushCas(p, d), 'gone')
+  // Retired, not replayed: no re-read for a live token, no second write,
+  // and the new generation's store is untouched by the dead-era intent.
+  eq(store.calls[store.calls.length - 1], 'set')
+  eq(store.v, null)
   eq(store.gen, 2)
+  eq(p.issued, undefined)
+})
+
+check('a dead generation on the entry read retires the intent outright', async () => {
+  const store = new Space()
+  store.goneReads = 1
+  const p: PendingWrite = { raw: 'mine' }
+  const d = rig(store)
+  eq(await flushCas(p, d), 'gone')
+  eq(store.calls, ['entry']) // terminal: not a paced retry, no write
+  eq(store.calls.includes('set'), false)
+  eq(store.calls.includes('fault'), false)
 })
 
 check('an unknown ack reads back and confirms a landed write', async () => {
@@ -266,14 +293,75 @@ check('an unknown ack with a foreign readback adopts instead of resending', asyn
   eq(store.v, 'F:landed')
 })
 
-check('an unknown ack with the old value readback re-issues once', async () => {
+check('an unknown ack with a stale readback reports unknown, never replays', async () => {
+  const store = new Space()
+  store.v = 'old'
+  store.dropThenTimeout = 1 // write did not land, ack lost
+  const p: PendingWrite = { raw: 'mine' }
+  eq(await flushCas(p, rig(store)), 'unknown')
+  // One set, one readback: the old value neither proves landing nor adopts,
+  // so the intent is consumed honestly - a re-issue could erase a peer write.
+  eq(store.v, 'old')
+  eq(store.calls, ['entry', 'foreign:old', 'stale?', 'set', 'entry', 'foreign:old'])
+  eq(p.issued, undefined)
+})
+
+check('an unknown ack with a null readback stays unknown', async () => {
+  const store = new Space() // empty record: deleted or never seeded
+  store.dropThenTimeout = 1
+  const p: PendingWrite = { raw: 'mine' }
+  eq(await flushCas(p, rig(store)), 'unknown')
+  eq(store.v, null)
+  eq(store.calls.filter((c) => c === 'set').length, 1)
+})
+
+check('an unknown ack with an own older record readback stays unknown', async () => {
+  // 'my-earlier' parses as this copy's own prior write - not the bytes it
+  // just tried to commit - so it proves neither landing nor a foreign win.
+  const store = new Space()
+  store.v = 'my-earlier'
+  store.dropThenTimeout = 1
+  const p: PendingWrite = { raw: 'mine' }
+  eq(await flushCas(p, rig(store)), 'unknown')
+  eq(store.v, 'my-earlier')
+  eq(store.calls.filter((c) => c === 'set').length, 1)
+})
+
+check('an unknown ack whose readback rejects reports unknown, not a retry', async () => {
   const store = new Space()
   store.v = 'old'
   store.dropThenTimeout = 1
   const p: PendingWrite = { raw: 'mine' }
+  const d = rig(store)
+  let reads = 0
+  const realEntry = d.entry
+  d.entry = async () => {
+    reads++
+    if (reads === 2) throw err('E_STORAGE') // the readback itself fails
+    return realEntry()
+  }
+  eq(await flushCas(p, d), 'unknown')
+  eq(store.v, 'old')
+  eq(store.calls.filter((c) => c === 'set').length, 1) // never re-issued
+  eq(store.calls.includes('fault'), false) // consumed, not paced for replay
+})
+
+check('an ambiguous transport error resolves through the same one readback', async () => {
+  // A thrown error with no contract code is ambiguous about landing.
+  const store = new Space()
+  store.v = 'mine' // the write actually committed before the error
+  store.weirdErr = new Error('network down')
+  const p: PendingWrite = { raw: 'mine' }
   eq(await flushCas(p, rig(store)), 'issued')
-  eq(store.v, 'mine')
-  eq(store.calls.filter((c) => c === 'set').length, 2)
+  eq(store.calls.filter((c) => c === 'set').length, 1)
+  // Same throw, non-matching readback: consumed as unknown, never replayed.
+  const store2 = new Space()
+  store2.v = 'other'
+  store2.weirdErr = Object.assign(new Error('E_WAT'), { code: 'E_WAT' })
+  const p2: PendingWrite = { raw: 'mine' }
+  eq(await flushCas(p2, rig(store2)), 'unknown')
+  eq(store2.v, 'other')
+  eq(store2.calls.filter((c) => c === 'set').length, 1)
 })
 
 check('a hard write fault parks the intent without looping forever', async () => {
@@ -323,7 +411,7 @@ check('casSet writes through the read token and survives a conflict', async () =
     }
     return set(k, v, expect)
   }
-  eq(await casSet(kv, 'prefs', 'light'), true)
+  eq(await casSet(kv, 'prefs', 'light'), 'placed')
   eq(store.v, 'light')
   eq(store.calls.filter((c) => c === 'set').length, 2)
 })
@@ -331,8 +419,30 @@ check('casSet writes through the read token and survives a conflict', async () =
 check('casSet reads a timed-out write back instead of retrying blind', async () => {
   const store = new Space()
   store.applyThenTimeout = 1
-  eq(await casSet(kvOf(store), 'prefs', 'light'), true)
+  eq(await casSet(kvOf(store), 'prefs', 'light'), 'placed')
   eq(store.calls.filter((c) => c === 'set').length, 1)
+})
+
+check('casSet stays unknown on a non-matching readback - no replay', async () => {
+  const store = new Space()
+  store.v = 'old'
+  store.dropThenTimeout = 1 // write lost, ack lost
+  eq(await casSet(kvOf(store), 'prefs', 'light'), 'unknown')
+  eq(store.v, 'old')
+  eq(store.calls.filter((c) => c === 'set').length, 1)
+})
+
+check('casSet reports a dead generation and never replays into a new one', async () => {
+  const store = new Space()
+  store.v = 'dark'
+  const kv = kvOf(store)
+  const set = kv.set
+  kv.set = async (k, v, expect) => {
+    store.recreate()
+    return set(k, v, expect)
+  }
+  eq(await casSet(kv, 'prefs', 'light'), 'gone')
+  eq(store.calls[store.calls.length - 1], 'set') // terminal, no re-read
 })
 
 check('casSet propagates a dead store honestly', async () => {

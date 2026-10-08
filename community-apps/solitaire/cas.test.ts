@@ -73,11 +73,17 @@ class Space {
   async set(v: string, expect?: { rev: number; gen: number }): Promise<{ rev: number }> {
     if (this.holdValue !== null && v === this.holdValue)
       return new Promise((res, rej) => this.heldSet.push({ v, e: expect, res, rej }))
+    if (this.timeoutNoApply > 0) {
+      this.timeoutNoApply--
+      throw err('E_TIMEOUT')
+    }
     return this.applySet(v, expect)
   }
   // When set, the next applying set lands, then a peer's confirmed write
   // lands, then the caller's ack is lost: the lost-ACK/ABA interleave.
   timeoutThenPeer: string | null = null
+  // A lost ack on a write that never applied at all.
+  timeoutNoApply = 0
   applySet(v: string, expect?: { rev: number; gen: number }): { rev: number } {
     if (expect && expect.gen !== this.gen) throw err('E_GONE')
     if (expect && expect.rev !== this.rev) throw err('E_CONFLICT')
@@ -457,6 +463,25 @@ check('a lost ack whose readback shows a confirmed peer write adopts it', async 
   eq(JSON.parse(store.v!).moves, 'd,d,d')
   // No-race control: same lost ack with no peer write in between confirms by
   // readback (the check above this one pins it verbatim).
+})
+
+check('an unresolvable ack retires unknown through the real caller - no replay', async () => {
+  // A's write never applied and its ack was lost; the readback shows a value
+  // that is neither A's bytes nor a foreign record. Through the production
+  // publish/flush wiring the intent must be consumed as 'unknown' - no
+  // fault pacing, and the next flush must not re-send the same raw.
+  const store = new Space()
+  store.v = 'not-a-record' // unparseable: not foreign, not ours
+  const a = new Copy('A')
+  a.publish(dealAt(41, [draw, draw]))
+  store.timeoutNoApply = 1
+  eq(await a.flush(store), 'unknown')
+  eq(a.pending, null) // consumed - the fault timer has nothing to requeue
+  eq(a.faults, 0) // unknown is not a paced fault
+  eq(store.delivered.length, 0) // nothing ever committed
+  eq(await a.flush(store), 'issued') // parked-intent noop: no re-issue
+  eq(store.delivered.length, 0)
+  eq(store.v, 'not-a-record')
 })
 
 const main = async () => {

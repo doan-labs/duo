@@ -418,8 +418,14 @@ function Solitaire() {
           if (pendingGame.current === game) noteWriteFault()
         }
       }).then((result) => {
-        // 'issued'/'adopted' resolve the intent; 'stale' drops it; 'fault'
-        // keeps it parked for the paced retry.
+        // 'issued'/'adopted' resolve the intent and 'stale' drops it.
+        // 'gone' retires it - the space moved generations, nothing to replay.
+        // 'unknown' consumes it too: the write may or may not have landed,
+        // and a fresh-token replay could erase a confirmed peer record, so
+        // the mirror's delivery decides what the table shows. Only 'fault'
+        // keeps the intent parked for the paced retry.
+        if (result === 'unknown') setStatus('Save unconfirmed - storage could not verify the last move.')
+        else if (result === 'gone') setStatus('Shared record reset - the table reloads from storage.')
         if (result !== 'fault' && pendingGame.current === game) pendingGame.current = null
       })
     }
@@ -441,6 +447,10 @@ function Solitaire() {
           if (pendingStats.current === stats) noteWriteFault()
         }
       }).then((result) => {
+        // Same outcome map as the game intent: an unknown ack is consumed
+        // without replay, a dead generation retires the stats write.
+        if (result === 'unknown') setStatus('Stats save unconfirmed - the next confirmed write corrects it.')
+        else if (result === 'gone') setStatus('Shared record reset - stats reload from storage.')
         if (result !== 'fault' && pendingStats.current === stats) pendingStats.current = null
       })
     }
