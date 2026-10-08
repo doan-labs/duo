@@ -722,5 +722,76 @@ await (async () => {
   )
 })()
 
+// --- lost ACK, peer confirms same key, readback sees peer (cross-app gate) -------------
+//
+// A's doc write commits but the ACK is lost; B then confirms on the same key.
+// A's readback must not rerun stale intent blind: it rereads, folds B's committed
+// doc as base, and replays the same writer/seq identity - never a fresh id, never
+// an unconditional overwrite. The durable doc must keep both ops.
+
+await (async () => {
+  const bus = new Bus()
+  const sa = mkSink()
+  const sb = mkSink()
+  const a = engine(bus, 'cover', 'cover', sa)
+  const b = engine(bus, 'inner', 'inner', sb)
+  await sleep(15)
+
+  bus.holdReads('cover') // A's readback parks behind B's commit below
+  bus.dropWrites = true // every commit lands but the ACK reads E_TIMEOUT
+  a.submit(opAdd(batchDraft('AckLost', 500)))
+  await waitFor(() => bus.rev >= 2, 'cover receipt+doc commits landed without ACKs')
+  bus.dropWrites = false
+
+  b.submit(opAdd(batchDraft('PeerNext', 300)))
+  await settle(b, sb, 'inner settled over cover')
+  const seen = parseDoc(bus.wire!)
+  ok(
+    seen.items.some((i) => i.name === 'PeerNext'),
+    'inner confirmed on the same key'
+  )
+
+  bus.releaseReads() // A's readback now resolves against B's committed doc
+  await settle(a, sa, 'cover settles after lost-ack readback')
+  await sleep(10)
+
+  const durable = parseDoc(bus.wire!)
+  ok(
+    durable.items.some((i) => i.name === 'AckLost'),
+    'lost-ack op survived durable'
+  )
+  ok(
+    durable.items.some((i) => i.name === 'PeerNext'),
+    'peer commit preserved through cover rebase'
+  )
+  eq(durable.items.filter((i) => i.name === 'AckLost').length, 1, 'no duplicated op from the lost ack')
+  eq(durable.items.find((i) => i.name === 'AckLost')?.milli, 500, 'single op quantity, not re-applied')
+  ok(sa.doc?.items.some((i) => i.name === 'PeerNext') === true, 'cover view carries the peer row')
+})()
+
+// --- no-race control: both ops confirm, nothing lost -----------------------------------
+
+await (async () => {
+  const bus = new Bus()
+  const sa = mkSink()
+  const sb = mkSink()
+  const a = engine(bus, 'cover', 'cover', sa)
+  const b = engine(bus, 'inner', 'inner', sb)
+  await sleep(15)
+  a.submit(opAdd(batchDraft('CleanA', 200)))
+  b.submit(opAdd(batchDraft('CleanB', 400)))
+  await settle(a, sa, 'cover control settles')
+  await settle(b, sb, 'inner control settles')
+  const durable = parseDoc(bus.wire!)
+  ok(
+    durable.items.some((i) => i.name === 'CleanA'),
+    'control keeps cover op'
+  )
+  ok(
+    durable.items.some((i) => i.name === 'CleanB'),
+    'control keeps inner op'
+  )
+})()
+
 for (const stop of stops) stop()
 console.log(`causality: ${n} checks passed`)
