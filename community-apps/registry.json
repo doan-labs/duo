@@ -40,6 +40,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.jigsaw": {
+      "folder": "jigsaw",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "developer": "doan-labs",
