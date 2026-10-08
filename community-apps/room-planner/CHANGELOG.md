@@ -12,7 +12,11 @@
   never resolved by replaying the request, so a peer's confirmed-later
   commit can never be overwritten by a stale intent's second flight.
   A failed read is still 'unknown', never an implied-empty library to
-  seed over.
+  seed over. Stored plan versions are a strict commit order: an
+  equal-version fork (two copies editing one plan in a millisecond) is a
+  second commit that binds one past the stored stamp, while a cached
+  union, a timed-out re-entry or a repair re-offer of a frozen snapshot
+  can never erase an acknowledged peer's equal-stamp commit.
 - The width callout now pins to the room's top edge in canvas space and
   clamps below the zoom dock, so it can never slide under the dock's chrome
   on either display or theme.

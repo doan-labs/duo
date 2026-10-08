@@ -460,7 +460,23 @@ export function parseMirror(raw: string | null): Mirror | null {
 export const serializeMirror = (by: string, doc: PlanDoc, sel: string | null, at = Date.now()) =>
   JSON.stringify({ by, at, sel, doc } satisfies Mirror)
 
-export const withDoc = (lib: Library, doc: PlanDoc): Library => ({ ...lib, plans: { ...lib.plans, [doc.id]: doc } })
+// An equal-version fork is a second commit at the same stamp: two copies
+// editing one plan in a millisecond both stamp `updated` the same (`touch`
+// only orders a single lineage). Only a doc carrying DIFFERENT content at
+// that exact stamp binds one past the stored version, so the acknowledged
+// write order is strict and the live intent lands as the last commit. A
+// same-core doc at the same stamp is an idempotent republish and an older
+// doc is a stale re-offer: both place as-is, and mergeLib's strictly-newer
+// rule lets the stored winner stand - a frozen snapshot is never promoted
+// merely because a current revision was read.
+export const withDoc = (lib: Library, doc: PlanDoc): Library => {
+  const existing = lib.plans[doc.id]
+  const bound =
+    existing && doc.updated === existing.updated && !sameCore(coreOf(existing), coreOf(doc))
+      ? { ...doc, updated: existing.updated + 1 }
+      : doc
+  return { ...lib, plans: { ...lib.plans, [doc.id]: bound } }
+}
 
 export function withoutDoc(lib: Library, id: string): Library {
   const plans = { ...lib.plans }
@@ -489,11 +505,13 @@ export function mergeLib(a: Library, b: Library): Library {
   const plans: Record<string, PlanDoc> = { ...a.plans }
   for (const [id, doc] of Object.entries(b.plans)) {
     const cur = plans[id]
-    // b is the writer's own merge side: on an equal stamp it wins, so a
-    // legitimate edit (a rename colliding in the same millisecond) lands
-    // instead of silently dropping to the stored copy. Genuinely stale
-    // writes never reach here - the mutate guard rejects them first.
-    if (!cur || cur.updated <= doc.updated) plans[id] = doc
+    // Strictly newer only. An equal stamp is either the same doc republished
+    // (a no-op either way) or a cross-copy fork - and `a` is always the side
+    // closer to ground truth (stored or accumulated), so a union must never
+    // promote a frozen snapshot over the acknowledged commit. Equal-version
+    // replacement happens only through withDoc's fork binding on a live
+    // intent, which is what makes the commit order durable in the first place.
+    if (!cur || cur.updated < doc.updated) plans[id] = doc
   }
   const gone: Record<string, Tomb> = { ...a.gone }
   for (const [id, tomb] of Object.entries(b.gone)) {

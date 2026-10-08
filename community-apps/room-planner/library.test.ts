@@ -23,6 +23,7 @@ import {
   newPlan,
   type PlanDoc,
   parseLibrary,
+  renameDoc,
   serializeLibrary,
   type Tomb,
   welcomePlan,
@@ -143,6 +144,99 @@ function eq(actual: unknown, want: unknown) {
 function ok(cond: boolean, what: string) {
   if (!cond) throw new Error(what)
 }
+
+// Parent probe peer-equal-version-probe.ts, replayed on the real exports:
+// two edits derived from the same base in the same millisecond both stamp
+// updated=1001 (Date.now pinned), so the writes are an equal-version fork.
+// 'peer-equal' loses A's ACK while B's equal-version commit lands; 'repair'
+// needs no timeout at all - A's cached union used to re-impose over B's
+// acknowledged write on the next change event. Version binding must make
+// the acknowledged commit strictly outrank every re-offered snapshot.
+const equalVersionRace = async (race: 'none' | 'peer-newer' | 'peer-equal' | 'repair-peer-equal') => {
+  const realNow = Date.now
+  Date.now = () => 1000
+  const base = newPlan('Base', 'base')
+  const mine = renameDoc(base, 'A version')
+  const peer = renameDoc(race === 'peer-newer' ? mine : base, 'B acknowledged version')
+  Date.now = realNow
+  let wire = serializeLibrary({ rev: 1, plans: { base }, gone: {} })
+  let rev = 1
+  let peerAck = false
+  let inject = race === 'peer-newer' || race === 'peer-equal'
+  let writesA = 0
+  const makeKV = (writer: 'A' | 'B'): LibKV => ({
+    get: async () => wire,
+    entry: async (k) => ({ k, v: wire, rev, gen: 1 }),
+    del: async () => {
+      throw new Error('unused')
+    },
+    set: async (_k, next, expect) => {
+      if (expect?.rev !== rev || expect.gen !== 1) throw new PlatformError('E_CONFLICT')
+      wire = next
+      rev++
+      if (writer === 'A') writesA++
+      if (writer === 'A' && inject) {
+        inject = false
+        const resultB = await storeB.write(intent(peer))
+        peerAck = resultB?.confirmed === true
+        throw new PlatformError('E_TIMEOUT')
+      }
+      return { rev }
+    }
+  })
+  const storeA = new LibStore(makeKV('A'))
+  const storeB = new LibStore(makeKV('B'))
+  // Exact main.tsx saveDoc callback; renameDoc is the production edit helper.
+  const intent = (next: PlanDoc) => (lib: Library) => {
+    const existing = lib.plans[next.id]
+    return !existing || existing.updated <= next.updated ? withDoc(lib, next) : null
+  }
+  const result = await storeA.write(intent(mine))
+  if (race === 'repair-peer-equal') {
+    const resultB = await storeB.write(intent(peer))
+    peerAck = resultB?.confirmed === true
+    await storeA.repair()
+  }
+  const final = parseLibrary(wire).plans.base!
+  return {
+    peerAck,
+    ownConfirmed: result?.confirmed === true,
+    writesA,
+    finalName: final.name,
+    finalUpdated: final.updated,
+    mine,
+    peer
+  }
+}
+
+await check('equal-version fork: controls land the only or strictly-newer write', async () => {
+  const none = await equalVersionRace('none')
+  eq(none.finalName, none.mine.name)
+  eq(none.writesA, 1)
+  const newer = await equalVersionRace('peer-newer')
+  eq(newer.finalName, newer.peer.name)
+  ok(newer.peerAck, 'the strictly-newer peer commit was acknowledged')
+})
+
+await check('equal-version fork: lost ACK covered by a peer commit preserves the peer', async () => {
+  // Previously A's re-entry folded its captured doc over B's equal-version
+  // commit via mergeLib's b-wins-tie, writing 'A version' back on top.
+  const r = await equalVersionRace('peer-equal')
+  eq(r.finalName, r.peer.name)
+  eq(r.finalUpdated, r.mine.updated + 1)
+  ok(r.peerAck, 'the peer commit was acknowledged')
+  eq(r.writesA, 1)
+})
+
+await check('equal-version fork: repair re-offer cannot erase an acknowledged peer', async () => {
+  // Both commits fully ACK in order; the losing copy's repair() fold sees
+  // the peer's bound version in storage and must decline, not promote its
+  // cached union snapshot merely because it re-read a current revision.
+  const r = await equalVersionRace('repair-peer-equal')
+  eq(r.finalName, r.peer.name)
+  ok(r.peerAck && r.ownConfirmed, 'both writes were acknowledged')
+  eq(r.writesA, 1)
+})
 
 await check('a failed bootstrap read is unknown, never an empty seed', async () => {
   const edited = { ...welcomePlan(), updated: 1000 }

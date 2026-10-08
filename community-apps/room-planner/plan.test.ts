@@ -261,6 +261,37 @@ check('library helpers pick newest, drop plans, keep others', () => {
   eq(latestDoc(withoutDoc(lib, 'b'))!.id, 'a')
 })
 
+check('withDoc binds equal-version adoptions to a strict commit order', () => {
+  // Two copies edit the same plan in one millisecond - both docs stamp
+  // updated=1001. The first adoption lands as authored; the second must
+  // bind past the stored version so the acknowledged write outranks every
+  // re-offered snapshot of the frozen first doc.
+  const base = { ...plan(), id: 'a', born: 5, updated: 1000 }
+  const aDoc = { ...base, name: 'A version', updated: 1001 }
+  const bDoc = { ...base, name: 'B acknowledged version', updated: 1001 }
+  const lib = { rev: 0, plans: { a: aDoc }, gone: {} }
+  const adopted = withDoc(lib, bDoc)
+  eq(adopted.plans.a!.updated, 1002)
+  eq(adopted.plans.a!.name, 'B acknowledged version')
+  // A re-offer of the frozen 1001 doc is now strictly older and loses.
+  eq(mergeLib(adopted, { rev: 0, plans: { a: aDoc }, gone: {} }).plans.a!.name, 'B acknowledged version')
+  // Newer still lands directly, unbound.
+  const newer = withDoc(adopted, { ...aDoc, name: 'C', updated: 2000 })
+  eq(newer.plans.a!.updated, 2000)
+})
+
+check('mergeLib keeps the stored doc on an equal-version fork', () => {
+  // A union must never promote a frozen snapshot over an acknowledged
+  // commit: equal stamps with different cores keep the `a` side, so the
+  // repair/mine re-offer cannot erase a peer's landed write.
+  const stored = { ...plan(), id: 'a', born: 5, updated: 1002, name: 'acknowledged' }
+  const fork = { ...plan(), id: 'a', born: 5, updated: 1002, name: 'stale snapshot' }
+  const merged = mergeLib({ rev: 0, plans: { a: stored }, gone: {} }, { rev: 0, plans: { a: fork }, gone: {} })
+  eq(merged.plans.a!.name, 'acknowledged')
+  const swapped = mergeLib({ rev: 0, plans: { a: fork }, gone: {} }, { rev: 0, plans: { a: stored }, gone: {} })
+  eq(swapped.plans.a!.name, 'stale snapshot')
+})
+
 check('mergeLib unions racing libraries, tombstones stop resurrection', () => {
   const a = { ...plan(), id: 'a', born: 5, updated: 5 }
   const b = { ...plan(), id: 'b', born: 3, updated: 3 }
@@ -375,14 +406,17 @@ check('imperial display never carries a 12-inch remainder', () => {
   }
 })
 
-check('rename moves the version and wins the library merge', () => {
+check('rename moves the version and wins the library write', () => {
   const doc = { ...plan(), id: 'a', updated: 1000 }
   const renamed = renameDoc(doc, 'Kitchen')
   ok(renamed.updated > doc.updated, 'rename did not touch the doc')
-  // Same-millisecond stamp on the stored copy: the writer's merge side wins.
+  // Same-millisecond stamp on the stored copy: the rename lands through
+  // withDoc's version binding (strictly past the stored doc), never through
+  // a union - equal-version replacement is binding, not merge preference.
   const stored = { ...doc, updated: renamed.updated }
-  const lib = mergeLib({ rev: 0, plans: { a: stored }, gone: {} }, { rev: 0, plans: { a: renamed }, gone: {} })
+  const lib = withDoc({ rev: 0, plans: { a: stored }, gone: {} }, renamed)
   eq(lib.plans.a!.name, 'Kitchen')
+  eq(lib.plans.a!.updated, stored.updated + 1)
   // And against a genuinely stale stored copy.
   const merged = mergeLib({ rev: 0, plans: { a: doc }, gone: {} }, { rev: 0, plans: { a: renamed }, gone: {} })
   eq(merged.plans.a!.name, 'Kitchen')
