@@ -166,6 +166,22 @@
         }
       ]
     },
+    "com.mnismt.duo.jigsaw": {
+      "name": "Jigsaw",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/jigsaw",
+      "permissions": [],
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+a942693e",
+          "sdk": "0.1.0",
+          "bytes": 572993,
+          "sha256": "cfa1e5465c8b91d9a56f087294b1ea69890a7bb9007898800fbc1748a33da8bc"
+        }
+      ]
+    },
     "com.mnismt.duo.memorymatch": {
       "name": "Memory Match",
       "lane": "community",
