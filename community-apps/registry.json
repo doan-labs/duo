@@ -135,6 +135,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.reversi": {
+      "folder": "reversi",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.tripplanner": {
       "folder": "trip-planner",
       "developer": "devin",
