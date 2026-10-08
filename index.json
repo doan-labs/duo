@@ -323,6 +323,22 @@
         }
       ]
     },
+    "com.mnismt.duo.reversi": {
+      "name": "Reversi",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/reversi",
+      "permissions": [],
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+3ab4daee",
+          "sdk": "0.1.0",
+          "bytes": 553373,
+          "sha256": "73b3f95651574c6f64a7925095407110251395b69961281e91acfbe527bbf960"
+        }
+      ]
+    },
     "com.mnismt.duo.snake": {
       "name": "Snake",
       "lane": "community",

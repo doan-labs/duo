@@ -1,0 +1,12 @@
+{
+  "id": "com.mnismt.duo.reversi",
+  "name": "Reversi",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "permissions": [],
+  "author": "devin",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/reversi",
+  "license": "MIT"
+}

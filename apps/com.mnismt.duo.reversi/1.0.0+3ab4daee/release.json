@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.reversi",
+    "name": "Reversi",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "permissions": [],
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/reversi",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T07:43:58.907Z",
+    "commit": "5b75392024ce3a179426d5a223c39280fabdaa41",
+    "hash": "3ab4daee"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 553373,
+      "sha256": "f039adb7212bb53bc4fa71702ae56d65900e40c022752567923901ba3796ac19"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1482451,
+      "sha256": "cd23bf067f20cf05639389ad405c82f0ba5ddd73a53e01bab4051cca9e546457"
+    }
+  ]
+}
