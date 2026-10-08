@@ -1417,6 +1417,124 @@ check(
   check('single-key peer value preserved', data.get('prefs') === '{"v":1,"muted":"peer"}')
 }
 
+// --- cycle-15: identity-bound single-key writes --------------------------
+
+// Parent's consume() probe: A checked undo at=1 via the mirror; B writes a
+// newer undo (at=2) and ACKs BEFORE A's entry read. The delete must skip -
+// B's incarnation is never removed on A's stale basis.
+{
+  const oldUndo = JSON.stringify({ v: 1, by: 'A', at: 1, kind: 'pack', tripId: 't', label: 'Old' })
+  const newUndo = JSON.stringify({ v: 1, by: 'B', at: 2, kind: 'pack', tripId: 't', label: 'New' })
+  const data = new Map<string, string>([['undo', oldUndo]])
+  const space = { rev: 1, gen: 1 }
+  let dels = 0
+  const io = {
+    entry: (k: string) => {
+      if (k === 'undo' && data.get(k) === oldUndo) {
+        // Peer write lands before A's entry read resolves.
+        data.set(k, newUndo)
+        space.rev++
+      }
+      return Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen })
+    },
+    set: () => Promise.resolve({ rev: space.rev }),
+    del: (k: string, expect: { rev: number; gen: number }) => {
+      dels++
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      space.rev++
+      return Promise.resolve({ rev: space.rev })
+    }
+  }
+  const r = await conditionalSet(io, 'undo', null, (v) => JSON.parse(v!).at === 1)
+  check('before-entry peer undo preserved', r === 'skipped' && data.get('undo') === newUndo)
+  check('no delete issued on mismatch', dels === 0)
+}
+
+// B commits between A's entry read and its delete: E_CONFLICT makes the
+// loop re-read and re-check the identity - still skips, still preserves B.
+{
+  const oldUndo = JSON.stringify({ v: 1, by: 'A', at: 1, kind: 'pack', tripId: 't', label: 'Old' })
+  const newUndo = JSON.stringify({ v: 1, by: 'B', at: 2, kind: 'pack', tripId: 't', label: 'New' })
+  const data = new Map<string, string>([['undo', oldUndo]])
+  const space = { rev: 1, gen: 1 }
+  let injected = false
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: () => Promise.resolve({ rev: space.rev }),
+    del: (k: string, expect: { rev: number; gen: number }) => {
+      if (!injected && k === 'undo') {
+        injected = true
+        data.set(k, newUndo)
+        space.rev++
+      }
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      space.rev++
+      return Promise.resolve({ rev: space.rev })
+    }
+  }
+  const r = await conditionalSet(io, 'undo', null, (v) => JSON.parse(v!).at === 1)
+  check('before-delete peer undo preserved via conflict re-check', r === 'skipped' && data.get('undo') === newUndo)
+}
+
+// Control: matching incarnation deletes cleanly.
+{
+  const oldUndo = JSON.stringify({ v: 1, by: 'A', at: 1, kind: 'pack', tripId: 't', label: 'Old' })
+  const data = new Map<string, string>([['undo', oldUndo]])
+  const space = { rev: 1, gen: 1 }
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: () => Promise.resolve({ rev: space.rev }),
+    del: (k: string, expect: { rev: number; gen: number }) => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      space.rev++
+      return Promise.resolve({ rev: space.rev })
+    }
+  }
+  const r = await conditionalSet(io, 'undo', null, (v) => JSON.parse(v!).at === 1)
+  check('control: matching incarnation deletes', r === 'landed' && !data.has('undo'))
+}
+
+// Delta write (ui patch): a conflict rebase re-derives the merge onto the
+// peer's fresh value instead of resubmitting the frozen merged doc.
+{
+  const data = new Map<string, string>([['ui', JSON.stringify({ v: 1, tab: 'Plan' })]])
+  const space = { rev: 1, gen: 1 }
+  let bounced = false
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }) => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      if (!bounced && k === 'ui') {
+        bounced = true
+        // Peer patch lands first (their tab choice), our token is stale.
+        data.set(k, JSON.stringify({ v: 1, tab: 'Pack', sel: 'peerSel' }))
+        space.rev++
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve({ rev: space.rev })
+    },
+    del: () => Promise.reject(new Error('unused'))
+  }
+  const r = await conditionalSet(io, 'ui', (fresh) => {
+    const cur = JSON.parse(fresh!)
+    return JSON.stringify({ ...cur, tripId: 'mine', v: 1 })
+  })
+  const stored = JSON.parse(data.get('ui')!)
+  check(
+    'delta write merges onto peer fresh value',
+    r === 'landed' && stored.tripId === 'mine' && stored.tab === 'Pack' && stored.sel === 'peerSel'
+  )
+}
+
 // Single-key control: unknown whose readback sees our value resolves.
 {
   const data = new Map<string, string>([['prefs', 'old']])

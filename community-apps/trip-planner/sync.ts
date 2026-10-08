@@ -382,26 +382,45 @@ export type ConditionalSpace = {
 }
 
 /**
- * One durable conditional write for a single key (v === null deletes).
- * E_CONFLICT/E_GONE refresh the token; refusals throw. An ambiguous
- * (timeout/closed/transport) outcome is settled by same-key readback:
- * seeing our value proves it landed; ANY other read reports failure -
- * the lost request may still commit late, so a fresh-token resend could
- * clobber a peer write or double-apply intent. No retries on unknown.
+ * One durable conditional write for a single key. `v === null` deletes; a
+ * function `v` derives the desired wire from the fresh entry (used when the
+ * intent is a delta on stored state, e.g. a merged ui patch) and may return
+ * undefined to abort.
+ *
+ * `match` binds the write to the identity/incarnation the caller's intent
+ * was derived from: when the fresh entry does not satisfy it, the write is
+ * 'skipped' - a peer's newer value (a confirmed undo, draft or confirm) is
+ * NEVER deleted or overwritten just because this copy read an older mirror.
+ * On E_CONFLICT/E_GONE the loop re-reads and re-checks `match`, so only the
+ * true semantic intent is rebased onto the exact fresh entry; a mismatch
+ * skips rather than executing a stale frozen delete/put.
+ *
+ * An ambiguous (timeout/closed/transport) outcome is settled by same-key
+ * readback: seeing the desired value proves it landed; ANY other read
+ * throws - the lost request may still commit late, so a fresh-token resend
+ * could clobber a peer write or double-apply intent. No retries on unknown.
  */
-export async function conditionalSet(space: ConditionalSpace, k: string, v: string | null): Promise<void> {
+export async function conditionalSet(
+  space: ConditionalSpace,
+  k: string,
+  v: string | null | ((fresh: string | null) => string | null | undefined),
+  match?: (v: string | null) => boolean
+): Promise<'landed' | 'skipped'> {
   for (let tries = 0; tries < MAX_TRIES; tries++) {
     const e = await space.entry(k)
+    if (match && !match(e.v)) return 'skipped'
+    const desired = typeof v === 'function' ? v(e.v) : v
+    if (desired === undefined || desired === e.v) return 'skipped'
     const expect = { rev: e.rev, gen: e.gen }
     try {
-      if (v === null) await space.del(k, expect)
-      else await space.set(k, v, expect)
-      return
+      if (desired === null) await space.del(k, expect)
+      else await space.set(k, desired, expect)
+      return 'landed'
     } catch (err) {
       if (isConflict(err)) continue
       if (isRefusal(err)) throw err
       const after = await space.entry(k)
-      if (v === null ? after.v === null : after.v === v) return
+      if (after.v === desired) return 'landed'
       throw Object.assign(new Error('write outcome unproven; refusing resend'), { code: 'E_CAS' })
     }
   }

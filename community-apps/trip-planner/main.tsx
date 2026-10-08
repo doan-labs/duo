@@ -432,18 +432,34 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   // still commit late, so no fresh-token resend is ever safe (it could
   // clobber a peer write that landed in between).
   const write = useCallback(
-    (k: string, v: string | null): Promise<WriteOutcome> => {
-      queuePending(pending.current, k, v)
-      if (v === null) latest.current.delete(k)
-      else latest.current.set(k, v)
+    (
+      k: string,
+      v: string | null | ((fresh: string | null) => string | null | undefined),
+      match?: (v: string | null) => boolean
+    ): Promise<WriteOutcome> => {
+      // `match` binds the write to the incarnation the caller's intent was
+      // derived from; it is checked against the live mirror for the
+      // optimistic mask and again against the durable entry inside
+      // conditionalSet - a mismatched durable value skips, never deletes
+      // or overwrites a peer's newer incarnation.
+      if (match && !match(latest.current.get(k) ?? null)) {
+        return Promise.resolve('landed')
+      }
+      const desired = typeof v === 'function' ? v(latest.current.get(k) ?? null) : v
+      if (desired === undefined) return Promise.resolve('landed')
+      queuePending(pending.current, k, desired)
+      if (desired === null) latest.current.delete(k)
+      else latest.current.set(k, desired)
       setValues((cur) => {
         const next = new Map(cur ?? [])
-        if (v === null) next.delete(k)
-        else next.set(k, v)
+        if (desired === null) next.delete(k)
+        else next.set(k, desired)
         return next
       })
       return writes.current.send(
-        async () => conditionalSet(space, k, v),
+        async () => {
+          await conditionalSet(space, k, v, match)
+        },
         () => {
           // Refused or uncertain: drop this copy's pending mask for the key
           // and re-snapshot so the display converges on the stored truth.
@@ -497,6 +513,14 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       /** Session-scope ephemeral keys (undo/draft/confirm) only - library
        * records go through commitLibWrites and are never deleted. */
       del: (k: string) => write(k, null),
+      /** Identity-bound delete: only removes the key while it still holds
+       * the incarnation `match` accepts - a peer's newer value is never
+       * deleted on behalf of a stale snapshot. */
+      delIf: (k: string, match: (v: string | null) => boolean) => write(k, null, match),
+      /** Delta write: the desired wire is recomputed from the exact fresh
+       * entry at commit time, so a conflict rebase reapplies the intent
+       * (e.g. a ui patch merge) instead of resubmitting a frozen doc. */
+      update: (k: string, derive: (fresh: string | null) => string | null | undefined) => write(k, derive),
       /** Resolves once every write queued so far finished; true iff all landed. */
       settled: () => writes.current.settled()
     }),
@@ -1472,13 +1496,15 @@ function TripPlanner() {
   const setUi = useCallback(
     (patch: Partial<Ui>) => {
       if (!liveVis()) return
-      const next: Ui = {
-        ...parseUi(session.now('ui')),
-        ...patch,
-        v: 1,
-        tab: tabFor(patch.tab ?? parseUi(session.now('ui')).tab)
-      }
-      session.put('ui', JSON.stringify(next))
+      // The patch is the true intent, not the merged document: derive it
+      // from the exact fresh entry at commit time so a conflict rebase
+      // merges onto the peer's landed ui instead of clobbering it with a
+      // document computed off a stale mirror.
+      session.update('ui', (fresh) => {
+        const cur = parseUi(fresh)
+        const next: Ui = { ...cur, ...patch, v: 1, tab: tabFor(patch.tab ?? cur.tab) }
+        return JSON.stringify(next)
+      })
     },
     [session, liveVis]
   )
@@ -1487,7 +1513,7 @@ function TripPlanner() {
     (d: Draft | null) => {
       if (!liveVis()) return
       if (d) session.put('draft', JSON.stringify(d))
-      else session.del('draft')
+      else session.delIf('draft', (v) => parseDraft(v)?.by === ME)
     },
     [session, liveVis]
   )
@@ -1606,9 +1632,12 @@ function TripPlanner() {
   )
 
   const dismissUndo = useCallback(() => {
-    if (!liveVis()) return
-    session.del('undo')
-  }, [session, liveVis])
+    if (!liveVis() || !undo) return
+    const u = undo
+    // Only the incarnation the user is dismissing may be removed - a
+    // peer's newer undo in the slot is not ours to delete.
+    session.delIf('undo', (v) => parseUndo(v)?.at === u.at)
+  }, [session, liveVis, undo])
 
   const openConfirm = useCallback(
     (c: Omit<Confirm, 'v'>) => {
@@ -1619,9 +1648,13 @@ function TripPlanner() {
     [session, liveVis]
   )
   const closeConfirm = useCallback(() => {
-    if (!liveVis()) return
-    session.del('confirm')
-  }, [session, liveVis])
+    if (!liveVis() || !confirm) return
+    const c = confirm
+    session.delIf('confirm', (v) => {
+      const cur = parseConfirm(v)
+      return cur !== null && cur.by === c.by && cur.kind === c.kind && cur.tripId === c.tripId && cur.id === c.id
+    })
+  }, [session, liveVis, confirm])
 
   const doUndo = useCallback(() => {
     if (!liveVis() || !undo) return
@@ -1631,8 +1664,10 @@ function TripPlanner() {
     // the slot still holds this same undo - a failed write keeps it so the
     // user can retry, and surfaces an error instead of a success cue.
     const consume = () => {
-      const cur2 = parseUndo(session.now('undo'))
-      if (cur2 && cur2.at === u.at) session.del('undo')
+      // Identity-bound: the slot is cleared only while it still holds
+      // THIS undo incarnation - a peer's newer Undo that landed between
+      // our check and the delete is never erased.
+      session.delIf('undo', (v) => parseUndo(v)?.at === u.at)
     }
     mutateLib(
       (cur) => applyUndo(cur, u),
@@ -1656,7 +1691,8 @@ function TripPlanner() {
     if (undoAt === undefined) return
     const left = UNDO_MS - (Date.now() - undoAt)
     const expire = () => {
-      if (liveVis()) session.del('undo')
+      // Expire only the incarnation this timer armed on.
+      if (liveVis()) session.delIf('undo', (v) => parseUndo(v)?.at === undoAt)
     }
     if (left <= 0) {
       expire()
@@ -1712,12 +1748,9 @@ function TripPlanner() {
         // Clear this commit's save lock once the mutation is durably done
         // (applied or failed) - a stale lock must never block the editor.
         if (r === 'dropped') return
-        void os.session
-          .get('draft')
-          .then((cur2) => {
-            if (parseDraft(cur2)?.saving === stamp) session.del('draft')
-          })
-          .catch(() => {})
+        // Clear only THIS commit's lock incarnation - a newer draft (own
+        // or peer's) in the slot is not ours to remove.
+        session.delIf('draft', (v) => parseDraft(v)?.saving === stamp)
         if (r === 'failed' || r === 'partial') cue('error')
       }
     )
@@ -1730,7 +1763,8 @@ function TripPlanner() {
   useEffect(() => {
     if (!draft?.saving) return
     const clear = () => {
-      if (liveVis()) session.del('draft')
+      // Expire only the lock incarnation this timer armed on.
+      if (liveVis()) session.delIf('draft', (v) => parseDraft(v)?.saving === draft.saving)
     }
     const left = SAVE_LOCK_MS - (Date.now() - draft.saving)
     if (left <= 0) {
@@ -1747,7 +1781,13 @@ function TripPlanner() {
   useEffect(() => {
     if (!draft || draft.saving) return
     const needsTrip = draft.kind !== 'trip-new'
-    if (needsTrip && draft.tripId && !getTrip(lib, draft.tripId)) session.del('draft')
+    if (needsTrip && draft.tripId && !getTrip(lib, draft.tripId)) {
+      const d = draft
+      session.delIf('draft', (v) => {
+        const cur = parseDraft(v)
+        return cur !== null && cur.by === ME && cur.kind === d.kind && cur.tripId === d.tripId
+      })
+    }
   }, [draft, lib, session])
 
   // A live confirm whose target disappeared (deleted on the other display, or
@@ -1763,7 +1803,13 @@ function TripPlanner() {
           : confirm.kind === 'leg'
             ? t.legs.some((l) => l.id === confirm.id)
             : t.stays.some((s) => s.id === confirm.id)))
-    if (!live) session.del('confirm')
+    if (!live) {
+      const c = confirm
+      session.delIf('confirm', (v) => {
+        const cur = parseConfirm(v)
+        return cur !== null && cur.by === c.by && cur.kind === c.kind && cur.tripId === c.tripId && cur.id === c.id
+      })
+    }
   }, [confirm, lib, session])
 
   const trip = getTrip(lib, ui.tripId)
