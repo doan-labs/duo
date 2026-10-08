@@ -284,8 +284,9 @@ const MAX_TRIES = 4
  *   it, so a peer insert/remove landing inside the window survives.
  * - 'unknown' is settled by reading the SAME key's entry: stored value
  *   equals the intended value -> the write landed before the ack was
- *   lost; equals the read value -> it provably missed and ONE retry with
- *   a fresh token is safe; anything else -> a peer landed, 'conflict'.
+ *   lost. Anything else reports 'partial': a non-match proves neither a
+ *   miss nor a safe rebase (the lost request can still commit late), so
+ *   no retry or replan is allowed to resend an already-ambiguous intent.
  *   The readback reconciles authority; it is never permission to resend
  *   a frozen payload.
  * - The first 'missed' refusal aborts the rest; nothing is written after
@@ -349,6 +350,12 @@ export async function commitLibWrites(io: CasStore, plan: LibWriteStep[]): Promi
       if (r === 'conflict') continue
       if (r === 'missed') return landed > 0 ? 'partial' : 'failed'
       // 'unknown': settle the SAME key by readback - never blind-resend.
+      // Only the exact desired value proves the write landed; anything
+      // else (prior value OR a peer's newer write) leaves the original
+      // request's fate unproven - it could still commit late - so the
+      // commit reports 'partial' and the caller replans nothing. Resending
+      // would risk a double-apply (toggle reversed twice, add duplicated)
+      // or clobbering the peer's landed value.
       try {
         const after = await io.entry(w.key)
         if (after.v === desired) {
@@ -357,8 +364,7 @@ export async function commitLibWrites(io: CasStore, plan: LibWriteStep[]): Promi
           landed++
           continue
         }
-        if (after.v === e.v) continue // provably missed: retry once w/ fresh token
-        return 'conflict' // a peer owns the value now
+        return 'partial'
       } catch {
         return 'partial'
       }
@@ -366,4 +372,82 @@ export async function commitLibWrites(io: CasStore, plan: LibWriteStep[]): Promi
     if (!stepDone) return 'partial'
   }
   return 'applied'
+}
+
+/** Minimal SDK surface a conditional single-key write needs. */
+export type ConditionalSpace = {
+  entry(k: string): Promise<{ v: string | null; rev: number; gen: number }>
+  set(k: string, v: string, expect: { rev: number; gen: number }): Promise<unknown>
+  del(k: string, expect: { rev: number; gen: number }): Promise<unknown>
+}
+
+/**
+ * One durable conditional write for a single key (v === null deletes).
+ * E_CONFLICT/E_GONE refresh the token; refusals throw. An ambiguous
+ * (timeout/closed/transport) outcome is settled by same-key readback:
+ * seeing our value proves it landed; ANY other read reports failure -
+ * the lost request may still commit late, so a fresh-token resend could
+ * clobber a peer write or double-apply intent. No retries on unknown.
+ */
+export async function conditionalSet(space: ConditionalSpace, k: string, v: string | null): Promise<void> {
+  for (let tries = 0; tries < MAX_TRIES; tries++) {
+    const e = await space.entry(k)
+    const expect = { rev: e.rev, gen: e.gen }
+    try {
+      if (v === null) await space.del(k, expect)
+      else await space.set(k, v, expect)
+      return
+    } catch (err) {
+      if (isConflict(err)) continue
+      if (isRefusal(err)) throw err
+      const after = await space.entry(k)
+      if (v === null ? after.v === null : after.v === v) return
+      throw Object.assign(new Error('write outcome unproven; refusing resend'), { code: 'E_CAS' })
+    }
+  }
+  throw Object.assign(new Error('conditional write loop exhausted'), { code: 'E_CAS' })
+}
+
+/**
+ * The shared replan loop for library mutations: run the semantic mutate
+ * on the current library, commit its diff, and on 'conflict' re-snapshot
+ * and re-derive the SAME intent on fresh durable state (never resubmit a
+ * frozen plan). 'partial'/'failed'/'applied'/'noop' pass straight through -
+ * only a provable zero-effects conflict may re-execute; an ambiguous
+ * outcome already reported 'partial' stops the loop.
+ */
+export async function commitWithReplan<Lib>(
+  resync: () => Promise<void>,
+  libNow: () => Lib,
+  mutate: (l: Lib) => Lib | null | undefined,
+  commit: (cur: Lib, next: Lib) => Promise<CommitOutcome>,
+  maxRounds = 3
+): Promise<'applied' | 'failed' | 'partial' | 'noop'> {
+  let cur = libNow()
+  let next = mutate(cur)
+  if (!next || next === cur) return 'noop'
+  let outcome: CommitOutcome | 'noop' = 'applied'
+  for (let round = 0; round < maxRounds; round++) {
+    if (round > 0) {
+      await resync()
+      cur = libNow()
+      next = mutate(cur)
+      // The intent is no longer expressible on the fresh state (e.g. the
+      // trip it edited is gone): refuse honestly rather than claim a
+      // landed write.
+      if (!next) {
+        outcome = 'noop'
+        break
+      }
+      // Fresh state already satisfies the intent: nothing more to write,
+      // and the durable truth matches - honestly 'applied'.
+      if (next === cur) {
+        outcome = 'applied'
+        break
+      }
+    }
+    outcome = await commit(cur, next)
+    if (outcome !== 'conflict') break
+  }
+  return outcome === 'conflict' ? 'partial' : outcome
 }

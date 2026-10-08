@@ -55,6 +55,8 @@ import {
   type CommitOutcome,
   clearPending,
   commitLibWrites,
+  commitWithReplan,
+  conditionalSet,
   isConflict,
   isRefusal,
   queuePending,
@@ -426,8 +428,9 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   // and the same value-level intent retries under the new revision - never
   // unconditional, always bounded. An ambiguous outcome settles on the SAME
   // key's readback: stored == desired -> the write landed before the ack
-  // was lost; stored == prior -> it provably missed and a fresh-token
-  // retry is safe; anything else means a peer owns the value now.
+  // was lost; ANYTHING else is reported as failure - the lost request may
+  // still commit late, so no fresh-token resend is ever safe (it could
+  // clobber a peer write that landed in between).
   const write = useCallback(
     (k: string, v: string | null): Promise<WriteOutcome> => {
       queuePending(pending.current, k, v)
@@ -440,23 +443,7 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
         return next
       })
       return writes.current.send(
-        async () => {
-          for (let tries = 0; tries < 4; tries++) {
-            const e = await space.entry(k)
-            const expect = { rev: e.rev, gen: e.gen }
-            try {
-              if (v === null) await space.del(k, expect)
-              else await space.set(k, v, expect)
-              return
-            } catch (err) {
-              if (isConflict(err)) continue
-              if (isRefusal(err)) throw err
-              const after = await space.entry(k)
-              if (v === null ? after.v === null : after.v === v) return
-            }
-          }
-          throw Object.assign(new Error('conditional write loop exhausted'), { code: 'E_CAS' })
-        },
+        async () => conditionalSet(space, k, v),
         () => {
           // Refused or uncertain: drop this copy's pending mask for the key
           // and re-snapshot so the display converges on the stored truth.
@@ -1560,42 +1547,21 @@ function TripPlanner() {
             after?.('failed')
             return
           }
-          let cur = libNow()
-          let next = mutate(cur)
-          if (!next || next === cur) {
-            after?.('noop')
-            return
-          }
           // Conditional commits can surface 'conflict': a peer's durable
           // write owns the base our intent was computed on. The honest
           // rebase is to re-snapshot durable state and re-run the same
           // semantic mutation on it (editing notes on the peer's new
           // packing state keeps both intents) - never to resubmit the
-          // frozen plan. Bounded rounds; exhaustion reports 'partial'.
-          let outcome: CommitOutcome | 'noop' = 'applied'
-          for (let round = 0; round < 3; round++) {
-            if (round > 0) {
-              await storage.resyncNow()
-              cur = libNow()
-              next = mutate(cur)
-              // The intent is no longer expressible on the fresh state
-              // (e.g. the trip it edited is gone): refuse honestly rather
-              // than claim a landed write.
-              if (!next) {
-                outcome = 'noop'
-                break
-              }
-              // Fresh state already satisfies the intent: nothing more to
-              // write, and the durable truth matches - honestly 'applied'.
-              if (next === cur) {
-                outcome = 'applied'
-                break
-              }
-            }
-            outcome = await writeLibDiff(cur, next)
-            if (outcome !== 'conflict') break
-          }
-          after?.(outcome === 'conflict' ? 'partial' : outcome)
+          // frozen plan. 'partial' stops the loop: an unproven unknown
+          // outcome may still commit late, so re-executing the intent
+          // would risk reversing a toggle or duplicating an add.
+          const outcome = await commitWithReplan<Library>(
+            () => storage.resyncNow(),
+            libNow,
+            mutate,
+            (p, n) => writeLibDiff(p, n)
+          )
+          after?.(outcome)
         })
         .catch(() => {})
     },

@@ -267,8 +267,16 @@ const mkPending = () => new Map<string, (string | null)[]>()
 // foreign writes interleave between steps, and the backing Map is inspected
 // afterwards exactly like a resnapshot would.
 
-import { type CasOutcome, classifyError, commitLibWrites, mergeIndexOrder } from './sync'
 import {
+  type CasOutcome,
+  classifyError,
+  commitLibWrites,
+  commitWithReplan,
+  conditionalSet,
+  mergeIndexOrder
+} from './sync'
+import {
+  addPack,
   addTrip,
   assembleLibrary,
   isTombValue,
@@ -375,6 +383,16 @@ class Store {
 }
 
 const lib0 = { order: [] as string[], trips: [] as import('./trips').Trip[] }
+// trip.* records of a durable map, shaped like a snapshot read.
+const recordsOf = (m: Map<string, string>) => new Map([...m].filter(([k]) => k.startsWith('trip.')))
+const readIndexList = (v: string): string[] => {
+  try {
+    const p = JSON.parse(v)
+    return Array.isArray(p?.order) ? p.order : []
+  } catch {
+    return []
+  }
+}
 const mk = () => {
   const a = addTrip(lib0, { name: 'A', start: '2026-03-01', end: '2026-03-05' }, 1, 'ta')
   const b = addTrip(a.lib, { name: 'B', start: '2026-04-01', end: '2026-04-03' }, 2, 'tb')
@@ -893,7 +911,7 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
   const final = assembleLibrary(data.get('index') ?? null, records())
   check('peer durable before A resolves', tripName(data, ta.id) === 'B confirmed edit')
   check('A never re-sent the stale payload', aPuts === 1)
-  check('readback sees the peer - honest conflict for replan', resultA === 'conflict')
+  check('readback sees the peer - honest partial, NO replan of unproven intent', resultA === 'partial')
   check('peer edit confirmed applied', receiptB === 'applied')
   check('peer edit preserved after A settles', tripName(data, ta.id) === 'B confirmed edit')
   check('assembler agrees', final.trips.find((t) => t.id === 'ta')?.name === 'B confirmed edit')
@@ -983,8 +1001,10 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
   }
   const next = updateTrip(lib, 'ta', { name: 'Dropped edit' })
   const outcome = await commitLibWrites(u, planLibWrites(lib, next))
-  check('pre-write drop reads back as provable miss -> bounded retried miss', outcome === 'partial')
-  check('retries re-read the token, never resend frozen', puts === 4)
+  // Prior-value readback does NOT prove the request missed - it may still
+  // commit late - so one unproven attempt is all that runs.
+  check('pre-write drop reports honest partial', outcome === 'partial')
+  check('no resend on unproven readback', puts === 1)
   check('prior value untouched', tripName(data, ta.id) === 'A')
 }
 
@@ -1014,11 +1034,12 @@ const tripName = (data: Map<string, string>, id: string) => JSON.parse(data.get(
   }
   const next = updateTrip(updateTrip(lib, 'ta', { name: 'A2' }), 'tb', { name: 'B2' })
   const outcome = await commitLibWrites(u, planLibWrites(lib, next))
-  // The lost write is proven missed by readback, so ONE fresh-token retry
-  // runs and lands - the commit completes honestly.
-  check('verified-miss retry completes the commit', outcome === 'applied' && n === 3)
+  // The readback sees the prior value but that does NOT prove the lost
+  // write missed (it may commit late) -> honest 'partial', zero resends,
+  // the landed prefix preserved and the rest unwritten.
+  check('mid-plan unknown reports partial, no resend', outcome === 'partial' && n === 2)
   check('landed prefix durable', tripName(data, ta.id) === 'A2')
-  check('retried step durable', tripName(data, tb.id) === 'B2')
+  check('unwritten step untouched', tripName(data, tb.id) === 'B')
 }
 
 // --- cycle-13 CAS regressions ---------------------------------------------
@@ -1132,6 +1153,290 @@ check(
   'merge is a no-op when fresh already equals intent',
   mergeIndexOrder(['a', 'b'], ['a', 'b'], new Set()).join(',') === 'a,b'
 )
+
+// --- cycle-14: unproven unknown never re-executes intent -----------------
+
+// The parent's exact interleaving through the REAL replan loop: A's toggle
+// resolves 'unknown', B's confirmed notes edit lands before A's readback.
+// The readback sees a non-matching value (peer's) -> commit is 'partial',
+// and commitWithReplan does NOT re-run the intent: a re-executed toggle
+// would reverse it (false instead of true). mutate runs exactly once.
+{
+  const { lib } = mk()
+  const lib2 = addPack(lib, 'ta', 'Passport', 'p1')!.lib
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib2.order)],
+    ...lib2.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let mutateCalls = 0
+  let dropSet = true
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      if (dropSet && k === 'trip.ta') {
+        dropSet = false
+        // Our request lands, then a peer's notes edit ACK lands over it,
+        // then our ACK is lost - the readback can only see the peer value.
+        data.set(k, v)
+        space.rev++
+        data.set(k, serializeTrip({ ...lib2.trips.find((t) => t.id === 'ta')!, notes: 'peer notes' }))
+        space.rev++
+        return Promise.resolve('unknown')
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  }
+  const commit = (cur: typeof lib2, next: typeof lib2) => commitLibWrites(io, planLibWrites(cur, next))
+  const mutate = (l: typeof lib2) => {
+    mutateCalls++
+    return togglePack(l, 'ta', 'p1')
+  }
+  const libNow = () => assembleLibrary(data.get('index') ?? null, recordsOf(data))
+  const outcome = await commitWithReplan(() => Promise.resolve(), libNow, mutate, commit)
+  check('unknown+peer -> honest partial', outcome === 'partial')
+  check('intent executed exactly once', mutateCalls === 1)
+  check('peer notes durable', JSON.parse(data.get('trip.ta')!).notes === 'peer notes')
+}
+
+// Same interleaving on addPack: re-executing would duplicate the item - a
+// single packing add stays single (or honestly unapplied), never two.
+{
+  const { lib } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let mutateCalls = 0
+  let dropped = true
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      if (dropped && k === 'trip.ta') {
+        dropped = false
+        // Our request lands, a peer edit ACKs over it, our ACK is lost -
+        // the readback can only observe the peer value.
+        data.set(k, v)
+        space.rev++
+        data.set(k, serializeTrip({ ...lib.trips.find((t) => t.id === 'ta')!, notes: 'peer' }))
+        space.rev++
+        return Promise.resolve('unknown')
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  }
+  const libNow = () => assembleLibrary(data.get('index') ?? null, recordsOf(data))
+  const outcome = await commitWithReplan(
+    () => Promise.resolve(),
+    libNow,
+    (l) => {
+      mutateCalls++
+      return addPack(l, 'ta', 'Charger', 'p9')?.lib
+    },
+    (cur, next) => commitLibWrites(io, planLibWrites(cur, next))
+  )
+  const stored = JSON.parse(data.get('trip.ta')!)
+  check('add unknown+peer -> partial', outcome === 'partial')
+  check('add intent never re-executed', mutateCalls === 1)
+  check('stored packing never duplicated', (stored.packing ?? []).length <= 1)
+}
+
+// Record+index prefix: record put lands, the index step loses its ACK,
+// a peer write lands before the index readback -> 'partial', the landed
+// record is durable, the index untouched, and nothing resends.
+{
+  const { lib } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let dropped = true
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      if (dropped && k === 'index') {
+        dropped = false
+        // The index write lands, then a peer add ACKs over it (its own
+        // record + a merged index that keeps our new id), then our ACK is
+        // lost - the index readback can only see the peer's index value.
+        data.set(k, v)
+        space.rev++
+        const peerOrder = [...readIndexList(v), 'pd']
+        data.set(
+          'trip.pd',
+          serializeTrip(addTrip(lib, { name: 'P', start: '2026-06-01', end: '2026-06-02' }, 4, 'pd')!.trip)
+        )
+        space.rev++
+        data.set('index', serializeIndex(peerOrder))
+        space.rev++
+        return Promise.resolve('unknown')
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  }
+  const created = addTrip(lib, { name: 'C', start: '2026-05-01', end: '2026-05-02' }, 3, 'tc')!
+  const libNow = () => assembleLibrary(data.get('index') ?? null, recordsOf(data))
+  const outcome = await commitWithReplan(
+    () => Promise.resolve(),
+    libNow,
+    () => created.lib,
+    (cur, next) => commitLibWrites(io, planLibWrites(cur, next))
+  )
+  const storedOrder = readIndexList(data.get('index')!)
+  check('index-prefix unknown -> partial', outcome === 'partial')
+  check('landed record durable', JSON.parse(data.get('trip.tc')!).name === 'C')
+  check('peer index preserved - no clobber', storedOrder.includes('pd') && storedOrder.includes('tc'))
+}
+
+// Control 1: unknown whose readback sees the DESIRED value proves the
+// write landed -> 'applied', mutate once.
+{
+  const { lib, ta } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let mutateCalls = 0
+  let dropped = true
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      if (dropped && k === 'trip.ta') {
+        dropped = false
+        data.set(k, v) // landed, ACK lost
+        space.rev++
+        return Promise.resolve('unknown')
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  }
+  const libNow = () => assembleLibrary(data.get('index') ?? null, recordsOf(data))
+  const outcome = await commitWithReplan(
+    () => Promise.resolve(),
+    libNow,
+    (l) => {
+      mutateCalls++
+      return updateTrip(l, 'ta', { name: 'A2' })
+    },
+    (cur, next) => commitLibWrites(io, planLibWrites(cur, next))
+  )
+  check('control: desired readback -> applied', outcome === 'applied')
+  check('control: mutate once', mutateCalls === 1)
+  check('control: edit durable', tripName(data, ta.id) === 'A2')
+}
+
+// Control 2: a provable E_CONFLICT (peer edit between entry read and set)
+// DOES replan - the re-derived toggle lands merged onto the peer state.
+{
+  const { lib } = mk()
+  const lib2 = addPack(lib, 'ta', 'Passport', 'p1')!.lib
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib2.order)],
+    ...lib2.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let mutateCalls = 0
+  let bounced = false
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      if (!bounced && k === 'trip.ta') {
+        bounced = true
+        // Peer edit lands first, so OUR token is now stale - but simulate
+        // the peer having already landed before our read: write peer value
+        // and bump rev, then report conflict on our attempt.
+        data.set(k, serializeTrip({ ...lib2.trips.find((t) => t.id === 'ta')!, notes: 'peer notes' }))
+        space.rev++
+        return Promise.resolve('conflict')
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  }
+  const libNow = () => assembleLibrary(data.get('index') ?? null, recordsOf(data))
+  const outcome = await commitWithReplan(
+    () => Promise.resolve(),
+    libNow,
+    (l) => {
+      mutateCalls++
+      return togglePack(l, 'ta', 'p1')
+    },
+    (cur, next) => commitLibWrites(io, planLibWrites(cur, next))
+  )
+  const stored = JSON.parse(data.get('trip.ta')!)
+  check('control: real conflict replans -> applied', outcome === 'applied')
+  check('control: mutate re-derived once', mutateCalls === 2)
+  check('control: both intents merged', stored.notes === 'peer notes' && stored.packing[0].done === true)
+}
+
+// Single-key conditionalSet: unknown then a non-matching readback throws
+// honestly with exactly ONE issued write - peer's value never overwritten
+// by a fresh-token resend.
+{
+  const data = new Map<string, string>([['prefs', '{"v":1,"muted":false}']])
+  const space = { rev: 0, gen: 1 }
+  let sets = 0
+  const fake = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<{ rev: number }> => {
+      void v
+      sets++
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        throw Object.assign(new Error('stale'), { code: 'E_CONFLICT' })
+      // Unknown outcome: never stored - and a peer write lands before the
+      // readback, so no read shows our value.
+      data.set(k, '{"v":1,"muted":"peer"}' as unknown as string)
+      space.rev++
+      throw Object.assign(new Error('timeout'), { code: 'E_TIMEOUT' })
+    },
+    del: () => Promise.reject(new Error('unused'))
+  }
+  let threw = false
+  await conditionalSet(fake, 'prefs', '{"v":1,"muted":true}').catch(() => {
+    threw = true
+  })
+  check('single-key unknown non-match -> honest throw', threw)
+  check('single-key issued exactly one write', sets === 1)
+  check('single-key peer value preserved', data.get('prefs') === '{"v":1,"muted":"peer"}')
+}
+
+// Single-key control: unknown whose readback sees our value resolves.
+{
+  const data = new Map<string, string>([['prefs', 'old']])
+  const space = { rev: 0, gen: 1 }
+  let sets = 0
+  const fake = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<{ rev: number }> => {
+      sets++
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        throw Object.assign(new Error('stale'), { code: 'E_CONFLICT' })
+      data.set(k, v)
+      space.rev++
+      throw Object.assign(new Error('timeout'), { code: 'E_TIMEOUT' })
+    },
+    del: () => Promise.reject(new Error('unused'))
+  }
+  await conditionalSet(fake, 'prefs', 'new')
+  check('single-key control: landed-through-unknown', data.get('prefs') === 'new' && sets === 1)
+}
 
 console.log(`\nsync: ${passed} passed, ${failed} failed`)
 if (failed) throw new Error(`${failed} checks failed`)
