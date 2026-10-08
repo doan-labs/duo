@@ -55,7 +55,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Full history: republication provenance diffs recorded build commits.
       - uses: useblacksmith/checkout@v1
+        with:
+          fetch-depth: 0
       - uses: useblacksmith/checkout@v1
         with:
           ref: catalog
