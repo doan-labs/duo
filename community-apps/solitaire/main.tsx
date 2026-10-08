@@ -22,6 +22,7 @@ import {
   type Move,
   mergeStats,
   newGame,
+  newWriter,
   nextWriteN,
   normalizeStats,
   recordId,
@@ -36,7 +37,10 @@ import { styles } from './styles.ts'
 // Why a writer id: both displays share one storage key whose store is
 // last-writer-wins, so a value not written by this copy is always the newer
 // settled game - adopting it unconditionally is what converges the two
-// displays, including the race where both seed a fresh deal at once.
+// displays, including the race where both seed a fresh deal at once. The id
+// rotates at the write-ordinal ceiling (see nextWriteN): records stamped by
+// an earlier epoch are still this copy's own writes, so own-versus-foreign
+// checks go through the writer's id set, never a bare `by === ME`.
 const ME = crypto.randomUUID()
 
 /** The running match: the deal's seed plus every legal move, and its replay. */
@@ -265,7 +269,7 @@ function Solitaire() {
   // keys on write identity, never record content: a new acknowledged record
   // that happens to equal an older one still adopts, and only a byte-echo of
   // a consumed write is skipped.
-  const writeSeq = useRef(0)
+  const writer = useRef(newWriter(ME))
   // Every game record this copy has issued, adopted or been delivered, keyed
   // by write identity (`by:n`; legacy records without n fall back to their
   // raw bytes, which keeps the same echo protection for them). The mirror
@@ -372,12 +376,12 @@ function Solitaire() {
         foreign: (cur) => {
           if (cur === lastSeen.current || seenIds.current.has(recordId(cur))) return false
           const next = adoptGame(cur)
-          if (!next || next.by === ME) return false
+          if (!next || writer.current.ids.has(next.by)) return false
           pendingGame.current = null
           mirrorBehind.current = true
           lastSeen.current = cur
           seenIds.current.add(recordId(cur))
-          writeSeq.current = Math.max(writeSeq.current, next.n)
+          writer.current.seq = Math.max(writer.current.seq, next.n)
           const t = { ...next.deal, game: next.game }
           setTable(t)
           tableRef.current = t
@@ -440,8 +444,8 @@ function Solitaire() {
       tableRef.current = next
       // auto:true tells the other display a sweep is in flight here, so a fold
       // mid-Auto hands it off instead of silently dropping the timer.
-      writeSeq.current = nextWriteN(writeSeq.current)
-      const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null, writeSeq.current))
+      const wr = nextWriteN(writer.current, () => crypto.randomUUID())
+      const raw = JSON.stringify(serializeGame(wr.by, next, autoTimer.current !== null, wr.n))
       // The store, not the mirror, is the authority: a foreign write this copy
       // has not been notified of yet still wins. The intent parks until a read
       // confirms the record - a rejected read is unknown peer state, never a
@@ -461,10 +465,10 @@ function Solitaire() {
     if (raw === lastSeen.current) mirrorBehind.current = false
     if (!mirrorBehind.current && raw && raw !== lastSeen.current && !seenIds.current.has(recordId(raw))) {
       const next = adoptGame(raw)
-      if (next && next.by !== ME) {
+      if (next && !writer.current.ids.has(next.by)) {
         lastSeen.current = raw
         seenIds.current.add(recordId(raw))
-        writeSeq.current = Math.max(writeSeq.current, next.n)
+        writer.current.seq = Math.max(writer.current.seq, next.n)
         const t = { ...next.deal, game: next.game }
         setTable(t)
         tableRef.current = t
@@ -520,7 +524,7 @@ function Solitaire() {
     // different foreign record is a live delivery worth adopting.
     if (mirrorBehind.current) {
       const maybe = raw ? adoptGame(raw) : null
-      if (!maybe || maybe.by === ME) return
+      if (!maybe || writer.current.ids.has(maybe.by)) return
     }
     mirrorBehind.current = false
     lastSeen.current = raw
@@ -536,8 +540,8 @@ function Solitaire() {
       return
     }
     const next = adoptGame(raw)
-    if (!next || next.by === ME) return
-    writeSeq.current = Math.max(writeSeq.current, next.n)
+    if (!next || writer.current.ids.has(next.by)) return
+    writer.current.seq = Math.max(writer.current.seq, next.n)
     const t = { ...next.deal, game: next.game }
     setTable(t)
     tableRef.current = t

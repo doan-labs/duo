@@ -545,14 +545,30 @@ export function recordId(raw: string): string {
 export const validWriteN = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 1
 
 /**
- * The next write ordinal for this writer. Ordinals are bounded: past the
- * safe-integer ceiling `+1` cannot advance and consecutive writes would share
- * one record id, so the sequence emits one unsafe sentinel instead. Records
- * stamped with it dedupe by content - distinct by construction - rather than
- * colliding on a frozen `by:n` pair.
+ * This copy's write identity: the id stamped on new records, every id it has
+ * ever used (a previous epoch's records are still own writes for echo and
+ * own-versus-foreign purposes), and its ordinal.
  */
-export const nextWriteN = (seq: number): number =>
-  seq >= 0 && seq < Number.MAX_SAFE_INTEGER ? seq + 1 : Number.MAX_SAFE_INTEGER + 1
+export type Writer = { me: string; ids: Set<string>; seq: number }
+export const newWriter = (me: string): Writer => ({ me, ids: new Set([me]), seq: 0 })
+
+/**
+ * The next (by, n) for a new write. Ordinals run 1..MAX_SAFE_INTEGER; at the
+ * ceiling `+1` cannot produce a new number, so the writer rotates to a fresh
+ * id and restarts - an epoch. `by:n` then stays unique for every new write,
+ * including a byte-identical Undo, and n always remains a valid ordinal:
+ * generated records never fall back to content identity.
+ */
+export const nextWriteN = (w: Writer, freshId: () => string): { by: string; n: number } => {
+  if (w.seq >= 0 && w.seq < Number.MAX_SAFE_INTEGER) {
+    w.seq += 1
+  } else {
+    w.me = freshId()
+    w.ids.add(w.me)
+    w.seq = 1
+  }
+  return { by: w.me, n: w.seq }
+}
 
 // --- Match statistics -------------------------------------------------------
 

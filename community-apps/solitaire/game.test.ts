@@ -21,6 +21,7 @@ import {
   type Mode,
   type Move,
   newGame,
+  newWriter,
   nextWriteN,
   normalizeStats,
   parseLog,
@@ -270,46 +271,162 @@ check('write ordinal makes identical-content writes distinct, echoes identical',
   eq(recordId(negRaw), `raw:${negRaw}`)
 })
 
-check('unsafe ordinals cannot pin writeSeq or freeze record ids', () => {
+check('malformed or unsafe ordinals never become record identity', () => {
   const dealA = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move] }
-  const dealB = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move, { t: 'draw' } as Move] }
   const MAX = Number.MAX_SAFE_INTEGER
   // The boundary is still a real ordinal; one past it is not - `+1` cannot
   // advance beyond MAX_SAFE_INTEGER, so accepting it as identity would freeze
   // every later write of this writer onto the same record id.
   eq(recordId(JSON.stringify(serializeGame('peer', dealA, false, MAX))), `peer:${MAX}`)
-  const unsafeA = JSON.stringify(serializeGame('peer', dealA, false, MAX + 1))
-  const unsafeB = JSON.stringify(serializeGame('peer', dealB, false, MAX + 1))
-  eq(recordId(unsafeA), `raw:${unsafeA}`)
-  // Two distinct writes stamped at the frozen ordinal must still be distinct:
-  // content dedup keeps them apart where the pair id could not.
-  eq(recordId(unsafeA) === recordId(unsafeB), false)
-  // Fractional, nonpositive, non-finite and non-number n read as no ordinal.
-  for (const n of [0, -1, 1.5, NaN, Infinity, -Infinity, '3', true, null]) {
+  // Fractional, nonpositive, non-finite, non-number and unsafe n all read as
+  // no ordinal: content dedup for identity, n=0 for counter continuation.
+  for (const n of [0, -1, 1.5, NaN, Infinity, -Infinity, '3', true, null, MAX + 1, MAX + 2]) {
     const raw = JSON.stringify({ v: 1, by: 'peer', mode: 'draw1', seed: 9, moves: 'd', n })
     eq(recordId(raw), `raw:${raw}`)
     eq(adoptGame(raw)!.n, 0)
   }
-  // An imported record at or past the ceiling adopts n=0: it cannot pin
-  // writeSeq where `+1` stalls, while a safe max still bumps the counter.
+  // A safe max still adopts and bumps the counter.
   eq(adoptGame(JSON.stringify(serializeGame('peer', dealA, false, MAX)))!.n, MAX)
-  eq(adoptGame(unsafeA)!.n, 0)
-  // The write counter is bounded: it advances to the ceiling, then emits one
-  // unsafe sentinel whose records dedupe by content rather than colliding.
-  eq(nextWriteN(0), 1)
-  eq(nextWriteN(5), 6)
-  eq(nextWriteN(MAX - 1), MAX)
-  eq(nextWriteN(MAX), MAX + 1)
-  eq(nextWriteN(MAX + 1), MAX + 1)
-  // Same writer at the cap: a draw then a move carry distinct identities.
-  const capped = nextWriteN(MAX)
-  const seqA = JSON.stringify(serializeGame('peer', dealA, false, capped))
-  const seqB = JSON.stringify(serializeGame('peer', dealB, false, capped))
-  eq(recordId(seqA) === recordId(seqB), false)
-  // And an Undo back to dealA's exact bytes is the one bounded case where
-  // content dedup treats a new write as an echo - honest at the cap.
-  const undone = JSON.stringify(serializeGame('peer', dealA, false, nextWriteN(capped)))
-  eq(recordId(undone), recordId(seqA))
+})
+
+check('capped writes roll a fresh epoch, never a frozen id', () => {
+  const MAX = Number.MAX_SAFE_INTEGER
+  const w = newWriter('A')
+  const mint = () => 'A2'
+  // Ordinals run 1..MAX_SAFE_INTEGER while +1 can still advance.
+  eq(nextWriteN(w, mint), { by: 'A', n: 1 })
+  eq(nextWriteN(w, mint), { by: 'A', n: 2 })
+  w.seq = MAX - 1
+  eq(nextWriteN(w, mint), { by: 'A', n: MAX })
+  // At the ceiling the writer rotates to a fresh id and restarts: n stays a
+  // valid ordinal, the pair stays unique, and the old id remains own.
+  eq(nextWriteN(w, mint), { by: 'A2', n: 1 })
+  eq(w.me, 'A2')
+  eq(w.ids.has('A') && w.ids.has('A2'), true)
+  eq(nextWriteN(w, mint), { by: 'A2', n: 2 })
+  // A corrupt counter (negative, NaN, past the ceiling) also rolls the epoch.
+  for (const bad of [-1, NaN, MAX + 5]) {
+    const c = newWriter('B')
+    c.seq = bad
+    eq(
+      nextWriteN(c, () => 'B2'),
+      { by: 'B2', n: 1 }
+    )
+  }
+})
+
+check('imported max ordinal cannot suppress a peer Undo', () => {
+  const MAX = Number.MAX_SAFE_INTEGER
+  const dealA = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move] }
+  const dealB = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move, { t: 'draw' } as Move] }
+  const store = { v: null as string | null }
+  // Faithful port of publish/flush/onWatch semantics: the store is authority,
+  // echoes dedupe on recordId, a record counts as own when its by is any id
+  // this copy has stamped (current or rolled epoch).
+  class Copy {
+    w: ReturnType<typeof newWriter>
+    seen = new Set<string>()
+    lastSeen: string | null = null
+    deal: { mode: Mode; seed: number; log: Move[] } | null = null
+    epoch = 0
+    constructor(me: string) {
+      this.w = newWriter(me)
+    }
+    publish(next: typeof dealA) {
+      const wr = nextWriteN(this.w, () => `${this.w.me}.e${++this.epoch}`)
+      const raw = JSON.stringify(serializeGame(wr.by, next, false, wr.n))
+      const cur = store.v
+      if (cur !== this.lastSeen && cur !== null && !this.seen.has(recordId(cur))) {
+        const foreign = adoptGame(cur)
+        if (foreign && !this.w.ids.has(foreign.by)) {
+          this.lastSeen = cur
+          this.seen.add(recordId(cur))
+          this.w.seq = Math.max(this.w.seq, foreign.n)
+          this.deal = foreign.deal
+          return
+        }
+      }
+      store.v = raw
+      this.seen.add(recordId(raw))
+      this.lastSeen = raw
+      this.deal = next
+    }
+    onWatch(raw: string | null): string {
+      if (raw === this.lastSeen) return 'resync'
+      if (raw !== null && this.seen.has(recordId(raw))) return 'echo'
+      this.lastSeen = raw
+      if (raw !== null) this.seen.add(recordId(raw))
+      const next = raw ? adoptGame(raw) : null
+      if (!next || this.w.ids.has(next.by)) return 'self'
+      this.w.seq = Math.max(this.w.seq, next.n)
+      this.deal = next.deal
+      return 'adopted'
+    }
+  }
+  const sameDeal = (d: { log: Move[] } | null, want: typeof dealA) =>
+    JSON.stringify(d?.log) === JSON.stringify(want.log)
+
+  // Control: the same-writer drawA -> drawB -> UndoA cycle converges at
+  // ordinary ordinals.
+  {
+    const A = new Copy('A')
+    const B = new Copy('B')
+    A.publish(dealA)
+    eq(B.onWatch(store.v), 'adopted')
+    A.publish(dealB)
+    eq(B.onWatch(store.v), 'adopted')
+    A.publish(dealA) // Undo back to dealA's bytes
+    eq(B.onWatch(store.v), 'adopted')
+    eq(sameDeal(B.deal, dealA), true)
+  }
+
+  // The flagged path: a peer legally stamps n=MAX; adopting it pins the
+  // counter where +1 cannot advance. Every new write must still mint a
+  // unique by:n - the writer rolls a fresh epoch.
+  {
+    const A = new Copy('A')
+    const B = new Copy('B')
+    const poison = JSON.stringify(serializeGame('P', dealA, false, MAX))
+    eq(A.onWatch(poison), 'adopted')
+    eq(A.w.seq, MAX)
+    A.publish(dealA)
+    const rawA = store.v!
+    eq(recordId(rawA), `A.e1:1`) // epoch rollover: new id, ordinal restarts
+    eq(B.onWatch(rawA), 'adopted')
+    A.publish(dealB)
+    eq(B.onWatch(store.v!), 'adopted')
+    eq(sameDeal(B.deal, dealB), true)
+    // Undo writes dealA's bytes again: same content as the first capped-era
+    // record but a different by:n, so the peer must adopt it - not skip it.
+    A.publish(dealA)
+    const undoRaw = store.v!
+    eq(recordId(undoRaw) === recordId(rawA), false)
+    eq(B.onWatch(undoRaw), 'adopted')
+    eq(sameDeal(B.deal, dealA), true)
+    // The peer's next write then lands on the adopted base and is adopted
+    // back - no stale-base bounce of the Undo.
+    B.publish(dealB)
+    eq(A.onWatch(store.v!), 'adopted')
+    eq(sameDeal(A.deal, dealB), true)
+    // Echo dedup still holds across the rollover: verbatim re-deliveries of
+    // both epochs' records are skipped.
+    eq(B.onWatch(rawA), 'echo')
+    eq(B.onWatch(undoRaw), 'echo')
+    // Same behaviour in the other direction: B capped, A receives.
+    const B2 = new Copy('B')
+    const A2 = new Copy('A')
+    eq(B2.onWatch(poison), 'adopted')
+    B2.publish(dealA)
+    eq(A2.onWatch(store.v!), 'adopted')
+    B2.publish(dealB)
+    eq(A2.onWatch(store.v!), 'adopted')
+    B2.publish(dealA)
+    eq(A2.onWatch(store.v!), 'adopted')
+    eq(sameDeal(A2.deal, dealA), true)
+    // A record stamped by the rolled-away epoch still reads as own on the
+    // writer side after a re-delivery.
+    eq(B2.w.ids.has(`B.e1`), true)
+  }
 })
 
 check('isRun only accepts descending alternating face-up runs', () => {
