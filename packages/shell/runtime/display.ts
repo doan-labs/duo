@@ -1,10 +1,18 @@
 import type { ViewInfo } from '../../sdk/protocol.ts'
 
 type Glass = { visible: boolean; active: boolean; angle: number; clip: number }
+// The loop reports what the glass would show; `sleeping` masks it so a parked
+// display reads hidden the moment the device sleeps, not a frame later.
+const physical: Record<ViewInfo['display'], Glass> = {
+  inner: { visible: false, active: true, angle: 180, clip: 0 },
+  cover: { visible: false, active: false, angle: 180, clip: 0 }
+}
 const displays: Record<ViewInfo['display'], Glass> = {
   inner: { visible: false, active: true, angle: 180, clip: 0 },
   cover: { visible: false, active: false, angle: 180, clip: 0 }
 }
+let sleeping = false
+const masked = (glass: Glass): Glass => ({ ...glass, visible: glass.visible && !sleeping })
 const listeners = new Set<() => void>()
 export const observeDisplay = (fn: () => void) => {
   listeners.add(fn)
@@ -12,11 +20,38 @@ export const observeDisplay = (fn: () => void) => {
     listeners.delete(fn)
   }
 }
-export function updateDisplays(inner: Glass, cover: Glass) {
-  displays.inner = inner
-  displays.cover = cover
+const emit = () => {
   for (const fn of listeners) fn()
 }
+export function updateDisplays(inner: Glass, cover: Glass) {
+  physical.inner = inner
+  physical.cover = cover
+  displays.inner = masked(inner)
+  displays.cover = masked(cover)
+  emit()
+}
+/** Applies or lifts the sleep mask and pushes the truth at once: a display-state flip cannot wait for the next rendered frame. */
+export function maskDisplays(asleep: boolean) {
+  if (sleeping === asleep) return
+  sleeping = asleep
+  displays.inner = masked(physical.inner)
+  displays.cover = masked(physical.cover)
+  emit()
+}
+/**
+ * Drops DOM focus out of a view no person can see - the same truth `viewInfo`
+ * reports to the frame, so hidden covers DOM-hidden, sleep-masked,
+ * away-facing and fully clipped states alike. A hidden copy that keeps focus
+ * still receives real key events; hiding the view must move focus.
+ * Returns true when it blurred, so the caller can refresh `focused`.
+ */
+export function releaseHiddenFocus(element: HTMLElement, info: ViewInfo) {
+  const active = document.activeElement
+  if (!active || !element.contains(active) || info.visible) return false
+  ;(active as HTMLElement).blur()
+  return true
+}
+
 export function viewInfo(
   element: HTMLElement,
   display: ViewInfo['display'],
@@ -30,7 +65,7 @@ export function viewInfo(
     height: element.clientHeight,
     angle: glass.angle,
     active: glass.active,
-    visible: glass.visible && glass.clip < (placement === 'left' ? 0.5 : 1),
+    visible: glass.visible && glass.clip < (placement === 'left' ? 0.5 : 1) && element.checkVisibility(),
     focused: element.contains(document.activeElement)
   }
 }
