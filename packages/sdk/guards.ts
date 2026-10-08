@@ -61,7 +61,7 @@ export function requestValid(value: unknown): value is Req {
     Number.isSafeInteger(value.id) &&
     Number(value.id) > 0 &&
     typeof value.m === 'string' &&
-    (/^(storage|session)\.(get|set|del|keys|snapshot|watch|unwatch)$/.test(value.m) ||
+    (/^(storage|session)\.(get|set|del|entry|keys|snapshot|watch|unwatch)$/.test(value.m) ||
       [
         'cmd.send',
         'cmd.ack',
@@ -152,6 +152,11 @@ export function noticeValid(v: unknown): v is Notice {
     (v.arg === undefined || (typeof v.arg === 'string' && v.arg.length <= LIMITS.noticeArg))
   )
 }
+/** Two requests share an outcome only when everything the host saw matches. */
+export const requestSame = (
+  a: { m: unknown; p?: unknown; epoch?: unknown },
+  b: { m: unknown; p?: unknown; epoch?: unknown }
+) => a.m === b.m && a.epoch === b.epoch && JSON.stringify(a.p) === JSON.stringify(b.p)
 export const mutating = (method: string) =>
   /\.(set|del)$/.test(method) ||
   method === 'cmd.send' ||

@@ -127,8 +127,9 @@ export type ErrCode =
   | 'E_GONE'
   | 'E_STORAGE'
   | 'E_UNSUPPORTED'
+  | 'E_CONFLICT'
 export type Method =
-  | `${'storage' | 'session'}.${'get' | 'set' | 'del' | 'keys' | 'snapshot' | 'watch' | 'unwatch'}`
+  | `${'storage' | 'session'}.${'get' | 'set' | 'del' | 'entry' | 'keys' | 'snapshot' | 'watch' | 'unwatch'}`
   | 'cmd.send'
   | 'cmd.ack'
   | 'widget.set'
@@ -170,10 +171,30 @@ export type AppEvt =
   | { ev: 'error'; p: { message: string; stack?: string } }
   | { ev: 'key'; p: { key: 'Escape' } }
 export type Snapshot = { rev: number; entries: [string, string][]; cursor?: string }
+/**
+ * One key plus the space's global revision and generation read in the same
+ * atomic transaction: `v`, `rev` and `gen` always describe the same
+ * authoritative moment. `rev` counts every write in the space, not just this
+ * key's, so `expect` is conservative: any sibling write since the read
+ * conflicts, even on unrelated keys. `gen` binds the token to the app
+ * generation it came from, so a restore that regresses `rev` cannot make a
+ * pre-restore precondition match again.
+ */
+export type Entry = { k: string; v: string | null; rev: number; gen: number }
+/** The `{ rev, gen }` of the entry a new value was computed from. */
+export type Expect = Pick<Entry, 'rev' | 'gen'>
 export type KV = {
   get(k: string): Promise<string | null>
-  set(k: string, v: string): Promise<{ rev: number }>
-  del(k: string): Promise<{ rev: number }>
+  /** The value and precondition token to `set`/`del` with `expect`. */
+  entry(k: string): Promise<Entry>
+  /**
+   * `expect` is the `{ rev, gen }` token the new value was computed from
+   * (from `entry`). The host checks it inside the write's own transaction:
+   * a moved space rejects `E_CONFLICT`, a dead generation rejects `E_GONE`,
+   * and either way nothing mutates. Omit it for an unconditional write.
+   */
+  set(k: string, v: string, expect?: Expect): Promise<{ rev: number }>
+  del(k: string, expect?: Expect): Promise<{ rev: number }>
   keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>
   snapshot(cursor?: string): Promise<Snapshot>
   watch(since: number, cb: (e: Change) => void): () => void
