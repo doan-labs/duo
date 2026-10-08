@@ -31,7 +31,7 @@ import {
   type Stats,
   serializeGame
 } from './game.ts'
-import { ackWrite, faultDelay, flushWrite, viewLive } from './io.ts'
+import { casSet, faultDelay, flushCas, viewLive } from './io.ts'
 import { styles } from './styles.ts'
 
 // Why a writer id: both displays share one storage key whose store is
@@ -366,13 +366,14 @@ function Solitaire() {
   }, [])
 
   // Runs the parked game/stats intents through one read-confirmed attempt
-  // each. Safe to fire any time: intents already issued wait on the mirror's
-  // acknowledgement, and a newer publish replaces a parked one wholesale.
+  // each. Safe to fire any time: an in-flight request keeps its intent marked,
+  // and a newer publish replaces a parked one wholesale.
   const flushIO = useCallback(() => {
     const game = pendingGame.current
     if (game && game.issued === undefined) {
-      void flushWrite(game, {
-        get: () => os.storage.get('game'),
+      void flushCas(game, {
+        entry: () => os.storage.entry('game'),
+        set: (v, expect) => os.storage.set('game', v, expect),
         foreign: (cur) => {
           if (cur === lastSeen.current || seenIds.current.has(recordId(cur))) return false
           const next = adoptGame(cur)
@@ -390,52 +391,60 @@ function Solitaire() {
           stopAuto()
           resumeAuto.current = next.auto === true
           tryResume()
+          ioFails.current = 0
           // The mirror still serves the superseded record and will re-deliver
           // it as a fresh foreign write - after a relaunch it even parses
           // foreign (a new ME) - which would bounce the table straight back.
-          // Settle the adopted record so it converges - but only while the
-          // store still holds it: a repair write landing after a newer record
-          // would revert that newer deal, so the store gets re-read first.
+          // Settle the adopted record so it converges, conditional on the
+          // store still holding it: the {rev, gen} token is the atomic guard,
+          // so a newer record admitted in between makes this write conflict
+          // and quietly die instead of reverting that deal.
           void os.storage
-            .get('game')
-            .then((now) => {
-              if (now === cur) void saved.set(cur)
+            .entry('game')
+            .then((e) => {
+              if (e.v === cur) return os.storage.set('game', cur, { rev: e.rev, gen: e.gen })
             })
             .catch(() => {})
           setStatus('Game restored - the other screen moved first.')
           return true
         },
         stale: () => tableRef.current !== game.next,
-        issue: (raw) => {
+        landed: (raw) => {
           lastSeen.current = raw
           seenIds.current.add(recordId(raw))
-          void saved.set(raw)
+          ioFails.current = 0
         },
         fault: () => {
           if (pendingGame.current === game) noteWriteFault()
         }
       }).then((result) => {
-        // Stale intent never writes and never retries; adoption already
-        // consumed it inside `foreign`.
-        if (result === 'stale' && pendingGame.current === game) pendingGame.current = null
+        // 'issued'/'adopted' resolve the intent; 'stale' drops it; 'fault'
+        // keeps it parked for the paced retry.
+        if (result !== 'fault' && pendingGame.current === game) pendingGame.current = null
       })
     }
     const stats = pendingStats.current
     if (stats && stats.issued === undefined) {
-      // Stats merge instead of adopting: readStats union keeps whichever copy
-      // wrote in between inside the committed record.
-      void os.storage
-        .get('stats')
-        .then((cur) => {
-          if (pendingStats.current !== stats) return
-          stats.issued = JSON.stringify({ v: 1, by: ME, ...mergeStats(readStats(cur), stats.next) })
-          void statsRaw.set(stats.issued)
-        })
-        .catch(() => {
+      // Stats merge instead of adopting: rebase unions whatever record the
+      // just-read entry holds with this copy's intent, so a conflicting peer
+      // write survives inside the committed record rather than being erased.
+      void flushCas(stats, {
+        entry: () => os.storage.entry('stats'),
+        set: (v, expect) => os.storage.set('stats', v, expect),
+        foreign: () => false,
+        stale: () => pendingStats.current !== stats,
+        rebase: (e) => JSON.stringify({ v: 1, by: ME, ...mergeStats(readStats(e.v), stats.next) }),
+        landed: () => {
+          ioFails.current = 0
+        },
+        fault: () => {
           if (pendingStats.current === stats) noteWriteFault()
-        })
+        }
+      }).then((result) => {
+        if (result !== 'fault' && pendingStats.current === stats) pendingStats.current = null
+      })
     }
-  }, [saved, statsRaw, stopAuto, tryResume, noteWriteFault])
+  }, [stopAuto, tryResume, noteWriteFault])
   flushIORef.current = flushIO
 
   const publish = useCallback(
@@ -491,21 +500,8 @@ function Solitaire() {
   // other display. A write this copy did not make is the newer settled deal;
   // the raw string is the guard so the effect never re-fires on its own echo.
   useEffect(() => {
-    // A parked intent resolves only through the mirror's acknowledgement:
-    // 'ready' with the issued value confirms it, 'error' requeues the intent
-    // for another read before anything else runs.
-    const io = pendingGame.current
-    if (io) {
-      const ack = ackWrite(io, saved.status, saved.value)
-      if (ack === 'confirmed') {
-        pendingGame.current = null
-        ioFails.current = 0
-      } else if (ack === 'requeue') {
-        io.issued = undefined
-        noteWriteFault()
-        return
-      }
-    }
+    // Parked intents resolve through their conditional-write promises, not
+    // this watch; here the mirror is read truth only.
     if (saved.status === 'hydrating' || saved.status === 'saving') return
     const raw = saved.value
     if (raw !== null && raw === lastSeen.current) {
@@ -558,22 +554,7 @@ function Solitaire() {
     // again; the per-tap mirror check is trustworthy once more.
     mirrorBehind.current = false
     setStatus('Game restored.')
-  }, [saved.value, saved.status, saved, publish, stopAuto, tryResume, noteWriteFault])
-
-  // Same acknowledgement watch for the stats key, kept apart so a stats
-  // store fault never blocks or fakes a deal adoption.
-  useEffect(() => {
-    const io = pendingStats.current
-    if (!io) return
-    const ack = ackWrite(io, statsRaw.status, statsRaw.value)
-    if (ack === 'confirmed') {
-      pendingStats.current = null
-      ioFails.current = 0
-    } else if (ack === 'requeue') {
-      io.issued = undefined
-      noteWriteFault()
-    }
-  }, [statsRaw.status, statsRaw.value, noteWriteFault])
+  }, [saved.value, saved.status, saved, publish, stopAuto, tryResume])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -950,9 +931,11 @@ function Solitaire() {
 
   const toggleMute = useCallback(() => {
     if (!viewLive(os.view)) return
-    void prefs.set(JSON.stringify({ v: 1, by: ME, muted: !muted }))
+    // Conditional too: a prefs write still races the other display's, so it
+    // goes through the same read-token-write dance rather than blind last-set.
+    void casSet(os.storage, 'prefs', JSON.stringify({ v: 1, by: ME, muted: !muted })).catch(() => {})
     if (muted) play('pickup')
-  }, [prefs, muted, play])
+  }, [muted, play])
 
   const closeConfirm = useCallback(() => {
     if (!viewLive(os.view)) return
