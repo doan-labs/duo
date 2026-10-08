@@ -118,6 +118,15 @@ export function cleanPrefs(raw: string | null): Prefs {
 /** The prefs wire envelope: prefs plus the revision and writer for ordering. */
 export type PrefsDoc = { rev: number; by: string; prefs: Prefs }
 
+/** Remount-safe prefs hydrate: the writer id is module-level and outlives a
+ * component remount, so a confirmed envelope this copy wrote still echoes
+ * as own. On first hydrate (current null) it must initialize state or the
+ * prefs gate never opens; later own echoes stay clock-only because the
+ * optimistic state is already at least as new. */
+export function ownPrefsAdopt(env: { by: string; prefs: Prefs }, me: string, current: Prefs | null): Prefs | null {
+  return env.by === me && current === null ? env.prefs : null
+}
+
 export function parsePrefsDoc(raw: string | null): PrefsDoc {
   const prefs = cleanPrefs(raw)
   try {
@@ -155,6 +164,20 @@ export function seedFailureKind(e: unknown): SeedFailureKind {
   if (errCode(e) === 'E_GONE') return 'terminal'
   if (seedRetryable(e)) return 'preapply'
   return 'ambiguous'
+}
+
+/** Manual-retry admission, the rule the click guard applies: nothing while
+ * a seed is inflight or backoff-queued, and a settled 'terminal'/'ambiguous'
+ * failure refuses a remount entirely - it could replay a mutating intent.
+ * A settled 'preapply' miss stays retryable (re-derivation is zero-durable-
+ * effect), and no seed failure at all (settledKind null, e.g. a bare mirror
+ * error) is exactly what the remount exists to recover. */
+export function seedManualRetryAllowed(s: {
+  busy: boolean
+  autoPending: boolean
+  settledKind: SeedFailureKind | null
+}): boolean {
+  return !s.busy && !s.autoPending && s.settledKind !== 'terminal' && s.settledKind !== 'ambiguous'
 }
 
 /** Seed admission gate: once a seed intent is running, queued for a bounded

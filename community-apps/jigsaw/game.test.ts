@@ -10,10 +10,12 @@ import {
   createPrefsPersistence,
   errCode,
   mergedSaves,
+  ownPrefsAdopt,
   PREFS0,
   parsePrefsDoc,
   seedFailureKind,
   seedGateBlocked,
+  seedManualRetryAllowed,
   seedRetryable
 } from './persist.ts'
 import {
@@ -1456,6 +1458,52 @@ await checkAsync('the seed admission gate blocks every retrigger while busy, que
   ok(seedGateBlocked({ ...idle, busy: true }), 'an inflight act must block a second intent')
   ok(seedGateBlocked({ ...idle, autoPending: true }), 'a queued backoff retry must block a second intent')
   ok(seedGateBlocked({ ...idle, settled: true }), 'a classified failure must block dependency retriggers')
+})
+
+await checkAsync('a stale queued tap cannot remount after a terminal or ambiguous settle', async () => {
+  // The Retry click guard reads refs synchronously: a tap dispatched before
+  // React commits the failure state still sees the settled kind, so only a
+  // proven preapply miss (or a bare mirror error, kind null) may remount.
+  const base = { busy: false, autoPending: false, settledKind: null as 'preapply' | 'terminal' | 'ambiguous' | null }
+  ok(seedManualRetryAllowed(base), 'a bare mirror error (no seed failure) must allow the remount retry')
+  ok(!seedManualRetryAllowed({ ...base, busy: true }), 'an inflight act must refuse the tap')
+  ok(!seedManualRetryAllowed({ ...base, autoPending: true }), 'a queued backoff retry must refuse the tap')
+  ok(
+    seedManualRetryAllowed({ ...base, settledKind: 'preapply' }),
+    'a settled preapply failure must keep the manual remount retry'
+  )
+  ok(!seedManualRetryAllowed({ ...base, settledKind: 'terminal' }), 'E_GONE must refuse the remount race or not')
+  ok(!seedManualRetryAllowed({ ...base, settledKind: 'ambiguous' }), 'an ambiguous commit must refuse the remount')
+})
+
+await checkAsync('a remount hydrates confirmed own prefs so the gate opens again', async () => {
+  // ME is module-level and survives the epoch remount: a stored prefs
+  // envelope written by this copy echoes as own, and the own-echo branch
+  // must initialize prefs state on first hydrate or the app sits behind
+  // !prefs forever - the seed can only run once prefs exist.
+  const env = parsePrefsDoc(
+    JSON.stringify({ rev: 4, by: 'me', prefs: { art: 'alpine', count: 24, muted: true, guide: false } })
+  )
+  eq(ownPrefsAdopt(env, 'me', null), env.prefs, 'a confirmed own envelope must seed prefs on first hydrate')
+  eq(ownPrefsAdopt(env, 'peer', null), null, 'a foreign envelope must not take the own-echo branch')
+  eq(ownPrefsAdopt(env, 'me', PREFS0), null, 'a later own echo stays clock-only once prefs exist')
+})
+
+await checkAsync('a mirror error at backoff expiry leaves the retry available, not stuck on Opening', async () => {
+  // The backoff callback clears autoPending AND the in-flight flag before
+  // re-arming seedAttempt: if the mirror went to 'error' during the wait,
+  // the re-armed effect returns at the status guard with no act running,
+  // and the wait card must expose the remount retry rather than loading.
+  const postExpiry = {
+    busy: false,
+    autoPending: false,
+    settledKind: null as 'preapply' | 'terminal' | 'ambiguous' | null
+  }
+  ok(seedManualRetryAllowed(postExpiry), 'post-expiry with no settled failure must admit the manual remount retry')
+  ok(
+    !seedGateBlocked({ seeded: false, busy: false, autoPending: false, settled: false }),
+    'post-expiry the effect gate must still admit the re-armed seed when the mirror is ready'
+  )
 })
 
 await checkAsync('a failed mirror hydrate recovers on a fresh subscribe', async () => {

@@ -15,6 +15,7 @@ import {
   fenceAdoptGame,
   LIVE_KEY,
   mergedSaves,
+  ownPrefsAdopt,
   PREFS_KEY,
   PREFS0,
   type Prefs,
@@ -22,7 +23,8 @@ import {
   SAVES_KEY,
   type SeedFailureKind,
   seedFailureKind,
-  seedGateBlocked
+  seedGateBlocked,
+  seedManualRetryAllowed
 } from './persist.ts'
 import {
   BOARD_H,
@@ -340,6 +342,14 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
     if (prefsKV.status !== 'ready') return
     const env = parsePrefsDoc(prefsKV.value)
     if (env.by === ME) {
+      // First hydrate after a (re)mount: the module-level writer id outlives
+      // the epoch, so a confirmed envelope this copy wrote still arrives as
+      // an own echo - adopt it once or the prefs gate never opens.
+      const first = ownPrefsAdopt(env, ME, prefsRef.current)
+      if (first) {
+        setPrefsState(first)
+        setMuted(first.muted)
+      }
       if (env.rev > prefsClock.current.rev) {
         prefsClock.current.rev = env.rev
         prefsClock.current.by = env.by
@@ -378,6 +388,10 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
   const autoSeed = useRef(0)
   const autoPending = useRef(false)
   const seedSettled = useRef(false)
+  // The settled class must be readable synchronously: a tap queued before
+  // the failure state's commit can still reach retrySeed, and state alone
+  // would answer stale.
+  const seedSettledKind = useRef<SeedFailureKind | null>(null)
   const [seedAttempt, setSeedAttempt] = useState(0)
   const [seedFailed, setSeedFailed] = useState<SeedFailureKind | null>(null)
   const [seedInFlight, setSeedInFlight] = useState(false)
@@ -435,6 +449,10 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
           autoPending.current = true
           setTimeout(() => {
             autoPending.current = false
+            // A mirror error during the backoff ends recovery at the status
+            // guard below: no act runs, so the in-flight flag must clear here
+            // or the card stays on "Opening" forever and hides the retry.
+            setSeedInFlight(false)
             setSeedAttempt((n) => n + 1)
           }, 400 * autoSeed.current)
           return
@@ -447,6 +465,7 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
         // semantic token via an epoch remount, so they offer Close/reopen
         // through the host instead of a Retry.
         seedSettled.current = true
+        seedSettledKind.current = kind
         setSeedFailed(kind)
       }
     )
@@ -799,7 +818,14 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
   // A click that races an inflight act or a queued auto-retry must not
   // remount and spawn a second intent - refs, not state, carry the answer.
   const retrySeed = useCallback(() => {
-    if (seedBusy.current || autoPending.current) return
+    if (
+      !seedManualRetryAllowed({
+        busy: seedBusy.current,
+        autoPending: autoPending.current,
+        settledKind: seedSettledKind.current
+      })
+    )
+      return
     onRetry()
   }, [onRetry])
 
