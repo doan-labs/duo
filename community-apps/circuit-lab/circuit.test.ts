@@ -913,7 +913,7 @@ checkAsync('a stale full-snapshot write cannot clobber a confirmed peer delete, 
   await libWrite(kv, LIBKEY, (l) => putDocIntent(X)(l))
   const staleEntry = await kv.entry(LIBKEY) // A's held read
   const libA = decodeLibrary(staleEntry.v!)!
-  await libWrite(kv, LIBKEY, dropDocIntent('x-doc', 20)) // B deletes
+  await libWrite(kv, LIBKEY, dropDocIntent('x-doc', 20, 10)) // B deletes the v10 it observed
   // A writes its frozen full library with the stale token: refused.
   await kv
     .set(LIBKEY, serializeLibrary(withDoc(libA, { ...newDoc('Y'), id: 'y-doc', updated: 30 })), {
@@ -940,7 +940,7 @@ checkAsync('a stale full-snapshot write cannot clobber a confirmed peer delete, 
   const kv2 = new MemKV()
   await libWrite(kv2, LIBKEY, (l) => putDocIntent(X)(l))
   const heldB = decodeLibrary((await kv2.entry(LIBKEY)).v!)! // B's held copy still has X
-  await libWrite(kv2, LIBKEY, dropDocIntent('x-doc', 50)) // A deletes X
+  await libWrite(kv2, LIBKEY, dropDocIntent('x-doc', 50, 10)) // A deletes the v10 it observed
   const r2 = await libWrite(kv2, LIBKEY, (l) => {
     let next = l
     for (const d of Object.values(heldB.circuits)) next = putDocIntent(d)(next) ?? next
@@ -1027,7 +1027,7 @@ checkAsync('delete beats older recreate, newer recreate beats delete (ABA)', asy
   const kv = new MemKV()
   const doc = { ...newDoc('ABA'), id: 'aba', updated: 10 }
   await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
-  await libWrite(kv, LIBKEY, dropDocIntent('aba', 100))
+  await libWrite(kv, LIBKEY, dropDocIntent('aba', 100, 10))
   // Stale snapshot of the deleted doc (updated 10 < tomb 100): refused.
   let r = await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
   eq(r, 'skipped')
@@ -1041,7 +1041,7 @@ checkAsync('delete beats older recreate, newer recreate beats delete (ABA)', asy
   // A second delete on top keeps the max tomb and drops the doc: the tomb
   // floors at the deleted doc's updated so a stale 200-doc cannot slip back
   // in under a smaller tomb.
-  r = await libWrite(kv, LIBKEY, dropDocIntent('aba', 150))
+  r = await libWrite(kv, LIBKEY, dropDocIntent('aba', 150, 200))
   eq(r, 'written')
   eq(Object.keys(saved(kv)!.circuits), [])
   eq(saved(kv)!.tombs.aba, 200)
@@ -1053,7 +1053,7 @@ checkAsync('peer delete plus local undo intent keeps both facts', async () => {
   const kv = new MemKV()
   const a1 = { ...newDoc('one'), id: 'a', updated: 10 }
   await libWrite(kv, LIBKEY, (l) => putDocIntent(a1)(l))
-  await libWrite(kv, LIBKEY, dropDocIntent('a', 100))
+  await libWrite(kv, LIBKEY, dropDocIntent('a', 100, 10))
   const undone = { ...a1, updated: 200 } // undo re-stamps the restored doc
   const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(undone)(l))
   eq(r, 'written')
@@ -1080,6 +1080,63 @@ checkAsync('a queued write always writes the latest pending value, not the queue
   const r2 = await writeConditional(kv, 'cam:x', () => pending)
   eq(r2, 'written')
   eq(kv.values.get('cam:x'), 'cam-v2')
+})
+
+checkAsync('lost ack then peer restore: readback mismatch is terminal unknown, never re-deletes', async () => {
+  // A's delete commits but the ack is lost; B restores the same id at a newer
+  // updated and acks. A's readback sees B's bytes, cannot prove its own
+  // request did not land - the only honest answer is 'unknown' and no resend,
+  // and the peer's confirmed restore must survive.
+  const kv = new MemKV()
+  const doc = { ...newDoc('Confirmed circuit'), id: 'doc1', updated: 1 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
+  let peerAck = false
+  const orig = kv.set.bind(kv)
+  kv.set = async (k, v, e) => {
+    // The delete itself lands; the ack is what gets lost.
+    const out = await orig(k, v, e)
+    // B's restore commits after A's lost write, using the real CAS.
+    await libWrite(kv, LIBKEY, (l) => putDocIntent({ ...doc, name: 'Peer restore', updated: 3 })(l))
+    peerAck = true
+    throw Object.assign(new Error('timeout'), { code: 'E_TIMEOUT' })
+  }
+  const r = await libWrite(kv, LIBKEY, dropDocIntent('doc1', 2, 1))
+  eq(r, 'unknown')
+  ok(peerAck, 'peer restore must have committed')
+  eq(saved(kv)!.circuits.doc1!.name, 'Peer restore') // peer's newer incarnation survives
+})
+
+checkAsync('peer newer edit conflicts before a delete: the delete refuses instead of re-deleting', async () => {
+  // B's newer edit lands between A's entry read and A's conditional set.
+  // Re-deriving the delete intent on the fresh library must refuse: the doc
+  // on the wire is a different incarnation than the one the user deleted.
+  const kv = new MemKV()
+  const doc = { ...newDoc('Confirmed circuit'), id: 'doc1', updated: 1 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
+  let injected = false
+  const orig = kv.set.bind(kv)
+  kv.set = async (k, v, e) => {
+    if (!injected) {
+      injected = true
+      await libWrite(kv, LIBKEY, (l) => putDocIntent({ ...doc, name: 'Peer edit', updated: 3 })(l))
+      throw Object.assign(new Error('conflict'), { code: 'E_CONFLICT' })
+    }
+    return orig(k, v, e)
+  }
+  const r = await libWrite(kv, LIBKEY, dropDocIntent('doc1', 2, 1))
+  eq(r, 'skipped') // refused: nothing to write for a doc that is not the one observed
+  eq(saved(kv)!.circuits.doc1!.name, 'Peer edit')
+  eq(saved(kv)!.tombs.doc1, undefined)
+})
+
+checkAsync('a delete on the observed incarnation still commits normally', async () => {
+  const kv = new MemKV()
+  const doc = { ...newDoc('Confirmed circuit'), id: 'doc1', updated: 1 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
+  const r = await libWrite(kv, LIBKEY, dropDocIntent('doc1', 2, 1))
+  eq(r, 'written')
+  eq(Object.keys(saved(kv)!.circuits), [])
+  eq(saved(kv)!.tombs.doc1, 2)
 })
 
 await Promise.all(asyncChecks)

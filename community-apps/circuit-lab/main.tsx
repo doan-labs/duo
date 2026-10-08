@@ -120,7 +120,7 @@ const enqueue = (job: () => Promise<WriteOutcome>) => {
   libQueue = libQueue
     .then(job)
     .then((outcome) => {
-      if (outcome === 'failed' || outcome === 'gone') saveFailed = true
+      if (outcome === 'failed' || outcome === 'gone' || outcome === 'unknown') saveFailed = true
       else saveFailed = false
     })
     .catch(() => {
@@ -513,7 +513,7 @@ function CircuitLab() {
             picked.doc = latestDoc(lib) ?? (lib.tombs.welcome === undefined ? welcomeDoc() : null)
             return picked.doc === null ? null : putDocIntent(picked.doc)(lib)
           })
-          if (outcome === 'failed' || outcome === 'gone' || !picked.doc) return outcome
+          if (outcome === 'failed' || outcome === 'gone' || outcome === 'unknown' || !picked.doc) return outcome
           const open = picked.doc
           seeded.current = true
           setDoc(open)
@@ -989,18 +989,28 @@ function CircuitLab() {
       // The replacement doc is minted once so a conflicted retry keeps one
       // stable identity; the open-circuit choice is recomputed per attempt on
       // the freshest library the host commits over.
-      const wantOpen = docRef.current?.id === id
+      const openDoc = docRef.current
+      const wantOpen = openDoc?.id === id
       const fallback = wantOpen ? newDoc('Circuit 1') : null
+      // The delete binds to the incarnation the user observed - the live doc
+      // for the open circuit, the listed row otherwise. Captured once here,
+      // never resampled inside the retry: a conflicted retry that found a
+      // peer's newer restore or edit must refuse, not re-delete their work.
+      const observed = openDoc?.id === id ? openDoc.updated : library.circuits[id]?.updated
+      const expected = observed ?? -1 // no observation: refuse any present doc
+      const at = Date.now()
       const picked: { doc: Doc | null } = { doc: null }
       const outcome = await libWrite(os.storage, LIB_KEY, (lib) => {
-        let next = dropDocIntent(id, Date.now())(lib) ?? lib
+        const cur = lib.circuits[id]
+        if (cur && cur.updated !== expected) return null
+        let next = dropDocIntent(id, at, expected)(lib) ?? lib
         if (fallback) {
           picked.doc = latestDoc(next) ?? fallback
           next = putDocIntent(picked.doc)(next) ?? next
         }
         return next === lib ? null : next
       })
-      if (!picked.doc || outcome === 'failed' || outcome === 'gone') return outcome
+      if (!picked.doc || outcome === 'failed' || outcome === 'gone' || outcome === 'unknown') return outcome
       const open = picked.doc
       framedDoc.current = null
       loadCam(open.id, open.view)

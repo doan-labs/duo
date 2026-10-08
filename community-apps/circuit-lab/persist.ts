@@ -10,10 +10,11 @@
 // Outcomes the host reports are kept honest:
 // - E_CONFLICT: a sibling write landed since the read; rebase and retry.
 // - E_GONE: the app generation died (restore); nothing may write - refuse.
-// - E_TIMEOUT: the ack was lost, outcome unknown. The serialized payload is
-//   deterministic, so reading the key back and finding those bytes means the
-//   write committed; a different value means a sibling won and the intent must
-//   rebase. There is no blind new-request retry and no unconditional fallback.
+// - E_TIMEOUT: the ack was lost, outcome unknown. Reading the key back and
+//   finding our own serialized bytes proves the write committed; anything
+//   else proves nothing - a peer's write can sit on top of ours, and the lost
+//   request itself cannot be proven dead. So a mismatch is terminal 'unknown':
+//   never resend under a fresh token, no blind new-request retry, no fallback.
 // - A failed or timed-out entry read writes nothing: an unread value is never
 //   treated as blank and never seeds a write.
 
@@ -26,7 +27,7 @@ export type KvSpace = {
   set(k: string, v: string, expect?: { rev: number; gen: number }): Promise<unknown>
   del(k: string, expect?: { rev: number; gen: number }): Promise<unknown>
 }
-export type WriteOutcome = 'written' | 'skipped' | 'gone' | 'failed'
+export type WriteOutcome = 'written' | 'skipped' | 'gone' | 'failed' | 'unknown'
 const errCode = (e: unknown): string => ((e as { code?: unknown })?.code as string) ?? ''
 /** Conflicts can only livelock under a continuously-writing peer; bound the rebase. */
 const WRITE_ATTEMPTS = 12
@@ -63,13 +64,17 @@ export async function writeConditional(
       if (code === 'E_CONFLICT') continue
       if (code === 'E_GONE') return 'gone'
       if (code === 'E_TIMEOUT') {
+        // Only our own bytes prove the lost write landed. A different value
+        // means the outcome is unprovable - the peer write that overwrote it
+        // could itself sit on our commit - so stop, don't resend the intent
+        // under a fresh token, and report it honestly as unknown.
         try {
           const back = await space.entry(key)
           if (back.v === next) return 'written'
         } catch {
           return 'failed'
         }
-        continue
+        return 'unknown'
       }
       return 'failed'
     }
@@ -98,12 +103,20 @@ export const putDocIntent =
     return pruneTombs({ ...lib, circuits: { ...lib.circuits, [doc.id]: doc } })
   }
 
-/** Delete a circuit durably: the tomb outranks any snapshot captured before it. */
+/**
+ * Delete a circuit durably: the tomb outranks any snapshot captured before it.
+ * `expected` binds the deletion to the incarnation the user observed, so a
+ * conflicted retry cannot delete different work: a peer restore or edit of
+ * the same id has a different `updated` and the delete refuses instead. An
+ * already-deleted doc still lands its tomb - the deletion fact must
+ * propagate to displays that never observed the doc at all.
+ */
 export const dropDocIntent =
-  (id: string, at: number): LibIntent =>
+  (id: string, at: number, expected: number): LibIntent =>
   (lib) => {
     const existing = lib.circuits[id]
     if (existing === undefined && lib.tombs[id] !== undefined) return null
+    if (existing !== undefined && existing.updated !== expected) return null
     const circuits = { ...lib.circuits }
     delete circuits[id]
     const tombs = { ...lib.tombs, [id]: Math.max(at, existing?.updated ?? 0, lib.tombs[id] ?? 0) }
