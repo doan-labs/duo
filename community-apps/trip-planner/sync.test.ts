@@ -269,6 +269,7 @@ const mkPending = () => new Map<string, (string | null)[]>()
 
 import {
   type CasOutcome,
+  type ConditionalSpace,
   classifyError,
   commitLibWrites,
   commitWithReplan,
@@ -1652,6 +1653,104 @@ for (const equalStamp of [true, false]) {
   }
   const out = await commitLibWrites(io, planLibWrites(lib, updateTrip(lib, 'ta', { name: 'A2' })))
   check('dead-generation first step -> failed, nothing written', out === 'failed' && tripName(data, ta.id) === 'A')
+}
+
+// useSpace.write wrapper: 'skipped' may ONLY come from a completed
+// conditionalSet resolving 'skipped'. A throw leaves the wrapper's res
+// unset and the queue's honest missed/unknown outcome propagates - the
+// cycle-17 wrapper lie. `wrap` mirrors main.tsx write()'s res/.then shape.
+{
+  const wrap = (io: ConditionalSpace, k: string, v: string | null, match?: (v: string | null) => boolean) => {
+    const q = new WriteQueue()
+    let res: 'landed' | 'skipped' | null = null
+    return q
+      .send(
+        async () => {
+          res = await conditionalSet(io, k, v, match)
+        },
+        () => {}
+      )
+      .then((o) => (res === 'skipped' ? 'skipped' : o))
+  }
+  const mkIo = (data: Map<string, string>, rev = { n: 1 }, gen = { n: 1 }) => ({
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: rev.n, gen: gen.n }),
+    set: (k: string, val: string, t: { rev: number; gen: number }) => {
+      if (t.rev !== rev.n || t.gen !== gen.n)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.set(k, val)
+      rev.n++
+      return Promise.resolve({ rev: rev.n })
+    },
+    del: (k: string, t: { rev: number; gen: number }) => {
+      if (t.rev !== rev.n || t.gen !== gen.n)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      rev.n++
+      return Promise.resolve({ rev: rev.n })
+    }
+  })
+
+  // Control: a satisfied match lands and reports 'landed'.
+  {
+    const data = new Map([['undo', 'A-wire']])
+    const io = mkIo(data)
+    const r = await wrap(io, 'undo', null, (v) => v === 'A-wire')
+    check('wrapper control: matching incarnation deletes -> landed', r === 'landed' && !data.has('undo'))
+  }
+  // A mismatched durable entry completes 'skipped' -> wrapper reports skip.
+  {
+    const data = new Map([['undo', 'B-wire']])
+    const io = mkIo(data)
+    const r = await wrap(io, 'undo', null, (v) => v === 'A-wire')
+    check('wrapper skip stays skipped, peer kept', r === 'skipped' && data.get('undo') === 'B-wire')
+  }
+  // E_GONE thrown inside the op: res stays unset, queue reports 'missed'
+  // (dead generation is a definitive refusal) - never 'skipped'.
+  {
+    const data = new Map([['ui', 'old']])
+    const rev = { n: 1 }
+    const gen = { n: 1 }
+    let calls = 0
+    const io = {
+      entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: rev.n, gen: gen.n }),
+      set: () => {
+        calls++
+        gen.n = 2
+        return Promise.reject(Object.assign(new Error('dead generation'), { code: 'E_GONE' }))
+      },
+      del: () => Promise.reject(Object.assign(new Error('dead generation'), { code: 'E_GONE' }))
+    }
+    const r = await wrap(io, 'ui', 'new', undefined)
+    check('wrapper E_GONE reports missed not skipped', r === 'missed' && calls === 1)
+  }
+  // Lost ACK whose readback shows a peer value: conditionalSet throws
+  // E_CAS, res stays unset, queue reports 'unknown' - never 'skipped'.
+  {
+    const data = new Map([['undo', 'A-wire']])
+    const rev = { n: 1 }
+    const gen = { n: 1 }
+    let acked = false
+    const io = {
+      entry: (k: string) => {
+        if (acked) data.set(k, 'B-wire') // peer landed while our ACK was lost
+        return Promise.resolve({ v: data.get(k) ?? null, rev: rev.n, gen: gen.n })
+      },
+      set: () => {
+        acked = true
+        return Promise.reject(Object.assign(new Error('lost'), { code: 'E_TIMEOUT' }))
+      },
+      del: (k: string) => {
+        data.delete(k) // write landed durably; only the ACK was lost
+        acked = true
+        return Promise.reject(Object.assign(new Error('lost'), { code: 'E_TIMEOUT' }))
+      }
+    }
+    const r = await wrap(io, 'undo', null, (v) => v === 'A-wire')
+    check(
+      'wrapper lost-ACK readback mismatch reports unknown not skipped',
+      r === 'unknown' && data.get('undo') === 'B-wire'
+    )
+  }
 }
 
 // Delta write (ui patch): a conflict rebase re-derives the merge onto the

@@ -459,7 +459,10 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
         else next.set(k, desired)
         return next
       })
-      let res: 'landed' | 'skipped' = 'skipped'
+      // `res` only holds a value once conditionalSet COMPLETED: a thrown
+      // refusal (E_GONE, readback mismatch) leaves it unset, and the queue's
+      // honest missed/unknown outcome propagates instead of reading 'skipped'.
+      let res: 'landed' | 'skipped' | null = null
       return writes.current
         .send(
           async () => {
