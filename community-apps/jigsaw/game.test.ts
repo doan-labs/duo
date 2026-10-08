@@ -1046,6 +1046,75 @@ await checkAsync('an unknown saves ACK verifies landed-or-not by readback, never
   eq(saves.store.get('saves'), before, 'an unacknowledged write mutated the durable doc')
 })
 
+await checkAsync('a lost ACK never authorizes a fresh write over a confirmed peer value', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+  P.refs.game.current = newGame('harbour', 12, 1)
+  // A's conditional commit lands but its ACK dies (E_TIMEOUT). Between the
+  // timeout and A's same-operation readback, peer B commits the same key and
+  // receives its ACK. The readback now shows B's newer value - nonmatching -
+  // so the step must report unknown and must not rerun the old intent under a
+  // fresh request, which would erase B.
+  const peerDoc = serializeSaves({
+    rev: 2,
+    by: 'peer',
+    current: 'alpine:24',
+    games: { 'alpine:24': newGame('alpine', 24, 2) }
+  })
+  saves.setFaults = ['timeout-landed']
+  // entry() is one-shot-hooked: the act's base read passes through untouched
+  // (B is still in flight) and arms the interleave, so B's confirmed commit
+  // lands between A's lost ACK and A's same-operation readback.
+  saves.getHook = async (k) => {
+    saves.getHook = async (k2) => {
+      saves.peerSet(k2, peerDoc)
+      return peerDoc
+    }
+    return saves.store.get(k) ?? null
+  }
+  let failed = false
+  await P.p
+    .act((ctx) => (ctx.game ? { next: placeAt(ctx.game!, 3, 50, 50, 7).game, held: null } : null))
+    .then(
+      () => {},
+      () => {
+        failed = true
+      }
+    )
+  ok(failed, 'a nonmatching readback was reported as applied')
+  eq(saves.store.get('saves'), peerDoc, "B's confirmed value was clobbered")
+  eq(saves.sets.filter((w) => w.k === 'saves').length, 1, 'the timed-out intent was resubmitted as a fresh write')
+  // Same-operation readback can also return the pre-write value while the
+  // original is still in flight: still unknown, still no new write.
+  const P2 = makePersist('me', live, saves)
+  P2.refs.game.current = newGame('harbour', 12, 1)
+  saves.setFaults = ['timeout-lost']
+  let failed2 = false
+  await P2.p
+    .act((ctx) => (ctx.game ? { next: placeAt(ctx.game!, 5, 70, 70, 8).game, held: null } : null))
+    .then(
+      () => {},
+      () => {
+        failed2 = true
+      }
+    )
+  ok(failed2, 'a pre-write readback was treated as proof of landing')
+  eq(saves.store.get('saves'), peerDoc, 'the unresolved write disturbed the durable doc')
+  // No-race control: the same timed-out landing with an unobstructed readback
+  // resolves and resubmits nothing (retains the contract from the test above).
+  const P3 = makePersist('me', live, saves)
+  P3.refs.game.current = newGame('lantern', 12, 9)
+  saves.peerSet('saves', peerDoc)
+  saves.setFaults = ['timeout-landed']
+  const writesBefore = saves.sets.length
+  await P3.p.act((ctx) => (ctx.game ? { next: ctx.game, held: 2 } : null))
+  const landed = parseSaves(saves.store.get('saves')!)
+  ok(landed.games['lantern:12'] !== undefined, 'a landed write was dropped')
+  ok(landed.games['alpine:24'] !== undefined, 'the seeded library was dropped')
+  eq(saves.sets.length - writesBefore, 1, 'the control resubmitted the timed-out write')
+})
+
 await checkAsync('two initial-null seeds race to one unioned library', async () => {
   const live = new FakeKV()
   const saves = new FakeKV()
