@@ -1559,6 +1559,45 @@ check(
   check('equal-stamp before-delete preserved', r === 'skipped' && data.get('undo') === peerUndo)
 }
 
+// Deferred-expiry binding: a timer armed on A's wire must expire THAT
+// incarnation only. A peer record landing between arm and fire (the
+// read-at-fire-time bug) leaves the armed wire stale -> delIf skips and
+// the newer record survives. Both equal-stamp and different-stamp.
+for (const equalStamp of [true, false]) {
+  const armed = JSON.stringify({ v: 1, by: 'A', at: 1, kind: 'pack', tripId: 't', label: 'Undo A' })
+  const peer = JSON.stringify({
+    v: 1,
+    by: 'B',
+    at: equalStamp ? 1 : 2,
+    kind: 'pack',
+    tripId: 't',
+    label: 'Acknowledged Undo B'
+  })
+  const data = new Map<string, string>([['undo', armed]])
+  const space = { rev: 1, gen: 1 }
+  let deletes = 0
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: () => Promise.resolve({ rev: space.rev }),
+    del: (k: string, expect: { rev: number; gen: number }) => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      space.rev++
+      deletes++
+      return Promise.resolve({ rev: space.rev })
+    }
+  }
+  // Peer ACKs a newer undo between the arm and the timer firing.
+  data.set('undo', peer)
+  space.rev++
+  const r = await conditionalSet(io, 'undo', null, (v) => v === armed)
+  check(
+    `armed-wire expiry skips peer replacement (equalStamp=${equalStamp})`,
+    r === 'skipped' && deletes === 0 && data.get('undo') === peer
+  )
+}
+
 // E_GONE is terminal in conditionalSet: the dead-generation refusal throws
 // on the FIRST attempt - the same intent is never migrated into the new
 // generation by a second set.

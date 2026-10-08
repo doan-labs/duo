@@ -1428,8 +1428,10 @@ function TripPlanner() {
   }, [storage])
 
   const ui = useMemo(() => parseUi(session.get('ui')), [session])
-  const draft = useMemo(() => parseDraft(session.get('draft')), [session])
-  const undo = useMemo(() => parseUndo(session.get('undo')), [session])
+  const draftWire = session.get('draft')
+  const undoWire = session.get('undo')
+  const draft = useMemo(() => parseDraft(draftWire), [draftWire])
+  const undo = useMemo(() => parseUndo(undoWire), [undoWire])
   const confirm = useMemo(() => parseConfirm(session.get('confirm')), [session])
   // Held snapshots exist only for the visible copy's sheet exits - a hidden
   // copy keeps held null, so no exit timers ever arm on it.
@@ -1696,13 +1698,15 @@ function TripPlanner() {
   // not expire a slot it cannot display.
   const undoAt = undo?.at
   useEffect(() => {
-    if (undoAt === undefined) return
+    if (undoAt === undefined || undoWire === null) return
+    // Armed on the render-time wire, frozen BEFORE the timer schedules -
+    // reading latest at fire time would let a peer's newer undo satisfy the
+    // gate and get deleted. `undoWire` is also the dep so an equal-stamp
+    // peer swap still re-arms on the new record.
+    const armed = undoWire
     const left = UNDO_MS - (Date.now() - undoAt)
     const expire = () => {
-      // Expire only the exact wire incarnation this timer armed on - a
-      // peer's undo sharing the `at` millisecond is a different record.
-      const wire = session.now('undo')
-      if (liveVis()) session.delIf('undo', (v) => v === wire)
+      if (liveVis()) session.delIf('undo', (v) => v === armed)
     }
     if (left <= 0) {
       expire()
@@ -1710,7 +1714,7 @@ function TripPlanner() {
     }
     const t = setTimeout(expire, left)
     return () => clearTimeout(t)
-  }, [undoAt, session, liveVis])
+  }, [undoAt, undoWire, session, liveVis])
 
   const openDraft = useCallback(
     (d: Omit<Draft, 'v'>) => {
@@ -1775,11 +1779,12 @@ function TripPlanner() {
   // clear it once it is older than the lock window. The live copy owns the
   // expiry so a hidden copy cannot drop a lock while someone is saving.
   useEffect(() => {
-    if (!draft?.saving) return
+    if (!draft?.saving || draftWire === null) return
+    // Same arm-time binding as the undo expiry: the draft lock wire the
+    // effect ran on, not whatever the mirror holds when the timer fires.
+    const armed = draftWire
     const clear = () => {
-      // Expire only the exact lock wire this timer armed on.
-      const wire = session.now('draft')
-      if (liveVis()) session.delIf('draft', (v) => v === wire)
+      if (liveVis()) session.delIf('draft', (v) => v === armed)
     }
     const left = SAVE_LOCK_MS - (Date.now() - draft.saving)
     if (left <= 0) {
@@ -1788,7 +1793,7 @@ function TripPlanner() {
     }
     const t = setTimeout(clear, left)
     return () => clearTimeout(t)
-  }, [draft?.saving, session, liveVis])
+  }, [draft, draftWire, session, liveVis])
 
   // The editor only makes sense against an existing trip for edit kinds; a
   // peer that deleted the trip mid-draft gets the sheet closed cleanly.
