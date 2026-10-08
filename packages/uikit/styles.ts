@@ -118,7 +118,12 @@ export const shared = stylex.create({
   press: {
     transitionProperty: 'transform, color, background-color',
     transitionDuration: `${motion.pressDuration}, .2s, .2s`,
-    transform: { default: 'scale(1)', ':active': motion.press }
+    transform: {
+      default: 'scale(1)',
+      ':active': motion.press,
+      // Scale is the one cue reduce-motion drops; colour still marks the press.
+      '@media (prefers-reduced-motion: reduce)': { ':active': 'scale(1)' }
+    }
   },
   /** A selectable row: colours ease instead of snapping; the row itself does not shrink. */
   select: {
@@ -227,7 +232,9 @@ export const shared = stylex.create({
       backgroundColor: colors.white,
       boxShadow: shadow.card,
       transitionProperty: 'transform',
-      transitionDuration: '.2s',
+      // The knob's position is the checked cue, so the transform stays under
+      // reduce; only the slide itself drops out.
+      transitionDuration: { default: '.2s', '@media (prefers-reduced-motion: reduce)': '0s' },
       transform: { default: null, ':checked': 'translateX(20px)' }
     }
   },
@@ -270,7 +277,11 @@ export const shared = stylex.create({
     zIndex: 4,
     transitionProperty: 'transform',
     transitionDuration: motion.pressDuration,
-    transform: { default: null, ':active': motion.press }
+    transform: {
+      default: null,
+      ':active': motion.press,
+      '@media (prefers-reduced-motion: reduce)': { ':active': null }
+    }
   },
   /** Tinted capsule button: subheadline semibold on systemFill. */
   pill: {
@@ -287,7 +298,11 @@ export const shared = stylex.create({
     color: app.link,
     transitionProperty: 'transform, background-color',
     transitionDuration: `${motion.pressDuration}, .2s`,
-    transform: { default: null, ':active': motion.press }
+    transform: {
+      default: null,
+      ':active': motion.press,
+      '@media (prefers-reduced-motion: reduce)': { ':active': null }
+    }
   },
   /** Secondary label: footnote in the secondary colour. */
   sub: {
@@ -343,7 +358,11 @@ export const shared = stylex.create({
     textShadow: 'none',
     transitionProperty: 'transform',
     transitionDuration: motion.pressDuration,
-    transform: { default: null, ':active': motion.press }
+    transform: {
+      default: null,
+      ':active': motion.press,
+      '@media (prefers-reduced-motion: reduce)': { ':active': null }
+    }
   },
   /** Small semibold label inside a widget. */
   widgetLabel: {

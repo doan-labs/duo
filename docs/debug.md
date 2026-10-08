@@ -76,6 +76,20 @@ StyleX sets width through classes, not inline style. Both roots stay attached, s
 computed display/opacity/clip and SDK visibility rather than DOM presence. A screenshot
 thumbnail clones the display and can double data-app matches.
 
+An occluded app document gets no animation frames and its timers are throttled,
+but lifecycle fields (`display`, `placement`, `visible`, `active`, `focused`)
+still reach `useDisplay()`/`useSyncExternalStore` subscribers on receipt - the
+committed snapshot must not lag `os.view` on a hide/show. Only size/angle
+updates coalesce to a frame, with a bounded timer fallback (~250 ms, throttled
+to ~1 s in a 0-size frame). Compare the live `os.view` read against the
+committed snapshot when reproducing "app thinks it is still visible" reports;
+any lifecycle gap is a delivery bug, a converging geometry gap is the
+documented coalescing. The same hides apply to DOM-hidden scenes: parking for
+Home, lock or the switcher keeps the frame mounted under `display:none`, so
+`visible` reads false and DOM focus is released out of it - check
+`document.activeElement` when reproducing "keys reach a parked copy" reports;
+an app reclaims focus once the view shows again.
+
 For fold continuity, mark nodes/view IDs and assert identity through close/open. Poll the
 actual bend angle instead of fixed waits; SwiftShader may need ~10 s. Do not reparent a
 frame to expose it: that reloads the document. Evaluating script inside a frame from the
