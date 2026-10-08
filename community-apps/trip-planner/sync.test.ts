@@ -177,8 +177,8 @@ const mkPending = () => new Map<string, (string | null)[]>()
   check('E_DENIED refuses -> missed', (await refused('E_DENIED')) === 'missed')
   check('E_STALE refuses -> missed', (await refused('E_STALE')) === 'missed')
   check(
-    'E_GONE classifies as a refreshable conflict',
-    classifyError(Object.assign(new Error('E_GONE'), { code: 'E_GONE' })) === 'conflict'
+    'E_GONE classifies as a terminal missed - dead generation is not refreshable',
+    classifyError(Object.assign(new Error('E_GONE'), { code: 'E_GONE' })) === 'missed'
   )
   check(
     'E_CONFLICT classifies as a refreshable conflict',
@@ -1498,6 +1498,121 @@ check(
   }
   const r = await conditionalSet(io, 'undo', null, (v) => JSON.parse(v!).at === 1)
   check('control: matching incarnation deletes', r === 'landed' && !data.has('undo'))
+}
+
+// Same-millisecond stamp is NOT identity: A and B undos share `at` but
+// differ by wire. Bound on the captured wire, A's consume skips - the
+// parent's equal-stamp repro.
+{
+  const oldUndo = JSON.stringify({ v: 1, by: 'A', at: 1, kind: 'pack', tripId: 't', label: 'Undo A' })
+  const peerUndo = JSON.stringify({ v: 1, by: 'B', at: 1, kind: 'pack', tripId: 't', label: 'Acknowledged Undo B' })
+  const data = new Map<string, string>([['undo', oldUndo]])
+  const space = { rev: 1, gen: 1 }
+  let injected = false
+  const io = {
+    entry: (k: string) => {
+      if (k === 'undo' && !injected) {
+        injected = true
+        data.set(k, peerUndo)
+        space.rev++
+      }
+      return Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen })
+    },
+    set: () => Promise.resolve({ rev: space.rev }),
+    del: (k: string, expect: { rev: number; gen: number }) => {
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      space.rev++
+      return Promise.resolve({ rev: space.rev })
+    }
+  }
+  const r = await conditionalSet(io, 'undo', null, (v) => v === oldUndo)
+  check('equal-stamp peer undo preserved by wire identity', r === 'skipped' && data.get('undo') === peerUndo)
+}
+
+// Same equal-stamp race landing between entry and delete: E_CONFLICT
+// re-checks the wire identity and still skips.
+{
+  const oldUndo = JSON.stringify({ v: 1, by: 'A', at: 1, kind: 'pack', tripId: 't', label: 'Undo A' })
+  const peerUndo = JSON.stringify({ v: 1, by: 'B', at: 1, kind: 'pack', tripId: 't', label: 'Acknowledged Undo B' })
+  const data = new Map<string, string>([['undo', oldUndo]])
+  const space = { rev: 1, gen: 1 }
+  let injected = false
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: () => Promise.resolve({ rev: space.rev }),
+    del: (k: string, expect: { rev: number; gen: number }) => {
+      if (!injected && k === 'undo') {
+        injected = true
+        data.set(k, peerUndo)
+        space.rev++
+      }
+      if (expect.rev !== space.rev || expect.gen !== space.gen)
+        return Promise.reject(Object.assign(new Error('stale'), { code: 'E_CONFLICT' }))
+      data.delete(k)
+      space.rev++
+      return Promise.resolve({ rev: space.rev })
+    }
+  }
+  const r = await conditionalSet(io, 'undo', null, (v) => v === oldUndo)
+  check('equal-stamp before-delete preserved', r === 'skipped' && data.get('undo') === peerUndo)
+}
+
+// E_GONE is terminal in conditionalSet: the dead-generation refusal throws
+// on the FIRST attempt - the same intent is never migrated into the new
+// generation by a second set.
+{
+  let gen = 1
+  let calls = 0
+  let value: string | null = null
+  const io = {
+    entry: () => Promise.resolve({ v: value, rev: 1, gen }),
+    set: (_k: string, v: string, token: { rev: number; gen: number }) => {
+      calls++
+      if (calls === 1) {
+        gen = 2
+        return Promise.reject(Object.assign(new Error('dead generation'), { code: 'E_GONE' }))
+      }
+      if (token.gen !== gen) return Promise.reject(Object.assign(new Error('dead generation'), { code: 'E_GONE' }))
+      value = v
+      return Promise.resolve({ rev: 1 })
+    },
+    del: () => Promise.reject(new Error('unused'))
+  }
+  let threw = false
+  await conditionalSet(io, 'ui', 'admitted old-generation intent').catch(() => {
+    threw = true
+  })
+  check('E_GONE terminal - intent never migrates generations', threw && calls === 1 && value === null)
+}
+
+// E_GONE inside a library commit: a landed prefix stays honest 'partial',
+// a first-step dead generation reports 'failed' - neither migrates intent.
+{
+  const { lib, ta } = mk()
+  const data = new Map<string, string>([
+    ['index', serializeIndex(lib.order)],
+    ...lib.trips.map((t) => [`trip.${t.id}`, serializeTrip(t)] as [string, string])
+  ])
+  const space = { rev: 0, gen: 1 }
+  let gone = true
+  const io = {
+    entry: (k: string) => Promise.resolve({ v: data.get(k) ?? null, rev: space.rev, gen: space.gen }),
+    set: (k: string, v: string, expect: { rev: number; gen: number }): Promise<CasOutcome> => {
+      void v
+      if (expect.rev !== space.rev || expect.gen !== space.gen) return Promise.resolve('conflict')
+      if (gone && k === 'trip.ta') {
+        gone = false
+        return Promise.resolve('missed') // a resolved E_GONE maps here
+      }
+      data.set(k, v)
+      space.rev++
+      return Promise.resolve('landed')
+    }
+  }
+  const out = await commitLibWrites(io, planLibWrites(lib, updateTrip(lib, 'ta', { name: 'A2' })))
+  check('dead-generation first step -> failed, nothing written', out === 'failed' && tripName(data, ta.id) === 'A')
 }
 
 // Delta write (ui patch): a conflict rebase re-derives the merge onto the

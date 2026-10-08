@@ -392,9 +392,11 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
   }, [space, owns])
 
   // Classify a thrown platform error for the conditional write path:
-  // E_CONFLICT/E_GONE are zero-effect rejections with a stale token -
-  // refreshable by reading `entry` again; a definitive refusal means the
-  // write provably never applied; anything else is ambiguous.
+  // E_CONFLICT is a zero-effect rejection with a stale token -
+  // refreshable by reading `entry` again; a definitive refusal (incl.
+  // E_GONE: the token's generation died, so the intent's basis is gone
+  // and must never migrate across generations) means the write provably
+  // never applied; anything else is ambiguous.
   const casOutcome = useCallback((e: unknown): CasOutcome => {
     return isConflict(e) ? 'conflict' : isRefusal(e) ? 'missed' : 'unknown'
   }, [])
@@ -436,17 +438,18 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
       k: string,
       v: string | null | ((fresh: string | null) => string | null | undefined),
       match?: (v: string | null) => boolean
-    ): Promise<WriteOutcome> => {
+    ): Promise<WriteOutcome | 'skipped'> => {
       // `match` binds the write to the incarnation the caller's intent was
       // derived from; it is checked against the live mirror for the
       // optimistic mask and again against the durable entry inside
       // conditionalSet - a mismatched durable value skips, never deletes
-      // or overwrites a peer's newer incarnation.
+      // or overwrites a peer's newer incarnation. The honest 'skipped'
+      // status is returned, not a false 'landed'.
       if (match && !match(latest.current.get(k) ?? null)) {
-        return Promise.resolve('landed')
+        return Promise.resolve('skipped')
       }
       const desired = typeof v === 'function' ? v(latest.current.get(k) ?? null) : v
-      if (desired === undefined) return Promise.resolve('landed')
+      if (desired === undefined) return Promise.resolve('skipped')
       queuePending(pending.current, k, desired)
       if (desired === null) latest.current.delete(k)
       else latest.current.set(k, desired)
@@ -456,18 +459,21 @@ function useSpace(space: KV, owns: (k: string) => boolean) {
         else next.set(k, desired)
         return next
       })
-      return writes.current.send(
-        async () => {
-          await conditionalSet(space, k, v, match)
-        },
-        () => {
-          // Refused or uncertain: drop this copy's pending mask for the key
-          // and re-snapshot so the display converges on the stored truth.
-          clearPending(pending.current, k)
-          setError(true)
-          bootRef.current()
-        }
-      )
+      let res: 'landed' | 'skipped' = 'skipped'
+      return writes.current
+        .send(
+          async () => {
+            res = await conditionalSet(space, k, v, match)
+          },
+          () => {
+            // Refused or uncertain: drop this copy's pending mask for the key
+            // and re-snapshot so the display converges on the stored truth.
+            clearPending(pending.current, k)
+            setError(true)
+            bootRef.current()
+          }
+        )
+        .then((o) => (res === 'skipped' ? 'skipped' : o))
     },
     [space]
   )
@@ -1633,10 +1639,11 @@ function TripPlanner() {
 
   const dismissUndo = useCallback(() => {
     if (!liveVis() || !undo) return
-    const u = undo
-    // Only the incarnation the user is dismissing may be removed - a
-    // peer's newer undo in the slot is not ours to delete.
-    session.delIf('undo', (v) => parseUndo(v)?.at === u.at)
+    // Only the exact incarnation the user is dismissing may be removed -
+    // bound on the captured WIRE (true logical identity), never a
+    // timestamp that a peer's unrelated undo could share.
+    const wire = session.now('undo')
+    session.delIf('undo', (v) => v === wire)
   }, [session, liveVis, undo])
 
   const openConfirm = useCallback(
@@ -1649,25 +1656,26 @@ function TripPlanner() {
   )
   const closeConfirm = useCallback(() => {
     if (!liveVis() || !confirm) return
-    const c = confirm
-    session.delIf('confirm', (v) => {
-      const cur = parseConfirm(v)
-      return cur !== null && cur.by === c.by && cur.kind === c.kind && cur.tripId === c.tripId && cur.id === c.id
-    })
+    // Bound on the exact wire shown - a newer record naming the same
+    // kind/trip/id (a re-opened confirm for the same target) is a
+    // different incarnation and is never deleted.
+    const wire = session.now('confirm')
+    session.delIf('confirm', (v) => v === wire)
   }, [session, liveVis, confirm])
 
   const doUndo = useCallback(() => {
     if (!liveVis() || !undo) return
     const u = undo
+    const uWire = session.now('undo')
     // Apply the inverse against the freshest library. The slot is consumed
     // only when the mutation is durably applied (or a verified noop) and
     // the slot still holds this same undo - a failed write keeps it so the
     // user can retry, and surfaces an error instead of a success cue.
     const consume = () => {
-      // Identity-bound: the slot is cleared only while it still holds
-      // THIS undo incarnation - a peer's newer Undo that landed between
-      // our check and the delete is never erased.
-      session.delIf('undo', (v) => parseUndo(v)?.at === u.at)
+      // Identity-bound on the exact captured wire: the slot is cleared
+      // only while it still holds THIS undo incarnation - a peer's newer
+      // Undo, even one sharing the same `at` millisecond, is never erased.
+      session.delIf('undo', (v) => v === uWire)
     }
     mutateLib(
       (cur) => applyUndo(cur, u),
@@ -1691,8 +1699,10 @@ function TripPlanner() {
     if (undoAt === undefined) return
     const left = UNDO_MS - (Date.now() - undoAt)
     const expire = () => {
-      // Expire only the incarnation this timer armed on.
-      if (liveVis()) session.delIf('undo', (v) => parseUndo(v)?.at === undoAt)
+      // Expire only the exact wire incarnation this timer armed on - a
+      // peer's undo sharing the `at` millisecond is a different record.
+      const wire = session.now('undo')
+      if (liveVis()) session.delIf('undo', (v) => v === wire)
     }
     if (left <= 0) {
       expire()
@@ -1735,7 +1745,11 @@ function TripPlanner() {
       return
     }
     const stamp = Date.now()
-    setDraft({ ...draft, err: undefined, saving: stamp })
+    const lockDraft = { ...draft, err: undefined, saving: stamp }
+    setDraft(lockDraft)
+    // The exact wire this lock wrote - the lock may only clear itself,
+    // never a different record that happens to share the `saving` stamp.
+    const lockWire = JSON.stringify(lockDraft)
     if (draft.kind === 'trip-new' && draft.createdId) setUi({ tripId: draft.createdId, day: 0 })
     // Rebase the commit on the freshest library inside the chain, then clear
     // the lock only after the write queue has settled.
@@ -1750,7 +1764,7 @@ function TripPlanner() {
         if (r === 'dropped') return
         // Clear only THIS commit's lock incarnation - a newer draft (own
         // or peer's) in the slot is not ours to remove.
-        session.delIf('draft', (v) => parseDraft(v)?.saving === stamp)
+        session.delIf('draft', (v) => v === lockWire)
         if (r === 'failed' || r === 'partial') cue('error')
       }
     )
@@ -1763,8 +1777,9 @@ function TripPlanner() {
   useEffect(() => {
     if (!draft?.saving) return
     const clear = () => {
-      // Expire only the lock incarnation this timer armed on.
-      if (liveVis()) session.delIf('draft', (v) => parseDraft(v)?.saving === draft.saving)
+      // Expire only the exact lock wire this timer armed on.
+      const wire = session.now('draft')
+      if (liveVis()) session.delIf('draft', (v) => v === wire)
     }
     const left = SAVE_LOCK_MS - (Date.now() - draft.saving)
     if (left <= 0) {
@@ -1782,11 +1797,10 @@ function TripPlanner() {
     if (!draft || draft.saving) return
     const needsTrip = draft.kind !== 'trip-new'
     if (needsTrip && draft.tripId && !getTrip(lib, draft.tripId)) {
-      const d = draft
-      session.delIf('draft', (v) => {
-        const cur = parseDraft(v)
-        return cur !== null && cur.by === ME && cur.kind === d.kind && cur.tripId === d.tripId
-      })
+      // Clear only the exact draft wire that went stale - a newer draft
+      // for the same trip is a different incarnation and must survive.
+      const wire = session.now('draft')
+      session.delIf('draft', (v) => v === wire)
     }
   }, [draft, lib, session])
 
@@ -1804,11 +1818,9 @@ function TripPlanner() {
             ? t.legs.some((l) => l.id === confirm.id)
             : t.stays.some((s) => s.id === confirm.id)))
     if (!live) {
-      const c = confirm
-      session.delIf('confirm', (v) => {
-        const cur = parseConfirm(v)
-        return cur !== null && cur.by === c.by && cur.kind === c.kind && cur.tripId === c.tripId && cur.id === c.id
-      })
+      // Clear only the exact confirm wire that went stale.
+      const wire = session.now('confirm')
+      session.delIf('confirm', (v) => v === wire)
     }
   }, [confirm, lib, session])
 

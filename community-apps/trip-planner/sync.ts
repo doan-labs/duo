@@ -75,22 +75,26 @@ export type WriteOutcome = 'landed' | 'missed' | 'unknown'
  * and non-platform errors are ambiguous: the host may already have applied
  * the write before the failure was observed.
  *
- * E_CONFLICT and E_GONE are handled separately by the CAS path, not by this
- * classifier: both are zero-effect rejections of a conditional write, but
- * they are REFRESHABLE - the precondition a moved space rejected can simply
- * be re-read through `entry` - so the CAS loop treats them as 'conflict'
- * and re-derives intent rather than reporting a terminal refusal.
+ * Only E_CONFLICT is handled separately by the CAS path: it is a
+ * zero-effect rejection whose precondition can simply be re-read through
+ * `entry`, so the CAS loop treats it as 'conflict' and re-derives intent.
+ * E_GONE is NOT refreshable: the generation the token was minted in is
+ * dead, so the intent's basis no longer exists - migrating the same
+ * intent into a new generation would apply user state it was never
+ * derived for. It is therefore a definitive terminal like any refusal.
  */
-const REFUSAL_CODES = new Set(['E_ARGS', 'E_QUOTA', 'E_RATE', 'E_DENIED', 'E_STALE', 'E_UNSUPPORTED'])
+const REFUSAL_CODES = new Set(['E_ARGS', 'E_QUOTA', 'E_RATE', 'E_DENIED', 'E_STALE', 'E_UNSUPPORTED', 'E_GONE'])
 
 export function isRefusal(e: unknown): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && REFUSAL_CODES.has(String((e as { code: unknown }).code))
 }
 
-/** Zero-effect conditional-write rejections whose token can be refreshed
- * by reading `entry` again: the space moved (E_CONFLICT) or the generation
- * the token was minted in died (E_GONE). Neither mutation took place. */
-const CONFLICT_CODES = new Set(['E_CONFLICT', 'E_GONE'])
+/** The zero-effect conditional-write rejection whose token can be
+ * refreshed by reading `entry` again: the space moved (E_CONFLICT). The
+ * mutation provably did not take place. E_GONE is deliberately absent:
+ * a dead generation invalidates the intent's basis, not just the token,
+ * so it is terminal, not re-derivable. */
+const CONFLICT_CODES = new Set(['E_CONFLICT'])
 
 export function isConflict(e: unknown): boolean {
   return typeof e === 'object' && e !== null && 'code' in e && CONFLICT_CODES.has(String((e as { code: unknown }).code))
@@ -172,9 +176,11 @@ export class WriteQueue {
  *   never treated as an absent key (a failed read must not seed a write).
  * - `set(k, v, {rev, gen})` is the checked write: 'landed' once the host
  *   applied it inside the token's transaction, 'conflict' when the space
- *   moved or the token's generation died (E_CONFLICT/E_GONE - zero
- *   effects, the token is simply stale), 'missed' on a definitive
- *   refusal, 'unknown' when the outcome is ambiguous.
+ *   moved (E_CONFLICT - zero effects, the token is simply stale),
+ *   'missed' on a definitive terminal refusal (including E_GONE: the
+ *   token's generation died, so the intent's basis is gone and the same
+ *   intent must never be migrated across generations), 'unknown' when
+ *   the outcome is ambiguous.
  */
 export type CasStore = {
   entry: (k: string) => Promise<{ v: string | null; rev: number; gen: number }>
@@ -271,7 +277,10 @@ const MAX_TRIES = 4
  * - Every step re-reads `entry` inside its own transaction window and
  *   writes with the `{rev, gen}` token just minted - `rev` counts every
  *   write in the space, so a token read before an earlier step is already
- *   stale. The bounded loop refreshes the token on E_CONFLICT/E_GONE.
+ *   stale. The bounded loop refreshes the token on E_CONFLICT only -
+ *   E_GONE is terminal (a dead generation invalidates the intent), so the
+ *   commit reports 'failed'/'partial' honestly instead of migrating the
+ *   intent into a generation it was not derived for.
  * - `put` on a value that no longer equals `base` stops with 'conflict':
  *   a peer edit owns the new base; resubmitting the frozen doc would
  *   clobber it. The caller re-runs the mutation on fresh state.
@@ -391,9 +400,11 @@ export type ConditionalSpace = {
  * was derived from: when the fresh entry does not satisfy it, the write is
  * 'skipped' - a peer's newer value (a confirmed undo, draft or confirm) is
  * NEVER deleted or overwritten just because this copy read an older mirror.
- * On E_CONFLICT/E_GONE the loop re-reads and re-checks `match`, so only the
+ * On E_CONFLICT the loop re-reads and re-checks `match`, so only the
  * true semantic intent is rebased onto the exact fresh entry; a mismatch
- * skips rather than executing a stale frozen delete/put.
+ * skips rather than executing a stale frozen delete/put. E_GONE is
+ * terminal: the token's generation died, so the intent's basis is gone
+ * and it must not be migrated across generations.
  *
  * An ambiguous (timeout/closed/transport) outcome is settled by same-key
  * readback: seeing the desired value proves it landed; ANY other read
