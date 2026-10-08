@@ -69,7 +69,7 @@ import {
   wireAt
 } from './circuit.ts'
 import {
-  dropDocIntent,
+  dropOpenIntent,
   libWrite,
   mutedIntent,
   putDocIntent,
@@ -993,24 +993,16 @@ function CircuitLab() {
       const wantOpen = openDoc?.id === id
       const fallback = wantOpen ? newDoc('Circuit 1') : null
       // The delete binds to the incarnation the user observed - the live doc
-      // for the open circuit, the listed row otherwise. Captured once here,
-      // never resampled inside the retry: a conflicted retry that found a
-      // peer's newer restore or edit must refuse, not re-delete their work.
-      const observed = openDoc?.id === id ? openDoc.updated : library.circuits[id]?.updated
-      const expected = observed ?? -1 // no observation: refuse any present doc
+      // for the open circuit, the listed row otherwise - captured once here,
+      // never resampled inside the retry. A conflicted retry that finds a
+      // peer's newer restore or edit refuses rather than re-delete peer work.
+      const observed = openDoc?.id === id ? openDoc : (library.circuits[id] ?? null)
       const at = Date.now()
       const picked: { doc: Doc | null } = { doc: null }
-      const outcome = await libWrite(os.storage, LIB_KEY, (lib) => {
-        const cur = lib.circuits[id]
-        if (cur && cur.updated !== expected) return null
-        let next = dropDocIntent(id, at, expected)(lib) ?? lib
-        if (fallback) {
-          picked.doc = latestDoc(next) ?? fallback
-          next = putDocIntent(picked.doc)(next) ?? next
-        }
-        return next === lib ? null : next
-      })
-      if (!picked.doc || outcome === 'failed' || outcome === 'gone' || outcome === 'unknown') return outcome
+      const outcome = await libWrite(os.storage, LIB_KEY, dropOpenIntent(id, at, observed, fallback, picked))
+      // Adopt only a doc this write actually committed: a refused ('skipped')
+      // or unproven delete must not publish a never-written replacement.
+      if (outcome !== 'written' || !picked.doc) return outcome
       const open = picked.doc
       framedDoc.current = null
       loadCam(open.id, open.view)

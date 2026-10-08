@@ -18,7 +18,15 @@
 // - A failed or timed-out entry read writes nothing: an unread value is never
 //   treated as blank and never seeds a write.
 
-import { type Doc, decodeLibrary, emptyLibrary, type Library, pruneTombs, serializeLibrary } from './circuit.ts'
+import {
+  type Doc,
+  decodeLibrary,
+  emptyLibrary,
+  type Library,
+  latestDoc,
+  pruneTombs,
+  serializeLibrary
+} from './circuit.ts'
 
 export type KvEntry = { k: string; v: string | null; rev: number; gen: number }
 /** The slice of the SDK KV contract the durable paths need. */
@@ -103,24 +111,62 @@ export const putDocIntent =
     return pruneTombs({ ...lib, circuits: { ...lib.circuits, [doc.id]: doc } })
   }
 
+const canonical = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(canonical)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(
+          Object.keys(v as Record<string, unknown>)
+            .sort()
+            .map((k) => [k, canonical((v as Record<string, unknown>)[k])])
+        )
+      : v
+
+/** Content equality for an observed incarnation, key order aside. */
+export const sameDoc = (a: Doc, b: Doc): boolean => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
+
 /**
  * Delete a circuit durably: the tomb outranks any snapshot captured before it.
- * `expected` binds the deletion to the incarnation the user observed, so a
- * conflicted retry cannot delete different work: a peer restore or edit of
- * the same id has a different `updated` and the delete refuses instead. An
- * already-deleted doc still lands its tomb - the deletion fact must
- * propagate to displays that never observed the doc at all.
+ * `observed` binds the deletion to the incarnation the user saw - content,
+ * not just a timestamp, so a same-updated peer write with different content
+ * still reads as a different incarnation. A conflicted retry that finds a
+ * stored doc unequal to the observed one refuses rather than re-delete the
+ * peer's work; a null observation refuses any present doc. An already-deleted
+ * doc still lands its tomb - the deletion fact must propagate to displays
+ * that never observed the doc at all.
  */
 export const dropDocIntent =
-  (id: string, at: number, expected: number): LibIntent =>
+  (id: string, at: number, observed: Doc | null): LibIntent =>
   (lib) => {
     const existing = lib.circuits[id]
     if (existing === undefined && lib.tombs[id] !== undefined) return null
-    if (existing !== undefined && existing.updated !== expected) return null
+    if (existing !== undefined && (observed === null || !sameDoc(existing, observed))) return null
     const circuits = { ...lib.circuits }
     delete circuits[id]
     const tombs = { ...lib.tombs, [id]: Math.max(at, existing?.updated ?? 0, lib.tombs[id] ?? 0) }
     return pruneTombs({ ...lib, circuits, tombs })
+  }
+
+/**
+ * The dropCircuit intent as one atomic plan: delete the observed incarnation
+ * and, when the deleted doc was open, open a replacement. `picked` is reset
+ * at the TOP of every attempt so a conflicted retry that then refuses the
+ * delete cannot leave a never-committed fallback doc in `picked` for the
+ * caller to adopt and mirror. When the outcome is 'skipped' nothing was
+ * written, so `picked.doc` stays null and the caller must not adopt it.
+ */
+export const dropOpenIntent =
+  (id: string, at: number, observed: Doc | null, fallback: Doc | null, picked: { doc: Doc | null }): LibIntent =>
+  (lib) => {
+    picked.doc = null
+    const cur = lib.circuits[id]
+    if (cur && (observed === null || !sameDoc(cur, observed))) return null
+    let next = dropDocIntent(id, at, observed)(lib) ?? lib
+    if (fallback) {
+      picked.doc = latestDoc(next) ?? fallback
+      next = putDocIntent(picked.doc)(next) ?? next
+    }
+    return next === lib ? null : next
   }
 
 export const solvedIntent =
