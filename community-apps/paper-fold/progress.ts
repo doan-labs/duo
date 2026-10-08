@@ -1,19 +1,14 @@
-// Durable progress authority. The `progress` doc is a whole-map aggregate that
-// any reader can use, but a store write replaces the whole key: a stale writer
-// that never saw (or stopped seeing) a peer's facts would drop them when its
-// older map lands last. Per-model receipt keys - one per catalog id, so the
-// causal record stays bounded - keep each model's record independently, and
-// every write merges the durable doc at write time instead of publishing an
-// older in-memory map. Reads and repairs union aggregate + receipts, so a
-// clobbered aggregate can never erase what the receipts still carry.
-import {
-  type ModelProgress,
-  mergeProgress,
-  type ProgressMap,
-  parseProgress,
-  progressSubset,
-  recordProgress
-} from './engine.ts'
+// Durable progress authority. Progress lives in per-model receipt keys - one
+// per catalog id, so the causal record stays bounded - and each write is a
+// read-modify-verify merge, never a whole-map replace. The legacy whole-map
+// `progress` doc is still read and repaired when it lacks facts, but new
+// writes never overwrite it: a stale writer that never saw (or stopped
+// seeing) a peer's facts can only clobber a whole-map value, and there is no
+// whole-map value left to clobber. Per-key last-writer-wins is still not
+// atomic across copies, so every writer verifies its own commit and re-merges
+// once if a concurrent write raced in, and a live copy repairs any durable
+// deficiency it observes (deduped, never an idle storm).
+import { type ModelProgress, mergeProgress, type ProgressMap, parseProgress, progressSubset } from './engine.ts'
 
 // Minimal storage surface both the SDK `os.storage` and test spaces satisfy.
 export interface Store {
@@ -40,6 +35,13 @@ export function parseReceipt(raw: string | null | undefined): ModelProgress | nu
   }
 }
 
+/** cur already carries every fact intent adds (hi watermark and done latch). */
+const covers = (cur: ModelProgress | null, intent: ModelProgress) =>
+  cur !== null && cur.hi >= intent.hi && (cur.done || !intent.done)
+
+const union = (a: ModelProgress | null, b: ModelProgress): ModelProgress =>
+  mergeProgress(a ? { m: a } : {}, { m: b }).m!
+
 const safeGet = async (store: Store, k: string): Promise<string | null> => {
   try {
     return await store.get(k)
@@ -50,7 +52,7 @@ const safeGet = async (store: Store, k: string): Promise<string | null> => {
   }
 }
 
-/** Everything durable knows: aggregate doc union every per-model receipt. */
+/** Everything durable knows: legacy aggregate doc union every receipt. */
 export async function durableProgress(
   store: Store,
   modelIds: string[]
@@ -70,37 +72,53 @@ export async function durableProgress(
   return { facts: mergeProgress(aggregate, receiptMap), aggregate, receipts }
 }
 
+export interface WriteResult {
+  rec: ModelProgress
+  acked: boolean
+}
+
 /**
- * Admitted progress write: merge the freshest durable doc into the record so a
- * writer that never observed a peer's facts emits their union, then store the
- * per-model receipt first (the record a stale aggregate cannot erase) and
- * publish the aggregate through the mirror last.
+ * Commit one model's record with read-modify-verify: each round re-reads the
+ * durable receipt (the read-back the SDK's E_TIMEOUT contract asks for),
+ * unions it into the intent so a writer that never observed a peer's facts
+ * emits their union, stores once, and re-reads to catch a concurrent write
+ * that raced in between. `acked: false` means storage never confirmed the
+ * merge - the caller routes the fact through the reconcile pass so the retry
+ * is deduped against whatever actually committed rather than guessed.
+ */
+export async function receiptWrite(store: Store, modelId: string, intent: ModelProgress): Promise<WriteResult> {
+  const key = receiptKey(modelId)
+  let merged = intent
+  for (let round = 0; round < 3; round++) {
+    const cur = parseReceipt(await safeGet(store, key))
+    merged = union(cur, intent)
+    if (covers(cur, intent)) return { rec: merged, acked: true }
+    try {
+      await store.set(key, JSON.stringify(merged))
+    } catch {
+      intent = merged
+      continue
+    }
+    const verify = parseReceipt(await safeGet(store, key))
+    if (verify && covers(verify, merged)) return { rec: union(verify, merged), acked: true }
+    intent = verify ? union(verify, merged) : merged
+  }
+  return { rec: merged, acked: false }
+}
+
+/**
+ * Admitted progress write: optimistic state already moved, so this only
+ * commits the one model's receipt. The whole-map aggregate is deliberately
+ * left alone - durable readers union it with the receipts, and a reconcile
+ * pass repairs it only if it is observed lacking facts.
  */
 export async function progressWrite(
   store: Store,
-  best: ProgressMap,
   modelId: string,
-  step: number,
-  steps: number,
-  at: number,
-  publish: (mJson: string) => void
-): Promise<ProgressMap> {
-  const cur = parseProgress(await safeGet(store, PROGRESS_KEY))
-  const merged = mergeProgress(best, mergeProgress(cur, recordProgress(best, modelId, step, steps, at)))
-  // The SDK's E_TIMEOUT contract asks for a read-back before retrying: the
-  // second attempt reads the receipt again so it retries with fresh state.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const prev = parseReceipt(await store.get(receiptKey(modelId)))
-      const keep = mergeProgress(prev ? { [modelId]: prev } : {}, { [modelId]: merged[modelId]! })[modelId]!
-      await store.set(receiptKey(modelId), JSON.stringify(keep))
-      break
-    } catch (e) {
-      if (attempt === 1) console.warn('paperfold: receipt write failed', e)
-    }
-  }
-  publish(JSON.stringify(merged))
-  return merged
+  intent: ModelProgress
+): Promise<{ map: ProgressMap; acked: boolean }> {
+  const { rec, acked } = await receiptWrite(store, modelId, intent)
+  return { map: { [modelId]: rec }, acked }
 }
 
 export interface RepairPlan {
@@ -111,10 +129,10 @@ export interface RepairPlan {
 /**
  * One reconcile pass: fold durable knowledge into `best` (both copies adopt
  * foreign facts) and, on a live copy only, plan repairs for what durable
- * evidence actually lacks. `held.sig` dedupes by the observed durable state, so
- * a deficiency is repaired once per distinct clobbered doc - never per render,
- * and a repeated clobber after a landed repair is repaired again because the
- * signature cleared when the doc was covered.
+ * evidence actually lacks. `held.sig` dedupes by the observed durable state,
+ * so a deficiency is repaired once per distinct clobbered doc - never per
+ * render, and a repeated clobber after a landed repair is repaired again
+ * because the signature cleared when the doc was covered.
  */
 export async function reconcileProgress(
   store: Store,

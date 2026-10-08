@@ -37,7 +37,7 @@ import {
 } from './engine.ts'
 import { live, stepTarget, stillBound } from './live.ts'
 import { MODELS, type Model, modelById } from './models.ts'
-import { progressWrite, receiptKey, reconcileProgress } from './progress.ts'
+import { progressWrite, receiptKey, receiptWrite, reconcileProgress } from './progress.ts'
 import { styles } from './styles.ts'
 
 // New user intent is admitted only on a copy that is both visible and active
@@ -457,6 +457,19 @@ function PaperFold() {
   const ui = useKV(os.session, 'ui')
   const progressKV = useKV(os.storage, 'progress')
   const prefsKV = useKV(os.storage, 'prefs')
+  // Receipt subscriptions share the space's single KVMirror (useKV memoizes it
+  // per space), so each of these is a snapshot read, not another watch: a
+  // foreign per-model commit re-runs the reconcile pass even though it never
+  // touches the aggregate doc.
+  const receipts = [
+    useKV(os.storage, receiptKey('dart')).value,
+    useKV(os.storage, receiptKey('boat')).value,
+    useKV(os.storage, receiptKey('cup')).value,
+    useKV(os.storage, receiptKey('helmet')).value,
+    useKV(os.storage, receiptKey('tulip')).value,
+    useKV(os.storage, receiptKey('balloon')).value
+  ]
+  const progressWatch = [progressKV.value, ...receipts].join('\u0001')
 
   const [darkMode, setDarkMode] = useState(false)
   useEffect(() => os.device.on('switches', (s) => setDarkMode(s.darkMode)), [])
@@ -511,6 +524,18 @@ function PaperFold() {
   const progBusy = useRef(false)
   const progAgain = useRef(false)
   const progPass = useRef<() => void>(() => {})
+  const progRetry = useRef(0)
+  // A write the store never acked (timeout/rate limit) is retried by one
+  // delayed reconcile pass - deduped there against whatever actually
+  // committed, so this can never become an idle write storm.
+  const scheduleProgRetry = useCallback(() => {
+    if (progRetry.current) return
+    progRetry.current = window.setTimeout(() => {
+      progRetry.current = 0
+      if (progBusy.current) progAgain.current = true
+      else progPass.current()
+    }, 1500)
+  }, [])
 
   // Adopt a strictly newer foreign position; when the shared doc lands behind
   // our best (a stale foreign write), the active copy repairs it once.
@@ -554,6 +579,9 @@ function PaperFold() {
   // request cap and starve ordinary writes out.
   useEffect(() => {
     if (progressKV.status === 'hydrating') return
+    // progressWatch is the trigger, not an input: receipt and aggregate values
+    // only decide WHEN a pass runs; the pass re-reads durable itself.
+    void progressWatch
     progPass.current = () => {
       progBusy.current = true
       void reconcileProgress(os.storage, MODEL_IDS, progressBest.current, live(view) && liveNow(), repairSig.current)
@@ -567,10 +595,12 @@ function PaperFold() {
             setProgress(progressBest.current)
           }
           if (plan.aggregate && progressKV.value !== plan.aggregate) progressKV.set(plan.aggregate)
+          // Repairs go through the same read-modify-verify write as user
+          // progress, so a repair never clobbers a concurrent peer fact.
           for (const [id, rec] of Object.entries(plan.receipts))
-            void os.storage
-              .set(receiptKey(id), JSON.stringify(rec))
-              .catch((e) => console.warn('paperfold: repair receipt failed', e))
+            void receiptWrite(os.storage, id, rec).then(({ acked }) => {
+              if (!acked) scheduleProgRetry()
+            })
         })
         .catch(() => {})
         .finally(() => {
@@ -589,7 +619,7 @@ function PaperFold() {
     // `view` joins the gate and the deps so a copy turning live re-runs the
     // pass: a reconcile that ran while hidden skips durable repair, and the
     // live transition re-arms it.
-  }, [progressKV.value, progressKV.status, progressKV.set, view])
+  }, [progressWatch, progressKV.value, progressKV.status, progressKV.set, view, scheduleProgRetry])
 
   const still = !prefs.motion
 
@@ -638,9 +668,10 @@ function PaperFold() {
     [prefsKV.set, byId]
   )
 
-  // An admitted write merges the freshest durable doc before publishing, so a
-  // copy that never observed a peer's facts emits their union instead of
-  // dropping them; the per-model receipt lands first (progress.ts).
+  // An admitted write commits only this model's receipt through the
+  // read-modify-verify merge in progress.ts - never the whole-map aggregate,
+  // so a stale or concurrent writer cannot discard a peer's facts. An unacked
+  // write re-enters through the deduped reconcile pass.
   const writeProgress = useCallback(
     (modelId: string, step: number, steps: number) => {
       const pre = mergeProgress(
@@ -650,18 +681,19 @@ function PaperFold() {
       progressBest.current = pre
       progJson.current = JSON.stringify(pre)
       setProgress(pre)
-      void progressWrite(os.storage, pre, modelId, step, steps, Date.now(), (mJson) => progressKV.set(mJson))
-        .then((merged) => {
-          progressBest.current = mergeProgress(progressBest.current, merged)
+      void progressWrite(os.storage, modelId, pre[modelId]!)
+        .then(({ map, acked }) => {
+          progressBest.current = mergeProgress(progressBest.current, map)
           const mJson = JSON.stringify(progressBest.current)
           if (mJson !== progJson.current) {
             progJson.current = mJson
             setProgress(progressBest.current)
           }
+          if (!acked) scheduleProgRetry()
         })
-        .catch(() => {})
+        .catch(() => scheduleProgRetry())
     },
-    [progressKV.set]
+    [scheduleProgRetry]
   )
 
   const openModel = useCallback(

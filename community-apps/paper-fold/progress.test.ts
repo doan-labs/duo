@@ -20,7 +20,14 @@ import {
 } from './engine'
 import { live, type ViewLike } from './live'
 import { MODELS } from './models'
-import { durableProgress, parseReceipt, progressWrite, receiptKey, reconcileProgress } from './progress.ts'
+import {
+  durableProgress,
+  parseReceipt,
+  progressWrite,
+  receiptKey,
+  receiptWrite,
+  reconcileProgress
+} from './progress.ts'
 
 const failures: string[] = []
 
@@ -160,7 +167,7 @@ const { KVMirror } = new Function(
 )(PlatformError) as { KVMirror: typeof import('../../packages/sdk/mirror.ts').KVMirror }
 
 const writeBody = source.match(
-  /const writeProgress = useCallback\(\s*\(modelId: string, step: number, steps: number\) => \{([\s\S]*?)\n {4}\},\n {4}\[progressKV\.set\]\s*\)/
+  /const writeProgress = useCallback\(\s*\(modelId: string, step: number, steps: number\) => \{([\s\S]*?)\n {4}\},\n {4}\[scheduleProgRetry\]\s*\)/
 )
 if (!writeBody) throw new Error('writeProgress callback not found in main.tsx')
 const writeJs = transpiler.transformSync(
@@ -168,7 +175,7 @@ const writeJs = transpiler.transformSync(
 )
 
 const effectBody = source.match(
-  /useEffect\(\(\) => \{\n {4}if \(progressKV\.status === 'hydrating'\) return([\s\S]*?)\n {2}\}, \[progressKV\.value, progressKV\.status, progressKV\.set(?:, view)?\]\)/
+  /useEffect\(\(\) => \{\n {4}if \(progressKV\.status === 'hydrating'\) return([\s\S]*?)\n {2}\}, \[progressWatch, progressKV\.value, progressKV\.status, progressKV\.set, view, scheduleProgRetry\]\)/
 )
 if (!effectBody) throw new Error('progress effect not found in main.tsx')
 
@@ -217,6 +224,12 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
   const progBusy = { current: false }
   const progAgain = { current: false }
   const progPass = { current: () => {} }
+  const retryLog: { scheduled: number } = { scheduled: 0 }
+  // The real callback debounces 1500ms through window.setTimeout; the harness
+  // records the retry and exposes runRetry() so checks stay deterministic.
+  const scheduleProgRetry = () => {
+    retryLog.scheduled++
+  }
   let rendered: ProgressMap = {}
   const setProgress = (p: ProgressMap) => {
     rendered = p
@@ -236,12 +249,20 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     'os',
     'progressKV',
     'progWritten',
+    'scheduleProgRetry',
     `${writeJs}\nreturn writeProgress;`
-  )(progressBest, mergeProgress, recordProgress, progJson, setProgress, progressWrite, os, progressKV, progWritten) as (
-    modelId: string,
-    step: number,
-    steps: number
-  ) => void
+  )(
+    progressBest,
+    mergeProgress,
+    recordProgress,
+    progJson,
+    setProgress,
+    progressWrite,
+    os,
+    progressKV,
+    progWritten,
+    scheduleProgRetry
+  ) as (modelId: string, step: number, steps: number) => void
 
   const liveRef = { current: true }
   const effectFn = new Function(
@@ -265,6 +286,9 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     'progBusy',
     'progAgain',
     'progPass',
+    'receiptWrite',
+    'scheduleProgRetry',
+    'progressWatch',
     `return () => {${effectBody[1]}\n}`
   )(
     progressKV,
@@ -286,7 +310,10 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     os.view,
     progBusy,
     progAgain,
-    progPass
+    progPass,
+    receiptWrite,
+    scheduleProgRetry,
+    ''
   ) as () => () => void
 
   let cleanup: (() => void) | undefined
@@ -302,7 +329,9 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     fire()
   }
   const unsub = mirror.subscribe(() => {
-    const deps = `${progressKV.status}|${progressKV.value}`
+    // The real effect also depends on every receipt key's value, so a foreign
+    // per-model commit re-fires the pass even when the aggregate is untouched.
+    const deps = `${progressKV.status}|${progressKV.value}|${MODEL_IDS.map((id) => mirror.read(receiptKey(id)).value).join('|')}`
     if (deps !== lastDeps) {
       lastDeps = deps
       fire()
@@ -314,6 +343,13 @@ const makeCopy = (backend: Backend, opts: { view?: ViewLike; latency?: number } 
     progressKV,
     progressBest,
     writeProgress,
+    retryLog,
+    // The 1500ms debounce in the real callback, fired by hand: runs the same
+    // coalesced pass trigger the timer would.
+    runRetry: () => {
+      if (progBusy.current) progAgain.current = true
+      else progPass.current()
+    },
     ui: () => rendered,
     fire,
     setView,
@@ -344,7 +380,7 @@ await check('slow boot: write before progress hydrate merges durable truth', asy
   const c = makeCopy(b, { latency: 25 }) // hydrate still pending when input lands
   c.writeProgress('cup', 5, stepsOf('cup'))
   await settle(400)
-  const d = durableMap(b)
+  const d = await durableFacts(b)
   ok(d.dart?.done, 'pre-existing dart must survive a pre-hydrate write')
   ok(d.cup?.done, 'own cup write must land')
   eq(c.ui().cup?.done, true)
@@ -357,8 +393,8 @@ await check('unseen peer: write merges a foreign doc this copy never observed', 
   c.space.muted = true // never observed the foreign write or its hydrate facts
   c.writeProgress('cup', 3, stepsOf('cup'))
   await settle()
-  const d = durableMap(b)
-  ok(d.dart?.done, 'unobserved dart fact must ride along in the aggregate')
+  const d = await durableFacts(b)
+  ok(d.dart?.done, 'unobserved dart fact survives via the union readers use')
   eq(d.cup?.hi, 3)
 })
 
@@ -367,8 +403,9 @@ await check('late stale whole-doc overwrite is repaired from durable evidence', 
   const a = makeCopy(b)
   for (const id of MODEL_IDS) a.writeProgress(id, stepsOf(id), stepsOf(id))
   await settle()
+  const pre = await durableFacts(b)
   ok(
-    MODEL_IDS.every((id) => durableMap(b)[id]?.done),
+    MODEL_IDS.every((id) => pre[id]?.done),
     'all six durable before the clobber'
   )
   const writesBefore = b.writes.length
@@ -417,7 +454,7 @@ await check('peer done then dispose: stale flight cannot erase receipt facts', a
   // Fresh copy boots cold, unions aggregate + receipts, repairs the aggregate.
   const c = makeCopy(b)
   await settle()
-  const d = durableMap(b)
+  const d = await durableFacts(b)
   eq(d.dart?.done, true, 'dart done must survive via its receipt')
   eq(d.dart?.hi, 6)
   eq(d.cup?.done, true)
@@ -459,15 +496,42 @@ await check('corrupt aggregate + corrupt receipt recover truthfully', async () =
   eq(parseReceipt(b.data.get(receiptKey('cup')))?.hi, 2)
 })
 
-await check('quota failure on receipt keeps aggregate + later reconcile repairs', async () => {
+await check('quota failure inside the write loop retries the next round', async () => {
   const b = new Backend()
   const c = makeCopy(b)
-  c.space.failSets = 1 // first receipt set rejects
+  c.space.failSets = 1 // first receipt set rejects; the loop's read-back retries
   c.writeProgress('cup', 5, stepsOf('cup'))
   await settle()
-  eq(durableMap(b).cup?.done, true, 'aggregate carried the fact through the failure')
-  await settle(10)
-  eq(parseReceipt(b.data.get(receiptKey('cup')))?.done, true, 'reconcile repaired the receipt')
+  eq(parseReceipt(b.data.get(receiptKey('cup')))?.done, true, 'receipt committed on the retry round')
+  eq((await durableFacts(b)).cup?.done, true)
+})
+
+await check('unacked write schedules a deduped repair, not a silent drop', async () => {
+  const b = new Backend()
+  const c = makeCopy(b)
+  await settle() // hydrate done first, so no reconcile fires during the write
+  c.space.failSets = 3 // every set in the write's three rounds rejects
+  c.writeProgress('cup', 5, stepsOf('cup'))
+  await settle()
+  ok(c.retryLog.scheduled > 0, 'an unacked write asks the reconcile pass to retry')
+  eq(b.data.get(receiptKey('cup')), undefined, 'nothing committed yet')
+  c.runRetry()
+  await settle()
+  eq(parseReceipt(b.data.get(receiptKey('cup')))?.done, true, 'the deduped pass landed the fact')
+  eq((await durableFacts(b)).cup?.done, true)
+})
+
+await check('stale same-model write is a no-op against the durable latch', async () => {
+  const b = new Backend()
+  await b.inject(receiptKey('boat'), JSON.stringify({ hi: 8, done: true, at: 1 }))
+  const writesBefore = b.writes.length
+  // An old publisher's regressed flight arrives: read-modify-verify merges it
+  // into the committed record instead of replacing it.
+  const r = await receiptWrite(new Space(b) as never, 'boat', { hi: 1, done: false, at: 9 })
+  eq(r.acked, true)
+  eq(parseReceipt(b.data.get(receiptKey('boat')))?.hi, 8)
+  eq(parseReceipt(b.data.get(receiptKey('boat')))?.done, true)
+  eq(b.writes.length, writesBefore, 'a covered intent emits no write')
 })
 
 await check('two copies converge: all six across both displays', async () => {
@@ -479,7 +543,7 @@ await check('two copies converge: all six across both displays', async () => {
     copy.writeProgress(id, stepsOf(id), stepsOf(id))
   }
   await settle(200)
-  const d = durableMap(b)
+  const d = await durableFacts(b)
   ok(
     MODEL_IDS.every((id) => d[id]?.done),
     'durable all-six across both copies'
@@ -502,7 +566,7 @@ await check('both copies end; fresh snapshot restores every durable fact', async
   c.dispose()
   const fresh = makeCopy(b)
   await settle()
-  const d = durableMap(b)
+  const d = await durableFacts(b)
   eq(d.dart?.done, true)
   eq(d.boat?.done, true)
   eq(d.cup?.done, true)
@@ -545,7 +609,7 @@ await check('delayed foreign write during own flight: deferred wins, union kept'
   await new Promise((r) => setTimeout(r, 5))
   await b.inject('progress', JSON.stringify({ dart: { hi: 6, done: true, at: 1 } }))
   await settle(500)
-  const d = durableMap(b)
+  const d = await durableFacts(b)
   eq(d.dart?.done, true)
   eq(d.cup?.hi, 3)
   eq(a.ui().dart?.done, true, 'the foreign fact was adopted, not lost')
@@ -561,7 +625,7 @@ await check('watch suppression: reconcile verifies durable by get, not echo', as
   // The next real write still merge-reads durable truth and re-publishes it.
   c.writeProgress('cup', 5, stepsOf('cup'))
   await settle()
-  const d = durableMap(b)
+  const d = await durableFacts(b)
   ok(
     MODEL_IDS.every((id) => d[id]?.done),
     'suppressed watch never let the clobber stand'
@@ -624,8 +688,9 @@ await check('best stays monotonic: late UI write never shrinks observed facts', 
   await settle()
   c.writeProgress('boat', 1, stepsOf('boat')) // revisit an early step
   await settle()
-  eq(durableMap(b).boat?.hi, 8)
-  eq(durableMap(b).boat?.done, true)
+  const d = await durableFacts(b)
+  eq(d.boat?.hi, 8)
+  eq(d.boat?.done, true)
   eq(c.ui().boat?.hi, 8)
 })
 

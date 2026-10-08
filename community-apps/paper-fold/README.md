@@ -28,24 +28,29 @@ for where a flap lands.
 `prefs` holds `{ muted, motion }`. No network, no accounts, no other
 permissions.
 
-Progress is stored durably, not just mirrored: beside the `progress`
-aggregate, each model keeps a causal receipt at `progress.m.<id>` with its
-own `{ hi, done, at }`. Every write (`progressWrite` in `progress.ts`)
-re-reads the durable aggregate first, unions it with best-known state, and
-then publishes - so an acknowledged write can never replace facts it never
-saw. `hi` is a per-model high-water mark and `done` a latch; merging can
-only grow them, so a stale late write (`hi 1, done false`) cannot unlatch
-a durable `done: true`. On every observed aggregate change a live copy
-runs `reconcileProgress`: it adopts the union of aggregate plus receipts
-and repairs whichever durable side now lacks those facts, deduped by the
+Progress is stored durably, not just mirrored: each model keeps a causal
+receipt at `progress.m.<id>` with its own `{ hi, done, at }`, and receipts
+are the only records new writes touch. The whole-map `progress` aggregate
+is still read (legacy v1 docs migrate into the union) and a live copy
+repairs it if it is observed lacking facts, but it is never overwritten by
+ordinary writes - a stale writer can only clobber a whole-map value, and
+there is no whole-map write left to clobber. Every receipt write
+(`receiptWrite` in `progress.ts`) is read-modify-verify: it re-reads the
+committed record, unions it with the intent so a writer that never saw a
+peer's fact emits the union, stores once, then re-reads to catch a
+concurrent commit that raced in between. `hi` is a per-model high-water
+mark and `done` a latch, so a regressed late write (`hi 1, done false`)
+is a no-op against a durable `done: true`. On every observed receipt or
+aggregate change a live copy runs `reconcileProgress`: it adopts the union
+and repairs whichever durable side lacks those facts, deduped by the
 signature of what it last read so repairs fire once per observation and
-re-fire if the doc is clobbered again. Receipts are bounded to the six
-catalog ids, the write path never throws (legacy v1 docs, corrupt JSON and
-missing receipts all parse into the union; quota and timeout failures are
-retried once per the SDK's read-back contract and otherwise left for the
-next reconcile), and a hidden copy still adopts but writes nothing.
-Reading likewise unions aggregate and receipts, so a cold boot survives a
-clobbered aggregate as long as any receipt held the fact.
+re-fire if the doc is clobbered again. A write the store never acked
+(timeout or rate limit) schedules one deduped retry through the same pass,
+never an idle storm. Receipts are bounded to the six catalog ids, the
+write path never throws (corrupt JSON and missing records parse into the
+union), and a hidden copy still adopts but writes nothing. A cold boot
+unions aggregate and receipts, so progress survives a clobbered aggregate
+as long as any receipt held the fact.
 
 ## Two copies, one session
 

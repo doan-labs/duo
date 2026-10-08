@@ -19,10 +19,14 @@
   switched away from.
 - Shared step position across both displays via session state; progress and
   preferences persist in device storage.
-- Durable progress: the aggregate doc is backed by bounded per-model
-  receipts so a stale or foreign whole-doc overwrite (peer write landing
-  late, an old acknowledged flight, a reload mid-flight) can no longer
-  erase completed models. Every write re-reads and unions durable state
-  first; `hi` only grows and `done` never unlatches; a live copy repairs
-  whichever durable side lacks the facts, deduped by the observed durable
-  content and re-armed when a copy becomes live.
+- Durable progress: bounded per-model receipts are now the only written
+  record - the whole-map aggregate is never overwritten by ordinary
+  writes, so a stale writer has nothing left to clobber (peer write
+  landing late, old acknowledged flight, reload mid-flight). Every receipt
+  write is read-modify-verify: it unions the committed record, stores
+  once, and re-reads to catch a racing commit; `hi` only grows and `done`
+  never unlatches, so a regressed same-model write is a no-op. A live copy
+  unions aggregate plus receipts on every observed change and repairs
+  whichever durable side lacks the facts, deduped by observed content and
+  re-armed when a copy becomes live; an unacked write schedules one
+  deduped retry instead of silently dropping.
