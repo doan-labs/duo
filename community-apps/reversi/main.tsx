@@ -318,10 +318,7 @@ function Game() {
           const base = parseTally(e.v)
           // The celebration (cue/haptic and the tally write) belongs to the
           // copy that is actually on screen; a hidden copy posts nothing.
-          if (!liveActive()) {
-            out = base
-            return null
-          }
+          if (!liveActive()) return null
           const next = step(base)
           const wire = JSON.stringify(next)
           return {
@@ -512,15 +509,29 @@ function Game() {
     if (!settledRead(stored.status)) return
     celebrated.current = game.id
     const winner = d.over.winner
+    // The step only computes the delta: the cue and haptic wait for the
+    // confirmed write, so an unresolved or refused commit plays nothing.
+    let counted = false
     void enqueueRecord((tally) => {
       if (tally.lastGame === game.id) return tally
-      if (liveActive()) navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
-      play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
+      counted = true
       return countFinished(tally, game.id, winner)
-    }).catch(() => {
-      // The tally write never landed: un-mark so a later activation retries.
-      celebrated.current = null
     })
+      .then((applied) => {
+        if (applied && counted) {
+          if (liveActive()) navigator.vibrate?.(winner === 'draw' ? [40] : [40, 60, 40])
+          play(winner === 'draw' ? 'draw' : game.mode === 'solo' && winner !== game.you ? 'lose' : 'win')
+        }
+        if (!applied) {
+          // Unresolved or refused: un-mark so a later activation retries; a
+          // landed-but-unconfirmed write is deduped by tally.lastGame.
+          celebrated.current = null
+        }
+      })
+      .catch(() => {
+        // The tally write never landed: un-mark so a later activation retries.
+        celebrated.current = null
+      })
   }, [d, game, corrupt, view.active, view.visible, stored.status, play, enqueueRecord])
 
   useEffect(() => {

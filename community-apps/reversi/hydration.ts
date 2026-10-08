@@ -172,31 +172,39 @@ const errCode = (e: unknown): string => {
 
 /**
  * One conditional write plus its readback. 'wrote' means the store confirmed
- * the exact wire landed; 'again' means it refused (moved space, dead
- * generation) or answered ambiguously, so the intent must be rebased on a
- * fresh entry rather than resubmitted frozen. For an acknowledgement the
- * wire cannot account for (timeout, host error) the same operation is read
- * back first: the host's serialized queue makes that read reflect everything
- * it accepted before it, so a matching value proves the write landed and any
- * other proves it did not - never a blind new-id retry, never a rollback
- * over unseen peer work. Argument/session errors are thrown as the real
- * failures they are.
+ * the exact wire landed, by acknowledgement or by reading the same value
+ * back. 'again' is the typed zero-effect E_CONFLICT alone: the space moved,
+ * so the intent may be recomputed on a fresh entry. 'gone' is E_GONE, a dead
+ * generation - terminal, the intent is stale forever and is never retried.
+ * For an acknowledgement the wire cannot account for (timeout, host error)
+ * the same operation is read back first: the host's serialized queue makes
+ * that read reflect everything it accepted before it, so a matching value
+ * proves the write landed. A different value proves nothing - a peer may
+ * have overwritten an already committed write - so the outcome stays
+ * 'unknown' and the intent is not replayed under a fresh token. Argument and
+ * session errors are thrown as the real failures they are.
  */
 const conditionalSet = async (
   kv: KvSpace,
   key: string,
   wire: string,
   token: EntryToken
-): Promise<'wrote' | 'again'> => {
+): Promise<'wrote' | 'again' | 'gone' | 'unknown'> => {
   try {
     await kv.set(key, wire, token)
     return 'wrote'
   } catch (e) {
     const code = errCode(e)
-    if (code === 'E_CONFLICT' || code === 'E_GONE') return 'again'
+    if (code === 'E_CONFLICT') return 'again'
+    if (code === 'E_GONE') return 'gone'
     if (code === 'E_ARGS' || code === 'E_CLOSED' || code === 'E_PROTOCOL') throw e
-    const back = await kv.entry(key)
-    return back.v === wire ? 'wrote' : 'again'
+    let back: KvEntry
+    try {
+      back = await kv.entry(key)
+    } catch {
+      return 'unknown'
+    }
+    return back.v === wire ? 'wrote' : 'unknown'
   }
 }
 
@@ -206,21 +214,27 @@ const conditionalSet = async (
  * a move, a merge, a guarded reset - is always recomputed against the newest
  * authoritative state, never replayed as a frozen document. `plan` may
  * refuse (null) when the intent no longer applies to what the store actually
- * holds; the caller then re-offers or rejects honestly. Exhausting the bound
- * throws instead of pretending: the space kept moving or storage kept
- * failing, and the job reports a real failure.
+ * holds; the caller then re-offers or rejects honestly. A dead generation
+ * also settles 'refused' - a terminal, provably unwritten intent. 'unknown'
+ * reports an unresolved commit: the store may or may not hold the write, no
+ * `land` runs, and the caller must not claim success; the next read settles
+ * the truth. Exhausting the bound throws instead of pretending: the space
+ * kept moving or storage kept failing, and the job reports a real failure.
  */
 export const commitCAS = async (
   kv: KvSpace,
   key: string,
   plan: (e: KvEntry) => PlannedWrite | null,
   tries: number = CAS_TRIES
-): Promise<'wrote' | 'refused'> => {
+): Promise<'wrote' | 'refused' | 'unknown'> => {
   for (let attempt = 0; attempt < tries; attempt++) {
     const e = await kv.entry(key)
     const next = plan(e)
     if (!next) return 'refused'
-    if ((await conditionalSet(kv, key, next.wire, { rev: e.rev, gen: e.gen })) === 'again') continue
+    const verdict = await conditionalSet(kv, key, next.wire, { rev: e.rev, gen: e.gen })
+    if (verdict === 'again') continue
+    if (verdict === 'gone') return 'refused'
+    if (verdict === 'unknown') return 'unknown'
     next.land?.()
     return 'wrote'
   }

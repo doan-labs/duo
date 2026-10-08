@@ -999,6 +999,8 @@ const casStore = (seed: Record<string, string> = {}): CasStore => ({ box: { ...s
 type CasHooks = {
   /** Runs between a caller's entry read and its set on the next `n` sets. */
   beforeSet?: (key: string, wire: string) => void
+  /** Runs inside 'timeout-landed' after the write applied, before the failure is reported. */
+  afterLand?: (key: string) => void
   /** Fault injected into the next `n` sets: 'timeout-landed' applies the write then reports timeout. */
   failSet?: string
 }
@@ -1036,6 +1038,7 @@ function casSpace(store: CasStore, hooks: CasHooks = {}) {
         hooks.failSet = undefined
         store.box[k] = v
         store.rev++
+        hooks.afterLand?.(k)
         boom('E_TIMEOUT')
       }
       if (hooks.failSet === 'timeout' || hooks.failSet === 'storage') {
@@ -1143,11 +1146,11 @@ checkAsync('CAS: two initial-null seeds converge on one shared opening', async (
   ok(seenC.adopted !== null && seenC.adopted.id === OPENING_ID, 'a cold copy adopts the shared opening')
 })
 
-checkAsync('CAS: a dead generation refuses a pre-restore token, then refuses the stale intent', async () => {
+checkAsync('CAS: a dead generation is terminal - the stale intent stops, never rebases', async () => {
   // A checkpoint restore between our entry read and write regresses rev: a
   // rev-only token could ABA-collide, so gen must catch it - E_GONE. The
-  // rebase then runs on the restored (newer) document, where the move aimed
-  // at the old 4-ply history is honestly refused instead of overwriting it.
+  // generation the intent was minted in is dead: no re-read, no rebase, no
+  // second set. The newer restored document is left untouched.
   const store = casStore({ 'reversi-game': JSON.stringify(progressed(4, { id: 'm' })) })
   let restored = false
   const space = casSpace(store, {
@@ -1160,23 +1163,27 @@ checkAsync('CAS: a dead generation refuses a pre-restore token, then refuses the
   })
   const seen = progressed(4, { id: 'm' })
   const plans: number[] = []
+  let lands = 0
   const result = await commitCAS(space, 'reversi-game', (e) => {
     const w = settleGame(e.v, 'copy')
     if (w.kind !== 'ok') return null
     plans.push(w.game.moves.length)
     const r = tryPlace(w.game, seen, nextLegal(w.game.moves))
-    return r.ok ? { wire: JSON.stringify({ ...r.game, by: 'copy' }), land: () => {} } : null
+    return r.ok ? { wire: JSON.stringify({ ...r.game, by: 'copy' }), land: () => lands++ } : null
   })
   eq(result, 'refused')
-  eq(plans.length, 2)
-  eq(plans, [4, 6])
+  eq(plans, [4])
+  eq(space.stats.set, 1)
+  eq(space.stats.entry, 1)
+  eq(lands, 0)
   eq(adoptGame(store.box['reversi-game'], 'x').moves.length, 6)
 })
 
-checkAsync('CAS: an ambiguous acknowledgement reads the same operation back before retrying', async () => {
-  // Timeout-after-land: the readback sees our exact wire and no retry mints
-  // a second write. Timeout-without-land: the readback proves it missed and
-  // the same intent rebases - one write total, no blind new-id.
+checkAsync('CAS: an ambiguous acknowledgement settles wrote or unknown, never replays', async () => {
+  // Timeout-after-land: the readback sees our exact wire - one write, one
+  // confirmed land. Timeout-without-land: a different readback cannot prove
+  // the write missed (a peer could have overwritten it), so the outcome is
+  // honestly unknown and the intent is never replayed under a fresh token.
   const landed = casStore({})
   const spaceL = casSpace(landed, { failSet: 'timeout-landed' })
   let lands = 0
@@ -1192,10 +1199,38 @@ checkAsync('CAS: an ambiguous acknowledgement reads the same operation back befo
 
   const missed = casStore({})
   const spaceM = casSpace(missed, { failSet: 'timeout' })
-  const r2 = await commitCAS(spaceM, 'reversi-prefs', () => ({ wire: '{"hints":true,"muted":false}' }))
-  eq(r2, 'wrote')
-  eq(spaceM.stats.set, 2)
-  eq(missed.box['reversi-prefs'], '{"hints":true,"muted":false}')
+  let landsM = 0
+  const r2 = await commitCAS(spaceM, 'reversi-prefs', () => ({
+    wire: '{"hints":true,"muted":false}',
+    land: () => landsM++
+  }))
+  eq(r2, 'unknown')
+  eq(spaceM.stats.set, 1)
+  eq(landsM, 0)
+  eq(missed.box['reversi-prefs'] ?? null, null)
+})
+
+checkAsync('CAS: a peer overwrite after a landed-but-unacked write stays unknown', async () => {
+  // The reviewer repro: our muted:true write lands but the ACK is lost, a
+  // peer's conditional muted:false lands before our readback. A nonmatching
+  // readback cannot prove our write missed - replaying the patch would
+  // clobber the peer - so the commit settles unknown: no second set, no
+  // land, peer value preserved.
+  const store = casStore({ 'reversi-prefs': '{"hints":true,"muted":false}' })
+  const space = casSpace(store, {
+    failSet: 'timeout-landed',
+    afterLand: (k) => space.peerWrite(k, '{"hints":true,"muted":false}')
+  })
+  const patch = { muted: true }
+  let lands = 0
+  const result = await commitCAS(space, 'reversi-prefs', (e) => ({
+    wire: JSON.stringify({ ...parsePrefs(e.v), ...patch }),
+    land: () => lands++
+  }))
+  eq(result, 'unknown')
+  eq(space.stats.set, 1)
+  eq(lands, 0)
+  eq(parsePrefs(store.box['reversi-prefs'] ?? null).muted, false)
 })
 
 checkAsync('CAS: a failed read is unknown, never empty - nothing seeds or writes', async () => {

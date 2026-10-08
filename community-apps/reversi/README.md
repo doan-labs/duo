@@ -38,10 +38,12 @@ mutation reads the entry (value plus its {rev,gen} token), derives the next
 document and its write token from that exact read, and sets only if nothing
 moved in between. A peer landing mid-commit refuses E_CONFLICT and the
 intent is recomputed on the fresh entry - a moved document is never
-overwritten by a stale base, and a checkpoint-restored generation refuses
-E_GONE outright. An acknowledgement the wire cannot account for is read
-back before any retry, so a write that secretly landed is never minted twice
-and one that missed is rebased, not blindly resubmitted. Folding the phone
+overwritten by a stale base, and a checkpoint-restored generation is dead
+outright - E_GONE ends the commit, never rebases. An acknowledgement the
+wire cannot account for reads the same operation back once: a matching
+value confirms the write landed, anything else settles honestly unknown -
+a different readback cannot prove the write missed (a peer may have
+overwritten it), so the intent is never replayed under a fresh token. Folding the phone
 hands the identical position to the other display and relaunching resumes
 it. Passes are never stored - they are forced, so the replay inserts them
 itself.
@@ -144,8 +146,9 @@ changes.
   across a fold. The conditional-write checks run against a controlled
   CAS adapter: a peer commit between read and write refusing and rebasing,
   two initial-null seeds converging on one shared opening, a dead
-  generation refusing a pre-restore token, ambiguous acknowledgements read
-  back before retry (landed-once vs missed-and-rebased), failed reads never
+  generation ending the commit outright, ambiguous acknowledgements read
+  back once and settling wrote or honest unknown (landed-once, missed,
+  peer-overwritten-same-field), failed reads never
   seeding, stale undos and equal-length alternate branches refusing,
   unbounded conflicts exhausting the bound instead of falling back
   unconditionally, and cold reopen preserving confirmed facts.
