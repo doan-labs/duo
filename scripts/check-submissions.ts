@@ -125,7 +125,11 @@ async function check(folder: string, registry: Registry, evidence: string): Prom
     .catch(() => '')
   if (!changelog.includes(m.version)) fail(`CHANGELOG.md has no entry for ${m.version}`)
 
-  // Version: above the base branch when the folder changed, and never a version the catalog already lists.
+  // Version: above the base branch when the authored folder changed, and never a version the
+  // catalog already lists. An untouched folder re-checked at the same version is a
+  // shared-deps republication candidate, not a submission: build evidence is still produced
+  // and the publisher's provenance gate decides whether the rebuild may land.
+  const authoredChanged = !!git('diff', '--name-only', `${base}...HEAD`, '--', folder)?.trim()
   const baselineText = git('show', `${base}:${folder}/manifest.json`)
   if (baselineText) {
     const baseline = JSON.parse(baselineText) as Manifest
@@ -134,14 +138,21 @@ async function check(folder: string, registry: Registry, evidence: string): Prom
     const a = semver(m.version)!
     const b = semver(baseline.version)!
     const higher = a.major - b.major || a.minor - b.minor || a.patch - b.patch
-    if (higher <= 0) fail(`Version ${m.version} must be higher than ${baseline.version} on ${base}`)
+    if (authoredChanged && higher <= 0) fail(`Version ${m.version} must be higher than ${baseline.version} on ${base}`)
+    if (!authoredChanged) report.notes.push('Folder unchanged since base: republication evidence only')
   } else report.notes.push('New app: no baseline manifest on the base branch')
   const published = await publishedVersions(m.id)
   if (!published) {
     const message = `Published release history at ${CATALOG_URL} was unavailable`
     if (process.env.CI) fail(message)
     else report.notes.push(message)
-  } else if (published.has(m.version)) fail(`${m.id} ${m.version} is already published; bump the version`)
+  } else if (published.has(m.version)) {
+    if (authoredChanged) fail(`${m.id} ${m.version} is already published; bump the version`)
+    else
+      report.notes.push(
+        `${m.version} is already published; republication is decided by the publisher's provenance check`
+      )
+  }
 
   // Dependencies: anything beyond the platform set needs a lockfile and a reviewer's eye.
   const pkg = (await Bun.file(join(root, folder, 'package.json'))

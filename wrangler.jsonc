@@ -1,13 +1,15 @@
 {
   "name": "duo",
   "compatibility_date": "2026-09-17",
-  // Only the blog runs the Worker first, to answer range requests for its films;
-  // every other path is served by the asset layer directly.
+  // The blog runs the Worker first to answer range requests for its films, and
+  // the release trees run it first so Cache-Control can be status-conditional:
+  // hits get the immutable no-transform contract, misses stay no-store (see
+  // packages/web/worker.ts). Every other path is served by the asset layer.
   "main": "./packages/web/worker.ts",
   "assets": {
     "directory": "./packages/web/dist/client",
     "binding": "ASSETS",
     "not_found_handling": "none",
-    "run_worker_first": ["/blog/*"]
+    "run_worker_first": ["/blog/*", "/catalog/apps/*", "/cdn/apps/*", "/preinstalled/apps/*"]
   }
 }
