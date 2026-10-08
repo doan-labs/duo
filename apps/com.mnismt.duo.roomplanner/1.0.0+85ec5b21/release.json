@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.roomplanner",
+    "name": "Room Planner",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/room-planner",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T09:35:50.916Z",
+    "commit": "57e88d8fa0ae663f43ec2bece05ab97580e500aa",
+    "hash": "85ec5b21"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 572884,
+      "sha256": "1de222740f73274fcb048ae550b145bf818b63be14b212bd45e40e3665cb4750"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 834755,
+      "sha256": "4c5cb0e797a9eb4fdab773ced5cfa6cbdc4656132104a535692280189c6d6b2b"
+    }
+  ]
+}

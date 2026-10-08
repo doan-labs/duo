@@ -355,6 +355,21 @@
         }
       ]
     },
+    "com.mnismt.duo.roomplanner": {
+      "name": "Room Planner",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/room-planner",
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+85ec5b21",
+          "sdk": "0.1.0",
+          "bytes": 572884,
+          "sha256": "32f36aff43c1cb642087c700c43fbc2596e3f969272229c7f13ec1bf9d152642"
+        }
+      ]
+    },
     "com.mnismt.duo.snake": {
       "name": "Snake",
       "lane": "community",

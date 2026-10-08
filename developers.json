@@ -32,6 +32,7 @@
     "com.mnismt.duo.sudoku": "devin",
     "labs.doan.fold-compass": "doan-labs",
     "com.mnismt.duo.pixelstudio": "devin",
+    "com.mnismt.duo.roomplanner": "devin",
     "com.mnismt.duo.pomodoro": "mnismt",
     "com.mnismt.duo.flashcards": "devin",
     "com.mnismt.duo.2048": "mnismt",
@@ -49,9 +50,10 @@
     "com.mnismt.duo.blockdrop": "devin",
     "com.mnismt.duo.battleship": "devin",
     "com.mnismt.duo.musicsketchpad": "devin",
+    "com.mnismt.duo.colorlab": "devin",
     "com.mnismt.duo.pocketbudget": "devin",
-    "com.mnismt.duo.solitaire": "devin",
     "com.mnismt.duo.reversi": "devin",
+    "com.mnismt.duo.solitaire": "devin",
     "com.mnismt.duo.tripplanner": "devin"
   }
 }
