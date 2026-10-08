@@ -39,17 +39,27 @@ app declares no permissions and uses no network.
 
 ### Persistence protocol
 
-Both displays are separate copies writing one last-writer-wins document, and
-watch events may arrive late, replayed or out of order. `sync.ts` owns the
-invariant: every accepted mutation is a journaled intent stamped with this
-copy's `seq`; a write commits base + replayed intents plus per-writer
-high-watermarks (`high`), so a settled document provably shows which ops it
-contains.
+Both displays are separate copies writing one document, and every durable
+write is conditional: `os.storage.entry` returns the value with its `{rev,
+gen}` token in one atomic read, and `os.storage.set`/`del` carry that token as
+a precondition checked inside the store's own transaction. A write that loses
+the race rejects `E_CONFLICT` with zero effects - a stale whole-blob payload
+can never land over a peer's confirmed commit - and a token bound to a dead
+generation rejects `E_GONE`. On conflict the engine re-reads and rebases the
+same intents (same writer ids, same seqs) onto the moved base; it never
+resubmits a frozen document under a fresh token. An ambiguous outcome
+(`E_TIMEOUT`, transport loss) is resolved by reading the key back and checking
+the same operation's identity - a committed document covering the journal, or
+the receipt entry carrying the op's seq - before retrying, so a retry can
+never double-land. A failed or unknown read is never treated as empty.
+
+`sync.ts` owns the invariant: every accepted mutation is a journaled intent
+stamped with this copy's `seq`; a write commits base + replayed intents plus
+per-writer high-watermarks (`high`), so a settled document provably shows
+which ops it contains.
 
 Adoption is a causal union, never a wholesale replacement - and the union is
-gated by coverage. A whole-blob write commits the payload it was staged on,
-so a set flight staged before a peer's commit landed can physically erase
-rows the store had already confirmed. The engine keeps the last settled base
+gated by coverage. The engine keeps the last settled base
 separate from the view; when a newer `rev` folds in, the view's rows merge
 into the base only where they carry information the base lacks: a document
 whose `high` marks are wholly covered by the current one contributes nothing
@@ -73,11 +83,12 @@ Dead-writer teardowns ride operation receipts. A stale in-flight write that
 lands after every engine disposed would erase a peer's confirmed op even
 though a copy had observed it - the in-memory journal dies with its copy.
 Each display therefore keeps one bounded whole-value receipt log
-(`pantry-ops-cover` / `pantry-ops-inner`), written *before* its document
-commit: a relaunching copy replays receipt entries the settled document does
-not cover, then covers them and the next slot write trims them. The log only
-holds what the doc has not yet covered, so it stays bounded; covered entries
-are dropped lazily on the next write.
+(`pantry-ops-cover` / `pantry-ops-inner`), written under the same conditional
+contract *before* its document commit: a stale slot write unions onto the
+re-read log instead of clobbering it, so a relaunched copy replays receipt
+entries the settled document does not cover, then covers them and the next
+slot write trims them. The log only holds what the doc has not yet covered, so
+it stays bounded; covered entries are dropped lazily on the next write.
 
 Two edges stay honest: only attested documents adopt or merge - every
 protocol write stamps `{by, s}` and `high`, so a blob with rows but no marks
@@ -85,11 +96,11 @@ is forged or corrupt and folds empty - and legacy pre-protocol documents
 (`v != 2`) still adopt wholesale, because last-writer-wins is the only
 honest reading of a blob that cannot say what it covered. Bare mark advances
 never trigger a write on their own, so two copies cannot ping-pong over
-provenance. The residual hole is narrower now and stated: under the real
-adapter both receipt keys exist and teardown recovery works; a single-key
-store with no receipt channel cannot preserve an op that every surviving
-copy failed to observe durably before a dead writer's stale commit landed -
-that is a property of the storage shape, not a waived defect.
+provenance. The residual hole is narrow and stated: with conditional writes a
+stale payload rejects instead of landing, so even a single-key store preserves
+confirmed peer progress; the only op still lost is one no receipt carried and
+no surviving copy ever observed before a dead writer's stale commit rejected -
+a property of the storage shape, not a waived defect.
 
 Admission is decided by `admission.ts` from the SDK's synchronous `os.view`
 (visible AND active) with `document.visibilityState` as a supplemental

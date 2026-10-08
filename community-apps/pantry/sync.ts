@@ -40,24 +40,39 @@
  *    stamp and no marks never passed through the protocol - a forged replay
  *    or a corrupt payload. It folds as empty and contributes nothing to a
  *    merge, while a bare empty blob folds empty harmlessly either way.
- * 6. Writes are serialized through a single drain: read a stable base (a get
- *    no event interleaved with), replay uncovered ops onto it, stamp, commit.
- *    The storage ack binds the write to its real revision; ops accepted during
- *    the flight stay uncovered and ride the next pass on a fresh base. When
- *    the view carries content the settled base does not - an uncovered op or
- *    rows/tombstones a merge restored - the drain writes again, so stale
- *    flights get a repair write instead of a permanent erasure. Bare mark
- *    advances never write on their own, so copies cannot ping-pong.
+ * 6. Writes are serialized through a single drain, and every commit is a
+ *    conditional write (SDK `entry`/`set` with an `expect` token). The pass
+ *    reads the base and its token in one transaction, replays uncovered ops
+ *    onto it, stamps, and commits conditioned on that exact `{rev, gen}`. A
+ *    write that loses the race rejects E_CONFLICT with zero effects - the
+ *    store itself refuses to land a stale payload - so the next pass re-reads
+ *    and rebases the same intents onto the moved base instead of resubmitting
+ *    a frozen document. E_GONE means the token's generation died (a restore
+ *    regressed the space): the rev floor resets and the pass re-reads under
+ *    the live generation. An ambiguous failure (E_TIMEOUT, a dropped or
+ *    unlabeled rejection) never assumes failure: the engine reads the key
+ *    back, and retries only when the same operation's coverage is genuinely
+ *    absent - a doc that already covers `high[me]` proves the write landed or
+ *    was superseded by a fuller peer write. Ops keep their assigned ids, so a
+ *    retry that turns out to be a second landing merges, never duplicates.
+ *    The storage ack binds the write to its real revision; ops accepted
+ *    during the flight stay uncovered and ride the next pass on a fresh base.
+ *    When the view carries content the settled base does not - an uncovered
+ *    op or rows/tombstones a merge restored - the drain writes again, so a
+ *    base that lost confirmed rows gets a repair write. Bare mark advances
+ *    never write on their own, so copies cannot ping-pong.
  * 7. Operation receipts are the teardown path. A stale in-flight write that
  *    lands after every engine disposed would erase a peer's confirmed op even
  *    though this copy had observed it - memory journals die with their copy.
  *    So each display slot keeps a durable op log (`os.storage` key
  *    `pantry-ops-<slot>`, one bounded whole-value log per slot, written
- *    before its document commit): a relaunching copy replays receipt entries
- *    the settled document does not cover, then covers them and lets the log
- *    trim them away. Entries covered by a committed document are dropped, so
- *    the log stays small; entries are never evicted while uncovered unless
- *    the bounded cap forces it.
+ *    before its document commit, under the same conditional contract): a
+ *    relaunching copy replays receipt entries the settled document does not
+ *    cover, then covers them and lets the log trim them away. Entries covered
+ *    by a committed document are dropped, so the log stays small; entries are
+ *    never evicted while uncovered unless the bounded cap forces it. Under
+ *    conditional writes the dead copy's stale doc commit rejects outright,
+ *    and the receipt is what carries ops accepted but never committed.
  * 8. `src` provenance makes same-batch convergence exact. Replaying an add
  *    that semantically merges into a peer's row used to leave the replaying
  *    copy's own-id row behind too - unioning by random id double-counted one
@@ -84,12 +99,32 @@
 import type { Doc, Item, Op, WireOp } from './pantry.ts'
 import { EMPTY_DOC, GONE_CAP, ITEMS_CAP, LIST_CAP, MAX_MILLI, parseDoc, serializeDoc, unpackOp } from './pantry.ts'
 
+/**
+ * One committed value plus the token to condition a write on it. `rev` counts
+ * every write in the space (sibling keys included), so an `expect` token is
+ * conservative: any foreign commit since the read conflicts. `gen` binds the
+ * token to the app generation it was read in - a restore that regresses rev
+ * answers E_GONE instead of letting an old precondition match again.
+ */
+export type StoreEntry = { v: string | null; rev: number; gen: number }
+export type StoreExpect = { rev: number; gen: number }
+
 /** The storage surface the engine needs; main.tsx binds it to os.storage. */
 export type DocStore = {
-  /** Latest committed value for the key, or null when never written. */
-  get(): Promise<string | null>
-  /** Commit a value; resolves with the storage revision of the write. */
-  set(v: string): Promise<number>
+  /**
+   * Latest committed value AND the precondition token it was read at, from
+   * one atomic transaction. A rejection is a failed read, never an empty
+   * document - callers must not seed on failure.
+   */
+  entry(): Promise<StoreEntry>
+  /**
+   * Conditional commit: resolves with the new storage revision. Rejects with
+   * E_CONFLICT when the space moved since `expect` (zero effects - rebase and
+   * retry), E_GONE when the token's generation is dead (re-read before
+   * retrying), E_TIMEOUT or another ambiguous failure when the outcome is
+   * unknown (read back before retrying), or a hard error like E_QUOTA.
+   */
+  set(v: string, expect: StoreExpect): Promise<number>
   /**
    * Subscribe to changes. `rev` is a storage revision; `rev` -1 is the
    * platform's resync sentinel meaning history was lost and the doc must be
@@ -100,14 +135,31 @@ export type DocStore = {
   /**
    * Optional per-slot receipt channel: one bounded op log per display,
    * written before its document commit so a confirmed op survives even when
-   * every engine that saw it is gone. Without it, dead-writer teardown loss
-   * stays a documented single-key limit.
+   * every engine that saw it is gone. Same conditional-write contract as the
+   * document key. Without it, dead-writer teardown loss stays a documented
+   * single-key limit.
    */
   ops?: {
-    get(slot: string): Promise<string | null>
-    set(slot: string, v: string): Promise<number>
+    entry(slot: string): Promise<StoreEntry>
+    set(slot: string, v: string, expect: StoreExpect): Promise<number>
   }
 }
+
+/**
+ * Storage error classification. The SDK throws PlatformError carrying a
+ * `.code`; fakes in tests throw plain objects with the same field. Anything
+ * unlabeled is treated as an ambiguous failure - the outcome is unknown, so
+ * the engine reads back instead of assuming the write failed.
+ */
+export function storeCode(e: unknown): string {
+  const code = (e as { code?: unknown } | null | undefined)?.code
+  return typeof code === 'string' ? code : ''
+}
+
+/** Errors where the write provably did not commit and a rebase may proceed. */
+const REBASE_CODES = new Set(['E_CONFLICT', 'E_GONE'])
+/** Errors where the outcome is unknown: the write may have landed. */
+const UNKNOWN_CODES = new Set(['', 'E_TIMEOUT', 'E_STORAGE', 'E_CLOSED'])
 
 export type SyncStatus = 'loading' | 'synced' | 'saving' | 'retrying'
 
@@ -148,8 +200,6 @@ function dominates(a: Record<string, number>, b: Record<string, number>): boolea
   return true
 }
 
-/** A get is retried this many times when an event lands while it reads. */
-const GET_CLEAN_TRIES = 4
 /** Delay before a failed drain runs again while ops are still uncovered. */
 const RETRY_MS = 1_500
 /** Bound on one slot's receipt log; covered entries are dropped first. */
@@ -250,10 +300,14 @@ export class PantrySync {
 
   /** Revision incorporated into `doc`'s settled base. -1 before first read. */
   private rev = -1
+  /**
+   * Generation the rev floor belongs to. A restore bumps it and regresses
+   * rev, so tokens and adoption floors from the old generation must be
+   * dropped - a stale floor would pin a dead space's state forever.
+   */
+  private gen = -1
   /** View document: settled base + every uncovered op replayed on top. */
   private doc: Doc = { ...EMPTY_DOC }
-  /** Highest revision ever observed; stale echoes and replays never pass it. */
-  private seen = 0
   /**
    * Journal of every accepted op in seq order. Ops are never evicted: any
    * future adopted document whose marks do not cover one was built on a base
@@ -375,37 +429,39 @@ export class PantrySync {
     // Receipt logs first: they carry confirmed ops the settled document may
     // not cover yet, and the fold below needs them in place before it runs.
     if (!(await this.loadReceipts())) return
-    for (let i = 0; i < GET_CLEAN_TRIES; i++) {
-      const mark = this.seen
-      let raw: string | null
-      try {
-        raw = await this.store.get()
-      } catch {
-        this.fail()
-        return
-      }
-      if (this.stopped) return
-      if (this.seen !== mark) continue // an event arrived mid-read; re-read
-      this.takeBase(mark, raw)
+    let entry: StoreEntry
+    try {
+      entry = await this.store.entry()
+    } catch {
+      this.fail()
       return
     }
-    // Events kept interleaving; their adoptions already folded the journal.
-    // Without a settled base this copy has never read successfully - retry
-    // rather than sit in `loading` until some unrelated event rescues it.
     if (this.stopped) return
-    if (this.rev < 0) this.fail()
-    else this.kick()
+    // One atomic read: the value and its revision always describe the same
+    // committed moment, and a failed read is never treated as an empty doc.
+    this.noteEntry(entry)
+    this.takeBase(entry.rev, entry.v)
+  }
+
+  /**
+   * Reconcile an entry read's generation with the rev floor. Within one
+   * generation revs are monotonic across the whole space; a bumped gen means
+   * the space was restored, so the old floor and any same-looking rev numbers
+   * from it no longer apply.
+   */
+  private noteEntry(e: StoreEntry): void {
+    if (this.gen !== -1 && e.gen !== this.gen) this.rev = -1
+    this.gen = e.gen
   }
 
   /**
    * A freshly read document is the settled truth covering every commit up to
-   * `mark`: adopt it and fold the journal on top. An unattested blob - one no
+   * `rev`: adopt it and fold the journal on top. An unattested blob - one no
    * protocol write could have produced - reads as corrupt and folds empty.
    */
   private takeBase(rev: number, raw: string | null): void {
     if (rev < this.rev) return
     this.rev = rev
-    this.seen = Math.max(this.seen, rev)
     const base = parseDoc(raw)
     this.fold(this.attested(base) || base.legacy ? base : { ...EMPTY_DOC })
   }
@@ -427,7 +483,7 @@ export class PantrySync {
     for (const slot of this.peerSlots) {
       let raw: string | null
       try {
-        raw = await ops.get(slot)
+        raw = (await ops.entry(slot)).v
       } catch {
         this.fail()
         return false
@@ -497,7 +553,6 @@ export class PantrySync {
    */
   private adopt(rev: number, raw: string): void {
     if (this.stopped) return
-    this.seen = Math.max(this.seen, rev)
     const inc = parseDoc(raw)
     if (rev <= this.rev) {
       this.mergeIntoView(inc)
@@ -662,6 +717,7 @@ export class PantrySync {
   private async drain(): Promise<void> {
     this.setStatus('saving')
     let pass = 0
+    let unknowns = 0
     try {
       for (;;) {
         if (this.stopped) return
@@ -672,49 +728,64 @@ export class PantrySync {
           return
         }
         this.again = false
-        // Stable base: a get that no storage event interleaved with.
-        let raw: string | null | undefined
-        for (let i = 0; i < GET_CLEAN_TRIES; i++) {
-          const mark = this.seen
-          try {
-            raw = await this.store.get()
-          } catch {
-            this.fail()
-            return
-          }
-          if (this.stopped) return
-          if (this.seen === mark) break
-          raw = undefined
-        }
-        if (raw === undefined) return // events kept arriving; their folds re-kick
-        // Fold the freshest committed doc (a no-op when nothing newer landed).
-        if (this.rev <= this.seen) {
-          this.rev = this.seen
-          this.fold(parseDoc(raw))
-        }
-        if (this.stopped) return
-        if (!this.needsWrite()) {
-          this.setStatus('synced')
-          return
-        }
         // The receipt log lands before the document: ops must be durable in
         // the slot first so a crash or teardown between the two writes still
         // leaves the confirmed ops recoverable by a relaunching copy.
-        if (!(await this.writeReceipt())) return
+        const receipt = await this.writeReceipt()
+        if (receipt === 'fail') return
+        if (receipt === 'gone') continue // generation moved; re-read everything
         if (this.stopped) return
-        // Commit the view document: base + every uncovered op and retained
-        // foreign progress, stamped so its marks prove coverage for anyone
-        // adopting it later.
-        const text = serializeDoc(this.stamp(this.doc))
-        let rev: number
+        // Base and commit token from one atomic read. The receipt write above
+        // moved the space rev, so the token must come from an entry read AFTER
+        // it - a captured-early token would conflict on our own receipt.
+        let entry: StoreEntry
         try {
-          rev = await this.store.set(text)
+          entry = await this.store.entry()
         } catch {
           this.fail()
           return
         }
         if (this.stopped) return
-        this.seen = Math.max(this.seen, rev)
+        this.noteEntry(entry)
+        this.takeBase(entry.rev, entry.v)
+        if (this.stopped) return
+        if (!this.needsWrite()) {
+          this.setStatus('synced')
+          return
+        }
+        // Commit the view document conditioned on the base it was built on:
+        // a foreign write since the read rejects E_CONFLICT (zero effects -
+        // the next pass rebases onto the moved base), a dead generation
+        // rejects E_GONE (re-read under the live one), and only a clean pass
+        // through the store's own transaction actually lands.
+        const text = serializeDoc(this.stamp(this.doc))
+        let rev: number
+        try {
+          rev = await this.store.set(text, { rev: entry.rev, gen: entry.gen })
+          unknowns = 0
+        } catch (e) {
+          const code = storeCode(e)
+          if (REBASE_CODES.has(code)) continue
+          if (UNKNOWN_CODES.has(code)) {
+            // Ambiguous outcome: the write may have landed. Read the key back
+            // and check the same operation's identity - a committed document
+            // covering our journal proves it did (or a fuller peer write did).
+            const back = await this.readback(text)
+            if (back === 'fail') return
+            if (back === 'covered') {
+              unknowns = 0
+              continue
+            }
+            if (++unknowns >= 3) {
+              this.fail()
+              return
+            }
+            continue // rebase the same intents onto the read-back base
+          }
+          this.fail() // E_QUOTA, E_ARGS, E_DENIED... honest retry path
+          return
+        }
+        if (this.stopped) return
         // The ack binds our write to its real revision. If an event already
         // carried something newer, keep its document; ours is superseded and
         // its ops replay onto the newer base on the next pass.
@@ -734,44 +805,99 @@ export class PantrySync {
   }
 
   /**
-   * Write this slot's receipt log: the union of what's already there and
-   * this copy's whole journal, minus anything the settled base already
-   * covers (those ops are durable inside the document). Bounded to
-   * RECEIPT_CAP with newest kept. Only written when the journal grew past
-   * what the log already holds; skipped entirely without an ops channel.
+   * Resolve an ambiguous commit: re-read the document key and compare what
+   * committed against the operation identity we tried to write. Our exact
+   * payload, or any attested document whose marks cover this writer's full
+   * journal, means the write's facts are durable - covered. Anything else
+   * means the write did not land; the returned entry becomes the next pass's
+   * base so the same intents (same ids, same seqs) rebase onto it.
    */
-  private async writeReceipt(): Promise<boolean> {
-    const ops = this.store.ops
-    if (!ops || this.slot === null) return true
-    if (this.seq <= this.receiptWatermark) return true
-    let raw: string | null
+  private async readback(committedText: string): Promise<'covered' | 'uncovered' | 'fail'> {
+    let entry: StoreEntry
     try {
-      raw = await ops.get(this.slot)
+      entry = await this.store.entry()
     } catch {
       this.fail()
-      return false
+      return 'fail'
     }
-    if (this.stopped) return false
-    const entries = parseReceipts(raw)
-    const have = new Set(entries.map((e) => `${e.w}:${e.s}`))
-    for (const it of this.ops) {
-      if (have.has(`${it.w}:${it.seq}`)) continue
-      entries.push({ w: it.w, s: it.seq, o: it.op.pack() })
-    }
-    // Entries the settled base covers are durable in the document itself -
-    // drop them so the log stays bounded, then cap at RECEIPT_CAP newest.
-    const kept = entries.filter((e) => (this.base.high[e.w] ?? 0) < e.s).slice(-RECEIPT_CAP)
-    const text = kept.length === 0 ? JSON.stringify({ v: 1, ops: [] }) : serializeReceipts(kept)
-    if (text !== raw) {
+    if (this.stopped) return 'fail'
+    this.noteEntry(entry)
+    const doc = parseDoc(entry.v)
+    const landed = entry.v === committedText || (this.attested(doc) && (doc.high[this.me] ?? 0) >= this.seq)
+    this.takeBase(entry.rev, entry.v)
+    return landed ? 'covered' : 'uncovered'
+  }
+
+  /**
+   * Write this slot's receipt log under the same conditional contract as the
+   * document: the union of what's already there and this copy's whole
+   * journal, minus anything the settled base already covers (those ops are
+   * durable inside the document). Bounded to RECEIPT_CAP with newest kept.
+   * A relaunched copy on the same slot can race a dying writer's late write;
+   * the precondition rejects that stale commit instead of clobbering the
+   * live log, and the next attempt unions onto the reread log. Returns
+   * 'gone' when the token's generation died (the caller restarts the whole
+   * pass under the live one).
+   */
+  private async writeReceipt(): Promise<'ok' | 'gone' | 'fail'> {
+    const ops = this.store.ops
+    if (!ops || this.slot === null || this.seq <= this.receiptWatermark) return 'ok'
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let entry: StoreEntry
       try {
-        await ops.set(this.slot, text)
+        entry = await ops.entry(this.slot)
       } catch {
         this.fail()
-        return false
+        return 'fail'
+      }
+      if (this.stopped) return 'fail'
+      this.noteEntry(entry)
+      const entries = parseReceipts(entry.v)
+      const have = new Set(entries.map((e) => `${e.w}:${e.s}`))
+      for (const it of this.ops) {
+        if (have.has(`${it.w}:${it.seq}`)) continue
+        entries.push({ w: it.w, s: it.seq, o: it.op.pack() })
+      }
+      // Entries the settled base covers are durable in the document itself -
+      // drop them so the log stays bounded, then cap at RECEIPT_CAP newest.
+      const kept = entries.filter((e) => (this.base.high[e.w] ?? 0) < e.s).slice(-RECEIPT_CAP)
+      const text = kept.length === 0 ? JSON.stringify({ v: 1, ops: [] }) : serializeReceipts(kept)
+      if (text === entry.v) {
+        this.receiptWatermark = this.seq
+        return 'ok'
+      }
+      try {
+        await ops.set(this.slot, text, { rev: entry.rev, gen: entry.gen })
+        this.receiptWatermark = this.seq
+        return 'ok'
+      } catch (e) {
+        const code = storeCode(e)
+        if (code === 'E_CONFLICT') continue // union again on the fresh log
+        if (code === 'E_GONE') return 'gone'
+        if (UNKNOWN_CODES.has(code)) {
+          // Ambiguous: read the log back - this writer's newest seq durable
+          // in the slot means the write landed. Retry unions, never replaces.
+          let back: StoreEntry
+          try {
+            back = await ops.entry(this.slot)
+          } catch {
+            this.fail()
+            return 'fail'
+          }
+          if (this.stopped) return 'fail'
+          this.noteEntry(back)
+          if (parseReceipts(back.v).some((x) => x.w === this.me && x.s === this.seq)) {
+            this.receiptWatermark = this.seq
+            return 'ok'
+          }
+          continue
+        }
+        this.fail()
+        return 'fail'
       }
     }
-    this.receiptWatermark = this.seq
-    return true
+    this.fail()
+    return 'fail'
   }
 
   /**

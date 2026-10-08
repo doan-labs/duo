@@ -27,6 +27,16 @@
   repair write restores what a stale whole-blob flight erased - so a peer op
   stays immortal in every copy that observed it; unattested blobs fold empty
   and legacy pre-protocol documents still adopt wholesale.
+- Moved every durable write onto the SDK's conditional storage contract:
+  document and receipt commits carry the `{rev, gen}` token of the base they
+  were computed from, so a losing write rejects `E_CONFLICT` with zero
+  effects instead of clobbering a peer's confirmed rows, a dead-generation
+  token rejects `E_GONE`, and an ambiguous acknowledgement resolves by reading
+  the key back and matching the same operation's identity before retrying.
+  Conflicts rebase the same intents onto the moved base rather than
+  resubmitting a frozen document, which closes late-write and receipt-trim
+  losses (including accepted adds over-counting after a merge replay) across
+  conflicts, unknown acks, trims and cold closes.
 - Made same-batch merging exact under replay: ops stamp row provenance
   (`src`), and merge folds batch siblings so a replayed duplicate drops and
   genuinely concurrent adds sum onto the canonical row.

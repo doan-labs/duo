@@ -21,7 +21,7 @@ import {
   serializeDoc,
   type Unit
 } from './pantry.ts'
-import { type DocStore, PantrySync, type SyncStatus } from './sync.ts'
+import { type DocStore, PantrySync, type StoreEntry, type StoreExpect, type SyncStatus } from './sync.ts'
 
 let n = 0
 const ok = (cond: boolean, label: string) => {
@@ -42,41 +42,61 @@ type Event = { rev: number; v?: string }
  * flushed (delayed/out-of-order delivery), `holdSets` parks write acks,
  * `failGet`/`failSet` count down rejections, `foreign` commits another copy's
  * write straight onto the document.
+ *
+ * The conditional contract is enforced exactly where the real adapter does -
+ * inside the write, not at call time: a parked or racing `set` whose `expect`
+ * token went stale rejects E_CONFLICT (zero effects) or E_GONE when the
+ * generation died. `dropSets` commits but eats the response, the ambiguous
+ * failure the engine must resolve by readback.
  */
 class FakeStore implements DocStore {
   rev = 0
+  gen = 1
   value: string | null = null
   failGet = 0
   failSet = 0
   quiet = false
   holdSets = false
   blockGet = false
+  dropSets = false
   commits = 0
   private listeners = new Set<(e: Event) => void>()
   private queued: Event[] = []
-  private held: { v: string; res: (r: number) => void; rej: (e: Error) => void }[] = []
-  private getWaiters: { res: (v: string | null) => void }[] = []
+  private held: { v: string; expect: StoreExpect; res: (r: number) => void; rej: (e: unknown) => void }[] = []
+  private getWaiters: { res: (v: StoreEntry) => void }[] = []
 
-  get(): Promise<string | null> {
+  entry(): Promise<StoreEntry> {
     if (this.failGet > 0) {
       this.failGet--
-      return Promise.reject(new Error('get rejected'))
+      return Promise.reject(new Error('entry rejected'))
     }
     if (this.blockGet) return new Promise((res) => this.getWaiters.push({ res }))
-    return Promise.resolve(this.value)
+    return Promise.resolve({ v: this.value, rev: this.rev, gen: this.gen })
   }
 
-  /** Resolve every parked get with the current value. */
+  /** Resolve every parked entry read with the current entry. */
   unblockGets(): void {
-    for (const w of this.getWaiters.splice(0)) w.res(this.value)
+    const e = { v: this.value, rev: this.rev, gen: this.gen }
+    for (const w of this.getWaiters.splice(0)) w.res(e)
   }
 
-  set(v: string): Promise<number> {
+  set(v: string, expect: StoreExpect): Promise<number> {
+    if (this.holdSets) return new Promise<number>((res, rej) => this.held.push({ v, expect, res, rej }))
+    return this.applySet(v, expect)
+  }
+
+  /** One conditional write attempt, checked at commit like the real adapter. */
+  private applySet(v: string, expect: StoreExpect): Promise<number> {
+    if (expect.gen !== this.gen) return Promise.reject({ code: 'E_GONE' })
+    if (expect.rev !== this.rev) return Promise.reject({ code: 'E_CONFLICT' })
     if (this.failSet > 0) {
       this.failSet--
       return Promise.reject(new Error('set rejected'))
     }
-    if (this.holdSets) return new Promise<number>((res, rej) => this.held.push({ v, res, rej }))
+    if (this.dropSets) {
+      this.commit(v)
+      return Promise.reject({ code: 'E_TIMEOUT' }) // landed, response lost
+    }
     return Promise.resolve(this.commit(v))
   }
 
@@ -106,6 +126,12 @@ class FakeStore implements DocStore {
     return this.commit(v)
   }
 
+  /** Simulate a restore: the space's generation advances, old tokens die. */
+  restore(v: string | null): number {
+    this.gen++
+    return this.commit(v)
+  }
+
   /** Deliver parked events oldest-first. */
   flush(): void {
     for (const e of this.queued.splice(0)) for (const cb of [...this.listeners]) cb(e)
@@ -126,14 +152,18 @@ class FakeStore implements DocStore {
     for (const cb of [...this.listeners]) cb({ rev: -1 })
   }
 
-  /** Commit every parked write ack, oldest first. */
+  /**
+   * Release every parked write, oldest first. The token check happens NOW,
+   * at commit time: a flight parked before a peer's commit rejects E_CONFLICT
+   * instead of clobbering it - the regression the SDK migration fixes.
+   */
   releaseSets(): void {
-    for (const h of this.held.splice(0)) h.res(this.commit(h.v))
+    for (const h of this.held.splice(0)) void this.applySet(h.v, h.expect).then(h.res, h.rej)
   }
 
-  /** Reject every parked write ack. */
+  /** Reject every parked write ack with an ambiguous error (outcome unknown). */
   rejectSets(): void {
-    for (const h of this.held.splice(0)) h.rej(new Error('set dropped'))
+    for (const h of this.held.splice(0)) h.rej({ code: 'E_TIMEOUT' })
   }
 
   get heldCount(): number {
@@ -553,14 +583,17 @@ async function heldFlightCase(heldWriter: string, peerWriter: string, watchBefor
   const watchers = new Map<string, (e: Event) => void>()
   let delayedPeerEvent: Event | null = null
   const mkStore = (writer: string): DocStore => ({
-    get: async () => wireNow,
-    set: async (v) => {
+    entry: async () => ({ v: wireNow, rev: revNow, gen: 1 }),
+    set: async (v, expect) => {
       if (writer === heldWriter && !held) {
         held = true
         heldText = v
         inFlight.resolve()
         await release.promise
       }
+      // Conditional check at commit, like the real adapter: the held payload's
+      // token went stale under the peer's commit and must reject, not erase it.
+      if (expect.rev !== revNow) throw { code: 'E_CONFLICT' }
       wireNow = v
       const n = ++revNow
       for (const [who, cb] of watchers) {
@@ -617,7 +650,7 @@ async function heldFlightCase(heldWriter: string, peerWriter: string, watchBefor
     eq(sa.doc!.items.length, 2, 'held copy renders both rows pre-ack')
   }
   b.dispose()
-  release.resolve() // A's stale payload lands at a newer revision over B's
+  release.resolve() // A's stale payload rejects E_CONFLICT at commit; the engine rebases
   for (let i = 0; i < 400 && sa.statuses.at(-1) !== 'synced'; i++) await sleep(2)
   if (delayedPeerEvent) watchers.get(heldWriter)?.(delayedPeerEvent)
   for (let i = 0; i < 400 && sa.statuses.at(-1) !== 'synced'; i++) await sleep(2)
@@ -662,13 +695,14 @@ await (async () => {
   const inFlight = Promise.withResolvers<void>()
   let held = false
   const mkStore = (writer: string): DocStore => ({
-    get: async () => wireNow,
-    set: async (v) => {
+    entry: async () => ({ v: wireNow, rev: revNow, gen: 1 }),
+    set: async (v, expect) => {
       if (writer === 'cover' && !held) {
         held = true
         inFlight.resolve()
         await release.promise
       }
+      if (expect.rev !== revNow) throw { code: 'E_CONFLICT' }
       wireNow = v
       const n = ++revNow
       for (const cb of watchers.values()) cb({ rev: n, v })
@@ -840,9 +874,9 @@ await (async () => {
   )
   sync.dispose()
   const commits = store.commits
-  store.releaseSets()
+  store.releaseSets() // foreign commit moved the rev: the stale payload rejects E_CONFLICT
   await sleep(20)
-  eq(store.commits - commits, 1, 'the released write commits once, no post-dispose drain')
+  eq(store.commits - commits, 0, 'stale held write rejects without landing; no post-dispose drain')
   eq(sink.statuses.at(-1), 'saving', 'disposed mid-save never flips to a false terminal')
 })()
 

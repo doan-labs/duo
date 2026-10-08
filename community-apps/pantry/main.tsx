@@ -73,8 +73,11 @@ const ME = crypto.randomUUID()
 // tests drive the same interface.
 const SLOT = os.view.display
 const docStore: DocStore = {
-  get: () => os.storage.get('pantry-v1'),
-  set: (v) => os.storage.set('pantry-v1', v).then((c) => c.rev),
+  // Conditional writes end to end: the engine's commits carry the {rev, gen}
+  // token of the base they were computed from, so a losing write rejects
+  // instead of clobbering a peer's confirmed rows.
+  entry: () => os.storage.entry('pantry-v1'),
+  set: (v, expect) => os.storage.set('pantry-v1', v, expect).then((c) => c.rev),
   watch: (cb) =>
     os.storage.watch(0, (c) => {
       // The resync sentinel (rev -1) has no key; anything else must be ours.
@@ -91,8 +94,8 @@ const docStore: DocStore = {
       }
     }),
   ops: {
-    get: (slot) => os.storage.get(`pantry-ops-${slot}`),
-    set: (slot, v) => os.storage.set(`pantry-ops-${slot}`, v).then((c) => c.rev)
+    entry: (slot) => os.storage.entry(`pantry-ops-${slot}`),
+    set: (slot, v, expect) => os.storage.set(`pantry-ops-${slot}`, v, expect).then((c) => c.rev)
   }
 }
 
