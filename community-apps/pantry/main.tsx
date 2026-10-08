@@ -204,6 +204,8 @@ function Pantry() {
   const [flashId, setFlashId] = useState<string | null>(null)
 
   const docRef = useRef(doc)
+  const draftRef = useRef(draft)
+  draftRef.current = draft
   const uiRef = useRef({ loc, q, sort })
   uiRef.current = { loc, q, sort }
   const noticeTimer = useRef<number | undefined>(undefined)
@@ -338,20 +340,23 @@ function Pantry() {
 
   const add = () => {
     if (!live()) return // denied events change nothing - no validation side effects
-    const name = cleanName(draft.name)
-    const milli = parseQty(draft.qty)
-    const date = draft.date.trim()
+    const accepted = draft
+    const name = cleanName(accepted.name)
+    const milli = parseQty(accepted.qty)
+    const date = accepted.date.trim()
     const errs: Errors = {}
     if (!name) errs.name = 'Name the ingredient'
     if (milli === null) errs.qty = 'Enter a quantity above 0 (e.g. 2 or 1.5)'
     if (date && !validDay(date)) errs.date = 'That is not a calendar day'
-    setErrors(errs)
+    // Write validation state only when the validated draft still owns the
+    // form - a stale-closure submit must not clobber a newer draft's errors.
+    setErrors((prev) => (draftRef.current === accepted ? errs : prev))
     if (Object.keys(errs).length) {
       announce('warn', 'Check the highlighted fields')
       return
     }
     const res = mutate(
-      opAdd({ name, milli: milli!, unit: draft.unit, location: draft.location, bestBefore: date || null })
+      opAdd({ name, milli: milli!, unit: accepted.unit, location: accepted.location, bestBefore: date || null })
     )
     if (!res) return
     const meta = res.meta as AddMeta | undefined
@@ -364,7 +369,10 @@ function Pantry() {
     announce('good', meta.merged && landed ? `${name} topped up to ${qtyText(landed)}` : `${name} stocked`)
     play('add')
     setFlashId(meta.id)
-    setDraft({ ...EMPTY_DRAFT, unit: draft.unit, location: draft.location })
+    setDraft({ ...EMPTY_DRAFT, unit: accepted.unit, location: accepted.location })
+    // Clear only for the draft this call accepted - a newer invalid draft's
+    // errors belong to that draft and must survive this submission's success.
+    setErrors((prev) => (draftRef.current === accepted ? {} : prev))
   }
 
   const step = (item: Item, dir: 'use' | 'restock') => {
