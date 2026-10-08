@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.1
+
+- A copy that fails to open now recovers instead of sitting on a blank
+  screen: a settled failed seed or a failed storage hydrate shows a legible
+  "Could not open your puzzle" state on both displays, and a quiet
+  "Opening" line while a load is still in flight. Retry stays hidden while
+  a seed attempt is pending or queued.
+- Retry remounts the copy, resubscribing the storage mirrors and re-reading
+  authoritative entries, so a saved library can never be replaced by a fresh
+  random game.
+- A proven pre-apply read failure re-derives the seed automatically, bounded
+  to two attempts. A dead generation or an ambiguous commit outcome is
+  terminal for that copy: no automatic or manual retry is offered in the
+  same session, only Close and reopen.
+
 ## 1.0.0
 
 - First release: three original SVG illustrations (Harbour Dawn, Alpine

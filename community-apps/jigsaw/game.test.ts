@@ -8,9 +8,15 @@ import {
   admitInput,
   createGamePersistence,
   createPrefsPersistence,
+  errCode,
   mergedSaves,
+  ownPrefsAdopt,
   PREFS0,
-  parsePrefsDoc
+  parsePrefsDoc,
+  seedFailureKind,
+  seedGateBlocked,
+  seedManualRetryAllowed,
+  seedRetryable
 } from './persist.ts'
 import {
   BOARD_H,
@@ -52,6 +58,13 @@ import {
   unionGames
 } from './puzzle.ts'
 import { enqueue } from './queue.ts'
+
+// The mirror-hydrate check below reads real SDK source at runtime; Bun is not
+// typed inside the app sandbox tsconfig, so declare the sliver it uses.
+declare const Bun: {
+  file(path: string): { text(): Promise<string> }
+  Transpiler: new (opts: { loader: string }) => { transformSync(src: string): string }
+}
 
 let passed = 0
 const failures: string[] = []
@@ -1300,6 +1313,252 @@ await checkAsync('a reset bumps the incarnation so pre-reset intents and stale s
   // Legacy wire docs without gen parse as incarnation 0.
   const legacy = parseGame(JSON.stringify({ ...g0, gen: undefined }))!
   eq(legacy.gen, 0, 'legacy save did not default to gen 0')
+})
+
+// ---------- recovery policy checks ----------
+//
+// The seed's retry contract: a proven pre-apply read failure may re-derive on
+// fresh entries; a dead generation is terminal; an ambiguous commit outcome is
+// never retried automatically. These run the real act() path over the same
+// host-faithful fake so the tag the UI keys on is exercised, not re-asserted.
+
+await checkAsync('a proven pre-apply read failure is retry-safe and adopts the saved puzzle', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const saved = placeAt(newGame('harbour', 12, 7), 3, 100, 100, 50).game
+  saves.peerSet('saves', serializeSaves({ rev: 2, by: 'peer', current: 'harbour:12', games: { 'harbour:12': saved } }))
+  const P = makePersist('me', live, saves)
+  // The seed's intent, verbatim from main.tsx: adopt the saved config entry,
+  // never mint a fresh random game over it.
+  const seed = (ctx: { game: Game | null; saves: Record<string, Game> }) =>
+    ctx.game ? null : { next: ctx.saves['harbour:12'] ?? newGame('harbour', 12, 99), held: null }
+  saves.failNext = 1
+  let err: unknown
+  await P.p.act(seed, undefined).then(
+    () => {},
+    (e) => {
+      err = e
+    }
+  )
+  ok(seedRetryable(err), 'a pre-apply read failure must be tagged retry-safe')
+  eq(P.state.game, null, 'a failed read still applied a game optimistically')
+  // The re-armed seed re-reads fresh entries: the saved puzzle comes back.
+  await P.p.act(seed, undefined)
+  ok(P.state.game !== null && sameGame(P.state.game, saved), 'retry must adopt the saved puzzle, not reseed')
+  const durable = parseSaves(saves.store.get('saves')!)
+  ok(
+    durable.games['harbour:12'] !== undefined && sameGame(durable.games['harbour:12']!, saved),
+    'durable library lost the saved puzzle'
+  )
+  eq(durable.games['harbour:12']!.seed, 7, 'a fresh random game replaced the saved seed')
+})
+
+await checkAsync('a dead generation is terminal even when the read failure is pre-apply', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+  saves.getHook = async () => {
+    throw Object.assign(new Error('generation dead'), { code: 'E_GONE' })
+  }
+  let err: unknown
+  await P.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(errCode(err), 'E_GONE', 'read did not surface E_GONE')
+  ok((err as { preApply?: boolean }).preApply === true, 'a failed read must still be marked pre-apply')
+  ok(!seedRetryable(err), 'E_GONE must never be auto-retried')
+  eq(live.sets.length + saves.sets.length, 0, 'a dead-generation failure mutated durable state')
+})
+
+await checkAsync('an ambiguous commit outcome is never retry-safe', async () => {
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+  // ACK lost and the host never applied it: the readback cannot prove landing,
+  // so the step fails ambiguous - a fresh seed attempt must not auto-fire.
+  saves.setFaults = ['timeout-lost']
+  let err: unknown
+  await P.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(errCode(err), 'E_TIMEOUT', 'lost ACK did not surface E_TIMEOUT')
+  ok(!(err as { preApply?: boolean }).preApply, 'a commit outcome must not be tagged pre-apply')
+  ok(!seedRetryable(err), 'an ambiguous outcome must never auto-retry')
+  ok(!saves.store.has('saves'), 'the unapplied write should stay absent from durable state')
+})
+
+await checkAsync('settled failures classify for the UI: only preapply may be retried by hand', async () => {
+  // The wait card branches on seedFailureKind: 'terminal' and 'ambiguous'
+  // render Close/reopen guidance with NO retry affordance - an epoch remount
+  // could replay a mutating intent, which is what this policy forbids.
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+
+  saves.failNext = 1
+  let err: unknown
+  await P.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(seedFailureKind(err), 'preapply', 'a proven read miss must classify as safely retryable')
+
+  saves.getHook = async () => {
+    throw Object.assign(new Error('generation dead'), { code: 'E_GONE' })
+  }
+  err = undefined
+  await P.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(seedFailureKind(err), 'terminal', 'E_GONE must classify terminal even when thrown pre-apply')
+
+  const saves2 = new FakeKV()
+  const P2 = makePersist('me', new FakeKV(), saves2)
+  saves2.setFaults = ['timeout-lost']
+  err = undefined
+  await P2.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(seedFailureKind(err), 'ambiguous', 'a commit outcome must classify ambiguous')
+  ok(seedFailureKind(err) !== 'preapply', 'ambiguous outcome must never reach a retry affordance')
+})
+
+await checkAsync('the seed admission gate blocks every retrigger while busy, queued, or settled', async () => {
+  // Mirrors the effect guard in main.tsx: once a seed intent is inflight,
+  // queued for the bounded auto-retry, or settled by a classified failure,
+  // no dependency change (copyLive wake, foreign saves write, seedAttempt
+  // tick) may spawn another intent in this mounted copy.
+  const idle = { seeded: false, busy: false, autoPending: false, settled: false }
+  ok(!seedGateBlocked(idle), 'an idle copy must admit a seed')
+  ok(seedGateBlocked({ ...idle, seeded: true }), 'a seeded copy must never reseed')
+  ok(seedGateBlocked({ ...idle, busy: true }), 'an inflight act must block a second intent')
+  ok(seedGateBlocked({ ...idle, autoPending: true }), 'a queued backoff retry must block a second intent')
+  ok(seedGateBlocked({ ...idle, settled: true }), 'a classified failure must block dependency retriggers')
+})
+
+await checkAsync('a stale queued tap cannot remount after a terminal or ambiguous settle', async () => {
+  // The Retry click guard reads refs synchronously: a tap dispatched before
+  // React commits the failure state still sees the settled kind, so only a
+  // proven preapply miss (or a bare mirror error, kind null) may remount.
+  const base = { busy: false, autoPending: false, settledKind: null as 'preapply' | 'terminal' | 'ambiguous' | null }
+  ok(seedManualRetryAllowed(base), 'a bare mirror error (no seed failure) must allow the remount retry')
+  ok(!seedManualRetryAllowed({ ...base, busy: true }), 'an inflight act must refuse the tap')
+  ok(!seedManualRetryAllowed({ ...base, autoPending: true }), 'a queued backoff retry must refuse the tap')
+  ok(
+    seedManualRetryAllowed({ ...base, settledKind: 'preapply' }),
+    'a settled preapply failure must keep the manual remount retry'
+  )
+  ok(!seedManualRetryAllowed({ ...base, settledKind: 'terminal' }), 'E_GONE must refuse the remount race or not')
+  ok(!seedManualRetryAllowed({ ...base, settledKind: 'ambiguous' }), 'an ambiguous commit must refuse the remount')
+})
+
+await checkAsync('a remount hydrates confirmed own prefs so the gate opens again', async () => {
+  // ME is module-level and survives the epoch remount: a stored prefs
+  // envelope written by this copy echoes as own, and the own-echo branch
+  // must initialize prefs state on first hydrate or the app sits behind
+  // !prefs forever - the seed can only run once prefs exist.
+  const env = parsePrefsDoc(
+    JSON.stringify({ rev: 4, by: 'me', prefs: { art: 'alpine', count: 24, muted: true, guide: false } })
+  )
+  eq(ownPrefsAdopt(env, 'me', null), env.prefs, 'a confirmed own envelope must seed prefs on first hydrate')
+  eq(ownPrefsAdopt(env, 'peer', null), null, 'a foreign envelope must not take the own-echo branch')
+  eq(ownPrefsAdopt(env, 'me', PREFS0), null, 'a later own echo stays clock-only once prefs exist')
+})
+
+await checkAsync('a mirror error at backoff expiry leaves the retry available, not stuck on Opening', async () => {
+  // The backoff callback clears autoPending AND the in-flight flag before
+  // re-arming seedAttempt: if the mirror went to 'error' during the wait,
+  // the re-armed effect returns at the status guard with no act running,
+  // and the wait card must expose the remount retry rather than loading.
+  const postExpiry = {
+    busy: false,
+    autoPending: false,
+    settledKind: null as 'preapply' | 'terminal' | 'ambiguous' | null
+  }
+  ok(seedManualRetryAllowed(postExpiry), 'post-expiry with no settled failure must admit the manual remount retry')
+  ok(
+    !seedGateBlocked({ seeded: false, busy: false, autoPending: false, settled: false }),
+    'post-expiry the effect gate must still admit the re-armed seed when the mirror is ready'
+  )
+})
+
+await checkAsync('a failed mirror hydrate recovers on a fresh subscribe', async () => {
+  // The real KVMirror, evaluated from shipped SDK source (paper-fold pattern:
+  // no package resolution inside the app sandbox; PlatformError injected).
+  const mirrorSource = await Bun.file(new URL('../../packages/sdk/mirror.ts', import.meta.url).pathname).text()
+  class PlatformError extends Error {
+    constructor(
+      public code: string,
+      message?: string
+    ) {
+      super(message ?? code)
+      this.name = 'PlatformError'
+    }
+  }
+  const { KVMirror } = new Function(
+    'PlatformError',
+    `${new Bun.Transpiler({ loader: 'ts' })
+      .transformSync(mirrorSource)
+      .replace(/^import[^\n]*\n/gm, '')
+      .replace(/^export /gm, '')}\nreturn { KVMirror };`
+  )(PlatformError) as {
+    KVMirror: new (
+      space: never
+    ) => { subscribe: (cb: () => void) => () => void; read: (k: string) => { value: string | null; status: string } }
+  }
+  let fails = 1
+  const space = {
+    async snapshot() {
+      if (fails > 0) {
+        fails--
+        // A non-retryable PlatformError lands the 'error' state on the first
+        // pull; a plain Error would be retried as E_STORAGE.
+        throw new PlatformError('E_GONE', 'dead generation')
+      }
+      const entries: [string, string][] = [['jigsaw-saves', '{"rev":2,"by":"peer","current":null,"games":{}}']]
+      return { entries, rev: 2, cursor: undefined }
+    },
+    watch: () => () => {},
+    async set() {},
+    async del() {},
+    async entry() {
+      return { k: 'jigsaw-saves', v: null, rev: 2, gen: 1 }
+    }
+  }
+  const mirror = new KVMirror(space as never)
+  const un = mirror.subscribe(() => {})
+  await new Promise((r) => setTimeout(r, 20))
+  eq(mirror.read('jigsaw-saves').status, 'error', 'a failed hydrate must surface the error state')
+  un()
+  // What the Retry button does: remount the copy, resubscribe, re-hydrate.
+  mirror.subscribe(() => {})
+  await new Promise((r) => setTimeout(r, 20))
+  eq(mirror.read('jigsaw-saves').status, 'ready', 'a resubscribed mirror never re-hydrated')
+  eq(mirror.read('jigsaw-saves').value, '{"rev":2,"by":"peer","current":null,"games":{}}')
 })
 
 await checkAsync('tray counts report the real tray population under filters', async () => {

@@ -56,7 +56,7 @@ export type KVLike = {
  * race, small enough that a dead end reports instead of spinning. */
 const CAS_ATTEMPTS = 4
 
-const errCode = (e: unknown): string =>
+export const errCode = (e: unknown): string =>
   e && typeof e === 'object' && 'code' in e && typeof (e as { code: unknown }).code === 'string'
     ? (e as { code: string }).code
     : 'E_STORAGE'
@@ -118,6 +118,15 @@ export function cleanPrefs(raw: string | null): Prefs {
 /** The prefs wire envelope: prefs plus the revision and writer for ordering. */
 export type PrefsDoc = { rev: number; by: string; prefs: Prefs }
 
+/** Remount-safe prefs hydrate: the writer id is module-level and outlives a
+ * component remount, so a confirmed envelope this copy wrote still echoes
+ * as own. On first hydrate (current null) it must initialize state or the
+ * prefs gate never opens; later own echoes stay clock-only because the
+ * optimistic state is already at least as new. */
+export function ownPrefsAdopt(env: { by: string; prefs: Prefs }, me: string, current: Prefs | null): Prefs | null {
+  return env.by === me && current === null ? env.prefs : null
+}
+
 export function parsePrefsDoc(raw: string | null): PrefsDoc {
   const prefs = cleanPrefs(raw)
   try {
@@ -135,6 +144,54 @@ export function parsePrefsDoc(raw: string | null): PrefsDoc {
 }
 
 /** Lamport clock for one shared key: the revision/writer last accepted. */
+/** Seed retry policy: a proven pre-apply read/intent failure (nothing was
+ * committed) may re-derive on fresh authoritative entries, bounded by the
+ * caller; a dead generation is terminal and anything ambiguous - a commit
+ * outcome, an exhausted CAS - is never auto-retried. */
+export function seedRetryable(e: unknown): boolean {
+  return (e as { preApply?: boolean })?.preApply === true && errCode(e) !== 'E_GONE'
+}
+
+/** A settled seed-act rejection classified for the recovery UI. 'terminal'
+ * (dead generation) and 'ambiguous' (a commit was attempted, so landing is
+ * unknown) refuse every same-session retry path - automatic, dependency
+ * retrigger, and manual remount alike - because a remount could replay a
+ * mutating intent; only a host close/reopen may try again. 'preapply' settled
+ * with zero durable effect, so a bounded re-derivation stays safe. */
+export type SeedFailureKind = 'preapply' | 'terminal' | 'ambiguous'
+
+export function seedFailureKind(e: unknown): SeedFailureKind {
+  if (errCode(e) === 'E_GONE') return 'terminal'
+  if (seedRetryable(e)) return 'preapply'
+  return 'ambiguous'
+}
+
+/** Manual-retry admission, the rule the click guard applies: nothing while
+ * a seed is inflight or backoff-queued, and a settled 'terminal'/'ambiguous'
+ * failure refuses a remount entirely - it could replay a mutating intent.
+ * A settled 'preapply' miss stays retryable (re-derivation is zero-durable-
+ * effect), and no seed failure at all (settledKind null, e.g. a bare mirror
+ * error) is exactly what the remount exists to recover. */
+export function seedManualRetryAllowed(s: {
+  busy: boolean
+  autoPending: boolean
+  settledKind: SeedFailureKind | null
+}): boolean {
+  return !s.busy && !s.autoPending && s.settledKind !== 'terminal' && s.settledKind !== 'ambiguous'
+}
+
+/** Seed admission gate: once a seed intent is running, queued for a bounded
+ * retry, or settled by a classified failure, no dependency retrigger may fire
+ * another one. */
+export function seedGateBlocked(s: {
+  seeded: boolean
+  busy: boolean
+  autoPending: boolean
+  settled: boolean
+}): boolean {
+  return s.seeded || s.busy || s.autoPending || s.settled
+}
+
 export type Clock = { rev: number; by: string }
 
 /** A live envelope carrying a strictly older incarnation than the confirmed
@@ -289,83 +346,100 @@ export function createGamePersistence(deps: {
     },
     act(fn, bind) {
       return enqueue(deps.queue, async () => {
+        // Once the step has reached a conditional write its outcome is
+        // ambiguous; before that every failure is a proven read/intent
+        // failure that a retry on fresh entries cannot make worse.
+        let commitAttempted = false
         for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
           // One confirmed read of BOTH entries: value plus the {rev, gen}
           // precondition token for this attempt's conditional writes.
-          const [liveEnt, savesEnt] = await Promise.all([
-            deps.liveKV.entry(deps.liveKey),
-            deps.savesKV.entry(deps.savesKey)
-          ])
-          const sd = parseSaves(savesEnt.v)
-          if (newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) deps.acceptSaves(sd)
-          // The library is always the per-key union of the store doc and
-          // our last CONFIRMED envelope, so exclusive keys a racer holds
-          // survive whoever wins the commit race. savesDoc() never reports
-          // an optimistic payload - this baseline is durable truth only.
-          const lib = unionGames(sd.games, deps.savesDoc()?.games ?? {})
-          const doc = parseLive(liveEnt.v)
-          // The rebase base is confirmed state, never the optimistic mirror:
-          // a foreign live doc wins adoption (fenced against dead
-          // incarnations), then the unioned library's same-key entry. The
-          // mirror seeds the base ONLY when no confirmed doc covers the
-          // running puzzle - otherwise the semantic intent re-runs on the
-          // confirmed copy, so a peer placement that landed mid-flight is
-          // preserved instead of overwritten by our stale whole-doc.
-          let base: Game | null = null
-          let heldBase: number | null = null
-          if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
-            const fenced = fenceAdoptGame(doc, lib)
-            deps.adopt(fenced)
-            base = fenced.game
-            heldBase = fenced === doc ? doc.held : null
-          }
-          const running = base ?? deps.refs.game.current
-          if (!base) {
-            const alt = running ? lib[configKey(running.art, running.count)] : undefined
-            base = alt ?? running
-            heldBase = alt && !sameGame(alt, running!) ? null : deps.refs.held.current
-          } else {
-            const alt = lib[configKey(base.art, base.count)]
-            if (alt && newerGame(alt, base) !== base) {
-              base = alt
-              heldBase = null
+          let payload: GameApply
+          let liveEnt: EntryToken
+          let savesEnt: EntryToken
+          try {
+            ;[liveEnt, savesEnt] = await Promise.all([
+              deps.liveKV.entry(deps.liveKey),
+              deps.savesKV.entry(deps.savesKey)
+            ])
+            const sd = parseSaves(savesEnt.v)
+            if (newerDoc(sd.rev, sd.by, deps.clocks.saves.rev, deps.clocks.saves.by)) deps.acceptSaves(sd)
+            // The library is always the per-key union of the store doc and
+            // our last CONFIRMED envelope, so exclusive keys a racer holds
+            // survive whoever wins the commit race. savesDoc() never reports
+            // an optimistic payload - this baseline is durable truth only.
+            const lib = unionGames(sd.games, deps.savesDoc()?.games ?? {})
+            const doc = parseLive(liveEnt.v)
+            // The rebase base is confirmed state, never the optimistic mirror:
+            // a foreign live doc wins adoption (fenced against dead
+            // incarnations), then the unioned library's same-key entry. The
+            // mirror seeds the base ONLY when no confirmed doc covers the
+            // running puzzle - otherwise the semantic intent re-runs on the
+            // confirmed copy, so a peer placement that landed mid-flight is
+            // preserved instead of overwritten by our stale whole-doc.
+            let base: Game | null = null
+            let heldBase: number | null = null
+            if (doc && doc.by !== deps.me && newerDoc(doc.rev, doc.by, deps.clocks.live.rev, deps.clocks.live.by)) {
+              const fenced = fenceAdoptGame(doc, lib)
+              deps.adopt(fenced)
+              base = fenced.game
+              heldBase = fenced === doc ? doc.held : null
             }
-          }
-          // A piece id admitted against one puzzle means nothing on another:
-          // if the live puzzle changed (peer switch, seed rollover, a reset
-          // that bumped the incarnation) the intent dies here rather than
-          // mutating a game it was never aimed at.
-          if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
-          const r = fn({ game: base, held: heldBase, saves: lib })
-          if (!r) return
-          deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
-          deps.clocks.live.by = deps.me
-          deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
-          deps.clocks.saves.by = deps.me
-          const key = `${r.next.art}:${r.next.count}`
-          const savesDoc: Saves = {
-            rev: deps.clocks.saves.rev,
-            by: deps.me,
-            current: key,
-            games: { ...lib, [key]: r.next }
-          }
-          const payload: GameApply = {
-            game: r.next,
-            held: r.held,
-            live: JSON.stringify({
-              v: 1,
+            const running = base ?? deps.refs.game.current
+            if (!base) {
+              const alt = running ? lib[configKey(running.art, running.count)] : undefined
+              base = alt ?? running
+              heldBase = alt && !sameGame(alt, running!) ? null : deps.refs.held.current
+            } else {
+              const alt = lib[configKey(base.art, base.count)]
+              if (alt && newerGame(alt, base) !== base) {
+                base = alt
+                heldBase = null
+              }
+            }
+            // A piece id admitted against one puzzle means nothing on another:
+            // if the live puzzle changed (peer switch, seed rollover, a reset
+            // that bumped the incarnation) the intent dies here rather than
+            // mutating a game it was never aimed at.
+            if (bind !== undefined && (!base || gameKeyOf(base) !== bind)) return
+            const r = fn({ game: base, held: heldBase, saves: lib })
+            if (!r) return
+            deps.clocks.live.rev = Math.max(deps.clocks.live.rev, doc?.rev ?? 0) + 1
+            deps.clocks.live.by = deps.me
+            deps.clocks.saves.rev = Math.max(deps.clocks.saves.rev, sd.rev) + 1
+            deps.clocks.saves.by = deps.me
+            const key = `${r.next.art}:${r.next.count}`
+            const savesDoc: Saves = {
+              rev: deps.clocks.saves.rev,
               by: deps.me,
-              rev: deps.clocks.live.rev,
+              current: key,
+              games: { ...lib, [key]: r.next }
+            }
+            payload = {
+              game: r.next,
               held: r.held,
-              game: r.next
-            } satisfies Live),
-            saves: serializeSaves(savesDoc),
-            savesDoc
+              live: JSON.stringify({
+                v: 1,
+                by: deps.me,
+                rev: deps.clocks.live.rev,
+                held: r.held,
+                game: r.next
+              } satisfies Live),
+              saves: serializeSaves(savesDoc),
+              savesDoc
+            }
+          } catch (e) {
+            // A rejection with no commit attempt behind it is a proven
+            // pre-apply read/intent failure; callers may retry it safely.
+            // Once any conditional write ran, the outcome stays ambiguous
+            // and the error is never marked retry-safe.
+            if (!commitAttempted) (e as { preApply?: boolean }).preApply = true
+            throw e
           }
           // Optimistic UI commit for this attempt; durable truth is the
           // awaited conditional write below.
           deps.apply(payload)
           try {
+            commitAttempted = true
             await Promise.all([
               deps.liveKV.set(deps.liveKey, payload.live, { rev: liveEnt.rev, gen: liveEnt.gen }),
               deps.savesKV.set(deps.savesKey, payload.saves, { rev: savesEnt.rev, gen: savesEnt.gen })
