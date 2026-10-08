@@ -56,6 +56,19 @@ named palette that survives the fold and relaunch.
 
 `os.storage` writes committed state only: the applied colour document, the
 saved palette library and the mute flag. A relaunch restores exactly those.
+Every durable key goes through a conditional writer (`CasKey`): it reads
+`os.storage.entry`, derives the exact value to store from the value just
+read, and writes it back with `set`/`del` carrying that entry's `{ rev, gen }`
+token, so a resolved call is a real durable ack. A moved revision rejects
+`E_CONFLICT` and the intent re-derives on the newer state (the palette
+merge keeps every peer fact; nothing freezes and resends a whole document);
+a dead generation is terminal; a read failure stays dirty and is never an
+absent key. An ambiguous outcome - a timeout or a lost ack - is reconciled
+once through `entry`: bytes equal to what was sent prove the write landed,
+and anything else reports `unknown` instead of claiming the mutation
+applied, because a timed-out original may still commit later. The mirror
+setter is never used as a durable path: it is optimistic and carries no
+ack.
 The half-typed code-field draft is session view state - it follows the fold
 through `os.session` so the other display keeps typing, but a hard relaunch
 returns the last committed colour rather than an unfinished draft.
@@ -70,14 +83,15 @@ returns the last committed colour rather than an unfinished draft.
   the wire or disk over a peer's palettes. A legitimate empty first boot
   and an explicit delete-all still travel, as a `pals: []` list and as
   delete ops.
-- The bootstrap read is a direct `os.storage.get` retried through
+- The bootstrap reads are `os.storage.entry` calls retried through
   `BootPolicy`: failures park while the copy is hidden (no timer-driven
   polling) and re-arm on the next admitted view event, and a resolved read
   that lands after a foreign adopt is discarded rather than clobbering it.
-- The durable writer (`PalStore`) advances its `persisted` marker only when
-  the mirror reports the sent wire settled - never at send time - so a
-  rejected or superseded write stays dirty and retries on re-admission or
-  the next request instead of masquerading as durable.
+  The document, palette and mute entries each seed their writer's token,
+  so the first conditional write binds to the revision actually read.
+- The durable writer (`CasKey`) keeps its latest confirmed entry; a
+  rejected or superseded write stays queued and re-derives from the next
+  `entry` on the next admitted ask instead of resending stale bytes.
 - Every new intent is admitted synchronously on `os.view.visible &&
   os.view.active` at its origin (`admitLive`): keys, pointers, buttons,
   field edits, saves, deletes, undo, mute, clipboard, focus and audio. A

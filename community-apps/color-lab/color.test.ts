@@ -9,9 +9,16 @@ import {
   applyPalOp,
   BLACK,
   BootPolicy,
+  CAS_SKIP,
+  type CasApi,
+  type CasDerive,
+  type CasEntry,
+  CasKey,
+  type CasOutcome,
   contrast,
   coreEq,
   coreOf,
+  docIntent,
   editBound,
   exportCodes,
   HARMONY_KINDS,
@@ -25,16 +32,19 @@ import {
   luminance,
   MAX_PALETTES,
   mergeAcks,
+  mergeDurablePals,
   mergePalWire,
+  muteIntent,
   newDoc,
   newPalette,
   PAL_ACK_LIMIT,
   PAL_OP_WINDOW,
   PAL_PENDING_LIMIT,
+  PAL_TOMB_LIMIT,
   type PalOp,
-  PalStore,
   PalsLib,
   palBase,
+  palsIntent,
   parseColor,
   parseColorFull,
   parseCore,
@@ -77,6 +87,22 @@ const check = (name: string, fn: () => void) => {
   } catch (e) {
     throw new Error(`${name}: ${(e as Error).message}`)
   }
+}
+const achecks: (() => Promise<void>)[] = []
+const acheck = (name: string, fn: () => Promise<void>) => {
+  achecks.push(async () => {
+    try {
+      await fn()
+      passed++
+    } catch (e) {
+      throw new Error(`${name}: ${(e as Error).message}`)
+    }
+  })
+}
+const tick = async () => {
+  await Promise.resolve()
+  await Promise.resolve()
+  await new Promise((r) => setTimeout(r, 0))
 }
 const ok = (cond: boolean, msg: string) => {
   if (!cond) throw new Error(msg)
@@ -1029,69 +1055,444 @@ check('empty bootstrap publish differs from an explicit delete-all', () => {
   eq(victim.list.length, 0, 'peer honours the explicit delete-all')
 })
 
-// ---- durable writer acknowledgements (PalStore) ----
+// ---- conditional durable writes (CasKey) ----
 
-check('PalStore: persisted advances only on settle, never at send time', () => {
-  const sent: string[] = []
-  const failed: string[] = []
-  const store = new PalStore(
-    (w) => sent.push(w),
-    (w) => failed.push(w)
+/**
+ * The durable-side adapter double, implementing the protocol's expectMeta
+ * semantics exactly: `entry` mints `{ v, rev, gen }` atomically; `set`/`del`
+ * reject a moved revision E_CONFLICT and a dead generation E_GONE inside the
+ * write itself; a resolved call is a real durable ack. Fault injection
+ * models a committed-but-lost ack, a still-in-flight (held) mutation, read
+ * failures and a foreign peer writing the same key.
+ */
+class FakeCas implements CasApi {
+  data = new Map<string, string>()
+  rev = 0
+  gen = 1
+  log: string[] = []
+  failReads = 0
+  commitThenLoseAck = 0
+  loseAckNoCommit = 0
+  rollGen = false
+  /** Fires inside the next `entry` after the token is minted: a peer write
+   *  landing between read and write is how a real E_CONFLICT happens. */
+  afterEntry: (() => void) | null = null
+  failHard: string | null = null
+  private held: { k: string; v: string; tok: { rev: number; gen: number }; reject: (e: unknown) => void }[] = []
+  holdNext = false
+
+  async entry(k: string): Promise<CasEntry> {
+    this.log.push(`entry:${k}`)
+    if (this.failReads > 0) {
+      this.failReads--
+      throw Object.assign(new Error('storage'), { code: 'E_STORAGE' })
+    }
+    const e = { v: this.data.get(k) ?? null, rev: this.rev, gen: this.gen }
+    // A generation dying between the read and the write makes the minted
+    // token dead at commit time - the real E_GONE race.
+    if (this.rollGen) {
+      this.rollGen = false
+      this.gen++
+    }
+    const hook = this.afterEntry
+    this.afterEntry = null
+    hook?.()
+    return e
+  }
+
+  private check(tok?: { rev: number; gen: number }) {
+    if (!tok) return
+    if (tok.gen !== this.gen) throw Object.assign(new Error('gone'), { code: 'E_GONE' })
+    if (tok.rev !== this.rev) throw Object.assign(new Error('conflict'), { code: 'E_CONFLICT' })
+  }
+
+  async set(k: string, v: string, expect?: { rev: number; gen: number }) {
+    if (this.holdNext) {
+      this.holdNext = false
+      const record = { k, v, tok: expect!, reject: (e: unknown) => {} }
+      return new Promise<never>((_res, rej) => {
+        record.reject = rej
+        this.held.push(record)
+      })
+    }
+    this.log.push(`set:${k}`)
+    this.check(expect)
+    if (this.failHard) throw Object.assign(new Error(this.failHard), { code: this.failHard })
+    if (this.loseAckNoCommit > 0) {
+      this.loseAckNoCommit--
+      throw Object.assign(new Error('ack lost'), { code: 'E_TIMEOUT' })
+    }
+    this.data.set(k, v)
+    this.rev++
+    if (this.commitThenLoseAck > 0) {
+      this.commitThenLoseAck--
+      throw Object.assign(new Error('ack lost'), { code: 'E_TIMEOUT' })
+    }
+    return { rev: this.rev }
+  }
+
+  async del(k: string, expect?: { rev: number; gen: number }) {
+    this.check(expect)
+    this.data.delete(k)
+    this.rev++
+    return { rev: this.rev }
+  }
+
+  /** A foreign client writing the same space directly (its own tokens). */
+  peerSet(k: string, v: string) {
+    this.data.set(k, v)
+    this.rev++
+  }
+
+  /** The held mutation resolves now: a still-valid token commits (the lost
+   *  ack landing late), a stale one is refused at commit - then the request
+   *  settles as an ambiguous timeout either way. */
+  releaseHeld() {
+    for (const h of this.held.splice(0)) {
+      try {
+        this.check(h.tok)
+        this.data.set(h.k, h.v)
+        this.rev++
+      } catch {
+        // Refused at commit: nothing landed.
+      }
+      h.reject(Object.assign(new Error('ack lost'), { code: 'E_TIMEOUT' }))
+    }
+  }
+}
+
+const palLibWith = (...items: SavedPalette[]) => {
+  const lib = new PalsLib('t')
+  lib.hydrate(serializePalettes(items))
+  return lib
+}
+const PALS_KEY = 'pals'
+const drain = async () => {
+  for (let i = 0; i < 30; i++) await tick()
+}
+
+// No-race control: the production pals intent lands and proves durable.
+await acheck('CasKey: a clean conditional write acks and skips once deduped', async () => {
+  const api = new FakeCas()
+  const lib = palLibWith(pal('P1', 'P1'))
+  const out: CasOutcome[] = []
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => lib.list,
+      () => lib.tombs
+    ),
+    {
+      mergeSafe: true,
+      onOutcome: (o) => out.push(o)
+    }
   )
-  store.request('w1')
-  eq(sent.join(','), 'w1', 'wire sent')
-  ok(store.persisted !== 'w1' && store.dirty, 'sent is not durable yet')
-  store.settle('w1', true)
-  eq(store.persisted, 'w1', 'acknowledged write is durable')
-  ok(!store.dirty, 'caught up')
+  key.ask()
+  await drain()
+  eq(parsePalettes(api.data.get(PALS_KEY)!).length, 1, 'the palette is durable')
+  ok(key.acked !== null && key.acked!.v === api.data.get(PALS_KEY)!, 'acked holds the landed value')
+  ok(out.includes('ack') && !out.includes('unknown'), 'honest ack, nothing falsely applied')
+  const revAfter = api.rev
+  key.ask()
+  await drain()
+  eq(api.rev, revAfter, 'a deduped ask writes nothing')
 })
 
-check('PalStore: rejected writes stay dirty and retry once re-armed', () => {
-  const sent: string[] = []
-  const failed: string[] = []
-  const store = new PalStore(
-    (w) => sent.push(w),
-    (w) => failed.push(w)
+acheck('CasKey: a peer write after the read conflicts, and the rebase keeps both facts', async () => {
+  const api = new FakeCas()
+  const me = palLibWith(pal('A', 'A'))
+  let conflicts = 0
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => me.list,
+      () => me.tombs
+    ),
+    {
+      mergeSafe: true,
+      onOutcome: (o) => {
+        if (o === 'conflict') conflicts++
+      }
+    }
   )
-  store.request('w1')
-  store.settle('w1', false)
-  eq(failed.join(','), 'w1', 'failure reported honestly')
-  ok(store.persisted !== 'w1' && store.dirty, 'uncertain write never claims durability')
-  store.retry()
-  eq(sent.join(','), 'w1,w1', 'retry resends the outstanding wire')
-  store.settle('w1', true)
-  eq(store.persisted, 'w1', 'second attempt confirms')
+  // The peer commits between my entry read and my conditional set.
+  api.afterEntry = () => api.peerSet(PALS_KEY, serializePalettes([pal('B1', 'B1')]))
+  key.ask()
+  await drain()
+  const ids = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
+  ok(ids.includes('B1') && ids.includes('A'), 'conflict rebase preserved the peer row and mine')
+  eq(conflicts, 1, 'the moved revision surfaced as E_CONFLICT')
 })
 
-check('PalStore: coalesces rapid requests and survives a foreign wire landing', () => {
-  const sent: string[] = []
-  const store = new PalStore((w) => sent.push(w))
-  store.request('w1')
-  store.request('w2')
-  eq(sent.join(','), 'w1,w2', 'each newest wire sent once')
-  store.settle('w2', true)
-  eq(store.persisted, 'w2', 'newest confirmed')
-  // A foreign write winning the rev race is the durable truth - and must not
-  // be clobbered by our stale latest before the merge re-bases it.
-  store.request('w3')
-  store.settle('wF', true)
-  eq(store.persisted, 'wF', 'foreign wire is the durable truth')
-  eq(sent.join(','), 'w1,w2,w3', 'no blind resend of the stale wire')
-  store.request('w3')
-  eq(sent.join(','), 'w1,w2,w3,w3', 'the re-based request still goes out')
+// The cross-app gate: A's conditional write commits but the ack is lost, B
+// writes the same key and is acked, then A reconciles. The same production
+// palsIntent derives every write, so A's rebased write must keep B's fact.
+acheck('CasKey: a lost ack over a peer write cannot erase or duplicate it', async () => {
+  const api = new FakeCas()
+  const libA = palLibWith(pal('PA', 'A one'))
+  const out: CasOutcome[] = []
+  const keyA = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => libA.list,
+      () => libA.tombs
+    ),
+    {
+      mergeSafe: true,
+      onOutcome: (o) => out.push(o)
+    }
+  )
+  api.commitThenLoseAck = 1 // A's write lands, then its ack is lost.
+  keyA.ask()
+  await drain()
+  // B's confirmed write on the same key lands while A still believes nothing.
+  const libB = palLibWith(pal('PB', 'B one'))
+  const keyB = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => libB.list,
+      () => libB.tombs
+    ),
+    { mergeSafe: true }
+  )
+  keyB.ask()
+  await drain()
+  // A reconciles on the next ask: the readback shows B's newer value, so the
+  // retried intent derives a merge - not the frozen pre-race bytes.
+  keyA.ask()
+  await drain()
+  const ids = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
+  ok(ids.includes('PB'), 'B survives the reconciled rewrite')
+  eq(ids.filter((i) => i === 'PA').length, 1, 'A lands exactly once - no duplicate')
+  eq(ids.length, 2, 'final durable state carries both facts')
 })
 
-check('PalStore: bootstrap seed never overrides an outstanding write', () => {
-  const sent: string[] = []
-  const store = new PalStore((w) => sent.push(w))
-  store.request('wMine')
-  store.seed('wRead')
-  ok(store.persisted === null, 'in-flight write keeps the seed out')
-  store.settle('wMine', true)
-  eq(store.persisted, 'wMine', 'settled write is the authority')
-  const fresh = new PalStore((w) => sent.push(w))
-  fresh.seed('wRead')
-  eq(fresh.persisted, 'wRead', 'idle seed adopts the confirmed read')
+// Same gate, whole-value intent: an ambiguous ack whose readback shows the
+// peer's value authorizes no same-cycle rerun - it reports unknown instead.
+acheck('CasKey: whole-value intent reports unknown rather than erasing a peer write', async () => {
+  const api = new FakeCas()
+  const mine = { doc: newDoc(hslToRgb({ h: 10, s: 0.8, l: 0.5 })) }
+  const out: CasOutcome[] = []
+  const key = new CasKey(
+    'doc',
+    api,
+    docIntent(() => mine.doc),
+    { onOutcome: (o) => out.push(o) }
+  )
+  api.loseAckNoCommit = 1 // the mutation's fate is unknown, and never landed.
+  key.ask()
+  await drain()
+  ok(out.includes('unknown'), 'the unresolved mutation reported unknown')
+  eq(api.log.filter((l) => l.startsWith('set')).length, 1, 'no same-cycle rerun of the ambiguous write')
+  // The next semantic trigger derives a fresh intent from the peer's landed
+  // value - that new write is authorized by the caller, not by the lost ack.
+  const peerDoc = newDoc(hslToRgb({ h: 250, s: 0.6, l: 0.4 }))
+  api.peerSet('doc', serializeDoc(peerDoc))
+  mine.doc = peerDoc // my live doc adopted the peer's (the wire's job)
+  key.ask()
+  await drain()
+  eq(api.data.get('doc'), serializeDoc(peerDoc), 'the fresh intent wrote the adopted doc')
+})
+
+acheck('CasKey: a held mutation refused at late commit still reconciles without losing the peer', async () => {
+  const api = new FakeCas()
+  const lib = palLibWith(pal('H1', 'H1'))
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => lib.list,
+      () => lib.tombs
+    ),
+    { mergeSafe: true }
+  )
+  api.holdNext = true
+  key.ask()
+  await drain()
+  // Still in flight when the peer writes; the held token is stale at commit,
+  // so the conditional write is refused - it cannot land over the peer.
+  api.peerSet(PALS_KEY, serializePalettes([pal('PEER', 'PEER')]))
+  api.releaseHeld()
+  await drain()
+  // Reconcile + mergeSafe rebase: durable carries the peer row plus mine.
+  const ids = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
+  ok(ids.includes('PEER') && ids.includes('H1'), 'reconciled merge kept both facts')
+  lib.push({ kind: 'add', palette: pal('NEXT', 'NEXT') })
+  key.ask()
+  await drain()
+  const after = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
+  ok(after.includes('NEXT'), 'the next admitted intent lands on the converged base')
+})
+
+acheck('CasKey: a failed entry read is not an absent key', async () => {
+  const api = new FakeCas()
+  api.data.set(PALS_KEY, serializePalettes([pal('REAL', 'REAL')]))
+  api.failReads = 1
+  const lib = palLibWith()
+  const out: CasOutcome[] = []
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => lib.list,
+      () => lib.tombs
+    ),
+    {
+      mergeSafe: true,
+      onOutcome: (o) => out.push(o)
+    }
+  )
+  key.ask()
+  await drain()
+  ok(out.includes('read'), 'the failed read surfaced honestly')
+  eq(parsePalettes(api.data.get(PALS_KEY)!).length, 1, 'the real row was never treated as absent')
+  key.retry()
+  await drain()
+  eq(parsePalettes(api.data.get(PALS_KEY)!).length, 1, 'recovery preserved the durable row')
+})
+
+acheck('CasKey: a dead generation is terminal and never retried', async () => {
+  const api = new FakeCas()
+  const lib = palLibWith(pal('P1', 'P1'))
+  const out: CasOutcome[] = []
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => lib.list,
+      () => lib.tombs
+    ),
+    {
+      mergeSafe: true,
+      onOutcome: (o) => out.push(o)
+    }
+  )
+  api.rollGen = true // the generation dies between entry and set.
+  key.ask()
+  await drain()
+  ok(out.includes('gone'), 'E_GONE surfaced as terminal')
+  ok(key.dead, 'the writer is dead')
+  eq(api.data.get(PALS_KEY) ?? null, null, 'nothing landed under the dead generation')
+  key.ask()
+  await drain()
+  eq(api.data.get(PALS_KEY) ?? null, null, 'a dead writer never retries')
+})
+
+acheck('CasKey: two copies cold-booting at a null record converge on both libraries', async () => {
+  const api = new FakeCas()
+  const libA = palLibWith(pal('CA', 'CA'))
+  const libB = palLibWith(pal('CB', 'CB'))
+  const keyA = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => libA.list,
+      () => libA.tombs
+    ),
+    { mergeSafe: true }
+  )
+  const keyB = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => libB.list,
+      () => libB.tombs
+    ),
+    { mergeSafe: true }
+  )
+  // Both read the same absent key, then both write - the loser rebases.
+  keyA.ask()
+  keyB.ask()
+  await drain()
+  const ids = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
+  ok(ids.includes('CA') && ids.includes('CB'), 'both null-boot writes converged')
+  // Cold-close both copies: fresh writers seeded from the durable read
+  // back the converged state and dedupe to zero writes.
+  const setsBefore = api.log.filter((l) => l.startsWith('set')).length
+  for (const lib of [libA, libB]) {
+    const fresh = new CasKey(
+      PALS_KEY,
+      api,
+      palsIntent(
+        () => lib.list,
+        () => lib.tombs
+      ),
+      { mergeSafe: true }
+    )
+    fresh.seed(await api.entry(PALS_KEY))
+    fresh.ask()
+  }
+  await drain()
+  eq(api.log.filter((l) => l.startsWith('set')).length, setsBefore, 'cold copies converge without rewriting')
+  ok(ids.length === 2, 'nothing duplicated on reopen')
+})
+
+acheck('CasKey: a null derive deletes the key, and a later recreate writes conditionally', async () => {
+  const api = new FakeCas()
+  let want: string | null = 'keep'
+  const key = new CasKey('flag', api, () => want, {})
+  key.ask()
+  await drain()
+  eq(api.data.get('flag'), 'keep', 'the create landed')
+  want = null
+  key.ask()
+  await drain()
+  ok(!api.data.has('flag'), 'the null intent deleted the key')
+  want = 'recreate'
+  key.ask()
+  await drain()
+  eq(api.data.get('flag'), 'recreate', 'a fresh value after delete lands on the next token')
+})
+
+acheck('CasKey: ABA writes each land under a fresh token', async () => {
+  const api = new FakeCas()
+  let want = 'A'
+  const key = new CasKey('mode', api, () => want, {})
+  key.ask()
+  await drain()
+  want = 'B'
+  key.ask()
+  await drain()
+  want = 'A'
+  key.ask()
+  await drain()
+  eq(api.data.get('mode'), 'A', 'the third write landed')
+  eq(api.log.filter((l) => l.startsWith('set')).length, 3, 'every transition was a real conditional write')
+})
+
+check('mergeDurablePals: local wins its ids, durable order carries, tombs stay dead', () => {
+  const a = pal('A', 'A')
+  const b = pal('B', 'B')
+  const x = pal('X', 'X')
+  const merged = mergeDurablePals([b, x], [a, b], new Set(['X']))
+  const ids = merged.map((p) => p.id)
+  eq(ids.join(','), 'B,A', 'durable order carries, tomb excluded, local-only appended')
+  // Idempotent: re-deriving the same inputs gives byte-identical order.
+  eq(
+    mergeDurablePals(merged, [a, b], new Set(['X']))
+      .map((p) => p.id)
+      .join(','),
+    'B,A',
+    'the merge is idempotent'
+  )
+})
+
+check('PalsLib: my delete and an adopted delete both tomb the id', () => {
+  const lib = palLibWith(pal('P1', 'P1'), pal('P2', 'P2'))
+  lib.push({ kind: 'delete', target: 'P1' })
+  ok(lib.tombs.has('P1'), 'my delete tombstoned')
+  // An adopt that drops P2 tombs it too, so the durable merge cannot
+  // resurrect it while the wire delete settles.
+  const other = new PalsLib('o')
+  other.hydrate(serializePalettes([pal('Q1', 'Q1')]))
+  const kw = sharedLib(other.ready, other.list, other.wireOps, other.wireAcks())
+  lib.adopt({ pals: kw.pals!, ops: kw.ops, acks: kw.acks })
+  ok(lib.tombs.has('P2') && !lib.list.some((p) => p.id === 'P2'), 'adopted removal tombstoned')
+  ok(lib.tombs.size <= PAL_TOMB_LIMIT, 'tombs stay bounded')
 })
 
 // ---- admission-aware bootstrap retry (BootPolicy) ----
@@ -1155,5 +1556,7 @@ check('BootPolicy: progress resets the backoff', () => {
   boot.fail()
   eq(delays[2], delays[0], 'a success resets to the base delay')
 })
+
+for (const run of achecks) await run()
 
 console.log(`color.test.ts: ${passed} checks passed`)

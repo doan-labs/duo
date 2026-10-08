@@ -1,5 +1,4 @@
 import { os } from '@doan-labs/duo-sdk'
-import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Button, IconButton, Push, Sheet, Sym, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
@@ -9,11 +8,15 @@ import { type Cue, cue } from './audio.ts'
 import {
   admitView,
   BootPolicy,
+  type CasEntry,
+  CasKey,
+  type CasOutcome,
   type Core,
   contrast,
   coreEq,
   coreOf,
   type Doc,
+  docIntent,
   editBound,
   exportCodes,
   HARMONY_KINDS,
@@ -27,15 +30,16 @@ import {
   hydrateNeedsEmit,
   inkFor,
   MAX_PALETTES,
+  muteIntent,
   newDoc,
   newPalette,
   type Pair,
   type PalOp,
-  PalStore,
   PalsLib,
   pairChoices,
   palBase,
   palListEq,
+  palsIntent,
   parseColorFull,
   parseDocJson,
   parseShared,
@@ -47,8 +51,6 @@ import {
   type SavedPalette,
   SEED_COLOR,
   type SheetKind,
-  serializeDoc,
-  serializePalettes,
   serializeShared,
   sharedLib,
   toHex,
@@ -338,11 +340,16 @@ function ColorLab() {
   // resolved storage read - null is a true absent key - or a foreign publish
   // carrying `pals`. Until then this copy has no library opinion, so a default
   // empty list can neither be published nor persisted over a peer's palettes.
-  // `palStore` owns the durable writer: its `persisted` marker advances only
-  // when a setter call resolves, so a failed write neither claims durability
-  // nor suppresses the retry.
+  // `palCas`/`docCas`/`muteCas` own the durable writers: each conditional
+  // write derives its value from the exact `entry` it preconditions on and
+  // advances only on a real settle - a conflict rebases, a dead generation
+  // is terminal, an ambiguous ack reconciles and reports unknown instead of
+  // claiming the mutation applied. Mirror setters are never used: they are
+  // optimistic and carry no durable ack.
   const lib = useRef(new PalsLib(ME))
-  const palStore = useRef<PalStore | null>(null)
+  const palCas = useRef<CasKey | null>(null)
+  const docCas = useRef<CasKey | null>(null)
+  const muteCas = useRef<CasKey | null>(null)
   // Bumped on every foreign adopt: edits admitted under one doc incarnation
   // stay bound to it, so a peer switch cancels their deferred writes.
   const editEpoch = useRef(0)
@@ -358,23 +365,47 @@ function ColorLab() {
   const deleteCancelRef = useRef<HTMLButtonElement | null>(null)
   const saveActionRef = useRef<HTMLButtonElement | null>(null)
   const lastSheet = useRef<SheetKind | null>(null)
+  // The confirmed durable bootstrap reads; `entry` mints the token the
+  // first conditional write preconditions on. `null` means not yet read -
+  // a pending or failed read is never treated as an absent key.
+  const durableDoc = useRef<CasEntry | null>(null)
+  const durableMute = useRef<CasEntry | null>(null)
+  const durableDone = useRef(false)
+  const durableBoot = useRef<BootPolicy | null>(null)
+  const [durableTick, setDurableTick] = useState(0)
 
-  const storedDoc = useKV(os.storage, STORE_DOC)
-  const storedPals = useKV(os.storage, STORE_PALS)
-  const storedMute = useKV(os.storage, STORE_MUTE)
-  const storedDocSet = useRef(storedDoc.set)
-  const storedPalsSet = useRef(storedPals.set)
-  const storedMuteSet = useRef(storedMute.set)
-  storedDocSet.current = storedDoc.set
-  storedPalsSet.current = storedPals.set
-  storedMuteSet.current = storedMute.set
-
-  if (!palStore.current) {
-    palStore.current = new PalStore(
-      (wire) => {
-        storedPalsSet.current(wire)
-      },
-      () => setNote('Palette library not saved - storage write failed')
+  if (!palCas.current) {
+    const outcome = (o: CasOutcome) => {
+      if (o === 'gone') setNote('Storage restarted - palette library may not have saved')
+      else if (o === 'unknown' || o === 'fail') setNote('Palette library not saved - storage write failed')
+    }
+    palCas.current = new CasKey(
+      STORE_PALS,
+      os.storage,
+      palsIntent(
+        () => lib.current.list,
+        () => lib.current.tombs
+      ),
+      {
+        mergeSafe: true,
+        onOutcome: outcome
+      }
+    )
+    docCas.current = new CasKey(
+      STORE_DOC,
+      os.storage,
+      docIntent(() => docRef.current),
+      {
+        onOutcome: (o) => {
+          if (o === 'gone') setNote('Storage restarted - colour document may not have saved')
+        }
+      }
+    )
+    muteCas.current = new CasKey(
+      STORE_MUTE,
+      os.storage,
+      muteIntent(() => uiRef.current.muted),
+      {}
     )
   }
 
@@ -437,7 +468,10 @@ function ColorLab() {
       const next = { ...prev, ...patch }
       uiRef.current = next
       setUi(next)
-      if (patch.muted !== undefined) void storedMuteSet.current(patch.muted ? '1' : '0')
+      // The mute flag persists conditionally: the newest toggle derives the
+      // value from the read it preconditions on, so a stale write can never
+      // clobber a peer toggle that landed in flight.
+      if (patch.muted !== undefined) muteCas.current?.ask()
       const d = docRef.current
       if (d) publish(d, next)
     },
@@ -463,7 +497,7 @@ function ColorLab() {
       docRef.current = next
       setDoc(next)
       publish(next, uiRef.current)
-      void storedDocSet.current(serializeDoc(next))
+      docCas.current?.ask()
       if (announceText) announce(announceText)
     },
     [publish, announce]
@@ -577,37 +611,37 @@ function ColorLab() {
 
   /** Persist the library only once it has confirmed authority - a queued op
    *  on an unconfirmed copy rides on the hydrate/adopt that lands later,
-   *  which persists the merged result instead. The store's dedupe then tracks
-   *  confirmed writes, never merely-sent ones. */
-  const persistPals = useCallback((items: SavedPalette[]) => {
+   *  which persists the merged result instead. */
+  const persistPals = useCallback((_items: SavedPalette[]) => {
     if (!lib.current.ready) return
-    palStore.current?.request(serializePalettes(items))
+    palCas.current?.ask()
   }, [])
 
   /**
-   * The palette-library bootstrap read: a direct storage get, retried through
-   * the admission-aware policy. Only a resolved read (null is a true absent
-   * key) or a foreign publish carrying `pals` makes the library authoritative
-   * - a rejection is not a read, so it can never seed the empty default.
+   * The palette-library bootstrap read: an `entry` read so the token it
+   * returns is the confirmed durable moment the writer seeds from. Only a
+   * resolved read (null is a true absent key) or a foreign publish carrying
+   * `pals` makes the library authoritative - a rejection is not a read, so
+   * it can never seed the empty default.
    */
   const ensurePalsHydrated = useCallback(() => {
     if (lib.current.ready || hydratingPals.current) return
     hydratingPals.current = true
     void (async () => {
       try {
-        const raw = await os.storage.get(STORE_PALS)
+        const e = await os.storage.entry(STORE_PALS)
         hydratingPals.current = false
         storeBoot.current?.ok()
-        if (lib.current.hydrate(raw)) {
+        if (lib.current.hydrate(e.v)) {
           setPalettes(lib.current.list)
-          palStore.current?.seed(raw)
+          palCas.current?.seed(e)
           // The read merged in ops the durable never saw (a pending queue):
           // only a real delta may touch the wire or disk, because re-emitting
           // identical content is how a stale read wins the last-writer race
           // over a peer delete that landed in flight. A null record is a
           // confirmed-absent key, where the empty first boot still writes.
           const d = docRef.current
-          if (d && hydrateNeedsEmit(raw, lib.current.list)) {
+          if (d && hydrateNeedsEmit(e.v, lib.current.list)) {
             publish(d, uiRef.current)
             persistPals(lib.current.list)
           }
@@ -621,14 +655,32 @@ function ColorLab() {
 
   if (!storeBoot.current) storeBoot.current = new BootPolicy(admitLive, ensurePalsHydrated)
 
-  // Durable-write acknowledgement: the mirror resolves the newest sent wire
-  // into the key state later, so the store's `persisted` marker advances only
-  // here - on a real settle, never at send time.
-  useEffect(() => {
-    if (storedPals.status === 'ready' || storedPals.status === 'error') {
-      palStore.current?.settle(storedPals.value, storedPals.status === 'ready')
-    }
-  }, [storedPals.status, storedPals.value])
+  /**
+   * The durable document and preference bootstrap: one `entry` per key so
+   * each writer's first conditional write binds to the generation and
+   * revision the app actually read. A failed read parks through the
+   * admission-aware policy - it is not an absent key and never seeds.
+   */
+  const ensureDurable = useCallback(() => {
+    if (durableDone.current) return
+    void (async () => {
+      try {
+        const [de, me] = await Promise.all([os.storage.entry(STORE_DOC), os.storage.entry(STORE_MUTE)])
+        durableDoc.current = de
+        durableMute.current = me
+        docCas.current?.seed(de)
+        muteCas.current?.seed(me)
+        durableDone.current = true
+        durableBoot.current?.ok()
+        setDurableTick((t) => t + 1)
+      } catch {
+        durableBoot.current?.fail()
+      }
+    })()
+  }, [])
+
+  if (!durableBoot.current) durableBoot.current = new BootPolicy(admitLive, ensureDurable)
+  useEffect(() => ensureDurable(), [ensureDurable])
 
   // The moment this copy is admitted again, a parked bootstrap read re-arms
   // and an unconfirmed durable write retries. The view notify is batched to a
@@ -639,12 +691,16 @@ function ColorLab() {
         if (!admitLive()) return
         liveBoot.current?.wake()
         storeBoot.current?.wake()
-        palStore.current?.retry()
+        durableBoot.current?.wake()
+        palCas.current?.retry()
+        docCas.current?.retry()
+        muteCas.current?.retry()
       }),
     []
   )
 
   // Adopt foreign writes; seed once storage is hydrated and no session exists.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: durableTick re-runs this effect the moment the durable bootstrap resolves; the reads themselves live in refs.
   useEffect(() => {
     if (!live.known) return
     if (live.raw !== null) {
@@ -657,6 +713,10 @@ function ColorLab() {
         editEpoch.current++
         docRef.current = shared.doc
         setDoc(shared.doc)
+        // Persist what the wire says the doc is: if the publisher's own
+        // durable write was lost, any copy that adopted it covers it, and
+        // the conditional dedupe makes it a no-op when it already matches.
+        docCas.current?.ask()
         editBase.current = null
         applyUi({
           field: shared.view.field,
@@ -692,30 +752,25 @@ function ColorLab() {
       }
       return
     }
-    if (seeded.current || storedDoc.status === 'hydrating' || storedMute.status === 'hydrating') return
+    // Only a confirmed entry read may seed: a pending or failed read is not
+    // an absent key, so a missing durable doc can never be claimed early.
+    if (seeded.current || !durableDone.current) return
     seeded.current = true
-    const initial = parseDocJson(storedDoc.value) ?? newDoc(hslToRgb(SEED_COLOR))
+    const initial = parseDocJson(durableDoc.current!.v) ?? newDoc(hslToRgb(SEED_COLOR))
     docRef.current = initial
     setDoc(initial)
-    const bootUi: UiState = { ...UI0, field: toHex(initial.color), muted: storedMute.value === '1' }
+    const bootUi: UiState = { ...UI0, field: toHex(initial.color), muted: durableMute.current!.v === '1' }
     uiRef.current = bootUi
     setUi(bootUi)
     publish(initial, bootUi)
-    if (!storedDoc.value) void storedDocSet.current(serializeDoc(initial))
+    // Conditional: the seeded doc writes only when the durable value does
+    // not already parse to it, so a corrupt record is repaired under the
+    // token it was read at and a matching one is never rewritten.
+    docCas.current?.ask()
     // The library confirms itself: a resolved read seeds it, and only then do
     // `pals` start travelling on this copy's publishes.
     ensurePalsHydrated()
-  }, [
-    live,
-    storedDoc.status,
-    storedDoc.value,
-    storedMute.status,
-    storedMute.value,
-    applyUi,
-    publish,
-    persistPals,
-    ensurePalsHydrated
-  ])
+  }, [live, durableTick, applyUi, publish, persistPals, ensurePalsHydrated])
 
   /** Queue one library write: apply to the freshest list, stamp the op with my
    *  incarnation id and seq, then publish the whole shared state. The op stays

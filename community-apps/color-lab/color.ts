@@ -456,6 +456,9 @@ export const PAL_OP_WINDOW = 24
 export const PAL_PENDING_LIMIT = 128
 /** Bound on the per-writer watermark map carried on the wire. */
 export const PAL_ACK_LIMIT = 32
+/** Bound on durable tombstones: palette ids are unique per save, so a held
+ *  delete marker can never collide with a later recreate. */
+export const PAL_TOMB_LIMIT = 64
 
 export type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
@@ -618,20 +621,38 @@ export class PalsLib {
 
   /** Adopt a foreign publish's confirmed library: wholesale, then replay. */
   adopt(shared: { pals: SavedPalette[]; ops?: PalOp[]; acks?: Record<string, number> }) {
+    const before = new Set(this.list.map((p) => p.id))
     mergeAcks(this.acks, shared.acks, this.me)
     const r = mergePalWire(shared, this.ops, this.me, this.maxAck)
     this.maxAck = r.maxAck
     this.ops = r.ops
     this.list = r.merged
+    // Ids the adopt removed were decided deletes on the wire, so the durable
+    // merge keeps them dead even while a stale durable row still claims them.
+    const keep = new Set(this.list.map((p) => p.id))
+    for (const id of before) if (!keep.has(id)) this.tomb(id)
+    for (const op of r.replayed) if (op.kind === 'delete') this.tomb(op.target)
     this.wireOps = [...(shared.ops ?? []), ...r.replayed].slice(-PAL_OP_WINDOW)
     this.ready = true
     return r
+  }
+
+  /** Ids an admitted op - mine or an adopted peer's - has removed. The
+   *  durable merge must never resurrect them: a palette id is unique per
+   *  save, so a tomb can only mean a delete that was decided, never a
+   *  recreate the writer has not seen. Bounded FIFO. */
+  tombs = new Set<string>()
+  private tomb(id: string) {
+    this.tombs.delete(id)
+    this.tombs.add(id)
+    while (this.tombs.size > PAL_TOMB_LIMIT) this.tombs.delete(this.tombs.values().next().value!)
   }
 
   /** Apply one admitted local op; returns the stamped op. */
   push(op: DistOmit<PalOp, 'id' | 'seq'>): PalOp {
     const seq = ++this.seq
     const full = { ...op, id: `${this.me}:${seq}`, seq } as PalOp
+    if (full.kind === 'delete') this.tomb(full.target)
     this.list = applyPalOp(this.list, full)
     this.acks[this.me] = seq
     this.wireOps = [...this.wireOps, full].slice(-PAL_OP_WINDOW)
@@ -646,81 +667,259 @@ export class PalsLib {
 }
 
 /**
- * The acknowledged writer for the durable library. The storage mirror's set
- * is fire-and-forget - its acknowledgement lands later in the key state - so
- * `persisted` advances only through `settle`, never at send time. A rejected
- * or superseded write neither claims durability nor suppresses the retry the
- * caller arms; requests coalesce because the mirror resolves only the newest
- * outstanding write anyway.
+ * The durable palette merge: the confirmed local library is authoritative
+ * for every id it holds, and the stored document contributes only rows the
+ * local library has never seen - peer saves not yet delivered on the wire -
+ * minus ids a decided delete tombstoned. A peer delete the wire has not
+ * shown me yet may reappear for one write cycle, but the op that carries the
+ * delete lands on adoption and the next write removes it again: the merge
+ * converges because deletes ride the op log, not the snapshot.
  */
-export class PalStore {
-  /** The wire the durable copy confirmed - or the confirmed bootstrap read. */
-  persisted: string | null = null
-  /** The newest wire anyone asked to make durable. */
-  latest: string | null = null
-  /** The wire whose acknowledgement is still outstanding. */
-  private sent: string | null = null
+export const mergeDurablePals = (
+  durable: SavedPalette[],
+  local: SavedPalette[],
+  tombs: ReadonlySet<string>
+): SavedPalette[] => {
+  // Order-stable: the durable order carries for rows both sides know, my
+  // own newer row wins shared ids, durable rows I lack are peer facts kept
+  // in place, and only ids durable has never seen append from my list.
+  // A fixed derivation order is what makes the merge idempotent - every
+  // copy re-derives byte-identical wire instead of reordering forever.
+  const mine = new Map(local.map((p) => [p.id, p]))
+  const seen = new Set<string>()
+  const merged: SavedPalette[] = []
+  for (const p of durable) {
+    if (tombs.has(p.id) || seen.has(p.id)) continue
+    seen.add(p.id)
+    merged.push(mine.get(p.id) ?? p)
+  }
+  for (const p of local) if (!seen.has(p.id)) merged.push(p)
+  return merged
+}
+
+// ---- Conditional durable writes (SDK 0.1.0) ----
+
+/** One atomic read: the stored value and the `{ rev, gen }` token a
+ *  conditional `set`/`del` must carry back to be accepted. */
+export interface CasEntry {
+  v: string | null
+  rev: number
+  gen: number
+}
+export type CasToken = { rev: number; gen: number }
+/** The host's durable key surface: `entry` mints the token the write
+ *  preconditions on, and a resolved `set`/`del` is a real durable ack - the
+ *  mirror's optimistic setter is not. */
+export interface CasApi {
+  entry(k: string): Promise<CasEntry>
+  set(k: string, v: string, expect: CasToken): Promise<unknown>
+  del(k: string, expect: CasToken): Promise<unknown>
+}
+export const CAS_SKIP: unique symbol = Symbol('cas-skip')
+/** The semantic intent for one write cycle: derive the exact value to store
+ *  from the exact value just read. `CAS_SKIP` means the durable already
+ *  satisfies the intent. `null` deletes the key. */
+export type CasDerive = (cur: string | null) => string | null | typeof CAS_SKIP
+export type CasOutcome = 'ack' | 'conflict' | 'unknown' | 'fail' | 'gone' | 'read'
+
+/**
+ * Errors whose protocol meaning is a typed zero-effect verdict: the request
+ * ran inside (or never reached) the host transaction, so nothing changed.
+ * `E_CONFLICT` rebases and `E_GONE` is terminal; the rest are honest
+ * failures that never masquerade as durability. Everything else -
+ * `E_TIMEOUT`, `E_CLOSED`, a non-PlatformError - leaves the outcome
+ * ambiguous: the request may still commit late, so it is reconciled, never
+ * assumed failed.
+ */
+const CAS_TYPED = new Set(['E_ARGS', 'E_QUOTA', 'E_RATE', 'E_DENIED', 'E_UNSUPPORTED', 'E_PROTOCOL', 'E_STORAGE'])
+const casErrCode = (e: unknown): string | null =>
+  e && typeof e === 'object' && typeof (e as { code?: unknown }).code === 'string' ? (e as { code: string }).code : null
+
+/**
+ * The conditional writer for one durable key. Every mutation is derived
+ * fresh from the exact `entry` read it preconditions on - never a frozen
+ * document resent under a fresh token - so `E_CONFLICT` rebases keep every
+ * peer fact the fresh read found. An ambiguous outcome (lost ack) is
+ * reconciled by reading `entry` once: the stored value equal to the sent
+ * bytes proves the write landed; anything else reports `unknown` instead of
+ * pretending the mutation applied - a timed-out original may still commit
+ * late, so a nonmatching readback (even the old value) authorizes no new
+ * write in the same cycle. Merge-safe derivations are the exception: a
+ * fact-preserving merge is idempotent under any interleaving, so it may
+ * rebase onto the newer value at once. Asks coalesce: a new `ask` while a
+ * cycle runs just re-derives the latest intent on the next pass.
+ */
+export class CasKey {
+  /** The newest confirmed durable moment (seed or a real settle). */
+  acked: CasEntry | null = null
+  /** `E_GONE` is terminal: the generation this copy's tokens bind to is dead. */
+  dead = false
+  private queued = false
+  private inflight = false
   constructor(
-    private set: (wire: string) => void,
-    private onFail: (wire: string) => void = () => {},
-    private onDrain: () => void = () => {}
+    private key: string,
+    private api: CasApi,
+    private derive: CasDerive,
+    private opts: {
+      /** A fact-preserving intent (id-keyed union minus tombstones) may
+       *  rebase immediately on a nonmatching reconciliation read. */
+      mergeSafe?: boolean
+      onOutcome?: (o: CasOutcome) => void
+      onDrain?: () => void
+    } = {}
   ) {}
 
-  /**
-   * Record the confirmed on-disk wire at bootstrap so it is not rewritten.
-   * Skipped while a write is outstanding: the read predates it, so the
-   * settle of the sent wire is the newer authority.
-   */
-  seed(wire: string | null) {
-    if (this.sent !== null || this.latest !== null) return
-    this.persisted = wire
-    this.latest = wire
+  /** Record the confirmed read the durable bootstrap made. */
+  seed(e: CasEntry | null) {
+    if (e && !this.acked) this.acked = e
   }
 
-  /** The newest requested wire is not yet confirmed durable. */
+  /** Something still wants a write cycle to run. */
   get dirty() {
-    return this.latest !== this.persisted
+    return this.queued
   }
 
-  /** Ask that `wire` become durable; skipped when it already is or is in flight. */
-  request(wire: string) {
-    this.latest = wire
-    if (wire === this.persisted || wire === this.sent) return
-    this.sent = wire
-    this.set(wire)
-  }
-
-  /**
-   * The mirror resolved the newest sent write. `ok` means the key's state is
-   * settled (not `saving`); `value` is what the durable copy now shows -
-   * `sent` means our write landed, anything else means a foreign write won
-   * the race, which is still the durable truth. A rejection keeps `latest`
-   * dirty so `retry` (or the next request) resends it.
-   */
-  settle(value: string | null, ok: boolean) {
-    if (this.sent === null) return
-    const sent = this.sent
-    this.sent = null
-    if (ok) {
-      this.persisted = value
-      if (value === sent) {
-        if (this.dirty) this.request(this.latest!)
-        else this.onDrain()
-      }
-      // A foreign wire landed over ours (`value !== sent`): the durable truth
-      // is `value`, and our `latest` stays outstanding until the adopt-driven
-      // request re-bases it - resending it now would clobber the peer write.
-      return
-    }
-    this.onFail(sent)
+  /** Ask that the current semantic intent become durable. */
+  ask() {
+    if (this.dead) return
+    this.queued = true
+    if (!this.inflight) void this.cycle()
   }
 
   /** Re-enter after a reported failure or a re-admission wake. */
   retry() {
-    if (this.sent === null && this.dirty) {
-      this.sent = this.latest
-      this.set(this.latest!)
+    this.ask()
+  }
+
+  private out(o: CasOutcome) {
+    this.opts.onOutcome?.(o)
+  }
+
+  private async entry(): Promise<CasEntry | null> {
+    try {
+      return await this.api.entry(this.key)
+    } catch {
+      // A failed read is not an empty key: stay dirty and let the next ask
+      // or admission wake re-arm the cycle.
+      this.out('read')
+      return null
     }
+  }
+
+  private async cycle() {
+    this.inflight = true
+    try {
+      while (this.queued && !this.dead) {
+        this.queued = false
+        const e = await this.entry()
+        if (!e) {
+          this.queued = true
+          return
+        }
+        this.acked = e
+        let v = this.derive(e.v)
+        if (v === CAS_SKIP) continue
+        let tok = { rev: e.rev, gen: e.gen }
+        for (;;) {
+          let code: string | null = null
+          try {
+            const res = v === null ? await this.api.del(this.key, tok) : await this.api.set(this.key, v, tok)
+            const rev =
+              res && typeof res === 'object' && typeof (res as { rev?: unknown }).rev === 'number'
+                ? (res as { rev: number }).rev
+                : tok.rev + 1
+            this.acked = { v, rev, gen: tok.gen }
+            this.out('ack')
+            break
+          } catch (err) {
+            code = casErrCode(err)
+          }
+          if (code === 'E_CONFLICT') {
+            // Typed zero-effect: nothing landed. Rebase on the newer state.
+            this.out('conflict')
+            const f = await this.entry()
+            if (!f) {
+              this.queued = true
+              return
+            }
+            this.acked = f
+            tok = { rev: f.rev, gen: f.gen }
+            v = this.derive(f.v)
+            if (v === CAS_SKIP) break
+            continue
+          }
+          if (code === 'E_GONE') {
+            this.dead = true
+            this.out('gone')
+            return
+          }
+          if (code && CAS_TYPED.has(code)) {
+            // Typed zero-effect failure: nothing landed, no retry storm.
+            this.out('fail')
+            break
+          }
+          // Ambiguous: the request may still commit late. Reconcile once -
+          // the stored value equal to the sent bytes proves the write
+          // landed; any other value (including the untouched old one) does
+          // not prove it never will, so no fresh write fires in this cycle
+          // unless the intent itself is provably idempotent.
+          const f = await this.entry()
+          if (!f) {
+            this.queued = true
+            return
+          }
+          this.acked = f
+          if (f.v === v) {
+            this.out('ack')
+            break
+          }
+          if (this.opts.mergeSafe) {
+            tok = { rev: f.rev, gen: f.gen }
+            v = this.derive(f.v)
+            if (v === CAS_SKIP) break
+            continue
+          }
+          this.out('unknown')
+          this.queued = true
+          return
+        }
+      }
+    } finally {
+      this.inflight = false
+      if (!this.queued && !this.dead) this.opts.onDrain?.()
+    }
+  }
+}
+
+/** The palette intent: the merged library normalized against the normalized
+ *  stored document, so only a real delta writes. */
+export const palsIntent = (list: () => SavedPalette[], tombs: () => ReadonlySet<string>): CasDerive => {
+  return (cur) => {
+    const merged = mergeDurablePals(parsePalettes(cur), list(), tombs())
+    const wire = serializePalettes(merged)
+    return wire === serializePalettes(parsePalettes(cur)) ? CAS_SKIP : wire
+  }
+}
+
+/** The document intent: persist the live doc - the same value a peer adopt
+ *  installed counts as the peer fact, never a frozen earlier doc. A stored
+ *  value that parses to the same document needs no rewrite, and a corrupt
+ *  one is repaired under its own token. */
+export const docIntent = (doc: () => Doc | null): CasDerive => {
+  return (cur) => {
+    const d = doc()
+    if (!d) return CAS_SKIP
+    const wire = serializeDoc(d)
+    const stored = parseDocJson(cur)
+    return stored && serializeDoc(stored) === wire ? CAS_SKIP : wire
+  }
+}
+
+/** The preference intent: the last toggle wins, deduped on the raw flag. */
+export const muteIntent = (muted: () => boolean): CasDerive => {
+  return (cur) => {
+    const wire = muted() ? '1' : '0'
+    return cur === wire ? CAS_SKIP : wire
   }
 }
 
