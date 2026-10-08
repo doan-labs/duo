@@ -21,7 +21,7 @@ export function compatible(host: SemVer, app: SemVer): boolean {
   return host.major === 0 && host.minor === 0 && host.patch === app.patch
 }
 
-export const HOST_SDK = '0.0.0'
+export const HOST_SDK = '0.1.0'
 export const REQUIRES_PLATFORM = 'Requires a newer platform version'
 export function supports(version: string, dev = false, host = HOST_SDK): boolean {
   const h = semver(host)

@@ -1,8 +1,8 @@
 import { REQUIRES_PLATFORM, supports } from '../../sdk/compat.ts'
-import { deviceEventName, envelope, PlatformError, requestValid, widgetValid } from '../../sdk/guards.ts'
+import { deviceEventName, envelope, PlatformError, requestSame, requestValid, widgetValid } from '../../sdk/guards.ts'
 import { record } from '../../sdk/manifest.ts'
 import { frameAllow, mutatingService, servicePermission } from '../../sdk/permissions.ts'
-import { type Change, LIMITS, PROTOCOL, type Req, type Res, type ViewInfo } from '../../sdk/protocol.ts'
+import { type Change, LIMITS, type Method, PROTOCOL, type Req, type Res, type ViewInfo } from '../../sdk/protocol.ts'
 import { claimSide } from '../device.ts'
 import { authority, broadcast, put, transaction } from './database.ts'
 import { deviceEvents } from './device-events.ts'
@@ -44,7 +44,12 @@ export function launchFrame(
   let refilled = performance.now()
   let loaded = false
   const inflight = new Set<number>()
-  const results = new Map<number, Res>()
+  const results = new Map<number, { m: Method; p: unknown; epoch: number | undefined; res: Res }>()
+  // Highest id whose response was already posted. An id at or below it that is
+  // no longer in `results` ran and its outcome was evicted: re-executing a
+  // conditional write could turn a committed write into a second conflict, so
+  // the repost is refused and the app reads back, matching the timeout contract.
+  let retired = 0
   const watches = new Set<'storage' | 'session'>()
   const state = (value: State, error?: string) => {
     launch.state = value
@@ -235,10 +240,23 @@ export function launchFrame(
       return fail('Invalid request')
     const req = data
     if (results.has(req.id)) {
-      launch.port?.postMessage(results.get(req.id))
+      // An ack-lost repost replays its original outcome, win or lose; the same
+      // id carrying a different payload is a new write disguised as a retry.
+      const seen = results.get(req.id)!
+      launch.port?.postMessage(
+        requestSame(seen, req)
+          ? seen.res
+          : errorResponse(req.id, new PlatformError('E_ARGS', 'Request id reused with a different payload'))
+      )
       return
     }
     if (inflight.has(req.id)) return
+    if (req.id <= retired) {
+      launch.port?.postMessage(
+        errorResponse(req.id, new PlatformError('E_ARGS', 'Request id already retired; read back before retrying.'))
+      )
+      return
+    }
     const now = performance.now()
     tokens = Math.min(LIMITS.burst, tokens + ((now - refilled) * LIMITS.rate) / 1000)
     refilled = now
@@ -271,8 +289,9 @@ export function launchFrame(
       const res = await response
       inflight.delete(req.id)
       if (launch.generation !== liveGeneration || launch.state === 'revoked') return
-      results.set(req.id, res)
+      results.set(req.id, { m: req.m, p: req.p, epoch: req.epoch, res })
       if (results.size > LIMITS.dedupe) results.delete(results.keys().next().value!)
+      retired = Math.max(retired, req.id)
       launch.port?.postMessage(res)
       if (!res.ok && res.e === 'E_GONE') view.revoke('uninstalled')
     })

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { compatible, semver, supports } from './compat.ts'
+import { compatible, HOST_SDK, semver, supports } from './compat.ts'
 import { bytes, deviceEventName, deviceEventValid, keyValid, requestValid, widgetValid } from './guards.ts'
 import { networkOrigin } from './manifest.ts'
 import { frameAllow, permissionsValid, servicePermission } from './permissions.ts'
@@ -20,8 +20,13 @@ test('full caret matrix, including patch floors and 0.x', () => {
             : host.minor === 0 && host.patch === app.patch)
       assert.equal(compatible(host, app), expected, `${h} satisfies ^${a}`)
     }
-  assert.equal(supports('0.0.0-dev.1'), false)
-  assert.equal(supports('0.0.0-dev.1', true), true)
+  assert.equal(supports(`${HOST_SDK}-dev.1`), false)
+  assert.equal(supports(`${HOST_SDK}-dev.1`, true), true)
+  // Apps built on the previous contract are refused on this host, and this
+  // host's bundles are refused by a host that predates the contract.
+  assert.equal(supports('0.0.0'), false)
+  assert.equal(supports('0.0.0', false, '0.0.0'), true)
+  assert.equal(supports(HOST_SDK, false, '0.0.0'), false)
   for (const bad of ['01.0.0', '1.0', '1.0.0+abc', '1.0.0-01', '1.0.0-', '9007199254740992.0.0'])
     assert.equal(semver(bad), null)
 })

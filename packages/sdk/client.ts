@@ -140,14 +140,22 @@ export function createClient() {
     })
   }
   function kv(space: 'storage' | 'session'): KV {
-    const keyRequest = <T>(action: 'get' | 'set' | 'del', k: string, v?: string): Promise<T> => {
+    const keyRequest = <T>(
+      action: 'get' | 'set' | 'del' | 'entry',
+      k: string,
+      v?: string,
+      expect?: number
+    ): Promise<T> => {
       if (!keyValid(k) || (action === 'set' && !valueValid(v))) return Promise.reject(new PlatformError('E_ARGS'))
-      return request(`${space}.${action}`, { k, v })
+      if (expect !== undefined && (!Number.isSafeInteger(expect) || expect < 0))
+        return Promise.reject(new PlatformError('E_ARGS'))
+      return request(`${space}.${action}`, { k, v, expect })
     }
     return {
       get: (k) => keyRequest('get', k),
-      set: (k, v) => keyRequest('set', k, v),
-      del: (k) => keyRequest('del', k),
+      entry: (k) => keyRequest('entry', k),
+      set: (k, v, expect) => keyRequest('set', k, v, expect),
+      del: (k, expect) => keyRequest('del', k, undefined, expect),
       keys: (cursor) => request(`${space}.keys`, { cursor }),
       snapshot: (cursor) => request(`${space}.snapshot`, { cursor }),
       watch(since, cb) {

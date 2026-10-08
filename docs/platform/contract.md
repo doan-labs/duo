@@ -305,8 +305,8 @@ export type AppEvt =
   | { ev: 'key'; p: { key: 'Escape' } }
 
 export type Method =
-  | 'storage.get' | 'storage.set' | 'storage.del' | 'storage.keys' | 'storage.snapshot' | 'storage.watch' | 'storage.unwatch'
-  | 'session.get' | 'session.set' | 'session.del' | 'session.keys' | 'session.snapshot' | 'session.watch' | 'session.unwatch'
+  | 'storage.get' | 'storage.set' | 'storage.del' | 'storage.entry' | 'storage.keys' | 'storage.snapshot' | 'storage.watch' | 'storage.unwatch'
+  | 'session.get' | 'session.set' | 'session.del' | 'session.entry' | 'session.keys' | 'session.snapshot' | 'session.watch' | 'session.unwatch'
   | 'cmd.send' | 'cmd.ack'
   | 'widget.set'
   | 'open' | 'home'
@@ -320,6 +320,7 @@ export type ErrCode =
   | 'E_STALE'      // epoch or generation no longer current
   | 'E_GONE'       // the app was uninstalled or its generation changed under this view
   | 'E_UNSUPPORTED' // the capability exists but this device or context cannot run it (insecure context, no device, no MediaRecorder)
+  | 'E_CONFLICT'   // the revision a conditional write expected no longer matches; nothing was written
   | 'E_STORAGE'    // the database refused or is unavailable; nothing was written
 ```
 
@@ -361,10 +362,14 @@ mutating request is acknowledged only after its database transaction
 Recommended (R2): **retry after timeout is by request id, and the host
 deduplicates.** Every `Req.id` is unique per view generation. The host keeps
 the last 256 completed ids with their results per view; a repeated id returns
-the recorded result without re-executing. The SDK's timeout (5 s) retries a
+the recorded result without re-executing, while the same id carrying a
+different payload is refused. An id whose recorded result was already evicted
+is retired, never re-executed: the host refuses it outright, since a re-run of
+a conditional write could turn a committed write into a second conflict. The
+SDK's timeout (5 s) retries a
 mutating request once with the same id, then surfaces `E_TIMEOUT`; the app
-then reads back (`get`) to reconcile, because a timeout does not prove the
-write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch`,
+then reads back (`get`, or `entry` where the revision matters) to reconcile,
+because a timeout does not prove the write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch`,
 `device.unwatch` and `notify.post` are never retried.
 
 | Limit | Value | Error |
@@ -524,10 +529,16 @@ export type StoredFile = { name: string; size: number; type: string; at: number 
 
 export type Notice = { title: string; body?: string; arg?: string }
 
+/** The value and the space revision from one atomic read - the precondition token. */
+export type Entry = { k: string; v: string | null; rev: number }
 export type KV = {
   get(k: string): Promise<string | null>
-  set(k: string, v: string): Promise<{ rev: number }>
-  del(k: string): Promise<{ rev: number }>
+  entry(k: string): Promise<Entry>
+  /** `expect` is the revision the new value was computed from; the host checks
+      it inside the write's own transaction and answers E_CONFLICT, changing
+      nothing, when the space moved. Omit it for an unconditional write. */
+  set(k: string, v: string, expect?: number): Promise<{ rev: number }>
+  del(k: string, expect?: number): Promise<{ rev: number }>
   keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>
   /** Atomic snapshot with the revision it is current at. */
   snapshot(cursor?: string): Promise<{ rev: number; entries: [string, string][]; cursor?: string }>
@@ -646,6 +657,26 @@ A client that sees `rev` jump by more than one resnapshots. Deletion is an
 event with `v: null`. Quota is checked inside the write transaction against
 the `meta.used` counter that the same transaction updates; an over-quota
 write aborts and nothing changes.
+
+Conditional writes (SDK 0.1.0): `entry(k)` returns `{ v, rev }` read atomically
+with the space revision, and `set`/`del` accept an optional `expect` revision.
+The host compares `expect` against `meta.rev` inside the same readwrite
+transaction that holds the authority check and the write, so a writer whose
+copy is stale loses at commit, not on the wire: it gets `E_CONFLICT` and
+nothing changes - no value, quota, rev or watch event. A successful
+conditional write returns the same `Change` and raises exactly one `kv`
+event, and its ack is durable because it posts only after the transaction
+completes. `rev` is one counter per space, not per key: a write to any key
+moves it, so `expect` is deliberately conservative across sibling keys. Every
+precondition is bound to the app generation the transaction checks, so a
+reinstall, update or checkpoint restore cannot resurrect one. Conflict
+recovery is an intent rebase - `entry()` again, recompute from that value,
+write with the fresh revision - never a blind resend of the stale document.
+An `E_TIMEOUT` or retired-request refusal leaves the outcome unknown; read
+`entry()` to reconcile, never assume nothing landed. `useKV`, `cell` and
+`KVMirror.write` remain optimistic fire-and-forget without a durable ack and
+are not the conditional path. `os.files` keeps its own atomicity domain and
+does not join these preconditions.
 
 Not synchronized: component state. What a view does not write to a KV space
 stays local. This is the only rule that does not require the shell to

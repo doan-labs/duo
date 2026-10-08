@@ -25,10 +25,23 @@ export function page(data: [string, string][], rev: number, cursor?: unknown): S
 }
 export function kvArgs(action: string, p: unknown): Record<string, unknown> {
   const args = record(p) ? p : {}
-  if (['get', 'set', 'del'].includes(action) && !keyValid(args.k)) throw new PlatformError('E_ARGS')
+  if (['get', 'set', 'del', 'entry'].includes(action) && !keyValid(args.k)) throw new PlatformError('E_ARGS')
   if (action === 'set' && !valueValid(args.v)) throw new PlatformError('E_ARGS')
+  // `expect` conditions a write on the space revision it was computed from.
+  if (['set', 'del'].includes(action)) {
+    if (args.expect !== undefined && (!Number.isSafeInteger(args.expect) || (args.expect as number) < 0))
+      throw new PlatformError('E_ARGS')
+  } else if (args.expect !== undefined) throw new PlatformError('E_ARGS')
   return args
 }
+// The revision check, quota and mutation share one transaction, so a stale
+// writer conflicts at commit without touching value, quota or rev.
+const expectMeta = (meta: Meta, expect: unknown) => {
+  if (meta.rev >= Number.MAX_SAFE_INTEGER) throw new PlatformError('E_STORAGE', 'Revision space exhausted')
+  if (expect !== undefined && meta.rev !== expect)
+    throw new PlatformError('E_CONFLICT', `Revision ${meta.rev} is not ${expect}`)
+}
+const KV_ACTIONS = ['get', 'set', 'del', 'entry', 'snapshot', 'keys']
 export async function snapshot(id: string, generation: number, cursor?: unknown) {
   return transaction(['installed', 'appdata', 'meta'], 'readonly', async (tx) => {
     await authority(tx, id, generation)
@@ -38,17 +51,23 @@ export async function snapshot(id: string, generation: number, cursor?: unknown)
 }
 export async function storage(id: string, generation: number, action: string, p: unknown) {
   const args = kvArgs(action, p)
+  if (!KV_ACTIONS.includes(action)) throw new PlatformError('E_UNSUPPORTED')
   if (action === 'snapshot' || action === 'keys') {
     const data = await snapshot(id, generation, args.cursor)
     return action === 'keys' ? { keys: data.entries.map(([k]) => k), cursor: data.cursor } : data
   }
-  const write = action !== 'get'
+  const write = action !== 'get' && action !== 'entry'
   const value = await transaction(['installed', 'appdata', 'meta'], write ? 'readwrite' : 'readonly', async (tx) => {
     await authority(tx, id, generation)
     const k = args.k as string
     const old = await read<string>(tx, 'appdata', [id, k])
-    if (!write) return old ?? null
+    if (!write) {
+      if (action === 'get') return old ?? null
+      const meta = (await read<Meta>(tx, 'meta', id)) ?? emptyMeta()
+      return { k, v: old ?? null, rev: meta.rev }
+    }
     const meta = (await read<Meta>(tx, 'meta', id)) ?? emptyMeta()
+    expectMeta(meta, args.expect)
     const v = action === 'set' ? (args.v as string) : null
     const used = meta.used - (old === undefined ? 0 : bytes(k) + bytes(old)) + (v === null ? 0 : bytes(k) + bytes(v))
     if (used > LIMITS.storage) throw new PlatformError('E_QUOTA')
@@ -78,8 +97,10 @@ export class MemoryKV {
   history: Change[] = []
   run(action: string, p: unknown) {
     const args = kvArgs(action, p)
+    if (!KV_ACTIONS.includes(action)) throw new PlatformError('E_UNSUPPORTED')
     const k = args.k as string
     if (action === 'get') return this.values.get(k) ?? null
+    if (action === 'entry') return { k, v: this.values.get(k) ?? null, rev: this.rev }
     if (action === 'snapshot' || action === 'keys') {
       const data = page(
         [...this.values].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
@@ -88,6 +109,7 @@ export class MemoryKV {
       )
       return action === 'keys' ? { keys: data.entries.map(([key]) => key), cursor: data.cursor } : data
     }
+    expectMeta({ rev: this.rev, used: this.used }, args.expect)
     const old = this.values.get(k)
     const v = action === 'set' ? (args.v as string) : null
     const used = this.used - (old === undefined ? 0 : bytes(k) + bytes(old)) + (v === null ? 0 : bytes(k) + bytes(v))
