@@ -10,6 +10,7 @@ test('typing during hydration and an old echo never replace the latest edit', as
   const acks: ((v: { rev: number }) => void)[] = []
   const space: KV = {
     get: async () => null,
+    entry: async () => ({ k: 'note', v: null, rev: 0, gen: 1 }),
     keys: async () => ({ keys: [] }),
     del: async () => ({ rev: 0 }),
     snapshot: () =>
@@ -43,6 +44,7 @@ test('typing during hydration and an old echo never replace the latest edit', as
 test('failed persistence keeps the optimistic empty string and exposes failure', async () => {
   const space: KV = {
     get: async () => null,
+    entry: async () => ({ k: 'note', v: null, rev: 0, gen: 1 }),
     keys: async () => ({ keys: [] }),
     del: async () => ({ rev: 0 }),
     snapshot: async () => ({ rev: 0, entries: [] }),
