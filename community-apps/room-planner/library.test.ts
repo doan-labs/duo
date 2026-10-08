@@ -382,6 +382,65 @@ await check('a delayed conditional set conflicts instead of clobbering a landed 
   ok(res.lib.plans.peer !== undefined && res.lib.plans.mine !== undefined, 'reported union')
 })
 
+await check('a timed-out library write covered by a peer same-plan commit keeps the peer union', async () => {
+  // The prefs-shaped clobber the parent probe caught, at library level: A's
+  // set lands, its ACK is lost (E_TIMEOUT), then B commits a NEWER version
+  // of the same plan. A's next pass re-entries, sees B's commit and unions
+  // over it - mergeLib keeps B's newer doc, so the union can never replay
+  // A's older version back over it. This is why the drain's continue-on-
+  // timeout is safe where a fixed-payload retry is not.
+  const base = docAt('Base', 'base', 1)
+  const mine = { ...base, name: 'A version', updated: 2 }
+  const peer = { ...base, name: 'B version', updated: 3 }
+  const c = cell(lib({ base }, {}, 1))
+  let dropped = false
+  const kv = c.kv()
+  const kvA: LibKV = {
+    ...kv,
+    set: async (k, v, expect) => {
+      if (!dropped) {
+        dropped = true
+        // The write lands and ACKs lost; B's newer commit lands after.
+        await kv.set(k, v, expect)
+        await kv.set(k, serializeLibrary(withDoc(lib({ base }, {}, 1), peer)))
+        throw new PlatformError('E_TIMEOUT')
+      }
+      return kv.set(k, v, expect)
+    }
+  }
+  const storeA = new LibStore(kvA)
+  const res = await storeA.write((l) => withDoc(l, mine))
+  ok(res !== null, 'drain reached a terminal')
+  const final = c.now()
+  eq(final.plans.base?.updated, 3)
+  eq(final.plans.base?.name, 'B version')
+  ok(res === null || res.lib.plans.base?.updated === 3, 'reported library carries the peer version')
+})
+
+await check('a timed-out library write that never landed still lands its union on the next pass', async () => {
+  // Timeout with no peer: the intent is still pending, the next pass's entry
+  // is the readback, and the union re-offers under a fresh token - honest
+  // 'unconfirmed' only if the space can never settle.
+  const a = docAt('A', 'a', 2)
+  const c = cell(lib({}, {}, 1))
+  let once = true
+  const kv = c.kv()
+  const kvA: LibKV = {
+    ...kv,
+    set: async (k, v, expect) => {
+      if (once) {
+        once = false
+        throw new PlatformError('E_TIMEOUT')
+      }
+      return kv.set(k, v, expect)
+    }
+  }
+  const storeA = new LibStore(kvA)
+  const res = await storeA.write((l) => withDoc(l, a))
+  ok(res?.confirmed === true, 'the union re-offer confirmed on the next pass')
+  ok(c.now().plans.a !== undefined, 'the intent landed')
+})
+
 await check('two writers over a never-created key converge to the union', async () => {
   // Both copies entry() a missing key (v:null) and compute from the same
   // empty base: the first conditional set wins, the second conflicts,

@@ -124,8 +124,12 @@ await check('a dropped ACK whose write landed resolves applied via readback, not
   eq(s.sets(), 1)
 })
 
-await check('a dropped ACK whose write did not land retries with a fresh request', async () => {
-  const s = space({})
+await check('a dropped ACK whose write did not land is unknown, never replayed', async () => {
+  // The mutation never reached the space but the caller cannot prove that:
+  // readback finds the prior value, not ours. Issuing a new request here is
+  // the clobber the parent probe caught - a peer's confirmed write that
+  // landed after our original must not be overwritten by its replay.
+  const s = space({ initial: 'prior' })
   let eaten = 0
   const kv: CasKV = {
     ...s.kv,
@@ -136,9 +140,65 @@ await check('a dropped ACK whose write did not land retries with a fresh request
     }
   }
   const out = await casSet(kv, 'k', () => 'mine')
+  eq(out, 'unknown')
+  eq(s.v(), 'prior')
+  eq(eaten, 1)
+})
+
+await check('a lost-ACK write covered by a peer same-field commit preserves the peer', async () => {
+  // Parent probe peer-pref-probe.ts replayed on the exact savePrefs shape:
+  // our set COMMITS (lands snap:20), the ACK is lost, a peer then commits
+  // snap:40. Readback sees the peer's value - the outcome is unresolved
+  // (our intent may have landed or not) and the peer's confirmed-later
+  // write must stand. The old code replayed snap:20 over it.
+  const prefs = (snap: number) => JSON.stringify({ units: 'metric', snap, muted: false })
+  let wire = prefs(10)
+  let rev = 1
+  let injected = false
+  const io: CasKV = {
+    entry: async (k) => ({ k, v: wire, rev, gen: 1 }),
+    del: async () => {
+      throw new Error('unused')
+    },
+    set: async (_key, next, expect) => {
+      if (expect?.rev !== rev || expect.gen !== 1) throw new PlatformError('E_CONFLICT')
+      wire = next
+      rev++
+      if (!injected) {
+        injected = true
+        // Peer commit lands between our lost ACK and our readback.
+        wire = JSON.stringify({ ...JSON.parse(wire), snap: 40 })
+        rev++
+        throw new PlatformError('E_TIMEOUT')
+      }
+      return { rev }
+    }
+  }
+  const outcome = await casSet(io, 'roomplanner-prefs', (cur) => JSON.stringify({ ...JSON.parse(cur ?? ''), snap: 20 }))
+  eq(JSON.parse(wire).snap, 40)
+  eq(outcome, 'unknown')
+})
+
+await check('a dropped ACK with no peer race reports applied on readback', async () => {
+  // Control for the probe: the write landed, nothing else moved, readback
+  // is byte-equal - operation evidence the intent is durable.
+  const s = space({})
+  let once = true
+  const kv: CasKV = {
+    ...s.kv,
+    set: async (k, v, expect) => {
+      if (once) {
+        once = false
+        await s.kv.set(k, v, expect)
+        throw new PlatformError('E_TIMEOUT')
+      }
+      return s.kv.set(k, v, expect)
+    }
+  }
+  const out = await casSet(kv, 'k', () => 'mine')
   eq(out, 'applied')
   eq(s.v(), 'mine')
-  eq(eaten, 2)
+  eq(s.sets(), 1)
 })
 
 await check('E_GONE on a dead generation is refused terminally, never retried', async () => {

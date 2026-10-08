@@ -156,7 +156,13 @@ export class LibStore {
         // this payload - report honestly. 'conflict'/'timeout'/'unknown' all
         // resolve the same way: the next pass's entry is the readback, the
         // fold re-runs over what actually stored, and still-pending intents
-        // re-offer with a fresh token and request id.
+        // re-offer with a fresh token and request id. For timeout this is a
+        // NEW union over the readback, not a replay of the set that may or
+        // may not have landed: mergeLib only ever adds newer per-plan
+        // versions and tombs, so the recomputed payload can never overwrite
+        // a peer's confirmed-later commit - the clobber a same-field replay
+        // would cause. If the original write did land, the readback shows it
+        // and the fold confirms instead of re-writing.
         if (kind === 'refused') return best === null ? null : { lib: best, confirmed: false }
         continue
       }
