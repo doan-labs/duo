@@ -40,6 +40,9 @@ const stableJson = (value: unknown): string =>
 
 type RegistryApps = Record<string, { folder: string }> | undefined
 
+/** Kebab-case relative folder segments only; traversal and absolute paths fail closed. */
+const SAFE_FOLDER = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/
+
 /**
  * Where an app's authored source lives in the repository: officials under
  * `packages/apps/<last id segment>`, community apps under their registry folder.
@@ -48,7 +51,25 @@ type RegistryApps = Record<string, { folder: string }> | undefined
 const sourceDir = (id: string, lane: Manifest['lane'], apps: RegistryApps) => {
   if (lane === 'official') return `packages/apps/${id.split('.').at(-1)}`
   const folder = apps?.[id]?.folder
-  return folder ? `community-apps/${folder}` : undefined
+  return folder && SAFE_FOLDER.test(folder) ? `community-apps/${folder}` : undefined
+}
+
+/**
+ * The same source directory resolved against a committed registry.json, read
+ * data-only from the repository at `commit`. Officials take the fixed path;
+ * a community id is unresolvable when the committed registry file is absent,
+ * unparseable, has no entry for the id or maps it to an invalid folder.
+ */
+const committedSourceDir = (commit: string, id: string, lane: Manifest['lane'], repoRoot: string) => {
+  if (lane === 'official') return `packages/apps/${id.split('.').at(-1)}`
+  const text = gitOut(['show', `${commit}:community-apps/registry.json`], repoRoot)
+  if (text === undefined) return undefined
+  try {
+    const folder = (JSON.parse(text) as { apps?: Record<string, { folder?: unknown }> }).apps?.[id]?.folder
+    return typeof folder === 'string' && SAFE_FOLDER.test(folder) ? `community-apps/${folder}` : undefined
+  } catch {
+    return undefined
+  }
 }
 
 const COMMIT = /^[a-f\d]{40}$/
@@ -61,6 +82,9 @@ const COMMIT = /^[a-f\d]{40}$/
  *   - both build commits are real commit objects, new one a descendant of the old,
  *   - the manifest committed at the new build commit equals the built one (the
  *     recorded commit is genuinely where the app was built from),
+ *   - the registry maps the id to the same source folder at both recorded commits
+ *     and that mapping equals the live registry's, so a remap cannot point the
+ *     identity at a different folder's unchanged tree,
  *   - the app's source tree hash is identical between the two commits (only shared
  *     dependencies may have changed), and the range changed something at all,
  *   - build.sdk/build.kit equal the versions committed in packages/sdk and
@@ -96,6 +120,13 @@ async function verifySharedRebuild(
     throw refuse('recorded build commits are not in repository history')
   if (older !== newer && !gitOk(['merge-base', '--is-ancestor', older, newer], repoRoot))
     throw refuse('the new build commit is not a descendant of the published one')
+  const [olderDir, newerDir] = [
+    committedSourceDir(older, id, next.manifest.lane, repoRoot),
+    committedSourceDir(newer, id, next.manifest.lane, repoRoot)
+  ]
+  if (!olderDir || !newerDir) throw refuse('the committed registry has no readable source mapping')
+  if (olderDir !== newerDir || newerDir !== dir)
+    throw refuse('the registry moved this app to a different source folder between the recorded commits')
   const committed = gitOut(['show', `${newer}:${dir}/manifest.json`], repoRoot)
   if (committed === undefined) throw refuse(`no committed manifest at ${newer}:${dir}`)
   if (stableJson(JSON.parse(committed)) !== stableJson(JSON.parse(nextManifest)))

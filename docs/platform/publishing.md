@@ -108,6 +108,11 @@ release already published at that version, and refuses otherwise:
   one or a descendant (`merge-base --is-ancestor`),
 - the manifest committed at the new build commit equals the built one, so the recorded
   commit is genuinely what the app was built from,
+- the registry maps a community id to the same folder at both recorded commits and that
+  equals the live registry's mapping (`git show <commit>:community-apps/registry.json`),
+  so repointing an id to a different folder between builds cannot reuse a version -
+  absent, malformed or divergent mappings refuse, and folder mappings must be kebab-case
+  relative paths inside `community-apps`,
 - the app's source tree is identical between the two commits (`git ls-tree` hash over
   `packages/apps/<name>` for officials or the registry folder for community apps), while
   the commit range changed something at all,

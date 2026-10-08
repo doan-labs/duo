@@ -124,9 +124,8 @@ try {
   // R4: a second identity under an authored version is allowed only as a shared-deps
   // rebuild with verifiable provenance. A scratch git repo supplies controlled commits.
   const prov = join(scratch, 'prov-repo')
-  await mkdir(join(prov, 'src/apps/myapp'), { recursive: true })
   const provenance = {
-    sourceDir: (id, lane) => (lane === 'official' ? `packages/apps/${id.split('.').at(-1)}` : 'src/apps/myapp'),
+    sourceDir: (id, lane) => (lane === 'official' ? `packages/apps/${id.split('.').at(-1)}` : 'community-apps/myapp'),
     repoRoot: prov
   }
   const git = (args) =>
@@ -163,8 +162,26 @@ try {
     id: 'labs.doan.ipduo.demo',
     lane: 'official'
   })
-  await writeFile(join(prov, 'src/apps/myapp/manifest.json'), manifestText)
-  await writeFile(join(prov, 'src/apps/myapp/main.txt'), 'v1')
+  const registryJson = (apps) =>
+    JSON.stringify(
+      {
+        reserved: [],
+        officialDeveloper: 'devin',
+        developers: {
+          devin: { name: 'Devin', description: 'd', imageUrl: 'https://example.com/i.png' }
+        },
+        apps
+      },
+      null,
+      2
+    )
+  await mkdir(join(prov, 'community-apps/myapp'), { recursive: true })
+  await writeFile(join(prov, 'community-apps/myapp/manifest.json'), manifestText)
+  await writeFile(join(prov, 'community-apps/myapp/main.txt'), 'v1')
+  await writeFile(
+    join(prov, 'community-apps/registry.json'),
+    registryJson({ 'labs.doan.myapp': { folder: 'myapp', developer: 'devin', maintainers: ['devin'] } })
+  )
   await mkdir(join(prov, 'packages/apps/demo'), { recursive: true })
   await writeFile(join(prov, 'packages/apps/demo/manifest.json'), JSON.stringify(demoManifest(), null, 2))
   await writeFile(join(prov, 'packages/apps/demo/main.txt'), 'v1')
@@ -177,9 +194,12 @@ try {
   const C1 = await commitAll()
   await writeFile(join(prov, 'other.txt'), 'v2')
   const C2 = await commitAll() // shared-code change only; the app trees are untouched
-  await writeFile(join(prov, 'src/apps/myapp/main.txt'), 'v2')
+  await writeFile(join(prov, 'community-apps/myapp/main.txt'), 'v2')
   const C3 = await commitAll() // authored source change under myapp
-  await writeFile(join(prov, 'src/apps/myapp/manifest.json'), JSON.stringify(myappManifest('1.0.0', 'Prove2'), null, 2))
+  await writeFile(
+    join(prov, 'community-apps/myapp/manifest.json'),
+    JSON.stringify(myappManifest('1.0.0', 'Prove2'), null, 2)
+  )
   const C4 = await commitAll() // authored manifest change
 
   const digestOf = (files) => {
@@ -267,7 +287,7 @@ try {
   })
   await refuse('new-hash kit spoof is refused', join(scratch, 'prov-spoof-kit'), /packages\/uikit/)
 
-  // Authored source changed under the published version (C3 touched src/apps/myapp).
+  // Authored source changed under the published version (C3 touched community-apps/myapp).
   await craft(join(scratch, 'prov-changed-src'), {
     manifest: myappManifest(),
     commit: C3,
@@ -405,6 +425,165 @@ try {
   await mkdir(noInput, { recursive: true })
   await assert.rejects(publish(noInput, netTree, [], undefined, provenance), /different manifests/)
   console.log('PASS same version under different manifests is rejected at index assembly')
+
+  // Registry-remap provenance hole on the canonical default path (real readRegistry,
+  // no sourceDir override): repointing a community id A->B between the recorded
+  // commits must not let B's different code reuse A's published version.
+  const prov2 = join(scratch, 'prov2-repo')
+  const swapManifest = (version = '4.0.0', name = 'Swap') => ({
+    ...myappManifest(version, name),
+    id: 'labs.doan.swap'
+  })
+  const stableManifest = { ...myappManifest('4.1.0', 'Stable'), id: 'labs.doan.stable' }
+  const swapText = JSON.stringify(swapManifest(), null, 2)
+  const swapApps = (folder) => ({
+    'labs.doan.swap': { folder, developer: 'devin', maintainers: ['devin'] },
+    'labs.doan.stable': { folder: 'folderc', developer: 'devin', maintainers: ['devin'] }
+  })
+  await mkdir(join(prov2, 'community-apps/foldera'), { recursive: true })
+  await mkdir(join(prov2, 'community-apps/folderb'), { recursive: true })
+  await mkdir(join(prov2, 'community-apps/folderc'), { recursive: true })
+  await writeFile(join(prov2, 'community-apps/foldera/manifest.json'), swapText)
+  await writeFile(join(prov2, 'community-apps/foldera/main.txt'), 'real-source-A')
+  await writeFile(join(prov2, 'community-apps/folderb/manifest.json'), swapText)
+  await writeFile(join(prov2, 'community-apps/folderb/main.txt'), 'different-code-B')
+  // labs.doan.stable keeps one mapping and one manifest across every commit.
+  await writeFile(join(prov2, 'community-apps/folderc/manifest.json'), JSON.stringify(stableManifest, null, 2))
+  await writeFile(join(prov2, 'community-apps/folderc/main.txt'), 'stable-code')
+  await mkdir(join(prov2, 'packages/sdk'), { recursive: true })
+  await writeFile(join(prov2, 'packages/sdk/package.json'), JSON.stringify({ version: '0.0.0' }))
+  await mkdir(join(prov2, 'packages/uikit'), { recursive: true })
+  await writeFile(join(prov2, 'packages/uikit/package.json'), JSON.stringify({ version: '0.0.0' }))
+  await writeFile(join(prov2, 'other2.txt'), 'v1')
+  const git2 = (args) =>
+    Bun.spawnSync(['git', ...args], {
+      cwd: prov2,
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'prov',
+        GIT_AUTHOR_EMAIL: 'prov@x',
+        GIT_COMMITTER_NAME: 'prov',
+        GIT_COMMITTER_EMAIL: 'prov@x'
+      }
+    })
+  const commit2 = async () => {
+    git2(['add', '-A'])
+    git2(['commit', '-qm', 'c'])
+    return git2(['rev-parse', 'HEAD']).stdout.toString().trim()
+  }
+  const liveRegistry = join(prov2, 'community-apps/registry.json')
+  git2(['init', '-q', '-b', 'main'])
+  const P0 = await commit2() // no registry yet
+  await writeFile(liveRegistry, registryJson(swapApps('foldera')))
+  const P1 = await commit2() // registry maps swap -> foldera
+  await writeFile(liveRegistry, registryJson(swapApps('folderb')))
+  const P2 = await commit2() // the remap commit: id repointed A->B, both trees untouched
+  await writeFile(liveRegistry, 'not json{')
+  const P3 = await commit2() // malformed registry
+  await writeFile(liveRegistry, registryJson(swapApps('../../evil')))
+  const P4 = await commit2() // folder escapes community-apps
+  await writeFile(liveRegistry, registryJson(swapApps('foldera')))
+  await writeFile(join(prov2, 'other2.txt'), 'v2')
+  const P5 = await commit2() // mapping restored; the tree differs from P1 via other2.txt
+
+  const ptree2 = join(scratch, 'prov2-tree')
+  const publish2 = (base) => publish(base, ptree2, [], liveRegistry, { repoRoot: prov2 })
+
+  // The seed lands while live and committed registries both map to foldera.
+  await craft(join(scratch, 'prov2-seed'), { manifest: swapManifest(), commit: P1, at: publishedAt })
+  await publish2(join(scratch, 'prov2-seed'))
+
+  // Remap A->B at the rebuild commit with live registry already repointed: refused.
+  await craft(join(scratch, 'prov2-remap'), {
+    manifest: swapManifest(),
+    commit: P2,
+    at: rebuiltAt,
+    seed: 'from-B'
+  })
+  await writeFile(liveRegistry, registryJson(swapApps('folderb')))
+  await assert.rejects(publish2(join(scratch, 'prov2-remap')), /different source folder/)
+  const idxAfter = JSON.parse(await Bun.file(join(ptree2, 'index.json')).text())
+  assert.equal(idxAfter.apps['labs.doan.swap'].releases.length, 1)
+  console.log('PASS registry remap to a different source folder is refused, index unchanged')
+
+  // A mapping stable at both commits and in the live registry still admits the rebuild.
+  await writeFile(liveRegistry, registryJson(swapApps('foldera')))
+  await craft(join(scratch, 'prov2-stable-seed'), {
+    manifest: stableManifest,
+    commit: P1,
+    at: publishedAt
+  })
+  await publish2(join(scratch, 'prov2-stable-seed'))
+  await craft(join(scratch, 'prov2-stable'), {
+    manifest: stableManifest,
+    commit: P5,
+    at: rebuiltAt,
+    seed: 'stable-rebuild'
+  })
+  const stable = await publish2(join(scratch, 'prov2-stable'))
+  assert.equal(stable.published.length, 1)
+  assert.equal(
+    JSON.parse(await Bun.file(join(ptree2, 'index.json')).text()).apps['labs.doan.stable'].releases.length,
+    2
+  )
+  console.log('PASS stable registry mapping admits the shared-deps rebuild on the default path')
+
+  // Registry states that cannot prove the mapping fail closed.
+  for (const [name, version, at2, seedCommit, pattern] of [
+    ['absent registry at the published commit', '4.5.0', P5, P0, /no readable source mapping/],
+    ['malformed registry at the rebuild commit', '4.2.0', P3, P1, /no readable source mapping/],
+    ['invalid folder mapping at the rebuild commit', '4.3.0', P4, P1, /no readable source mapping/]
+  ]) {
+    const seed = join(scratch, `prov2-s-${version}`)
+    await craft(seed, { manifest: swapManifest(version), commit: seedCommit, at: publishedAt })
+    await publish2(seed)
+    const bad = join(scratch, `prov2-b-${version}`)
+    await craft(bad, { manifest: swapManifest(version), commit: at2, at: rebuiltAt, seed: 'bad' })
+    await assert.rejects(publish2(bad), pattern, name)
+    console.log(`PASS ${name}`)
+  }
+
+  // The live registry cannot rescue an id the committed registries never named.
+  const ghostManifest = { ...myappManifest('5.0.0', 'Ghost'), id: 'labs.doan.ghost' }
+  await writeFile(
+    liveRegistry,
+    registryJson({
+      ...swapApps('foldera'),
+      'labs.doan.ghost': { folder: 'foldera', developer: 'devin', maintainers: ['devin'] }
+    })
+  )
+  await craft(join(scratch, 'prov2-ghost-seed'), {
+    manifest: ghostManifest,
+    commit: P1,
+    at: publishedAt
+  })
+  await publish2(join(scratch, 'prov2-ghost-seed'))
+  await craft(join(scratch, 'prov2-ghost'), {
+    manifest: ghostManifest,
+    commit: P5,
+    at: rebuiltAt,
+    seed: 'ghost'
+  })
+  await assert.rejects(publish2(join(scratch, 'prov2-ghost')), /no readable source mapping/)
+  console.log('PASS committed registries that never named the id fail closed')
+
+  // A hostile live folder mapping cannot escape community-apps.
+  await writeFile(liveRegistry, registryJson(swapApps('foldera')))
+  await craft(join(scratch, 'prov2-evil-seed'), {
+    manifest: swapManifest('4.4.0'),
+    commit: P1,
+    at: publishedAt
+  })
+  await publish2(join(scratch, 'prov2-evil-seed'))
+  await writeFile(liveRegistry, registryJson(swapApps('../evil')))
+  await craft(join(scratch, 'prov2-evil'), {
+    manifest: swapManifest('4.4.0'),
+    commit: P5,
+    at: rebuiltAt,
+    seed: 'evil'
+  })
+  await assert.rejects(publish2(join(scratch, 'prov2-evil')), /cannot be resolved/)
+  console.log('PASS invalid live folder mapping fails closed')
 
   console.log('Publisher PASS')
 } finally {
