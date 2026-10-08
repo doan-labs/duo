@@ -26,7 +26,11 @@ const styles = stylex.create({
     borderStyle: 'solid',
     borderColor: 'currentColor',
     backgroundColor: { default: 'transparent', ':checked': 'currentColor' },
-    transform: { default: 'scale(1)', ':active': 'scale(.92)' },
+    transform: {
+      default: 'scale(1)',
+      ':active': 'scale(.92)',
+      '@media (prefers-reduced-motion: reduce)': { ':active': 'scale(1)' }
+    },
     transitionProperty: 'background-color, transform',
     transitionDuration: '.18s, .12s',
     transitionTimingFunction: easing.pop,
@@ -41,7 +45,12 @@ const styles = stylex.create({
       maskPosition: 'center',
       maskRepeat: 'no-repeat',
       opacity: { default: 0, ':checked': 1 },
-      transform: { default: 'scale(.5)', ':checked': 'scale(1)' },
+      // Under reduced motion the check is revealed by opacity only.
+      transform: {
+        default: 'scale(.5)',
+        ':checked': 'scale(1)',
+        '@media (prefers-reduced-motion: reduce)': { default: 'scale(1)', ':checked': 'scale(1)' }
+      },
       transitionProperty: 'opacity, transform',
       transitionDuration: '.18s',
       transitionTimingFunction: easing.spring
