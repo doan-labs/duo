@@ -1,4 +1,5 @@
 import type { KV } from '@doan-labs/duo-sdk'
+import { casClass } from './cas.ts'
 import {
   type Library,
   latestDoc,
@@ -13,9 +14,11 @@ import {
 
 export const LIB_KEY = 'roomplanner-library'
 
-// Only get/set are exercised; typing the parameter as a Pick keeps the queue
-// testable against a stub while os.storage satisfies it structurally.
-export type LibKV = Pick<KV, 'get' | 'set'>
+// entry supplies the versioned {rev, gen} token every write is conditioned
+// on; get serves the read-only paths (seed admission reads don't write).
+// Typing the parameter as a Pick keeps the queue testable against a stub
+// while os.storage satisfies it structurally.
+export type LibKV = Pick<KV, 'get' | 'set' | 'entry' | 'del'>
 
 // os.storage.get resolves null for a missing key; a rejection means the read
 // itself failed. Keeping them apart matters: treated as empty, a failed read
@@ -52,18 +55,18 @@ export type Intent = (lib: Library) => Library | null
 // stay pending and are replayed by the next write or repair().
 export type WriteResult = { lib: Library; confirmed: boolean } | null
 
-// os.storage has no cross-copy compare-and-set: a whole-blob set is
-// last-writer-wins, so a copy's delayed set can land AFTER a peer commit and
-// destroy it, and re-reading can never show the loss (the peer's data is
-// already gone). Convergence therefore needs two things per copy: (1) pending
-// intents that are only dropped once OBSERVED inside the stored value, and
-// (2) `mine` - the union of everything this copy has committed - re-offered
-// on every pass so a clobbered write is restored by the next drain instead of
-// silently lost. repair() is the peer-facing half: callers run it on every
-// library-key change event (the useKV mirror), so a foreign commit that
-// landed on top of this copy's earlier write gets folded back in. Tombstone
-// merges keep deleted plans deleted; mergeLib's per-plan newest-wins keeps
-// both displays' edits order-independent.
+// Every write is conditioned on the {rev, gen} of the entry the merge was
+// computed from: a peer commit that lands between our read and our set
+// conflicts the write in storage's own transaction instead of being clobbered
+// by a stale blob - the next pass re-reads and rebases the intents on top of
+// it. Convergence still needs two things per copy, because conflicts are
+// detection, not completion: (1) pending intents that are only dropped once
+// OBSERVED inside the stored value, and (2) `mine` - the union of everything
+// this copy has committed - re-offered on every pass so an uncommitted write
+// is retried by the next drain instead of silently lost. repair() is the
+// peer-facing half: callers run it on every library-key change event (the
+// useKV mirror). Tombstone merges keep deleted plans deleted; mergeLib's
+// per-plan newest-wins keeps both displays' edits order-independent.
 export class LibStore {
   private queue: Promise<void> = Promise.resolve()
   private pending: Intent[] = []
@@ -130,8 +133,12 @@ export class LibStore {
   private async drain(): Promise<WriteResult> {
     let best: Library | null = null
     for (let i = 0; i < 6; i++) {
-      const cur = await readLib(this.kv)
-      if (!cur) continue
+      // entry() is the read and the write's readback in one: a rejected entry
+      // is 'unknown', never implied-empty, and every retry below re-entries
+      // before issuing a new request - no blind re-write, ever.
+      const e = await this.kv.entry(LIB_KEY).catch(() => null)
+      if (!e) continue
+      const cur = parseLibrary(e.v)
       const { merged, threw } = this.fold(cur)
       if (threw) return null
       if (sameLib(cur, merged)) {
@@ -142,25 +149,19 @@ export class LibStore {
       best = merged
       const next = { ...merged, rev: Math.max(cur.rev, merged.rev) + 1 }
       try {
-        await this.kv.set(LIB_KEY, serializeLibrary(next))
-      } catch {
-        // A failed set may mean a peer write landed instead: the next pass
-        // re-reads and replays the merge on top of it.
+        await this.kv.set(LIB_KEY, serializeLibrary(next), { rev: e.rev, gen: e.gen })
+      } catch (err) {
+        const kind = casClass(err)
+        // 'refused' (dead generation, args, quota) cannot be fixed by retrying
+        // this payload - report honestly. 'conflict'/'timeout'/'unknown' all
+        // resolve the same way: the next pass's entry is the readback, the
+        // fold re-runs over what actually stored, and still-pending intents
+        // re-offer with a fresh token and request id.
+        if (kind === 'refused') return best === null ? null : { lib: best, confirmed: false }
         continue
       }
       this.mine = next
       best = next
-      // The set landed but a peer commit may have raced it: confirm by
-      // re-reading and folding still-pending intents over what storage
-      // actually holds now. Pending intents survive an unverifiable confirm
-      // for the next drain instead of being dropped as 'probably applied'.
-      const after = await readLib(this.kv)
-      if (!after) return { lib: next, confirmed: false }
-      const { merged: folded, threw: threwAfter } = this.fold(after)
-      if (threwAfter) return null
-      this.mine = folded
-      best = folded
-      if (this.pending.length === 0 && sameLib(after, folded)) return { lib: folded, confirmed: true }
     }
     return best === null ? null : { lib: best, confirmed: false }
   }

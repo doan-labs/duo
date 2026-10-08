@@ -8,11 +8,13 @@
 //    library), a failed write reaches a null terminal instead of an
 //    empty-success shape or a hang, and one bad drain cannot wedge the next.
 //  - copy races: two LibStore instances with independent queues share one
-//    backing cell. A delayed successful set lands LAST over a peer commit and
-//    destroys it, and no re-read can reveal the loss - the peer data is
-//    already gone. Convergence is what repair() provides: every stored change
-//    fires it on both copies, and each copy re-offers its own committed union
-//    until the stored value carries it.
+//    backing cell. Every write is conditioned on the space revision it was
+//    computed from, so a peer commit that lands between a copy's entry and
+//    its set conflicts the write in-place instead of being clobbered: the
+//    losing drain re-reads, rebases its intents over the peer's commit and
+//    lands the union. repair() remains the belt: every stored change fires
+//    it on both copies and each copy re-offers its committed union.
+import { PlatformError } from '@doan-labs/duo-sdk/guards.ts'
 import { admitSeed, LIB_KEY, type LibKV, LibStore, readLib, seedDoc } from './library.ts'
 import {
   isDeadIncarnation,
@@ -30,10 +32,16 @@ import {
 
 const fakeKV = (impl: {
   get?: (key: string) => Promise<string | null>
-  set?: (key: string, value: string) => Promise<{ rev: number }>
+  entry?: (key: string) => Promise<{ k: string; v: string | null; rev: number; gen: number }>
+  set?: (key: string, value: string, expect?: { rev: number; gen: number }) => Promise<{ rev: number }>
+  del?: (key: string, expect?: { rev: number; gen: number }) => Promise<{ rev: number }>
 }): LibKV => ({
   get: impl.get ?? (() => Promise.resolve(null)),
-  set: impl.set ?? (() => Promise.resolve({ rev: 0 }))
+  // entry defaults to the same read path as get with a fixed token, so
+  // get-focused stubs exercise the real drain without extra plumbing.
+  entry: impl.entry ?? (async (k) => ({ k, v: await (impl.get ?? (() => Promise.resolve(null)))(k), rev: 0, gen: 1 })),
+  set: impl.set ?? (() => Promise.resolve({ rev: 0 })),
+  del: impl.del ?? (() => Promise.resolve({ rev: 0 }))
 })
 
 const lib = (plans: Record<string, PlanDoc> = {}, gone: Record<string, Tomb> = {}, rev = 1): Library => ({
@@ -42,19 +50,43 @@ const lib = (plans: Record<string, PlanDoc> = {}, gone: Record<string, Tomb> = {
   rev
 })
 
-// One backing cell with a change feed: every landed set fires the watchers,
-// which stand in for the useKV mirror that drives LibStore.repair() in the app.
-const cell = (initial: Library) => {
-  let stored = serializeLibrary(initial)
+// One backing cell with CAS semantics and a change feed: rev counts every
+// landed write in the space (not just this key), and a set carrying an
+// expect token rejects E_CONFLICT when the space moved since that read -
+// the same check the host runs inside its transaction. Every landed set
+// fires the watchers, which stand in for the useKV mirror that drives
+// LibStore.repair() in the app.
+const cell = (initial: Library | null) => {
+  let stored: string | null = initial === null ? null : serializeLibrary(initial)
+  let rev = 0
+  const gen = 1
   const listeners: (() => void)[] = []
   const kv = (gate?: () => Promise<void>): LibKV => ({
     get: () => Promise.resolve(stored),
-    set: async (_k, v) => {
+    entry: (k) => Promise.resolve({ k, v: stored, rev, gen }),
+    del: async (_k, expect) => {
+      if (expect) {
+        if (expect.gen !== gen) throw new PlatformError('E_GONE')
+        if (expect.rev !== rev) throw new PlatformError('E_CONFLICT')
+      }
+      stored = null
+      rev++
+      for (const f of listeners) f()
+      return { rev }
+    },
+    set: async (_k, v, expect) => {
+      // The gate models transit: a peer commit lands while this write is in
+      // flight, so by the time the mutation runs the token is already stale.
       await gate?.()
+      if (expect) {
+        if (expect.gen !== gen) throw new PlatformError('E_GONE')
+        if (expect.rev !== rev) throw new PlatformError('E_CONFLICT')
+      }
       stored = v
+      rev++
       // The mirror fires on every landed change, not just once.
       for (const f of listeners) f()
-      return { rev: 0 }
+      return { rev }
     }
   })
   return {
@@ -67,7 +99,7 @@ const cell = (initial: Library) => {
 const docAt = (name: string, id: string, updated: number): PlanDoc => ({ ...newPlan(name), id, updated })
 
 // A latch that blocks exactly one set call so a peer commit can be scheduled
-// between a copy's get and its delayed successful set.
+// between a copy's entry read and its delayed conditional write.
 const once = () => {
   let armed = true
   let release!: () => void
@@ -79,7 +111,8 @@ const once = () => {
       await gate
     },
     release: () => release(),
-    // True once the gated copy has reached its set call - its get already ran.
+    // True once the gated copy has reached its set call - its entry read
+    // already ran, so its expect token is fixed while the gate holds.
     entered: () => !armed
   }
 }
@@ -208,13 +241,13 @@ await check('a mutation replayed after a failed set merges over the peer write i
   eq(Object.keys(out.lib.plans).sort(), [peer.id, mine.id].sort())
 })
 
-// Parent probe duo-room46-success-race-probe.ts, replayed on the real adapter:
-// a foreign commit lands after this copy's get and before its delayed
-// successful set. The delayed blob still lands last, so the peer write is
-// destroyed in storage; the convergence contract is that the change feed
-// fires repair() and the clobbered copy re-offers its union until storage
-// carries it.
-await check('a delayed successful set that lands over a foreign add is repaired to the union', async () => {
+// Parent probe duo-room46-success-race-probe.ts, replayed on the real
+// adapter under CAS: a foreign commit lands after this copy's entry and
+// before its delayed set reaches the transaction. The conditional token is
+// stale by then, so the write conflicts - the drain re-reads, rebases the
+// intent over the peer's commit and lands the union: the peer is never
+// destroyed at all. repair() still runs as the change feed fires.
+await check('a delayed set conflicting on a foreign add rebases to the union', async () => {
   const original = docAt('Original', 'original', 1)
   const mine = docAt('Mine', 'mine', 2)
   const peer = docAt('Peer', 'peer', 3)
@@ -234,16 +267,14 @@ await check('a delayed successful set that lands over a foreign add is repaired 
   gate.release()
   const aRes = await pA
   ok(aRes !== null, 'own write landed and reports a terminal value')
-  // A's stale blob destroyed B's commit; without repair the loss is invisible
-  // to every reader. Drive quiescence and demand the union.
   await settle([storeA, storeB])
   const final = c.now()
-  ok(final.plans.peer !== undefined, 'peerPlanSurvived: peer plan restored after clobber')
+  ok(final.plans.peer !== undefined, 'peerPlanSurvived: peer never clobbered')
   ok(final.plans.mine !== undefined, 'own plan survived')
   ok(final.plans.original !== undefined, 'untouched plan survived')
 })
 
-await check('a delayed successful set that lands over a foreign delete restores the tombstone', async () => {
+await check('a delayed set conflicting on a foreign delete keeps the tombstone', async () => {
   const original = docAt('Original', 'original', 1)
   const edited = { ...original, name: 'Edited', updated: 2 }
   const c = cell(lib({ original }, {}, 1))
@@ -261,7 +292,7 @@ await check('a delayed successful set that lands over a foreign delete restores 
   await pA
   await settle([storeA, storeB])
   const final = c.now()
-  ok(final.gone.original !== undefined, 'peerTombstoneSurvived: delete restored after clobber')
+  ok(final.gone.original !== undefined, 'peerTombstoneSurvived: delete never lost')
   ok(final.plans.original === undefined, 'deletedOriginalResurrected must stay false')
 })
 
@@ -313,7 +344,7 @@ await check('an unconfirmed seed write is retried until confirmed, never admitte
   const c = cell(lib({}, {}, 0))
   let sets = 0
   const kv: LibKV = {
-    get: () => c.kv().get(LIB_KEY),
+    ...c.kv(),
     set: (_k, _v) => {
       sets++
       return Promise.reject(new Error('E_IO'))
@@ -326,11 +357,12 @@ await check('an unconfirmed seed write is retried until confirmed, never admitte
   eq(Object.keys(c.now().plans), [])
 })
 
-await check('a single copy cannot self-restore a clobbered peer write', async () => {
-  // Negative control for the probe schedule: the peer commit inside the
-  // delayed set is invisible to every later read, so convergence CANNOT come
-  // from this copy alone - it needs the peer's own union re-offer. This is
-  // the failure the probe reported at 46e374a.
+await check('a delayed conditional set conflicts instead of clobbering a landed peer', async () => {
+  // The pre-CAS failure the parent probe reported at 46e374a: a peer commit
+  // landing inside the delayed-set window used to be destroyed by the stale
+  // blob landing last. The conditional token makes the same schedule a
+  // conflict: A's write is refused by the space, the drain re-reads, rebases
+  // and lands the union in the same pass - no repair needed to save B.
   const peer = docAt('Peer', 'peer', 3)
   const mine = docAt('Mine', 'mine', 2)
   const c = cell(lib({}, {}, 1))
@@ -338,13 +370,58 @@ await check('a single copy cannot self-restore a clobbered peer write', async ()
   const store = new LibStore(c.kv(gate.gate))
   const p = store.write((l) => withDoc(l, mine))
   while (!gate.entered()) await new Promise((r) => setTimeout(r, 0))
-  // Peer lands while A waits on its set; then A's stale blob lands last.
+  // Peer lands (unconditional: a foreign writer that does not expect) while
+  // A's conditional write is still in flight.
   await c.kv().set(LIB_KEY, serializeLibrary(withDoc(lib({}, {}, 1), peer)))
   gate.release()
   const res = await p
   if (!res) throw new Error('terminal reached')
-  ok(c.now().plans.peer === undefined, 'single-copy storage cannot self-restore a clobbered peer')
-  ok(res.lib.plans.mine !== undefined, 'own write survived')
+  const final = c.now()
+  ok(final.plans.peer !== undefined, 'the conflict kept the peer commit alive at write time')
+  ok(final.plans.mine !== undefined, 'the rebased union landed own write')
+  ok(res.lib.plans.peer !== undefined && res.lib.plans.mine !== undefined, 'reported union')
+})
+
+await check('two writers over a never-created key converge to the union', async () => {
+  // Both copies entry() a missing key (v:null) and compute from the same
+  // empty base: the first conditional set wins, the second conflicts,
+  // re-entries, sees the peer doc and lands the union - the two-null-writer
+  // schedule that used to be a coin toss.
+  const c = cell(null)
+  const a = docAt('A', 'a', 1)
+  const b = docAt('B', 'b', 1)
+  const storeA = new LibStore(c.kv())
+  const storeB = new LibStore(c.kv())
+  c.onChange(() => void storeA.repair())
+  c.onChange(() => void storeB.repair())
+  await Promise.all([storeA.write((l) => withDoc(l, a)), storeB.write((l) => withDoc(l, b))])
+  await settle([storeA, storeB])
+  const final = c.now()
+  ok(final.plans.a !== undefined && final.plans.b !== undefined, 'both initial writes survive')
+})
+
+await check('a cold-closed copy leaves committed state readable for the survivor', async () => {
+  // Close both copies mid-queue: the intents that never committed are gone
+  // with memory (callers saw unconfirmed, honest), but every committed write
+  // stays. A fresh LibStore over the same space reads exactly what landed -
+  // nothing invents or loses it.
+  const open = docAt('Open', 'open', 1)
+  const c = cell(lib({ open }, {}, 1))
+  const storeA = new LibStore(c.kv())
+  const a = docAt('A', 'a', 2)
+  const landed = await storeA.write((l) => withDoc(l, a))
+  ok(landed?.confirmed === true, 'committed before close')
+  // A and B both die here; only the cell survives. A new store sees the
+  // committed union and its own intents build on it.
+  const storeC = new LibStore(c.kv())
+  const b = docAt('B', 'b', 3)
+  const out = await storeC.write((l) => withDoc(l, b))
+  ok(out?.confirmed === true, 'survivor confirmed')
+  const final = c.now()
+  ok(
+    final.plans.open !== undefined && final.plans.a !== undefined && final.plans.b !== undefined,
+    'all committed plans survive cold close'
+  )
 })
 
 await check('a throwing mutation resolves null and drops nothing else', async () => {

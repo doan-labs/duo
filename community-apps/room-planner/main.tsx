@@ -3,9 +3,10 @@ import { useKV } from '@doan-labs/duo-sdk/react.ts'
 import { Sheet, Sym, TextField, useDisplay, useWide } from '@doan-labs/duo-uikit'
 import { dark, light, shared } from '@doan-labs/duo-uikit/styles.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type RefObject, useEffect, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { type Cue, cue } from './audio.ts'
+import { casSet } from './cas.ts'
 import { admitSeed, LIB_KEY, LibStore, readLib } from './library.ts'
 import {
   addItem,
@@ -474,11 +475,29 @@ function RoomPlanner() {
     // copy stays silent even when a remote adoption fires mid-fold.
     if (liveNow() && !prefsRef.current.muted) cue(kind)
   }
+  // Publishes the live doc through a versioned conditional set: each attempt
+  // reads the space revision first, so a peer mirror landing between our read
+  // and write conflicts the commit instead of a stale payload winning
+  // last-writer-wins. The maker rebinds to the doc on screen NOW - a retried
+  // call ships current truth, never the captured one, and a dead incarnation
+  // can never be re-authored. The mirror is a broadcast, not the durable
+  // store: bounded attempts are enough because LibStore carries the truth.
+  // Every input is a ref or module const, so the callback is stable and safe
+  // inside effect dependency lists.
+  const publishMirror = useCallback(
+    () =>
+      void casSet(os.session, DOC_KEY, () => {
+        const cur = docRef.current
+        if (!cur || isDeadIncarnation(cur, goneRef.current) || isOlderEdit(cur, remoteDoc.current)) return null
+        const at = wire.stamp(cur)
+        return serializeMirror(ME, cur, selRef.current, at)
+      }),
+    []
+  )
   const publish = (
     next: PlanDoc,
     opts: { sel?: string | null; tag?: string | null; prev?: Core | null; skipHist?: boolean } = {}
   ) => {
-    const selNow = opts.sel === undefined ? selRef.current : opts.sel
     const before = docRef.current
     // A same-doc edit grown from a base older than the newest adopted remote
     // write would stamp stale content back over the fold (act right after
@@ -499,10 +518,18 @@ function RoomPlanner() {
     }
     if (before && before.id !== next.id) setHist(emptyHistory())
     setDoc(next)
-    if (opts.sel !== undefined) setSel(opts.sel)
+    // docRef is 'the doc this copy owns now': publishMirror's maker reads it
+    // synchronously, so it must move at commit, not at the next render.
+    docRef.current = next
+    if (opts.sel !== undefined) {
+      setSel(opts.sel)
+      selRef.current = opts.sel
+    }
     saveDoc(next)
-    const at = wire.stamp(next)
-    void os.session.set(DOC_KEY, serializeMirror(ME, next, selNow, at)).catch(() => {})
+    // The wire head must move even if the publish itself never lands: admit()
+    // orders foreign payloads against it, not against the session key.
+    wire.stamp(next)
+    publishMirror()
   }
   // Once-registered listeners (keyboard, session watch) call through refs so
   // they never need to re-subscribe on every render.
@@ -527,9 +554,13 @@ function RoomPlanner() {
   const soundRef = useRef(sound)
   soundRef.current = sound
 
-  const savePrefs = (next: Prefs) => {
+  // Preferences write through the same conditional path as every other key:
+  // a patch re-merges over the freshest stored value on each attempt, so a
+  // peer toggling another field in the same instant is never overwritten by
+  // this copy's whole-blob snapshot.
+  const savePrefs = (patch: Partial<Prefs>) => {
     if (!liveNow()) return
-    prefKV.set(serializePrefs(next))
+    void casSet(os.storage, PREF_KEY, (cur) => serializePrefs({ ...parsePrefs(cur), ...patch }))
   }
 
   // Why a raw watch beside useKV: remote KV changes render through a view
@@ -600,10 +631,12 @@ function RoomPlanner() {
             if (docRef.current !== null || remoteDoc.current !== null) return
             // The confirmed union can carry a newer peer doc: adopt what won.
             const openNow = latestDoc(wrote.lib) ?? open
-            const at = wire.stamp(openNow)
+            wire.stamp(openNow)
             setDoc(openNow)
+            docRef.current = openNow
             setSel(null)
-            await os.session.set(DOC_KEY, serializeMirror(ME, openNow, null, at)).catch(() => {})
+            selRef.current = null
+            publishMirror()
             return
           }
           // Never seeded: reopen the gate so a later storage recovery or fold
@@ -666,12 +699,12 @@ function RoomPlanner() {
       const existing = lib.plans[next.doc.id]
       return !existing || existing.updated < next.doc.updated ? withDoc(lib, next.doc) : null
     })
-  }, [live, stored.status])
+  }, [live, stored.status, publishMirror])
 
-  // Whole-blob writes have no CAS: a delayed foreign set can land on top of a
-  // commit from this copy and erase it. Every observed change to the library
-  // key runs a repair pass that re-offers our union and unconfirmed intents -
-  // without it a clobbered plan would simply be gone.
+  // Conflicts are detection, not completion: an intent whose conditional
+  // write lost can also lose every retry, and a peer commit needs to be
+  // folded into this copy's own union. Every observed change to the library
+  // key runs a repair pass that re-offers our union and unconfirmed intents.
   useEffect(() => {
     if (stored.status === 'ready') void libStore.repair()
     // A tombstone for the plan on screen means the open doc is a ghost:
@@ -737,14 +770,15 @@ function RoomPlanner() {
       )
         return
       setDoc(next)
+      docRef.current = next
       // Framing a doc behind the newest remote write must not push it back.
       if (!isOlderEdit(next, remoteDoc.current)) {
         void libStore.write((lib) => {
           const existing = lib.plans[next.id]
           return !existing || existing.updated < next.updated ? withDoc(lib, next) : null
         })
-        const at = wire.stamp(next)
-        void os.session.set(DOC_KEY, serializeMirror(ME, next, selRef.current, at)).catch(() => {})
+        wire.stamp(next)
+        publishMirror()
       }
     }
     const f = requestAnimationFrame(() => {
@@ -775,7 +809,7 @@ function RoomPlanner() {
       cancelAnimationFrame(f)
       ro.disconnect()
     }
-  }, [doc, wide])
+  }, [doc, wide, publishMirror])
 
   useEffect(() => {
     requestAnimationFrame(() => os.ready())
@@ -998,7 +1032,7 @@ function RoomPlanner() {
       (best, s) => (Math.abs(s - prefs.snap) < Math.abs(best - prefs.snap) ? s : best),
       steps[0]!
     )
-    savePrefs({ ...prefs, units, snap })
+    savePrefs({ units, snap })
   }
   const doClear = () => {
     if (!liveNow()) return
@@ -1085,12 +1119,14 @@ function RoomPlanner() {
     const open = latestDoc(lib) ?? newPlan('Layout 1', 'layout-1')
     framedDoc.current = null
     setHist(emptyHistory())
-    const at = wire.stamp(open)
+    wire.stamp(open)
     setDoc(open)
+    docRef.current = open
     setSel(null)
+    selRef.current = null
     setArming(null)
     void libStore.write((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
-    void os.session.set(DOC_KEY, serializeMirror(ME, open, null, at)).catch(() => {})
+    publishMirror()
   }
   adoptSurvivorRef.current = adoptSurvivor
 
@@ -1388,7 +1424,7 @@ function RoomPlanner() {
               key={step}
               type="button"
               aria-pressed={prefs.snap === step}
-              onClick={() => savePrefs({ ...prefs, snap: step })}
+              onClick={() => savePrefs({ snap: step })}
               {...stylex.props(styles.chipBtn, shared.press, prefs.snap === step && styles.chipOn)}
             >
               {fmtSnap(step, prefs.units)}
@@ -1688,9 +1724,8 @@ function RoomPlanner() {
       aria-label={prefs.muted ? 'Unmute sounds' : 'Mute sounds'}
       aria-pressed={prefs.muted}
       onClick={() => {
-        const next = { ...prefs, muted: !prefs.muted }
-        savePrefs(next)
-        if (!next.muted) cue('select')
+        savePrefs({ muted: !prefs.muted })
+        if (prefs.muted) cue('select')
       }}
       {...stylex.props(styles.iconBtn, shared.press)}
     >
