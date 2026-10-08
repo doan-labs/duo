@@ -15,12 +15,14 @@
 //    until the stored value carries it.
 import { admitSeed, LIB_KEY, type LibKV, LibStore, readLib, seedDoc } from './library.ts'
 import {
+  isDeadIncarnation,
   type Library,
   latestDoc,
   newPlan,
   type PlanDoc,
   parseLibrary,
   serializeLibrary,
+  type Tomb,
   welcomePlan,
   withDoc,
   withoutDoc
@@ -34,7 +36,7 @@ const fakeKV = (impl: {
   set: impl.set ?? (() => Promise.resolve({ rev: 0 }))
 })
 
-const lib = (plans: Record<string, PlanDoc> = {}, gone: Record<string, number> = {}, rev = 1): Library => ({
+const lib = (plans: Record<string, PlanDoc> = {}, gone: Record<string, Tomb> = {}, rev = 1): Library => ({
   plans,
   gone,
   rev
@@ -289,19 +291,19 @@ await check('two cold copies racing a seed converge, welcome tombstone respected
   // Both copies cold-open a library whose welcome plan was deleted: each
   // seeds a fresh non-welcome doc, their writes race, and union convergence
   // must keep both and keep the tombstone.
-  const c = cell(lib({}, { welcome: 5 }, 2))
+  const c = cell(lib({}, { welcome: { ts: 5, born: 5 } }, 2))
   const storeA = new LibStore(c.kv())
   const storeB = new LibStore(c.kv())
   c.onChange(() => void storeA.repair())
   c.onChange(() => void storeB.repair())
-  const seedA = seedDoc(lib({}, { welcome: 5 }))
-  const seedB = seedDoc(lib({}, { welcome: 5 }))
+  const seedA = seedDoc(lib({}, { welcome: { ts: 5, born: 5 } }))
+  const seedB = seedDoc(lib({}, { welcome: { ts: 5, born: 5 } }))
   ok(seedA.id !== 'welcome' && seedB.id !== 'welcome', 'post-tombstone seeds avoid the welcome id')
   await Promise.all([storeA.write((l) => withDoc(l, seedA)), storeB.write((l) => withDoc(l, seedB))])
   await settle([storeA, storeB])
   const final = c.now()
   ok(final.plans[seedA.id] !== undefined && final.plans[seedB.id] !== undefined, 'both cold seeds survive')
-  eq(final.gone.welcome, 5)
+  eq(final.gone.welcome, { ts: 5, born: 5 })
 })
 
 await check('an unconfirmed seed write is retried until confirmed, never admitted blind', async () => {
@@ -395,6 +397,35 @@ await check(`writes address only ${LIB_KEY}`, async () => {
   const plan = newPlan('D')
   await new LibStore(kv).write((l) => withDoc(l, plan))
   eq(touched, [LIB_KEY])
+})
+
+await check('a peer still holding the deleted plan converges off the ghost', async () => {
+  // Reviewer repro: copy A deletes the plan copy B is editing. B's next
+  // publish re-stamps the ghost `updated` higher than any tomb could order
+  // against, which used to resurrect the plan. The incarnation bound makes
+  // the tomb causal: the ghost is dead no matter its version.
+  const open = { ...newPlan('Shared'), id: 'shared', born: 10, updated: 10 }
+  const c = cell(lib({ shared: open }, {}, 1))
+  const storeA = new LibStore(c.kv())
+  const storeB = new LibStore(c.kv())
+  c.onChange(() => void storeA.repair())
+  c.onChange(() => void storeB.repair())
+  const deleted = await storeA.write((l) => withoutDoc(l, 'shared'))
+  ok(deleted !== null && deleted.lib.gone.shared !== undefined, 'delete landed')
+  // B publishes an edit grown from the pre-delete base: same incarnation,
+  // newer stamp. The merge must keep it dead.
+  const ghost = { ...open, updated: (deleted!.lib.gone.shared!.ts ?? 0) + 500 }
+  await storeB.write((l) => withDoc(l, ghost))
+  await settle([storeA, storeB])
+  const final = c.now()
+  eq(final.plans.shared, undefined)
+  ok(isDeadIncarnation(ghost, final.gone), 'B is shown the kill so it can move off the ghost')
+  // Only a genuinely new incarnation (a recreation, born after the tomb)
+  // may carry this id again.
+  const recreation = { ...open, born: final.gone.shared!.born + 1, updated: final.gone.shared!.ts + 1000 }
+  await storeB.write((l) => withDoc(l, recreation))
+  await settle([storeA, storeB])
+  eq(c.now().plans.shared?.born, recreation.born)
 })
 
 if (failures.length) throw new Error(`${failures.length} failing checks\n${failures.join('\n')}`)

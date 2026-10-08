@@ -11,6 +11,7 @@ import {
   fmtDims,
   fmtLength,
   fmtSnap,
+  isDeadIncarnation,
   isOlderEdit,
   itemRect,
   itemSize,
@@ -261,21 +262,58 @@ check('library helpers pick newest, drop plans, keep others', () => {
 })
 
 check('mergeLib unions racing libraries, tombstones stop resurrection', () => {
-  const a = { ...plan(), id: 'a', updated: 5 }
-  const b = { ...plan(), id: 'b', updated: 3 }
+  const a = { ...plan(), id: 'a', born: 5, updated: 5 }
+  const b = { ...plan(), id: 'b', born: 3, updated: 3 }
   const left = { rev: 4, plans: { a, b }, gone: {} }
   // Right deleted plan a while it held a stale b and a fresh c.
-  const c = { ...plan(), id: 'c', updated: 9 }
-  const right = { rev: 4, plans: { b: { ...b, updated: 7 }, c }, gone: { a: 100 } }
+  const c = { ...plan(), id: 'c', born: 9, updated: 9 }
+  const right = { rev: 4, plans: { b: { ...b, updated: 7 }, c }, gone: { a: { ts: 100, born: 5 } } }
   const merged = mergeLib(left, right)
   eq(Object.keys(merged.plans).sort(), ['b', 'c'])
   eq(merged.plans.b!.updated, 7)
   eq(merged.rev, 4)
   // Order-independent: the same two writes merge the same way either direction.
   eq(mergeLib(right, left), merged)
-  // A plan edit newer than its tombstone is a real edit, not a resurrection.
-  const edited = { ...a, updated: 200 }
-  eq(mergeLib({ rev: 0, plans: { a: edited }, gone: {} }, right).plans.a!.updated, 200)
+  // A re-publish of the deleted incarnation always loses to its tomb, no
+  // matter how far ahead it stamps `updated` - this is the ghost-publish
+  // path that used to resurrect deleted plans.
+  const ghost = { ...a, updated: 200 }
+  eq(mergeLib({ rev: 0, plans: { a: ghost }, gone: {} }, right).plans.a, undefined)
+  // A plan born again after the tomb is a new incarnation, not a ghost:
+  // same-id recreation survives legitimately.
+  const recreated = { ...a, born: 200, updated: 200 }
+  eq(mergeLib({ rev: 0, plans: { a: recreated }, gone: {} }, right).plans.a!.updated, 200)
+})
+
+check('a tombstone kills the whole incarnation, ghosts and honest edits alike', () => {
+  const a = { ...plan(), id: 'a', born: 50, updated: 50 }
+  const dead = withoutDoc({ rev: 0, plans: { a }, gone: {} }, 'a')
+  const tomb = dead.gone.a!
+  ok(isDeadIncarnation(a, dead.gone), 'the deleted doc is a dead incarnation')
+  ok(!isDeadIncarnation({ ...a, born: tomb.born + 1 }, dead.gone), 'a newer incarnation lives')
+  // A peer's unsent edit of the deleted plan (newer `updated`, same `born`)
+  // is dead too: the tomb witnessed that incarnation and wins causally.
+  const ghost = { ...a, updated: tomb.ts + 500 }
+  eq(mergeLib(dead, { rev: 0, plans: { a: ghost }, gone: {} }).plans.a, undefined)
+  // The same stamp on a plan born after the tomb is a recreation and lives.
+  const again = { ...a, born: tomb.born + 1, updated: tomb.ts + 500 }
+  eq(mergeLib(dead, { rev: 0, plans: { a: again }, gone: {} }).plans.a, again)
+  // Tomb union keeps the stronger bound in either write order.
+  const weak = { rev: 0, plans: {}, gone: { a: { ts: 1, born: 1 } } }
+  eq(mergeLib(weak, dead).gone.a, tomb)
+  eq(mergeLib(dead, weak).gone.a, tomb)
+})
+
+check('deleting a doc the write never saw still bounds pre-delete incarnations', () => {
+  // The deleted plan sat on a peer newer than this read reached: with no doc
+  // in view the tomb bounds by its own delete stamp, so anything born before
+  // the deletion dies and later recreations live.
+  const dead = withoutDoc({ rev: 0, plans: {}, gone: {} }, 'a')
+  const tomb = dead.gone.a!
+  const stalePeerDoc = { ...plan(), id: 'a', born: tomb.ts - 1, updated: tomb.ts - 1 }
+  eq(mergeLib(dead, { rev: 0, plans: { a: stalePeerDoc }, gone: {} }).plans.a, undefined)
+  const peerRecreated = { ...plan(), id: 'a', born: tomb.ts + 1, updated: tomb.ts + 1 }
+  eq(mergeLib(dead, { rev: 0, plans: { a: peerRecreated }, gone: {} }).plans.a, peerRecreated)
 })
 
 check('isOlderEdit flags a stale-base publish only for the same doc', () => {
@@ -289,7 +327,7 @@ check('isOlderEdit flags a stale-base publish only for the same doc', () => {
 check('parseLibrary reads rev and gone, defaults on junk', () => {
   const lib = parseLibrary('{"rev":7,"plans":{},"gone":{"a":12}}')
   eq(lib.rev, 7)
-  eq(lib.gone, { a: 12 })
+  eq(lib.gone, { a: { ts: 12, born: 12 } })
   eq(parseLibrary(null), { rev: 0, plans: {}, gone: {} })
   eq(parseLibrary('{oops'), { rev: 0, plans: {}, gone: {} })
 })
@@ -360,7 +398,7 @@ check('rename moves the version and wins the library merge', () => {
 check('a tombstone outranks even a clock-inflated doc', () => {
   const doc = { ...plan(), id: 'a', updated: Date.now() + 100000 }
   const lib = withoutDoc({ rev: 0, plans: { a: doc }, gone: {} }, 'a')
-  ok(lib.gone.a! > doc.updated, 'tombstone lost to the inflated doc stamp')
+  ok(lib.gone.a!.ts > doc.updated, 'tombstone lost to the inflated doc stamp')
   eq(mergeLib(lib, { rev: 0, plans: { a: doc }, gone: {} }).plans.a, undefined)
 })
 

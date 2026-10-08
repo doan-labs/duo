@@ -21,6 +21,10 @@ export type PlanDoc = {
   room: Room
   items: Record<string, Item>
   view: View
+  /** Incarnation stamp, fixed at creation and carried untouched by edits.
+   * Two docs sharing an id but born apart are different layouts: a delete
+   * tombstone kills the incarnation it saw, never a recreation. */
+  born: number
   /** Last-writer-wins clock for picking the newest layout in a library. */
   updated: number
 }
@@ -28,11 +32,16 @@ export type Library = {
   /** Monotonic write counter: two copies compare whose write landed last. */
   rev: number
   plans: Record<string, PlanDoc>
-  /** Delete tombstones: plan id -> deletion time, so a stale library merge
-   * cannot resurrect a deliberately removed layout but a genuinely newer
-   * edit still can. */
-  gone: Record<string, number>
+  /** Delete tombstones keyed by plan id. `ts` orders deletions against each
+   * other and stale writes; `born` names the killed incarnation: every doc
+   * stamped at or before it is dead forever, while a recreation born later
+   * legitimately survives the tomb. Version stamps cannot express this - a
+   * ghost re-publish always looks 'newer' than the tomb it outlived. */
+  gone: Record<string, Tomb>
 }
+/** One deletion: the write stamp plus the incarnation bound it kills. */
+export type Tomb = { ts: number; born: number }
+
 export type Prefs = { units: Units; snap: number; muted: boolean }
 export type Mirror = { by: string; at: number; sel: string | null; doc: PlanDoc }
 
@@ -375,6 +384,10 @@ export function cleanDoc(v: unknown): PlanDoc | null {
     },
     items,
     view: cleanView(v.view),
+    // Pre-incarnation rows carry no `born`: their version stamp is the
+    // closest creation hint, and a legacy numeric tombstone (born=ts) still
+    // outranks it exactly the way the old timestamp compare did.
+    born: num(v.born, num(v.updated, 0)),
     updated: num(v.updated, 0)
   }
 }
@@ -384,15 +397,23 @@ export function parseLibrary(raw: string | null): Library {
   try {
     const parsed: unknown = JSON.parse(raw)
     const plans: Record<string, PlanDoc> = {}
-    const gone: Record<string, number> = {}
+    const gone: Record<string, Tomb> = {}
     if (record(parsed) && record(parsed.plans)) {
       for (const [id, value] of Object.entries(parsed.plans)) {
         const doc = cleanDoc(value)
         if (doc) plans[id] = doc
       }
       if (record(parsed.gone)) {
-        for (const [id, ts] of Object.entries(parsed.gone)) {
-          if (typeof ts === 'number' && Number.isFinite(ts) && ts > 0) gone[id] = ts
+        for (const [id, v] of Object.entries(parsed.gone)) {
+          if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+            // Legacy tombstone: the delete time doubles as the incarnation
+            // bound, killing everything stamped before it.
+            gone[id] = { ts: v, born: v }
+          } else if (record(v)) {
+            const ts = num(v.ts, 0)
+            const born = num(v.born, ts)
+            if (ts > 0) gone[id] = { ts, born }
+          }
         }
       }
     }
@@ -445,10 +466,15 @@ export function withoutDoc(lib: Library, id: string): Library {
   const plans = { ...lib.plans }
   const doc = plans[id]
   delete plans[id]
-  // The tombstone must outrank every stamp this doc ever carried, including a
-  // monotonic `updated` that ran ahead of the wall clock on a rapid burst.
-  const ts = Math.max(lib.gone[id] ?? 0, Date.now(), (doc?.updated ?? 0) + 1)
-  return { ...lib, plans, gone: { ...lib.gone, [id]: ts } }
+  const prev = lib.gone[id]
+  // The write stamp must outrank every version this doc ever carried,
+  // including a monotonic `updated` that ran ahead of the wall clock.
+  const ts = Math.max(prev?.ts ?? 0, Date.now(), (doc?.updated ?? 0) + 1)
+  // The killed incarnation is the doc's own birth when it is in view; when
+  // the doc is out of view (a peer held a newer copy than this read saw) the
+  // delete stamp itself is the bound, so anything born before it dies.
+  const born = Math.max(prev?.born ?? 0, doc?.born ?? ts)
+  return { ...lib, plans, gone: { ...lib.gone, [id]: { ts, born } } }
 }
 
 /**
@@ -469,13 +495,17 @@ export function mergeLib(a: Library, b: Library): Library {
     // writes never reach here - the mutate guard rejects them first.
     if (!cur || cur.updated <= doc.updated) plans[id] = doc
   }
-  const gone: Record<string, number> = { ...a.gone }
-  for (const [id, ts] of Object.entries(b.gone)) {
-    if ((gone[id] ?? 0) < ts) gone[id] = ts
+  const gone: Record<string, Tomb> = { ...a.gone }
+  for (const [id, tomb] of Object.entries(b.gone)) {
+    const cur = gone[id]
+    if (!cur || tomb.born > cur.born || (tomb.born === cur.born && tomb.ts > cur.ts)) gone[id] = tomb
   }
-  for (const [id, ts] of Object.entries(gone)) {
+  for (const [id, tomb] of Object.entries(gone)) {
     const doc = plans[id]
-    if (doc && doc.updated <= ts) delete plans[id]
+    // The tomb kills the incarnation it witnessed: a ghost re-publish of the
+    // same creation loses no matter how high it stamps `updated`, while a
+    // genuine recreation (born after the tomb) is the one legitimate survivor.
+    if (doc && doc.born <= tomb.born) delete plans[id]
   }
   return { rev: Math.max(a.rev, b.rev), plans, gone }
 }
@@ -486,6 +516,12 @@ export const isOlderEdit = (base: PlanDoc, remote: { id: string; updated: number
   !!remote && base.id === remote.id && base.updated < remote.updated
 
 /** The most recently edited layout, or null on a fresh install. */
+/** True when this doc belongs to an incarnation the tombstone killed. */
+export const isDeadIncarnation = (doc: PlanDoc, gone: Record<string, Tomb>): boolean => {
+  const t = gone[doc.id]
+  return !!t && doc.born <= t.born
+}
+
 export function latestDoc(lib: Library): PlanDoc | null {
   return Object.values(lib.plans).reduce<PlanDoc | null>(
     (best, doc) => (doc.updated > (best?.updated ?? -1) ? doc : best),
@@ -493,14 +529,16 @@ export function latestDoc(lib: Library): PlanDoc | null {
   )
 }
 
-export function newPlan(name: string): PlanDoc {
+export function newPlan(name: string, id = spawn()): PlanDoc {
+  const now = Date.now()
   return {
-    id: spawn(),
+    id,
     name,
     room: { w: 420, d: 340 },
     items: {},
     view: { x: 0, y: 0, zoom: 1, framed: false },
-    updated: Date.now()
+    born: now,
+    updated: now
   }
 }
 
@@ -520,12 +558,14 @@ export function welcomePlan(): PlanDoc {
     { id: 'w-plant', kind: 'plant', x: 415, y: 300, rot: 0 },
     { id: 'w-lamp', kind: 'lamp', x: 60, y: 60, rot: 0 }
   ]
+  const now = Date.now()
   return {
     id: 'welcome',
     name: 'Welcome',
     room: { w: 460, d: 360 },
     items: Object.fromEntries(items.map((item) => [item.id, item])),
     view: { x: 0, y: 0, zoom: 1, framed: false },
-    updated: Date.now()
+    born: now,
+    updated: now
   }
 }

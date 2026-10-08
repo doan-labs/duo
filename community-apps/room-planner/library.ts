@@ -30,7 +30,7 @@ export const readLib = (storage: LibKV): Promise<Library | null> => storage.get(
 // deterministic first-run welcome both displays can agree on. Reachable only
 // after a successful read - a failed read is 'unknown', not 'empty'.
 export const seedDoc = (lib: Library): PlanDoc =>
-  latestDoc(lib) ?? (lib.gone.welcome !== undefined ? newPlan('Layout 1') : welcomePlan())
+  latestDoc(lib) ?? (lib.gone.welcome !== undefined ? newPlan('Layout 1', 'layout-1') : welcomePlan())
 
 // Cold-open admission: 'retry' when the library state is unknown (a failed
 // read must not masquerade as an empty library to seed over), null when a doc
@@ -177,4 +177,7 @@ const sameLib = (a: Library, b: Library) =>
     const e = b.plans[id]
     return !!e && sameDoc(d, e)
   }) &&
-  Object.entries(a.gone).every(([id, ts]) => b.gone[id] === ts)
+  Object.entries(a.gone).every(([id, tomb]) => {
+    const e = b.gone[id]
+    return !!e && e.ts === tomb.ts && e.born === tomb.born
+  })

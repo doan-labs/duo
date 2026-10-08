@@ -132,6 +132,7 @@ const plan = (id: string, name = id, updated = 0): PlanDoc => ({
   room: { w: 420, d: 340 },
   items: {},
   view: { x: 0, y: 0, zoom: 1, framed: false },
+  born: updated,
   updated
 })
 const edit = (doc: PlanDoc, name: string): PlanDoc => ({ ...doc, name, updated: doc.updated + 1 })

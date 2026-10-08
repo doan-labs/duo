@@ -21,9 +21,11 @@ import {
   fmtSnap,
   type History,
   ITEM_LIMIT,
+  isDeadIncarnation,
   isOlderEdit,
   itemRect,
   itemSize,
+  type Library,
   latestDoc,
   moveItem,
   newPlan,
@@ -370,6 +372,15 @@ function RoomPlanner() {
   const suppressClick = useRef(false)
   const lastSeen = useRef<string | null>(null)
   const seeded = useRef(false)
+  // Tombstones observed in reached libraries. A doc matching one is a dead
+  // incarnation: this copy must stop authoring it even when the kill was a
+  // peer's, and the editor transitions to a surviving plan instead of
+  // holding a ghost the next publish would resurrect.
+  const goneRef = useRef<Library['gone']>({})
+  const seeLib = (lib: Library) => {
+    goneRef.current = lib.gone
+  }
+  const tombKills = (d: PlanDoc | null): boolean => !!d && isDeadIncarnation(d, goneRef.current)
   // The doc id this copy framed for its own canvas: one shared view cannot
   // serve a 387pt cover and a 790pt inner, so each display frames the plan it
   // is showing. Cleared wherever a doc arrives carrying a view this copy did
@@ -380,6 +391,14 @@ function RoomPlanner() {
   // observe(), so only a real size change may trigger a refit - refitting on
   // the initial callback loops setDoc -> effect -> observe -> refit forever.
   const lastBox = useRef<{ w: number; h: number } | null>(null)
+  // Render-side copy of lastBox for canvas-space callouts (the width label
+  // must dodge the zoom dock, which lives outside the world transform).
+  const [canvasBox, setCanvasBox] = useState<{ w: number; h: number } | null>(null)
+  // Measured bottom edge of the zoom dock in canvas space, plus a margin:
+  // the width callout clamps below it. Default covers top:sm + 44pt + gap
+  // until the first real measurement lands.
+  const dockRef = useRef<HTMLDivElement>(null)
+  const [dockClear, setDockClear] = useState(72)
   const docRef = useRef(doc)
   // Newest foreign doc write seen on the wire, for the stale-base publish guard.
   const remoteDoc = useRef<{ id: string; updated: number } | null>(null)
@@ -470,6 +489,10 @@ function RoomPlanner() {
     // delayed fit/observer fire) would regress name/room/items on screen and
     // back over the wire: decline it - a stale payload is not user work.
     if (before && before.id === next.id && next.updated < before.updated) return
+    // A confirmed delete retires the incarnation: a deferred callback
+    // republishing its captured doc would resurrect the ghost with a newer
+    // stamp. Real recreations carry a later `born` and pass.
+    if (tombKills(next)) return
     if (!opts.skipHist && before && before.id === next.id) {
       const prev = opts.prev ?? coreOf(before)
       setHist((h) => commitHistory(h, prev, coreOf(next), opts.tag ?? null))
@@ -485,6 +508,10 @@ function RoomPlanner() {
   // they never need to re-subscribe on every render.
   const publishRef = useRef(publish)
   publishRef.current = publish
+  // The delete-current transition is ref-held like publish(): the stored
+  // effect may not list it as a dependency, but by the time effects run the
+  // current slot always carries this render's closure.
+  const adoptSurvivorRef = useRef<(lib: Library) => void>(() => {})
 
   // Selection is part of the shared truth: a tap that only setSel()'d locally
   // would leave the wire's `sel` stale until the next edit, and a fresh
@@ -596,6 +623,10 @@ function RoomPlanner() {
     // (a peer's stale republish, a mirror that predates our plan switch) must
     // never regress the doc, its history or the selection on screen.
     if (!wire.admit(next, now)) return
+    // A peer echo of a plan this copy watched die: the peer simply has not
+    // transitioned yet. Adopting it would reopen the deleted incarnation
+    // here and write it back durable.
+    if (isDeadIncarnation(next.doc, goneRef.current)) return
     // Keep this copy's own view for the plan it already framed: a remote fit
     // was computed for a different canvas and must not replace the local one.
     const keep = now?.id === next.doc.id && framedDoc.current === next.doc.id
@@ -643,6 +674,14 @@ function RoomPlanner() {
   // without it a clobbered plan would simply be gone.
   useEffect(() => {
     if (stored.status === 'ready') void libStore.repair()
+    // A tombstone for the plan on screen means the open doc is a ghost:
+    // the delete won causally, so this copy moves to a survivor the same
+    // way the deleting copy did. Anything still typing into the dead doc
+    // (a deferred callback, an echo) dies at publish().
+    const lib = parseLibrary(stored.value)
+    goneRef.current = lib.gone
+    const cur = docRef.current
+    if (cur && isDeadIncarnation(cur, lib.gone)) adoptSurvivorRef.current(lib)
   }, [stored])
 
   // First sight of a plan frames the whole room for THIS canvas: legibility on
@@ -658,6 +697,9 @@ function RoomPlanner() {
       const box = el.getBoundingClientRect()
       if (!box.width || !box.height) return
       lastBox.current = { w: box.width, h: box.height }
+      setCanvasBox({ w: box.width, h: box.height })
+      const dock = dockRef.current?.getBoundingClientRect()
+      if (dock) setDockClear(dock.bottom - box.top + 10)
       // A fit that runs late must serve the doc on screen now, not the one
       // this callback captured: edits between schedule and fire made the
       // capture stale, and republishing its core would erase newer work on
@@ -717,6 +759,11 @@ function RoomPlanner() {
       const last = lastBox.current
       if (last && Math.abs(box.width - last.w) < 1 && Math.abs(box.height - last.h) < 1) return
       lastBox.current = box.width && box.height ? { w: box.width, h: box.height } : last
+      setCanvasBox(box.width && box.height ? { w: box.width, h: box.height } : null)
+      // The dock's real bottom edge drives the width callout's clamp -
+      // measuring beats hardcoding the token math (top:sm + 44pt row).
+      const dock = dockRef.current?.getBoundingClientRect()
+      if (dock) setDockClear(dock.bottom - box.top + 10)
       if (!box.width || !box.height) return
       if (framedDoc.current !== doc.id) return fitLocal()
       // Refit on a canvas resize only while the camera is still in auto-fit:
@@ -1022,19 +1069,30 @@ function RoomPlanner() {
       // an unreadable or unconfirmed write keeps the current doc instead of
       // publishing a fresh 'Layout 1' over a state nobody saw.
       if (!wrote || wrote.lib.gone[id] === undefined) return
-      const open = docRef.current?.id === id ? (latestDoc(wrote.lib) ?? newPlan('Layout 1')) : null
-      if (open) {
-        await libStore.write((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
-        framedDoc.current = null
-        setHist(emptyHistory())
-        const at = wire.stamp(open)
-        setDoc(open)
-        setSel(null)
-        void os.session.set(DOC_KEY, serializeMirror(ME, open, null, at)).catch(() => {})
-      }
+      seeLib(wrote.lib)
+      if (docRef.current?.id === id) adoptSurvivor(wrote.lib)
     })()
     sound('delete')
   }
+
+  // Shared delete-current transition for the local delete and the tombstone
+  // watch: move to the newest surviving plan, or - when none remains - one
+  // deterministic recovery plan. The fixed id keeps both displays' fallback
+  // choices identical so concurrent transitions converge on a single new
+  // plan instead of forking two; its fresh `born` outranks any 'layout-1'
+  // tomb from an earlier deletion, so the recovery itself cannot be killed.
+  const adoptSurvivor = (lib: Library) => {
+    const open = latestDoc(lib) ?? newPlan('Layout 1', 'layout-1')
+    framedDoc.current = null
+    setHist(emptyHistory())
+    const at = wire.stamp(open)
+    setDoc(open)
+    setSel(null)
+    setArming(null)
+    void libStore.write((l) => ((l.plans[open.id]?.updated ?? -1) >= open.updated ? null : withDoc(l, open)))
+    void os.session.set(DOC_KEY, serializeMirror(ME, open, null, at)).catch(() => {})
+  }
+  adoptSurvivorRef.current = adoptSurvivor
 
   // --- pointer: pan, drag, pinch ---------------------------------------------
 
@@ -1408,7 +1466,7 @@ function RoomPlanner() {
   )
 
   const zoomDock = (
-    <div role="toolbar" aria-label="Zoom" {...stylex.props(styles.zoomDock)}>
+    <div ref={dockRef} role="toolbar" aria-label="Zoom" {...stylex.props(styles.zoomDock)}>
       <button
         type="button"
         aria-label="Zoom out"
@@ -1443,6 +1501,17 @@ function RoomPlanner() {
   )
 
   const gridStep = prefs.snap > 0 ? prefs.snap : prefs.units === 'metric' ? 25 : 30.48
+
+  // The width callout lives in canvas space, not the world transform: it
+  // pins to the room's top edge horizontally and rides just above its wall,
+  // but the zoom dock is chrome - when the wall's line slides underneath the
+  // dock the label clamps below it instead of disappearing under chrome.
+  const dimW = (() => {
+    if (!canvasBox?.w) return null
+    const wx = Math.min(Math.max(canvasBox.w / 2 + doc.view.x, 46), Math.max(46, canvasBox.w - 46))
+    const wallTop = canvasBox.h / 2 + doc.view.y - (doc.room.d / 2) * zoom
+    return { x: wx, y: Math.max(wallTop - 20, dockClear) }
+  })()
 
   const canvas = (
     <div
@@ -1587,20 +1656,17 @@ function RoomPlanner() {
         <span
           {...stylex.props(
             styles.dimTop,
-            styles.calloutAt(doc.room.w / 2, -14, `translate(-50%,-100%) scale(${cs})`, 'center bottom')
-          )}
-        >
-          {fmtLength(doc.room.w, prefs.units)}
-        </span>
-        <span
-          {...stylex.props(
-            styles.dimTop,
             styles.calloutAt(-14, doc.room.d / 2, `translate(-50%,-50%) rotate(-90deg) scale(${cs})`, 'center')
           )}
         >
           {fmtLength(doc.room.d, prefs.units)}
         </span>
       </div>
+      {dimW && (
+        <span {...stylex.props(styles.dimTop, styles.dimCanvasAt(dimW.x, dimW.y))}>
+          {fmtLength(doc.room.w, prefs.units)}
+        </span>
+      )}
       {zoomDock}
       <span {...stylex.props(styles.hint, !wide && styles.hintCover)}>
         {wide ? 'Drag to pan, drag a piece to move it' : 'Drag to pan, tap a piece'}

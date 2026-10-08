@@ -267,6 +267,15 @@ export const styles = stylex.create({
     transform: tf,
     transformOrigin: origin
   }),
+  // Canvas-space variant for the width callout: unlike calloutAt it is not a
+  // child of the scaled world, so it never shrinks and can be clamped below
+  // the zoom dock's screen-space band.
+  dimCanvasAt: (x: number, y: number) => ({
+    left: `${x}px`,
+    top: `${y}px`,
+    transform: 'translate(-50%,-50%)',
+    zIndex: 5
+  }),
   swatchAt: (hue: string) => ({ backgroundColor: hue }),
   flipIcon: { display: 'inline-flex', transform: 'scaleX(-1)' },
   contents: { display: 'contents' },
