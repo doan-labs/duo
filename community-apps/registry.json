@@ -135,6 +135,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.solitaire": {
+      "folder": "solitaire",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.reversi": {
       "folder": "reversi",
       "developer": "devin",
