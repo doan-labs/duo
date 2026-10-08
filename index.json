@@ -96,6 +96,21 @@
         }
       ]
     },
+    "com.mnismt.duo.circuitlab": {
+      "name": "Circuit Lab",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/circuit-lab",
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+6454db35",
+          "sdk": "0.1.0",
+          "bytes": 578930,
+          "sha256": "f1f8d285f4af9e08c3eca8874eea4da37d7cebc15cb10584804d4464e534b2f6"
+        }
+      ]
+    },
     "com.mnismt.duo.flappyduo": {
       "name": "Flappy Duo",
       "lane": "community",

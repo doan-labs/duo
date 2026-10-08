@@ -1,0 +1,32 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.circuitlab",
+    "name": "Circuit Lab",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/circuit-lab",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T09:38:35.274Z",
+    "commit": "b693629ba958987574e874d77a0e02b9622cc397",
+    "hash": "6454db35"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 578930,
+      "sha256": "2b889b94dae88187e343668441b39c3ed35e6dbcc945c55d909af2dedd465ab6"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 866003,
+      "sha256": "808c0eeb44166de8c719f14ab75a43cbffe28eb347312f31ef0dba26b0cc7095"
+    }
+  ]
+}
