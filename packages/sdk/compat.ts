@@ -21,7 +21,11 @@ export function compatible(host: SemVer, app: SemVer): boolean {
   return host.major === 0 && host.minor === 0 && host.patch === app.patch
 }
 
-export const HOST_SDK = '0.0.0'
+export const HOST_SDK = '0.1.0'
+/** Audited legacy contracts this host still launches, exact versions only.
+    A profile is a host decision, not a compatible() exception: earlier and
+    later hosts keep the pure caret rule, and prereleases cannot take one. */
+export const HOST_PROFILES: readonly string[] = ['0.0.0']
 export const REQUIRES_PLATFORM = 'Requires a newer platform version'
 export function supports(version: string, dev = false, host = HOST_SDK): boolean {
   const h = semver(host)
@@ -30,5 +34,13 @@ export function supports(version: string, dev = false, host = HOST_SDK): boolean
   if (dev && (a.prerelease.length || h.prerelease.length)) {
     return compatible({ ...h, prerelease: [] }, { ...a, prerelease: [] })
   }
-  return compatible(h, a)
+  if (compatible(h, a)) return true
+  return host === HOST_SDK && !a.prerelease.length && HOST_PROFILES.includes(version)
+}
+
+/** Whether a bundle built on this SDK may use the conditional-write protocol. */
+export function conditional(version: string): boolean {
+  const h = semver(HOST_SDK)
+  const a = semver(version)
+  return !!h && !!a && compatible(h, a)
 }
