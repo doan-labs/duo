@@ -421,6 +421,22 @@
         }
       ]
     },
+    "com.mnismt.duo.tripplanner": {
+      "name": "Trip Planner",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/trip-planner",
+      "permissions": [],
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+07eae126",
+          "sdk": "0.1.0",
+          "bytes": 595114,
+          "sha256": "f1eb3db2f1d36596ba2cdd73b6821049bc50874de915c7fe8e976025db59b23a"
+        }
+      ]
+    },
     "com.mnismt.duo.wordlemini": {
       "name": "Wordle Mini",
       "lane": "community",
