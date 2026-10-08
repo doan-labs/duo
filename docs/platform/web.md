@@ -31,6 +31,11 @@ Deployment requirements:
 - Configure DNS and HTTPS for the canonical domain, and serve correct content
   types. Do not return the website's HTML fallback for missing catalog or
   artifact paths.
+- Serve release bytes untransformed. Hash verification at install time requires
+  the response to equal the committed bytes for every request class, including
+  document navigations the edge may rewrite (analytics snippet injection and
+  similar features). The site Worker stamps `no-transform` on release-tree hits
+  for exactly this (see `run_worker_first` in wrangler.jsonc).
 - Cache immutable versioned bundles long-term. Revalidate site entry documents
   and keep catalog freshness short (the store proposal uses 60 seconds).
   Publish complete artifacts before the catalog references them. An already
@@ -89,6 +94,29 @@ compatibility have already been verified.
 ## Build record
 
 Newest first. Each pass records what changed and how it was verified.
+
+### Release responses pinned to committed bytes
+
+- The three release trees (`/catalog/apps/*`, `/cdn/apps/*`,
+  `/preinstalled/apps/*`) run through the site Worker via
+  `assets.run_worker_first`. The site host was found rewriting `text/html`
+  release documents for `Accept: text/html` requests (an edge analytics
+  injection), which changed the bytes the downloader hashes. The Worker stamps
+  `Cache-Control: public, max-age=31536000, immutable, no-transform` on hits
+  and `no-store` on misses/redirects/errors - status-conditional freshness,
+  which `_headers` cannot express: a flat immutable rule was observed stamping
+  a year-long cache onto 404s under the trees. Only Cache-Control is
+  overridden; bodies and other headers pass through.
+- Verification: `scripts/checks/publish/headers.mjs` asserts the routing
+  contract, validates `_headers` grammar/effective values if the file exists,
+  and drives the real handler over canned statuses (hit, redirect, miss,
+  error, conditional, HEAD) checking emitted Cache-Control, status,
+  passthrough bytes and upstream headers; a fixture suite exercises the
+  validator. `bunx biome check`, `bun run typecheck`, `bun run build` and the
+  publisher checks run clean. Edge behavior verified by the `Accept` split
+  before the fix: `*/*` served committed bytes, `text/html` served an
+  injected document; live postdeploy verification re-runs both classes plus
+  a miss.
 
 ### Kit scenes follow the page's appearance
 
