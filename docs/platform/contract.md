@@ -136,10 +136,21 @@ export function compatible(H: SemVer, A: SemVer): boolean {
 ```
 
 So host 1.2.0 rejects an app built on 1.2.1; host 0.3.0 rejects 0.2.5; host
-0.0.1 rejects 0.0.0. The SDK is 0.0.0 today, so the 0.x rules apply from the
+0.0.1 rejects 0.0.0. The SDK is 0.1.0 today, so the 0.x rules apply from the
 first release. The SDK's README carries the discipline this implies: while
 0.x, every published SDK version is its own host contract; a host bump is a
 shell release.
+
+Amendment (owner-approved): **the host additionally declares audited legacy
+contracts as profiles.** `HOST_PROFILES` in `compat.ts` pins the exact
+versions - `0.0.0` today - and `supports()` accepts them on this host only.
+A profile is a host capability, not a `compatible()` exception: a prerelease
+cannot take one, and no other host string inherits them, so a host that
+predates this contract still refuses 0.1.0 bundles outright. A bundle
+admitted on a legacy profile keeps its own contract exactly: `entry` and
+`expect` were never part of it, so a forged conditional-write request from a
+profiled release is refused `E_UNSUPPORTED` at dispatch, never applied
+unconditionally (decision 111).
 
 Settled: the wire protocol has its own integer `PROTOCOL`, bumped only for
 breaking message changes; the handshake checks it as a fast fail. It is not in

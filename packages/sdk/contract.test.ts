@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { compatible, HOST_SDK, semver, supports } from './compat.ts'
+import { compatible, conditional, HOST_PROFILES, HOST_SDK, semver, supports } from './compat.ts'
 import { bytes, deviceEventName, deviceEventValid, keyValid, requestValid, widgetValid } from './guards.ts'
 import { networkOrigin } from './manifest.ts'
 import { frameAllow, permissionsValid, servicePermission } from './permissions.ts'
@@ -22,11 +22,22 @@ test('full caret matrix, including patch floors and 0.x', () => {
     }
   assert.equal(supports(`${HOST_SDK}-dev.1`), false)
   assert.equal(supports(`${HOST_SDK}-dev.1`, true), true)
-  // Apps built on the previous contract are refused on this host, and this
-  // host's bundles are refused by a host that predates the contract.
-  assert.equal(supports('0.0.0'), false)
-  assert.equal(supports('0.0.0', false, '0.0.0'), true)
+  // The approved legacy profile admits exactly the audited 0.0.0 contract on
+  // this host; every other profile candidate stays refused.
+  for (const version of HOST_PROFILES) assert.equal(supports(version), true, version)
+  assert.equal(supports('0.0.0-dev.1'), false, 'a prerelease cannot take the profile')
+  assert.equal(supports('0.0.0-dev.1', true), false, 'not even in development')
+  for (const bad of ['0.0.1', '0.2.0', '1.0.0', '0.0.0.0', 'garbage']) assert.equal(supports(bad), false, bad)
+  // A host that predates this contract keeps the pure caret rule: a bundle
+  // built on 0.1.0 is refused, while its own 0.0.0 bundles still satisfy it.
   assert.equal(supports(HOST_SDK, false, '0.0.0'), false)
+  assert.equal(supports('0.0.0', false, '0.0.0'), true)
+  assert.equal(supports('0.0.0', false, '0.1.0'), true, 'the current host honors its own profile')
+  assert.equal(supports('0.0.0', false, '0.2.0'), false, 'other hosts never take profiles')
+  // Only the current contract may use conditional writes.
+  assert.equal(conditional(HOST_SDK), true)
+  assert.equal(conditional('0.0.0'), false, 'legacy profile cannot forge CAS')
+  assert.equal(conditional('0.0.1'), false)
   for (const bad of ['01.0.0', '1.0', '1.0.0+abc', '1.0.0-01', '1.0.0-', '9007199254740992.0.0'])
     assert.equal(semver(bad), null)
 })

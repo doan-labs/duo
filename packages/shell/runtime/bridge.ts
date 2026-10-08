@@ -1,4 +1,4 @@
-import { REQUIRES_PLATFORM, supports } from '../../sdk/compat.ts'
+import { conditional, REQUIRES_PLATFORM, supports } from '../../sdk/compat.ts'
 import { deviceEventName, envelope, PlatformError, requestSame, requestValid, widgetValid } from '../../sdk/guards.ts'
 import { record } from '../../sdk/manifest.ts'
 import { frameAllow, mutatingService, servicePermission } from '../../sdk/permissions.ts'
@@ -105,6 +105,10 @@ export function launchFrame(
     }
     if (req.m.startsWith('storage.') || req.m.startsWith('session.')) {
       const [space, action] = req.m.split('.') as ['storage' | 'session', string]
+      // A bundle on a legacy profile has no conditional-write contract: a
+      // forged `entry` or `expect` is refused, never silently unconditional.
+      if ((action === 'entry' || p.expect !== undefined) && !conditional(session.bundle.release.build.sdk))
+        throw new PlatformError('E_UNSUPPORTED', 'Conditional writes require SDK 0.1.0')
       if (action === 'watch') {
         if (space === 'storage') {
           const current = await snapshot(session.app.id, session.app.generation)

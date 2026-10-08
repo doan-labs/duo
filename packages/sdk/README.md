@@ -9,6 +9,10 @@ The host must satisfy the full caret range of the exact SDK version recorded
 in the app release. While 0.x, every published SDK version is its own host
 contract and a host bump requires a shell release. Prereleases are accepted
 only in development. Protocol version and SDK version are separate checks.
+This host additionally declares audited legacy contracts as profiles
+(`HOST_PROFILES` = 0.0.0): a profiled bundle launches against its own
+contract exactly, so `entry`/`expect` requests from it are refused
+`E_UNSUPPORTED` rather than silently falling back to unconditional writes.
 
 Call `await os.connect()` before rendering, then `os.ready()` after the first
 frame. Storage is asynchronous and strings-only. Snapshot and watch revisions
