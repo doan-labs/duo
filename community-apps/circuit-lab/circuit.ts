@@ -41,10 +41,21 @@ export type Doc = CircuitState & {
 }
 export type Library = {
   circuits: Record<string, Doc>
+  /** Deleted circuit ids -> deletion time: a confirmed delete a stale snapshot must not undo. */
+  tombs: Record<string, number>
   /** Solved challenge ids, persisted with the library. */
   solved: string[]
   muted: boolean
 }
+/** Tombstones are bounded: oldest deletions fall off first, deterministically. */
+export const TOMB_LIMIT = 64
+export const pruneTombs = (lib: Library): Library => {
+  const ids = Object.keys(lib.tombs)
+  if (ids.length <= TOMB_LIMIT) return lib
+  const keep = ids.sort((a, b) => (lib.tombs[b] ?? 0) - (lib.tombs[a] ?? 0)).slice(0, TOMB_LIMIT)
+  return { ...lib, tombs: Object.fromEntries(keep.map((id) => [id, lib.tombs[id] ?? 0])) }
+}
+export const emptyLibrary = (): Library => ({ circuits: {}, tombs: {}, solved: [], muted: false })
 export type Sel = { kind: 'node' | 'wire'; id: string } | null
 /**
  * The content-changing edit a session write carried, described opaquely so a
@@ -596,27 +607,43 @@ export function cleanDoc(v: unknown): Doc | null {
   }
 }
 
-export function parseLibrary(raw: string | null): Library {
-  const empty: Library = { circuits: {}, solved: [], muted: false }
-  if (!raw) return empty
+/**
+ * Strict library decode: returns the cleaned Library, or null when the stored
+ * bytes are unparseable. Write paths use this so a corrupt blob fails the
+ * write instead of reading back as an empty library and clobbering itself.
+ */
+export function decodeLibrary(raw: string): Library | null {
+  let parsed: unknown
   try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!record(parsed)) return empty
-    const circuits: Record<string, Doc> = {}
-    if (record(parsed.circuits)) {
-      for (const [id, value] of Object.entries(parsed.circuits)) {
-        const doc = cleanDoc(value)
-        if (doc) circuits[id] = doc
-      }
-    }
-    return {
-      circuits,
-      solved: Array.isArray(parsed.solved) ? parsed.solved.filter((s): s is string => typeof s === 'string') : [],
-      muted: parsed.muted === true
-    }
+    parsed = JSON.parse(raw)
   } catch {
-    return empty
+    return null
   }
+  if (!record(parsed)) return null
+  const circuits: Record<string, Doc> = {}
+  if (record(parsed.circuits)) {
+    for (const [id, value] of Object.entries(parsed.circuits)) {
+      const doc = cleanDoc(value)
+      if (doc) circuits[id] = doc
+    }
+  }
+  const tombs: Record<string, number> = {}
+  if (record(parsed.tombs)) {
+    for (const [id, at] of Object.entries(parsed.tombs)) {
+      if (/^[\w-]+$/.test(id) && typeof at === 'number' && Number.isFinite(at)) tombs[id] = at
+    }
+  }
+  return {
+    circuits,
+    tombs,
+    solved: Array.isArray(parsed.solved) ? parsed.solved.filter((s): s is string => typeof s === 'string') : [],
+    muted: parsed.muted === true
+  }
+}
+
+export function parseLibrary(raw: string | null): Library {
+  if (!raw) return emptyLibrary()
+  return decodeLibrary(raw) ?? emptyLibrary()
 }
 
 export function serializeLibrary(lib: Library) {

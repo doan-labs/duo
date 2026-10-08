@@ -27,8 +27,10 @@ import {
   connect,
   type Doc,
   decideRemote,
+  decodeLibrary,
   displayName,
   docBounds,
+  emptyLibrary,
   evaluate,
   gatesOf,
   hasOutput,
@@ -56,7 +58,6 @@ import {
   removeNode,
   removeWire,
   type Sel,
-  serializeLibrary,
   serializeMirror,
   setLabel,
   switchesOf,
@@ -65,10 +66,17 @@ import {
   undo,
   type View,
   welcomeDoc,
-  wireAt,
-  withDoc,
-  withoutDoc
+  wireAt
 } from './circuit.ts'
+import {
+  dropDocIntent,
+  libWrite,
+  mutedIntent,
+  putDocIntent,
+  solvedIntent,
+  type WriteOutcome,
+  writeConditional
+} from './persist.ts'
 import { styles } from './styles.ts'
 
 const ME = crypto.randomUUID()
@@ -97,13 +105,31 @@ type Drag = {
   moved: boolean
 }
 
-const readLib = (): Promise<Library> => os.storage.get(LIB_KEY).then(parseLibrary, () => parseLibrary(null))
-
 // Library writes funnel through one queue so two quick edits cannot each merge
-// into the same stale snapshot and overwrite one another's circuits.
+// into the same stale snapshot and overwrite one another's circuits. Each job
+// is a conditional write: it reads the freshest entry inside the host's CAS
+// contract and re-derives its intent on conflict, so a write computed from a
+// stale read loses to confirmed peer facts instead of clobbering them.
 let libQueue = Promise.resolve()
-const enqueue = (job: () => Promise<void>) => {
-  libQueue = libQueue.then(job).catch(() => {})
+let savePending = 0
+let saveFailed = false
+let onSaveState: (() => void) | null = null
+const enqueue = (job: () => Promise<WriteOutcome>) => {
+  savePending++
+  onSaveState?.()
+  libQueue = libQueue
+    .then(job)
+    .then((outcome) => {
+      if (outcome === 'failed' || outcome === 'gone') saveFailed = true
+      else saveFailed = false
+    })
+    .catch(() => {
+      saveFailed = true
+    })
+    .finally(() => {
+      savePending--
+      onSaveState?.()
+    })
 }
 
 const wirePath = (x1: number, y1: number, x2: number, y2: number) => {
@@ -233,14 +259,11 @@ function CircuitLab() {
   const activeChallenge = challengeById(doc?.challenge)
   const run = doc && activeChallenge ? challengeRun(doc, activeChallenge) : null
 
-  // Merges one doc into the freshest library it can read. Merging against a
-  // fresh get - not the KV mirror, which lags while occluded - is what stops a
-  // hidden copy from clobbering circuits it has not seen yet.
+  // Merges one doc into the freshest library the host will commit over. The
+  // intent recomputes on the entry read each attempt, so a confirmed peer
+  // delete or newer stored version wins over a snapshot captured here.
   const saveDoc = (next: Doc) => {
-    enqueue(async () => {
-      const lib = await readLib()
-      stored.set(serializeLibrary(withDoc(lib, next)))
-    })
+    enqueue(() => libWrite(os.storage, LIB_KEY, putDocIntent(next)))
   }
 
   // Every structural edit lands in both places: the session key carries the
@@ -274,7 +297,12 @@ function CircuitLab() {
     window.clearTimeout(camSave.current)
     const p = camPending.current
     camPending.current = null
-    if (p) void os.storage.set(p.key, p.json).catch(() => {})
+    // Conditional like the library: on conflict the intent re-reads the live
+    // pending value, so a newer resting frame always beats a stale payload.
+    if (p)
+      void writeConditional(os.storage, p.key, () =>
+        camPending.current && camPending.current.key === p.key ? camPending.current.json : p.json
+      )
   }, [])
   const applyCam = useCallback(
     (docId: string, v: View) => {
@@ -351,10 +379,19 @@ function CircuitLab() {
 
   const setMuted = (next: boolean) => {
     if (!admit()) return
-    enqueue(async () => {
-      const lib = await readLib()
-      stored.set(serializeLibrary({ ...lib, muted: next }))
-    })
+    enqueue(() => libWrite(os.storage, LIB_KEY, mutedIntent(next)))
+  }
+
+  // A fresh durable read for choices that must see confirmed peer state.
+  // A failed or corrupt read resolves to null and the caller aborts - it
+  // never acts on a blank library.
+  const readLibEntry = async (): Promise<Library | null> => {
+    try {
+      const e = await os.storage.entry(LIB_KEY)
+      return e.v === null ? emptyLibrary() : decodeLibrary(e.v)
+    } catch {
+      return null
+    }
   }
 
   // A raw watch beside useKV: remote KV changes render through a view
@@ -464,20 +501,29 @@ function CircuitLab() {
     lastSeen.current = raw
     if (!raw) {
       // Seed only after the library hydrates: a fresh copy publishing before it
-      // would otherwise let a peer write over circuits it never saw.
+      // would otherwise let a peer write over circuits it never saw. The
+      // choice of what to open is made inside the conditional write, on the
+      // freshest library the host commits over - a boot where both copies
+      // race still yields one circuit, and a confirmed delete of the welcome
+      // doc is never resurrected by a returning display.
       if (!seeded.current && stored.status === 'ready') {
-        seeded.current = true
         enqueue(async () => {
-          const lib = await readLib()
-          const open = latestDoc(lib) ?? welcomeDoc()
+          const picked: { doc: Doc | null } = { doc: null }
+          const outcome = await libWrite(os.storage, LIB_KEY, (lib) => {
+            picked.doc = latestDoc(lib) ?? (lib.tombs.welcome === undefined ? welcomeDoc() : null)
+            return picked.doc === null ? null : putDocIntent(picked.doc)(lib)
+          })
+          if (outcome === 'failed' || outcome === 'gone' || !picked.doc) return outcome
+          const open = picked.doc
+          seeded.current = true
           setDoc(open)
           docRef.current = open
           loadCam(open.id, open.view)
           setSel(null)
-          stored.set(serializeLibrary(withDoc(lib, open)))
           const raw = serializeMirror(ME, open, null, docRev.current, { t: 'doc' })
           lastWritten.current = raw
           await os.session.set(DOC_KEY, raw).catch(() => {})
+          return outcome
         })
       }
       return
@@ -493,10 +539,7 @@ function CircuitLab() {
       const selNow = pruneSel(selRef.current, merged)
       setDoc(merged)
       docRef.current = merged
-      enqueue(async () => {
-        const lib = await readLib()
-        stored.set(serializeLibrary(withDoc(lib, merged)))
-      })
+      enqueue(() => libWrite(os.storage, LIB_KEY, putDocIntent(merged)))
       // Only the live copy may answer a stale write - a hidden copy's heal
       // would itself be a stale writer. The same write re-decides when this
       // copy becomes visible, so convergence waits for the fold, not for it.
@@ -522,14 +565,10 @@ function CircuitLab() {
     setSel(pruneSel(next.sel, next.doc))
     setArmed(null)
     setArming(null)
-    enqueue(async () => {
-      const lib = await readLib()
-      const existing = lib.circuits[next.doc.id]
-      if (!existing || existing.updated < next.doc.updated) {
-        stored.set(serializeLibrary(withDoc(lib, next.doc)))
-      }
-    })
-  }, [live, stored.status, stored.set, loadCam])
+    // Persist only if the fresher library does not already hold this version
+    // or a confirmed delete of it.
+    enqueue(() => libWrite(os.storage, LIB_KEY, putDocIntent(next.doc)))
+  }, [live, stored.status, loadCam])
 
   // First sight of a circuit fits it whole - circuits are small, so the
   // overview is the legible one - for THIS canvas. A hidden copy measures 0x0
@@ -576,12 +615,8 @@ function CircuitLab() {
     if (!solvedNow || !doc || !activeChallenge) return
     if (!mutedRef.current && admit()) cue('solve')
     setNote(`${activeChallenge.title} solved`)
-    enqueue(async () => {
-      const lib = await readLib()
-      if (lib.solved.includes(activeChallenge.id)) return
-      stored.set(serializeLibrary({ ...lib, solved: [...lib.solved, activeChallenge.id] }))
-    })
-  }, [solvedNow, doc, activeChallenge, stored.set])
+    enqueue(() => libWrite(os.storage, LIB_KEY, solvedIntent(activeChallenge.id)))
+  }, [solvedNow, doc, activeChallenge])
 
   // Hands the pre-connect Escape guard the live cancel callback only while a
   // wire is armed or a Sheet is actually open.
@@ -639,11 +674,26 @@ function CircuitLab() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  // Durable-write status comes from the conditional queue itself: in flight
+  // reads Saving, a committed write clears it and an unrecoverable outcome
+  // (conflict bound exhausted, dead generation, corrupt blob) reads failed
+  // rather than silently pretending a save.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'failed'>('idle')
+  useEffect(() => {
+    const update = () => setSaveStatus(savePending > 0 ? 'saving' : saveFailed ? 'failed' : 'idle')
+    onSaveState = update
+    update()
+    return () => {
+      onSaveState = null
+    }
+  }, [])
+
   if (!doc) return <main ref={rootRef} {...stylex.props(dark, styles.root)} />
 
   const ev = evaluate(doc)
   const table = truthTable(doc)
-  const saving = stored.status === 'saving'
+  const saving = saveStatus === 'saving'
+  const saveErr = saveStatus === 'failed'
   const ins = switchesOf(doc)
   const outs = bulbsOf(doc)
   // The truth-table row matching the live switch pattern, lit for orientation.
@@ -897,7 +947,7 @@ function CircuitLab() {
     // Read the library fresh: the KV mirror can lag while this copy is
     // occluded, so a circuit the other display just made may not be listed yet.
     void (async () => {
-      const next = (await readLib()).circuits[id]
+      const next = (await readLibEntry())?.circuits[id]
       if (next && next.id !== docRef.current?.id) {
         framedDoc.current = null
         loadCam(next.id, next.view)
@@ -909,7 +959,9 @@ function CircuitLab() {
     if (!admit()) return
     setArming(null)
     void (async () => {
-      const next = newDoc(`Circuit ${Object.keys((await readLib()).circuits).length + 1}`)
+      const lib = await readLibEntry()
+      if (!lib) return
+      const next = newDoc(`Circuit ${Object.keys(lib.circuits).length + 1}`)
       framedDoc.current = null
       loadCam(next.id, next.view)
       publish(next, null, { t: 'doc' })
@@ -919,7 +971,8 @@ function CircuitLab() {
     if (!admit()) return
     setArming(null)
     void (async () => {
-      const lib = await readLib()
+      const lib = await readLibEntry()
+      if (!lib) return
       const existing = Object.values(lib.circuits).find((c) => c.challenge === id)
       const ch = challengeById(id)
       if (!ch) return
@@ -933,16 +986,29 @@ function CircuitLab() {
     if (!admit()) return
     setConfirmDelete(null)
     enqueue(async () => {
-      const lib = withoutDoc(await readLib(), id)
-      const open = docRef.current?.id === id ? (latestDoc(lib) ?? newDoc('Circuit 1')) : null
-      stored.set(serializeLibrary(open ? withDoc(lib, open) : lib))
-      if (open) {
-        framedDoc.current = null
-        loadCam(open.id, open.view)
-        setDoc(open)
-        setSel(null)
-        void os.session.set(DOC_KEY, serializeMirror(ME, open, null, docRev.current, { t: 'doc' })).catch(() => {})
-      }
+      // The replacement doc is minted once so a conflicted retry keeps one
+      // stable identity; the open-circuit choice is recomputed per attempt on
+      // the freshest library the host commits over.
+      const wantOpen = docRef.current?.id === id
+      const fallback = wantOpen ? newDoc('Circuit 1') : null
+      const picked: { doc: Doc | null } = { doc: null }
+      const outcome = await libWrite(os.storage, LIB_KEY, (lib) => {
+        let next = dropDocIntent(id, Date.now())(lib) ?? lib
+        if (fallback) {
+          picked.doc = latestDoc(next) ?? fallback
+          next = putDocIntent(picked.doc)(next) ?? next
+        }
+        return next === lib ? null : next
+      })
+      if (!picked.doc || outcome === 'failed' || outcome === 'gone') return outcome
+      const open = picked.doc
+      framedDoc.current = null
+      loadCam(open.id, open.view)
+      setDoc(open)
+      docRef.current = open
+      setSel(null)
+      void os.session.set(DOC_KEY, serializeMirror(ME, open, null, docRev.current, { t: 'doc' })).catch(() => {})
+      return outcome
     })
   }
 
@@ -1575,6 +1641,7 @@ function CircuitLab() {
             <h1 {...stylex.props(styles.title, !wide && styles.titleCover)}>{doc.name}</h1>
           </div>
           {saving ? <span {...stylex.props(styles.chip)}>Saving</span> : null}
+          {saveErr ? <span {...stylex.props(styles.chip)}>Save failed</span> : null}
           {chips}
         </header>
         {wide ? (

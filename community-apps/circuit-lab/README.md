@@ -78,3 +78,16 @@ survive app relaunch through the library. Both displays run their own copy of
 the app - whichever copy is visible owns sound, the marching signal dashes
 and every input. If an occluded copy still writes from an older revision, the
 holder merges that write's edit into the newer doc instead of losing it.
+
+Every durable write goes through the conditional contract (`persist.ts`): a
+write reads `storage.entry` for the space revision and generation, computes an
+intent over the freshest library, and commits with `set`/`del` guarded by that
+token. A moved space refuses with `E_CONFLICT` and the intent re-derives on
+the fresh entry - it never resubmits frozen bytes - so a late full-snapshot
+from a stale copy can no longer overwrite a peer's delete or drop a confirmed
+circuit. Deletes are tombstones (`tombs[id]` floors at the removed doc's
+`updated`), which lets a genuine recreate win while a stale snapshot of the
+deleted doc is refused. A timed-out ack is verified by reading the key back
+and comparing bytes; a dead generation (`E_GONE`) or a corrupt stored blob
+fails honestly instead of seeding an empty library. The status chip reports
+the queue itself, so an unwritable save reads failed rather than Saved.

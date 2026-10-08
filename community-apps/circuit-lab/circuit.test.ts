@@ -14,7 +14,9 @@ import {
   connect,
   type Doc,
   decideRemote,
+  decodeLibrary,
   evaluate,
+  type Library,
   latestDoc,
   layoutPads,
   MAX_SWITCHES,
@@ -43,6 +45,7 @@ import {
   withDoc,
   withoutDoc
 } from './circuit.ts'
+import { dropDocIntent, libWrite, putDocIntent, solvedIntent, writeConditional } from './persist.ts'
 
 let passed = 0
 const failures: string[] = []
@@ -343,7 +346,7 @@ check('library and mirror roundtrip structurally identical', () => {
   d = toggleSwitch(d, switchesOf(d)[0]!.id)
   const r = connect(d, switchesOf(d)[0]!.id, bulbsOf(d)[0]!.id, 0)
   d = r.doc
-  const lib = withDoc({ circuits: {}, solved: ['two-keys'], muted: true }, d)
+  const lib = withDoc({ circuits: {}, tombs: {}, solved: ['two-keys'], muted: true }, d)
   const back = parseLibrary(serializeLibrary(lib))
   eq(back.solved, ['two-keys'])
   eq(back.muted, true)
@@ -376,7 +379,7 @@ check('hydration survives nulls, junk and primitives', () => {
 check('latestDoc and withoutDoc pick and remove', () => {
   const a = { ...newDoc('one'), updated: 10 }
   const b = { ...newDoc('two'), updated: 30 }
-  const lib = withDoc(withDoc({ circuits: {}, solved: [], muted: false }, a), b)
+  const lib = withDoc(withDoc({ circuits: {}, tombs: {}, solved: [], muted: false }, a), b)
   eq(latestDoc(lib)!.id, b.id)
   eq(Object.keys(withoutDoc(lib, b.id).circuits).length, 1)
 })
@@ -815,6 +818,271 @@ check('two concurrent welcome seeds merge into one identical half adder', () => 
   eq(Object.keys(pair.b.doc!.nodes).length, 6)
   eq(Object.keys(pair.b.doc!.wires).length, 6)
 })
+
+// ---- conditional write contract: rev/gen CAS over the durable space ---------
+//
+// The adapter below implements the accepted SDK contract (rev+gen guard inside
+// the write transaction, E_CONFLICT/E_GONE/E_TIMEOUT as distinct failures) so
+// the app's actual persist intents and writeConditional/libWrite helpers run
+// against it unchanged - not a re-implementation of them.
+
+const asyncChecks: Promise<void>[] = []
+function checkAsync(name: string, fn: () => Promise<void>) {
+  asyncChecks.push(
+    fn()
+      .then(() => {
+        passed++
+      })
+      .catch((error) => {
+        failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
+      })
+  )
+}
+
+class MemKV {
+  values = new Map<string, string>()
+  rev = 0
+  gen = 1
+  /** When set, the next set/del throws this code instead of committing. */
+  inject: string | null = null
+  /** When true, entry() throws (read failure). */
+  entryFails = false
+  async entry(k: string) {
+    if (this.entryFails) throw new Error('read failed')
+    return { k, v: this.values.get(k) ?? null, rev: this.rev, gen: this.gen }
+  }
+  async set(k: string, v: string, expect?: { rev: number; gen: number }) {
+    if (this.inject) {
+      const code = this.inject
+      this.inject = null
+      throw Object.assign(new Error(code), { code })
+    }
+    if (expect) {
+      if (expect.gen !== this.gen) throw Object.assign(new Error('gone'), { code: 'E_GONE' })
+      if (expect.rev !== this.rev) throw Object.assign(new Error('conflict'), { code: 'E_CONFLICT' })
+    }
+    this.values.set(k, v)
+    return { rev: ++this.rev }
+  }
+  async del(k: string, expect?: { rev: number; gen: number }) {
+    if (this.inject) {
+      const code = this.inject
+      this.inject = null
+      throw Object.assign(new Error(code), { code })
+    }
+    if (expect) {
+      if (expect.gen !== this.gen) throw Object.assign(new Error('gone'), { code: 'E_GONE' })
+      if (expect.rev !== this.rev) throw Object.assign(new Error('conflict'), { code: 'E_CONFLICT' })
+    }
+    this.values.delete(k)
+    return { rev: ++this.rev }
+  }
+}
+
+const LIBKEY = 'circuitlab-library'
+const saved = (kv: MemKV) =>
+  kv.values.get(LIBKEY) === undefined ? null : (decodeLibrary(kv.values.get(LIBKEY)!) as Library)
+const fresh = () => ({ circuits: {}, tombs: {}, solved: [] as string[], muted: false })
+
+checkAsync('two concurrent null seeds commit exactly one welcome doc', async () => {
+  const kv = new MemKV()
+  // Both copies read the same null entry, then interleave commits. The loser
+  // must rebase onto the winner's seed instead of writing a duplicate.
+  const e1 = kv.entry(LIBKEY)
+  const e2 = kv.entry(LIBKEY)
+  const [r1, r2] = await Promise.all([
+    (async () => {
+      await e1
+      return libWrite(kv, LIBKEY, (l) => putDocIntent(welcomeDoc())(l))
+    })(),
+    (async () => {
+      await e2
+      return libWrite(kv, LIBKEY, (l) => putDocIntent(welcomeDoc())(l))
+    })()
+  ])
+  eq(Object.keys(saved(kv)!.circuits), ['welcome'])
+  for (const r of [r1, r2]) ok(r === 'written' || r === 'skipped', `unexpected outcome ${r}`)
+})
+
+checkAsync('a stale full-snapshot write cannot clobber a confirmed peer delete, either direction', async () => {
+  // Direction 1: A holds a stale library containing X; B deletes X; A's stale
+  // snapshot write must lose (E_CONFLICT = zero effects), and A's intent
+  // rebased on the fresh library must preserve the tomb.
+  const kv = new MemKV()
+  const X = { ...newDoc('X'), id: 'x-doc', updated: 10 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(X)(l))
+  const staleEntry = await kv.entry(LIBKEY) // A's held read
+  const libA = decodeLibrary(staleEntry.v!)!
+  await libWrite(kv, LIBKEY, dropDocIntent('x-doc', 20)) // B deletes
+  // A writes its frozen full library with the stale token: refused.
+  await kv
+    .set(LIBKEY, serializeLibrary(withDoc(libA, { ...newDoc('Y'), id: 'y-doc', updated: 30 })), {
+      rev: staleEntry.rev,
+      gen: staleEntry.gen
+    })
+    .then(
+      () => {
+        throw new Error('stale write should have conflicted')
+      },
+      (err) => eq((err as { code?: string }).code, 'E_CONFLICT')
+    )
+  // Zero effects: the tomb stands, no ghost circuit landed.
+  eq(saved(kv)!.tombs['x-doc'], 20)
+  eq(Object.keys(saved(kv)!.circuits), [])
+  // A's real intent (add Y) rebased on the fresh state keeps the tomb.
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent({ ...newDoc('Y'), id: 'y-doc', updated: 30 })(l))
+  eq(r, 'written')
+  eq(saved(kv)!.tombs['x-doc'], 20)
+  eq(Object.keys(saved(kv)!.circuits), ['y-doc'])
+
+  // Direction 2: the peer that deleted X holds a stale library that still
+  // carries X. Re-persisting it after the delete must not resurrect X.
+  const kv2 = new MemKV()
+  await libWrite(kv2, LIBKEY, (l) => putDocIntent(X)(l))
+  const heldB = decodeLibrary((await kv2.entry(LIBKEY)).v!)! // B's held copy still has X
+  await libWrite(kv2, LIBKEY, dropDocIntent('x-doc', 50)) // A deletes X
+  const r2 = await libWrite(kv2, LIBKEY, (l) => {
+    let next = l
+    for (const d of Object.values(heldB.circuits)) next = putDocIntent(d)(next) ?? next
+    return next === l ? null : next
+  })
+  eq(r2, 'skipped') // intent resolves to nothing: the tomb wins
+  eq(Object.keys(saved(kv2)!.circuits), [])
+})
+
+checkAsync('failed reads return failed and never seed or blank', async () => {
+  const kv = new MemKV()
+  kv.entryFails = true
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(welcomeDoc())(l))
+  eq(r, 'failed')
+  eq(kv.values.has(LIBKEY), false)
+})
+
+checkAsync('unknown ack reads back the same bytes, no blind retry', async () => {
+  const kv = new MemKV()
+  let sets = 0
+  const orig = kv.set.bind(kv)
+  kv.set = async (k, v, e) => {
+    sets++
+    if (sets === 1) {
+      // Commit actually happens, ack is lost: write through then report timeout.
+      kv.values.set(k, v)
+      kv.rev++
+      throw Object.assign(new Error('timeout'), { code: 'E_TIMEOUT' })
+    }
+    return orig(k, v, e)
+  }
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(welcomeDoc())(l))
+  eq(r, 'written')
+  eq(sets, 1) // no second set: readback found the committed bytes
+  eq(Object.keys(saved(kv)!.circuits), ['welcome'])
+})
+
+checkAsync('a write refused by moved space rebases intent instead of resubmitting frozen bytes', async () => {
+  const kv = new MemKV()
+  const peerDoc = { ...newDoc('peer'), id: 'peer-doc', updated: 40 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(peerDoc)(l))
+  // Writer intents over a read taken BEFORE the peer commit: on conflict the
+  // library it writes must contain BOTH the peer's doc and its own.
+  const mine = { ...newDoc('mine'), id: 'my-doc', updated: 35 }
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(mine)(l))
+  eq(r, 'written')
+  eq(Object.keys(saved(kv)!.circuits).sort(), ['my-doc', 'peer-doc'])
+})
+
+checkAsync('dead generation is reported gone with zero effects', async () => {
+  const kv = new MemKV()
+  kv.gen = 7
+  const e = { k: LIBKEY, v: null, rev: 0, gen: 1 } // stale generation token
+  await kv.set(LIBKEY, serializeLibrary(fresh()), { rev: e.rev, gen: e.gen }).then(
+    () => {
+      throw new Error('expected E_GONE')
+    },
+    (err) => eq((err as { code?: string }).code, 'E_GONE')
+  )
+  eq(kv.values.has(LIBKEY), false)
+})
+
+checkAsync('corrupt stored bytes fail honestly instead of overwriting with empty', async () => {
+  const kv = new MemKV()
+  kv.values.set(LIBKEY, '{oops-corrupt')
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(welcomeDoc())(l))
+  eq(r, 'failed')
+  eq(kv.values.get(LIBKEY), '{oops-corrupt') // untouched
+})
+
+checkAsync('persistent contention refuses after the attempt bound', async () => {
+  const kv = new MemKV()
+  // Every other write in the space bumps rev, so this writer always conflicts.
+  const orig = kv.set.bind(kv)
+  kv.set = async (k, v, e) => {
+    kv.rev++ // sibling write
+    return orig(k, v, e)
+  }
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(welcomeDoc())(l))
+  eq(r, 'failed')
+})
+
+checkAsync('delete beats older recreate, newer recreate beats delete (ABA)', async () => {
+  const kv = new MemKV()
+  const doc = { ...newDoc('ABA'), id: 'aba', updated: 10 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
+  await libWrite(kv, LIBKEY, dropDocIntent('aba', 100))
+  // Stale snapshot of the deleted doc (updated 10 < tomb 100): refused.
+  let r = await libWrite(kv, LIBKEY, (l) => putDocIntent(doc)(l))
+  eq(r, 'skipped')
+  eq(Object.keys(saved(kv)!.circuits), [])
+  // Genuine recreation with a newer timestamp: admitted, tomb stays put.
+  const reborn = { ...doc, updated: 200 }
+  r = await libWrite(kv, LIBKEY, (l) => putDocIntent(reborn)(l))
+  eq(r, 'written')
+  eq(saved(kv)!.circuits.aba!.updated, 200)
+  eq(saved(kv)!.tombs.aba, 100)
+  // A second delete on top keeps the max tomb and drops the doc: the tomb
+  // floors at the deleted doc's updated so a stale 200-doc cannot slip back
+  // in under a smaller tomb.
+  r = await libWrite(kv, LIBKEY, dropDocIntent('aba', 150))
+  eq(r, 'written')
+  eq(Object.keys(saved(kv)!.circuits), [])
+  eq(saved(kv)!.tombs.aba, 200)
+})
+
+checkAsync('peer delete plus local undo intent keeps both facts', async () => {
+  // App flow: cover deletes doc A while inner's undo restores its pre-delete
+  // edit with a FRESH updated stamp - a recreate, not a stale snapshot.
+  const kv = new MemKV()
+  const a1 = { ...newDoc('one'), id: 'a', updated: 10 }
+  await libWrite(kv, LIBKEY, (l) => putDocIntent(a1)(l))
+  await libWrite(kv, LIBKEY, dropDocIntent('a', 100))
+  const undone = { ...a1, updated: 200 } // undo re-stamps the restored doc
+  const r = await libWrite(kv, LIBKEY, (l) => putDocIntent(undone)(l))
+  eq(r, 'written')
+  eq(saved(kv)!.circuits.a!.updated, 200)
+  // And a solved flag from the peer survives in the same library.
+  const r2 = await libWrite(kv, LIBKEY, solvedIntent('two-keys'))
+  eq(r2, 'written')
+  eq(saved(kv)!.solved, ['two-keys'])
+})
+
+checkAsync('a queued write always writes the latest pending value, not the queued one', async () => {
+  // flushCam semantics: the intent samples live state at execution time, so a
+  // write queued behind another commits the freshest value, not the frozen one.
+  const kv = new MemKV()
+  let pending = 'cam-v1'
+  kv.inject = null
+  const r1 = await writeConditional(kv, 'cam:x', () => pending)
+  eq(r1, 'written')
+  eq(kv.values.get('cam:x'), 'cam-v1')
+  // Peer bumps rev between the read and the commit; queued intent re-reads
+  // pending (now v2) on the fresh token.
+  pending = 'cam-v2'
+  kv.rev++ // foreign write in the same space
+  const r2 = await writeConditional(kv, 'cam:x', () => pending)
+  eq(r2, 'written')
+  eq(kv.values.get('cam:x'), 'cam-v2')
+})
+
+await Promise.all(asyncChecks)
 
 if (failures.length) throw new Error(`${failures.length} failing checks\n${failures.join('\n')}`)
 console.log(`circuit.test.ts: ${passed} checks passed`)

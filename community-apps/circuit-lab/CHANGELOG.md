@@ -39,5 +39,10 @@ First release.
   confirmation, per-part labels.
 - Saved circuits in an on-device library; the open circuit and selection
   follow the fold through `os.session`, the library through `os.storage`.
+  Every durable write is a conditional `rev`/`gen` commit that re-derives its
+  intent on conflict instead of resubmitting a stale snapshot: deletes are
+  tombstones a stale writer cannot resurrect, a lost ack is verified by
+  reading the key back, and a failed read or corrupt blob reports failed
+  rather than seeding an empty library or claiming Saved.
 - Quiet connect, switch, undo and solve sounds with a persisted mute toggle;
   audio unlocks on the first gesture and only the visible copy plays.
