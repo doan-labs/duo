@@ -280,7 +280,15 @@ export function createGamePersistence(deps: {
         // the acknowledged write stands and the heal/watch path converges.
         try {
           const back = parseSaves(await deps.savesKV.get(deps.savesKey))
-          if (back.rev === savesDoc.rev && back.by === deps.me) return
+          // "Our write already landed" needs the whole doc, not just the
+          // envelope: an equal rev+by from a different writer (a crashed copy
+          // relaunched under the same display id, or a racer sharing the
+          // tie-break name) must not pass for our payload and skip the union.
+          const sameSaves =
+            back.current === savesDoc.current &&
+            Object.keys(back.games).length === Object.keys(savesDoc.games).length &&
+            Object.keys(back.games).every((k) => k in savesDoc.games && sameGame(back.games[k]!, savesDoc.games[k]!))
+          if (back.rev === savesDoc.rev && back.by === deps.me && sameSaves) return
           if (back.by !== deps.me && newerDoc(back.rev, back.by, deps.clocks.saves.rev, deps.clocks.saves.by))
             deps.acceptSaves(back)
           const unioned = unionGames(back.games, savesDoc.games)
