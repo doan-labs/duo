@@ -136,10 +136,21 @@ export function compatible(H: SemVer, A: SemVer): boolean {
 ```
 
 So host 1.2.0 rejects an app built on 1.2.1; host 0.3.0 rejects 0.2.5; host
-0.0.1 rejects 0.0.0. The SDK is 0.0.0 today, so the 0.x rules apply from the
+0.0.1 rejects 0.0.0. The SDK is 0.1.0 today, so the 0.x rules apply from the
 first release. The SDK's README carries the discipline this implies: while
 0.x, every published SDK version is its own host contract; a host bump is a
 shell release.
+
+Amendment (owner-approved): **the host additionally declares audited legacy
+contracts as profiles.** `HOST_PROFILES` in `compat.ts` pins the exact
+versions - `0.0.0` today - and `supports()` accepts them on this host only.
+A profile is a host capability, not a `compatible()` exception: a prerelease
+cannot take one, and no other host string inherits them, so a host that
+predates this contract still refuses 0.1.0 bundles outright. A bundle
+admitted on a legacy profile keeps its own contract exactly: `entry` and
+`expect` were never part of it, so a forged conditional-write request from a
+profiled release is refused `E_UNSUPPORTED` at dispatch, never applied
+unconditionally (decision 111).
 
 Settled: the wire protocol has its own integer `PROTOCOL`, bumped only for
 breaking message changes; the handshake checks it as a fast fail. It is not in
@@ -305,8 +316,8 @@ export type AppEvt =
   | { ev: 'key'; p: { key: 'Escape' } }
 
 export type Method =
-  | 'storage.get' | 'storage.set' | 'storage.del' | 'storage.keys' | 'storage.snapshot' | 'storage.watch' | 'storage.unwatch'
-  | 'session.get' | 'session.set' | 'session.del' | 'session.keys' | 'session.snapshot' | 'session.watch' | 'session.unwatch'
+  | 'storage.get' | 'storage.set' | 'storage.del' | 'storage.entry' | 'storage.keys' | 'storage.snapshot' | 'storage.watch' | 'storage.unwatch'
+  | 'session.get' | 'session.set' | 'session.del' | 'session.entry' | 'session.keys' | 'session.snapshot' | 'session.watch' | 'session.unwatch'
   | 'cmd.send' | 'cmd.ack'
   | 'widget.set'
   | 'open' | 'home'
@@ -320,6 +331,7 @@ export type ErrCode =
   | 'E_STALE'      // epoch or generation no longer current
   | 'E_GONE'       // the app was uninstalled or its generation changed under this view
   | 'E_UNSUPPORTED' // the capability exists but this device or context cannot run it (insecure context, no device, no MediaRecorder)
+  | 'E_CONFLICT'   // the revision a conditional write expected no longer matches; nothing was written
   | 'E_STORAGE'    // the database refused or is unavailable; nothing was written
 ```
 
@@ -361,10 +373,14 @@ mutating request is acknowledged only after its database transaction
 Recommended (R2): **retry after timeout is by request id, and the host
 deduplicates.** Every `Req.id` is unique per view generation. The host keeps
 the last 256 completed ids with their results per view; a repeated id returns
-the recorded result without re-executing. The SDK's timeout (5 s) retries a
+the recorded result without re-executing, while the same id carrying a
+different payload is refused. An id whose recorded result was already evicted
+is retired, never re-executed: the host refuses it outright, since a re-run of
+a conditional write could turn a committed write into a second conflict. The
+SDK's timeout (5 s) retries a
 mutating request once with the same id, then surfaces `E_TIMEOUT`; the app
-then reads back (`get`) to reconcile, because a timeout does not prove the
-write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch`,
+then reads back (`get`, or `entry` where the revision matters) to reconcile,
+because a timeout does not prove the write failed. `open`, `home`, `side.claim`, `side.release`, `device.watch`,
 `device.unwatch` and `notify.post` are never retried.
 
 | Limit | Value | Error |
@@ -524,10 +540,22 @@ export type StoredFile = { name: string; size: number; type: string; at: number 
 
 export type Notice = { title: string; body?: string; arg?: string }
 
+/** The value, space revision and app generation from one atomic read -
+    the precondition token. `gen` binds the token to the generation it was
+    minted under, so a restore that regresses `rev` cannot make an old
+    precondition match again. */
+export type Entry = { k: string; v: string | null; rev: number; gen: number }
+export type Expect = Pick<Entry, 'rev' | 'gen'>
 export type KV = {
   get(k: string): Promise<string | null>
-  set(k: string, v: string): Promise<{ rev: number }>
-  del(k: string): Promise<{ rev: number }>
+  entry(k: string): Promise<Entry>
+  /** `expect` is the `{ rev, gen }` token the new value was computed from;
+      the host checks both halves inside the write's own transaction and
+      answers E_CONFLICT, changing nothing, when the space moved, or E_GONE
+      when the token's generation is dead. Omit it for an unconditional
+      write. */
+  set(k: string, v: string, expect?: Expect): Promise<{ rev: number }>
+  del(k: string, expect?: Expect): Promise<{ rev: number }>
   keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>
   /** Atomic snapshot with the revision it is current at. */
   snapshot(cursor?: string): Promise<{ rev: number; entries: [string, string][]; cursor?: string }>
@@ -579,13 +607,22 @@ export type ViewInfo = {
   height: number
   /**
    * The shell is actually showing this view: the panel is facing the camera,
-   * not clipped away entirely, opacity above zero, and the device is awake.
-   * Derived from the render loop's own visibility and opacity writes, not from the angle.
+   * not clipped away entirely, opacity above zero, the device is awake, and the
+   * view's own box is rendered. A parked or covered scene stays mounted but is
+   * `display:none`, so it reads false. Derived from the render loop's own
+   * visibility and opacity writes plus the element's rendered visibility, not from the angle.
    */
   visible: boolean
   /** This display is the one in use; frame buttons go here. Flips at 40°. */
   active: boolean
-  /** This view has keyboard focus. Only one view on a display has it when two apps split it. */
+  /**
+   * This view has keyboard focus. Only one view on a display has it when two
+   * apps split it. A view that stops being shown cannot keep focus: hiding
+   * moves focus out, and showing it again lets the app reclaim it. Shown is
+   * the same predicate `visible` reports - DOM-rendered, awake, facing and
+   * unclipped - so a parked, asleep, away-facing or fully clipped view loses
+   * focus with it.
+   */
   focused: boolean
   /** Hinge angle, 0 closed to 180 flat. */
   angle: number
@@ -602,8 +639,17 @@ Accepted: `view` events are coalesced to one per view per animation frame and
 sent only when a field changed. The SDK stores the latest and notifies
 subscribers once per frame; the kit's layout hooks read `width`/`height` and
 ignore `angle`, so an angle sweep rerenders nothing that did not ask for it.
-If a view's port backlog exceeds 60 undelivered `view` events, the host drops
-the older ones; only the latest matters.
+Lifecycle fields (`display`, `placement`, `visible`, `active`, `focused`) are
+the exception: a change in any of them reaches subscribers on receipt, never
+gated on a repaint callback or a throttled timer, since visibility is what
+gates timers, effects and input work and an occluded document may get neither.
+Geometry-only updates (`width`, `height`, `angle`) keep the per-frame
+coalescing, with a bounded timer as the delivery floor when a view's document
+stops producing frames. Discrete host transitions (sleep, wake) apply to the
+derived display state the moment they happen and are pushed then, never at the
+next rendered frame; the loop still drives fold, clip and opacity truth. If a
+view's port backlog exceeds 60 undelivered `view`
+events, the host drops the older ones; only the latest matters.
 
 ### 3.3 State synchronization
 
@@ -628,6 +674,29 @@ A client that sees `rev` jump by more than one resnapshots. Deletion is an
 event with `v: null`. Quota is checked inside the write transaction against
 the `meta.used` counter that the same transaction updates; an over-quota
 write aborts and nothing changes.
+
+Conditional writes (SDK 0.1.0): `entry(k)` returns `{ v, rev, gen }` read
+atomically with the space revision and app generation, and `set`/`del`
+accept an optional `expect` carrying both halves. The host compares them
+inside the same readwrite transaction that holds the authority check and
+the write, so a writer whose copy is stale loses at commit, not on the
+wire: a moved revision gets `E_CONFLICT`, a dead generation gets `E_GONE`,
+and either way nothing changes - no value, quota, rev or watch event. A
+successful conditional write returns the same `Change` and raises exactly
+one `kv` event, and its ack is durable because it posts only after the
+transaction completes. `rev` is one counter per space, not per key: a
+write to any key moves it, so `expect` is deliberately conservative
+across sibling keys. `gen` binds the token to the generation it was
+minted under, so a checkpoint restore that regresses `rev` to the same
+number still refuses a pre-restore token - the rev alone can never
+collide across generations. Conflict
+recovery is an intent rebase - `entry()` again, recompute from that value,
+write with the fresh token - never a blind resend of the stale document.
+An `E_TIMEOUT` or retired-request refusal leaves the outcome unknown; read
+`entry()` to reconcile, never assume nothing landed. `useKV`, `cell` and
+`KVMirror.write` remain optimistic fire-and-forget without a durable ack and
+are not the conditional path. `os.files` keeps its own atomicity domain and
+does not join these preconditions.
 
 Not synchronized: component state. What a view does not write to a KV space
 stays local. This is the only rule that does not require the shell to

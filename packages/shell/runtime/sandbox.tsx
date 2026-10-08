@@ -6,7 +6,7 @@ import { byName } from '../apps.ts'
 import { goHome } from '../device.ts'
 import { launchFrame } from './bridge.ts'
 import { development } from './development.ts'
-import { observeDisplay, viewInfo } from './display.ts'
+import { observeDisplay, releaseHiddenFocus, viewInfo } from './display.ts'
 import { restore } from './lifecycle.ts'
 import { previewState } from './preview-events.ts'
 import { closeSession, session } from './sessions.ts'
@@ -24,10 +24,20 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
     setError(false)
     setStatus('Connecting…')
     const refresh = () => {
-      if (root.current)
-        live.current?.update(viewInfo(root.current, wide ? 'inner' : 'cover', placement.current ?? 'full'))
+      const el = root.current
+      if (!el) return
+      const info = viewInfo(el, wide ? 'inner' : 'cover', placement.current ?? 'full')
+      // Focus follows the same truth the frame is about to receive; a blur
+      // changes `focused`, so recompute it before posting.
+      if (releaseHiddenFocus(el, info)) info.focused = el.contains(document.activeElement)
+      live.current?.update(info)
     }
     const unwatch = observeDisplay(refresh)
+    // A parked or covered scene hides the frame's ancestors without a display
+    // event; push the truth when the DOM actually hides it, not at next frame.
+    const mo = new MutationObserver(refresh)
+    for (let el = root.current?.parentElement; el && el !== document.body; el = el.parentElement)
+      mo.observe(el, { attributes: true, attributeFilter: ['class', 'style'] })
     void session(id, os.arg, attempt > 0)
       .then((app) => {
         if (disposed) {
@@ -64,6 +74,7 @@ export function Sandbox({ id, os, wide, side }: { id: string; os: Os; wide: bool
     return () => {
       disposed = true
       unwatch()
+      mo.disconnect()
       live.current?.close()
       live.current = undefined
     }
