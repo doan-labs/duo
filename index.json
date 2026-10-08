@@ -190,6 +190,12 @@
       "developer": "devin",
       "releases": [
         {
+          "release": "1.0.1+c8fe520b",
+          "sdk": "0.1.0",
+          "bytes": 575216,
+          "sha256": "77ea235b21fb4e73025657afa0f80e3581e16958871933f917231c6cc214f315"
+        },
+        {
           "release": "1.0.0+a942693e",
           "sdk": "0.1.0",
           "bytes": 572993,

@@ -1,0 +1,35 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.jigsaw",
+    "name": "Jigsaw",
+    "version": "1.0.1",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "light": true,
+    "permissions": [],
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/jigsaw",
+    "license": "MIT",
+    "description": "Piece-assembly puzzles from three original illustrations, playable on the cover or unfolded."
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T16:29:42.167Z",
+    "commit": "ef182149f2c1bcb1fbe7948e05165975943300af",
+    "hash": "c8fe520b"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 575216,
+      "sha256": "550d82a6fbe7675217968a2755030c2ca66b4adf0052354e571bc4c8a8f29dbc"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 973982,
+      "sha256": "a27afc1fe29059d049cda19505ea80160f76d20fc61344722143d4c061624510"
+    }
+  ]
+}
