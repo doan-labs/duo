@@ -75,6 +75,9 @@ class Space {
       return new Promise((res, rej) => this.heldSet.push({ v, e: expect, res, rej }))
     return this.applySet(v, expect)
   }
+  // When set, the next applying set lands, then a peer's confirmed write
+  // lands, then the caller's ack is lost: the lost-ACK/ABA interleave.
+  timeoutThenPeer: string | null = null
   applySet(v: string, expect?: { rev: number; gen: number }): { rev: number } {
     if (expect && expect.gen !== this.gen) throw err('E_GONE')
     if (expect && expect.rev !== this.rev) throw err('E_CONFLICT')
@@ -87,6 +90,14 @@ class Space {
     }
     if (this.dropThenTimeout > 0) {
       this.dropThenTimeout--
+      throw err('E_TIMEOUT')
+    }
+    if (this.timeoutThenPeer !== null) {
+      const peer = this.timeoutThenPeer
+      this.timeoutThenPeer = null
+      this.v = peer
+      this.rev++
+      this.delivered.push(peer)
       throw err('E_TIMEOUT')
     }
     return { rev: this.rev }
@@ -416,6 +427,36 @@ check('the same operation never retries blind after an unknown ack', async () =>
   await a.flush(store)
   eq(store.delivered.length, 1) // one set, read back, confirmed
   eq(JSON.parse(store.v!).seed, 29)
+})
+
+check('a lost ack whose readback shows a confirmed peer write adopts it', async () => {
+  // The ABA gate: A's conditional commit lands but its ack is lost, B writes
+  // the same key and is acked before A reads back. A's readback sees B's
+  // newer value - the parked intent must be consumed as adopted, never
+  // re-issued as a fresh write over the confirmed peer record.
+  const store = new Space()
+  const a = new Copy('A')
+  a.publish(dealAt(31, [draw, draw]))
+  const bRaw = JSON.stringify(serializeGame('B', dealAt(31, [draw]), false, 1))
+  store.timeoutThenPeer = bRaw // A applies, B confirmed lands, A's ack lost
+  eq(await a.flush(store), 'adopted')
+  eq(store.v, bRaw) // B's confirmed record stands
+  await new Promise((r) => setTimeout(r, 5)) // let the conditional settle land
+  // A's intent was never re-sent: its raw appears once (the original lost
+  // write); any later settle delivery rewrites B's own bytes verbatim.
+  const aRaw = JSON.stringify(serializeGame('A', dealAt(31, [draw, draw]), false, 1))
+  eq(store.delivered.filter((d) => d === aRaw).length, 1)
+  eq(store.delivered[store.delivered.length - 1], bRaw)
+  eq(JSON.parse(store.v!).by, 'B')
+  eq(a.deal?.log.length, 1) // A holds B's adopted deal
+  eq(a.pending, null) // intent consumed, not re-parked for another resend
+  // A's next real intent still issues - on the adopted base.
+  a.publish(dealAt(31, [draw, draw, draw]))
+  eq(await a.flush(store), 'issued')
+  eq(store.delivered[store.delivered.length - 1], store.v)
+  eq(JSON.parse(store.v!).moves, 'd,d,d')
+  // No-race control: same lost ack with no peer write in between confirms by
+  // readback (the check above this one pins it verbatim).
 })
 
 const main = async () => {
