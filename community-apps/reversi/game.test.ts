@@ -34,6 +34,8 @@ import {
 } from './game.ts'
 import {
   adoptDecision,
+  CAS_TRIES,
+  commitCAS,
   type Guard,
   offerPlan,
   openingSeed,
@@ -979,6 +981,326 @@ checkAsync('a corrupt wire surfaces as corrupt on every read and only an explici
   await space.set('reversi-game', JSON.stringify(seed))
   const healed = settleGame(await space.get('reversi-game'), 'copy-b')
   ok(healed.kind === 'ok' && healed.game.id === OPENING_ID, 'both copies adopt the canonical seed')
+})
+
+// --- Conditional-write (CAS) contract --------------------------------------------------
+
+// A store honouring the real conditional contract: `entry` returns the value
+// plus the space-wide revision and generation in one atomic tuple; `set` with
+// an `expect` token throws E_CONFLICT when the space moved on (any key) and
+// E_GONE when the generation the token was minted in is dead (a checkpoint
+// restore regresses `rev` and bumps `gen`, closing the rev-only ABA). Hooks
+// let a test interpose a peer write or an ambiguous acknowledgement exactly
+// between a caller's entry read and its conditional set - the interleavings
+// the app must survive without clobbering anything.
+type CasStore = { box: Record<string, string>; rev: number; gen: number }
+const casStore = (seed: Record<string, string> = {}): CasStore => ({ box: { ...seed }, rev: 7, gen: 1 })
+
+type CasHooks = {
+  /** Runs between a caller's entry read and its set on the next `n` sets. */
+  beforeSet?: (key: string, wire: string) => void
+  /** Fault injected into the next `n` sets: 'timeout-landed' applies the write then reports timeout. */
+  failSet?: string
+}
+
+function casSpace(store: CasStore, hooks: CasHooks = {}) {
+  const stats = { entry: 0, set: 0, del: 0 }
+  const boom = (code: string): never => {
+    const e = new Error(code)
+    ;(e as Error & { code: string }).code = code
+    throw e
+  }
+  return {
+    stats,
+    // Test-side mutation helpers: what a peer display or a checkpoint restore does.
+    peerWrite(k: string, v: string) {
+      store.box[k] = v
+      store.rev++
+    },
+    peerDelete(k: string) {
+      delete store.box[k]
+      store.rev++
+    },
+    restore() {
+      store.gen++
+      store.rev = 3
+    },
+    async entry(k: string) {
+      stats.entry++
+      return { k, v: store.box[k] ?? null, rev: store.rev, gen: store.gen }
+    },
+    async set(k: string, v: string, expect?: { rev: number; gen: number }) {
+      stats.set++
+      hooks.beforeSet?.(k, v)
+      if (hooks.failSet === 'timeout-landed') {
+        hooks.failSet = undefined
+        store.box[k] = v
+        store.rev++
+        boom('E_TIMEOUT')
+      }
+      if (hooks.failSet === 'timeout' || hooks.failSet === 'storage') {
+        const code = hooks.failSet === 'timeout' ? 'E_TIMEOUT' : 'E_STORAGE'
+        hooks.failSet = undefined
+        boom(code)
+      }
+      if (expect) {
+        if (expect.gen !== store.gen) boom('E_GONE')
+        if (expect.rev !== store.rev) boom('E_CONFLICT')
+      }
+      store.box[k] = v
+      store.rev++
+      return { rev: store.rev }
+    },
+    async del(k: string, expect?: { rev: number; gen: number }) {
+      stats.del++
+      if (expect) {
+        if (expect.gen !== store.gen) boom('E_GONE')
+        if (expect.rev !== store.rev) boom('E_CONFLICT')
+      }
+      delete store.box[k]
+      store.rev++
+      return { rev: store.rev }
+    }
+  }
+}
+
+/** The first legal move on a history, as the app's own engine enumerates it. */
+const nextLegal = (moves: number[]): number => [...derive(moves).legal.keys()][0]!
+
+/** A legal continuation after `prefix` different from `avoid`, for same-length alternate branches. */
+const altLegal = (prefix: number[], avoid: number): number =>
+  [...derive(prefix).legal.keys()].find((m) => m !== avoid) ?? nextLegal(prefix)
+
+/** The exact plan startFresh runs: adopt a readable wire, seed only a still-corrupt-or-empty one. */
+const resetPlan =
+  (seen: { adopted: SavedGame | null }) =>
+  (e: { v: string | null }): { wire: string; land: () => void } | null => {
+    const w = settleGame(e.v, 'copy')
+    if (w.kind === 'ok') {
+      seen.adopted = w.game
+      return null
+    }
+    const seed = { ...openingSeed('copy'), by: 'copy' }
+    return { wire: JSON.stringify(seed), land: () => {} }
+  }
+
+checkAsync('CAS: a peer landing between read and write conflicts instead of being overwritten', async () => {
+  // The 8-ply incident shape: our reset intent reads corrupt bytes, a peer
+  // commits a valid match before our write lands, and the conditional token
+  // refuses the overwrite - the loop re-reads and adopts the healthy match.
+  const store = casStore({ 'reversi-game': '{broken' })
+  const peer = progressed(8, { mode: 'local' })
+  let raced = false
+  const space = casSpace(store, {
+    beforeSet: () => {
+      if (raced) return
+      raced = true
+      space.peerWrite('reversi-game', JSON.stringify(peer))
+    }
+  })
+  const seen = { adopted: null as SavedGame | null }
+  const result = await commitCAS(space, 'reversi-game', resetPlan(seen))
+  eq(result, 'refused')
+  eq(space.stats.set, 1)
+  ok(seen.adopted !== null && seen.adopted.moves.length === 8, 'the peer match is adopted, not clobbered')
+  eq(adoptGame(store.box['reversi-game'], 'x').moves.length, 8)
+})
+
+checkAsync('CAS: still-corrupt reset control lands exactly one canonical seed', async () => {
+  const store = casStore({ 'reversi-game': '{broken' })
+  const space = casSpace(store)
+  const seen = { adopted: null as SavedGame | null }
+  const result = await commitCAS(space, 'reversi-game', resetPlan(seen))
+  eq(result, 'wrote')
+  eq(space.stats.set, 1)
+  const doc = settleGame(store.box['reversi-game'] ?? null, 'copy')
+  ok(doc.kind === 'ok' && doc.game.id === OPENING_ID && doc.game.moves.length === 0, 'canonical seed landed')
+})
+
+checkAsync('CAS: two initial-null seeds converge on one shared opening', async () => {
+  // Both displays read the same confirmed-empty entry; the first seed write
+  // lands, the second conflicts on it, re-reads, and adopts - one shared
+  // incarnation, not two divergent ones.
+  const store = casStore({})
+  const seenB = { adopted: null as SavedGame | null }
+  let raced = false
+  const spaceB = casSpace(store, {
+    beforeSet: () => {
+      if (raced) return
+      raced = true
+      // The peer's own seed lands between our empty read and our write.
+      spaceB.peerWrite('reversi-game', JSON.stringify({ ...openingSeed('copy-a'), by: 'copy-a' }))
+    }
+  })
+  const b = await commitCAS(spaceB, 'reversi-game', resetPlan(seenB))
+  eq(b, 'refused')
+  ok(seenB.adopted !== null && seenB.adopted.id === OPENING_ID, 'the loser adopts the winner seed')
+  eq(JSON.parse(store.box['reversi-game'] ?? '{}').id, OPENING_ID)
+  // A late copy on the settled store adopts the same seed too.
+  const seenC = { adopted: null as SavedGame | null }
+  const c = await commitCAS(casSpace(store), 'reversi-game', resetPlan(seenC))
+  eq(c, 'refused')
+  ok(seenC.adopted !== null && seenC.adopted.id === OPENING_ID, 'a cold copy adopts the shared opening')
+})
+
+checkAsync('CAS: a dead generation refuses a pre-restore token, then refuses the stale intent', async () => {
+  // A checkpoint restore between our entry read and write regresses rev: a
+  // rev-only token could ABA-collide, so gen must catch it - E_GONE. The
+  // rebase then runs on the restored (newer) document, where the move aimed
+  // at the old 4-ply history is honestly refused instead of overwriting it.
+  const store = casStore({ 'reversi-game': JSON.stringify(progressed(4, { id: 'm' })) })
+  let restored = false
+  const space = casSpace(store, {
+    beforeSet: () => {
+      if (restored) return
+      restored = true
+      space.restore()
+      space.peerWrite('reversi-game', JSON.stringify(progressed(6, { id: 'm' })))
+    }
+  })
+  const seen = progressed(4, { id: 'm' })
+  const plans: number[] = []
+  const result = await commitCAS(space, 'reversi-game', (e) => {
+    const w = settleGame(e.v, 'copy')
+    if (w.kind !== 'ok') return null
+    plans.push(w.game.moves.length)
+    const r = tryPlace(w.game, seen, nextLegal(w.game.moves))
+    return r.ok ? { wire: JSON.stringify({ ...r.game, by: 'copy' }), land: () => {} } : null
+  })
+  eq(result, 'refused')
+  eq(plans.length, 2)
+  eq(plans, [4, 6])
+  eq(adoptGame(store.box['reversi-game'], 'x').moves.length, 6)
+})
+
+checkAsync('CAS: an ambiguous acknowledgement reads the same operation back before retrying', async () => {
+  // Timeout-after-land: the readback sees our exact wire and no retry mints
+  // a second write. Timeout-without-land: the readback proves it missed and
+  // the same intent rebases - one write total, no blind new-id.
+  const landed = casStore({})
+  const spaceL = casSpace(landed, { failSet: 'timeout-landed' })
+  let lands = 0
+  const r1 = await commitCAS(spaceL, 'reversi-prefs', () => ({
+    wire: '{"hints":false,"muted":true}',
+    land: () => lands++
+  }))
+  eq(r1, 'wrote')
+  eq(spaceL.stats.set, 1)
+  eq(spaceL.stats.entry, 2)
+  eq(lands, 1)
+  eq(landed.box['reversi-prefs'], '{"hints":false,"muted":true}')
+
+  const missed = casStore({})
+  const spaceM = casSpace(missed, { failSet: 'timeout' })
+  const r2 = await commitCAS(spaceM, 'reversi-prefs', () => ({ wire: '{"hints":true,"muted":false}' }))
+  eq(r2, 'wrote')
+  eq(spaceM.stats.set, 2)
+  eq(missed.box['reversi-prefs'], '{"hints":true,"muted":false}')
+})
+
+checkAsync('CAS: a failed read is unknown, never empty - nothing seeds or writes', async () => {
+  const store = casStore({ 'reversi-game': JSON.stringify(progressed(8)) })
+  let calls = 0
+  const space = {
+    ...casSpace(store),
+    entry: async () => {
+      calls++
+      const e = new Error('E_STORAGE')
+      ;(e as Error & { code: string }).code = 'E_STORAGE'
+      throw e
+    }
+  }
+  let threw = false
+  try {
+    await commitCAS(space, 'reversi-game', resetPlan({ adopted: null }))
+  } catch {
+    threw = true
+  }
+  ok(threw, 'the failed read propagates as failure')
+  eq(calls, 1)
+  eq(adoptGame(store.box['reversi-game'], 'x').moves.length, 8)
+})
+
+checkAsync('CAS: a stale undo refuses once the wire history moved', async () => {
+  // Copy aimed its undo at the 2-ply doc it rendered; the peer already wrote
+  // a third ply. The rebound plan re-runs on the fresh entry and refuses -
+  // the peer's ply is never cut.
+  const store = casStore({ 'reversi-game': JSON.stringify(progressed(2, { id: 'm' })) })
+  const expected = progressed(2, { id: 'm' })
+  let raced = false
+  const space = casSpace(store, {
+    beforeSet: () => {
+      if (raced) return
+      raced = true
+      space.peerWrite('reversi-game', JSON.stringify(progressed(3, { id: 'm' })))
+    }
+  })
+  const result = await commitCAS(space, 'reversi-game', (e) => {
+    const w = settleGame(e.v, 'copy')
+    if (w.kind !== 'ok') return null
+    const r = tryUndo(w.game, expected)
+    return r.ok ? { wire: JSON.stringify({ ...r.game, by: 'copy' }) } : null
+  })
+  eq(result, 'refused')
+  eq(adoptGame(store.box['reversi-game'], 'x').moves.length, 3)
+})
+
+checkAsync('CAS: an equal-length alternate branch refuses a stale placement', async () => {
+  // Peer undid and replayed to a different move - same id, same ply count.
+  // Length equality is not history equality: the tap aimed at the old board
+  // must refuse rather than append onto unseen work.
+  const seen = progressed(2, { id: 'm' })
+  const branch = progressed(2, { id: 'm' })
+  branch.moves = [...seen.moves.slice(0, 1), altLegal(seen.moves.slice(0, 1), seen.moves[1]!)]
+  const store = casStore({ 'reversi-game': JSON.stringify(branch) })
+  const space = casSpace(store)
+  const r = tryPlace(branch, seen, nextLegal(branch.moves))
+  eq(r.ok, false)
+  const result = await commitCAS(space, 'reversi-game', (e) => {
+    const w = settleGame(e.v, 'copy')
+    if (w.kind !== 'ok') return null
+    const again = tryPlace(w.game, seen, nextLegal(w.game.moves))
+    return again.ok ? { wire: JSON.stringify({ ...again.game, by: 'copy' }) } : null
+  })
+  eq(result, 'refused')
+  eq(space.stats.set, 0)
+  eq(adoptGame(store.box['reversi-game'], 'x').moves.length, 2)
+})
+
+checkAsync('CAS: unbounded conflicts exhaust the bound and throw, never fall back', async () => {
+  const store = casStore({ 'reversi-prefs': '{"hints":true,"muted":false}' })
+  let n = 0
+  const space = casSpace(store, {
+    beforeSet: (k) => space.peerWrite(k, `{"bump":${++n}}`)
+  })
+  let threw = false
+  try {
+    await commitCAS(space, 'reversi-prefs', () => ({ wire: '{"hints":false,"muted":false}' }))
+  } catch (e) {
+    threw = true
+    ok(String((e as Error).message).startsWith('E_CONFLICT'), 'exhaustion reports the real cause')
+  }
+  ok(threw, 'the job fails instead of writing unconditionally')
+  eq(space.stats.set, CAS_TRIES)
+  eq(space.stats.entry, CAS_TRIES)
+})
+
+checkAsync('CAS: cold close and reopen preserves confirmed facts on both copies', async () => {
+  const store = casStore({})
+  const spaceA = casSpace(store)
+  const game = progressed(3, { id: 'm' })
+  await commitCAS(spaceA, 'reversi-game', () => ({
+    wire: JSON.stringify({ ...game, by: 'a' })
+  }))
+  await commitCAS(spaceA, 'reversi-record', () => ({
+    wire: JSON.stringify(countFinished(emptyTally(), 'm', 'b'))
+  }))
+  // A second copy in a fresh "session" sees exactly what was confirmed.
+  const spaceB = casSpace(store)
+  const e = await spaceB.entry('reversi-game')
+  const w = settleGame(e.v, 'b')
+  ok(w.kind === 'ok' && w.game.moves.length === 3 && w.game.id === 'm', 'the durable match survives reopen')
+  eq(parseTally((await spaceB.entry('reversi-record')).v).black, 1)
 })
 
 await Promise.all(pending)

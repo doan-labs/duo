@@ -1,5 +1,7 @@
 import type { Color } from './engine.ts'
-import { adoptGame, derive, type Mode, newGame, OPENING_ID, type SavedGame } from './game.ts'
+import { adoptGame, derive, type Mode, newGame, OPENING_ID, type SavedGame, sameMoves } from './game.ts'
+
+export { sameMoves }
 
 /** Status one mirrored key reports through useKV. */
 export type KvStatus = 'hydrating' | 'ready' | 'saving' | 'error'
@@ -59,9 +61,6 @@ export const offerPlan = (game: SavedGame): 'confirm' | 'direct' => {
 
 /** The fresh local board shown only after an empty store is confirmed. */
 export const openingSeed = (me: string): SavedGame => ({ ...newGame(me, 'solo', 'Medium', 'b'), id: OPENING_ID })
-
-/** Two move lists are the same history only when every ply matches: equal length alone says nothing. */
-export const sameMoves = (a: number[], b: number[]): boolean => a.length === b.length && a.every((v, i) => v === b[i])
 
 /**
  * What a just-read wire document means for local state: 'keep' when the
@@ -139,3 +138,91 @@ export const recoverReads = (
     prefs,
     game
   }))
+
+/**
+ * The durable contract this app writes against: `entry` returns the value
+ * plus the space-wide revision and generation that pin it to one atomic
+ * authoritative moment, and `set` accepts that `{rev,gen}` token so the
+ * write only lands if nothing - on any key - moved in between. Structural,
+ * so the real SDK space and a controlled test adapter both satisfy it.
+ */
+export type EntryToken = { rev: number; gen: number }
+export type KvEntry = { v: string | null; rev: number; gen: number }
+export type KvSpace = {
+  entry: (key: string) => Promise<KvEntry>
+  set: (key: string, value: string, expect?: EntryToken) => Promise<unknown>
+}
+
+/**
+ * What one commit attempt plans on a just-read entry: `wire` is the value
+ * derived from that entry and only it; `land` runs local state commits
+ * strictly after the durable write is confirmed, so a refused or ambiguous
+ * write never publishes a board the store does not hold. Returning null is
+ * an honest refusal: nothing is written and the caller re-offers.
+ */
+export type PlannedWrite = { wire: string; land?: () => void }
+
+/** Bounds one conditional-commit retry: see commitCAS. */
+export const CAS_TRIES = 4
+
+const errCode = (e: unknown): string => {
+  const c = (e as { code?: unknown } | null | undefined)?.code
+  return typeof c === 'string' ? c : 'E_UNKNOWN'
+}
+
+/**
+ * One conditional write plus its readback. 'wrote' means the store confirmed
+ * the exact wire landed; 'again' means it refused (moved space, dead
+ * generation) or answered ambiguously, so the intent must be rebased on a
+ * fresh entry rather than resubmitted frozen. For an acknowledgement the
+ * wire cannot account for (timeout, host error) the same operation is read
+ * back first: the host's serialized queue makes that read reflect everything
+ * it accepted before it, so a matching value proves the write landed and any
+ * other proves it did not - never a blind new-id retry, never a rollback
+ * over unseen peer work. Argument/session errors are thrown as the real
+ * failures they are.
+ */
+const conditionalSet = async (
+  kv: KvSpace,
+  key: string,
+  wire: string,
+  token: EntryToken
+): Promise<'wrote' | 'again'> => {
+  try {
+    await kv.set(key, wire, token)
+    return 'wrote'
+  } catch (e) {
+    const code = errCode(e)
+    if (code === 'E_CONFLICT' || code === 'E_GONE') return 'again'
+    if (code === 'E_ARGS' || code === 'E_CLOSED' || code === 'E_PROTOCOL') throw e
+    const back = await kv.entry(key)
+    return back.v === wire ? 'wrote' : 'again'
+  }
+}
+
+/**
+ * The bounded compare-and-set loop every durable mutation funnels through.
+ * Each attempt reads the entry fresh and calls `plan` on it, so the intent -
+ * a move, a merge, a guarded reset - is always recomputed against the newest
+ * authoritative state, never replayed as a frozen document. `plan` may
+ * refuse (null) when the intent no longer applies to what the store actually
+ * holds; the caller then re-offers or rejects honestly. Exhausting the bound
+ * throws instead of pretending: the space kept moving or storage kept
+ * failing, and the job reports a real failure.
+ */
+export const commitCAS = async (
+  kv: KvSpace,
+  key: string,
+  plan: (e: KvEntry) => PlannedWrite | null,
+  tries: number = CAS_TRIES
+): Promise<'wrote' | 'refused'> => {
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const e = await kv.entry(key)
+    const next = plan(e)
+    if (!next) return 'refused'
+    if ((await conditionalSet(kv, key, next.wire, { rev: e.rev, gen: e.gen })) === 'again') continue
+    next.land?.()
+    return 'wrote'
+  }
+  throw new Error(`E_CONFLICT: "${key}" kept changing before the write could land`)
+}

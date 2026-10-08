@@ -29,6 +29,7 @@ import {
 import * as hydration from './hydration.ts'
 import {
   type Guard,
+  type KvEntry,
   type NewPatch,
   offerPlan,
   openingSeed,
@@ -40,10 +41,13 @@ import {
 } from './hydration.ts'
 import { styles } from './styles.ts'
 
-// One storage key holds the whole match as a last-writer-wins document. Every
-// mutation re-reads the settled document before writing and validates the
-// input against it, so a display whose local copy lags the wire rejects stale
-// placements instead of clobbering the other display's moves.
+// One storage key holds the whole match. Every mutation is a bounded
+// compare-and-set (hydration.commitCAS): read the entry, derive the next
+// document and its {rev,gen} token from it, write conditionally. A moved
+// space or dead generation re-reads and re-runs the intent on the fresh
+// state - a display whose local copy lags the wire never overwrites plies it
+// never saw - and an ambiguous acknowledgement reads the same operation back
+// before any retry. Refusal is honest: the caller re-offers, the user picks.
 const ME = crypto.randomUUID()
 const GAME_KEY = 'reversi-game'
 const RECORD_KEY = 'reversi-record'
@@ -198,8 +202,10 @@ function Game() {
     if (!mutedRef.current && liveActive()) cue(kind)
   }, [])
 
-  /** The raw wire value, or null when the store holds no game yet. */
-  const readGameWire = useCallback((): Promise<string | null> => os.storage.get(GAME_KEY), [])
+  // Every durable write is a bounded compare-and-set (hydration.commitCAS):
+  // read the entry, derive the next wire and its token from it, write
+  // conditionally. A refused or ambiguous write re-reads and re-runs the
+  // intent on the fresh entry - never an unconditional set over unseen work.
 
   // Settle a just-read wire document into local state: adopt what the store
   // carries - an equal-length alternate branch is still unseen work the board
@@ -231,24 +237,21 @@ function Game() {
   // hydrate, seeds only when the empty answer is real, and re-opens the gate.
   // A corrupt document is neither authority nor empty - it is surfaced, not
   // adopted and not seeded over.
-  const syncGame = useCallback(async (): Promise<SavedGame | null> => {
-    const w = settleGame(await readGameWire(), ME)
-    setRecovered(true)
-    if (w.kind === 'corrupt') {
-      markCorrupt(true)
-      return null
-    }
-    markCorrupt(false)
-    settleStored(w.kind === 'ok' ? w.game : null)
-    return w.kind === 'ok' ? w.game : gameRef.current
-  }, [readGameWire, settleStored, markCorrupt])
+  const settleEntry = useCallback(
+    (e: KvEntry): SavedGame | null => {
+      const w = settleGame(e.v, ME)
+      setRecovered(true)
+      if (w.kind === 'corrupt') {
+        markCorrupt(true)
+        return null
+      }
+      markCorrupt(false)
+      settleStored(w.kind === 'ok' ? w.game : null)
+      return gameRef.current
+    },
+    [settleStored, markCorrupt]
+  )
 
-  /**
-   * Every game write goes through here: sync to the wire, run the step on the
-   * freshest document, write once, then verify nothing foreign landed during
-   * our own write - if it did, the settled winner is adopted instead of
-   * argued with.
-   */
   // One tail on the serial queue: every job (write or read-through sync)
   // marks the board busy until it settles.
   const enqueue = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
@@ -270,55 +273,67 @@ function Game() {
   const enqueueGame = useCallback(
     (step: (base: SavedGame) => SavedGame | null): Promise<boolean> =>
       enqueue(async () => {
-        const base = await syncGame()
-        // Admission already happened at the handler. The only gate left is
-        // validation against this fresh read: a rejected step never writes,
-        // while an accepted one lands even if the copy folded during the
-        // round-trip - admitted work finishes rather than silently dropping.
-        if (!base) return false
-        const next = step(base)
-        if (!next) return false
-        const settled = { ...next, by: ME }
-        const wire = JSON.stringify(settled)
-        await os.storage.set(GAME_KEY, wire)
-        lastSeen.current = wire
-        setGame(settled)
-        gameRef.current = settled
-        const after = await os.storage.get(GAME_KEY)
-        if (after !== null && after !== wire) {
-          // A foreign write raced ours: adopt the settled winner, or flag a
-          // document the reader cannot understand instead of inventing one.
-          const foreign = settleGame(after, ME)
-          if (foreign.kind === 'corrupt') markCorrupt(true)
-          else if (foreign.kind === 'ok') {
-            const winner = foreign.game
-            if (winner.id !== settled.id || !hydration.sameMoves(winner.moves, settled.moves)) {
-              setGame(winner)
-              gameRef.current = winner
+        // Admission already happened at the handler. Each attempt re-reads
+        // the entry, re-runs the step on that fresh base and writes guarded
+        // by its token, so a peer landing in between answers E_CONFLICT
+        // instead of being silently overwritten - the intent is rebased or
+        // honestly refused, never replayed as a frozen document. An accepted
+        // write still lands even if the copy folded during the round-trip:
+        // admitted work finishes rather than silently dropping.
+        const result = await hydration.commitCAS(os.storage, GAME_KEY, (e) => {
+          const base = settleEntry(e)
+          if (!base) return null
+          const next = step(base)
+          if (!next) return null
+          const settled = { ...next, by: ME }
+          const wire = JSON.stringify(settled)
+          return {
+            wire,
+            land: () => {
+              lastSeen.current = wire
+              setGame(settled)
+              gameRef.current = settled
             }
           }
-        }
-        return true
+        })
+        return result === 'wrote'
       }),
-    [enqueue, syncGame, markCorrupt]
+    [enqueue, settleEntry]
   )
 
   /** Read-through on the same queue: orders an activation sync before input. */
-  const enqueueSync = useCallback((): Promise<SavedGame | null> => enqueue(syncGame), [enqueue, syncGame])
+  const enqueueSync = useCallback(
+    () => enqueue(() => os.storage.entry(GAME_KEY).then(settleEntry)),
+    [enqueue, settleEntry]
+  )
 
   const enqueueRecord = useCallback(
-    (step: (base: Tally) => Tally): Promise<Tally> =>
+    (step: (base: Tally) => Tally): Promise<Tally | undefined> =>
       enqueue(async () => {
-        const base = parseTally(await os.storage.get(RECORD_KEY))
-        // The celebration (cue/haptic and the tally write) belongs to the
-        // copy that is actually on screen; a hidden copy posts nothing.
-        if (!liveActive()) return base
-        const next = step(base)
-        const wire = JSON.stringify(next)
-        await os.storage.set(RECORD_KEY, wire)
-        lastRecord.current = wire
-        setRecord(next)
-        return next
+        // Same conditional contract as the game writer: the tally delta is
+        // recomputed on the freshest entry each attempt, so a peer's count
+        // is preserved rather than rolled back to the base this copy saw.
+        let out: Tally | null = null
+        await hydration.commitCAS(os.storage, RECORD_KEY, (e) => {
+          const base = parseTally(e.v)
+          // The celebration (cue/haptic and the tally write) belongs to the
+          // copy that is actually on screen; a hidden copy posts nothing.
+          if (!liveActive()) {
+            out = base
+            return null
+          }
+          const next = step(base)
+          const wire = JSON.stringify(next)
+          return {
+            wire,
+            land: () => {
+              lastRecord.current = wire
+              setRecord(next)
+              out = next
+            }
+          }
+        })
+        return out ?? undefined
       }),
     [enqueue]
   )
@@ -326,15 +341,25 @@ function Game() {
   const enqueuePrefs = useCallback(
     (patch: Partial<Prefs>): Promise<Prefs | undefined> =>
       enqueue(async () => {
-        const base = parsePrefs(await os.storage.get(PREFS_KEY))
-        // Callers admit at the handler; the merge is unconditional so a pref
-        // flipped the instant before a fold still lands on the wire.
-        const next = { ...base, ...patch }
-        const wire = JSON.stringify(next)
-        await os.storage.set(PREFS_KEY, wire)
-        lastPrefs.current = wire
-        setPrefs(next)
-        return next
+        // The patch is an intent, not a document: on a moved space it
+        // re-merges onto the fresh entry, so a peer's concurrent flip of a
+        // different field is preserved instead of clobbered by a stale base.
+        let out: Prefs | null = null
+        await hydration.commitCAS(os.storage, PREFS_KEY, (e) => {
+          // Callers admit at the handler; the merge itself is unconditional
+          // so a pref flipped the instant before a fold still lands on the wire.
+          const next = { ...parsePrefs(e.v), ...patch }
+          const wire = JSON.stringify(next)
+          return {
+            wire,
+            land: () => {
+              lastPrefs.current = wire
+              setPrefs(next)
+              out = next
+            }
+          }
+        })
+        return out ?? undefined
       }).catch(() => undefined),
     [enqueue]
   )
@@ -719,7 +744,7 @@ function Game() {
   // surfaced, not adopted. A failed batch adopts nothing and the error card
   // stays for the next attempt. Runs only while live.
   const recoverAll = useCallback(async () => {
-    const reads = await recoverReads((k) => os.storage.get(k), {
+    const reads = await recoverReads((k) => os.storage.entry(k).then((e) => e.v), {
       record: RECORD_KEY,
       prefs: PREFS_KEY,
       game: GAME_KEY
@@ -753,23 +778,34 @@ function Game() {
   const startFresh = useCallback(() => {
     if (!liveActive()) return
     void enqueue(async () => {
-      const w = hydration.settleGame(await os.storage.get(GAME_KEY), ME)
-      if (w.kind === 'ok') {
-        // A readable match reached the store after the card: adopt it and
-        // clear the card - never clobber unseen progress on a stale reset.
-        markCorrupt(false)
-        setGame(w.game)
-        gameRef.current = w.game
-        return
-      }
-      const seed = { ...openingSeed(ME), by: ME }
-      const wire = JSON.stringify(seed)
-      await os.storage.set(GAME_KEY, wire)
-      lastSeen.current = wire
-      setRecovered(true)
-      markCorrupt(false)
-      setGame(seed)
-      gameRef.current = seed
+      // The seed write is conditional on the exact entry it was computed
+      // from: a peer match landing between the read and this write answers
+      // E_CONFLICT, so the loop reads again and adopts the healthy document
+      // instead of destroying it. Only a still-corrupt or still-empty entry
+      // keeps the reset authorized.
+      await hydration.commitCAS(os.storage, GAME_KEY, (e) => {
+        const w = hydration.settleGame(e.v, ME)
+        if (w.kind === 'ok') {
+          // A readable match reached the store after the card: adopt it and
+          // clear the card - never clobber unseen progress on a stale reset.
+          markCorrupt(false)
+          setGame(w.game)
+          gameRef.current = w.game
+          return null
+        }
+        const seed = { ...openingSeed(ME), by: ME }
+        const wire = JSON.stringify(seed)
+        return {
+          wire,
+          land: () => {
+            lastSeen.current = wire
+            setRecovered(true)
+            markCorrupt(false)
+            setGame(seed)
+            gameRef.current = seed
+          }
+        }
+      })
     }).catch(() => {})
   }, [enqueue, markCorrupt])
 

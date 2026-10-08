@@ -32,11 +32,19 @@ differentiated engines, or hand the phone over for local pass-and-play.
 
 ## Persistence
 
-The running match (mode, level, your colour and the full move list) is written
-to app storage on every change, so folding the phone hands the identical
-position to the other display and relaunching resumes it. Hints and the mute
-switch persist the same way. Passes are never stored - they are forced, so the
-replay inserts them itself.
+The running match (mode, level, your colour and the full move list), the
+tally and the preferences persist to app storage as conditional writes: every
+mutation reads the entry (value plus its {rev,gen} token), derives the next
+document and its write token from that exact read, and sets only if nothing
+moved in between. A peer landing mid-commit refuses E_CONFLICT and the
+intent is recomputed on the fresh entry - a moved document is never
+overwritten by a stale base, and a checkpoint-restored generation refuses
+E_GONE outright. An acknowledgement the wire cannot account for is read
+back before any retry, so a write that secretly landed is never minted twice
+and one that missed is rebased, not blindly resubmitted. Folding the phone
+hands the identical position to the other display and relaunching resumes
+it. Passes are never stored - they are forced, so the replay inserts them
+itself.
 
 The bot only thinks on the display being looked at, and it re-reads the latest
 wire state inside its think timer: an undo, reset or foreign write during the
@@ -76,8 +84,9 @@ screen posing as durable authority, while bot, focus and timer paths stop
 with it. Nothing is adopted as an invented fallback board (which would mint
 a different random match per read and churn every guard), and only the
 user's own click ever overwrites the unreadable bytes. Even that click is
-guarded: Start fresh re-reads the wire and seeds only while it is still
-unreadable or empty, so a healthy match a peer stored after the card is
+guarded twice: Start fresh re-reads the wire, seeds only while it is still
+unreadable or empty, and binds the write to that read's token - a healthy
+match a peer stored after the card (or between the read and the write) is
 recovered and shown instead of destroyed. Move lists stay readable on a
 best-effort basis: entries that are not real cells are dropped and the
 replay stops at the first illegal ply, while documents without a string id
@@ -85,9 +94,10 @@ or a moves array are corrupt.
 
 Destructive intents - new match, mode or colour switch, or a confirmed Sheet
 run - carry a guard: the match id AND the exact move history the user saw.
-The queued write re-checks the freshest settled document and lands only when
-the wire still shows the confirmed history itself or a real prefix of it - a
-peer's undo to a seen position. Unseen work refuses: newer plies, a different
+The queued commit re-checks the freshest settled document and lands only
+when the wire still shows the confirmed history itself or a real prefix of
+it - a peer's undo to a seen position - and the write itself is conditional
+on that read, so the same rule holds against anything landing mid-commit. Unseen work refuses: newer plies, a different
 match, or an unseen alternate branch of the same match (a peer undid and
 replayed a different line), no matter how few plies it has. A refusal re-asks
 against the board now showing instead of overwriting. Confirmed-empty stores
@@ -131,7 +141,14 @@ changes.
   unseen healthy progress, canonical confirmed-empty seeding on every copy
   including over a stale rendered match, stale fallback guards, legal and
   malformed tail classification, and admitted finite writes completing
-  across a fold.
+  across a fold. The conditional-write checks run against a controlled
+  CAS adapter: a peer commit between read and write refusing and rebasing,
+  two initial-null seeds converging on one shared opening, a dead
+  generation refusing a pre-restore token, ambiguous acknowledgements read
+  back before retry (landed-once vs missed-and-rebased), failed reads never
+  seeding, stale undos and equal-length alternate branches refusing,
+  unbounded conflicts exhausting the bound instead of falling back
+  unconditionally, and cold reopen preserving confirmed facts.
 - `bun packages/cli/index.mjs check community-apps/reversi` - manifest,
   source, design-token and strict typecheck gates.
 - `bun packages/cli/index.mjs build community-apps/reversi` - bundle well

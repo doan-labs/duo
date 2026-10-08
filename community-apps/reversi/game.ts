@@ -133,16 +133,21 @@ export function adoptGame(saved: string | object | null | undefined, me: string)
 // either side lands on the same match instead of forking two identities.
 export const OPENING_ID = 'reversi-opening'
 
+/** Two move lists are the same history only when every ply matches: equal length alone says nothing. */
+export const sameMoves = (a: number[], b: number[]): boolean => a.length === b.length && a.every((v, i) => v === b[i])
+
 /** A write's verdict: apply the next document or reject the stale input. */
 export type Mutation = { ok: true; game: SavedGame } | { ok: false }
 
 /**
  * A placement is only legal on the exact settled document the tap was aimed
- * at. When the wire carries a newer match or newer moves, the input is stale:
- * rejecting it is what stops a lagging display from clobbering foreign plies.
+ * at: the same match incarnation AND the same history. When the wire carries
+ * a newer match, newer moves, or an equal-length alternate branch a peer
+ * replayed, the input is stale - rejecting it is what stops a lagging display
+ * from clobbering foreign plies.
  */
 export function tryPlace(base: SavedGame, expected: SavedGame, at: number): Mutation {
-  if (base.id !== expected.id || base.moves.length !== expected.moves.length) return { ok: false }
+  if (base.id !== expected.id || !sameMoves(base.moves, expected.moves)) return { ok: false }
   const d = derive(base.moves)
   if (d.over || !d.legal.has(at)) return { ok: false }
   if (base.mode === 'solo' && d.toMove !== base.you) return { ok: false }
@@ -151,7 +156,7 @@ export function tryPlace(base: SavedGame, expected: SavedGame, at: number): Muta
 
 /** Same identity check for a takeback; the match keeps its id for the tally. */
 export function tryUndo(base: SavedGame, expected: SavedGame): Mutation {
-  if (base.id !== expected.id) return { ok: false }
+  if (base.id !== expected.id || !sameMoves(base.moves, expected.moves)) return { ok: false }
   const d = derive(base.moves)
   if (!canUndo(base, d, false) || d.plies === 0) return { ok: false }
   return { ok: true, game: { ...base, moves: undoCut(base) } }
@@ -160,7 +165,7 @@ export function tryUndo(base: SavedGame, expected: SavedGame): Mutation {
 /** The bot's deferred reply only lands while the position it read is settled. */
 export function tryReply(base: SavedGame, snapshot: SavedGame, at: number): Mutation {
   if (base.mode !== 'solo') return { ok: false }
-  if (base.id !== snapshot.id || base.moves.length !== snapshot.moves.length) return { ok: false }
+  if (base.id !== snapshot.id || !sameMoves(base.moves, snapshot.moves)) return { ok: false }
   const d = derive(base.moves)
   if (d.over || d.toMove === base.you || d.toMove === null || !d.legal.has(at)) return { ok: false }
   return { ok: true, game: { ...base, moves: [...base.moves, at] } }
