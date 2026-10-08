@@ -699,7 +699,7 @@ function RoomPlanner() {
       lastBox.current = { w: box.width, h: box.height }
       setCanvasBox({ w: box.width, h: box.height })
       const dock = dockRef.current?.getBoundingClientRect()
-      if (dock) setDockClear(dock.bottom - box.top + 10)
+      if (dock) setDockClear(dock.bottom - box.top + 14)
       // A fit that runs late must serve the doc on screen now, not the one
       // this callback captured: edits between schedule and fire made the
       // capture stale, and republishing its core would erase newer work on
@@ -763,7 +763,7 @@ function RoomPlanner() {
       // The dock's real bottom edge drives the width callout's clamp -
       // measuring beats hardcoding the token math (top:sm + 44pt row).
       const dock = dockRef.current?.getBoundingClientRect()
-      if (dock) setDockClear(dock.bottom - box.top + 10)
+      if (dock) setDockClear(dock.bottom - box.top + 14)
       if (!box.width || !box.height) return
       if (framedDoc.current !== doc.id) return fitLocal()
       // Refit on a canvas resize only while the camera is still in auto-fit:
