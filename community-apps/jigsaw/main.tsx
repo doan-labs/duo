@@ -20,7 +20,9 @@ import {
   type Prefs,
   parsePrefsDoc,
   SAVES_KEY,
-  seedRetryable
+  type SeedFailureKind,
+  seedFailureKind,
+  seedGateBlocked
 } from './persist.ts'
 import {
   BOARD_H,
@@ -370,13 +372,26 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
   // (mirror status/value or this display going live again) re-runs the effect.
   const seedBusy = useRef(false)
   // Bounded automatic recovery: only a proven pre-apply read failure re-arms
-  // the seed (seedRetryable); anything ambiguous waits for the Retry button.
+  // the seed (seedRetryable). autoPending marks the backoff queue; seedSettled
+  // marks a classified failure that gave up - both keep the effect's admission
+  // gate shut on dependency retriggers.
   const autoSeed = useRef(0)
+  const autoPending = useRef(false)
+  const seedSettled = useRef(false)
   const [seedAttempt, setSeedAttempt] = useState(0)
-  const [seedFailed, setSeedFailed] = useState(false)
+  const [seedFailed, setSeedFailed] = useState<SeedFailureKind | null>(null)
+  const [seedInFlight, setSeedInFlight] = useState(false)
   const copyLive = view.active && view.visible
   useEffect(() => {
-    if (seeded.current || seedBusy.current) return
+    if (
+      seedGateBlocked({
+        seeded: seeded.current,
+        busy: seedBusy.current,
+        autoPending: autoPending.current,
+        settled: seedSettled.current
+      })
+    )
+      return
     if (savesKV.status !== 'ready' || live.status !== 'ready' || !prefs) return
     const remote = parseLive(live.value)
     if (remote) {
@@ -393,6 +408,7 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
     void copyLive
     void seedAttempt
     seedBusy.current = true
+    setSeedInFlight(true)
     void act((ctx) => {
       if (ctx.game) return null
       const p = prefsRef.current ?? PREFS0
@@ -403,20 +419,35 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
       () => {
         seedBusy.current = false
         seeded.current = true
+        setSeedInFlight(false)
       },
       (e) => {
         seedBusy.current = false
         // Only a settled, proven pre-apply read failure re-derives on its own:
         // the fresh attempt re-reads authoritative entries first, so a saved
-        // library entry can never be replaced by a fresh random game. Every
-        // other outcome - dead generation, ambiguous commit, exhausted CAS -
-        // surfaces the recovery UI for an explicit Retry instead.
-        if (seedRetryable(e) && autoSeed.current < 2) {
+        // library entry can never be replaced by a fresh random game. During
+        // the backoff the act is settled but recovery is not: autoPending
+        // holds the admission gate (a foreign dep change cannot jump the
+        // queue) and seedInFlight keeps the wait card on "Opening".
+        const kind = seedFailureKind(e)
+        if (kind === 'preapply' && autoSeed.current < 2) {
           autoSeed.current += 1
-          setTimeout(() => setSeedAttempt((n) => n + 1), 400 * autoSeed.current)
+          autoPending.current = true
+          setTimeout(() => {
+            autoPending.current = false
+            setSeedAttempt((n) => n + 1)
+          }, 400 * autoSeed.current)
           return
         }
-        setSeedFailed(true)
+        setSeedInFlight(false)
+        // Settled: dependency retriggers are dead from here (seedSettled), and
+        // the classified outcome decides the UI. Only 'preapply' may be
+        // retried by hand - a remount re-derives, which is zero-durable-effect
+        // for that class. 'terminal'/'ambiguous' must never spawn a fresh
+        // semantic token via an epoch remount, so they offer Close/reopen
+        // through the host instead of a Retry.
+        seedSettled.current = true
+        setSeedFailed(kind)
       }
     )
   }, [savesKV.status, savesKV.value, live.status, live.value, prefs, act, adoptLive, copyLive, seedAttempt])
@@ -765,21 +796,42 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
     return null
   }, [game, drag, held, heldPos])
 
+  // A click that races an inflight act or a queued auto-retry must not
+  // remount and spawn a second intent - refs, not state, carry the answer.
+  const retrySeed = useCallback(() => {
+    if (seedBusy.current || autoPending.current) return
+    onRetry()
+  }, [onRetry])
+
   if (!prefs || !game) {
-    const failed = seedFailed || live.status === 'error' || savesKV.status === 'error' || prefsKV.status === 'error'
+    // Invariant: this card exists only while no game is present - a landed or
+    // foreign-adopted game passes the gate and the board renders instead, so
+    // a stale failure banner can never cover live progress.
+    const failed =
+      seedFailed !== null || live.status === 'error' || savesKV.status === 'error' || prefsKV.status === 'error'
+    const pending = seedInFlight || seedBusy.current || autoPending.current
     return (
       <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)}>
         <div {...stylex.props(styles.wait)}>
-          {failed ? (
+          {pending || !failed ? (
+            <p {...stylex.props(styles.waitBody)}>Opening…</p>
+          ) : seedFailed === 'terminal' || seedFailed === 'ambiguous' ? (
+            <>
+              <p {...stylex.props(styles.waitTitle)}>Could not open your puzzle</p>
+              <p {...stylex.props(styles.waitBody)}>
+                {seedFailed === 'terminal'
+                  ? 'This copy is out of date. Close and reopen Jigsaw.'
+                  : 'Your game may have been saved. Close and reopen Jigsaw to check.'}
+              </p>
+            </>
+          ) : (
             <>
               <p {...stylex.props(styles.waitTitle)}>Could not open your puzzle</p>
               <p {...stylex.props(styles.waitBody)}>Saved games are kept. Try again.</p>
-              <Button variant="filled" onClick={onRetry}>
+              <Button variant="filled" onClick={retrySeed}>
                 Retry
               </Button>
             </>
-          ) : (
-            <p {...stylex.props(styles.waitBody)}>Opening…</p>
           )}
         </div>
       </main>

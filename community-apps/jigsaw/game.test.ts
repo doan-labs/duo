@@ -12,6 +12,8 @@ import {
   mergedSaves,
   PREFS0,
   parsePrefsDoc,
+  seedFailureKind,
+  seedGateBlocked,
   seedRetryable
 } from './persist.ts'
 import {
@@ -1391,6 +1393,69 @@ await checkAsync('an ambiguous commit outcome is never retry-safe', async () => 
   ok(!(err as { preApply?: boolean }).preApply, 'a commit outcome must not be tagged pre-apply')
   ok(!seedRetryable(err), 'an ambiguous outcome must never auto-retry')
   ok(!saves.store.has('saves'), 'the unapplied write should stay absent from durable state')
+})
+
+await checkAsync('settled failures classify for the UI: only preapply may be retried by hand', async () => {
+  // The wait card branches on seedFailureKind: 'terminal' and 'ambiguous'
+  // render Close/reopen guidance with NO retry affordance - an epoch remount
+  // could replay a mutating intent, which is what this policy forbids.
+  const live = new FakeKV()
+  const saves = new FakeKV()
+  const P = makePersist('me', live, saves)
+
+  saves.failNext = 1
+  let err: unknown
+  await P.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(seedFailureKind(err), 'preapply', 'a proven read miss must classify as safely retryable')
+
+  saves.getHook = async () => {
+    throw Object.assign(new Error('generation dead'), { code: 'E_GONE' })
+  }
+  err = undefined
+  await P.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(seedFailureKind(err), 'terminal', 'E_GONE must classify terminal even when thrown pre-apply')
+
+  const saves2 = new FakeKV()
+  const P2 = makePersist('me', new FakeKV(), saves2)
+  saves2.setFaults = ['timeout-lost']
+  err = undefined
+  await P2.p
+    .act(() => ({ next: newGame('harbour', 12, 1), held: null }))
+    .then(
+      () => {},
+      (e) => {
+        err = e
+      }
+    )
+  eq(seedFailureKind(err), 'ambiguous', 'a commit outcome must classify ambiguous')
+  ok(seedFailureKind(err) !== 'preapply', 'ambiguous outcome must never reach a retry affordance')
+})
+
+await checkAsync('the seed admission gate blocks every retrigger while busy, queued, or settled', async () => {
+  // Mirrors the effect guard in main.tsx: once a seed intent is inflight,
+  // queued for the bounded auto-retry, or settled by a classified failure,
+  // no dependency change (copyLive wake, foreign saves write, seedAttempt
+  // tick) may spawn another intent in this mounted copy.
+  const idle = { seeded: false, busy: false, autoPending: false, settled: false }
+  ok(!seedGateBlocked(idle), 'an idle copy must admit a seed')
+  ok(seedGateBlocked({ ...idle, seeded: true }), 'a seeded copy must never reseed')
+  ok(seedGateBlocked({ ...idle, busy: true }), 'an inflight act must block a second intent')
+  ok(seedGateBlocked({ ...idle, autoPending: true }), 'a queued backoff retry must block a second intent')
+  ok(seedGateBlocked({ ...idle, settled: true }), 'a classified failure must block dependency retriggers')
 })
 
 await checkAsync('a failed mirror hydrate recovers on a fresh subscribe', async () => {

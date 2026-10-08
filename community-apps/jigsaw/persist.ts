@@ -143,6 +143,32 @@ export function seedRetryable(e: unknown): boolean {
   return (e as { preApply?: boolean })?.preApply === true && errCode(e) !== 'E_GONE'
 }
 
+/** A settled seed-act rejection classified for the recovery UI. 'terminal'
+ * (dead generation) and 'ambiguous' (a commit was attempted, so landing is
+ * unknown) refuse every same-session retry path - automatic, dependency
+ * retrigger, and manual remount alike - because a remount could replay a
+ * mutating intent; only a host close/reopen may try again. 'preapply' settled
+ * with zero durable effect, so a bounded re-derivation stays safe. */
+export type SeedFailureKind = 'preapply' | 'terminal' | 'ambiguous'
+
+export function seedFailureKind(e: unknown): SeedFailureKind {
+  if (errCode(e) === 'E_GONE') return 'terminal'
+  if (seedRetryable(e)) return 'preapply'
+  return 'ambiguous'
+}
+
+/** Seed admission gate: once a seed intent is running, queued for a bounded
+ * retry, or settled by a classified failure, no dependency retrigger may fire
+ * another one. */
+export function seedGateBlocked(s: {
+  seeded: boolean
+  busy: boolean
+  autoPending: boolean
+  settled: boolean
+}): boolean {
+  return s.seeded || s.busy || s.autoPending || s.settled
+}
+
 export type Clock = { rev: number; by: string }
 
 /** A live envelope carrying a strictly older incarnation than the confirmed
