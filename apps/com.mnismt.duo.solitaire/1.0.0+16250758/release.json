@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.solitaire",
+    "name": "Solitaire",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "permissions": [],
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/solitaire",
+    "license": "MIT"
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T08:55:54.993Z",
+    "commit": "102fbb54b2606d48eccfb9d1b0133ad59e162fd7",
+    "hash": "16250758"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 571422,
+      "sha256": "e851422131c177edbac73287c027aae37fe8ccd0e289238a01d5e57e9f622234"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 1253836,
+      "sha256": "0fa5340462fa2e6af86d49e03eda1ac4972ff0e8daf23947376d79e07f8913bb"
+    }
+  ]
+}

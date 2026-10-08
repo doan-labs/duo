@@ -378,6 +378,22 @@
         }
       ]
     },
+    "com.mnismt.duo.solitaire": {
+      "name": "Solitaire",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/solitaire",
+      "permissions": [],
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+16250758",
+          "sdk": "0.1.0",
+          "bytes": 571422,
+          "sha256": "1303c162a80e4a5242b41f314ff4d8427696f39930451825f20cb3a3aba48a08"
+        }
+      ]
+    },
     "com.mnismt.duo.sudoku": {
       "name": "Sudoku",
       "lane": "community",
