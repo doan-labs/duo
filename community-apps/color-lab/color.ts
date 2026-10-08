@@ -447,7 +447,7 @@ export const ratioFloor = (r: number, digits: number) => {
  */
 export type PalOp =
   | { id: string; seq: number; kind: 'add'; palette: SavedPalette }
-  | { id: string; seq: number; kind: 'rename'; target: string; name: string }
+  | { id: string; seq: number; kind: 'rename'; target: string; name: string; base?: string }
   | { id: string; seq: number; kind: 'delete'; target: string }
 
 /** The trailing ops window each publish echoes for fast id settlement. */
@@ -570,6 +570,15 @@ export function mergePalWire(
   const replayed: PalOp[] = []
   for (const op of myOps) {
     if (op.seq <= myAck || seen.has(op.id)) continue
+    // A causal rename replays only while the adopted row still shows the
+    // base it was issued against: a foreign publish carrying a newer name
+    // makes the op a stale replay, not a live intent - it stays unsettled
+    // for the watermark, but it never overwrites the peer fact (and never
+    // poisons the base a fresh rename would stamp).
+    if (op.kind === 'rename' && op.base !== undefined) {
+      const row = merged.find((i) => i.id === op.target)
+      if (row && row.name !== op.base && row.name !== op.name) continue
+    }
     const next = applyPalOp(merged, op)
     if (palListEq(next, merged)) continue
     merged = next
@@ -651,7 +660,11 @@ export class PalsLib {
   /** Apply one admitted local op; returns the stamped op. */
   push(op: DistOmit<PalOp, 'id' | 'seq'>): PalOp {
     const seq = ++this.seq
-    const full = { ...op, id: `${this.me}:${seq}`, seq } as PalOp
+    // A rename stamps the name it was issued against as its causal base, so
+    // a durable replay can tell 'the stored row predates my op' from 'the
+    // stored row is a peer's newer replacement'.
+    const base = op.kind === 'rename' ? this.list.find((p) => p.id === op.target)?.name : undefined
+    const full = { ...op, id: `${this.me}:${seq}`, seq, ...(base === undefined ? {} : { base }) } as PalOp
     if (full.kind === 'delete') this.tomb(full.target)
     this.list = applyPalOp(this.list, full)
     this.acks[this.me] = seq
@@ -665,12 +678,37 @@ export class PalsLib {
     return { ...this.acks, [this.me]: this.seq }
   }
 
-  /** My ops no foreign watermark has covered yet - the deliberate edits the
-   *  durable intent may still re-apply onto a newer stored value. Ops that
-   *  settled on the wire stay in `ops` as an echo tail but must not keep
-   *  re-asserting against the stored document. */
+  /** My ops no foreign watermark has covered yet and no ambiguous write has
+   *  retired - the deliberate edits the durable intent may still re-apply
+   *  onto a newer stored value. Ops that settled on the wire stay in `ops`
+   *  as an echo tail but must not keep re-asserting against the store. */
   pending(): PalOp[] {
-    return this.ops.filter((o) => o.seq > this.maxAck)
+    return this.ops.filter((o) => o.seq > this.maxAck && o.seq > this.retiredSeq)
+  }
+
+  /** Ops at or below this seq retired after an ambiguous write: the write's
+   *  durable fate is unknowable, so the same intent may never replay onto a
+   *  readback it did not produce - not in-cycle, queued, or deferred. */
+  private retiredSeq = 0
+
+  /** Palette ids a reconcile readback denied: the last ambiguous write
+   *  claimed them and the confirmed store proved them absent (a peer delete
+   *  the wire has not delivered yet). Fenced out of local-only appends so a
+   *  stale row can never resurrect them durable-side. */
+  readonly denied = new Set<string>()
+
+  /** An ambiguous write reconciled to a different confirmed value: every op
+   *  issued so far retires, and ids the sent value claimed that the
+   *  readback denies are fenced out of durable appends. Bounded FIFO. */
+  fence(sent: string | null, readback: string | null) {
+    this.retiredSeq = this.seq
+    const rb = new Set(parsePalettes(readback).map((p) => p.id))
+    for (const p of parsePalettes(sent)) {
+      if (rb.has(p.id)) continue
+      this.denied.delete(p.id)
+      this.denied.add(p.id)
+      while (this.denied.size > PAL_TOMB_LIMIT) this.denied.delete(this.denied.values().next().value!)
+    }
   }
 }
 
@@ -756,10 +794,12 @@ const casErrCode = (e: unknown): string | null =>
  * bytes proves the write landed; anything else reports `unknown` instead of
  * pretending the mutation applied - a timed-out original may still commit
  * late, so a nonmatching readback (even the old value) authorizes no new
- * write in the same cycle. Merge-safe derivations are the exception: a
- * fact-preserving merge is idempotent under any interleaving, so it may
- * rebase onto the newer value at once. Asks coalesce: a new `ask` while a
- * cycle runs just re-derives the latest intent on the next pass.
+ * write in the same cycle. A nonmatching reconciliation read adopts the
+ * confirmed value and retires the intent's pending ops through
+ * `onAmbiguous` - a retired op is never replayed, not in this cycle, not
+ * queued, not deferred; only a genuine new intent derives a fresh value.
+ * Asks coalesce: a new `ask` while a cycle runs just re-derives the latest
+ * intent on the next pass.
  */
 export class CasKey {
   /** The newest confirmed durable moment (seed or a real settle). */
@@ -773,11 +813,13 @@ export class CasKey {
     private api: CasApi,
     private derive: CasDerive,
     private opts: {
-      /** A fact-preserving intent (id-keyed union minus tombstones) may
-       *  rebase immediately on a nonmatching reconciliation read. */
-      mergeSafe?: boolean
       onOutcome?: (o: CasOutcome) => void
       onDrain?: () => void
+      /** A reconciliation read disagreed with the sent bytes: the write's
+       *  durable fate is unknowable. Fired once, before `unknown`, so the
+       *  owner can retire the intent's pending ops and fence the ids the
+       *  readback denied. */
+      onAmbiguous?: (sent: string | null, readback: CasEntry) => void
     } = {}
   ) {}
 
@@ -874,7 +916,7 @@ export class CasKey {
           // the stored value equal to the sent bytes proves the write
           // landed; any other value (including the untouched old one) does
           // not prove it never will, so no fresh write fires in this cycle
-          // unless the intent itself is provably idempotent.
+          // and the owner retires the intent's pending ops before 'unknown'.
           const f = await this.entry()
           if (!f) {
             this.queued = true
@@ -885,12 +927,7 @@ export class CasKey {
             this.out('ack')
             break
           }
-          if (this.opts.mergeSafe) {
-            tok = { rev: f.rev, gen: f.gen }
-            v = this.derive(f.v)
-            if (v === CAS_SKIP) break
-            continue
-          }
+          this.opts.onAmbiguous?.(v, f)
           this.out('unknown')
           this.queued = true
           return
@@ -903,31 +940,53 @@ export class CasKey {
   }
 }
 
-/** One admitted op applied onto the stored document. Identical to
- *  `applyPalOp` except a rename already visible in the stored row is a
- *  no-op - the derive must converge to byte-identical wire, so a settled
- *  effect can never re-stamp `updatedAt` and keep rewriting forever. */
+/** One admitted op applied onto the stored document - the causal fence
+ *  between my intent and a peer's replacement of the same id:
+ *  - a rename applies only while the stored row still shows the name the
+ *    op was issued against (`base`); a newer peer name suppresses the
+ *    replay, so a stale op can never overwrite the acknowledged
+ *    replacement. Ops minted before `base` existed apply unconditionally.
+ *  - an add owns its palette id outright (ids are unique per save), so a
+ *    stored same-id row is always a newer confirmed fact and is never
+ *    overwritten.
+ *  A rename already visible in the stored row is a no-op either way - the
+ *  derive must converge to byte-identical wire, so a settled effect can
+ *  never re-stamp `updatedAt` and keep rewriting forever. */
 const applyDurablePalOp = (items: SavedPalette[], op: PalOp): SavedPalette[] => {
+  if (op.kind === 'add') return items.some((i) => i.id === op.palette.id) ? items : applyPalOp(items, op)
   if (op.kind !== 'rename') return applyPalOp(items, op)
   const name = op.name.trim().slice(0, MAX_PALETTE_NAME)
-  return items.map((i) => (i.id === op.target && name && i.name !== name ? { ...i, name, updatedAt: Date.now() } : i))
+  return items.map((i) =>
+    i.id === op.target && name && i.name !== name && (op.base === undefined || i.name === op.base)
+      ? { ...i, name, updatedAt: Date.now() }
+      : i
+  )
 }
+
+const EMPTY_IDS: ReadonlySet<string> = new Set()
 
 /** The palette intent: the stored document carries every peer fact (it wins
  *  shared ids by definition - it is the last confirmed write), my unseen
  *  rows append to cover a peer's lost write, and only my ops no foreign
- *  watermark has covered re-apply on top. An op is the only way a local
- *  edit is deliberate rather than stale: a same-id rename by me lands on
- *  the peer's row, while my merely-older copy of a row the peer edited
- *  silently defers - which is exactly what makes a lost-ack reconcile safe
- *  to rebase instead of reporting unknown. */
+ *  watermark has covered re-apply on top - each gated by the causal base it
+ *  was issued against, so a stale replay can never overwrite a peer's
+ *  acknowledged replacement. `denied` fences the ids a reconciliation
+ *  readback proved absent: a row the last ambiguous write claimed and the
+ *  store denied is a peer delete the wire has not delivered yet, and
+ *  re-appending it would resurrect it durable-side. */
 export const palsIntent = (
   list: () => SavedPalette[],
   tombs: () => ReadonlySet<string>,
-  ops: () => PalOp[] = () => []
+  ops: () => PalOp[] = () => [],
+  denied: () => ReadonlySet<string> = () => EMPTY_IDS
 ): CasDerive => {
   return (cur) => {
-    let merged = mergeDurablePals(parsePalettes(cur), list(), tombs())
+    const deniedSet = denied()
+    let merged = mergeDurablePals(
+      parsePalettes(cur),
+      list().filter((p) => !deniedSet.has(p.id)),
+      tombs()
+    )
     for (const op of ops()) merged = applyDurablePalOp(merged, op)
     const wire = serializePalettes(merged)
     return wire === serializePalettes(parsePalettes(cur)) ? CAS_SKIP : wire
@@ -1195,7 +1254,14 @@ export function parseShared(raw: string | null): SharedState | null {
               return palette ? { id: o.id, seq, kind: 'add', palette } : null
             }
             if (o.kind === 'rename' && typeof o.target === 'string' && typeof o.name === 'string')
-              return { id: o.id, seq, kind: 'rename', target: o.target, name: o.name.slice(0, MAX_PALETTE_NAME) }
+              return {
+                id: o.id,
+                seq,
+                kind: 'rename',
+                target: o.target,
+                name: o.name.slice(0, MAX_PALETTE_NAME),
+                ...(typeof o.base === 'string' ? { base: o.base.slice(0, MAX_PALETTE_NAME) } : {})
+              }
             if (o.kind === 'delete' && typeof o.target === 'string')
               return { id: o.id, seq, kind: 'delete', target: o.target }
             return null

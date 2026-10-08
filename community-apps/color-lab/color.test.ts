@@ -1074,6 +1074,9 @@ class FakeCas implements CasApi {
   /** Fires inside the next `entry` after the token is minted: a peer write
    *  landing between read and write is how a real E_CONFLICT happens. */
   afterEntry: (() => void) | null = null
+  /** Fires inside `set` after the commit but before the (lost) response:
+   *  the peer overwrite landing between my commit and my reconcile readback. */
+  afterCommit: (() => void) | null = null
   failHard: string | null = null
   private held: { k: string; v: string; tok: { rev: number; gen: number }; reject: (e: unknown) => void }[] = []
   holdNext = false
@@ -1121,6 +1124,9 @@ class FakeCas implements CasApi {
     }
     this.data.set(k, v)
     this.rev++
+    const hook = this.afterCommit
+    this.afterCommit = null
+    hook?.()
     if (this.commitThenLoseAck > 0) {
       this.commitThenLoseAck--
       throw Object.assign(new Error('ack lost'), { code: 'E_TIMEOUT' })
@@ -1182,7 +1188,6 @@ await acheck('CasKey: a clean conditional write acks and skips once deduped', as
       () => lib.pending()
     ),
     {
-      mergeSafe: true,
       onOutcome: (o) => out.push(o)
     }
   )
@@ -1210,7 +1215,6 @@ acheck('CasKey: a peer write after the read conflicts, and the rebase keeps both
       () => me.pending()
     ),
     {
-      mergeSafe: true,
       onOutcome: (o) => {
         if (o === 'conflict') conflicts++
       }
@@ -1241,13 +1245,13 @@ acheck('CasKey: a lost ack over a peer write cannot erase or duplicate it', asyn
       () => libA.pending()
     ),
     {
-      mergeSafe: true,
       onOutcome: (o) => out.push(o)
     }
   )
   api.commitThenLoseAck = 1 // A's write lands, then its ack is lost.
   keyA.ask()
   await drain()
+  ok(out.includes('ack') && !out.includes('unknown'), 'a byte-equal readback proves the lost-ack write landed')
   // B's confirmed write on the same key lands while A still believes nothing.
   const libB = palLibWith(pal('PB', 'B one'))
   const keyB = new CasKey(
@@ -1258,7 +1262,7 @@ acheck('CasKey: a lost ack over a peer write cannot erase or duplicate it', asyn
       () => libB.tombs,
       () => libB.pending()
     ),
-    { mergeSafe: true }
+    {}
   )
   keyB.ask()
   await drain()
@@ -1299,7 +1303,7 @@ acheck('CasKey: whole-value intent reports unknown rather than erasing a peer wr
   eq(api.data.get('doc'), serializeDoc(peerDoc), 'the fresh intent wrote the adopted doc')
 })
 
-acheck('CasKey: a held mutation refused at late commit still reconciles without losing the peer', async () => {
+acheck('CasKey: a held mutation refused at late commit reconciles and fences the unproven row', async () => {
   const api = new FakeCas()
   const lib = palLibWith(pal('H1', 'H1'))
   const key = new CasKey(
@@ -1308,9 +1312,10 @@ acheck('CasKey: a held mutation refused at late commit still reconciles without 
     palsIntent(
       () => lib.list,
       () => lib.tombs,
-      () => lib.pending()
+      () => lib.pending(),
+      () => lib.denied
     ),
-    { mergeSafe: true }
+    { onAmbiguous: (sent, f) => lib.fence(sent, f.v) }
   )
   api.holdNext = true
   key.ask()
@@ -1320,14 +1325,16 @@ acheck('CasKey: a held mutation refused at late commit still reconciles without 
   api.peerSet(PALS_KEY, serializePalettes([pal('PEER', 'PEER')]))
   api.releaseHeld()
   await drain()
-  // Reconcile + mergeSafe rebase: durable carries the peer row plus mine.
+  // Reconcile: the confirmed store denied the sent row, so H1 is fenced out
+  // of durable appends rather than re-asserted over the peer's write.
   const ids = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
-  ok(ids.includes('PEER') && ids.includes('H1'), 'reconciled merge kept both facts')
+  ok(ids.includes('PEER') && !ids.includes('H1'), 'the confirmed store kept the peer row, unproven row fenced')
+  ok(lib.denied.has('H1'), 'the denied id was fenced')
   lib.push({ kind: 'add', palette: pal('NEXT', 'NEXT') })
   key.ask()
   await drain()
   const after = parsePalettes(api.data.get(PALS_KEY)!).map((p) => p.id)
-  ok(after.includes('NEXT'), 'the next admitted intent lands on the converged base')
+  ok(after.includes('NEXT') && !after.includes('H1'), 'a new intent lands; the fenced row stays fenced')
 })
 
 acheck('CasKey: a failed entry read is not an absent key', async () => {
@@ -1345,7 +1352,6 @@ acheck('CasKey: a failed entry read is not an absent key', async () => {
       () => lib.pending()
     ),
     {
-      mergeSafe: true,
       onOutcome: (o) => out.push(o)
     }
   )
@@ -1371,7 +1377,6 @@ acheck('CasKey: a dead generation is terminal and never retried', async () => {
       () => lib.pending()
     ),
     {
-      mergeSafe: true,
       onOutcome: (o) => out.push(o)
     }
   )
@@ -1398,7 +1403,7 @@ acheck('CasKey: two copies cold-booting at a null record converge on both librar
       () => libA.tombs,
       () => libA.pending()
     ),
-    { mergeSafe: true }
+    {}
   )
   const keyB = new CasKey(
     PALS_KEY,
@@ -1408,7 +1413,7 @@ acheck('CasKey: two copies cold-booting at a null record converge on both librar
       () => libB.tombs,
       () => libB.pending()
     ),
-    { mergeSafe: true }
+    {}
   )
   // Both read the same absent key, then both write - the loser rebases.
   keyA.ask()
@@ -1428,7 +1433,7 @@ acheck('CasKey: two copies cold-booting at a null record converge on both librar
         () => lib.tombs,
         () => lib.pending()
       ),
-      { mergeSafe: true }
+      {}
     )
     fresh.seed(await api.entry(PALS_KEY))
     fresh.ask()
@@ -1490,17 +1495,17 @@ check('mergeDurablePals: durable wins shared ids, order carries, tombs stay dead
   )
 })
 
-// The parent's exact probe (color-cas-peer-rename-probe.ts): A holds
-// old-name P and adds Q; A's conditional write commits but the ack is lost;
-// B sees Q, renames the shared P, and acks; A's reconcile readback sees B's
-// value. Under the old local-wins merge A re-asserted its stale P and
-// erased B's acknowledged rename. Now the stored row wins the shared id and
-// only A's deliberate op (add Q) may re-apply - Q lands, B's name survives.
-acheck('CasKey: lost ack over a peer rename preserves the acknowledged name (parent probe)', async () => {
+// The reviewer's R1 probe (cas-probe.ts): A renames P, the write commits
+// but its ack is lost; B renames the same id and acks first. A's reconcile
+// readback sees B's acknowledged value - the only honest outcome is
+// `unknown`, the pending rename retires on the spot, and no deferred drain
+// ever replays it (the retired op would be a fresh-token replay of an
+// unknown write).
+acheck('CasKey: a lost-ack rename retires instead of replaying over the peer name (R1)', async () => {
   const saved = { id: 'p', name: 'Old name', colors: [rgb(5, 8, 13)], updatedAt: 1 }
-  const added = { id: 'q', name: 'My new palette', colors: [rgb(34, 55, 89)], updatedAt: 2 }
-  const local = [saved, added]
-  const ops: PalOp[] = [{ id: 'a:1', seq: 1, kind: 'add', palette: added }]
+  const lib = new PalsLib('a')
+  lib.hydrate(serializePalettes([saved]))
+  lib.push({ kind: 'rename', target: 'p', name: 'A name' })
   let v: string | null = serializePalettes([saved])
   let rev = 1
   let sets = 0
@@ -1515,8 +1520,9 @@ acheck('CasKey: lost ack over a peer rename preserves the acknowledged name (par
       if (expect.rev !== rev) throw { code: 'E_CONFLICT' }
       v = next
       rev++
+      // B's acknowledged rename lands between A's commit and A's readback.
       if (sets === 1) {
-        v = serializePalettes(renamePalette(parsePalettes(v), 'p', 'B acknowledged name'))
+        v = serializePalettes(renamePalette(parsePalettes(v), 'p', 'B name'))
         rev++
         throw { code: 'E_TIMEOUT' }
       }
@@ -1528,77 +1534,128 @@ acheck('CasKey: lost ack over a peer rename preserves the acknowledged name (par
     'palettes',
     api,
     palsIntent(
-      () => local,
-      () => new Set(),
-      () => ops
+      () => lib.list,
+      () => lib.tombs,
+      () => lib.pending(),
+      () => lib.denied
     ),
-    { mergeSafe: true, onOutcome: (o) => out.push(o) }
+    { onAmbiguous: (sent, f) => lib.fence(sent, f.v), onOutcome: (o) => out.push(o) }
   )
   cas.ask()
   await drain()
-  const final = parsePalettes(v)
-  eq(
-    final.find((p) => p.id === 'p')?.name,
-    'B acknowledged name',
-    "B's acknowledged rename survives A's stale local copy"
-  )
-  ok(
-    final.some((p) => p.id === 'q'),
-    'A added palette Q without re-asserting its stale P - the deliberate op is what landed'
-  )
-  // Same scenario under a non-merge intent: the ambiguous reconcile reports
-  // unknown and never touches the key, B untouched either way.
-  const out2: CasOutcome[] = []
-  let v2: string | null = serializePalettes([saved])
-  let rev2 = 1
-  const api2 = {
-    entry: async (_key: string) => ({ v: v2, rev: rev2, gen: 1 }),
-    del: async () => {
-      throw new Error('unused')
-    },
-    set: async (_key: string, next: string, expect: { rev: number; gen: number }) => {
-      if (expect.rev !== rev2) throw { code: 'E_CONFLICT' }
-      v2 = next
-      rev2++
-      v2 = serializePalettes(renamePalette(parsePalettes(v2), 'p', 'B acknowledged name'))
-      rev2++
-      throw { code: 'E_TIMEOUT' }
-    }
-  }
-  const cas2 = new CasKey(
-    'palettes',
-    api2,
-    palsIntent(
-      () => local,
-      () => new Set(),
-      () => ops
-    ),
-    { onOutcome: (o) => out2.push(o) }
-  )
-  cas2.ask()
+  eq(sets, 1, 'one conditional write, never a fresh-token replay')
+  ok(out.includes('unknown'), 'the ambiguous write reported unknown, not a silent overwrite')
+  eq(parsePalettes(v).find((p) => p.id === 'p')?.name, 'B name', "B's acknowledged name survives")
+  eq(lib.pending().length, 0, 'the ambiguous op retired the moment the readback disagreed')
+  // Deferred drains and later asks re-derive from the confirmed store; the
+  // retired op is never replayed by queue, watch or wakeup either.
+  cas.ask()
   await drain()
-  ok(out2.includes('unknown'), 'non-merge intent reports unknown on the different readback')
-  eq(parsePalettes(v2).find((p) => p.id === 'p')?.name, 'B acknowledged name', 'no fresh-token replay erased B either')
+  eq(sets, 1, 'a deferred drain never replays the retired op')
+  eq(parsePalettes(v).find((p) => p.id === 'p')?.name, 'B name', 'B survives every later pass')
 })
 
-// The deliberate-op case of the same gate: when A genuinely renames P (a
-// live op, not a stale row), a typed E_CONFLICT rebases onto B's value and
-// A's op re-applies onto B's row - causal op identity, never a whole-row
-// clobber. B's confirmed write still lands its own name first.
-acheck('CasKey: a same-id rename conflict replays the deliberate op on the peer row', async () => {
+// The reviewer's D1 probe: A adds Q, the write commits but its ack is lost;
+// B deletes Q and acks. A's readback denies q - fencing the id stops both
+// the retired add and the stale local row resurrecting it on any later
+// write, and a delayed tombstone arriving over the wire stays consistent.
+acheck('CasKey: a lost-ack add never resurrects a peer-deleted row (D1)', async () => {
   const api = new FakeCas()
-  const lib = new PalsLib('A')
-  lib.hydrate(serializePalettes([pal('P', 'Old name')]))
-  lib.push({ kind: 'rename', target: 'P', name: 'A deliberate name' })
+  const lib = new PalsLib('a')
+  const P = pal('p', 'P')
+  lib.hydrate(serializePalettes([P]))
+  lib.push({ kind: 'add', palette: pal('q', 'Q') })
+  const out: CasOutcome[] = []
   const key = new CasKey(
     PALS_KEY,
     api,
     palsIntent(
       () => lib.list,
       () => lib.tombs,
-      () => lib.pending()
+      () => lib.pending(),
+      () => lib.denied
     ),
-    { mergeSafe: true }
+    { onAmbiguous: (sent, f) => lib.fence(sent, f.v), onOutcome: (o) => out.push(o) }
+  )
+  api.commitThenLoseAck = 1
+  // B's acknowledged delete of q lands between A's commit and the readback.
+  api.afterCommit = () => api.peerSet(PALS_KEY, serializePalettes([P]))
+  key.ask()
+  await drain()
+  eq(api.log.filter((l) => l.startsWith('set')).length, 1, 'one write, no fresh-token replay')
+  ok(out.includes('unknown'), 'the ambiguous add reported unknown')
+  ok(lib.denied.has('q'), 'the readback-denied id is fenced')
+  eq(lib.pending().length, 0, 'the ambiguous op retired')
+  eq(parsePalettes(api.data.get(PALS_KEY)!).length, 1, 'Q stays deleted durable-side')
+  // A delayed tombstone over the wire agrees with the fence; asks keep
+  // skipping - the denied row can never re-enter a durable write.
+  lib.adopt({ pals: [P] })
+  key.ask()
+  key.ask()
+  await drain()
+  eq(api.log.filter((l) => l.startsWith('set')).length, 1, 'no deferred drain resurrected Q')
+  eq(parsePalettes(api.data.get(PALS_KEY)!).length, 1, 'Q stays dead after the delayed tomb')
+})
+
+// The disjoint-id control of the same race: A adds Q and loses the ack; B
+// renames the untouched P and acks. Reconcile reports unknown and retires
+// the op, yet the durable write already carries both facts - nothing is
+// lost and nothing replays.
+acheck('CasKey: a disjoint lost-ack preserves both committed facts', async () => {
+  const api = new FakeCas()
+  const lib = new PalsLib('a')
+  const P = pal('p', 'P')
+  lib.hydrate(serializePalettes([P]))
+  lib.push({ kind: 'add', palette: pal('q', 'Q') })
+  const out: CasOutcome[] = []
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => lib.list,
+      () => lib.tombs,
+      () => lib.pending(),
+      () => lib.denied
+    ),
+    { onAmbiguous: (sent, f) => lib.fence(sent, f.v), onOutcome: (o) => out.push(o) }
+  )
+  api.commitThenLoseAck = 1
+  // B's acknowledged rename of P lands between A's commit and the readback.
+  api.afterCommit = () => api.peerSet(PALS_KEY, serializePalettes([{ ...P, name: 'B name' }, pal('q', 'Q')]))
+  key.ask()
+  await drain()
+  ok(out.includes('unknown'), 'a nonmatching readback still reports unknown')
+  const final = parsePalettes(api.data.get(PALS_KEY)!)
+  eq(final.find((p) => p.id === 'p')?.name, 'B name', "B's rename of the disjoint id survives")
+  ok(
+    final.some((p) => p.id === 'q'),
+    "A's committed add survives - the disjoint fact was already durable"
+  )
+  eq(lib.denied.size, 0, 'nothing was denied - the readback still carries both ids')
+  key.ask()
+  await drain()
+  eq(api.log.filter((l) => l.startsWith('set')).length, 1, 'the settled intent dedupes to zero writes')
+})
+
+// The typed-conflict same-id case: A's rename was issued against 'Old name'
+// but the stored row now carries B's acknowledged replacement - the stale
+// causal base suppresses the replay. A rename deliberately issued against
+// the confirmed name is a fresh intent and lands.
+acheck('CasKey: a same-id conflict honours the causal base, not the stale op', async () => {
+  const api = new FakeCas()
+  const lib = new PalsLib('A')
+  lib.hydrate(serializePalettes([pal('P', 'Old name')]))
+  lib.push({ kind: 'rename', target: 'P', name: 'A stale name' })
+  const key = new CasKey(
+    PALS_KEY,
+    api,
+    palsIntent(
+      () => lib.list,
+      () => lib.tombs,
+      () => lib.pending(),
+      () => lib.denied
+    ),
+    { onAmbiguous: (sent, f) => lib.fence(sent, f.v) }
   )
   // The peer's rename of the same id commits between my read and my write.
   api.afterEntry = () => api.peerSet(PALS_KEY, serializePalettes(renamePalette([pal('P', 'Old name')], 'P', 'B name')))
@@ -1606,8 +1663,16 @@ acheck('CasKey: a same-id rename conflict replays the deliberate op on the peer 
   await drain()
   const final = parsePalettes(api.data.get(PALS_KEY)!)
   eq(final.length, 1, 'one row, no duplication')
-  eq(final[0]!.name, 'A deliberate name', "A's deliberate rename lands on the peer's row")
-  eq(final[0]!.id, 'P', 'the peer row was edited in place, not replaced by a stale copy')
+  eq(final[0]!.name, 'B name', "the stale-base op can never overwrite the peer's acknowledged name")
+  // The wire delivers the peer fact; a new rename issued against it is
+  // legitimate and lands on the confirmed base.
+  lib.adopt({ pals: final })
+  lib.push({ kind: 'rename', target: 'P', name: 'A fresh name' })
+  key.ask()
+  await drain()
+  const landed = parsePalettes(api.data.get(PALS_KEY)!)
+  eq(landed[0]!.name, 'A fresh name', 'a deliberate rename on the confirmed base lands')
+  eq(landed.length, 1, 'still one row - the peer fact was edited in place')
 })
 
 check('PalsLib: my delete and an adopted delete both tomb the id', () => {

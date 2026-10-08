@@ -71,13 +71,20 @@ setter is never used as a durable path: it is optimistic and carries no
 ack.
 For the palette library the stored document is the last confirmed write, so
 on a shared id the stored row always wins over a local copy that cannot
-prove it is newer - a lost-ack rebase can never re-assert a stale row over
-a peer's acknowledged rename. Local rows the store has never seen still get
-written (peer saves a crashed write never landed). Deliberate edits ride
-the op log instead: only palette ops no foreign watermark has covered
-(`PalsLib.pending()`) re-apply onto the readback, so my in-flight rename
-lands on the peer's row with causal identity while a settled op stops
-re-asserting once the wire has covered it.
+prove it is newer. Local rows the store has never seen still get written
+(peer saves a crashed write never landed), except ids a reconciliation
+readback denied: a row the last ambiguous write claimed and the confirmed
+store proved absent is a peer delete the wire has not delivered yet, so it
+is fenced out of durable appends (`PalsLib.denied`) rather than
+resurrected. Deliberate edits ride the op log: ops no foreign watermark has
+covered and no ambiguous write has retired (`PalsLib.pending()`) re-apply
+onto the readback - each gated by the causal base it was issued against, so
+a stale rename can never overwrite a peer's acknowledged replacement while
+a rename deliberately issued against the confirmed name lands. An ambiguous
+write that reconciles to different bytes reports `unknown` and retires its
+pending ops on the spot (`PalsLib.fence` via `onAmbiguous`): a retired op
+is never replayed, not in-cycle, queued, deferred, or on wakeup - only a
+genuine new intent derives a fresh value.
 The half-typed code-field draft is session view state - it follows the fold
 through `os.session` so the other display keeps typing, but a hard relaunch
 returns the last committed colour rather than an unfinished draft.

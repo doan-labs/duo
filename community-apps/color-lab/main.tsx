@@ -385,10 +385,15 @@ function ColorLab() {
       palsIntent(
         () => lib.current.list,
         () => lib.current.tombs,
-        () => lib.current.pending()
+        () => lib.current.pending(),
+        () => lib.current.denied
       ),
       {
-        mergeSafe: true,
+        // A reconciliation read that disagrees with the sent bytes means the
+        // write's fate is unknowable: retire its pending ops and fence the
+        // ids the readback denied, so a peer's confirmed delete can never be
+        // resurrected by a stale local row or a replayed op.
+        onAmbiguous: (sent, readback) => lib.current.fence(sent, readback.v),
         onOutcome: outcome
       }
     )
