@@ -130,6 +130,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.circuitlab": {
+      "folder": "circuit-lab",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.blockdrop": {
       "folder": "block-drop",
       "developer": "devin",
