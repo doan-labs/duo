@@ -19,7 +19,8 @@ import {
   PREFS0,
   type Prefs,
   parsePrefsDoc,
-  SAVES_KEY
+  SAVES_KEY,
+  seedRetryable
 } from './persist.ts'
 import {
   BOARD_H,
@@ -73,7 +74,7 @@ addEventListener(
   true
 )
 
-function Jigsaw() {
+function Jigsaw({ onRetry }: { onRetry: () => void }) {
   const view = useDisplay()
   const [rootRef, wide] = useWide<HTMLElement>(560)
   const cover = !wide
@@ -368,6 +369,11 @@ function Jigsaw() {
   // game. A failed read leaves the copy unseeded until the next real change
   // (mirror status/value or this display going live again) re-runs the effect.
   const seedBusy = useRef(false)
+  // Bounded automatic recovery: only a proven pre-apply read failure re-arms
+  // the seed (seedRetryable); anything ambiguous waits for the Retry button.
+  const autoSeed = useRef(0)
+  const [seedAttempt, setSeedAttempt] = useState(0)
+  const [seedFailed, setSeedFailed] = useState(false)
   const copyLive = view.active && view.visible
   useEffect(() => {
     if (seeded.current || seedBusy.current) return
@@ -380,10 +386,12 @@ function Jigsaw() {
       adoptLive(fenceAdoptGame(remote, parseSaves(savesKV.value)?.games))
       return
     }
-    // savesKV.value and copyLive are re-triggers, not inputs: a failed seed
-    // retries on the next foreign saves write or when this copy wakes.
+    // savesKV.value, copyLive and seedAttempt are re-triggers, not inputs: a
+    // failed seed retries on the next foreign saves write, when this copy
+    // wakes, or when a proven read failure re-arms it.
     void savesKV.value
     void copyLive
+    void seedAttempt
     seedBusy.current = true
     void act((ctx) => {
       if (ctx.game) return null
@@ -396,11 +404,22 @@ function Jigsaw() {
         seedBusy.current = false
         seeded.current = true
       },
-      () => {
+      (e) => {
         seedBusy.current = false
+        // Only a settled, proven pre-apply read failure re-derives on its own:
+        // the fresh attempt re-reads authoritative entries first, so a saved
+        // library entry can never be replaced by a fresh random game. Every
+        // other outcome - dead generation, ambiguous commit, exhausted CAS -
+        // surfaces the recovery UI for an explicit Retry instead.
+        if (seedRetryable(e) && autoSeed.current < 2) {
+          autoSeed.current += 1
+          setTimeout(() => setSeedAttempt((n) => n + 1), 400 * autoSeed.current)
+          return
+        }
+        setSeedFailed(true)
       }
     )
-  }, [savesKV.status, savesKV.value, live.status, live.value, prefs, act, adoptLive, copyLive])
+  }, [savesKV.status, savesKV.value, live.status, live.value, prefs, act, adoptLive, copyLive, seedAttempt])
 
   // Device dark-mode switch; the shell applies the real class natively.
   useEffect(() => os.device.on('switches', (sw: { darkMode: boolean }) => setDarkMode(sw.darkMode)), [])
@@ -747,7 +766,24 @@ function Jigsaw() {
   }, [game, drag, held, heldPos])
 
   if (!prefs || !game) {
-    return <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)} />
+    const failed = seedFailed || live.status === 'error' || savesKV.status === 'error' || prefsKV.status === 'error'
+    return (
+      <main ref={rootRef} {...stylex.props(darkMode ? dark : light, styles.root)}>
+        <div {...stylex.props(styles.wait)}>
+          {failed ? (
+            <>
+              <p {...stylex.props(styles.waitTitle)}>Could not open your puzzle</p>
+              <p {...stylex.props(styles.waitBody)}>Saved games are kept. Try again.</p>
+              <Button variant="filled" onClick={onRetry}>
+                Retry
+              </Button>
+            </>
+          ) : (
+            <p {...stylex.props(styles.waitBody)}>Opening…</p>
+          )}
+        </div>
+      </main>
+    )
   }
 
   const art = ARTS.find((a) => a.id === (game.art as ArtId)) ?? ARTS[0]!
@@ -1093,4 +1129,10 @@ function Jigsaw() {
 }
 
 await os.connect()
-createRoot(document.body).render(<Jigsaw />)
+function JigsawRoot() {
+  const [epoch, setEpoch] = useState(0)
+  const retry = useCallback(() => setEpoch((e) => e + 1), [])
+  return <Jigsaw key={epoch} onRetry={retry} />
+}
+
+createRoot(document.body).render(<JigsawRoot />)

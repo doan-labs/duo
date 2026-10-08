@@ -562,6 +562,36 @@ export const styles = stylex.create({
     animationDelay: `${(i % 5) * 0.28}s`,
     backgroundColor: [colors.yellow, colors.blue, colors.red, colors.green, colors.purple][i % 5]
   }),
+  // The loading / recovery state shown while a copy cannot reach the board.
+  wait: {
+    flexGrow: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.md,
+    paddingTop: space.lg,
+    paddingRight: space.lg,
+    paddingBottom: space.lg,
+    paddingLeft: space.lg
+  },
+  waitTitle: {
+    fontSize: typeScale.title3,
+    lineHeight: leading.title3,
+    letterSpacing: tracking.title3,
+    fontWeight: weight.semibold,
+    color: app.fg,
+    textAlign: 'center',
+    margin: 0
+  },
+  waitBody: {
+    fontSize: typeScale.body,
+    lineHeight: leading.body,
+    letterSpacing: tracking.body,
+    color: app.label2,
+    textAlign: 'center',
+    margin: 0
+  },
   // shared.press has no reduced-motion variant (platform gap): keep the press
   // colour ease but flatten the scale so reduce truly means reduce.
   // StyleX merges array entries per property key, not per condition, so this
