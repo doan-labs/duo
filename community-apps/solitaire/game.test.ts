@@ -21,6 +21,7 @@ import {
   type Mode,
   type Move,
   newGame,
+  nextWriteN,
   normalizeStats,
   parseLog,
   recordId,
@@ -267,6 +268,48 @@ check('write ordinal makes identical-content writes distinct, echoes identical',
   // Non-integer or negative n is not a real ordinal: content fallback.
   const negRaw = JSON.stringify({ ...JSON.parse(undo), n: -1 })
   eq(recordId(negRaw), `raw:${negRaw}`)
+})
+
+check('unsafe ordinals cannot pin writeSeq or freeze record ids', () => {
+  const dealA = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move] }
+  const dealB = { mode: 'draw1' as Mode, seed: 9, log: [{ t: 'draw' } as Move, { t: 'draw' } as Move] }
+  const MAX = Number.MAX_SAFE_INTEGER
+  // The boundary is still a real ordinal; one past it is not - `+1` cannot
+  // advance beyond MAX_SAFE_INTEGER, so accepting it as identity would freeze
+  // every later write of this writer onto the same record id.
+  eq(recordId(JSON.stringify(serializeGame('peer', dealA, false, MAX))), `peer:${MAX}`)
+  const unsafeA = JSON.stringify(serializeGame('peer', dealA, false, MAX + 1))
+  const unsafeB = JSON.stringify(serializeGame('peer', dealB, false, MAX + 1))
+  eq(recordId(unsafeA), `raw:${unsafeA}`)
+  // Two distinct writes stamped at the frozen ordinal must still be distinct:
+  // content dedup keeps them apart where the pair id could not.
+  eq(recordId(unsafeA) === recordId(unsafeB), false)
+  // Fractional, nonpositive, non-finite and non-number n read as no ordinal.
+  for (const n of [0, -1, 1.5, NaN, Infinity, -Infinity, '3', true, null]) {
+    const raw = JSON.stringify({ v: 1, by: 'peer', mode: 'draw1', seed: 9, moves: 'd', n })
+    eq(recordId(raw), `raw:${raw}`)
+    eq(adoptGame(raw)!.n, 0)
+  }
+  // An imported record at or past the ceiling adopts n=0: it cannot pin
+  // writeSeq where `+1` stalls, while a safe max still bumps the counter.
+  eq(adoptGame(JSON.stringify(serializeGame('peer', dealA, false, MAX)))!.n, MAX)
+  eq(adoptGame(unsafeA)!.n, 0)
+  // The write counter is bounded: it advances to the ceiling, then emits one
+  // unsafe sentinel whose records dedupe by content rather than colliding.
+  eq(nextWriteN(0), 1)
+  eq(nextWriteN(5), 6)
+  eq(nextWriteN(MAX - 1), MAX)
+  eq(nextWriteN(MAX), MAX + 1)
+  eq(nextWriteN(MAX + 1), MAX + 1)
+  // Same writer at the cap: a draw then a move carry distinct identities.
+  const capped = nextWriteN(MAX)
+  const seqA = JSON.stringify(serializeGame('peer', dealA, false, capped))
+  const seqB = JSON.stringify(serializeGame('peer', dealB, false, capped))
+  eq(recordId(seqA) === recordId(seqB), false)
+  // And an Undo back to dealA's exact bytes is the one bounded case where
+  // content dedup treats a new write as an echo - honest at the cap.
+  const undone = JSON.stringify(serializeGame('peer', dealA, false, nextWriteN(capped)))
+  eq(recordId(undone), recordId(seqA))
 })
 
 check('isRun only accepts descending alternating face-up runs', () => {

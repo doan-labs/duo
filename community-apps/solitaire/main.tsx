@@ -22,6 +22,7 @@ import {
   type Move,
   mergeStats,
   newGame,
+  nextWriteN,
   normalizeStats,
   recordId,
   recordPlay,
@@ -439,7 +440,8 @@ function Solitaire() {
       tableRef.current = next
       // auto:true tells the other display a sweep is in flight here, so a fold
       // mid-Auto hands it off instead of silently dropping the timer.
-      const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null, ++writeSeq.current))
+      writeSeq.current = nextWriteN(writeSeq.current)
+      const raw = JSON.stringify(serializeGame(ME, next, autoTimer.current !== null, writeSeq.current))
       // The store, not the mirror, is the authority: a foreign write this copy
       // has not been notified of yet still wins. The intent parks until a read
       // confirms the record - a rejected read is unknown peer state, never a

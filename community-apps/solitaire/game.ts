@@ -514,8 +514,11 @@ export function adoptGame(raw: string): { by: string; deal: Deal; game: Game; au
   const game = buildGame(saved.mode, seed, log)
   if (!game) return null
   // Records written before `n` existed, or by a peer that never stamps it,
-  // read as 0 - identity dedup falls back to content for those.
-  const n = typeof saved.n === 'number' && Number.isInteger(saved.n) && saved.n > 0 ? saved.n : 0
+  // read as 0 - identity dedup falls back to content for those. An unsafe,
+  // fractional or nonpositive ordinal is no ordinal either: adopting it would
+  // pin writeSeq at the safe-integer ceiling where `+1` can never advance and
+  // every later write would collide on one record id.
+  const n = validWriteN(saved.n) ? saved.n : 0
   return { by: saved.by, deal: { mode: saved.mode, seed, log }, game, auto: saved.auto === true, n }
 }
 
@@ -529,15 +532,7 @@ export function adoptGame(raw: string): { by: string; deal: Deal; game: Game; au
 export function recordId(raw: string): string {
   try {
     const p = JSON.parse(raw) as { by?: unknown; n?: unknown }
-    if (
-      p &&
-      typeof p === 'object' &&
-      !Array.isArray(p) &&
-      typeof p.by === 'string' &&
-      typeof p.n === 'number' &&
-      Number.isInteger(p.n) &&
-      p.n > 0
-    ) {
+    if (p && typeof p === 'object' && !Array.isArray(p) && typeof p.by === 'string' && validWriteN(p.n)) {
       return `${p.by}:${p.n}`
     }
   } catch {
@@ -545,6 +540,19 @@ export function recordId(raw: string): string {
   }
   return `raw:${raw}`
 }
+
+/** A write ordinal is only an ordinal while `+1` can still advance past it. */
+export const validWriteN = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 1
+
+/**
+ * The next write ordinal for this writer. Ordinals are bounded: past the
+ * safe-integer ceiling `+1` cannot advance and consecutive writes would share
+ * one record id, so the sequence emits one unsafe sentinel instead. Records
+ * stamped with it dedupe by content - distinct by construction - rather than
+ * colliding on a frozen `by:n` pair.
+ */
+export const nextWriteN = (seq: number): number =>
+  seq >= 0 && seq < Number.MAX_SAFE_INTEGER ? seq + 1 : Number.MAX_SAFE_INTEGER + 1
 
 // --- Match statistics -------------------------------------------------------
 
