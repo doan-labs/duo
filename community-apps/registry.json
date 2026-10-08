@@ -105,6 +105,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.pantry": {
+      "folder": "pantry",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "developer": "linhtinhvovan",
@@ -135,8 +140,8 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
-    "com.mnismt.duo.pantry": {
-      "folder": "pantry",
+    "com.mnismt.duo.solitaire": {
+      "folder": "solitaire",
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
