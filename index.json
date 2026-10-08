@@ -302,6 +302,22 @@
         }
       ]
     },
+    "com.mnismt.duo.paperfold": {
+      "name": "Paper Fold",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/paper-fold",
+      "permissions": [],
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+88c8ae84",
+          "sdk": "0.1.0",
+          "bytes": 568648,
+          "sha256": "469f86be6d327969bd1dc0e6790c6df5c8682d187aeaac76638600ea7519d3c3"
+        }
+      ]
+    },
     "com.mnismt.duo.pixelstudio": {
       "name": "Pixel Studio",
       "lane": "community",

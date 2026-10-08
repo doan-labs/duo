@@ -1,0 +1,34 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.paperfold",
+    "name": "Paper Fold",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/paper-fold",
+    "license": "MIT",
+    "light": true,
+    "permissions": []
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T09:39:22.060Z",
+    "commit": "ef8a99ff9fca15d6afd7ebeeccec42ed9e78c113",
+    "hash": "88c8ae84"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 568648,
+      "sha256": "06e3af81938380b6aca2501ab70a699d197d89f62db6cd1ae627ebec3c857b84"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 36949,
+      "sha256": "ac90901f991e2cd71b8d3b0f49efa60b0545a6365c02a082293b02572d5ebb08"
+    }
+  ]
+}
