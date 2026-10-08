@@ -135,6 +135,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.colorlab": {
+      "folder": "color-lab",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.pocketbudget": {
       "folder": "pocket-budget",
       "developer": "devin",
