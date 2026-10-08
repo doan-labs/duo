@@ -145,6 +145,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.paperfold": {
+      "folder": "paper-fold",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.musicsketchpad": {
       "folder": "music-sketchpad",
       "developer": "devin",
