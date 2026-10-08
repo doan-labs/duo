@@ -1,0 +1,13 @@
+{
+  "id": "com.mnismt.duo.pantry",
+  "name": "Pantry",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "light": true,
+  "author": "devin",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pantry",
+  "license": "MIT",
+  "permissions": []
+}

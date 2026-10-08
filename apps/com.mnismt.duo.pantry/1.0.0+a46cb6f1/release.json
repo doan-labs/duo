@@ -1,0 +1,34 @@
+{
+  "manifest": {
+    "id": "com.mnismt.duo.pantry",
+    "name": "Pantry",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "light": true,
+    "author": "devin",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pantry",
+    "license": "MIT",
+    "permissions": []
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-10-08T09:35:01.917Z",
+    "commit": "c1c5b11c6bd6cb1367df29116896c940bad71dc2",
+    "hash": "a46cb6f1"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 565905,
+      "sha256": "0e8d054a915b64509547197067ba72815c38bc5bce2be1df8f9706c145db1514"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 903741,
+      "sha256": "2d318682c45a254c24d3b45a013574dc845d3ecf5e6ea19bed5431b8f4371b03"
+    }
+  ]
+}
