@@ -854,7 +854,7 @@ function Jigsaw({ onRetry }: { onRetry: () => void }) {
             <>
               <p {...stylex.props(styles.waitTitle)}>Could not open your puzzle</p>
               <p {...stylex.props(styles.waitBody)}>Saved games are kept. Try again.</p>
-              <Button variant="filled" onClick={retrySeed}>
+              <Button variant="filled" xstyle={styles.sheetBtn} onClick={retrySeed}>
                 Retry
               </Button>
             </>
