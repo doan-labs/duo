@@ -1950,9 +1950,10 @@ nothing. Cover semantics are unchanged: its panel already fades and hides on
 its own.
 
 The mirrored strip of app content reported at the folded cover's right edge is
-a separate, reproduced rendering defect now isolated below app code (debug.md):
-it appears after live folds inside the cover app iframe element's raster, past
-the app's painted width, on builds with and without this change, and on a bare
-`<iframe>` on an empty page with no shell, CSS3D, transforms or WebGL involved.
-It is named here only so the two are not conflated; this cull is not asserted
-as its repair.
+a separate, reproduced rendering defect whose mechanism is undetermined
+(debug.md): after live folds a band appears past the cover app's painted width,
+on builds with and without this change. DOM mutations on affected instances tie
+it to the cover app iframe element's raster - an association that does not by
+itself separate a raster, compositor or capture-pipeline defect. It is named
+here only so the two are not conflated; this cull is not asserted as its
+repair.
