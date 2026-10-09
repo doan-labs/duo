@@ -1,0 +1,12 @@
+{
+  "id": "com.mnismt.duo.colorlab",
+  "name": "Color Lab",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "devin",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/color-lab",
+  "license": "MIT",
+  "light": true
+}
