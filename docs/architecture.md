@@ -78,9 +78,10 @@ direction, not zoom distance; close zoom can still crop. See [model checks](debu
 | Surface | Behavior |
 | --- | --- |
 | Baked canvas | Shell-only texture projected from the fixed eye, blurred/darkened through folding; inner bake is black when a bending app uses live DOM |
-| Live DOM | Inner panel at flat ≥179°, or throughout an open app's fold; cover when closed or when its app faces the camera |
+| Live DOM | Inner panel at flat ≥179°, or throughout an open app's fold until the fold covers it; cover when closed or when its app faces the camera |
 
-`foldClip()` projects the moving edge back onto the inner glass using the camera position.
+`foldClip()` (in `shell/fold-clip.ts`) projects the moving edge back onto the inner glass using the camera position;
+when the clip covers the whole width the inner panel is culled (`panelGone`, decision 112).
 `ramp()` matches shader shading with one gradient and six clipped blur layers at z-index 11;
 OS layers stay at 10 or below. Cover pointer events are enabled only when flat (≤1°).
 The cover is off at 180° and fades in over the first 30° of folding.

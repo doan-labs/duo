@@ -10,6 +10,7 @@ import { booted, busy, device, follow, goHome, lockState, setPose, unlockAll } f
 import { press } from './device-buttons.ts'
 import { hear } from './embed-device.ts'
 import { flatPanels } from './flat-panels.ts'
+import { foldClip, panelGone } from './fold-clip.ts'
 import { mountHud } from './hud.tsx'
 import { isDesktop } from './native.ts'
 import { os } from './os.tsx'
@@ -659,32 +660,8 @@ const pos = new THREE.Vector3()
 /** Flat: off it the inner display is a bent surface, and only the clip below keeps its panel honest. */
 const FLAT = 179
 const camLocal = new THREE.Vector3()
-/**
- * How much of the inner display the fold has taken, as a fraction of its width
- * from the moving half's free edge: 0 flat, 1 gone. The edge is rotated about
- * the hinge exactly as `shaders/fold.ts` does it, then projected back onto the
- * flat glass plane along the ray it leaves the eye on — the trip the screen
- * shader makes per fragment. So the folded display shows the flat picture cut
- * off at this edge, and a flat live panel clipped here is that picture, live:
- * the app keeps running while the phone folds instead of being swapped for a
- * baked home screen.
- *
- * From the camera's own position rather than the shader's fixed eye. The two
- * agree at the default pose, and away from it this one still cuts the panel
- * exactly where the folding half hides it — which is what keeps a panel with no
- * depth test from spilling over the fold.
- */
-const foldClip = () => {
-  body.worldToLocal(camLocal.copy(camera.position))
-  const c = Math.cos(bend.value)
-  const s = Math.sin(bend.value)
-  const dz = INNER_Z - HINGE_Z
-  const edge = c * INNER.x + s * dz
-  const depth = -s * INNER.x + c * dz + HINGE_Z
-  const t = (INNER_Z - camLocal.z) / (depth - camLocal.z)
-  if (t <= 0) return 1
-  return Math.min(1, Math.max(0, (camLocal.x + (edge - camLocal.x) * t - INNER.x) / INNER.z))
-}
+/** The clip in flat-panel units: the shader's fold edge projected back onto the glass. */
+const INNER_PANEL = { x: INNER.x, w: INNER.z, z: INNER_Z }
 
 // The blur and darkening shaders/screen.ts ramps toward a display's free edge,
 // in CSS. A live panel is flat glass and the bake is not there to help — with
@@ -830,9 +807,12 @@ renderer.setAnimationLoop((now) => {
   outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
   coverFold(outerLive.visible ? smooth(Math.min(1, angle / 90)) : 0)
   // The clip is what keeps the inner panel inside the half that is still
-  // facing you, so it holds all the way to closed.
-  const clip = foldClip()
-  innerLive.visible = facing(innerLive) && (angle > FLAT || app)
+  // facing you, so it holds all the way to closed - and once it covers the
+  // whole display the panel shows nothing, so it is culled rather than kept
+  // as a zero-pixel composited layer for the rest of the travel.
+  body.worldToLocal(camLocal.copy(camera.position))
+  const clip = foldClip(bend.value, camLocal.x, camLocal.z, INNER_PANEL, HINGE_Z)
+  innerLive.visible = facing(innerLive) && (angle > FLAT || app) && !panelGone(clip)
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
   updateDisplays(
     { visible: innerLive.visible, active: angle > 40, angle, clip },

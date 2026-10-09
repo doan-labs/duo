@@ -1952,3 +1952,27 @@ exactly that contract, keeps every caret rule untouched, and refuses a
 conditional write from a profiled bundle at dispatch since that API was never
 in its contract. Store updates republish older apps against the new SDK as new
 identities under the publisher's R4 rules.
+
+## 112. A live panel the fold has taken is culled
+
+2026-10-07, accepted. The inner live panel rides an app through the whole fold,
+clipped where the fold takes it (24). At the end of the travel the clip covers
+its whole width, and for tens of frames it stayed a composited element under a
+full `clip-path` - a zero-pixel layer still held composited for the rest of
+the travel. `foldClip` moved to `shell/fold-clip.ts` and its result now also gates
+`innerLive.visible`: once the fold has taken the whole width the object is
+hidden, which uncomposites the layer instead of asking the compositor to keep
+clipping it. The same element keeps running - the app's hidden copy is not
+remounted and returns with the first sliver on the way back out - and the
+display metadata now reports the inner copy invisible when it genuinely shows
+nothing. Cover semantics are unchanged: its panel already fades and hides on
+its own.
+
+The mirrored strip of app content reported at the folded cover's right edge is
+a separate, reproduced rendering defect whose mechanism is undetermined
+(debug.md): after live folds a band appears past the cover app's painted width,
+on builds with and without this change. DOM mutations on affected instances tie
+it to the cover app iframe element's raster - an association that does not by
+itself separate a raster, compositor or capture-pipeline defect. It is named
+here only so the two are not conflated; this cull is not asserted as its
+repair.
