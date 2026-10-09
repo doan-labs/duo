@@ -40,6 +40,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.jigsaw": {
+      "folder": "jigsaw",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "labs.doan.fold-compass": {
       "folder": "fold-compass",
       "developer": "doan-labs",
@@ -47,6 +52,11 @@
     },
     "com.mnismt.duo.pixelstudio": {
       "folder": "pixel-studio",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.roomplanner": {
+      "folder": "room-planner",
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
@@ -105,6 +115,11 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.pantry": {
+      "folder": "pantry",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.linhtinhvovan.duo.chess": {
       "folder": "chess",
       "developer": "linhtinhvovan",
@@ -112,6 +127,11 @@
     },
     "com.mnismt.duo.mindmap": {
       "folder": "mind-map",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.circuitlab": {
+      "folder": "circuit-lab",
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
@@ -125,13 +145,38 @@
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.paperfold": {
+      "folder": "paper-fold",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.musicsketchpad": {
       "folder": "music-sketchpad",
       "developer": "devin",
       "maintainers": ["mnismt"]
     },
+    "com.mnismt.duo.colorlab": {
+      "folder": "color-lab",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
     "com.mnismt.duo.pocketbudget": {
       "folder": "pocket-budget",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.reversi": {
+      "folder": "reversi",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.solitaire": {
+      "folder": "solitaire",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.tripplanner": {
+      "folder": "trip-planner",
       "developer": "devin",
       "maintainers": ["mnismt"]
     }

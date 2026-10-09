@@ -815,9 +815,9 @@ renderer.setAnimationLoop((now) => {
   innerLive.visible = facing(innerLive) && (angle > FLAT || app) && !panelGone(clip)
   innerLive.element.style.clipPath = clip > 0 ? `inset(0 0 0 ${(clip * 100).toFixed(2)}%)` : ''
   updateDisplays(
-    { visible: innerLive.visible && !device.asleep, active: angle > 40, angle, clip },
+    { visible: innerLive.visible, active: angle > 40, angle, clip },
     {
-      visible: outerLive.visible && Number(outerLive.element.style.opacity) > 0 && !device.asleep,
+      visible: outerLive.visible && Number(outerLive.element.style.opacity) > 0,
       active: angle <= 40,
       angle,
       clip: 0

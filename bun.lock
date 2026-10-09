@@ -374,7 +374,7 @@
     },
     "packages/sdk": {
       "name": "@doan-labs/duo-sdk",
-      "version": "0.0.0",
+      "version": "0.1.0",
     },
     "packages/shell": {
       "name": "@doan-labs/duo-shell",

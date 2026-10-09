@@ -76,6 +76,20 @@ StyleX sets width through classes, not inline style. Both roots stay attached, s
 computed display/opacity/clip and SDK visibility rather than DOM presence. A screenshot
 thumbnail clones the display and can double data-app matches.
 
+An occluded app document gets no animation frames and its timers are throttled,
+but lifecycle fields (`display`, `placement`, `visible`, `active`, `focused`)
+still reach `useDisplay()`/`useSyncExternalStore` subscribers on receipt - the
+committed snapshot must not lag `os.view` on a hide/show. Only size/angle
+updates coalesce to a frame, with a bounded timer fallback (~250 ms, throttled
+to ~1 s in a 0-size frame). Compare the live `os.view` read against the
+committed snapshot when reproducing "app thinks it is still visible" reports;
+any lifecycle gap is a delivery bug, a converging geometry gap is the
+documented coalescing. The same hides apply to DOM-hidden scenes: parking for
+Home, lock or the switcher keeps the frame mounted under `display:none`, so
+`visible` reads false and DOM focus is released out of it - check
+`document.activeElement` when reproducing "keys reach a parked copy" reports;
+an app reclaims focus once the view shows again.
+
 For fold continuity, mark nodes/view IDs and assert identity through close/open. Poll the
 actual bend angle instead of fixed waits; SwiftShader may need ~10 s. Do not reparent a
 frame to expose it: that reloads the document. Evaluating script inside a frame from the
@@ -247,7 +261,7 @@ The full Linux build reproduces it; `BUN_JSC_useFTLJIT=false` fixes that reprodu
 | A gesture over an embedded frame moves nothing | Hand-rolled `Input.dispatchTouchEvent` does not hit-test into frames and reports a silent zero for every point over one. Use `Input.synthesizeScrollGesture`, which goes through the real gesture pipeline |
 | A clean console that should not be | `agent-browser console` does not record `console.error`. Register a shim as an init script before the first navigation, and do not truncate each entry: React's hydration diff, the part that names the element, comes after several hundred characters of boilerplate |
 | A hydration mismatch in a component that looks correct | `useReducedMotion()` is `null` on the server and a boolean on the first client render, so anything gated on it (a prop, a class, an `initial` pose, a branch of the tree) changes the markup between the two. `?? false` does not help: the divergence is server-`null` against client-`true`. Note also that a component returning `children` unwrapped on one path shifts the React tree depth, which desynchronises every `useId` below it and surfaces in the component that called `useId`, not in the one that branched |
-A mirrored strip of app content at the cover's right edge | Reproduced in the simulator under Chromium + SwiftShader, intermittent and environment-dependent: a live fold (a cold `?deg=0` boot is clean) can leave a ~10-50px band past the cover app's painted right edge showing a mirrored repeat of the content's rightmost columns. Attribution established on affected instances: DOM mutations tie the band to the cover app iframe element's raster - it translates with the element, vanishes when the element is hidden, fades at half opacity, and `elementsFromPoint` hits the iframe inside the band. That proves association with the frame; by itself it does not separate a raster, compositor or capture-pipeline defect, which remain undistinguished. Counts by environment: on the author's first VM instance the band appeared on roughly 1 in 4-5 fresh sim boots after a live fold (axis observed at 31-92% of element width, healing only on a device-scale change DPR 2 to 3 to 2), and a bare `<iframe>` on an empty page plus a cloned folded-cover ancestor chain appeared to band nearly every boot; on a later author instance the sim banded again after a live fold but the same fixture set produced none in 9+ fresh processes, and an independent reviewer on Chrome 155.0.8059.39 + SwiftShader flags + DPR 2 + 1280x577 got 0/16 on the fixtures and 0/3 live folds on this branch's head - earlier reviewer rounds did capture 3/3 live folds banded on an earlier head and on base. The bare-page rate was therefore an author-instance observation, not a portable rate; treat the defect as reproduced in the product but not yet isolated to a layer. Every in-page mutation tried on a banded instance leaves the band pixel-identical (element resize, `clip-path`, `filter`, `zoom`, transforms, `backface-visibility`, `overflow`, visibility/opacity cycles, viewport resize, refolds). The inner panel cull (decision 111) does not repair it. Observed only under software rendering so far - that is not evidence it cannot occur elsewhere; the external check still needed is real-GPU Chromium and native WKWebView runs (this VM has no GPU and no WebKit). No in-scope repair has been demonstrated |
+A mirrored strip of app content at the cover's right edge | Reproduced in the simulator under Chromium + SwiftShader, intermittent and environment-dependent: a live fold (a cold `?deg=0` boot is clean) can leave a ~10-50px band past the cover app's painted right edge showing a mirrored repeat of the content's rightmost columns. Attribution established on affected instances: DOM mutations tie the band to the cover app iframe element's raster - it translates with the element, vanishes when the element is hidden, fades at half opacity, and `elementsFromPoint` hits the iframe inside the band. That proves association with the frame; by itself it does not separate a raster, compositor or capture-pipeline defect, which remain undistinguished. Counts by environment: on the author's first VM instance the band appeared on roughly 1 in 4-5 fresh sim boots after a live fold (axis observed at 31-92% of element width, healing only on a device-scale change DPR 2 to 3 to 2), and a bare `<iframe>` on an empty page plus a cloned folded-cover ancestor chain appeared to band nearly every boot; on a later author instance the sim banded again after a live fold but the same fixture set produced none in 9+ fresh processes, and an independent reviewer on Chrome 155.0.8059.39 + SwiftShader flags + DPR 2 + 1280x577 got 0/16 on the fixtures and 0/3 live folds on this branch's head - earlier reviewer rounds did capture 3/3 live folds banded on an earlier head and on base. The bare-page rate was therefore an author-instance observation, not a portable rate; treat the defect as reproduced in the product but not yet isolated to a layer. Every in-page mutation tried on a banded instance leaves the band pixel-identical (element resize, `clip-path`, `filter`, `zoom`, transforms, `backface-visibility`, `overflow`, visibility/opacity cycles, viewport resize, refolds). The inner panel cull (decision 112) does not repair it. Observed only under software rendering so far - that is not evidence it cannot occur elsewhere; the external check still needed is real-GPU Chromium and native WKWebView runs (this VM has no GPU and no WebKit). No in-scope repair has been demonstrated |
 
 ## Platform checks
 
@@ -285,6 +299,16 @@ static site has rebuilt. The same workflow should create a `chore(web): redeploy
 commit on `main`. Verify that commit and then inspect `/catalog/index.json` and `/apps` for
 the release ID. If the branch is current but the site is stale, the failure is in the web
 deployment trigger or hosting propagation, not submission validation.
+
+Release-byte integrity is per request class: compare the hosted response against
+`origin/catalog` bytes under both `Accept: */*` (what `fetch` sends) and
+`Accept: text/html` (a document navigation). A mismatch only in the second means
+the edge rewrote the response - the release trees' Worker stamp (`no-transform`
+on hits) is missing, or the path fell outside the `run_worker_first` routes in
+wrangler.jsonc. Misses must answer `no-store`: a long-cache miss pins a
+not-yet-published release's absence. The file hash is in each release's
+`release.json`; `scripts/checks/publish/headers.mjs` holds the config and
+handler contract, and the live check is the two request classes plus a 404.
 
 When every app on `/apps` reads Created/Updated as the deploy day, the build checkout had
 no usable history or release metadata: shell dates come from `git log` per package (a

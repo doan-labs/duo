@@ -1934,7 +1934,26 @@ handle or name. `/apps` shows community apps as one tab per developer, each open
 profile card (icon, name, description, website) above that developer's apps. Details are in [publishing](platform/publishing.md#developer-profiles).
 
 
-## 111. A live panel the fold has taken is culled
+## 111. Conditional writes ride on the SDK contract, with an audited-legacy profile
+
+2026-10-07, accepted. Every hidden view used to keep full write authority, so a
+stale copy's whole-document `set` could land after a newer value was durably
+acknowledged and erase it. `os.storage`/`os.session` gain `entry(k)`, which
+returns the value and the space revision from one atomic read, and an `expect`
+precondition on `set`/`del` checked inside the write's own transaction; a stale
+writer loses with `E_CONFLICT` and mutates nothing. The revision is global to
+the space, so sibling writes conflict too - conservative, and documented.
+
+The API is SDK 0.1.0, and every 0.x version is its own host contract, which
+would refuse every installed 0.0.0 app. The owner chose an explicit
+audited-legacy profile over a semver exception or a catalog rewrite: the host
+declares `HOST_PROFILES = ['0.0.0']`, a host-bound capability that admits
+exactly that contract, keeps every caret rule untouched, and refuses a
+conditional write from a profiled bundle at dispatch since that API was never
+in its contract. Store updates republish older apps against the new SDK as new
+identities under the publisher's R4 rules.
+
+## 112. A live panel the fold has taken is culled
 
 2026-10-07, accepted. The inner live panel rides an app through the whole fold,
 clipped where the fold takes it (24). At the end of the travel the clip covers
