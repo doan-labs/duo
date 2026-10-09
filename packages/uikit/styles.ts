@@ -280,7 +280,8 @@ export const shared = stylex.create({
     transform: {
       default: null,
       ':active': motion.press,
-      '@media (prefers-reduced-motion: reduce)': { ':active': null }
+      // null emits no rule, so the plain :active scale would still win.
+      '@media (prefers-reduced-motion: reduce)': { ':active': 'none' }
     }
   },
   /** Tinted capsule button: subheadline semibold on systemFill. */
@@ -301,7 +302,8 @@ export const shared = stylex.create({
     transform: {
       default: null,
       ':active': motion.press,
-      '@media (prefers-reduced-motion: reduce)': { ':active': null }
+      // null emits no rule, so the plain :active scale would still win.
+      '@media (prefers-reduced-motion: reduce)': { ':active': 'none' }
     }
   },
   /** Secondary label: footnote in the secondary colour. */
@@ -361,7 +363,8 @@ export const shared = stylex.create({
     transform: {
       default: null,
       ':active': motion.press,
-      '@media (prefers-reduced-motion: reduce)': { ':active': null }
+      // null emits no rule, so the plain :active scale would still win.
+      '@media (prefers-reduced-motion: reduce)': { ':active': 'none' }
     }
   },
   /** Small semibold label inside a widget. */
