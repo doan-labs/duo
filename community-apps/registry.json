@@ -125,6 +125,10 @@
       "developer": "linhtinhvovan",
       "maintainers": ["linhtinhvovan"]
     },
+    "com.lucpastc.lbpr.app": {
+      "folder": "lbpr",
+      "maintainers": ["lucazinho1002"]
+    },
     "com.mnismt.duo.mindmap": {
       "folder": "mind-map",
       "developer": "devin",

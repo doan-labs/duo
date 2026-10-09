@@ -1,0 +1,11 @@
+{
+  "name": "lbpr",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@doan-labs/duo-sdk": "*",
+    "@doan-labs/duo-uikit": "*",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}
