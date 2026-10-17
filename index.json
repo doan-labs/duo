@@ -324,6 +324,22 @@
         }
       ]
     },
+    "com.mnismt.duo.phrasebook": {
+      "name": "Phrasebook",
+      "lane": "community",
+      "author": "devin",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/phrasebook",
+      "permissions": [],
+      "developer": "devin",
+      "releases": [
+        {
+          "release": "1.0.0+d195da9b",
+          "sdk": "0.1.0",
+          "bytes": 534770,
+          "sha256": "ef4455246c4fd799e90cb53cff4c5989ba5d332ce022077f35e714ea94928a0b"
+        }
+      ]
+    },
     "com.mnismt.duo.pixelstudio": {
       "name": "Pixel Studio",
       "lane": "community",
