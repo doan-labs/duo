@@ -179,6 +179,11 @@
       "folder": "trip-planner",
       "developer": "devin",
       "maintainers": ["mnismt"]
+    },
+    "com.mnismt.duo.phrasebook": {
+      "folder": "phrasebook",
+      "developer": "devin",
+      "maintainers": ["mnismt"]
     }
   }
 }
