@@ -63,6 +63,7 @@ export const Route = createRootRoute({
       { property: 'og:image:width', content: '1200' },
       { property: 'og:image:height', content: '630' },
       { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:creator', content: '@capythanh' },
       { name: 'twitter:title', content: 'Duo - Folding iPhone simulator for app builders' },
       {
         name: 'twitter:description',
