@@ -44,6 +44,8 @@ map SDK.
 ## Apple artwork
 
 App icons and the wallpaper are extracted from a local macOS install by
-`bun run icons`, and the device model comes from Apple's own iPhone Duo USDZ via
-`scripts/prepare-model.py`. Neither is redistributed in this repository: both are
-fetched per clone, which is why `public/model` is git-ignored.
+`bun run icons`, the device model comes from Apple's own iPhone Duo USDZ via
+`scripts/prepare-model.py`, and the UI typeface is Apple's SF Pro, cut to a web
+subset by `scripts/prepare-fonts.py`. None are redistributed in this repository:
+each is fetched per clone, which is why `public/model` and `public/fonts` are
+git-ignored.

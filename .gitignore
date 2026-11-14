@@ -11,6 +11,9 @@ dist/
 # No trailing slash: a worktree usually links this at the main checkout's copy.
 public/model
 
+# Apple's SF Pro web subset, fetched per clone: python3 scripts/prepare-fonts.py
+public/fonts
+
 # Blender scratch output
 design/blender/tex/
 design/blender/render/

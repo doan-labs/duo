@@ -29,7 +29,8 @@ bun run desktop      # native window
 bun run desktop:build
 ```
 
-Fresh clone also needs the model, once: `pip install usd-core && python3 scripts/prepare-model.py`.
+Fresh clone also needs the model and the SF Pro web font, once:
+`pip install usd-core fonttools brotli && python3 scripts/prepare-model.py && python3 scripts/prepare-fonts.py`.
 
 ## Structure
 
