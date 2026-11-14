@@ -9,6 +9,20 @@
          while the module graph is still being parsed rather than after it. -->
     <link rel="preload" href="/model/iPhone_Duo_Render.usdc" as="fetch" crossorigin />
     <style>
+      /* Real SF Pro on every OS: scripts/prepare-fonts.py cuts the variable font
+         out of Apple's distribution into git-ignored public/fonts, the same rule
+         that keeps the model out of Git. The absolute URL stays out of the
+         bundler's asset scan, so the font stays optional: no file, no request,
+         and the system stack renders instead. -apple-system keeps winning on
+         Apple hardware, where the system face is SF Pro with native optical
+         sizing. */
+      @font-face {
+        font-family: "SF Pro";
+        src: url("/fonts/sf-pro.woff2") format("woff2");
+        font-weight: 1 1000;
+        font-style: normal;
+        font-display: swap;
+      }
       /* Everything in a layer: StyleX emits layered CSS and unlayered rules
          would beat it regardless of specificity. `reset` is declared first so
          it sits under every StyleX layer. */
@@ -25,7 +39,7 @@
         /* Page-level: the elements React never renders. Everything else is StyleX. */
         html, body { height: 100%; overflow: hidden; background: transparent; }
         body {
-          font: 400 17px/22px -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", sans-serif;
+          font: 400 17px/22px -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, "Helvetica Neue", sans-serif;
           letter-spacing: -0.43px;
           color: #1d1d1f;
           -webkit-user-select: none; user-select: none;

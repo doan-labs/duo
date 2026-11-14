@@ -185,7 +185,8 @@ const styles = stylex.create({
     fontSize: typeScale.caption2,
     lineHeight: leading.caption2,
     letterSpacing: tracking.caption2,
-    fontWeight: weight.semibold,
+    // iOS's home-screen label weight; the real SF Pro from fonts.system serves it.
+    fontWeight: weight.medium,
     textShadow: shadow.text,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
