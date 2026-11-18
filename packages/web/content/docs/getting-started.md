@@ -15,7 +15,7 @@ You need [Bun](https://bun.sh) and Python 3 with `pip`. The packages are not on 
 ```sh
 git clone https://github.com/doan-labs/duo.git && cd duo
 bun install
-pip install usd-core && python3 scripts/prepare-model.py   # Apple's model into public/model, once
+pip install usd-core fonttools brotli && python3 scripts/prepare-model.py && python3 scripts/prepare-fonts.py   # Apple's model and SF Pro into public/, once
 bun run dev                                                # http://localhost:3000
 ```
 

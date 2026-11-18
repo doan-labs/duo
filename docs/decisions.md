@@ -1976,3 +1976,19 @@ it to the cover app iframe element's raster - an association that does not by
 itself separate a raster, compositor or capture-pipeline defect. It is named
 here only so the two are not conflated; this cull is not asserted as its
 repair.
+
+## 113. The shell loads Apple's SF Pro as a per-clone web font
+
+2026-11-14, accepted. `fonts.system` named SF Pro, but only Apple hardware could
+resolve the name: everywhere else the stack fell through to system-ui and the
+simulator drew its reference iOS look in Segoe, Roboto or whatever the platform
+kept. The variable font now ships per clone the way the model does:
+`scripts/prepare-fonts.py` downloads Apple's SF Pro distribution, pins the width
+axis, keeps the weight ladder and optical sizing, and writes git-ignored
+`public/fonts/sf-pro.woff2` (a couple hundred KB of latin and cyrillic). The
+shell's `@font-face` declares it as "SF Pro" and the token and the reset stack
+slot it after `-apple-system`/`BlinkMacSystemFont`, so native faces still win on
+Apple hardware and `font-display: swap` never blocks a first paint. Home-screen
+tile labels move from semibold to medium, the weight Apple's home screen uses:
+with the real face loaded the lock-screen clock keeps its bold and the labels
+finally render at the designed weight instead of an approximated one.

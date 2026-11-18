@@ -2,6 +2,10 @@
 
 ## 0.3.0 (Unreleased)
 
+### Shell
+
+- Real SF Pro in every browser: `scripts/prepare-fonts.py` fetches Apple's variable font per clone (never committed, like the model) and the shell loads it ahead of system-ui. Home-screen labels move to medium, iOS's own weight.
+
 ### Site
 
 - `/kit` is the Platform page: Duo taken apart layer by layer, the build rules, the UI kit and the SDK's buttons and sensors on one page. `/sdk` forwards to it.

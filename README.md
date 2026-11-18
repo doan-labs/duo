@@ -34,12 +34,13 @@ https://github.com/user-attachments/assets/2460d57e-335e-4c2f-bda9-b00b6561417d
 You'll need Bun and Python. For the desktop app, you'll also need Rust and the
 Tauri prerequisites for your operating system.
 
-Install dependencies and prepare Apple's model once:
+Install dependencies and prepare Apple's model and SF Pro once:
 
 ```sh
 bun install
-pip install usd-core
+pip install usd-core fonttools brotli
 python3 scripts/prepare-model.py
+python3 scripts/prepare-fonts.py
 ```
 
 Start the web app:
@@ -52,8 +53,10 @@ Open [localhost:3000](http://localhost:3000). To run the desktop window instead,
 `bun run desktop`.
 
 The model is downloaded into `public/model` and stays out of Git because it is not
-redistributable. Native development currently focuses on macOS; Windows and Linux
-parity has not been verified.
+redistributable. The same rule keeps Apple's SF Pro out of Git: `prepare-fonts.py`
+cuts the UI typeface into git-ignored `public/fonts`, which the shell loads on
+platforms where `-apple-system` is not SF Pro. Native development currently focuses
+on macOS; Windows and Linux parity has not been verified.
 
 | Command | Purpose |
 | --- | --- |

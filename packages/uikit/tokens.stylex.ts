@@ -60,8 +60,13 @@ export const colors = stylex.defineVars({
 })
 
 export const fonts = stylex.defineVars({
-  /** SF Pro. `-apple-system` first so WebKit picks the real face with optical sizing. */
-  system: '-apple-system,BlinkMacSystemFont,system-ui,"SF Pro Text","Helvetica Neue",sans-serif',
+  /**
+   * SF Pro. `-apple-system` first so WebKit picks the real face with native
+   * optical sizing; `"SF Pro"` is the variable web subset that
+   * scripts/prepare-fonts.py cuts into git-ignored public/fonts, ahead of
+   * system-ui so every other OS renders the reference typeface too.
+   */
+  system: '-apple-system,BlinkMacSystemFont,"SF Pro","SF Pro Text",system-ui,"Helvetica Neue",sans-serif',
   /** SF Pro Rounded: the lock-screen clock, widget numerals. */
   rounded: 'ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif',
   /** New York: Books and Preview body text. */
