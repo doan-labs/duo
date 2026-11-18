@@ -1,0 +1,12 @@
+{
+  "id": "com.adrianpetkov.duo.tennisfortwo",
+  "name": "Tennis for 2",
+  "version": "1.0.0",
+  "lane": "community",
+  "entry": "./main.tsx",
+  "icon": "./icon.png",
+  "author": "adrianpetkov",
+  "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tennis-for-two",
+  "license": "MIT",
+  "permissions": []
+}
