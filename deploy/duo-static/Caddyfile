@@ -1,0 +1,51 @@
+# The site as plain static files behind Cloudflare, without the Worker. It serves
+# packages/web/dist/client mounted at /srv and reproduces what worker.ts and the
+# asset layer did: ranges for the films (file_server answers them natively),
+# status-conditional caching for the release trees, and no redirects.
+{
+	admin off
+	auto_https off
+	servers {
+		# Cloudflare terminates TLS; the tunnel connector is the only client.
+		trusted_proxies static private_ranges
+	}
+}
+
+:8080 {
+	root * /srv
+
+	# Release ids carry a `+` (1.0.0+hash). A literal `+` and %2B both decode to the
+	# same folder here, so neither form redirects.
+	# /simulator and other routes are prerendered as <route>/index.html; serve them
+	# at the bare path instead of redirecting to the trailing slash.
+	try_files {path} {path}/index.html {path}.html
+
+	# Release trees: hash-verified, identity-embedded, never change; the body must
+	# reach the downloader unmodified (no-transform). Errors are no-store (handle_errors).
+	@release path_regexp ^/(catalog|cdn|preinstalled)/apps/
+	header @release Cache-Control "public, max-age=31536000, immutable, no-transform"
+
+	# Long-lived static trees. The catalog indexes are excluded on purpose: they
+	# change on every publication and must stay revalidated.
+	@immutable {
+		path /icons/* /model/* /assets/*
+	}
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	# Everything else, HTML and the catalog indexes included: short and revalidated.
+	@short {
+		not path_regexp ^/(catalog|cdn|preinstalled)/apps/
+		not path /icons/* /model/* /assets/*
+	}
+	header @short Cache-Control "public, max-age=60, must-revalidate"
+
+	file_server {
+		# Directory listings off; a folder without index.html is a 404.
+		index index.html
+	}
+
+	handle_errors {
+		header Cache-Control "no-store"
+		respond "{err.status_code} {err.status_text}" {err.status_code}
+	}
+}

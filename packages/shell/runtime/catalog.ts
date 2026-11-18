@@ -1,5 +1,5 @@
 import { supports } from '../../sdk/compat.ts'
-import { type Catalog, networkOrigin, record, releaseId } from '../../sdk/manifest.ts'
+import { type Catalog, networkOrigin, record, releaseBase, releaseId } from '../../sdk/manifest.ts'
 import { PERMISSIONS } from '../../sdk/permissions.ts'
 import { PREVIEW_FEATURES } from '../../sdk/preview-features.ts'
 import type { Store, StoreRow, StoreState } from '../../sdk/store.ts'
@@ -125,7 +125,7 @@ async function sync() {
           preinstalled: seeded.has(id),
           progress: progress.get(id),
           error: errors.get(id),
-          icon: release ? `${source}/apps/${id}/${release.release}/icon-1024.png` : undefined,
+          icon: release ? `${releaseBase(source, id, release.release)}icon-1024.png` : undefined,
           repo: app.repo,
           bytes: release?.bytes,
           note: release?.note
@@ -235,7 +235,7 @@ export const store: Store = {
       if (!release) throw new Error('Requires a newer platform version')
       progress.set(id, 0)
       await sync()
-      await install(id, `${source}/apps/${id}/${release.release}/`, release, {
+      await install(id, releaseBase(source, id, release.release), release, {
         progress: (value) => {
           progress.set(id, value)
           void sync()

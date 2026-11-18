@@ -61,6 +61,19 @@ would need an explicit migration/export plan.
 These are deployment requirements, not a claim that DNS, hosting or browser
 compatibility have already been verified.
 
+Release URLs put the release id in the path, and the id carries a `+`
+(`1.0.0+17a50d77`). Build those URLs with `releaseBase` in `sdk/manifest.ts`,
+which sends the `+` as %2B: the Workers asset layer answers a literal `+`
+with a 307 to the encoded form, one extra round trip per file.
+
+`deploy/duo-static` serves the same `dist/client` without the Worker: Caddy in
+its own compose project behind a Cloudflare Tunnel. It answers both `+` and
+%2B, serves prerendered routes such as `/simulator` at the bare path with no
+trailing-slash redirect, answers film ranges, and keeps the Worker's
+status-conditional release caching (hits immutable and no-transform, misses
+no-store). `/icons`, `/model` and `/assets` are immutable for a year; HTML and
+the catalog indexes revalidate after 60 seconds.
+
 ## Pages
 
 1. **Home.** The device, folding on scroll. Download links for the dmg, msi,

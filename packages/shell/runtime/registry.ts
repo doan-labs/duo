@@ -1,5 +1,5 @@
 import { supports } from '../../sdk/compat.ts'
-import type { Catalog } from '../../sdk/manifest.ts'
+import { type Catalog, releaseBase } from '../../sdk/manifest.ts'
 import { PREVIEW_FEATURES } from '../../sdk/preview-features.ts'
 import type { App } from '../../uikit/app.ts'
 import { APPS, LEFT, RIGHT } from '../apps.ts'
@@ -88,7 +88,7 @@ export function bootRegistry() {
     const catalog: Catalog = await response.json()
     for (const [id, app] of Object.entries(catalog.apps)) {
       const release = app.releases.find((r) => supports(r.sdk))
-      if (release) await install(id, `/preinstalled/apps/${id}/${release.release}/`, release, { seeded: true })
+      if (release) await install(id, releaseBase('/preinstalled', id, release.release), release, { seeded: true })
     }
     const dev = new URLSearchParams(location.search).get('dev')
     if (dev) {

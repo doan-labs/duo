@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { publish } from '../../../scripts/publish-catalog.ts'
-import { type Catalog, type Release, releaseId } from '../../sdk/manifest.ts'
+import { type Catalog, type Release, releaseBase, releaseId } from '../../sdk/manifest.ts'
 import { PERMISSIONS } from '../../sdk/permissions.ts'
 import { ICONS } from '../../uikit/icons/index.ts'
 
@@ -89,7 +89,7 @@ const shelf = Object.entries(index.apps).map(([id, app]) => {
     created: committed?.created ?? released[0]!,
     updated: committed?.updated ?? released.at(-1)!,
     permissions: (app.permissions ?? []).map((name) => ({ name, label: PERMISSIONS[name].label })),
-    icon: `/catalog/apps/${id}/${releaseId(newest)}/icon-1024.png`,
+    icon: `${releaseBase('/catalog', id, releaseId(newest))}icon-1024.png`,
     changelog: changelog(source)
   }
 })

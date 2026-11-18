@@ -44,6 +44,10 @@ export type Catalog = {
   developers?: Record<string, Developer>
 }
 export const releaseId = (release: Release): ReleaseId => `${release.manifest.version}+${release.build.hash}`
+/** A release's folder URL under a catalog root. The `+` in the id is sent as %2B: Workers static
+ *  assets answer a literal `+` with a 307 to the encoded form, one extra round trip per file. */
+export const releaseBase = (root: string, id: string, release: ReleaseId) =>
+  `${root}/apps/${id}/${encodeURIComponent(release)}/`
 export const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
