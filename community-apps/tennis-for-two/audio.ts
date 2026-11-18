@@ -13,6 +13,9 @@ const TONE: Record<Cue, [number, number, number]> = {
 export function blip(cue: Cue) {
   try {
     audio ??= new AudioContext()
+    // A context made before the first tap (the bot serving after a reload) starts suspended;
+    // resume on every blip so sound returns once the player has touched the app.
+    if (audio.state === 'suspended') void audio.resume()
     const [freq, length, level] = TONE[cue]
     const t = audio.currentTime
     const osc = audio.createOscillator()

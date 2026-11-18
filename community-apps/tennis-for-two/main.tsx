@@ -181,7 +181,10 @@ function Tennis() {
         ArrowDown: () => nudge(duo ? 'right' : 'left', -5)
       }
       const action = keys[e.key]
-      if (!action || !live) return
+      // A control reached by keyboard keeps its own keys, so Space and Enter still press "Play again"
+      // or "New match". One focused by a click does not, or Space after "New match" would restart again.
+      const control = e.target instanceof Element && e.target.closest('button, input, select, textarea, [role]')
+      if (!action || !live || (control && control !== stage.current && control.matches(':focus-visible'))) return
       e.preventDefault()
       action()
     }
