@@ -147,25 +147,17 @@ The website build runs `packages/web/scripts/catalog.ts`: it unpacks `origin/cat
 `public/catalog/` when reachable and merges the bundled official releases from
 `dist/cdn` with the same publisher, so the hosted Store lists official and community apps
 from one origin. The Store loads `/catalog/index.json`, then `/cdn`, then `/preinstalled`.
-The release trees run through the site Worker (`run_worker_first` in
-wrangler.jsonc, `packages/web/worker.ts`) because their Cache-Control must be
-status-conditional, which the asset layer's `_headers` cannot express: a flat
-immutable rule would stamp year-long freshness on a 404 and let a client cache
-the absence of a release it asked for before publication. Committed hits get
-`Cache-Control: public, max-age=31536000, immutable, no-transform` - `no-transform`
+The site is served as static files by Openship (decision 113). Path header
+rules on the Duo project give every response under the three release trees
+`Cache-Control: no-cache, no-transform`, whatever its status. `no-transform`
 forbids edge rewriting of the bytes the downloader hashes, which is how the
-hosted production symptom presented; misses, redirects and errors get
-`no-store`. Only Cache-Control is overridden; bodies and other headers pass
-through. `scripts/checks/publish/headers.mjs` asserts the routing contract
-(`run_worker_first` covers exactly the three trees and `assets.binding` stays
-`ASSETS`, the name `worker.ts` dereferences), and resolves `assets.directory`
-to the real build output rather than matching a substring. `_headers` never
-applies to Worker-served responses, so release-tree rules there are dead
-config; the checker still validates any `_headers` file present (grammar,
-comma-join and detach, directive values, and conflicting same-name directives
-in the joined value on probed paths) because broken directives are defects
-wherever they sit, and drives the real Worker handler over canned statuses;
-live edge behavior is verified against the deploy itself.
+hosted production symptom presented. `no-cache` keeps a 404 from pinning the
+absence of a release that is published later; hits revalidate with their ETag
+and come back as a `304` without the body. Openship applies header rules to
+every status and cannot vary them by status, so the year-long `immutable`
+freshness the earlier Cloudflare Worker gave committed hits is not available.
+The rule lives in Openship, not the repo; live edge behavior is verified
+against the deploy itself (debug.md).
 Site Created/Updated dates are the release `build.at` for community apps but the first
 and last package commit for official apps: their `dist/cdn` release is rebuilt on every
 site build, so its timestamp is only the deploy minute. For the same reason the script

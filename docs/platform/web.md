@@ -21,8 +21,8 @@ Build locally or in CI; installation, app execution and persistence stay in
 the client. No custom application server is required for the MVP. This does
 not change the SDK, iframe isolation or lifecycle contracts.
 
-The hosting provider and final paths for the simulator, docs, catalog and
-bundles remain open. Keep deployment URLs configurable rather than encoding
+The site is hosted on Openship as static files (decision 113); final paths for
+the simulator, docs, catalog and bundles remain open. Keep deployment URLs configurable rather than encoding
 an assumed route layout into the SDK. A separate CDN hostname is optional;
 external developer catalogs remain supported.
 
@@ -34,9 +34,11 @@ Deployment requirements:
 - Serve release bytes untransformed. Hash verification at install time requires
   the response to equal the committed bytes for every request class, including
   document navigations the edge may rewrite (analytics snippet injection and
-  similar features). The site Worker stamps `no-transform` on release-tree hits
-  for exactly this (see `run_worker_first` in wrangler.jsonc).
-- Cache immutable versioned bundles long-term. Revalidate site entry documents
+  similar features). The host sends `no-transform` on every release-tree
+  response for exactly this (a path header rule on the Duo project in Openship).
+- Cache immutable versioned bundles long-term where the host can limit that to
+  hits; Openship cannot, so release trees revalidate (`no-cache`) rather than
+  risk caching a 404 (decision 113). Revalidate site entry documents
   and keep catalog freshness short (the store proposal uses 60 seconds).
   Publish complete artifacts before the catalog references them. An already
   open simulator does not automatically adopt newly deployed shell code.
@@ -94,6 +96,18 @@ compatibility have already been verified.
 ## Build record
 
 Newest first. Each pass records what changed and how it was verified.
+
+### Hosting moves to Openship
+
+- `duo.doan-labs.com` is served by Openship as static files built from `main`,
+  replacing the Cloudflare Worker (decision 113). `wrangler.jsonc`,
+  `packages/web/worker.ts` and `scripts/checks/publish/headers.mjs` are
+  removed. Range requests for films are answered by the host itself; the
+  release trees get `Cache-Control: no-cache, no-transform` from an Openship
+  path header rule.
+- Verification, on the live origin: home `200`, the catalog, release files
+  under both `+` and `%2B` identities `200` with the header, missing release
+  paths `404` with the header, and an `If-None-Match` revalidation `304`.
 
 ### Release responses pinned to committed bytes
 
