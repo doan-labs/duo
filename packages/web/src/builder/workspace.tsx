@@ -61,10 +61,11 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
    * job's emits land, so a stale or aborted flow cannot write into its successor. */
   const startJob = async (
     work: (signal: AbortSignal, emit: (event: JobEvent) => void) => Promise<void>,
-    label: string
+    label: string,
+    // A caller that must abort only its own job later passes the controller in.
+    control = new AbortController()
   ) => {
     const id = ++jobSeq.current
-    const control = new AbortController()
     // One job at a time: the one this replaces stops here, not only through disabled buttons.
     controller.current?.abort()
     controller.current = control
@@ -179,18 +180,24 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     const selected = current.current
     if (!selected || selected.id !== projectId || !client) return
     setError('')
-    void startJob(async (signal, emit) => {
-      emit({ type: 'compile' })
-      const revision = selected.revisions[selected.current]!
-      const bundle = await compile(revision.source, signal)
-      // Throw, not return: startJob turns an abort into 'stop', a plain return would leave the job busy.
-      signal.throwIfAborted()
-      emit({ type: 'starting-on-phone' })
-      await client.apply(selected.id, revision.id, bundle)
-      signal.throwIfAborted()
-      emit({ type: 'ready' })
-    }, 'Preview unavailable')
-    return () => controller.current?.abort()
+    // Its own controller: the cleanup must stop this load, not whatever job is newest by then.
+    const control = new AbortController()
+    void startJob(
+      async (signal, emit) => {
+        emit({ type: 'compile' })
+        const revision = selected.revisions[selected.current]!
+        const bundle = await compile(revision.source, signal)
+        // Throw, not return: startJob turns an abort into 'stop', a plain return would leave the job busy.
+        signal.throwIfAborted()
+        emit({ type: 'starting-on-phone' })
+        await client.apply(selected.id, revision.id, bundle)
+        signal.throwIfAborted()
+        emit({ type: 'ready' })
+      },
+      'Preview unavailable',
+      control
+    )
+    return () => control.abort()
   }, [projectId, client])
   // biome-ignore lint/correctness/useExhaustiveDependencies: new messages and progress keep the active conversation visible.
   useEffect(() => {
@@ -334,7 +341,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     await startJob(async (signal, emit) => {
       emit({ type: 'test' })
       await completion(connection, [{ role: 'user', content: 'Reply OK.' }], signal, undefined, true)
-      emit({ type: 'ready' })
+      emit({ type: 'tested' })
     }, 'Connection failed')
   }
   const source = project?.revisions[project.current]?.source

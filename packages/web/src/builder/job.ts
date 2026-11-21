@@ -26,6 +26,8 @@ export type Job =
   | { kind: 'restoring' }
   | { kind: 'testing' }
   | { kind: 'ready' }
+  /** A connection test passed; idle like ready, but says so. */
+  | { kind: 'tested' }
   | { kind: 'stopped' }
   /** `step` is the phase it failed in; null when nothing was running (a late phone-connect failure). */
   | { kind: 'failed'; step: Step | null; label: string }
@@ -41,6 +43,7 @@ export type JobEvent =
   | { type: 'restore' }
   | { type: 'test' }
   | { type: 'ready' }
+  | { type: 'tested' }
   | { type: 'stop' }
   | { type: 'failed'; label: string }
 
@@ -78,6 +81,8 @@ export const nextJob = (job: Job, event: JobEvent): Job => {
       return { kind: 'testing' }
     case 'ready':
       return { kind: 'ready' }
+    case 'tested':
+      return { kind: 'tested' }
     case 'stop':
       return jobBusy(job) ? { kind: 'stopped' } : job
     case 'failed':
@@ -109,6 +114,8 @@ export const jobStatus = (job: Job): string => {
       return 'Testing connection'
     case 'ready':
       return 'Ready'
+    case 'tested':
+      return 'Connection works'
     case 'stopped':
       return 'Stopped'
     case 'failed':

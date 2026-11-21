@@ -101,6 +101,16 @@ test('a quick chord screenshots, a held one shows the power sheet', () => {
   assert.deepEqual(nextSide({ kind: 'spent' }, 'release'), { state: { kind: 'idle' }, effects: [] })
 })
 
+test('a second volume key joining a spent chord fires no screenshot', () => {
+  const chord = nextSide({ kind: 'pressed', clicks: 0 }, 'chord-press')
+  const held = nextSide(chord.state, { timer: 'chord' })
+  const again = nextSide(held.state, 'chord-press')
+  assert.deepEqual(again.state, { kind: 'chord', spent: true })
+  assert.deepEqual(again.effects, [])
+  const up = nextSide(again.state, 'chord-release')
+  assert.deepEqual(up.effects, [])
+})
+
 test('a double-click of the side button opens Wallet, a single click sleeps', () => {
   let s = nextSide({ kind: 'idle' }, 'press')
   s = nextSide(s.state, 'release')

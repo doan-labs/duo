@@ -288,7 +288,12 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
       cam: ctl.cam,
       hud,
       screenshot,
-      powerSheet: () => emit('open-power')
+      // With Control Center up, open-power only marks it closing with the
+      // sheet under it; ccClose plays the panel out so the sheet takes over.
+      powerSheet: () => {
+        ccClose()
+        emit('open-power')
+      }
     }
     // Home with Control Center up drops what is under it and lets the panel
     // play out; a plain 'close' first would unmount it before ccClose runs.

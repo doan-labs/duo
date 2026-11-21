@@ -47,3 +47,10 @@ test('progress outside generating is dropped; stop only lands while busy', () =>
   const generating: Job = { kind: 'generating', chars: 10 }
   expect(nextJob(generating, { type: 'stop' })).toEqual({ kind: 'stopped' })
 })
+
+test('a passed connection test ends idle and says the connection works', () => {
+  const end = drive({ kind: 'ready' }, [{ type: 'test' }, { type: 'tested' }])
+  expect(end).toEqual({ kind: 'tested' })
+  expect(jobBusy(end)).toBe(false)
+  expect(jobStatus(end)).toBe('Connection works')
+})

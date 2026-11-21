@@ -450,6 +450,8 @@ async function doPlay(id: string) {
   // A scrubbed-but-unplayed memo resumes from the mark, not from zero.
   if (p?.id === memo.id && p.posMs > 0 && !p.playing) audio.currentTime = p.posMs / 1000
   await audio.play().catch(() => {})
+  // A stop during that await wins; setting the cell now would undo it.
+  if (playSeq !== mine) return
   playCell.set({ id: memo.id, posMs: 0, playing: !audio.paused, rate: audio.playbackRate })
 }
 

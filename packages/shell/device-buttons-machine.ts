@@ -90,10 +90,13 @@ export function nextSide(s: SideState, e: SideEvent): Step<SideState, SideEvent>
     if (s.kind === 'chord') return { state: { kind: 'idle' }, effects: s.spent ? [] : [{ action: 'screenshot' }] }
     return { state: { kind: 'idle' }, effects: [] }
   }
-  if (e === 'chord-press')
-    // Any state: a fresh chord re-arms the power-off timer, the way a second
-    // volume key joining the grip does.
+  if (e === 'chord-press') {
+    // A spent chord already showed the power sheet: re-arming it would let
+    // the second volume key's release fire a stray screenshot.
+    if (s.kind === 'chord' && s.spent) return same(s)
+    // Otherwise a fresh chord re-arms the power-off timer.
     return { state: { kind: 'chord', spent: false }, effects: [{ after: POWER, event: { timer: 'chord' as const } }] }
+  }
   if (e === 'chord-release') {
     if (s.kind !== 'chord') return same(s)
     // The side button stays down, spent: its release does nothing on its own.
