@@ -155,3 +155,30 @@ test('a stale end event after the deck moved on does not skip a track', () => {
   fireEnded()
   assert.equal(d.now!.id, EPS[2]!.id)
 })
+
+test('a renumbered queue does not reuse the last end', () => {
+  const { a, fireEnded } = fakeAudio()
+  const d = deck(EPS, () => a)
+  d.play(EPS.slice(0, 3), 0)
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
+  a.ended = false
+  // clearQueue renumbers the playing episode to position 0; its end must count.
+  d.clearQueue()
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
+  assert.equal(d.playing, false)
+})
+
+test('a replayed last episode can end and advance into new arrivals', () => {
+  const { a, fireEnded } = fakeAudio()
+  const d = deck(EPS.slice(0, 1), () => a)
+  d.play(EPS.slice(0, 1), 0)
+  fireEnded()
+  assert.equal(d.playing, false)
+  a.ended = false
+  d.enqueue(EPS[1]!)
+  d.toggle()
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
+})
