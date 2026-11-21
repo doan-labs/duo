@@ -76,9 +76,17 @@ monopolized main thread. Compiler workers are separately terminable.
 
 ## Interaction and bounds
 
+The workspace's phase is one `Job` value (`builder/job.ts`), changed only through its
+reducer: generating, repairing, compiling, starting-on-phone, restoring, testing, ready,
+stopped or failed (which records the failed step). Status text and the busy flag are
+derived from it. Each async flow runs through `startJob`, which issues an AbortController
+and a job id; emits from a superseded job are dropped, so an aborted compile cannot clear
+a newer job's busy state. Only one job runs at a time.
+
 Generation progress streams, but only a complete valid revision applies. The old app stays
 live during generation/compilation. Stop cancels those stages; activation finishes or rolls
-back before another action. Provider charges may already have occurred on cancellation.
+back before another action. A user's message enters chat history only once a build
+succeeds. Provider charges may already have occurred on cancellation.
 
 One automatic repair may use another provider request with bounded diagnostics. Authentication,
 rate-limit and network failures do not trigger repair. Requests time out after three minutes;
