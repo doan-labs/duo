@@ -13,11 +13,13 @@ Paths below are relative to `packages/shell/` unless stated otherwise.
 | `main.ts` | Model loading/mesh classification, scene, fold/render loop, display visibility, HUD wiring and torch LED |
 | `hud.tsx` | Hinge slider, fold/flip/home/reset buttons and auto-rotate; the degree readout is written through a ref, only state changes cross React |
 | `view.ts` | The persisted view preference (`os.view`): hinge angle, yaw, camera orbit/zoom and auto-rotate, restored at load and written on gestures only |
-| `buttons.ts` → `device-buttons.ts` → `device.ts` | Hardware hit boxes/springs/keys and their screen spots → press interpretation → device actions, display registry, app button listeners and the pose; device.ts has no React/StyleX |
+| `buttons.ts` → `device-buttons.ts` → `device.ts` | Hardware hit boxes/springs/keys and their screen spots → the driver that runs the press machines' timers and effects → device actions, the `device.power` phase (off, booting, asleep, awake), display registry, app button listeners and the pose; device.ts has no React/StyleX |
+| `device-buttons-machine.ts` | What a press means: pure per-button machines (side, each volume key, Camera Control) returning the next state plus effects |
 | `runtime/device-events.ts` | One sandboxed view's watched device events: button listeners, pose and switch subscriptions |
 | `embed-device.ts` | The embedding page's device events: the same `deviceEvents` as an always-active view, posted to the page that asked (the SDK section of the site's `/kit`) |
 | `os.tsx` | Create each display root and mount SpringBoard |
-| `springboard/springboard.tsx` | Layer stack and state that outlives individual layers |
+| `springboard/springboard.tsx` | Mounting and wiring the layers, and state that outlives individual layers |
+| `springboard/layer.ts` | Which overlay is up (switcher, Spotlight, Control Center and what it covers, power sheet) and the lock screen's phase, each one value with one transition |
 | `springboard/scenes.ts` | Per-display apps, split placement and mirrored scenes |
 | `springboard/gestures.ts`, `home-bar.tsx` | WAAPI scrubbing/zoom geometry, the hold-to-switch/split gesture and the lift that carries a held tile |
 | `springboard/grid.ts`, `wallpaper.ts` | Device-wide, persisted home order (apps, folders and the dock) and wallpaper; both displays and the bake read them |

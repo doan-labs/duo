@@ -60,7 +60,10 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | Reset / minimap | Return yaw and camera to the default view |
 
 Going Home parks an app rather than closing it: it stays mounted, `display: none`, so the
-switcher can show it live and put it back with its state. The six most recent stay; older
+switcher can show it live and put it back with its state. A scene's lifecycle is its
+`phase` field (`shown`, `parking`, `parked`, `closing`), changed only through the
+guards in `scenes.ts`: `park()` from `shown`, `unpark()` from `parked`, `close()`
+from either resting phase - a mid-transition scene ignores repeat calls. The six most recent stay; older
 ones close, and Camera always closes so a parked app cannot hold the webcam. A layer
 that lays scenes out through `ctl.els` (the switcher) must do so from a passive effect:
 the shell re-creates the scenes' ref callbacks every render, so React empties the map in
@@ -119,6 +122,28 @@ for layout; cover and split widths are narrow.
 | Layout constant | Update live tokens/layout and `screen.ts`; compare flat and 120° |
 | Page HUD widget | Update the corresponding main.ts/hud.tsx bands and rerun [fit checks](debug.md#2-reading-the-model) |
 
+### State that has phases
+
+When a feature moves through distinct phases (a call is dialing, then connected,
+then held, then ended), do not spread the phase over several booleans, nullable
+fields, timer handles and refs - that shape admits combinations the UI never has
+and lets stale timers write into newer phases. Put the phase in one discriminated
+union and change it through one pure `next(state, event)` function:
+
+```ts
+type Layer = { kind: 'none' } | { kind: 'switcher' } | { kind: 'search' }
+```
+
+- Data that exists in one phase only lives inside that phase's variant.
+- Leaving a phase clears its timers and aborts its work; keep the handles in one
+  place per machine, not one ref per timer.
+- Async results check a generation number or AbortController before writing,
+  including in `finally`.
+- Derive status text, `busy` and similar from the phase; never store a second copy.
+- React code uses `useReducer`; the pure transition gets a pure unit test. Copy
+  the shape from `runtime/bridge.ts`, `runtime/database.ts`, `sdk/mirror.ts` or
+  `sdk/protocol.ts` (decision 114).
+
 ## Style and layout constraints
 
 All styling uses StyleX except `@layer reset` in shell index.html. Unlayered global CSS
@@ -170,8 +195,11 @@ keys `min(<full>, (100cqh - <fixed>) / <rows>)`; change `<fixed>` with any heigh
 
 `packages/apps/safari/index.tsx` owns tab history, the floating URL pill and the cover rail;
 `bookmarks.tsx` owns the local Recently Saved, folders and bookmark sections; shared Safari
-layout and material rules stay in `styles.ts`. Real web pages scroll in their own iframe
-viewport. The Duo website mounts `packages/web/src/safari-scroll-bridge.tsx`, which sends only
+layout and material rules stay in `styles.ts`. One `sheet` value picks the surface over the
+page - `page`, `tabs`, `bookmarks`, `bookmarks-more` (the cover's bookmarks menu, keeping any
+Add-to pick under it), `add-to`, `more` or `page-menu` - so the tab grid and
+bookmarks can never be open at once; `usePresence` keeps a closing sheet mounted through its
+exit animation. Real web pages scroll in their own iframe viewport. The Duo website mounts `packages/web/src/safari-scroll-bridge.tsx`, which sends only
 scroll direction and position to the parent because cross-origin document scroll events cannot
 reach the Safari DOM. The URL pill compacts into the small gray pill on downward intent and
 expands on upward intent. A page that does not install the bridge remains functional, but its

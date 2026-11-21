@@ -1,13 +1,7 @@
-// What a press on the frame means. iOS's rules for an iPhone with a side button
-// and a Camera Control, and iOS's timings:
-//
-//   side       click: sleep, or wake to the lock screen. Double-click: Wallet.
-//              Hold: Siri (powered off: boot).
-//   side+vol   click: screenshot. Held: slide to power off.
-//   volume     volume, held: keeps going. In Camera: shutter on press; Volume
-//              Up held is a burst, Volume Down held a QuickTake recording.
-//   camera     click: Camera, or the shutter once it is open. Hold: record.
-//              Slide along the cap: zoom.
+// The driver for the button machines in device-buttons-machine.ts: it keeps
+// each machine's state, runs the effects they return (the timers, the device
+// calls) and routes the presses apps take. One timer set per machine, cleared
+// whenever its state moves - leaving a phase cancels what it armed.
 //
 // An app listening to volume or Camera Control takes the press instead, and one
 // listening to the side button hears it while it still does all of the above
@@ -16,30 +10,23 @@
 // The hardware that produces the presses is packages/shell/buttons.ts.
 
 import type { Button, Press } from './buttons.ts'
-import { device, type Heard, type Listener, offer } from './device.ts'
+import { device, type Heard, type Listener, offer, onPower } from './device.ts'
+import {
+  type Action,
+  type CamEvent,
+  type CamState,
+  nextCam,
+  nextSide,
+  nextVol,
+  type SideEvent,
+  type SideState,
+  type Step,
+  type VolEvent,
+  type VolState
+} from './device-buttons-machine.ts'
 
-const HOLD = 500
-const DOUBLE = 300
-const POWER = 1200
-const RECORD = 400
-const REPEAT = 130
-
-const held = new Set<Button>()
-let sideHold = 0
-let sideClick = 0
-let clicks = 0
-let sideSpent = false
-let chord = 0
-let chordSpent = false
-let repeat = 0
-// Per key: holding both volume keys is a real grip, so each keeps its own hold
-// timer and camera action; releasing one must not end the other's.
-const volHold: Record<'up' | 'down', number> = { up: 0, down: 0 }
-const volAction: Record<'up' | 'down', 'burst' | 'rec' | null> = { up: null, down: null }
-let camHold = 0
-let camSlid = false
-let recording = false
-let zoom0 = 1
+/** One machine's live state and the timers it armed but has not fired. */
+type Machine<S> = { state: S; timers: Map<string, number> }
 
 /** Who took each button's press, so its slide and release reach the same listener. */
 const taken = new Map<Button, Listener>()
@@ -57,133 +44,163 @@ function tell(button: Button, e: Heard[keyof Heard], last = false) {
   return !!listener
 }
 
-const chordStart = () => {
-  clearTimeout(sideHold)
-  sideHold = 0
-  sideSpent = true
-  chordSpent = false
-  chord = setTimeout(() => {
-    chord = 0
-    chordSpent = true
-    device.power()
-  }, POWER)
-}
-/** Either button of the chord coming up ends it: a screenshot if it was quick. */
-const chordEnd = () => {
-  if (chord) {
-    clearTimeout(chord)
-    chord = 0
-    device.screenshot()
+/** The device calls the machines' `action` effects stand for. */
+function act(action: Action) {
+  if (typeof action === 'object') {
+    if ('volume' in action) return device.volume(action.volume)
+    if ('zoom' in action) return void device.zoom(action.zoom)
   }
-  if (!held.has('side') || !(held.has('up') || held.has('down'))) chordSpent = false
+  switch (action) {
+    case 'boot':
+      return device.boot()
+    case 'siri':
+      return device.siri()
+    case 'side-hold':
+      return device.off ? device.boot() : device.siri()
+    case 'wallet':
+      return device.wallet()
+    case 'side':
+      return device.side()
+    case 'screenshot':
+      return device.screenshot()
+    case 'power-sheet':
+      return device.powerSheet()
+    case 'camera':
+      return device.camera()
+    case 'cam-tap':
+      return device.cameraOpen() ? device.shoot() : device.camera()
+    case 'shoot':
+      return device.shoot()
+    case 'record-on':
+      return device.record(true)
+    case 'record-off':
+      return device.record(false)
+    case 'burst-on':
+      return device.burst(true)
+    case 'burst-off':
+      return device.burst(false)
+  }
 }
 
-function side(down: boolean) {
+/**
+ * Applies a machine's step: the new state, its timers replaced wholesale (the
+ * old phase's timers die with it), then each effect. A timer firing sends its
+ * event back into the same machine through `fire`.
+ */
+function run<S, E>(m: Machine<S>, step: Step<S, E>, fire: (e: E) => void) {
+  const same = step.state === m.state && step.effects.length === 0
+  m.state = step.state
+  if (same) return
+  for (const t of m.timers.values()) clearTimeout(t)
+  m.timers.clear()
+  for (const ef of step.effects) {
+    if ('action' in ef) act(ef.action)
+    else if (ef.event && typeof ef.event === 'object' && 'timer' in ef.event) {
+      const name = String(ef.event.timer)
+      m.timers.set(
+        name,
+        setTimeout(() => {
+          m.timers.delete(name)
+          fire(ef.event)
+        }, ef.after) as unknown as number
+      )
+    }
+  }
+}
+
+const side: Machine<SideState> = { state: { kind: 'idle' }, timers: new Map() }
+const vol: Record<'up' | 'down', Machine<VolState>> = {
+  up: { state: { kind: 'idle' }, timers: new Map() },
+  down: { state: { kind: 'idle' }, timers: new Map() }
+}
+const cam: Machine<CamState> = { state: { kind: 'idle' }, timers: new Map() }
+
+const fireSide = (e: SideEvent) => run(side, nextSide(side.state, e), fireSide)
+const fireVol = (b: 'up' | 'down') => (e: VolEvent) => run(vol[b], nextVol(b, vol[b].state, e), fireVol(b))
+// The machine does not see the device; the driver fills in what Camera is doing at fire time.
+const fireCam = (e: CamEvent) =>
+  run(
+    cam,
+    nextCam(cam.state, typeof e === 'object' && 'timer' in e ? { ...e, camera: device.cameraOpen() } : e),
+    fireCam
+  )
+
+const held = new Set<Button>()
+
+// A press sequence and its pending timers belong to the phase that started
+// them: leaving 'awake' clears all of it, so a click queued before a sleep or
+// a boot cannot fire into the new phase.
+onPower((p) => {
+  if (p.kind === 'awake') return
+  // A burst or QuickTake a hold started ends with the phase: the reset below
+  // drops the state its release would have stopped it from.
+  for (const m of [vol.up, vol.down, cam]) {
+    if (m.state.kind === 'burst') act('burst-off')
+    if (m.state.kind === 'recording') act('record-off')
+  }
+  for (const m of [side, vol.up, vol.down, cam]) {
+    for (const t of m.timers.values()) clearTimeout(t)
+    m.timers.clear()
+    m.state = { kind: 'idle' }
+  }
+})
+
+function sideButton(down: boolean) {
   if (down) {
     give('side', 'side', { action: 'press' })
-    sideSpent = false
-    if (held.has('up') || held.has('down')) return chordStart()
-    sideHold = setTimeout(() => {
-      sideHold = 0
-      sideSpent = true
-      if (device.off) device.boot()
-      else device.siri()
-    }, HOLD)
-    return
+    // A volume key already held turns this press into the chord, never a click.
+    if (held.has('up') || held.has('down')) return fireSide('chord-press')
+    return fireSide('press')
   }
   tell('side', { action: 'release' }, true)
-  clearTimeout(sideHold)
-  sideHold = 0
-  if (chord || chordSpent) return chordEnd()
-  if (sideSpent) return
-  if (++clicks === 2) {
-    clearTimeout(sideClick)
-    clicks = 0
-    device.wallet()
-    return
-  }
-  sideClick = setTimeout(() => {
-    clicks = 0
-    device.side()
-  }, DOUBLE)
+  fireSide('release')
 }
 
-function volume(b: 'up' | 'down', down: boolean) {
+function volumeButton(b: 'up' | 'down', down: boolean) {
   if (!down) {
-    clearTimeout(repeat)
-    repeat = 0
-    clearTimeout(volHold[b])
-    volHold[b] = 0
-    // A camera action that started with the hold ends with the button.
-    if (volAction[b] === 'burst') device.burst(false)
-    if (volAction[b] === 'rec') device.record(false)
-    volAction[b] = null
-    if (chord || chordSpent) chordEnd()
-    tell(b, { action: 'release', button: b }, true)
+    // Either chord button coming up ends the chord on the side machine, even
+    // when an app owned this press and gets the release.
+    fireSide('chord-release')
+    if (tell(b, { action: 'release', button: b }, true)) return
+    fireVol(b)('release')
     return
   }
-  if (held.has('side')) return chordStart()
+  // The side button held turns this press into the chord, dead until release.
+  if (held.has('side')) {
+    fireVol(b)('chord-press')
+    return fireSide('chord-press')
+  }
   if (give(b, 'volume', { action: 'press', button: b })) return
-  if (device.cameraOpen()) {
-    device.shoot()
-    volHold[b] = setTimeout(() => {
-      volHold[b] = 0
-      volAction[b] = b === 'up' ? 'burst' : 'rec'
-      if (volAction[b] === 'burst') device.burst(true)
-      else device.record(true)
-    }, HOLD)
-    return
-  }
-  const step = () => {
-    device.volume(b === 'up' ? 1 : -1)
-    repeat = setTimeout(step, repeat ? REPEAT : 3 * REPEAT)
-  }
-  step()
+  fireVol(b)({ press: true, camera: device.cameraOpen() })
 }
 
-function cameraControl(down: boolean) {
+function cameraButton(down: boolean) {
   if (down) {
     if (give('camera', 'camera-control', { action: 'press' })) return
-    camSlid = false
-    zoom0 = device.zoom()
-    camHold = setTimeout(() => {
-      camHold = 0
-      if (!device.cameraOpen()) return
-      recording = true
-      device.record(true)
-    }, RECORD)
-    return
+    return fireCam({ press: true, zoom0: device.zoom() })
   }
   if (tell('camera', { action: 'release' }, true)) return
-  if (camHold) {
-    clearTimeout(camHold)
-    camHold = 0
-    if (camSlid) return
-    if (device.cameraOpen()) device.shoot()
-    else device.camera()
-  } else if (recording) {
-    recording = false
-    device.record(false)
-  }
+  fireCam('release')
 }
 
 /** One centimetre along the cap doubles the zoom, like sliding Camera Control. */
 function slide(cm: number) {
-  if (held.has('camera') && tell('camera', { action: 'slide', offset: cm })) return
-  if (!held.has('camera') || !device.cameraOpen()) return
-  if (!camSlid && Math.abs(cm) < 0.04) return
-  camSlid = true
-  clearTimeout(camHold)
-  camHold = 0
-  device.zoom(Math.min(5, Math.max(0.5, zoom0 * 2 ** cm)))
+  if (!held.has('camera')) return
+  if (tell('camera', { action: 'slide', offset: cm })) return
+  fireCam({ slide: cm, camera: device.cameraOpen() })
 }
 
 export function press(p: Press) {
   if ('slide' in p) return slide(p.slide)
   const { button, down } = p
+  // While the device boots every new press is dead; while off, only the side
+  // button's hold matters - it is what powers the phone back on. Releases
+  // always pass: a listener or machine that got the press needs to see it end.
+  const kind = device.power.kind
+  if (down && (kind === 'booting' || (kind === 'off' && button !== 'side'))) return
   if (down === held.has(button)) return
   held[down ? 'add' : 'delete'](button)
-  if (button === 'side') side(down)
-  else if (button === 'camera') cameraControl(down)
-  else volume(button, down)
+  if (button === 'side') sideButton(down)
+  else if (button === 'camera') cameraButton(down)
+  else volumeButton(button, down)
 }

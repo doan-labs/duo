@@ -1993,3 +1993,32 @@ keeps the hashed bytes intact and `no-cache` keeps a 404 from being cached as a
 release's absence; the cost is a revalidation (a bodyless `304`) where a hit
 used to be fresh for a year. This supersedes the Worker routing described
 under "Release responses pinned to committed bytes" in web.md.
+
+## 114. A phase is one discriminated value with one transition function
+
+2026-11-21, accepted. Several places in the shell, the builder and the apps
+kept their phase spread over booleans, nullable fields, timer handles and
+refs - an implicit state machine in which every handler resets the flags it
+happens to remember. That shape admits combinations the UI never has
+(Spotlight still drawn over the lock screen after wake) and lets a timer or
+promise from an old phase write into a new one (an aborted compile clearing
+`busy` while the next compile runs). The rule: when a piece of UI or logic
+moves through distinct phases, the phase is one discriminated union value
+changed by one pure `next(state, event)` function, and data that exists only
+in a phase lives inside that phase's variant. Leaving a phase clears its
+timers and aborts its work; stale async results check a generation or an
+AbortController before writing, including in `finally`. Status text, `busy`
+and similar are derived from the phase, never stored. React parts use
+`useReducer`; no library. Cost: a small union and reducer where a few flags
+sat, and the honest enumeration of the states the flags were hiding. The
+how-to is in working.md under "Adding things". This refines decision 70: the
+`parked` state it describes is now one variant of a scene's `phase` field
+(`shown`, `parking`, `parked`, `closing`) rather than a flag pair - the
+behaviour it records is unchanged. One timing change is intended: a second
+side press inside the double-click window now cancels the pending single
+click, so click-then-hold is Siri alone and a slow second click is Wallet,
+where the old timers fired sleep and then Siri or wake. A side press inside
+that window while a volume key is held starts the chord the same way, dropping
+the pending click; a second volume key joining a chord that is already spent is
+ignored, so it cannot fire a stray screenshot. Leaving the awake
+phase also ends a volume-key burst or QuickTake the hold started.

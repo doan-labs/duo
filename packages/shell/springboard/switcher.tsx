@@ -121,7 +121,7 @@ export function Switcher({ ctl, onClose }: { ctl: Scenes; onClose: () => void })
     const from = pose(e, cx)
     done.current = true
     clear()
-    if (e.parked) {
+    if (e.phase === 'parked') {
       for (const x of ctl.onStage()) ctl.park(x.id, [])
       ctl.unpark(e.id, undefined, (el) => [grow(el, from)])
     } else {

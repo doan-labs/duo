@@ -238,6 +238,9 @@ async function doStartRec(opts?: { replaceAtSec?: number }) {
     return
   }
   if (!replaceCell.get().active) startSpeech()
+  // A subscription left by an earlier take is released before replacing it;
+  // assigning over it would leave its handler live and leak the status feed.
+  unStatus?.()
   unStatus = os.mic.onStatus((s) => {
     if (s.state === 'recording' || s.state === 'paused') {
       const rec = recCell.get()
@@ -363,6 +366,9 @@ export function discardRec() {
   return run({ op: 'discard' })
 }
 async function doDiscardRec() {
+  // Nothing to discard while a save or another discard holds the mic - and
+  // clearing `stopping` mid-save would let a new take start over it.
+  if (stopping || !['starting', 'recording', 'paused'].includes(recCell.get().phase)) return
   stopping = true
   try {
     await os.mic.stop()
@@ -385,6 +391,8 @@ const playCell = cell<Play | null>('session', 'memos.play', null)
 export const usePlay = () => useSyncExternalStore(playCell.subscribe, playCell.get)
 
 let el: HTMLAudioElement | undefined
+// A play's file load is async; a newer play or a stop supersedes it before it lands.
+let playSeq = 0
 
 /** A data: URL is the only media src the sandbox's document policy allows. */
 const dataUrl = (blob: Blob) =>
@@ -424,18 +432,26 @@ async function doPlay(id: string) {
   if (!memo) return
   const audio = element()
   const p = playCell.get()
+  // Taken before either branch: a resume also supersedes another memo still loading.
+  const mine = ++playSeq
   if (p?.id === memo.id) {
     if (audio.paused) await audio.play().catch(() => {})
-    playCell.set({ ...p, playing: true })
+    // A stop during the await wins over this resume.
+    if (playSeq !== mine) return
+    playCell.set({ ...p, playing: !audio.paused })
     return
   }
   const blob = await os.files.get(memo.file)
-  if (!blob) return
-  audio.src = await dataUrl(blob)
+  if (!blob || playSeq !== mine) return
+  const url = await dataUrl(blob)
+  if (playSeq !== mine) return
+  audio.src = url
   audio.playbackRate = p?.rate ?? 1
   // A scrubbed-but-unplayed memo resumes from the mark, not from zero.
   if (p?.id === memo.id && p.posMs > 0 && !p.playing) audio.currentTime = p.posMs / 1000
   await audio.play().catch(() => {})
+  // A stop during that await wins; setting the cell now would undo it.
+  if (playSeq !== mine) return
   playCell.set({ id: memo.id, posMs: 0, playing: !audio.paused, rate: audio.playbackRate })
 }
 
@@ -494,6 +510,8 @@ export function stopPlay(id?: string) {
   return run({ op: 'stopPlay', id })
 }
 function doStopPlay(id?: string) {
+  // A play still loading its file must not land after this.
+  ++playSeq
   const p = playCell.get()
   if (!p || (id && p.id !== id)) return
   el?.pause()

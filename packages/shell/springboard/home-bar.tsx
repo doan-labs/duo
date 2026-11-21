@@ -147,20 +147,55 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       }
       paint()
     }
-    const up = () => {
+    const off = () => {
       removeEventListener('pointermove', move)
       removeEventListener('pointerup', up)
-      removeEventListener('pointercancel', up)
+      removeEventListener('pointercancel', cancel)
       clearTimeout(timer)
+    }
+    // Where the card visually sits right now, then reset to rest. Both release
+    // paths snapshot before clearing or the return animation runs none to none.
+    const snap = (): Keyframe => {
+      const start: Keyframe = { transform: el.style.transform || 'none', borderRadius: el.style.borderRadius || '0px' }
+      el.style.transform = ''
+      el.style.borderRadius = ''
+      return start
+    }
+    const springBack = (start: Keyframe) => {
+      const back = [
+        el.animate([start, { transform: 'none', borderRadius: 0 }], {
+          duration: 300,
+          easing: 'ease-out',
+          fill: 'both'
+        })
+      ]
+      if (home) {
+        // The hold already sent the home screen back; a second reverse would bring it in.
+        if (!held) home.reverse()
+        back.push(home)
+      }
+      Promise.all(back.map((a) => a.finished)).then(
+        () => {
+          for (const a of back) a.cancel()
+        },
+        () => {}
+      )
+    }
+    const cancel = () => {
+      // A cancelled touch is not a release: the card springs home, never a tap.
+      off()
+      onDrop(null)
+      springBack(snap())
+    }
+    const up = () => {
+      off()
       // Let go as a card in hand: the switcher lays it out from where it is, so the transform stays.
       if (held && !zoned) {
         home?.cancel()
         onDrop(null)
         return onSwitch()
       }
-      const start: Keyframe = { transform: el.style.transform || 'none', borderRadius: el.style.borderRadius || '0px' }
-      el.style.transform = ''
-      el.style.borderRadius = ''
+      const start = snap()
       if (held) {
         onDrop(null)
         return place(
@@ -174,27 +209,11 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       if (dy > 49 || v > 0.6 || Math.abs(dy) < 4 * s) {
         return park(e.id, [zoom(el, e.from, true, z, start), ...(home ? [home] : [])])
       }
-      const back = [
-        el.animate([start, { transform: 'none', borderRadius: 0 }], {
-          duration: 300,
-          easing: 'ease-out',
-          fill: 'both'
-        })
-      ]
-      if (home) {
-        home.reverse()
-        back.push(home)
-      }
-      Promise.all(back.map((a) => a.finished)).then(
-        () => {
-          for (const a of back) a.cancel()
-        },
-        () => {}
-      )
+      springBack(start)
     }
     addEventListener('pointermove', move)
     addEventListener('pointerup', up)
-    addEventListener('pointercancel', up)
+    addEventListener('pointercancel', cancel)
   }
 
   /**
@@ -205,7 +224,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
   function place(e: Scene, side: Side | undefined, card: Box, home: Animation | null) {
     const z = box(e.side)
     const z2 = box(side)
-    const other = live.current.find((x) => !x.leaving && x !== e && x.side === side)
+    const other = live.current.find((x) => (x.phase === 'shown' || x.phase === 'parked') && x !== e && x.side === side)
     // Synchronous, so the element is in its new half before the frames below
     // pretend it is still the card.
     flushSync(() =>
@@ -251,7 +270,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
   return (
     <>
       {ctl.scenes
-        .filter((e) => !e.leaving && !e.parked)
+        .filter((e) => e.phase === 'shown')
         .map((e) => (
           <HomeBar
             key={e.id}

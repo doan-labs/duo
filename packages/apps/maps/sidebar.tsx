@@ -78,7 +78,12 @@ export function Sidebar({
           <>
             {found.map((p) => row(p, p.kind))}
             {searching && <div {...stylex.props(styles.note, styles.searching)}>Searching…</div>}
-            {!searching && failed && <div {...stylex.props(styles.empty)}>Search isn’t available right now.</div>}
+            {!searching && failed && (
+              // The only way out of a dead answer: resubmitting asks again.
+              <button type="button" onClick={() => onQuery(query)} {...stylex.props(styles.empty)}>
+                Search isn’t available right now. Tap to retry.
+              </button>
+            )}
             {!searching && !failed && !found.length && (
               <div {...stylex.props(styles.empty)}>No results for “{query.trim()}”</div>
             )}

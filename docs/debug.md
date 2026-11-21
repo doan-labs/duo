@@ -61,7 +61,7 @@ StyleX classes are unstable; use shell data attributes:
 
 ```js
 const st = () => page.evaluate(() => ({
-  asleep: __duo.device.asleep, off: __duo.device.off, level: __duo.device.level,
+  power: __duo.device.power.kind, asleep: __duo.device.asleep, off: __duo.device.off, level: __duo.device.level,
   locked: document.querySelectorAll('[data-lock]:not([data-hidden])').length,
   apps: [...document.querySelectorAll('[data-app]')].map((e) => e.closest('[data-os]').offsetWidth + ':' + e.dataset.app),
   vol: !!document.querySelector('[data-hud=vol][data-on]'), thumb: !!document.querySelector('[data-hud=thumb]'),

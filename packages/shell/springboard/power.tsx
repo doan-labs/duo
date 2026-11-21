@@ -39,19 +39,15 @@ const Apple = () => (
   </svg>
 )
 
+// Mirrors BOOT_FADE_MS in ../device.ts - stylex.create needs a compile-time
+// literal, so the constant lives with the device and the value repeats here.
+const BOOT_FADE_MS = 700
+
 /**
  * The logo on black the display wears while the device boots. The caller owns
- * when. The bar is indeterminate — nothing here knows how far along a boot is,
+ * when. The bar is indeterminate: nothing here knows how far along a boot is,
  * so it eases out and crawls rather than claiming progress it can't see.
  */
-/**
- * How long the logo stays up at minimum. Only on localhost, where demos are
- * recorded: a visitor's boot takes exactly as long as the load.
- */
-export const BOOT_MS = typeof location !== 'undefined' && location.hostname === 'localhost' ? 3000 : 0
-/** The logo's fade into the booted screen; the caller keeps it mounted this long with `leaving`. */
-export const BOOT_FADE_MS = 700
-
 export const BootScreen = ({ error, leaving }: { error?: string; leaving?: boolean }) => (
   <div data-boot {...stylex.props(styles.boot, leaving && styles.bootOut)}>
     <Apple />

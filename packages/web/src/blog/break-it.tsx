@@ -128,6 +128,17 @@ export function BreakIt() {
   const seen = useInView(svg, { amount: 0.4 })
   const still = useReducedMotion()
   const n = useRef(0)
+  // Every timeout the run schedules lives here, cleared when the run is replaced
+  // or the figure unmounts, so none writes into a newer run.
+  const timers = useRef<number[]>([])
+  const clearTimers = useCallback(() => {
+    for (const t of timers.current) window.clearTimeout(t)
+    timers.current = []
+  }, [])
+  const later = (f: () => void, ms: number) => timers.current.push(window.setTimeout(f, ms))
+  useEffect(() => clearTimers, [clearTimers])
+  // Bumped by every launch and tamper: a tamper's hash landing after a newer run started is dropped.
+  const gen = useRef(0)
   const auto = seen && !touched && !still
   const g = geo(useNarrow())
   const { APP, WALL, MID, HOST, PORT, TARGETS, CELLS } = g
@@ -145,6 +156,8 @@ export function BreakIt() {
   const launch = useCallback(() => {
     port.current?.close()
     port.current = null
+    clearTimers()
+    gen.current++
     setFlip(null)
     setProbes({})
     setPackets([])
@@ -152,7 +165,7 @@ export function BreakIt() {
     setLast('verified: sha-256 matches the release, policy first in <head>')
     setState('running')
     setRun((r) => r + 1)
-  }, [])
+  }, [clearTimers])
 
   const poke = useCallback(() => port.current?.postMessage({ type: 'poke' }), [])
 
@@ -160,18 +173,21 @@ export function BreakIt() {
     if (!rel) return
     port.current?.close()
     port.current = null
+    clearTimers()
     // One byte in the script: the kind of change a compromised mirror would make.
     const start = rel.doc.indexOf('<script>') + 8
     const at = start + 40 + Math.floor(Math.random() * (SCRIPT.length - 80))
     const now = rel.doc[at] === 'x' ? 'y' : 'x'
+    const mine = ++gen.current
     const got = hex(await sha(rel.doc.slice(0, at) + now + rel.doc.slice(at + 1)))
+    if (gen.current !== mine) return
     setFlip({ at, now, got })
     setProbes({})
     setPackets([])
     setDone(false)
     setLast(`refused: computed sha-256 ${short(got)}, the release says ${short(rel.hash)}`)
     setState('refused')
-  }, [rel])
+  }, [rel, clearTimers])
 
   // The first time it scrolls in, launch; while it plays itself, break it every way in turn.
   useEffect(() => {
@@ -207,14 +223,14 @@ export function BreakIt() {
       if (d.type === 'hello' && d.nonce === nonce && !hello) {
         hello = true
         send(true, `hello ${nonce}`)
-        window.setTimeout(() => send(false, 'ack'), 500)
+        later(() => send(false, 'ack'), 500)
         ch.port1.postMessage({ type: 'ack' })
       } else if (d.type === 'hello') {
         send(true, 'hello, again', true)
         setLast('revoked: a second hello after the ack. Port closed, frame removed')
         ch.port1.close()
         port.current = null
-        window.setTimeout(() => setState('revoked'), 700)
+        later(() => setState('revoked'), 700)
       } else if (d.type === 'probe' && d.name) {
         setProbes((p) => ({ ...p, [d.name as string]: { ok: Boolean(d.ok), text: d.text ?? '' } }))
         setLast(`${d.name}: ${d.text ?? ''}`)

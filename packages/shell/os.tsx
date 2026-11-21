@@ -5,11 +5,11 @@
 import { colors, fonts, layout, leading, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
 import { createRoot } from 'react-dom/client'
-import { device } from './device.ts'
+import { BOOT_FADE_MS, BOOT_MS, device } from './device.ts'
 import { development } from './runtime/development.ts'
 import { shots } from './runtime/photos.ts'
 import { bootRegistry } from './runtime/registry.ts'
-import { BOOT_FADE_MS, BOOT_MS, BootScreen } from './springboard/power.tsx'
+import { BootScreen } from './springboard/power.tsx'
 import { SpringBoard } from './springboard/springboard.tsx'
 
 /** Builds one display's OS. `w`/`hgt` in CSS px. `arg` is the deep link `boot` opens with. */
