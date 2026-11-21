@@ -17,10 +17,21 @@ export async function erase() {
   await transaction([...STORES], 'readwrite', async (tx) => {
     for (const name of STORES) await tx.clear(name)
   })
-  // On Mono the IndexedDB copy it adopted would come back on the next IndexedDB boot.
+  // Erase the engine this tab is not on too, or switching back to it would bring the data back.
   if ((await activeBackend()).name === 'mono') indexedDB.deleteDatabase('ipduo')
+  else await destroyMono()
   // The storage engine is how this device keeps data, not data: it survives the erase.
   for (const key of Object.keys(localStorage))
     if (DEVICE_KEY.test(key) && key !== 'os.storage') localStorage.removeItem(key)
   location.reload()
+}
+
+async function destroyMono() {
+  // Without OPFS Mono cannot have kept anything here, and its worker is never loaded.
+  if (!navigator.storage?.getDirectory) return
+  try {
+    await (await (await import('@doan-labs/mono')).open('ipduo')).destroy()
+  } catch {
+    // A browser where Mono cannot open has no Mono store to erase.
+  }
 }
