@@ -137,6 +137,8 @@ export function BreakIt() {
   }, [])
   const later = (f: () => void, ms: number) => timers.current.push(window.setTimeout(f, ms))
   useEffect(() => clearTimers, [clearTimers])
+  // Bumped by every launch and tamper: a tamper's hash landing after a newer run started is dropped.
+  const gen = useRef(0)
   const auto = seen && !touched && !still
   const g = geo(useNarrow())
   const { APP, WALL, MID, HOST, PORT, TARGETS, CELLS } = g
@@ -155,6 +157,7 @@ export function BreakIt() {
     port.current?.close()
     port.current = null
     clearTimers()
+    gen.current++
     setFlip(null)
     setProbes({})
     setPackets([])
@@ -175,7 +178,9 @@ export function BreakIt() {
     const start = rel.doc.indexOf('<script>') + 8
     const at = start + 40 + Math.floor(Math.random() * (SCRIPT.length - 80))
     const now = rel.doc[at] === 'x' ? 'y' : 'x'
+    const mine = ++gen.current
     const got = hex(await sha(rel.doc.slice(0, at) + now + rel.doc.slice(at + 1)))
+    if (gen.current !== mine) return
     setFlip({ at, now, got })
     setProbes({})
     setPackets([])

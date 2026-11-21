@@ -57,7 +57,11 @@ export function ReminderRow({ r, tint, last }: { r: Reminder; tint: string; last
   )
 
   const toggle = () => {
-    if (done) return setDone(r, false)
+    if (done) {
+      // Back to open: the row can be completed again.
+      setLeaving(false)
+      return setDone(r, false)
+    }
     // The row is already animating out: a second tap would arm a second timer.
     if (leaving) return
     setLeaving(true)

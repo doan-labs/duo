@@ -26,7 +26,10 @@ test('a generation run walks generating -> compiling -> starting-on-phone -> rea
 test('a mid-run failure records the step it failed in', () => {
   const end = drive({ kind: 'ready' }, [{ type: 'restore' }, { type: 'failed', label: 'Restore failed' }])
   expect(end).toEqual({ kind: 'failed', step: 'restoring', label: 'Restore failed' })
-  expect(jobStatus(end)).toBe('Restore failed')
+  expect(jobStatus(end)).toBe('Restore failed while restoring')
+  // Nothing running: the label alone.
+  const late = nextJob({ kind: 'ready' }, { type: 'failed', label: 'Simulator not responding' })
+  expect(jobStatus(late)).toBe('Simulator not responding')
   expect(jobBusy(end)).toBe(false)
 })
 

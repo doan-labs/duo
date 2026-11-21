@@ -27,7 +27,8 @@ export type Job =
   | { kind: 'testing' }
   | { kind: 'ready' }
   | { kind: 'stopped' }
-  | { kind: 'failed'; step: Step; label: string }
+  /** `step` is the phase it failed in; null when nothing was running (a late phone-connect failure). */
+  | { kind: 'failed'; step: Step | null; label: string }
 
 export type JobEvent =
   | { type: 'wait-for-phone' }
@@ -80,7 +81,7 @@ export const nextJob = (job: Job, event: JobEvent): Job => {
     case 'stop':
       return jobBusy(job) ? { kind: 'stopped' } : job
     case 'failed':
-      return { kind: 'failed', step: ACTIVE.has(job.kind) ? (job.kind as Step) : 'booting', label: event.label }
+      return { kind: 'failed', step: ACTIVE.has(job.kind) ? (job.kind as Step) : null, label: event.label }
   }
 }
 
@@ -111,6 +112,18 @@ export const jobStatus = (job: Job): string => {
     case 'stopped':
       return 'Stopped'
     case 'failed':
-      return job.label
+      return job.step ? `${job.label} while ${DOING[job.step]}` : job.label
   }
+}
+
+/** The failed phase, as the tail of "<label> while …". */
+const DOING: Record<Step, string> = {
+  generating: 'generating',
+  repairing: 'repairing',
+  compiling: 'compiling',
+  'starting-on-phone': 'starting on the phone',
+  restoring: 'restoring',
+  testing: 'testing the connection',
+  booting: 'loading the workspace',
+  'waiting-for-phone': 'starting the phone'
 }

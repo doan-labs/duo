@@ -2017,5 +2017,7 @@ how-to is in working.md under "Adding things". This refines decision 70: the
 behaviour it records is unchanged. One timing change is intended: a second
 side press inside the double-click window now cancels the pending single
 click, so click-then-hold is Siri alone and a slow second click is Wallet,
-where the old timers fired sleep and then Siri or wake. Leaving the awake
+where the old timers fired sleep and then Siri or wake. A volume key joining
+inside that window turns the press into the chord the same way, dropping the
+pending click. Leaving the awake
 phase also ends a volume-key burst or QuickTake the hold started.

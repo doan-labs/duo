@@ -41,7 +41,9 @@ export function nextLayer(s: Layer, e: LayerEvent): Layer {
     case 'pull-control':
       return { kind: 'control', closing: false, under: s.kind === 'control' ? s.under : s }
     case 'open-power':
-      return { kind: 'power' }
+      // From Control Center's power button: the sheet goes under the panel,
+      // which keeps playing out and hands over when it settles.
+      return s.kind === 'control' ? { kind: 'control', closing: true, under: { kind: 'power' } } : { kind: 'power' }
     case 'drop-under':
       return s.kind === 'control' ? { ...s, under: { kind: 'none' } } : { kind: 'none' }
     case 'close-control':

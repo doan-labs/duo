@@ -12,9 +12,7 @@ test('lock or close drops whatever layer was up', () => {
 
 test('overlays are exclusive: opening one replaces another', () => {
   assert.deepEqual(nextLayer({ kind: 'switcher' }, 'open-search'), { kind: 'search' })
-  assert.deepEqual(nextLayer({ kind: 'control', closing: false, under: { kind: 'none' } }, 'open-power'), {
-    kind: 'power'
-  })
+  assert.deepEqual(nextLayer({ kind: 'search' }, 'open-power'), { kind: 'power' })
 })
 
 test('Control Center pulled over a layer gives it back when the panel goes', () => {
@@ -32,11 +30,12 @@ test('control closing keeps it mounted, and a stale close cannot drop a newer la
   assert.deepEqual(open, { kind: 'control', closing: false, under: { kind: 'none' } })
   const closing = nextLayer(open, 'close-control')
   assert.deepEqual(closing, { kind: 'control', closing: true, under: { kind: 'none' } })
-  // The power sheet can open over a closing Control Center (the CC power button).
+  // The CC power button: the sheet goes under the panel while it plays out, and its settle hands over.
   const power = nextLayer(closing, 'open-power')
-  assert.deepEqual(power, { kind: 'power' })
-  // The settle callback of the Control Center animation now fires: stale, ignored.
+  assert.deepEqual(power, { kind: 'control', closing: true, under: { kind: 'power' } })
   assert.deepEqual(nextLayer(power, 'control-closed'), { kind: 'power' })
+  // A settle that lands once the sheet is on its own is stale, ignored.
+  assert.deepEqual(nextLayer({ kind: 'power' }, 'control-closed'), { kind: 'power' })
   // From the still-open Control Center it lands at none.
   assert.deepEqual(nextLayer(closing, 'control-closed'), { kind: 'none' })
 })

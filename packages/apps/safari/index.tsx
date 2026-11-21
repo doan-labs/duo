@@ -45,8 +45,8 @@ type Sheet =
   | { kind: 'page' }
   | { kind: 'tabs' }
   | { kind: 'bookmarks' }
-  /** Bookmarks with its own More menu (New Tab, Close Bookmarks) open over it. */
-  | { kind: 'bookmarks-more' }
+  /** Bookmarks with its own More menu (New Tab, Close Bookmarks) open over it; `pick` keeps an Add-to in progress. */
+  | { kind: 'bookmarks-more'; pick?: { url: string; title: string } }
   | { kind: 'add-to'; url: string; title: string }
   | { kind: 'more' }
   | { kind: 'page-menu' }
@@ -67,7 +67,15 @@ export const Safari = ({ os }: { os: Os }) => {
   const bookMenu = sheet.kind === 'bookmarks-more'
   const bookmarks = sheet.kind === 'bookmarks' || sheet.kind === 'add-to' || bookMenu
   // Set by "Add Bookmark to…": the sheet asks which list to save it in.
-  const pickFor = sheet.kind === 'add-to' ? { url: sheet.url, title: sheet.title } : null
+  const pickFor =
+    sheet.kind === 'add-to'
+      ? { url: sheet.url, title: sheet.title }
+      : sheet.kind === 'bookmarks-more'
+        ? (sheet.pick ?? null)
+        : null
+  /** Closing the bookmarks menu goes back to what was under it: the Add-to pick, or plain bookmarks. */
+  const unMenu = (s: Sheet): Sheet =>
+    s.kind === 'bookmarks-more' ? (s.pick ? { kind: 'add-to', ...s.pick } : { kind: 'bookmarks' }) : s
   const moreOpen = sheet.kind === 'more'
   const pageMenu = sheet.kind === 'page-menu'
   const [urlCompact, setUrlCompact] = useState(false)
@@ -386,7 +394,7 @@ export const Safari = ({ os }: { os: Os }) => {
           {bookmarks && (
             <Menu
               open={bookMenu}
-              onClose={() => setSheet((s) => (s.kind === 'bookmarks-more' ? { kind: 'bookmarks' } : s))}
+              onClose={() => setSheet(unMenu)}
               xstyle={styles.moreMenu}
               itemStyle={styles.moreItem}
               items={[
@@ -401,7 +409,7 @@ export const Safari = ({ os }: { os: Os }) => {
             type="button"
             {...stylex.props(styles.pageScrim)}
             aria-label="Close menu"
-            onClick={() => setSheet({ kind: bookMenu ? 'bookmarks' : 'page' })}
+            onClick={() => setSheet((s) => (bookMenu ? unMenu(s) : { kind: 'page' }))}
           />
         )}
         {!bookmarks && (
@@ -539,7 +547,14 @@ export const Safari = ({ os }: { os: Os }) => {
               <Btn
                 name="more"
                 onClick={() =>
-                  setSheet((s) => (s.kind === 'bookmarks-more' ? { kind: 'bookmarks' } : { kind: 'bookmarks-more' }))
+                  setSheet((s) =>
+                    s.kind === 'bookmarks-more'
+                      ? unMenu(s)
+                      : {
+                          kind: 'bookmarks-more',
+                          pick: s.kind === 'add-to' ? { url: s.url, title: s.title } : undefined
+                        }
+                  )
                 }
               />
               <Btn name="close" onClick={closeBookmarks} />

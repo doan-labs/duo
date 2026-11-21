@@ -52,7 +52,10 @@ function useWebcam(facing: Facing = 'user') {
         s = got
         setStream(got)
       })
-      .catch(() => setDenied(true))
+      .catch(() => {
+        // A refusal for a facing already left behind is not this one's.
+        if (!gone) setDenied(true)
+      })
     return () => {
       gone = true
       s?.getTracks().forEach((t) => t.stop())

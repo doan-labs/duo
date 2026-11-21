@@ -35,6 +35,8 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
   const [sourceOpen, setSourceOpen] = useState(false)
   const [mode, setMode] = useState<'simulator' | 'build'>(upcoming ? 'simulator' : 'build')
   const [text, setText] = useState('')
+  /** The prompt of the build in flight; it joins `project.messages` only on success. */
+  const [pending, setPending] = useState('')
   const [error, setError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [token, setToken] = useState('')
@@ -181,9 +183,11 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
       emit({ type: 'compile' })
       const revision = selected.revisions[selected.current]!
       const bundle = await compile(revision.source, signal)
-      if (signal.aborted) return
+      // Throw, not return: startJob turns an abort into 'stop', a plain return would leave the job busy.
+      signal.throwIfAborted()
       emit({ type: 'starting-on-phone' })
       await client.apply(selected.id, revision.id, bundle)
+      signal.throwIfAborted()
       emit({ type: 'ready' })
     }, 'Preview unavailable')
     return () => controller.current?.abort()
@@ -248,6 +252,8 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
       ...project.messages,
       { id: crypto.randomUUID(), role: 'user' as const, content: message.trim().slice(0, 8000) }
     ].slice(-40)
+    // Shown at once as a pending bubble, outside history, so the prompt never vanishes while it builds.
+    setPending(message.trim())
     let next: Source | undefined
     await startJob(async (signal, emit) => {
       try {
@@ -268,6 +274,8 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
             // A newer job aborted this one during the apply: its project write would be stale.
             if (signal.aborted) throw new Error('Stopped')
             const revisions = [...project.revisions.slice(0, project.current + 1), revision].slice(-10)
+            // Same update as the history write, so the bubble never shows twice.
+            setPending('')
             setProject({
               ...project,
               name: next.name,
@@ -303,6 +311,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
         throw e
       }
     }, 'Could not update')
+    if (alive.current) setPending('')
   }
   async function restore(index: number) {
     if (!project || !client || jobBusy(jobRef.current)) return
@@ -311,10 +320,10 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     await startJob(async (signal, emit) => {
       emit({ type: 'restore' })
       const bundle = await compile(revision.source, signal)
-      if (signal.aborted) return
+      signal.throwIfAborted()
       emit({ type: 'starting-on-phone' })
       await client.apply(project.id, revision.id, bundle, true)
-      if (signal.aborted) return
+      signal.throwIfAborted()
       setProject({ ...project, current: index, name: revision.source.name })
       emit({ type: 'ready' })
     }, 'Restore failed')
@@ -452,7 +461,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
             )}
           </div>
           <div ref={scroller} {...stylex.props(styles.messages)}>
-            {!project?.messages.length && (
+            {!project?.messages.length && !pending && (
               <div {...stylex.props(styles.intro)}>
                 <span {...stylex.props(styles.spark)}>✳</span>
                 <h1 {...stylex.props(styles.headline)}>
@@ -485,6 +494,12 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                 <p {...stylex.props(styles.messageText)}>{message.content}</p>
               </div>
             ))}
+            {pending && (
+              <div {...stylex.props(styles.message, styles.userMessage)}>
+                <span {...stylex.props(styles.label)}>You</span>
+                <p {...stylex.props(styles.messageText)}>{pending}</p>
+              </div>
+            )}
           </div>
           {upcoming && (
             <div {...stylex.props(styles.composer)}>
