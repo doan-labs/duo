@@ -416,6 +416,7 @@
         "@doan-labs/duo-app-weather": "workspace:*",
         "@doan-labs/duo-sdk": "workspace:*",
         "@doan-labs/duo-uikit": "workspace:*",
+        "@doan-labs/mono": "file:../../vendor/mono/doan-labs-mono-0.0.1-duo.a3b9aad.tgz",
         "@stylexjs/stylex": "0.19.0",
         "@tauri-apps/api": "^2.11.1",
         "react": "^19",
@@ -593,6 +594,8 @@
     "@doan-labs/duo-uikit": ["@doan-labs/duo-uikit@workspace:packages/uikit"],
 
     "@doan-labs/duo-web": ["@doan-labs/duo-web@workspace:packages/web"],
+
+    "@doan-labs/mono": ["@doan-labs/mono@../../vendor/mono/doan-labs-mono-0.0.1-duo.a3b9aad.tgz", { "peerDependencies": { "@tauri-apps/api": "^2.0.0", "effect": "^4.0.0" }, "optionalPeers": ["@tauri-apps/api", "effect"] }, "sha512-BAHaNevahl/mLg4eBbtQeY1le1C3EGZDZj/eHyljMJoeEX0Bku8iCJof0uvWY7kRQLRegR5Chqs48n8Phj0JTA=="],
 
     "@dual-bundle/import-meta-resolve": ["@dual-bundle/import-meta-resolve@4.2.1", "", {}, "sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg=="],
 

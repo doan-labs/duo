@@ -133,6 +133,8 @@ examples/
 serve.ts            root development server
 build.ts            root production build, writes dist/ and stylex.css
 stylex-plugin.ts    shared Bun StyleX compilation
+mono-plugin.ts      points @doan-labs/mono's storage worker at the files serve.ts and build.ts provide
+vendor/mono/        @doan-labs/mono packed from a Mono checkout until it is on npm
 bunfig.toml         development plugin registration
 tsconfig.json       shared strict TypeScript configuration
 .cargo/             shared Rust cache configuration and shell-check alias
@@ -144,6 +146,7 @@ docs/               maintainer guides and documentation index
 scripts/            model preparation, asset extraction, screenshots
   build-app.ts      isolated document builder and local release catalog
   build-preinstalled.ts  bundled Notes and Weather releases
+  vendor-mono.ts    packs a local @doan-labs/mono build into vendor/mono/
   package-platform.ts  private SDK/kit/CLI archives for external consumers
   check-platform.ts    local/CI platform gate
   check-submissions.ts community-apps gate: identity, completeness, dependencies, build

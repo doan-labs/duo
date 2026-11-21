@@ -1,5 +1,15 @@
 import { networkOrigin, releaseId, releaseValid } from '../../sdk/manifest.ts'
-import { appLock, broadcast, type Installed, put, range, read, type StoredRelease, transaction } from './database.ts'
+import {
+  appLock,
+  broadcast,
+  type Installed,
+  put,
+  read,
+  remove,
+  removeRange,
+  type StoredRelease,
+  transaction
+} from './database.ts'
 import { clearNotices } from './notifications.ts'
 import { boundedFetch, digest, download } from './releases.ts'
 
@@ -61,8 +71,8 @@ export async function removeDevelopment(id: string) {
         const old = await read<Installed>(tx, 'marks', id)
         if (old) await put(tx, 'marks', id, { ...old, generation: old.generation + 1, state: 'removing' })
         for (const store of ['appdata', 'widgets', 'checkpoints', 'recovery', 'leases'] as const)
-          tx.objectStore(store).delete(range(id))
-        tx.objectStore('meta').delete(id)
+          await removeRange(tx, store, id)
+        await remove(tx, 'meta', id)
       }
     )
     const previous = development.get(id)

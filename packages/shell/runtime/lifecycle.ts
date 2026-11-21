@@ -12,12 +12,14 @@ import {
   type Installed,
   type Meta,
   put,
-  range,
   read,
-  result,
+  releaseSummaries,
+  remove,
+  removeRange,
   STORES,
   type StoredRelease,
   type StoredWidget,
+  type Tx,
   transaction,
   writeAuthority
 } from './database.ts'
@@ -34,14 +36,13 @@ export async function lease(id: string, generation: number, views: number) {
     if (views) {
       await authority(tx, id, generation)
       await put(tx, 'leases', [id, tabId], { views, heartbeat: Date.now() })
-    } else tx.objectStore('leases').delete([id, tabId])
+    } else await remove(tx, 'leases', [id, tabId])
   })
   if (!views) await activate(id)
 }
-async function freshLeases(tx: IDBTransaction, id: string) {
+async function freshLeases(tx: Tx, id: string) {
   const leases = await entries<{ views: number; heartbeat: number }>(tx, 'leases', id)
-  for (const [key, value] of leases)
-    if (Date.now() - value.heartbeat >= 30000) tx.objectStore('leases').delete([id, key])
+  for (const [key, value] of leases) if (Date.now() - value.heartbeat >= 30000) await remove(tx, 'leases', [id, key])
   return leases.some(([, value]) => value.views > 0 && Date.now() - value.heartbeat < 30000)
 }
 let timer: ReturnType<typeof setInterval> | undefined
@@ -62,11 +63,11 @@ export function startLifecycle() {
   addEventListener('pagehide', () => {
     for (const id of sessions.keys())
       void transaction(['leases'], 'readwrite', async (tx) => {
-        tx.objectStore('leases').delete([id, tabId])
+        await remove(tx, 'leases', [id, tabId])
       }).catch(() => {})
   })
 }
-async function checkpoint(tx: IDBTransaction, id: string): Promise<Checkpoint> {
+async function checkpoint(tx: Tx, id: string): Promise<Checkpoint> {
   return {
     entries: await entries<string>(tx, 'appdata', id),
     meta: (await read<Meta>(tx, 'meta', id)) ?? emptyMeta(),
@@ -74,9 +75,9 @@ async function checkpoint(tx: IDBTransaction, id: string): Promise<Checkpoint> {
     takenAt: Date.now()
   }
 }
-async function replaceData(tx: IDBTransaction, id: string, data: Checkpoint) {
-  tx.objectStore('appdata').delete(range(id))
-  tx.objectStore('widgets').delete(range(id))
+async function replaceData(tx: Tx, id: string, data: Checkpoint) {
+  await removeRange(tx, 'appdata', id)
+  await removeRange(tx, 'widgets', id)
   for (const [key, value] of data.entries) await put(tx, 'appdata', [id, key], value)
   for (const [key, value] of data.widgets) await put(tx, 'widgets', [id, key], value)
   await put(tx, 'meta', id, data.meta)
@@ -214,12 +215,12 @@ export async function ready(id: string, generation: number) {
       app.attempts = 0
       app.state = 'ready'
       if (app.migration) app.migration.done = true
-      const checkpoints = await entries<Checkpoint>(tx, 'checkpoints', id)
+      const checkpoints = await entries<Checkpoint>(tx, 'checkpoints', id, { large: false })
       for (const [release] of checkpoints)
         if (release !== app.recovery?.release) {
-          tx.objectStore('checkpoints').delete([id, release])
+          await remove(tx, 'checkpoints', [id, release])
           if (release !== app.current && release !== app.candidate && release !== app.failedVersion)
-            tx.objectStore('releases').delete(release)
+            await remove(tx, 'releases', release)
         }
       await put(tx, 'installed', id, app)
     })
@@ -236,7 +237,7 @@ export async function restore(id: string) {
         throw new PlatformError('E_STALE', 'Close the app before restoring')
       const saved = await read<Checkpoint>(tx, 'checkpoints', app.recovery.checkpoint)
       if (!saved) throw new PlatformError('E_STORAGE', 'Recovery checkpoint missing')
-      tx.objectStore('recovery').delete(range(id))
+      await removeRange(tx, 'recovery', id)
       await put(tx, 'recovery', [id, app.current], await checkpoint(tx, id))
       await replaceData(tx, id, saved)
       app.failedVersion = app.current
@@ -288,12 +289,12 @@ async function finishRemoval(id: string) {
     transaction([...STORES], 'readwrite', async (tx) => {
       const app = await read<Installed>(tx, 'installed', id)
       if (!app || app.state !== 'removing' || (await freshLeases(tx, id))) return
-      const releases = (await result(tx.objectStore('releases').getAll())) as StoredRelease[]
-      for (const bundle of releases)
-        if (bundle.release.manifest.id === id) tx.objectStore('releases').delete(releaseId(bundle.release))
+      const releases = await releaseSummaries(tx)
+      for (const [, bundle] of releases)
+        if (bundle.release.manifest.id === id) await remove(tx, 'releases', releaseId(bundle.release))
       for (const store of ['appdata', 'appfiles', 'checkpoints', 'recovery', 'widgets', 'leases'] as const)
-        tx.objectStore(store).delete(range(id))
-      for (const store of ['installed', 'meta', 'legacy'] as const) tx.objectStore(store).delete(id)
+        await removeRange(tx, store, id)
+      for (const store of ['installed', 'meta', 'legacy'] as const) await remove(tx, store, id)
     })
   )
   broadcast({ id })
@@ -307,10 +308,8 @@ export async function reconcile() {
       await appLock(app.id, () => migrateNotes(app.id))
     }
   }
-  const bundles = await transaction(
-    ['releases'],
-    'readonly',
-    (tx) => result(tx.objectStore('releases').getAll()) as Promise<StoredRelease[]>
+  const bundles = await transaction(['releases'], 'readonly', async (tx) =>
+    (await releaseSummaries(tx)).map(([, bundle]) => bundle)
   )
   for (const bundle of bundles)
     if (Date.now() - bundle.committedAt > 600000)
@@ -322,8 +321,8 @@ export async function reconcile() {
           if ([app?.current, app?.candidate, app?.recovery?.release, app?.failedVersion].includes(rid)) return
           // Older recovery code is retained until the trial has proved itself.
           if (app?.state === 'trial' && (await read(tx, 'checkpoints', [id, rid]))) return
-          tx.objectStore('releases').delete(rid)
-          tx.objectStore('checkpoints').delete([id, rid])
+          await remove(tx, 'releases', rid)
+          await remove(tx, 'checkpoints', [id, rid])
         })
       )
 }

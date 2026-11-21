@@ -1,7 +1,7 @@
 import { bytes, keyValid, PlatformError, valueValid } from '../../sdk/guards.ts'
 import { record } from '../../sdk/manifest.ts'
 import { type Change, LIMITS, type Snapshot } from '../../sdk/protocol.ts'
-import { authority, broadcast, entries, type Meta, put, read, transaction } from './database.ts'
+import { authority, broadcast, entries, type Meta, put, read, remove, transaction } from './database.ts'
 
 export const emptyMeta = (): Meta => ({ rev: 0, used: 0 })
 export function page(data: [string, string][], rev: number, cursor?: unknown): Snapshot {
@@ -86,17 +86,9 @@ export async function storage(id: string, generation: number, action: string, p:
     const v = action === 'set' ? (args.v as string) : null
     const used = meta.used - (old === undefined ? 0 : bytes(k) + bytes(old)) + (v === null ? 0 : bytes(k) + bytes(v))
     if (used > LIMITS.storage) throw new PlatformError('E_QUOTA')
-    if (
-      v !== null &&
-      old === undefined &&
-      (await new Promise<number>((resolve, reject) => {
-        const req = tx.objectStore('appdata').count(IDBKeyRange.bound([id], [id, []]))
-        req.onsuccess = () => resolve(req.result)
-        req.onerror = () => reject(req.error)
-      })) >= LIMITS.keys
-    )
+    if (v !== null && old === undefined && (await tx.count('appdata', id)) >= LIMITS.keys)
       throw new PlatformError('E_ARGS', 'Too many keys')
-    if (v === null) tx.objectStore('appdata').delete([id, k])
+    if (v === null) await remove(tx, 'appdata', [id, k])
     else await put(tx, 'appdata', [id, k], v)
     await put(tx, 'meta', id, { ...meta, used, rev: meta.rev + 1 })
     return { rev: meta.rev + 1, k, v } satisfies Change

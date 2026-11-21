@@ -47,6 +47,7 @@ staged files. See [the hook documentation](https://learn.chatgpt.com/docs/hooks)
 | `?deg=0..180&yaw=<radians>` | Pin pose; 0 closed, 180 flat, yaw −1.5708 faces the right edge |
 | `?app=Notes` | Open an app past the lock screen |
 | `?arg=<catalog id>` | Argument the `?app=` app gets as `os.arg`; `?app=App Store&arg=<id>` opens that app's page in the Store |
+| `?storage=mono` / `?storage=indexeddb` | Switch this device's storage engine (kept in `os.storage`); `?debug` adds `__duo.db()` to read either |
 | `?hud=0` | No slider, buttons, hint or minimap, fit centred on the phone; for a page that poses it by postMessage |
 | `Esc` / Home | Return home on both displays |
 | `L`, `C`, `↑`/`↓` | Side, Camera Control, volume buttons |
