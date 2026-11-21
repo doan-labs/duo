@@ -8,6 +8,7 @@ import { open } from '@doan-labs/mono'
 import { entries, put, read, remove, setBackend, transaction } from './database.ts'
 import { monoBackend } from './database-mono.ts'
 import { storageCases } from './storage-cases.test.ts'
+import { copyStores } from './storage-migration.ts'
 
 const store = await open(`duo-test-${process.pid}`, { backend: 'memory' })
 setBackend(monoBackend(store))
@@ -68,4 +69,20 @@ test('an error thrown inside a transaction rolls back its fs writes too', async 
     undefined
   )
   assert.equal((await store.fs.readdir('/large')).length, 1)
+})
+
+test('a copy replaces what the destination held, so a retried adoption keeps no deleted rows', async () => {
+  const from = await monoBackend(await open(`duo-from-${process.pid}`, { backend: 'memory' }))
+  const to = await monoBackend(await open(`duo-to-${process.pid}`, { backend: 'memory' }))
+  await from.transaction(['installed'], 'readwrite', (tx) => tx.put('installed', 'kept.app', { state: 'ready' }))
+  await to.transaction(['installed', 'appdata'], 'readwrite', async (tx) => {
+    await tx.put('installed', 'gone.app', { state: 'ready' })
+    await tx.put('appdata', ['gone.app', 'k'], { value: 'x'.repeat(100 * 1024) })
+  })
+  assert.equal(await copyStores(from, to), 1)
+  const left = await to.transaction(['installed', 'appdata'], 'readonly', async (tx) => [
+    (await tx.all('installed')).map(([k]) => k),
+    await tx.all('appdata')
+  ])
+  assert.deepEqual(left, [['kept.app'], []])
 })
