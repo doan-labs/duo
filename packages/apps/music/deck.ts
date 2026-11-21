@@ -212,6 +212,9 @@ export function deck(list: Track[]) {
         i = cur
       }
       shuffle = v
+      // The order just renumbered around the playing track: a position consumed
+      // for one track now names another, so the guard drops it.
+      atEnd = -1
       emit()
     },
     /** off -> all -> one, matching the repeat glyph's three states. */
@@ -255,8 +258,12 @@ export function deck(list: Track[]) {
   function toggle() {
     if (!a.src) load(i)
     on = !on
-    if (on) start()
-    else a.pause()
+    if (on) {
+      // Resuming a track whose end was consumed (a replay of the parked last
+      // one) re-arms it: this end is a new one, not the spent one.
+      atEnd = -1
+      start()
+    } else a.pause()
     emit()
   }
   function fade(ms: number, to: number, done?: () => void) {
