@@ -1,0 +1,33 @@
+{
+  "manifest": {
+    "id": "com.adrianpetkov.duo.tennisfortwo",
+    "name": "Tennis for 2",
+    "version": "1.0.0",
+    "lane": "community",
+    "entry": "./main.tsx",
+    "icon": "./icon.png",
+    "author": "adrianpetkov",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tennis-for-two",
+    "license": "MIT",
+    "permissions": []
+  },
+  "build": {
+    "sdk": "0.1.0",
+    "kit": "1.2.0",
+    "at": "2026-11-21T02:14:16.744Z",
+    "commit": "988ebf5bd35a2cb8f20ef61184c7f2ca9a0c6ada",
+    "hash": "c7fcc2ce"
+  },
+  "files": [
+    {
+      "path": "app.html",
+      "bytes": 278638,
+      "sha256": "634b9071881ed58a1c192ef3a70d7caaef7edfbe4f09db8cdb64b7624941f50c"
+    },
+    {
+      "path": "icon-1024.png",
+      "bytes": 75806,
+      "sha256": "051b160ca69406b0cb310470df8b6b90d73b02ba2f293586cd072f8fcbe8fbd9"
+    }
+  ]
+}

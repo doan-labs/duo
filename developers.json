@@ -1,6 +1,12 @@
 {
   "official": "doan-labs",
   "developers": {
+    "adrianpetkov": {
+      "name": "Adrian Petkov",
+      "description": "Brought the 1958 oscilloscope classic Tennis for Two to the fold.",
+      "imageUrl": "https://avatars.githubusercontent.com/Adrianpetkov",
+      "github": "Adrianpetkov"
+    },
     "doan-labs": {
       "name": "Doan Labs",
       "description": "The team behind Duo: the folding simulator, the SDK and UI kit, and every official app.",
@@ -28,6 +34,7 @@
     }
   },
   "apps": {
+    "com.adrianpetkov.duo.tennisfortwo": "adrianpetkov",
     "com.mnismt.duo.habitstreaks": "mnismt",
     "com.mnismt.duo.sudoku": "devin",
     "com.mnismt.duo.jigsaw": "devin",

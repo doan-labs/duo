@@ -1,5 +1,21 @@
 {
   "apps": {
+    "com.adrianpetkov.duo.tennisfortwo": {
+      "name": "Tennis for 2",
+      "lane": "community",
+      "author": "adrianpetkov",
+      "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tennis-for-two",
+      "permissions": [],
+      "developer": "adrianpetkov",
+      "releases": [
+        {
+          "release": "1.0.0+c7fcc2ce",
+          "sdk": "0.1.0",
+          "bytes": 278638,
+          "sha256": "350de877936f36da984726ef5c606520f662cd861664d2ba6981792606ae681a"
+        }
+      ]
+    },
     "com.linhtinhvovan.duo.chess": {
       "name": "Chess",
       "lane": "community",
@@ -603,6 +619,12 @@
     }
   },
   "developers": {
+    "adrianpetkov": {
+      "name": "Adrian Petkov",
+      "description": "Brought the 1958 oscilloscope classic Tennis for Two to the fold.",
+      "imageUrl": "https://avatars.githubusercontent.com/Adrianpetkov",
+      "github": "Adrianpetkov"
+    },
     "doan-labs": {
       "name": "Doan Labs",
       "description": "The team behind Duo: the folding simulator, the SDK and UI kit, and every official app.",
