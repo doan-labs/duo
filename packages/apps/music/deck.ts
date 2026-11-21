@@ -31,6 +31,13 @@ export function deck(list: Track[]) {
   // Tracks that actually started, most recent first: Home's Recently Played
   // reads this instead of inventing a shelf.
   let history: Track[] = []
+  // A track's end reaches advance() twice - the 'ended' event and the 250 ms
+  // clock poll - and each would move a track on, skipping a song. The guard is
+  // the position whose end was already consumed: a second call for it is a
+  // no-op, while the new track's own end still lands.
+  let atEnd = -1
+  // The one fade ramp that owns the volume; a new fade cancels it.
+  let fadeFrame = 0
   const subs = new Set<() => void>()
   const emit = () => {
     for (const f of subs) f()
@@ -53,6 +60,8 @@ export function deck(list: Track[]) {
   const load = (n: number) => {
     i = ((n % order.length) + order.length) % order.length
     t = 0
+    // Stepping back onto a track that already ended re-arms its end.
+    if (i === atEnd) atEnd = -1
     a.src = now().src
     if (on) start()
     record()
@@ -69,8 +78,11 @@ export function deck(list: Track[]) {
     load(i + d)
   }
   const advance = () => {
+    if (atEnd === i) return
+    atEnd = i
     if (repeat === 'one') {
       t = 0
+      atEnd = -1
       a.currentTime = 0
       if (on) void a.play().catch(() => {})
       emit()
@@ -85,7 +97,12 @@ export function deck(list: Track[]) {
     }
     skip(1)
   }
-  a.addEventListener('ended', advance)
+  a.addEventListener('ended', () => {
+    // A queued 'ended' can arrive after the poll already advanced and the
+    // element was reloaded; it then describes a track the deck already left.
+    if (!a.ended) return
+    advance()
+  })
   // <audio> is the clock while it is streaming; a quarter-second tick covers
   // the corner where the file never loaded and only `secs` knows the length.
   setInterval(() => {
@@ -163,6 +180,7 @@ export function deck(list: Track[]) {
         i = idx
       }
       t = 0
+      atEnd = -1
       a.src = now().src
       on = true
       start()
@@ -242,13 +260,19 @@ export function deck(list: Track[]) {
     emit()
   }
   function fade(ms: number, to: number, done?: () => void) {
+    // One ramp owns the volume at a time: a new fade cancels the one in flight,
+    // so an old fadeOut cannot finish a fadeIn by pausing mid-rise.
+    cancelAnimationFrame(fadeFrame)
     const from = a.volume
     const t0 = performance.now()
     const tick = () => {
       const k = Math.min(1, (performance.now() - t0) / ms)
       a.volume = from + (to - from) * k
-      if (k < 1) requestAnimationFrame(tick)
-      else done?.()
+      if (k < 1) fadeFrame = requestAnimationFrame(tick)
+      else {
+        fadeFrame = 0
+        done?.()
+      }
     }
     tick()
   }
