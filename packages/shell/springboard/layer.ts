@@ -8,18 +8,18 @@
 // some of them, which left Spotlight or the power-off sheet drawn over the
 // lock screen after wake.
 
-export type Layer =
-  | { kind: 'none' }
-  | { kind: 'switcher' }
-  | { kind: 'search' }
-  | { kind: 'control'; closing: boolean }
-  | { kind: 'power' }
+/** A layer Control Center can be pulled over: it comes back when the panel goes. */
+type Under = { kind: 'none' } | { kind: 'switcher' } | { kind: 'search' } | { kind: 'power' }
+
+export type Layer = Under | { kind: 'control'; closing: boolean; under: Under }
 
 export type LayerEvent =
   | 'open-switcher'
   | 'open-search'
   | 'pull-control'
   | 'open-power'
+  /** Home with Control Center up: what is under it goes now, the panel plays out first. */
+  | 'drop-under'
   /** The Control Center is animating out; a later 'control-closed' unmounts it. */
   | 'close-control'
   /** The Control Center finished leaving, or its pull was cancelled. */
@@ -39,15 +39,17 @@ export function nextLayer(s: Layer, e: LayerEvent): Layer {
     case 'open-search':
       return { kind: 'search' }
     case 'pull-control':
-      return { kind: 'control', closing: false }
+      return { kind: 'control', closing: false, under: s.kind === 'control' ? s.under : s }
     case 'open-power':
       return { kind: 'power' }
+    case 'drop-under':
+      return s.kind === 'control' ? { ...s, under: { kind: 'none' } } : { kind: 'none' }
     case 'close-control':
-      return s.kind === 'control' ? { kind: 'control', closing: true } : s
+      return s.kind === 'control' ? { ...s, closing: true } : s
     case 'control-closed':
       // Only ever closes Control Center: a settle callback that fires after
       // another layer took over (the power sheet from a CC button) is stale.
-      return s.kind === 'control' ? { kind: 'none' } : s
+      return s.kind === 'control' ? s.under : s
   }
 }
 

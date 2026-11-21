@@ -26,7 +26,7 @@ import {
 } from './device-buttons-machine.ts'
 
 /** One machine's live state and the timers it armed but has not fired. */
-type Machine<S, E> = { state: S; timers: Map<string, number> }
+type Machine<S> = { state: S; timers: Map<string, number> }
 
 /** Who took each button's press, so its slide and release reach the same listener. */
 const taken = new Map<Button, Listener>()
@@ -87,7 +87,7 @@ function act(action: Action) {
  * old phase's timers die with it), then each effect. A timer firing sends its
  * event back into the same machine through `fire`.
  */
-function run<S, E>(m: Machine<S, E>, step: Step<S, E>, fire: (e: E) => void) {
+function run<S, E>(m: Machine<S>, step: Step<S, E>, fire: (e: E) => void) {
   const same = step.state === m.state && step.effects.length === 0
   m.state = step.state
   if (same) return
@@ -108,12 +108,12 @@ function run<S, E>(m: Machine<S, E>, step: Step<S, E>, fire: (e: E) => void) {
   }
 }
 
-const side: Machine<SideState, SideEvent> = { state: { kind: 'idle' }, timers: new Map() }
-const vol: Record<'up' | 'down', Machine<VolState, VolEvent>> = {
+const side: Machine<SideState> = { state: { kind: 'idle' }, timers: new Map() }
+const vol: Record<'up' | 'down', Machine<VolState>> = {
   up: { state: { kind: 'idle' }, timers: new Map() },
   down: { state: { kind: 'idle' }, timers: new Map() }
 }
-const cam: Machine<CamState, CamEvent> = { state: { kind: 'idle' }, timers: new Map() }
+const cam: Machine<CamState> = { state: { kind: 'idle' }, timers: new Map() }
 
 const fireSide = (e: SideEvent) => run(side, nextSide(side.state, e), fireSide)
 const fireVol = (b: 'up' | 'down') => (e: VolEvent) => run(vol[b], nextVol(b, vol[b].state, e), fireVol(b))
@@ -132,6 +132,12 @@ const held = new Set<Button>()
 // a boot cannot fire into the new phase.
 onPower((p) => {
   if (p.kind === 'awake') return
+  // A burst or QuickTake a hold started ends with the phase: the reset below
+  // drops the state its release would have stopped it from.
+  for (const m of [vol.up, vol.down, cam]) {
+    if (m.state.kind === 'burst') act('burst-off')
+    if (m.state.kind === 'recording') act('record-off')
+  }
   for (const m of [side, vol.up, vol.down, cam]) {
     for (const t of m.timers.values()) clearTimeout(t)
     m.timers.clear()

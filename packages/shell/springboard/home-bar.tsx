@@ -170,7 +170,8 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
         })
       ]
       if (home) {
-        home.reverse()
+        // The hold already sent the home screen back; a second reverse would bring it in.
+        if (!held) home.reverse()
         back.push(home)
       }
       Promise.all(back.map((a) => a.finished)).then(

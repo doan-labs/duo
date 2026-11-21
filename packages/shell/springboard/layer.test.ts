@@ -5,20 +5,33 @@ import { nextLayer, nextLock } from './layer.ts'
 test('lock or close drops whatever layer was up', () => {
   assert.deepEqual(nextLayer({ kind: 'search' }, 'lock'), { kind: 'none' })
   assert.deepEqual(nextLayer({ kind: 'power' }, 'lock'), { kind: 'none' })
-  assert.deepEqual(nextLayer({ kind: 'control', closing: false }, 'lock'), { kind: 'none' })
+  const cc = { kind: 'control', closing: false, under: { kind: 'switcher' } } as const
+  assert.deepEqual(nextLayer(cc, 'lock'), { kind: 'none' })
   assert.deepEqual(nextLayer({ kind: 'switcher' }, 'close'), { kind: 'none' })
 })
 
 test('overlays are exclusive: opening one replaces another', () => {
   assert.deepEqual(nextLayer({ kind: 'switcher' }, 'open-search'), { kind: 'search' })
-  assert.deepEqual(nextLayer({ kind: 'control', closing: false }, 'open-power'), { kind: 'power' })
+  assert.deepEqual(nextLayer({ kind: 'control', closing: false, under: { kind: 'none' } }, 'open-power'), {
+    kind: 'power'
+  })
+})
+
+test('Control Center pulled over a layer gives it back when the panel goes', () => {
+  const over = nextLayer({ kind: 'switcher' }, 'pull-control')
+  assert.deepEqual(over, { kind: 'control', closing: false, under: { kind: 'switcher' } })
+  assert.deepEqual(nextLayer(over, 'control-closed'), { kind: 'switcher' })
+  // Home: the switcher goes now, the panel stays mounted to play out.
+  const home = nextLayer(over, 'drop-under')
+  assert.deepEqual(home, { kind: 'control', closing: false, under: { kind: 'none' } })
+  assert.deepEqual(nextLayer(nextLayer(home, 'close-control'), 'control-closed'), { kind: 'none' })
 })
 
 test('control closing keeps it mounted, and a stale close cannot drop a newer layer', () => {
   const open = nextLayer({ kind: 'none' }, 'pull-control')
-  assert.deepEqual(open, { kind: 'control', closing: false })
+  assert.deepEqual(open, { kind: 'control', closing: false, under: { kind: 'none' } })
   const closing = nextLayer(open, 'close-control')
-  assert.deepEqual(closing, { kind: 'control', closing: true })
+  assert.deepEqual(closing, { kind: 'control', closing: true, under: { kind: 'none' } })
   // The power sheet can open over a closing Control Center (the CC power button).
   const power = nextLayer(closing, 'open-power')
   assert.deepEqual(power, { kind: 'power' })

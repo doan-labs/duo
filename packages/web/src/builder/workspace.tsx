@@ -63,6 +63,8 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
   ) => {
     const id = ++jobSeq.current
     const control = new AbortController()
+    // One job at a time: the one this replaces stops here, not only through disabled buttons.
+    controller.current?.abort()
     controller.current = control
     const emit = (event: JobEvent) => {
       if (jobSeq.current === id && alive.current) emitJob(event)
@@ -263,6 +265,8 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
             emit({ type: 'starting-on-phone' })
             const revision = { id: crypto.randomUUID(), source: next, at: Date.now() }
             await client.apply(project.id, revision.id, bundle)
+            // A newer job aborted this one during the apply: its project write would be stale.
+            if (signal.aborted) throw new Error('Stopped')
             const revisions = [...project.revisions.slice(0, project.current + 1), revision].slice(-10)
             setProject({
               ...project,
@@ -310,11 +314,13 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
       if (signal.aborted) return
       emit({ type: 'starting-on-phone' })
       await client.apply(project.id, revision.id, bundle, true)
+      if (signal.aborted) return
       setProject({ ...project, current: index, name: revision.source.name })
       emit({ type: 'ready' })
     }, 'Restore failed')
   }
   async function testConnection() {
+    if (jobBusy(jobRef.current)) return
     setError('')
     await startJob(async (signal, emit) => {
       emit({ type: 'test' })
@@ -326,7 +332,6 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
   const provider = custom ? undefined : PROVIDERS.find((p) => p.endpoint === connection.endpoint)
   const connected = Boolean(connection.key.trim() && connection.model.trim())
   const busy = jobBusy(job)
-  const working = busy
   const stage = jobStatus(job)
   return (
     <section {...stylex.props(styles.workspace)} data-builder data-lenis-prevent>
@@ -614,7 +619,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                   e.preventDefault()
                   void run()
                 }}
-                {...stylex.props(styles.form, working && styles.formBusy)}
+                {...stylex.props(styles.form, busy && styles.formBusy)}
               >
                 <textarea
                   aria-label="Describe your app or ask for a change"
@@ -659,7 +664,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                     </button>
                   )}
                   <span role="status" aria-live="polite" {...stylex.props(styles.status)}>
-                    {working && <span {...stylex.props(styles.pulse)} aria-hidden="true" />}
+                    {busy && <span {...stylex.props(styles.pulse)} aria-hidden="true" />}
                     {stage}
                   </span>
                   <div {...stylex.props(styles.spacer)} />

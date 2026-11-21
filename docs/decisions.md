@@ -2014,4 +2014,8 @@ sat, and the honest enumeration of the states the flags were hiding. The
 how-to is in working.md under "Adding things". This refines decision 70: the
 `parked` state it describes is now one variant of a scene's `phase` field
 (`shown`, `parking`, `parked`, `closing`) rather than a flag pair - the
-behaviour it records is unchanged.
+behaviour it records is unchanged. One timing change is intended: a second
+side press inside the double-click window now cancels the pending single
+click, so click-then-hold is Siri alone and a slow second click is Wallet,
+where the old timers fired sleep and then Siri or wake. Leaving the awake
+phase also ends a volume-key burst or QuickTake the hold started.

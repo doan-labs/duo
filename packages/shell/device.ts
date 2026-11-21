@@ -99,10 +99,6 @@ const savedLevel = () => {
  * How long the boot logo stays up at minimum. Only on localhost, where demos
  * are recorded: a visitor's boot takes exactly as long as the load.
  */
-/**
- * How long the boot logo stays up at minimum. Only on localhost, where demos
- * are recorded: a visitor's boot takes exactly as long as the load.
- */
 export const BOOT_MS = typeof location !== 'undefined' && location.hostname === 'localhost' ? 3000 : 0
 /** The logo's fade into the booted screen; displays keep it mounted this long with `leaving`. */
 export const BOOT_FADE_MS = 700

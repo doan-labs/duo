@@ -88,10 +88,12 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   // the logo up while booting.
   const [power, setPower] = useState(device.power)
   const asleep = power.kind === 'asleep' || power.kind === 'off'
-  const switcher = layer.kind === 'switcher'
-  const searching = layer.kind === 'search'
+  // Control Center pulled over another layer leaves that one mounted under it.
+  const base = layer.kind === 'control' ? layer.under : layer
+  const switcher = base.kind === 'switcher'
+  const searching = base.kind === 'search'
   const cc = layer.kind === 'control'
-  const poff = layer.kind === 'power'
+  const poff = base.kind === 'power'
   const locked = lockPhase === 'locked'
   const lockOn = lockPhase !== 'unlocked'
   const ccScrim = useRef<HTMLDivElement>(null)
@@ -145,8 +147,10 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   ]
 
   function lock() {
-    if (lockRef.current === 'locked') return
+    // Every layer drops even when already locked: Control Center or the power
+    // sheet opened over the lock screen must not outlast a sleep.
     emit('lock')
+    if (lockRef.current === 'locked') return
     parkAll()
     emitLock('lock')
     // A fresh element: one still lifting out cannot be the one that comes back.
@@ -286,7 +290,10 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
       screenshot,
       powerSheet: () => emit('open-power')
     }
-    const detach = addDisplay(d, { home: [() => emit('close'), parkAll, ccClose], lock, unlock })
+    // Home with Control Center up drops what is under it and lets the panel
+    // play out; a plain 'close' first would unmount it before ccClose runs.
+    const home = () => (layerRef.current.kind === 'control' ? emit('drop-under') : emit('close'))
+    const detach = addDisplay(d, { home: [home, parkAll, ccClose], lock, unlock })
     const first = boot && byName(boot)
     if (first) open(first, undefined, arg ?? undefined)
     return detach

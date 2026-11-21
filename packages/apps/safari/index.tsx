@@ -45,6 +45,8 @@ type Sheet =
   | { kind: 'page' }
   | { kind: 'tabs' }
   | { kind: 'bookmarks' }
+  /** Bookmarks with its own More menu (New Tab, Close Bookmarks) open over it. */
+  | { kind: 'bookmarks-more' }
   | { kind: 'add-to'; url: string; title: string }
   | { kind: 'more' }
   | { kind: 'page-menu' }
@@ -62,7 +64,8 @@ export const Safari = ({ os }: { os: Os }) => {
   // The overview's segment: the private list or the normal one.
   const [priv, setPriv] = useState(false)
   const grid = sheet.kind === 'tabs'
-  const bookmarks = sheet.kind === 'bookmarks' || sheet.kind === 'add-to'
+  const bookMenu = sheet.kind === 'bookmarks-more'
+  const bookmarks = sheet.kind === 'bookmarks' || sheet.kind === 'add-to' || bookMenu
   // Set by "Add Bookmark to…": the sheet asks which list to save it in.
   const pickFor = sheet.kind === 'add-to' ? { url: sheet.url, title: sheet.title } : null
   const moreOpen = sheet.kind === 'more'
@@ -380,13 +383,25 @@ export const Safari = ({ os }: { os: Os }) => {
               )}
             </div>
           )}
+          {bookmarks && (
+            <Menu
+              open={bookMenu}
+              onClose={() => setSheet((s) => (s.kind === 'bookmarks-more' ? { kind: 'bookmarks' } : s))}
+              xstyle={styles.moreMenu}
+              itemStyle={styles.moreItem}
+              items={[
+                { label: 'New Tab', onSelect: () => open() },
+                { label: 'Close Bookmarks', onSelect: closeBookmarks }
+              ]}
+            />
+          )}
         </div>
-        {(pageMenu || moreOpen) && (
+        {(pageMenu || moreOpen || bookMenu) && (
           <button
             type="button"
             {...stylex.props(styles.pageScrim)}
             aria-label="Close menu"
-            onClick={() => setSheet({ kind: 'page' })}
+            onClick={() => setSheet({ kind: bookMenu ? 'bookmarks' : 'page' })}
           />
         )}
         {!bookmarks && (
@@ -523,7 +538,9 @@ export const Safari = ({ os }: { os: Os }) => {
             <div {...stylex.props(styles.railPill)}>
               <Btn
                 name="more"
-                onClick={() => setSheet((s) => (s.kind === 'more' ? { kind: 'bookmarks' } : { kind: 'more' }))}
+                onClick={() =>
+                  setSheet((s) => (s.kind === 'bookmarks-more' ? { kind: 'bookmarks' } : { kind: 'bookmarks-more' }))
+                }
               />
               <Btn name="close" onClick={closeBookmarks} />
             </div>

@@ -432,12 +432,15 @@ async function doPlay(id: string) {
   if (!memo) return
   const audio = element()
   const p = playCell.get()
+  // Taken before either branch: a resume also supersedes another memo still loading.
+  const mine = ++playSeq
   if (p?.id === memo.id) {
     if (audio.paused) await audio.play().catch(() => {})
-    playCell.set({ ...p, playing: true })
+    // A stop during the await wins over this resume.
+    if (playSeq !== mine) return
+    playCell.set({ ...p, playing: !audio.paused })
     return
   }
-  const mine = ++playSeq
   const blob = await os.files.get(memo.file)
   if (!blob || playSeq !== mine) return
   const url = await dataUrl(blob)
