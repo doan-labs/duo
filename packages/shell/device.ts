@@ -32,13 +32,14 @@ export const unlockAll = () => {
 export const active = { wide: true }
 export type Display = {
   wide: boolean
-  dark: (on: boolean) => void
+  /** The device's power phase changed; the display re-derives what it shows. */
+  power: (p: Power) => void
   launch: (name: string, arg?: string) => void
   cam: () => CameraHooks | null
   hud: () => void
   screenshot: () => void
-  power: () => void
-  boot: () => void
+  /** Opens the slide-to-power-off sheet. */
+  powerSheet: () => void
   /** What is open here, in stage order. */
   stage: () => Stage
   /** Shows exactly `want`, with no zooms: this display is mirroring the other, not launching. */
@@ -95,40 +96,98 @@ const savedLevel = () => {
 }
 
 /**
+ * How long the boot logo stays up at minimum. Only on localhost, where demos
+ * are recorded: a visitor's boot takes exactly as long as the load.
+ */
+/**
+ * How long the boot logo stays up at minimum. Only on localhost, where demos
+ * are recorded: a visitor's boot takes exactly as long as the load.
+ */
+export const BOOT_MS = typeof location !== 'undefined' && location.hostname === 'localhost' ? 3000 : 0
+/** The logo's fade into the booted screen; displays keep it mounted this long with `leaving`. */
+export const BOOT_FADE_MS = 700
+
+/**
+ * The device's power phase: the one value that says whether the glass is dark,
+ * booting, asleep or live. It used to be two booleans (`asleep`, `off`) plus a
+ * boot flag the shell kept separately, which let a side click wake past the
+ * boot screen and left the boot timers running on top of a new boot
+ * (decisions.md 114).
+ */
+export type Power =
+  | { kind: 'off' }
+  /** The logo is up; `leaving` once the live screen is underneath and it is fading out. */
+  | { kind: 'booting'; leaving: boolean }
+  | { kind: 'asleep' }
+  | { kind: 'awake' }
+
+// The boot timers: one handle, owned by the phase that armed it.
+let bootTimer = 0
+const cancelBoot = () => {
+  clearTimeout(bootTimer)
+  bootTimer = 0
+}
+const powerSubs = new Set<(p: Power) => void>()
+/** Runs `f` on every power phase change; the button driver clears dead work with it. */
+export const onPower = (f: (p: Power) => void) => {
+  powerSubs.add(f)
+  return () => powerSubs.delete(f)
+}
+/** Pushes the power phase at every display and at the glass mask, in one place. */
+function syncPower() {
+  for (const d of displays) d.power(device.power)
+  maskDisplays(device.power.kind === 'asleep' || device.power.kind === 'off')
+  powerSubs.forEach((f) => f(device.power))
+}
+
+/**
  * What the buttons on the frame reach. Sleep, wake and power are device-wide; the
  * rest goes to the display in use, as iOS does with one screen at a time.
  */
 export const device = {
-  asleep: false,
-  off: false,
+  power: { kind: 'awake' } as Power,
+  /** Dark to a reader that wants the screen off: asleep or powered down, but lit through a boot. */
+  get asleep() {
+    return device.power.kind === 'asleep' || device.power.kind === 'off'
+  },
+  get off() {
+    return device.power.kind === 'off'
+  },
   /** Ringer level, sixteenths like iOS. */
   level: savedLevel() ?? 10,
   sleep() {
+    if (device.power.kind === 'off' || device.power.kind === 'asleep') return
+    cancelBoot()
     lockAll()
-    device.asleep = true
-    for (const d of displays) d.dark(true)
-    maskDisplays(true)
+    device.power = { kind: 'asleep' }
+    syncPower()
   },
   wake() {
-    if (device.off) return
-    device.asleep = false
-    for (const d of displays) d.dark(false)
-    maskDisplays(false)
+    // A boot plays through: waking early would skip the logo mid-boot.
+    if (device.power.kind !== 'asleep') return
+    device.power = { kind: 'awake' }
+    syncPower()
   },
-  /** The side button clicked: wake to the lock screen, or sleep. Only the swipe unlocks. */
+  /** The side button clicked: wake to the lock screen, or sleep. Dead while off or booting. */
   side() {
-    if (device.off) return
-    if (device.asleep) device.wake()
-    else device.sleep()
+    if (device.power.kind === 'awake') device.sleep()
+    else if (device.power.kind === 'asleep') device.wake()
   },
   /** An app by name on the display in use; `arg` reaches it as `os.arg`. The embed bridge in main.ts uses this. */
   open: (name: string, arg?: string) => inUse().launch(name, arg),
-  siri: () => inUse().launch('Siri'),
-  wallet: () => {
+  siri() {
+    if (device.power.kind === 'off' || device.power.kind === 'booting') return
+    inUse().launch('Siri')
+  },
+  wallet() {
+    if (device.power.kind === 'off' || device.power.kind === 'booting') return
     for (const claim of sideClaims) if (claim()) return
     inUse().launch('Wallet')
   },
-  camera: () => inUse().launch('Camera'),
+  camera() {
+    if (device.power.kind === 'off' || device.power.kind === 'booting') return
+    inUse().launch('Camera')
+  },
   cameraOpen: () => !!inUse().cam(),
   shoot: () => inUse().cam()?.shoot(),
   record: (on: boolean) => inUse().cam()?.record(on),
@@ -145,21 +204,39 @@ export const device = {
   },
   volume(d: number) {
     device.setLevel(device.level + d)
-    if (!device.asleep) inUse().hud()
+    if (device.power.kind === 'awake') inUse().hud()
   },
   screenshot() {
-    if (!device.asleep) inUse().screenshot()
+    if (device.power.kind === 'awake') inUse().screenshot()
   },
-  power() {
-    if (!device.asleep) inUse().power()
+  /** The slide-to-power-off chord held long enough: the sheet, on the display in use. */
+  powerSheet() {
+    if (device.power.kind === 'awake') inUse().powerSheet()
   },
   powerOff() {
-    device.sleep()
-    device.off = true
+    cancelBoot()
+    lockAll()
+    device.power = { kind: 'off' }
+    syncPower()
   },
+  /** Side-button hold while off: the logo goes up and the boot timers are this phase's to own. */
   boot() {
-    device.off = false
-    inUse().boot()
+    if (device.power.kind !== 'off') return
+    cancelBoot()
+    device.power = { kind: 'booting', leaving: false }
+    syncPower()
+    bootTimer = setTimeout(() => {
+      bootTimer = 0
+      if (device.power.kind !== 'booting') return
+      device.power = { kind: 'booting', leaving: true }
+      syncPower()
+      bootTimer = setTimeout(() => {
+        bootTimer = 0
+        if (device.power.kind !== 'booting') return
+        device.power = { kind: 'awake' }
+        syncPower()
+      }, BOOT_FADE_MS)
+    }, BOOT_MS)
   }
 }
 
