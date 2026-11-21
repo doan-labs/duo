@@ -205,7 +205,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
   function place(e: Scene, side: Side | undefined, card: Box, home: Animation | null) {
     const z = box(e.side)
     const z2 = box(side)
-    const other = live.current.find((x) => !x.leaving && x !== e && x.side === side)
+    const other = live.current.find((x) => (x.phase === 'shown' || x.phase === 'parked') && x !== e && x.side === side)
     // Synchronous, so the element is in its new half before the frames below
     // pretend it is still the card.
     flushSync(() =>
@@ -251,7 +251,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
   return (
     <>
       {ctl.scenes
-        .filter((e) => !e.leaving && !e.parked)
+        .filter((e) => e.phase === 'shown')
         .map((e) => (
           <HomeBar
             key={e.id}
