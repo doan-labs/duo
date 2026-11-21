@@ -47,6 +47,7 @@
     "@doan-labs/duo-app-tips": "workspace:*",
     "@doan-labs/duo-app-tv": "workspace:*",
     "@doan-labs/duo-app-wallet": "workspace:*",
-    "@doan-labs/duo-app-weather": "workspace:*"
+    "@doan-labs/duo-app-weather": "workspace:*",
+    "@doan-labs/mono": "file:../../vendor/mono/doan-labs-mono-0.0.1-duo.a3b9aad.tgz"
   }
 }

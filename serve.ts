@@ -1,6 +1,7 @@
 // Dev server. Bun's plain HTML entry server answers every unknown path with
 // the page itself, which turns the USD model into HTML; this serves public/
 // as real files, the way `bun build` and Tauri ship it.
+import { monoAssets } from './mono-plugin.ts'
 import index from './packages/shell/index.html'
 import { buildPreinstalled } from './scripts/build-preinstalled.ts'
 
@@ -13,6 +14,8 @@ Bun.serve({
   development: { hmr: true, console: true },
   async fetch(req) {
     const path = decodeURIComponent(new URL(req.url).pathname)
+    const mono = monoAssets[path.slice(1)]
+    if (mono) return new Response(Bun.file(mono))
     const file = Bun.file(
       `${path.startsWith('/cdn/') || path.startsWith('/preinstalled/') ? './dist' : './public'}${path}`
     )

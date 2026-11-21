@@ -1993,3 +1993,17 @@ keeps the hashed bytes intact and `no-cache` keeps a 404 from being cached as a
 release's absence; the cost is a revalidation (a bodyless `304`) where a hit
 used to be fresh for a year. This supersedes the Worker routing described
 under "Release responses pinned to committed bytes" in web.md.
+
+## 114. Persistence runs on @doan-labs/mono behind an opt-in switch
+
+2026-11-21, accepted for dogfooding. The runtime's IndexedDB calls move behind
+one `Tx` interface in `database.ts` with two backends, IndexedDB and
+`@doan-labs/mono`, so Duo exercises Mono before Mono is on npm. IndexedDB
+stays the default; `?storage=mono` opts a device in and copies its IndexedDB
+data once. Mono comes from `vendor/mono/`, a tarball `scripts/vendor-mono.ts`
+packs from a Mono checkout at a recorded commit, with the Linux x64 Node addon
+so `bun test` runs the storage contract on both engines. `mono-plugin.ts`
+points Mono's worker at `mono/dist/worker-host.js` under the page, which
+serve.ts answers and build.ts copies into `dist/`. Making Mono the default
+needs a native WKWebView run and a decision of its own.
+

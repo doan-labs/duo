@@ -19,8 +19,9 @@ import {
   type Installed,
   type Meta,
   put,
-  range,
   read,
+  remove,
+  removeRange,
   type StoredRelease,
   transaction
 } from './database'
@@ -160,7 +161,7 @@ export function startBuilderPreview() {
           // A tab may close during startup. Recover the durable checkpoint before accepting more code.
           const interrupted = await read<Checkpoint>(tx, 'marks', pendingKey)
           if (interrupted) {
-            tx.objectStore('appdata').delete(range(id))
+            await removeRange(tx, 'appdata', id)
             for (const [key, value] of interrupted.entries) await put(tx, 'appdata', [id, key], value)
             await put(tx, 'meta', id, interrupted.meta)
           }
@@ -174,7 +175,7 @@ export function startBuilderPreview() {
           if (previousRevision) await put(tx, 'checkpoints', [id, previousRevision], checkpoint)
           await put(tx, 'marks', pendingKey, checkpoint)
           if (restoreData) {
-            tx.objectStore('appdata').delete(range(id))
+            await removeRange(tx, 'appdata', id)
             for (const [key, value] of restoreData.entries) await put(tx, 'appdata', [id, key], value)
             await put(tx, 'meta', id, restoreData.meta)
           }
@@ -186,9 +187,9 @@ export function startBuilderPreview() {
             generation: (old?.generation ?? 0) + 1,
             installedAt: Date.now()
           } satisfies Installed)
-          const history = await entries<Checkpoint>(tx, 'checkpoints', id)
+          const history = await entries<Checkpoint>(tx, 'checkpoints', id, { large: false })
           for (const [key] of history.sort((a, b) => b[1].takenAt - a[1].takenAt).slice(10))
-            tx.objectStore('checkpoints').delete([id, key])
+            await remove(tx, 'checkpoints', [id, key])
         })
         staged = true
       })
@@ -203,7 +204,7 @@ export function startBuilderPreview() {
       device.open(id)
       await waiting.promise
       await transaction(['marks'], 'readwrite', async (tx) => {
-        tx.objectStore('marks').delete(pendingKey)
+        await remove(tx, 'marks', pendingKey)
         await put(tx, 'marks', currentKey, request.revision)
       })
       current = { id, revision: request.revision }
@@ -217,10 +218,10 @@ export function startBuilderPreview() {
         await appLock(id, async () => {
           const old = await getInstalled(id)
           await transaction(['marks', 'appdata', 'meta'], 'readwrite', async (tx) => {
-            tx.objectStore('appdata').delete(range(id))
+            await removeRange(tx, 'appdata', id)
             for (const [key, value] of saved.entries) await put(tx, 'appdata', [id, key], value)
             await put(tx, 'meta', id, saved.meta)
-            tx.objectStore('marks').delete(pendingKey)
+            await remove(tx, 'marks', pendingKey)
             if (old)
               await put(tx, 'marks', id, {
                 ...old,

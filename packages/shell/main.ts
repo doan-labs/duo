@@ -652,7 +652,19 @@ if (queued) pose(queued)
 
 if (q.has('debug')) {
   Object.assign(window, {
-    __duo: { bend, phone, renderer, scene, camera, controls, screens, press: hardware.press, device }
+    __duo: {
+      bend,
+      phone,
+      renderer,
+      scene,
+      camera,
+      controls,
+      screens,
+      press: hardware.press,
+      device,
+      // The persistence layer, to assert what a run stored on either engine.
+      db: () => import('./runtime/database.ts')
+    }
   })
 }
 const dir = new THREE.Vector3()

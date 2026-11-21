@@ -31,7 +31,9 @@ and the kit but never share the shell's JavaScript, stylesheet or import map.
 
 ## Responsibilities
 
-`packages/shell/runtime/database.ts` owns IndexedDB transactions; `storage.ts` owns
+`packages/shell/runtime/database.ts` owns the transaction API every runtime module uses and picks
+the storage engine: `database-idb.ts` (IndexedDB, the default) or `database-mono.ts`
+(`@doan-labs/mono`, opt-in with `?storage=mono`, kept in `os.storage`); `storage.ts` owns
 revisioned KV; `releases.ts` downloads and verifies artifacts; `lifecycle.ts` owns
 installation, generations, leases, activation, migration, restore and removal.
 `sessions.ts` owns sessions, sticky effect ownership and commands. `bridge.ts` owns
@@ -93,7 +95,11 @@ button and the side+volume chord never are. See contract §3.8.
 
 ## Persistence and lifecycle
 
-IndexedDB is launch/data authority. Per-app locks and cross-tab leases coordinate durable
+The device's storage engine is launch/data authority: IndexedDB by default, or the Mono store
+`ipduo` in OPFS once a device opts in. Mono's first boot copies every IndexedDB store once
+(`storage-migration.ts`) and leaves IndexedDB untouched, so `?storage=indexeddb` returns to the
+data of that moment. Mono keeps big values (blobs, release html, fields over 64 KiB) in its
+`fs` under `/large/`, written in the same transaction as the row that names them. Per-app locks and cross-tab leases coordinate durable
 transitions; BroadcastChannel only invalidates cached observations. Staging preserves
 running generations. Activation, restoration and removal retire launch authority;
 reinstall cannot revive old writers. First-boot seed/migration markers survive removal.

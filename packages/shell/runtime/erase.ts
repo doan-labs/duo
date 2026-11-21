@@ -8,15 +8,30 @@
 // start `os.` or `duo.`, so erasing a phone must not sign a reader out of a
 // dark page.
 
-import { STORES, transaction } from './database.ts'
+import { activeBackend, STORES, transaction } from './database.ts'
 
 const DEVICE_KEY = /^(?:os|duo)\./
 
 /** Wipes the device and reloads. Both displays share this page, so one reload resets the pair. */
 export async function erase() {
   await transaction([...STORES], 'readwrite', async (tx) => {
-    for (const name of STORES) tx.objectStore(name).clear()
+    for (const name of STORES) await tx.clear(name)
   })
-  for (const key of Object.keys(localStorage)) if (DEVICE_KEY.test(key)) localStorage.removeItem(key)
+  // Erase the engine this tab is not on too, or switching back to it would bring the data back.
+  if ((await activeBackend()).name === 'mono') indexedDB.deleteDatabase('ipduo')
+  else await destroyMono()
+  // The storage engine is how this device keeps data, not data: it survives the erase.
+  for (const key of Object.keys(localStorage))
+    if (DEVICE_KEY.test(key) && key !== 'os.storage') localStorage.removeItem(key)
   location.reload()
+}
+
+async function destroyMono() {
+  // Without OPFS Mono cannot have kept anything here, and its worker is never loaded.
+  if (!navigator.storage?.getDirectory) return
+  try {
+    await (await (await import('@doan-labs/mono')).open('ipduo')).destroy()
+  } catch {
+    // A browser where Mono cannot open has no Mono store to erase.
+  }
 }

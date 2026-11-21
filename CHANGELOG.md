@@ -6,6 +6,10 @@
 
 - `/kit` is the Platform page: Duo taken apart layer by layer, the build rules, the UI kit and the SDK's buttons and sensors on one page. `/sdk` forwards to it.
 
+### Shell
+
+- `?storage=mono` runs the device's storage on `@doan-labs/mono` (OPFS), copying its IndexedDB data once; IndexedDB stays the default.
+
 ## 0.2.0 (2026-09-26)
 
 ### UI kit 1.1.0 → 1.2.0

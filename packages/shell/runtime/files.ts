@@ -7,7 +7,7 @@
 import { fileNameValid, PlatformError } from '../../sdk/guards.ts'
 import type { FileHost } from '../../sdk/legacy.ts'
 import { LIMITS, type StoredFile } from '../../sdk/protocol.ts'
-import { entries, put, read, result, transaction } from './database.ts'
+import { entries, put, read, remove, transaction } from './database.ts'
 
 type Row = { blob: Blob; type: string; size: number; at: number }
 const row = (name: string, r: Row): StoredFile => ({ name, size: r.size, type: r.type, at: r.at })
@@ -16,7 +16,7 @@ export async function fileService(ns: string, method: string, p: Record<string, 
   switch (method) {
     case 'file.list':
       return transaction(['appfiles'], 'readonly', async (tx) =>
-        (await entries<Row>(tx, 'appfiles', ns)).map(([name, r]) => row(name, r))
+        (await entries<Row>(tx, 'appfiles', ns, { large: false })).map(([name, r]) => row(name, r))
       )
     case 'file.get': {
       if (!fileNameValid(p.name)) throw new PlatformError('E_ARGS')
@@ -28,7 +28,7 @@ export async function fileService(ns: string, method: string, p: Record<string, 
       if (!fileNameValid(p.name) || !(blob instanceof Blob) || blob.size > LIMITS.file)
         throw new PlatformError('E_ARGS')
       return transaction(['appfiles'], 'readwrite', async (tx) => {
-        const existing = await entries<Row>(tx, 'appfiles', ns)
+        const existing = await entries<Row>(tx, 'appfiles', ns, { large: false })
         const replacing = existing.find(([name]) => name === p.name)?.[1]
         const used = existing.reduce((n, [, r]) => n + r.size, 0) - (replacing?.size ?? 0)
         if (!replacing && existing.length >= LIMITS.files) throw new PlatformError('E_QUOTA', 'Too many files')
@@ -40,9 +40,7 @@ export async function fileService(ns: string, method: string, p: Record<string, 
     }
     case 'file.del': {
       if (!fileNameValid(p.name)) throw new PlatformError('E_ARGS')
-      return transaction(['appfiles'], 'readwrite', (tx) =>
-        result(tx.objectStore('appfiles').delete([ns, p.name as string])).then(() => undefined)
-      )
+      return transaction(['appfiles'], 'readwrite', (tx) => remove(tx, 'appfiles', [ns, p.name as string]))
     }
   }
   throw new PlatformError('E_ARGS')

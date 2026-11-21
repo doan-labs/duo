@@ -1,2 +1,2 @@
 [serve.static]
-plugins = ["./stylex-plugin.ts"]
+plugins = ["./stylex-plugin.ts", "./mono-plugin.ts"]
