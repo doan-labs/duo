@@ -90,8 +90,9 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
         .catch(() => {})
     emit()
   }
-  const advance = () => {
-    if (atEnd === i) return
+  const advance = (manual = false) => {
+    // A manual Next is the user's own move, not a second report of one end.
+    if (!manual && atEnd === i) return
     atEnd = i
     if (i >= queue.length - 1) {
       // Off the end of Up Next: park on the last episode, stopped.
@@ -160,6 +161,9 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       } else {
         on = !on
         if (on) {
+          // Resuming a track whose end was consumed (a replay of the parked
+          // last one) re-arms it: this end is a new one, not the spent one.
+          atEnd = -1
           tickStart()
           void el()
             .play()
@@ -191,7 +195,7 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       load(i - 1)
     },
     next() {
-      advance()
+      advance(true)
     },
     /** Jumps to a position in the queue; how an Up Next row plays early. */
     load,
@@ -212,6 +216,9 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       const cur = now()
       queue = cur ? [cur] : []
       i = 0
+      // The queue just renumbered around the playing episode: a position
+      // consumed for one episode now names another, so the guard drops it.
+      atEnd = -1
       emit()
     },
     /** Cycles 0.75 -> 1 -> 1.25 -> 1.5 -> 2x. */
