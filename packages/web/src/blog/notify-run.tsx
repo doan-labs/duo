@@ -61,6 +61,11 @@ export function NotifyRun() {
   const say = (line: string) => setLog((l) => [...l, line].slice(-4))
   const run = () => {
     if (state === 'busy') return
+    // A new post owns the screen: the old run's pending writes (the idle reset,
+    // the banner's file-away) must not land inside it.
+    for (const t of timers.current) clearTimeout(t)
+    timers.current = []
+    clearTimeout(filing.current)
     const note = { ...fields, app, id: ++n.current }
     setState('busy')
     // The post's round trip to the shell, slowed enough to see.

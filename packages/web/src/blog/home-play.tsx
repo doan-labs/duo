@@ -111,6 +111,14 @@ export function HomePlay() {
 
   const folder = home.grid.find((s): s is Folder => isFolder(s) && s.id === open) ?? null
 
+  // A pending hold does not outlive the figure.
+  useEffect(
+    () => () => {
+      if (press.current) window.clearTimeout(press.current.timer)
+    },
+    []
+  )
+
   // After a drop, the icon that moved flies in from where the finger let go.
   useLayoutEffect(() => {
     const l = landing.current
@@ -230,7 +238,7 @@ export function HomePlay() {
   }, [home, gx, gy, gs, go])
 
   const down = (slot: Slot, from: From) => (e: ReactPointerEvent<HTMLElement>) => {
-    if (e.button !== 0 || carryRef.current) return
+    if (e.button !== 0 || carryRef.current || press.current) return
     const el = e.currentTarget
     const r = stage.current?.getBoundingClientRect()
     const timer = window.setTimeout(() => {
