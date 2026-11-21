@@ -1976,3 +1976,20 @@ it to the cover app iframe element's raster - an association that does not by
 itself separate a raster, compositor or capture-pipeline defect. It is named
 here only so the two are not conflated; this cull is not asserted as its
 repair.
+
+## 113. The site is hosted on Openship, without the Cloudflare Worker
+
+2026-11-18, accepted. `duo.doan-labs.com` is served by the owner's Openship
+instance as plain static files built from `main` (bun build, model fetch and
+the `catalog` branch included), rebuilt on every push, with missing paths
+answering a real `404`. The Cloudflare Worker, `wrangler.jsonc` and its
+contract check are removed; the Worker existed for two jobs the new host
+covers differently. Range requests for films are answered by the host's own
+static server. The release trees' Cache-Control is now a path header rule on
+the Openship project, `no-cache, no-transform` on every status, because
+Openship applies header rules to all statuses and cannot express the Worker's
+status-conditional `immutable` on hits and `no-store` on misses. `no-transform`
+keeps the hashed bytes intact and `no-cache` keeps a 404 from being cached as a
+release's absence; the cost is a revalidation (a bodyless `304`) where a hit
+used to be fresh for a year. This supersedes the Worker routing described
+under "Release responses pinned to committed bytes" in web.md.

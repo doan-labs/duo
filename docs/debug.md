@@ -303,12 +303,13 @@ deployment trigger or hosting propagation, not submission validation.
 Release-byte integrity is per request class: compare the hosted response against
 `origin/catalog` bytes under both `Accept: */*` (what `fetch` sends) and
 `Accept: text/html` (a document navigation). A mismatch only in the second means
-the edge rewrote the response - the release trees' Worker stamp (`no-transform`
-on hits) is missing, or the path fell outside the `run_worker_first` routes in
-wrangler.jsonc. Misses must answer `no-store`: a long-cache miss pins a
-not-yet-published release's absence. The file hash is in each release's
-`release.json`; `scripts/checks/publish/headers.mjs` holds the config and
-handler contract, and the live check is the two request classes plus a 404.
+the edge rewrote the response - the release trees' `no-transform` header is
+missing (it is a path header rule on the Duo project in Openship, not a repo
+file). Misses must never be cached long: a long-cache miss pins a
+not-yet-published release's absence, so every status under the trees answers
+`Cache-Control: no-cache, no-transform`. The file hash is in each release's
+`release.json`; the live check is the two request classes plus a 404, each
+carrying that header.
 
 When every app on `/apps` reads Created/Updated as the deploy day, the build checkout had
 no usable history or release metadata: shell dates come from `git log` per package (a
