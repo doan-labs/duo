@@ -440,8 +440,9 @@ async function doPlay(id: string) {
   const mine = ++playSeq
   const blob = await os.files.get(memo.file)
   if (!blob || playSeq !== mine) return
-  audio.src = await dataUrl(blob)
+  const url = await dataUrl(blob)
   if (playSeq !== mine) return
+  audio.src = url
   audio.playbackRate = p?.rate ?? 1
   // A scrubbed-but-unplayed memo resumes from the mark, not from zero.
   if (p?.id === memo.id && p.posMs > 0 && !p.playing) audio.currentTime = p.posMs / 1000
