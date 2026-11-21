@@ -152,10 +152,11 @@ function sideButton(down: boolean) {
 
 function volumeButton(b: 'up' | 'down', down: boolean) {
   if (!down) {
+    // Either chord button coming up ends the chord on the side machine, even
+    // when an app owned this press and gets the release.
+    fireSide('chord-release')
     if (tell(b, { action: 'release', button: b }, true)) return
     fireVol(b)('release')
-    // Either chord button coming up ends the chord on the side machine too.
-    fireSide('chord-release')
     return
   }
   // The side button held turns this press into the chord, dead until release.
@@ -186,12 +187,13 @@ function slide(cm: number) {
 export function press(p: Press) {
   if ('slide' in p) return slide(p.slide)
   const { button, down } = p
+  // While the device boots every new press is dead; while off, only the side
+  // button's hold matters - it is what powers the phone back on. Releases
+  // always pass: a listener or machine that got the press needs to see it end.
+  const kind = device.power.kind
+  if (down && (kind === 'booting' || (kind === 'off' && button !== 'side'))) return
   if (down === held.has(button)) return
   held[down ? 'add' : 'delete'](button)
-  // While the device boots every button is dead; while off, only the side
-  // button's hold matters - it is what powers the phone back on.
-  const kind = device.power.kind
-  if (kind === 'booting' || (kind === 'off' && button !== 'side')) return
   if (button === 'side') sideButton(down)
   else if (button === 'camera') cameraButton(down)
   else volumeButton(button, down)
