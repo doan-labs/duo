@@ -58,6 +58,8 @@ export function ReminderRow({ r, tint, last }: { r: Reminder; tint: string; last
 
   const toggle = () => {
     if (done) return setDone(r, false)
+    // The row is already animating out: a second tap would arm a second timer.
+    if (leaving) return
     setLeaving(true)
     beep([1320, 1760], 0.05, 0.05)
     t.current = setTimeout(() => setDone(r, true), 420)

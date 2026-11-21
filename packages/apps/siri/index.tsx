@@ -24,6 +24,9 @@ export const Siri = ({ os }: { os: Os }) => {
   const [answer, setAnswer] = useState<string | null>(null)
   const orb = useRef<HTMLDivElement>(null)
   const stream = useRef<MediaStream>(undefined)
+  // getUserMedia takes a beat: a tap while it is still asking is a re-entry,
+  // not a second listener - without the flag two taps open two mic streams.
+  const asking = useRef(false)
   const raf = useRef(0)
   const timers = useRef<number[]>([])
 
@@ -79,7 +82,16 @@ export const Siri = ({ os }: { os: Os }) => {
       <div
         ref={orb}
         {...stylex.props(styles.orb)}
-        onClick={() => (raf.current ? hush() : listen().catch(() => setSaid('Microphone unavailable.')))}
+        onClick={() => {
+          if (raf.current) return hush()
+          if (asking.current) return
+          asking.current = true
+          listen()
+            .catch(() => setSaid('Microphone unavailable.'))
+            .finally(() => {
+              asking.current = false
+            })
+        }}
       />
       <div {...stylex.props(styles.said)}>{said}</div>
       <div {...stylex.props(styles.out)}>

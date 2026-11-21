@@ -372,9 +372,10 @@ export const Maps = () => {
       query={query}
       onQuery={(next) => {
         const t = next.trim()
-        // Retyping a failed query is a resubmit; a fresh key reopens the fetch.
+        // Resubmitting a failed query - even the same text - is a retry: drop
+        // the dead record so the fetch effect asks again.
         const retry =
-          t && t !== q && found?.key === `${t}|${bucket}` && found.failed
+          t && found?.key === `${t}|${bucket}` && found.failed
             ? { results: { key: '', q: t, list: [], failed: false, tries: 0 } }
             : {}
         share.set({ query: next, ...retry })

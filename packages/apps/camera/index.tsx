@@ -38,6 +38,8 @@ function useWebcam(facing: Facing = 'user') {
   const [stream, setStream] = useState<MediaStream>()
   const [denied, setDenied] = useState(false)
   useEffect(() => {
+    // A fresh facing is a fresh ask: the old camera's 'no' is not this one's.
+    setDenied(false)
     let s: MediaStream | undefined
     let gone = false
     const ask = (c: MediaStreamConstraints) =>

@@ -147,11 +147,42 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       }
       paint()
     }
-    const up = () => {
+    const off = () => {
       removeEventListener('pointermove', move)
       removeEventListener('pointerup', up)
-      removeEventListener('pointercancel', up)
+      removeEventListener('pointercancel', cancel)
       clearTimeout(timer)
+    }
+    const springBack = () => {
+      const start: Keyframe = { transform: el.style.transform || 'none', borderRadius: el.style.borderRadius || '0px' }
+      el.style.transform = ''
+      el.style.borderRadius = ''
+      const back = [
+        el.animate([start, { transform: 'none', borderRadius: 0 }], {
+          duration: 300,
+          easing: 'ease-out',
+          fill: 'both'
+        })
+      ]
+      if (home) {
+        home.reverse()
+        back.push(home)
+      }
+      Promise.all(back.map((a) => a.finished)).then(
+        () => {
+          for (const a of back) a.cancel()
+        },
+        () => {}
+      )
+    }
+    const cancel = () => {
+      // A cancelled touch is not a release: the card springs home, never a tap.
+      off()
+      onDrop(null)
+      springBack()
+    }
+    const up = () => {
+      off()
       // Let go as a card in hand: the switcher lays it out from where it is, so the transform stays.
       if (held && !zoned) {
         home?.cancel()
@@ -174,27 +205,11 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       if (dy > 49 || v > 0.6 || Math.abs(dy) < 4 * s) {
         return park(e.id, [zoom(el, e.from, true, z, start), ...(home ? [home] : [])])
       }
-      const back = [
-        el.animate([start, { transform: 'none', borderRadius: 0 }], {
-          duration: 300,
-          easing: 'ease-out',
-          fill: 'both'
-        })
-      ]
-      if (home) {
-        home.reverse()
-        back.push(home)
-      }
-      Promise.all(back.map((a) => a.finished)).then(
-        () => {
-          for (const a of back) a.cancel()
-        },
-        () => {}
-      )
+      springBack()
     }
     addEventListener('pointermove', move)
     addEventListener('pointerup', up)
-    addEventListener('pointercancel', up)
+    addEventListener('pointercancel', cancel)
   }
 
   /**
