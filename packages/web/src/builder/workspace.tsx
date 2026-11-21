@@ -249,8 +249,10 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     let next: Source | undefined
     await startJob(async (signal, emit) => {
       try {
-        const context = await prompt(project.revisions[project.current]!.source, messages)
+        // First event lands before the prompt's await, so a second call in the
+        // same window already sees a busy job and returns.
         emit({ type: 'generate' })
+        const context = await prompt(project.revisions[project.current]!.source, messages)
         let output = await completion(connection, context, signal, (n) => emit({ type: 'progress', chars: n }))
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
