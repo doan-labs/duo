@@ -36,9 +36,14 @@ export function MicWave() {
   const [playing, setPlaying] = useState(false)
   const stopRef = useRef<(() => void) | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
+  // A run id plus the unmount flag: a getUserMedia resolving after either is a
+  // stream to drop at once, not a recording to start.
+  const run = useRef(0)
+  const dead = useRef(false)
 
   useEffect(
     () => () => {
+      dead.current = true
       stopRef.current?.()
       audio.current?.pause()
     },
@@ -47,14 +52,21 @@ export function MicWave() {
   useEffect(() => () => void (take && URL.revokeObjectURL(take.url)), [take])
 
   const record = async () => {
+    stopRef.current?.()
     audio.current?.pause()
     setPlaying(false)
     setPhase('asking')
+    dead.current = false
+    const mine = ++run.current
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
-      setPhase('blocked')
+      if (!dead.current && run.current === mine) setPhase('blocked')
+      return
+    }
+    if (dead.current || run.current !== mine) {
+      for (const t of stream.getTracks()) t.stop()
       return
     }
     const ctx = new AudioContext()
