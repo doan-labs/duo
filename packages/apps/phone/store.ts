@@ -49,7 +49,7 @@ function cell<T>(key: string | null, initial: T) {
 }
 
 const bookCell = cell<Book>('phone.book', SEED)
-const recentsCell = cell<Recent[]>('phone.recents', SEED_RECENTS)
+export const recentsCell = cell<Recent[]>('phone.recents', SEED_RECENTS)
 const vmCell = cell<Voicemail[]>('phone.voicemail', SEED_VM)
 
 // ---------- session cells: shared by both displays, never persisted ----------
@@ -97,7 +97,7 @@ export type LiveCall = {
 
 export type Incoming = { name: string; number: string; contactId?: string; screening: boolean }
 
-const callsCell = cell<LiveCall[]>(null, [])
+export const callsCell = cell<LiveCall[]>(null, [])
 const incomingCell = cell<Incoming | null>(null, null)
 
 let callSeq = 0
@@ -107,6 +107,12 @@ const dialTimers = new Map<number, number>()
 
 const patchCall = (id: number, patch: Partial<LiveCall>) =>
   callsCell.set(callsCell.get().map((c) => (c.id === id ? { ...c, ...patch } : c)))
+
+/** The foreground line: every other call still dialling or connected drops to hold. */
+function setLive(id: number) {
+  for (const c of callsCell.get())
+    if (c.id !== id && (c.phase === 'calling' || c.phase === 'active')) patchCall(c.id, { phase: 'held' })
+}
 
 /** The one second hand every live call shares; starts on the first call, stops after the last. */
 function ensureTicker() {
@@ -140,8 +146,6 @@ export function place(raw: { number: string; contactId?: string }) {
   const name = 'first' in who ? fullName(who) : who.name
   const number = 'first' in who ? who.phone : who.number
   const contactId = 'first' in who ? who.id : who.contactId
-  // A second call puts the live one on hold, the way the Phone app does.
-  for (const c of callsCell.get()) if (c.phase === 'active') patchCall(c.id, { phase: 'held' })
   const call: LiveCall = {
     id: ++callSeq,
     name,
@@ -156,11 +160,18 @@ export function place(raw: { number: string; contactId?: string }) {
     keypad: false
   }
   callsCell.set([...callsCell.get(), call])
+  // A second call puts the live one on hold, the way the Phone app does - even
+  // one still dialling, which would otherwise connect over the new call.
+  setLive(call.id)
   beep([350, 440], 0.5, 0.05)
   dialTimers.set(
     call.id,
     window.setTimeout(() => {
-      patchCall(call.id, { phase: 'active', connectAt: Date.now() })
+      dialTimers.delete(call.id)
+      const c = callsCell.get().find((x) => x.id === call.id)
+      if (!c || c.phase === 'ended') return
+      // A line held before it connected stays held when the answer arrives.
+      patchCall(call.id, { connectAt: Date.now(), ...(c.phase === 'calling' ? { phase: 'active' } : {}) })
       beep([440, 660], 0.1, 0.07)
       ensureTicker()
     }, 2400)
@@ -171,7 +182,7 @@ export function place(raw: { number: string; contactId?: string }) {
 /** Hang up: the row lingers a beat as 'call ended', then lands in Recents. */
 export function end(id: number) {
   const call = callsCell.get().find((c) => c.id === id)
-  if (!call) return
+  if (!call || call.phase === 'ended') return
   clearTimeout(dialTimers.get(id))
   dialTimers.delete(id)
   pushRecent({
@@ -201,10 +212,10 @@ export function toggleCall(id: number, key: 'muted' | 'speaker' | 'keypad') {
 
 /** Pick the held line back up, putting the live one down: iOS's swap. */
 export function swapCalls(id: number) {
-  for (const c of callsCell.get()) {
-    if (c.id === id) patchCall(c.id, { phase: 'active', connectAt: Date.now() - c.secs * 1000 })
-    else if (c.phase === 'active') patchCall(c.id, { phase: 'held' })
-  }
+  const target = callsCell.get().find((c) => c.id === id)
+  if (!target || target.phase !== 'held') return
+  setLive(id)
+  patchCall(id, { phase: 'active', connectAt: Date.now() - target.secs * 1000 })
   ensureTicker()
 }
 
@@ -264,12 +275,12 @@ export function answer() {
   if (!inc) return
   window.clearTimeout(ringTimer)
   incomingCell.set(null)
-  // Call-waiting: a live line drops to hold when the new one connects.
-  for (const c of callsCell.get()) if (c.phase === 'active') patchCall(c.id, { phase: 'held' })
+  // Call-waiting: a live or still-dialling line drops to hold when the new one connects.
+  const id = ++callSeq
   callsCell.set([
     ...callsCell.get(),
     {
-      id: ++callSeq,
+      id,
       name: inc.name,
       number: inc.number,
       contactId: inc.contactId,
@@ -282,6 +293,7 @@ export function answer() {
       keypad: false
     }
   ])
+  setLive(id)
   ensureTicker()
 }
 
