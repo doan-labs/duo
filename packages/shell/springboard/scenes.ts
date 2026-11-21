@@ -70,8 +70,10 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     setScenes(next)
   }
   const onStage = () => live.current.filter((e) => e.phase === 'shown')
-  /** Everything mounted, on the glass or parked, most recently used first: the switcher's cards. */
-  const recent = () => live.current.filter((e) => e.phase !== 'closing').sort((a, b) => b.used - a.used)
+  /** Everything mounted, on the glass or parked, most recently used first: the switcher's cards.
+   * A mid-transition scene (`parking`, `closing`) is no card: it could not be picked anyway. */
+  const recent = () =>
+    live.current.filter((e) => e.phase === 'shown' || e.phase === 'parked').sort((a, b) => b.used - a.used)
   // Where the divider between two halves sits, as a fraction of the width. A ref
   // for the gestures, which read it between renders; state for the layout.
   const [split, setSplit] = useState(0.5)
