@@ -172,7 +172,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
     launch(n.app, n.arg)
   }
 
-  const cur = scenes.filter((e) => !e.leaving && !e.parked)
+  const cur = scenes.filter((e) => e.phase === 'shown')
   const away = switcher || cur.length === 2 || cur.some((e) => !e.side)
   // The status stack sits top-right, so the app under it decides its colour.
   const topRight = cur.find((e) => e.side !== 'left')
@@ -183,7 +183,12 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   // home, like the cover display's. An app still shrinking out of a half keeps
   // the home there until it is gone, so it lands on the icon it is aiming at.
   const half = cur.filter((e) => e.side)
-  const holder = half.length === 1 ? half[0] : half.length === 0 ? scenes.find((e) => e.leaving && e.side) : undefined
+  const holder =
+    half.length === 1
+      ? half[0]
+      : half.length === 0
+        ? scenes.find((e) => e.phase !== 'shown' && e.phase !== 'parked' && e.side)
+        : undefined
   const homeSide = holder ? (holder.side === 'left' ? 'right' : 'left') : undefined
   // The divider is only there with an app on each side, and goes back to the
   // middle once one leaves: the narrow home the other half shows is always half.
@@ -193,7 +198,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
     if (!two) ctl.setRatio(0.5)
   }, [two])
   /** Nothing on the glass but apps parked behind it: a swipe up from the bottom finds them. */
-  const parked = scenes.some((e) => e.parked && !e.leaving)
+  const parked = scenes.some((e) => e.phase === 'parked')
   const rise = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = disp.current!
     const s = d.clientWidth / d.getBoundingClientRect().width
@@ -401,7 +406,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
                 e.side === 'left' && styles.appLeft(split * 100),
                 e.side === 'right' && styles.appRight(split * 100),
                 (drop?.id === e.id || switcher) && styles.appDrag,
-                e.parked && !switcher && styles.appParked,
+                e.phase === 'parked' && !switcher && styles.appParked,
                 e.a.light && !t.darkMode ? light : dark
               )}
             >
