@@ -195,8 +195,10 @@ keys `min(<full>, (100cqh - <fixed>) / <rows>)`; change `<fixed>` with any heigh
 
 `packages/apps/safari/index.tsx` owns tab history, the floating URL pill and the cover rail;
 `bookmarks.tsx` owns the local Recently Saved, folders and bookmark sections; shared Safari
-layout and material rules stay in `styles.ts`. Real web pages scroll in their own iframe
-viewport. The Duo website mounts `packages/web/src/safari-scroll-bridge.tsx`, which sends only
+layout and material rules stay in `styles.ts`. One `sheet` value picks the surface over the
+page - `page`, `tabs`, `bookmarks`, `add-to`, `more` or `page-menu` - so the tab grid and
+bookmarks can never be open at once; `usePresence` keeps a closing sheet mounted through its
+exit animation. Real web pages scroll in their own iframe viewport. The Duo website mounts `packages/web/src/safari-scroll-bridge.tsx`, which sends only
 scroll direction and position to the parent because cross-origin document scroll events cannot
 reach the Safari DOM. The URL pill compacts into the small gray pill on downward intent and
 expands on upward intent. A page that does not install the bridge remains functional, but its

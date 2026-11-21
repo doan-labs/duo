@@ -153,10 +153,15 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       removeEventListener('pointercancel', cancel)
       clearTimeout(timer)
     }
-    const springBack = () => {
+    // Where the card visually sits right now, then reset to rest. Both release
+    // paths snapshot before clearing or the return animation runs none to none.
+    const snap = (): Keyframe => {
       const start: Keyframe = { transform: el.style.transform || 'none', borderRadius: el.style.borderRadius || '0px' }
       el.style.transform = ''
       el.style.borderRadius = ''
+      return start
+    }
+    const springBack = (start: Keyframe) => {
       const back = [
         el.animate([start, { transform: 'none', borderRadius: 0 }], {
           duration: 300,
@@ -179,7 +184,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       // A cancelled touch is not a release: the card springs home, never a tap.
       off()
       onDrop(null)
-      springBack()
+      springBack(snap())
     }
     const up = () => {
       off()
@@ -189,9 +194,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
         onDrop(null)
         return onSwitch()
       }
-      const start: Keyframe = { transform: el.style.transform || 'none', borderRadius: el.style.borderRadius || '0px' }
-      el.style.transform = ''
-      el.style.borderRadius = ''
+      const start = snap()
       if (held) {
         onDrop(null)
         return place(
@@ -205,7 +208,7 @@ export function HomeBars({ ctl, wide, lockedRef, reveal, off, drop, onDrop, onSw
       if (dy > 49 || v > 0.6 || Math.abs(dy) < 4 * s) {
         return park(e.id, [zoom(el, e.from, true, z, start), ...(home ? [home] : [])])
       }
-      springBack()
+      springBack(start)
     }
     addEventListener('pointermove', move)
     addEventListener('pointerup', up)
