@@ -23,16 +23,19 @@ import { flip } from './toggles.ts'
 
 /**
  * `side` unset is the whole display; `from` is the icon it grew out of and
- * shrinks back into. A `parked` scene is off the glass but still mounted, so the
- * app switcher can show it and put it back with its state intact; `used` orders
- * the switcher, most recent first.
+ * shrinks back into. The scene's `phase` is one discriminated value
+ * (decisions.md 114): `shown` on the glass, `parking` while it zooms out,
+ * `parked` mounted but off the glass so the app switcher can show it and put it
+ * back with its state intact, `closing` while it leaves for good. `used`
+ * orders the switcher, most recent first.
  */
+export type ScenePhase = 'shown' | 'parking' | 'parked' | 'closing'
+
 export type Scene = {
   id: number
   a: App
   ctx: Os
-  leaving: boolean
-  parked?: boolean
+  phase: ScenePhase
   used: number
   side?: Side
   from: Box
@@ -66,9 +69,11 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     live.current = next
     setScenes(next)
   }
-  const onStage = () => live.current.filter((e) => !e.leaving && !e.parked)
-  /** Everything mounted, on the glass or parked, most recently used first: the switcher's cards. */
-  const recent = () => live.current.filter((e) => !e.leaving).sort((a, b) => b.used - a.used)
+  const onStage = () => live.current.filter((e) => e.phase === 'shown')
+  /** Everything mounted, on the glass or parked, most recently used first: the switcher's cards.
+   * A mid-transition scene (`parking`, `closing`) is no card: it could not be picked anyway. */
+  const recent = () =>
+    live.current.filter((e) => e.phase === 'shown' || e.phase === 'parked').sort((a, b) => b.used - a.used)
   // Where the divider between two halves sits, as a fraction of the width. A ref
   // for the gestures, which read it between renders; state for the layout.
   const [split, setSplit] = useState(0.5)
@@ -104,7 +109,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     if (!side && on[0]) side = on[0].side === 'left' ? 'right' : 'left'
     if (on.some((e) => e.side === side)) return
     // Already parked: the app comes back as it was, not as a second copy.
-    const kept = live.current.find((e) => e.parked && !e.leaving && same(e, a))
+    const kept = live.current.find((e) => e.phase === 'parked' && same(e, a))
     if (kept) {
       // A deep link into a parked app (a notification tap) still reaches it.
       if (a.id && arg !== undefined) void deliverArg(a.id, arg)
@@ -136,7 +141,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
       mic: micHost(a.name),
       files: fileHost(`baked:${a.name}`)
     }
-    setList([...live.current, { id, a, ctx, leaving: false, used: Date.now(), side, from }])
+    setList([...live.current, { id, a, ctx, phase: 'shown', used: Date.now(), side, from }])
   }
   const same = (e: Scene, a: App) => (a.id ? e.a.id === a.id : e.a.name === a.name)
   /**
@@ -145,14 +150,14 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
    * and closes, so a parked Camera cannot keep the webcam on.
    */
   function park(id: number, anims?: Animation[]) {
-    const e = live.current.find((x) => x.id === id && !x.leaving && !x.parked)
+    const e = live.current.find((x) => x.id === id && x.phase === 'shown')
     if (!e) return
     if (e.ctx.camera.current) return close(id, anims)
-    setList(live.current.map((x) => (x === e ? { ...x, leaving: true } : x)))
+    setList(live.current.map((x) => (x === e ? { ...x, phase: 'parking' } : x)))
     const el = els.current.get(e.id)
     settle(anims ?? (el ? [zoom(el, e.from, true, box(e.side))] : []), () => {
-      setList(live.current.map((x) => (x.id === e.id ? { ...x, leaving: false, parked: true } : x)))
-      const parked = live.current.filter((x) => x.parked).sort((a, b) => a.used - b.used)
+      setList(live.current.map((x) => (x.id === e.id && x.phase === 'parking' ? { ...x, phase: 'parked' } : x)))
+      const parked = live.current.filter((x) => x.phase === 'parked').sort((a, b) => a.used - b.used)
       for (const old of parked.slice(0, Math.max(0, parked.length - PARKED))) close(old.id, [])
     })
   }
@@ -161,9 +166,9 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
    * `anims` if given (the switcher's card growing into place), else the icon zoom.
    */
   function unpark(id: number, side?: Side, anims?: Animation[] | ((el: HTMLElement) => Animation[])) {
-    const e = live.current.find((x) => x.id === id && x.parked && !x.leaving)
+    const e = live.current.find((x) => x.id === id && x.phase === 'parked')
     if (!e) return
-    flushSync(() => setList(live.current.map((x) => (x === e ? { ...x, parked: false, side, used: Date.now() } : x))))
+    flushSync(() => setList(live.current.map((x) => (x === e ? { ...x, phase: 'shown', side, used: Date.now() } : x))))
     const el = els.current.get(e.id)
     if (!el) return
     const list = typeof anims === 'function' ? anims(el) : (anims ?? [zoom(el, e.from, false, box(side))])
@@ -175,9 +180,9 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
     )
   }
   function close(id: number, anims?: Animation[]) {
-    const e = live.current.find((x) => x.id === id && !x.leaving)
+    const e = live.current.find((x) => x.id === id && x.phase !== 'closing' && x.phase !== 'parking')
     if (!e) return
-    setList(live.current.map((x) => (x === e ? { ...x, leaving: true } : x)))
+    setList(live.current.map((x) => (x === e ? { ...x, phase: 'closing' } : x)))
     const el = els.current.get(e.id)
     settle(anims ?? (el ? [zoom(el, e.from, true, box(e.side))] : []), () => {
       zoomed.current.delete(e.id)
@@ -244,7 +249,7 @@ export function useScenes({ w, hgt, shots, disp, pageRef }: Opts) {
   // of its icon starts here rather than in open().
   useLayoutEffect(() => {
     for (const e of scenes) {
-      if (e.leaving || zoomed.current.has(e.id)) continue
+      if (e.phase !== 'shown' || zoomed.current.has(e.id)) continue
       zoomed.current.add(e.id)
       const el = els.current.get(e.id)
       if (!el) continue

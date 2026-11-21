@@ -116,8 +116,10 @@ const RingingOverlay = () => {
       )
   }
   const snooze = () => {
-    ringing.del()
+    // snoozedUntil lands before the banner clears: the watcher's next tick
+    // between the two writes would see a free slot and ring the alarm again.
     alarms.set(alarms.value.map((a) => (a.id === r.id ? { ...a, snoozedUntil: Date.now() + 9 * 60 * 1000 } : a)))
+    ringing.del()
   }
 
   return (

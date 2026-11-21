@@ -16,6 +16,7 @@ export type Media = {
   duration: number
   playbackRate: number
   preload: string
+  ended: boolean
   play(): Promise<void>
   pause(): void
   addEventListener(type: 'ended', cb: () => void): void
@@ -37,16 +38,27 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
   let on = false
   let rate = 1
   let timer: ReturnType<typeof setInterval> | null = null
+  // A track's end reaches advance() twice - the 'ended' event and the 250 ms
+  // clock poll - and each would move the queue on, skipping an episode. The
+  // guard is the position whose end was already consumed: a second call for it
+  // is a no-op, while the new track's own end still lands.
+  let atEnd = -1
   const subs = new Set<() => void>()
   const emit = () => {
     for (const f of subs) f()
   }
   const el = () => {
     if (!a) {
-      a = makeAudio()
-      a.preload = 'none'
-      a.addEventListener('ended', advance)
-      a.playbackRate = rate
+      const media = makeAudio()
+      media.preload = 'none'
+      media.addEventListener('ended', () => {
+        // A queued 'ended' can arrive after the poll already advanced and the
+        // element was reloaded; it then describes a track the deck already left.
+        if (!media.ended) return
+        advance()
+      })
+      media.playbackRate = rate
+      a = media
     }
     return a
   }
@@ -67,6 +79,8 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
     if (!queue.length) return
     i = ((n % queue.length) + queue.length) % queue.length
     t = 0
+    // Stepping back onto a track that already ended re-arms its end.
+    if (i === atEnd) atEnd = -1
     el().src = now()!.src
     el().playbackRate = rate
     api.onStart?.(now()!)
@@ -76,7 +90,10 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
         .catch(() => {})
     emit()
   }
-  const advance = () => {
+  const advance = (manual = false) => {
+    // A manual Next is the user's own move, not a second report of one end.
+    if (!manual && atEnd === i) return
+    atEnd = i
     if (i >= queue.length - 1) {
       // Off the end of Up Next: park on the last episode, stopped.
       on = false
@@ -124,6 +141,7 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       queue = list.slice()
       i = idx
       t = 0
+      atEnd = -1
       on = true
       tickStart()
       load(i)
@@ -143,6 +161,9 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       } else {
         on = !on
         if (on) {
+          // Resuming a track whose end was consumed (a replay of the parked
+          // last one) re-arms it: this end is a new one, not the spent one.
+          atEnd = -1
           tickStart()
           void el()
             .play()
@@ -174,7 +195,7 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       load(i - 1)
     },
     next() {
-      advance()
+      advance(true)
     },
     /** Jumps to a position in the queue; how an Up Next row plays early. */
     load,
@@ -195,6 +216,9 @@ export function deck(eps: Ep[], makeAudio: () => Media = () => new Audio(), opts
       const cur = now()
       queue = cur ? [cur] : []
       i = 0
+      // The queue just renumbered around the playing episode: a position
+      // consumed for one episode now names another, so the guard drops it.
+      atEnd = -1
       emit()
     },
     /** Cycles 0.75 -> 1 -> 1.25 -> 1.5 -> 2x. */

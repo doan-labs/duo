@@ -207,6 +207,10 @@ export type Runner = { open: (app: string, arg?: string) => void; home: () => vo
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+// Which launch owns each shortcut's cleanup: a finished run's tidy-up timer can
+// land after a new run started, and only the newest run may clear the state.
+const runSeq = new Map<string, number>()
+
 /**
  * Runs a shortcut: marks it running, works the steps after a beat, then records
  * the outcome. 'Go Home' reaches os.home, a known app opens through os.open,
@@ -214,6 +218,11 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
  * clear feedback instead of a dead tap. A shortcut with no steps fails.
  */
 export async function runShortcut(sc: Shortcut, os: Runner, hold = 420): Promise<Run> {
+  // A tap during a run is a re-entry, not a second run.
+  if (statesCell.get()[sc.id] === 'running')
+    return { id: uid('run'), name: sc.name, at: Date.now(), ok: false, detail: 'Already running' }
+  const seq = (runSeq.get(sc.id) ?? 0) + 1
+  runSeq.set(sc.id, seq)
   statesCell.set({ ...statesCell.get(), [sc.id]: 'running' })
   await sleep(hold)
   const steps = sc.steps.filter((s) => s.action.trim())
@@ -244,7 +253,7 @@ export async function runShortcut(sc: Shortcut, os: Runner, hold = 420): Promise
   say(ok ? `${sc.name} finished` : `${sc.name} couldn't run - add an action`)
   setTimeout(() => {
     const s = statesCell.get()
-    if (s[sc.id] !== 'running') {
+    if (s[sc.id] !== 'running' && runSeq.get(sc.id) === seq) {
       const next = { ...s }
       delete next[sc.id]
       statesCell.set(next)

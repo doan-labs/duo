@@ -40,6 +40,17 @@ const tab = (url?: string, priv = false): Tab => ({ id: seq++, hist: url ? [url]
 const at = (x: Tab) => x.hist[x.at]
 const name = (x: Tab) => (at(x) ? host(at(x)!) : 'Start Page')
 
+/** The one surface on top of the page, mutually exclusive by construction. */
+type Sheet =
+  | { kind: 'page' }
+  | { kind: 'tabs' }
+  | { kind: 'bookmarks' }
+  /** Bookmarks with its own More menu (New Tab, Close Bookmarks) open over it; `pick` keeps an Add-to in progress. */
+  | { kind: 'bookmarks-more'; pick?: { url: string; title: string } }
+  | { kind: 'add-to'; url: string; title: string }
+  | { kind: 'more' }
+  | { kind: 'page-menu' }
+
 export const Safari = ({ os }: { os: Os }) => {
   const home = typeof window !== 'undefined' && isDev(window.location.hostname) ? DEV_HOME : HOME
   const book = useSyncExternalStore(safari.subscribe, safari.get)
@@ -47,14 +58,26 @@ export const Safari = ({ os }: { os: Os }) => {
   // The open tab by id, which a tab closing before it cannot shift; the first
   // tab until one is picked.
   const [cur, setCur] = useState(-1)
-  const [grid, setGrid] = useState(false)
+  // Five flags became one value because handlers kept resetting different
+  // subsets of them, leaving the tab grid and bookmarks open together.
+  const [sheet, setSheet] = useState<Sheet>({ kind: 'page' })
   // The overview's segment: the private list or the normal one.
   const [priv, setPriv] = useState(false)
-  const [bookmarks, setBookmarks] = useState(false)
+  const grid = sheet.kind === 'tabs'
+  const bookMenu = sheet.kind === 'bookmarks-more'
+  const bookmarks = sheet.kind === 'bookmarks' || sheet.kind === 'add-to' || bookMenu
   // Set by "Add Bookmark to…": the sheet asks which list to save it in.
-  const [pickFor, setPickFor] = useState<{ url: string; title: string } | null>(null)
-  const [moreOpen, setMoreOpen] = useState(false)
-  const [pageMenu, setPageMenu] = useState(false)
+  const pickFor =
+    sheet.kind === 'add-to'
+      ? { url: sheet.url, title: sheet.title }
+      : sheet.kind === 'bookmarks-more'
+        ? (sheet.pick ?? null)
+        : null
+  /** Closing the bookmarks menu goes back to what was under it: the Add-to pick, or plain bookmarks. */
+  const unMenu = (s: Sheet): Sheet =>
+    s.kind === 'bookmarks-more' ? (s.pick ? { kind: 'add-to', ...s.pick } : { kind: 'bookmarks' }) : s
+  const moreOpen = sheet.kind === 'more'
+  const pageMenu = sheet.kind === 'page-menu'
   const [urlCompact, setUrlCompact] = useState(false)
   const [zooms, setZooms] = useState<Record<string, number>>({})
   const bookmarkPage = usePresence(bookmarks)
@@ -124,10 +147,7 @@ export const Safari = ({ os }: { os: Os }) => {
     const h = [...t.hist.slice(0, t.at + 1), v]
     show(h, h.length - 1)
     if (!t.priv) visit(v, host(v))
-    setBookmarks(false)
-    setPickFor(null)
-    setMoreOpen(false)
-    setPageMenu(false)
+    setSheet({ kind: 'page' })
     setUrlCompact(false)
   }
   // Re-assigning the same src is how an iframe reloads; React would see no change.
@@ -138,7 +158,7 @@ export const Safari = ({ os }: { os: Os }) => {
   const pick = (x: Tab) => {
     setCur(x.id)
     fresh(x)
-    setGrid(false)
+    setSheet({ kind: 'page' })
     setUrlCompact(false)
   }
   // A new tab joins the list on show: the overview's segment, else the open tab's.
@@ -147,10 +167,7 @@ export const Safari = ({ os }: { os: Os }) => {
     setTabs([...tabs, x])
     setCur(x.id)
     setText('')
-    setBookmarks(false)
-    setPickFor(null)
-    setMoreOpen(false)
-    setGrid(false)
+    setSheet({ kind: 'page' })
     setUrlCompact(false)
     setTimeout(() => field.current?.focus())
   }
@@ -166,14 +183,11 @@ export const Safari = ({ os }: { os: Os }) => {
     setTabs(rest)
     setCur(next.id)
     fresh(next)
-    setMoreOpen(false)
     setUrlCompact(false)
   }
   const overview = () => {
     setPriv(t.priv)
-    setMoreOpen(false)
-    setPageMenu(false)
-    setGrid(true)
+    setSheet({ kind: 'tabs' })
   }
   // Done goes back to the open tab if it is in the list on show, else to that
   // list's last tab, else to a new one in it.
@@ -240,10 +254,7 @@ export const Safari = ({ os }: { os: Os }) => {
     }
   }
   const page = () => (url ? { url, title: pageTitle() ?? host(url) } : null)
-  const closeBookmarks = () => {
-    setBookmarks(false)
-    setPickFor(null)
-  }
+  const closeBookmarks = () => setSheet({ kind: 'page' })
   const more: MenuEntry[] = [
     { icon: 'share', label: 'Share', onSelect: share },
     {
@@ -260,8 +271,8 @@ export const Safari = ({ os }: { os: Os }) => {
       label: 'Add Bookmark to…',
       disabled: !url,
       onSelect: () => {
-        setPickFor(page())
-        setBookmarks(true)
+        const p = page()
+        if (p) setSheet({ kind: 'add-to', url: p.url, title: p.title })
       }
     },
     'separator',
@@ -272,10 +283,7 @@ export const Safari = ({ os }: { os: Os }) => {
     {
       icon: 'book',
       label: 'Bookmarks',
-      onSelect: () => {
-        setPickFor(null)
-        setBookmarks(true)
-      }
+      onSelect: () => setSheet({ kind: 'bookmarks' })
     },
     { icon: 'tabs', label: 'All Tabs', onSelect: overview }
   ]
@@ -385,8 +393,8 @@ export const Safari = ({ os }: { os: Os }) => {
           )}
           {bookmarks && (
             <Menu
-              open={moreOpen}
-              onClose={() => setMoreOpen(false)}
+              open={bookMenu}
+              onClose={() => setSheet(unMenu)}
               xstyle={styles.moreMenu}
               itemStyle={styles.moreItem}
               items={[
@@ -396,22 +404,19 @@ export const Safari = ({ os }: { os: Os }) => {
             />
           )}
         </div>
-        {(pageMenu || moreOpen) && (
+        {(pageMenu || moreOpen || bookMenu) && (
           <button
             type="button"
             {...stylex.props(styles.pageScrim)}
             aria-label="Close menu"
-            onClick={() => {
-              setPageMenu(false)
-              setMoreOpen(false)
-            }}
+            onClick={() => setSheet((s) => (bookMenu ? unMenu(s) : { kind: 'page' }))}
           />
         )}
         {!bookmarks && (
           <div {...stylex.props(styles.foot)}>
             <Menu
               open={pageMenu}
-              onClose={() => setPageMenu(false)}
+              onClose={() => setSheet((s) => (s.kind === 'page-menu' ? { kind: 'page' } : s))}
               size={18}
               xstyle={styles.pageMenu}
               itemStyle={styles.moreItem}
@@ -420,7 +425,7 @@ export const Safari = ({ os }: { os: Os }) => {
             />
             <Menu
               open={moreOpen}
-              onClose={() => setMoreOpen(false)}
+              onClose={() => setSheet((s) => (s.kind === 'more' ? { kind: 'page' } : s))}
               size={18}
               xstyle={[styles.pageMenu, styles.menuRight]}
               itemStyle={styles.moreItem}
@@ -483,7 +488,9 @@ export const Safari = ({ os }: { os: Os }) => {
                       aria-label="Page actions"
                       aria-expanded={pageMenu}
                       tabIndex={urlCompact ? -1 : undefined}
-                      onClick={() => setPageMenu((o) => !o)}
+                      onClick={() =>
+                        setSheet((s) => (s.kind === 'page-menu' ? { kind: 'page' } : { kind: 'page-menu' }))
+                      }
                     >
                       <Sym name="pageMenu" size={20} />
                     </button>
@@ -523,7 +530,7 @@ export const Safari = ({ os }: { os: Os }) => {
                     aria-label="More"
                     aria-expanded={moreOpen}
                     tabIndex={urlCompact ? -1 : undefined}
-                    onClick={() => setMoreOpen((o) => !o)}
+                    onClick={() => setSheet((s) => (s.kind === 'more' ? { kind: 'page' } : { kind: 'more' }))}
                   >
                     <Sym name="ellipsis" size={20} />
                   </button>
@@ -537,27 +544,26 @@ export const Safari = ({ os }: { os: Os }) => {
         <div {...stylex.props(styles.rail)}>
           {bookmarks ? (
             <div {...stylex.props(styles.railPill)}>
-              <Btn name="more" onClick={() => setMoreOpen((open) => !open)} />
               <Btn
-                name="close"
-                onClick={() => {
-                  closeBookmarks()
-                  setMoreOpen(false)
-                }}
+                name="more"
+                onClick={() =>
+                  setSheet((s) =>
+                    s.kind === 'bookmarks-more'
+                      ? unMenu(s)
+                      : {
+                          kind: 'bookmarks-more',
+                          pick: s.kind === 'add-to' ? { url: s.url, title: s.title } : undefined
+                        }
+                  )
+                }
               />
+              <Btn name="close" onClick={closeBookmarks} />
             </div>
           ) : (
             <>
               <div {...stylex.props(styles.railPill)}>
                 <Btn name="back" disabled={t.at === 0} onClick={() => step(-1)} />
-                <Btn
-                  name="bookOutline"
-                  onClick={() => {
-                    setMoreOpen(false)
-                    setPickFor(null)
-                    setBookmarks(true)
-                  }}
-                />
+                <Btn name="bookOutline" onClick={() => setSheet({ kind: 'bookmarks' })} />
               </div>
               <div {...stylex.props(styles.railGap)} />
               <div {...stylex.props(styles.railPill)}>

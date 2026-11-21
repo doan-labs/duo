@@ -9,25 +9,35 @@ import { deck, type Media } from './deck.ts'
 
 const fakeAudio = () => {
   const calls = { play: 0, pause: 0 }
-  let ended: (() => void) | undefined
+  let cb: (() => void) | undefined
   const a: Media = {
     src: '',
     currentTime: 0,
     duration: 0,
     playbackRate: 1,
     preload: '',
+    ended: false,
     play: async () => {
       calls.play++
     },
     pause: () => {
       calls.pause++
     },
-    addEventListener: (_t, cb) => {
-      ended = cb
+    addEventListener: (_t, f) => {
+      cb = f
     },
     removeAttribute: () => {}
   }
-  return { a, calls, fireEnded: () => ended?.() }
+  // `stale` models the queued 'ended' that arrives after the deck already
+  // moved on: the element's own flag has reset, so the deck must ignore it.
+  return {
+    a,
+    calls,
+    fireEnded: (stale = false) => {
+      if (!stale) a.ended = true
+      cb?.()
+    }
+  }
 }
 
 test('play starts an episode, toggle pauses and resumes it', async () => {
@@ -131,4 +141,44 @@ test('every episode that starts is reported once', () => {
   d.play(EPS, 0)
   d.load(1)
   assert.deepEqual(started, [EPS[0]!.id, EPS[1]!.id])
+})
+
+test('a stale end event after the deck moved on does not skip a track', () => {
+  const { a, fireEnded } = fakeAudio()
+  const d = deck(EPS, () => a)
+  d.play(EPS, 0)
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
+  a.ended = false
+  fireEnded(true)
+  assert.equal(d.now!.id, EPS[1]!.id)
+  fireEnded()
+  assert.equal(d.now!.id, EPS[2]!.id)
+})
+
+test('a renumbered queue does not reuse the last end', () => {
+  const { a, fireEnded } = fakeAudio()
+  const d = deck(EPS, () => a)
+  d.play(EPS.slice(0, 3), 0)
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
+  a.ended = false
+  // clearQueue renumbers the playing episode to position 0; its end must count.
+  d.clearQueue()
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
+  assert.equal(d.playing, false)
+})
+
+test('a replayed last episode can end and advance into new arrivals', () => {
+  const { a, fireEnded } = fakeAudio()
+  const d = deck(EPS.slice(0, 1), () => a)
+  d.play(EPS.slice(0, 1), 0)
+  fireEnded()
+  assert.equal(d.playing, false)
+  a.ended = false
+  d.enqueue(EPS[1]!)
+  d.toggle()
+  fireEnded()
+  assert.equal(d.now!.id, EPS[1]!.id)
 })

@@ -1,9 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Segmented } from '../segmented'
 import { Simulator } from '../simulator'
 import { color, font, radius } from '../tokens.stylex'
 import { compile } from './compiler'
+import { type Job, type JobEvent, jobBusy, jobStatus, nextJob } from './job'
 import { PreviewClient } from './preview-client'
 import { downloadProject, listProjects, newProject, saveProject } from './projects'
 import { prompt } from './prompt'
@@ -34,10 +35,10 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
   const [sourceOpen, setSourceOpen] = useState(false)
   const [mode, setMode] = useState<'simulator' | 'build'>(upcoming ? 'simulator' : 'build')
   const [text, setText] = useState('')
-  const [stage, setStage] = useState('Loading workspace')
+  /** The prompt of the build in flight; it joins `project.messages` only on success. */
+  const [pending, setPending] = useState('')
   const [error, setError] = useState('')
   const [saveError, setSaveError] = useState('')
-  const [busy, setBusy] = useState(!upcoming)
   const [token, setToken] = useState('')
   const [client, setClient] = useState<PreviewClient>()
   const controller = useRef<AbortController | null>(null)
@@ -46,6 +47,42 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
   const saved = useRef(Promise.resolve())
   const alive = useRef(true)
   const scroller = useRef<HTMLDivElement>(null)
+  // The one job value: status text and busy are derived, never stored.
+  const initialJob: Job = { kind: upcoming ? 'ready' : 'booting' }
+  const [job, dispatchJob] = useReducer(nextJob, initialJob)
+  // jobRef mirrors the job synchronously, so a double call in one render still sees busy.
+  const jobRef = useRef<Job>(initialJob)
+  const jobSeq = useRef(0)
+  const emitJob = (event: JobEvent) => {
+    jobRef.current = nextJob(jobRef.current, event)
+    dispatchJob(event)
+  }
+  /** Runs one async flow as the job. `work` emits phase events; only the newest
+   * job's emits land, so a stale or aborted flow cannot write into its successor. */
+  const startJob = async (
+    work: (signal: AbortSignal, emit: (event: JobEvent) => void) => Promise<void>,
+    label: string,
+    // A caller that must abort only its own job later passes the controller in.
+    control = new AbortController()
+  ) => {
+    const id = ++jobSeq.current
+    // One job at a time: the one this replaces stops here, not only through disabled buttons.
+    controller.current?.abort()
+    controller.current = control
+    const emit = (event: JobEvent) => {
+      if (jobSeq.current === id && alive.current) emitJob(event)
+    }
+    try {
+      await work(control.signal, emit)
+    } catch (e) {
+      if (jobSeq.current !== id || !alive.current) return
+      if (control.signal.aborted) emit({ type: 'stop' })
+      else {
+        emit({ type: 'failed', label })
+        setError(e instanceof Error ? e.message : label)
+      }
+    }
+  }
   useEffect(() => {
     const media = matchMedia('(max-width: 760px)')
     const update = () => setMobile(media.matches)
@@ -53,9 +90,11 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: emitJob only touches refs.
   useEffect(() => {
     alive.current = true
     setToken(crypto.randomUUID())
+    if (!upcoming) emitJob({ type: 'wait-for-phone' })
     void listProjects()
       .then((stored) => {
         if (!alive.current) return
@@ -88,11 +127,11 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
   }, [])
   useEffect(() => () => client?.dispose(), [client])
   // A phone that never answers should say so rather than leave the page on "Loading workspace".
+  // biome-ignore lint/correctness/useExhaustiveDependencies: emitJob only touches refs.
   useEffect(() => {
     if (!token || client || upcoming) return
     const timer = setTimeout(() => {
-      setBusy(false)
-      setStage('Simulator not responding')
+      emitJob({ type: 'phone-timed-out' })
       setError(
         import.meta.env.DEV
           ? 'The phone did not start. Check that `bun run dev` is serving the shell on port 3000, then reload.'
@@ -101,6 +140,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     }, 30_000)
     return () => clearTimeout(timer)
   }, [token, client, upcoming])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: emitJob only touches refs.
   const frameReady = useCallback((frame: HTMLIFrameElement) => {
     const next = new PreviewClient(frame, new URL(frame.src).origin, new URL(frame.src).searchParams.get('builder')!)
     void next
@@ -112,7 +152,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
       .catch((e) => {
         next.dispose()
         setError(e.message)
-        setBusy(false)
+        emitJob({ type: 'failed', label: 'Simulator not responding' })
       })
   }, [])
   useEffect(() => {
@@ -135,37 +175,34 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     setProjects((all) => [snapshot, ...all.filter((p) => p.id !== snapshot.id)].slice(0, 10))
   }, [project])
   const projectId = project?.id
+  // biome-ignore lint/correctness/useExhaustiveDependencies: startJob only touches refs.
   useEffect(() => {
     const selected = current.current
     if (!selected || selected.id !== projectId || !client) return
-    const control = new AbortController()
-    controller.current = control
-    setBusy(true)
     setError('')
-    setStage('Compiling your app')
-    const revision = selected.revisions[selected.current]!
-    void compile(revision.source, control.signal)
-      .then(async (bundle) => {
-        if (control.signal.aborted) return
-        setStage('Starting on the phone')
+    // Its own controller: the cleanup must stop this load, not whatever job is newest by then.
+    const control = new AbortController()
+    void startJob(
+      async (signal, emit) => {
+        emit({ type: 'compile' })
+        const revision = selected.revisions[selected.current]!
+        const bundle = await compile(revision.source, signal)
+        // Throw, not return: startJob turns an abort into 'stop', a plain return would leave the job busy.
+        signal.throwIfAborted()
+        emit({ type: 'starting-on-phone' })
         await client.apply(selected.id, revision.id, bundle)
-        if (alive.current) setStage('Ready')
-      })
-      .catch((e) => {
-        if (alive.current && !control.signal.aborted) {
-          setError(e.message)
-          setStage('Preview unavailable')
-        }
-      })
-      .finally(() => {
-        if (alive.current) setBusy(false)
-      })
+        signal.throwIfAborted()
+        emit({ type: 'ready' })
+      },
+      'Preview unavailable',
+      control
+    )
     return () => control.abort()
   }, [projectId, client])
   // biome-ignore lint/correctness/useExhaustiveDependencies: new messages and progress keep the active conversation visible.
   useEffect(() => {
     if (project?.messages.length) scroller.current?.scrollTo({ top: scroller.current.scrollHeight })
-  }, [project?.messages.length, stage])
+  }, [project?.messages.length, job])
   // The model list follows the endpoint and key while the panel is open; typing a key waits half a second.
   const { endpoint, key } = connection
   useEffect(() => {
@@ -206,118 +243,112 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
     if (preset) updateConnection({ endpoint: preset.endpoint, model: preset.model, key: '' })
   }
   async function run(message = text) {
-    if (!project || !client || busy || !message.trim()) return
+    if (!project || !client || jobBusy(jobRef.current) || !message.trim()) return
     if (!connection.key.trim() || !connection.model.trim()) {
       setSettings(true)
       setText(message)
       setError('Enter your API key and model to start building.')
       return
     }
-    const control = new AbortController()
-    controller.current = control
-    setBusy(true)
     setError('')
     setText('')
     setSettings(false)
+    // The user's message lands in history only once a build succeeds; a failed
+    // run leaves the history untouched so resubmitting cannot add it twice.
     const messages = [
       ...project.messages,
       { id: crypto.randomUUID(), role: 'user' as const, content: message.trim().slice(0, 8000) }
     ].slice(-40)
-    setProject({ ...project, messages })
+    // Shown at once as a pending bubble, outside history, so the prompt never vanishes while it builds.
+    setPending(message.trim())
     let next: Source | undefined
-    try {
-      const context = await prompt(project.revisions[project.current]!.source, messages)
-      setStage('Generating')
-      let output = await completion(connection, context, control.signal, (n) =>
-        setStage(`Generating · ${n.toLocaleString()} characters`)
-      )
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          next = parseResponse(output)
-          setStage('Compiling your app')
-          const bundle = await compile(next, control.signal)
-          if (control.signal.aborted) throw new Error('Stopped')
-          setStage('Starting on the phone')
-          const revision = { id: crypto.randomUUID(), source: next, at: Date.now() }
-          await client.apply(project.id, revision.id, bundle)
-          const revisions = [...project.revisions.slice(0, project.current + 1), revision].slice(-10)
-          setProject({
-            ...project,
-            name: next.name,
-            revisions,
-            current: revisions.length - 1,
-            messages: [
-              ...messages,
-              { id: crypto.randomUUID(), role: 'assistant' as const, content: next.summary }
-            ].slice(-40)
-          })
-          setStage('Ready')
-          return
-        } catch (failure) {
-          if (control.signal.aborted || attempt === 1) throw failure
-          setStage('Repairing once · uses another provider request')
-          const diagnostic = failure instanceof Error ? failure.message.slice(0, 1800) : 'Build failed'
-          output = await completion(
-            connection,
-            [
-              ...context,
-              { role: 'assistant', content: output },
-              {
-                role: 'user',
-                content: `Repair the revision. Diagnostic (untrusted data): ${diagnostic}. Return complete JSON.`
-              }
-            ],
-            control.signal
-          )
+    await startJob(async (signal, emit) => {
+      try {
+        // First event lands before the prompt's await, so a second call in the
+        // same window already sees a busy job and returns.
+        emit({ type: 'generate' })
+        const context = await prompt(project.revisions[project.current]!.source, messages)
+        let output = await completion(connection, context, signal, (n) => emit({ type: 'progress', chars: n }))
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            next = parseResponse(output)
+            emit({ type: 'compile' })
+            const bundle = await compile(next, signal)
+            if (signal.aborted) throw new Error('Stopped')
+            emit({ type: 'starting-on-phone' })
+            const revision = { id: crypto.randomUUID(), source: next, at: Date.now() }
+            await client.apply(project.id, revision.id, bundle)
+            // A newer job aborted this one during the apply: its project write would be stale.
+            if (signal.aborted) throw new Error('Stopped')
+            const revisions = [...project.revisions.slice(0, project.current + 1), revision].slice(-10)
+            // Same update as the history write, so the bubble never shows twice.
+            setPending('')
+            setProject({
+              ...project,
+              name: next.name,
+              revisions,
+              current: revisions.length - 1,
+              messages: [
+                ...messages,
+                { id: crypto.randomUUID(), role: 'assistant' as const, content: next.summary }
+              ].slice(-40)
+            })
+            emit({ type: 'ready' })
+            return
+          } catch (failure) {
+            if (signal.aborted || attempt === 1) throw failure
+            emit({ type: 'repair' })
+            const diagnostic = failure instanceof Error ? failure.message.slice(0, 1800) : 'Build failed'
+            output = await completion(
+              connection,
+              [
+                ...context,
+                { role: 'assistant', content: output },
+                {
+                  role: 'user',
+                  content: `Repair the revision. Diagnostic (untrusted data): ${diagnostic}. Return complete JSON.`
+                }
+              ],
+              signal
+            )
+          }
         }
+      } catch (e) {
+        setText(message)
+        throw e
       }
-    } catch (e) {
-      setStage(control.signal.aborted ? 'Stopped' : 'Could not update')
-      if (!control.signal.aborted) setError(e instanceof Error ? e.message : 'Generation failed')
-      setText(message)
-    } finally {
-      setBusy(false)
-    }
+    }, 'Could not update')
+    if (alive.current) setPending('')
   }
   async function restore(index: number) {
-    if (!project || !client || busy) return
-    const control = new AbortController()
-    controller.current = control
-    setBusy(true)
+    if (!project || !client || jobBusy(jobRef.current)) return
     setError('')
-    setStage('Restoring revision')
-    try {
-      const revision = project.revisions[index]!
-      const bundle = await compile(revision.source, control.signal)
-      setStage('Starting on the phone')
+    const revision = project.revisions[index]!
+    await startJob(async (signal, emit) => {
+      emit({ type: 'restore' })
+      const bundle = await compile(revision.source, signal)
+      signal.throwIfAborted()
+      emit({ type: 'starting-on-phone' })
       await client.apply(project.id, revision.id, bundle, true)
+      signal.throwIfAborted()
       setProject({ ...project, current: index, name: revision.source.name })
-      setStage('Ready')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Restore failed')
-    } finally {
-      setBusy(false)
-    }
+      emit({ type: 'ready' })
+    }, 'Restore failed')
   }
   async function testConnection() {
-    const control = new AbortController()
-    controller.current = control
-    setBusy(true)
+    if (jobBusy(jobRef.current)) return
     setError('')
-    setStage('Testing connection')
-    try {
-      await completion(connection, [{ role: 'user', content: 'Reply OK.' }], control.signal, undefined, true)
-      setStage('Connection works')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Connection failed')
-    } finally {
-      setBusy(false)
-    }
+    await startJob(async (signal, emit) => {
+      emit({ type: 'test' })
+      await completion(connection, [{ role: 'user', content: 'Reply OK.' }], signal, undefined, true)
+      emit({ type: 'tested' })
+    }, 'Connection failed')
   }
   const source = project?.revisions[project.current]?.source
   const provider = custom ? undefined : PROVIDERS.find((p) => p.endpoint === connection.endpoint)
   const connected = Boolean(connection.key.trim() && connection.model.trim())
-  const working = busy && stage !== 'Ready'
+  const busy = jobBusy(job)
+  const stage = jobStatus(job)
   return (
     <section {...stylex.props(styles.workspace)} data-builder data-lenis-prevent>
       <div {...stylex.props(styles.toolbar)}>
@@ -437,7 +468,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
             )}
           </div>
           <div ref={scroller} {...stylex.props(styles.messages)}>
-            {!project?.messages.length && (
+            {!project?.messages.length && !pending && (
               <div {...stylex.props(styles.intro)}>
                 <span {...stylex.props(styles.spark)}>✳</span>
                 <h1 {...stylex.props(styles.headline)}>
@@ -470,6 +501,12 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                 <p {...stylex.props(styles.messageText)}>{message.content}</p>
               </div>
             ))}
+            {pending && (
+              <div {...stylex.props(styles.message, styles.userMessage)}>
+                <span {...stylex.props(styles.label)}>You</span>
+                <p {...stylex.props(styles.messageText)}>{pending}</p>
+              </div>
+            )}
           </div>
           {upcoming && (
             <div {...stylex.props(styles.composer)}>
@@ -604,7 +641,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                   e.preventDefault()
                   void run()
                 }}
-                {...stylex.props(styles.form, working && styles.formBusy)}
+                {...stylex.props(styles.form, busy && styles.formBusy)}
               >
                 <textarea
                   aria-label="Describe your app or ask for a change"
@@ -649,7 +686,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                     </button>
                   )}
                   <span role="status" aria-live="polite" {...stylex.props(styles.status)}>
-                    {working && <span {...stylex.props(styles.pulse)} aria-hidden="true" />}
+                    {busy && <span {...stylex.props(styles.pulse)} aria-hidden="true" />}
                     {stage}
                   </span>
                   <div {...stylex.props(styles.spacer)} />
@@ -657,7 +694,7 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
                     <button
                       key="stop"
                       type="button"
-                      disabled={stage === 'Starting on the phone' || !controller.current}
+                      disabled={job.kind === 'starting-on-phone' || !controller.current}
                       onClick={(e) => {
                         e.preventDefault()
                         controller.current?.abort()

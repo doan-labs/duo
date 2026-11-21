@@ -25,7 +25,7 @@ import {
   weight
 } from '@doan-labs/duo-uikit/tokens.stylex.ts'
 import * as stylex from '@stylexjs/stylex'
-import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
+import { type PointerEvent as ReactPointerEvent, useEffect, useReducer, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { byName } from '../apps.ts'
 import { addDisplay, type Display, device, lockState, unlockAll } from '../device.ts'
@@ -35,9 +35,10 @@ import { ControlCenter } from './control-center.tsx'
 import { settle, swipe } from './gestures.ts'
 import { type Drop, HomeBar, HomeBars } from './home-bar.tsx'
 import { HomeScreen } from './home-screen.tsx'
+import { type Layer, type LayerEvent, type Lock, type LockEvent, nextLayer, nextLock } from './layer.ts'
 import { LockScreen } from './lock-screen.tsx'
 import { NoticeBanner } from './notifications.tsx'
-import { BOOT_FADE_MS, BOOT_MS, BootScreen, PowerSheet } from './power.tsx'
+import { BootScreen, PowerSheet } from './power.tsx'
 import { useScenes } from './scenes.ts'
 import { Spotlight } from './spotlight.tsx'
 import { StatusBar } from './status-bar.tsx'
@@ -64,18 +65,37 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   const t = useToggles()
 
   const [drop, setDrop] = useState<Drop>(null)
-  const [switcher, setSwitcher] = useState(false)
   const [land, setLand] = useState(0)
-  const [locked, setLocked] = useState(lockState.locked)
+  // The topmost layer and the lock phase, each one value with one transition
+  // (layer.ts). The refs mirror the reducers so imperative gestures can read
+  // the phase synchronously, the way `hasLock` always did.
+  const [layer, layerSend] = useReducer(nextLayer, { kind: 'none' } as Layer)
+  const layerRef = useRef(layer)
+  const emit = (e: LayerEvent) => {
+    layerRef.current = nextLayer(layerRef.current, e)
+    layerSend(e)
+  }
+  const [lockPhase, lockSend] = useReducer(nextLock, (lockState.locked ? 'locked' : 'unlocked') as Lock)
+  const lockRef = useRef(lockPhase)
   const hasLock = useRef(lockState.locked)
-  const [lockOn, setLockOn] = useState(lockState.locked)
+  const emitLock = (e: LockEvent) => {
+    lockRef.current = nextLock(lockRef.current, e)
+    hasLock.current = lockRef.current === 'locked'
+    lockSend(e)
+  }
   const [lockKey, setLockKey] = useState(0)
-  const [asleep, setAsleep] = useState(false)
-  const [searching, setSearching] = useState(false)
-  const [poff, setPoff] = useState(false)
-  const [booting, setBooting] = useState<false | 'up' | 'leaving'>(false)
-  const [cc, setCc] = useState(false)
-  const ccOn = useRef(false)
+  // The device's power phase, mirrored for render: dark when asleep or off,
+  // the logo up while booting.
+  const [power, setPower] = useState(device.power)
+  const asleep = power.kind === 'asleep' || power.kind === 'off'
+  // Control Center pulled over another layer leaves that one mounted under it.
+  const base = layer.kind === 'control' ? layer.under : layer
+  const switcher = base.kind === 'switcher'
+  const searching = base.kind === 'search'
+  const cc = layer.kind === 'control'
+  const poff = base.kind === 'power'
+  const locked = lockPhase === 'locked'
+  const lockOn = lockPhase !== 'unlocked'
   const ccScrim = useRef<HTMLDivElement>(null)
   const ccPanel = useRef<HTMLDivElement>(null)
   // Brightness is a preference: `os.bright` keeps it for the next visit. Each
@@ -127,35 +147,27 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   ]
 
   function lock() {
-    if (hasLock.current) return
-    setSwitcher(false)
+    // Every layer drops even when already locked: Control Center or the power
+    // sheet opened over the lock screen must not outlast a sleep.
+    emit('lock')
+    if (lockRef.current === 'locked') return
     parkAll()
-    hasLock.current = true
-    setLocked(true)
-    setLockOn(true)
+    emitLock('lock')
     // A fresh element: one still lifting out cannot be the one that comes back.
     setLockKey((k) => k + 1)
   }
   /** Plays the lock screen out. Pass the animations a swipe already scrubbed. */
   function unlock(anims?: Animation[]) {
-    if (!hasLock.current) return
-    hasLock.current = false
-    setLocked(false)
+    if (lockRef.current !== 'locked') return
+    emitLock('unlock')
     // Icons land again, as on first paint: the unlock is what reveals them.
     setLand((k) => k + 1)
     const el = lockEl.current
-    if (!el) return setLockOn(false)
+    if (!el) return emitLock('unlocked')
     settle(anims ?? lift(el), () => {
-      if (!hasLock.current) setLockOn(false)
+      // Stale if a lock landed mid-lift: nextLock keeps it 'locked'.
+      emitLock('unlocked')
     })
-  }
-  const powerOn = () => {
-    setBooting('up')
-    setTimeout(() => {
-      device.wake()
-      setBooting('leaving')
-      setTimeout(() => setBooting(false), BOOT_FADE_MS)
-    }, BOOT_MS)
   }
 
   /** A notification tap: the device unlocks, the app opens with the deep link. */
@@ -164,7 +176,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
     launch(n.app, n.arg)
   }
 
-  const cur = scenes.filter((e) => !e.leaving && !e.parked)
+  const cur = scenes.filter((e) => e.phase === 'shown')
   const away = switcher || cur.length === 2 || cur.some((e) => !e.side)
   // The status stack sits top-right, so the app under it decides its colour.
   const topRight = cur.find((e) => e.side !== 'left')
@@ -175,7 +187,12 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   // home, like the cover display's. An app still shrinking out of a half keeps
   // the home there until it is gone, so it lands on the icon it is aiming at.
   const half = cur.filter((e) => e.side)
-  const holder = half.length === 1 ? half[0] : half.length === 0 ? scenes.find((e) => e.leaving && e.side) : undefined
+  const holder =
+    half.length === 1
+      ? half[0]
+      : half.length === 0
+        ? scenes.find((e) => e.phase !== 'shown' && e.phase !== 'parked' && e.side)
+        : undefined
   const homeSide = holder ? (holder.side === 'left' ? 'right' : 'left') : undefined
   // The divider is only there with an app on each side, and goes back to the
   // middle once one leaves: the narrow home the other half shows is always half.
@@ -185,7 +202,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
     if (!two) ctl.setRatio(0.5)
   }, [two])
   /** Nothing on the glass but apps parked behind it: a swipe up from the bottom finds them. */
-  const parked = scenes.some((e) => e.parked && !e.leaving)
+  const parked = scenes.some((e) => e.phase === 'parked')
   const rise = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = disp.current!
     const s = d.clientWidth / d.getBoundingClientRect().width
@@ -204,7 +221,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
       removeEventListener('pointerup', up)
       removeEventListener('pointercancel', up)
       // swipe()'s commit rule: a third of the way or a flick.
-      if (dy > 49 || v > 0.6) setSwitcher(true)
+      if (dy > 49 || v > 0.6) emit('open-switcher')
     }
     addEventListener('pointermove', move)
     addEventListener('pointerup', up)
@@ -242,29 +259,27 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
   }
   /** A finger on the top strip: the panel is mounted at once so the drag can scrub it in. */
   const ccPull = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (ccOn.current || device.asleep) return
-    ccOn.current = true
-    flushSync(() => setCc(true))
+    if (layerRef.current.kind === 'control' || device.asleep) return
+    flushSync(() => emit('pull-control'))
     swipe(e.nativeEvent, ccAnim(false), (anims) => settle(anims, () => {}), {
       down: true,
-      back: () => {
-        ccOn.current = false
-        setCc(false)
-      }
+      back: () => emit('control-closed')
     })
   }
   /** Plays the panel out. Pass the animations a swipe already scrubbed. */
   const ccClose = (anims?: Animation[]) => {
-    if (!ccOn.current) return
-    ccOn.current = false
-    settle(anims ?? ccAnim(true), () => setCc(false))
+    if (layerRef.current.kind !== 'control' || layerRef.current.closing) return
+    emit('close-control')
+    // 'control-closed', not 'close': a settle that lands after another layer
+    // took over is stale and must not drop it.
+    settle(anims ?? ccAnim(true), () => emit('control-closed'))
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: registered once; every callback reads refs and calls stable setters, so none goes stale
   useEffect(() => {
     const d: Display = {
       wide,
-      dark: setAsleep,
+      power: setPower,
       launch,
       stage: ctl.stage,
       mirror: ctl.mirror,
@@ -273,10 +288,17 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
       cam: ctl.cam,
       hud,
       screenshot,
-      power: () => setPoff(true),
-      boot: powerOn
+      // With Control Center up, open-power only marks it closing with the
+      // sheet under it; ccClose plays the panel out so the sheet takes over.
+      powerSheet: () => {
+        ccClose()
+        emit('open-power')
+      }
     }
-    const detach = addDisplay(d, { home: [() => setSwitcher(false), parkAll, ccClose], lock, unlock })
+    // Home with Control Center up drops what is under it and lets the panel
+    // play out; a plain 'close' first would unmount it before ccClose runs.
+    const home = () => (layerRef.current.kind === 'control' ? emit('drop-under') : emit('close'))
+    const detach = addDisplay(d, { home: [home, parkAll, ccClose], lock, unlock })
     const first = boot && byName(boot)
     if (first) open(first, undefined, arg ?? undefined)
     return detach
@@ -311,7 +333,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
           land={land}
           pageRef={pageNow}
           onOpen={openFrom}
-          onSearch={() => setSearching(true)}
+          onSearch={() => emit('open-search')}
         />
 
         <HomeBars
@@ -322,11 +344,11 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
           off={cc || switcher}
           drop={drop}
           onDrop={setDrop}
-          onSwitch={() => setSwitcher(true)}
+          onSwitch={() => emit('open-switcher')}
         />
-        {switcher && <Switcher ctl={ctl} onClose={() => setSwitcher(false)} />}
+        {switcher && <Switcher ctl={ctl} onClose={() => emit('close')} />}
         {/* Under the switcher's cards, the bar is the way back to the last app: a tap on it. */}
-        {switcher && <HomeBar onPointerDown={() => setSwitcher(false)} />}
+        {switcher && <HomeBar onPointerDown={() => emit('close')} />}
         {!switcher && !cur.length && !locked && !cc && parked && <HomeBar faint onPointerDown={rise} />}
         {two && !switcher && (
           <div data-divider {...stylex.props(styles.divider, styles.dividerAt(split * 100))} onPointerDown={divide} />
@@ -351,7 +373,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
           />
         )}
 
-        {searching && <Spotlight onPick={(a) => open(a, at(search.current!))} onClose={() => setSearching(false)} />}
+        {searching && <Spotlight onPick={(a) => open(a, at(search.current!))} onClose={() => emit('close')} />}
 
         {/* Swipe down from the top edge, from the lock screen too, as on a Face ID
             iPhone. The status stack is pointer-events none, so the strip sits under it. */}
@@ -369,7 +391,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
             }}
             onPower={() => {
               ccClose()
-              setPoff(true)
+              emit('open-power')
             }}
             onClose={() => ccClose()}
             onDismiss={(e) => swipe(e.nativeEvent, ccAnim(true), ccClose)}
@@ -396,7 +418,7 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
                 e.side === 'left' && styles.appLeft(split * 100),
                 e.side === 'right' && styles.appRight(split * 100),
                 (drop?.id === e.id || switcher) && styles.appDrag,
-                e.parked && !switcher && styles.appParked,
+                e.phase === 'parked' && !switcher && styles.appParked,
                 e.a.light && !t.darkMode ? light : dark
               )}
             >
@@ -417,15 +439,15 @@ export function SpringBoard({ w, hgt, boot, arg, shots }: SpringBoardProps) {
         {poff && (
           <PowerSheet
             disp={disp}
-            onCancel={() => setPoff(false)}
+            onCancel={() => emit('close')}
             onCommit={() => {
-              setPoff(false)
+              emit('close')
               device.powerOff()
             }}
           />
         )}
       </div>
-      {booting && <BootScreen leaving={booting === 'leaving'} />}
+      {power.kind === 'booting' && <BootScreen leaving={power.leaving} />}
     </>
   )
 }

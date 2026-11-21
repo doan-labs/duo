@@ -24,12 +24,20 @@ export const Siri = ({ os }: { os: Os }) => {
   const [answer, setAnswer] = useState<string | null>(null)
   const orb = useRef<HTMLDivElement>(null)
   const stream = useRef<MediaStream>(undefined)
+  // getUserMedia takes a beat: a tap while it is still asking is a re-entry,
+  // not a second listener - without the flag two taps open two mic streams.
+  const asking = useRef(false)
   const raf = useRef(0)
   const timers = useRef<number[]>([])
+  // Siri can close while the mic prompt is still up: the stream that arrives
+  // after unmount is stopped at once instead of listening with no one to hush it.
+  const gone = useRef(false)
 
   /** Live mic level drives the orb, so it visibly reacts to the room. */
   const listen = async () => {
-    stream.current = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const got = await navigator.mediaDevices.getUserMedia({ audio: true })
+    if (gone.current) return got.getTracks().forEach((t) => t.stop())
+    stream.current = got
     ac ??= new AudioContext()
     const ana = ac.createAnalyser()
     ana.fftSize = 128
@@ -54,6 +62,7 @@ export const Siri = ({ os }: { os: Os }) => {
   // Same as `hush`, spelled out so the effect closes over refs only.
   useEffect(
     () => () => {
+      gone.current = true
       cancelAnimationFrame(raf.current)
       stream.current?.getTracks().forEach((t) => t.stop())
       for (const t of timers.current) clearTimeout(t)
@@ -79,7 +88,16 @@ export const Siri = ({ os }: { os: Os }) => {
       <div
         ref={orb}
         {...stylex.props(styles.orb)}
-        onClick={() => (raf.current ? hush() : listen().catch(() => setSaid('Microphone unavailable.')))}
+        onClick={() => {
+          if (raf.current) return hush()
+          if (asking.current) return
+          asking.current = true
+          listen()
+            .catch(() => setSaid('Microphone unavailable.'))
+            .finally(() => {
+              asking.current = false
+            })
+        }}
       />
       <div {...stylex.props(styles.said)}>{said}</div>
       <div {...stylex.props(styles.out)}>
