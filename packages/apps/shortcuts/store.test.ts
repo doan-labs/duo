@@ -123,3 +123,13 @@ test('the automation editor opens a draft, saves edits and the row toggles', () 
   deleteAutomation(au.id)
   assert.equal(automationsCell.get().length, len - 1)
 })
+
+test('a tap while a shortcut runs is ignored, not a second run', async () => {
+  const { os, opened } = fakeOs()
+  const sc = { id: 't-guard', name: 'Slow', icon: '✨', steps: [{ action: 'Music' }] }
+  const first = runShortcut(sc, os, 30)
+  const second = await runShortcut(sc, os, 0)
+  await first
+  assert.equal(second.detail, 'Already running')
+  assert.equal(opened.length, 1)
+})
