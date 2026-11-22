@@ -39,7 +39,12 @@ type Tile = {
 }
 
 const TILES: Tile[] = [
-  { title: 'One layout, both displays.', uses: ['useWide', 'Push', 'Row', 'LargeTitle'], Scene: Fold, shape: 'full' },
+  {
+    title: 'One layout for both displays.',
+    uses: ['useWide', 'Push', 'Row', 'LargeTitle'],
+    Scene: Fold,
+    shape: 'full'
+  },
   {
     title: 'Rings that fill like today did.',
     uses: ['Rings', 'Bars', 'Num'],
@@ -58,8 +63,8 @@ const TILES: Tile[] = [
   { title: 'Widgets on real glass.', uses: ['Widget'], Scene: Widgets, shape: 'half', night: true },
   { title: 'Menus that float out of their control.', uses: ['Menu', 'IconButton'], Scene: Menus, shape: 'half' },
   { title: 'Forms, fields and sheets.', uses: ['TextField', 'Select', 'Sheet'], Scene: Form, shape: 'tall' },
-  { title: 'Dynamic Type, every step.', uses: ['Text'], Scene: Type, shape: 'tall' },
-  { title: `${SYMBOL_COUNT} SF Symbols, tinted by colour.`, uses: ['Sym'], Scene: Symbols, shape: 'tall' }
+  { title: 'Every Dynamic Type size.', uses: ['Text'], Scene: Type, shape: 'tall' },
+  { title: `${SYMBOL_COUNT} SF Symbols in any colour.`, uses: ['Sym'], Scene: Symbols, shape: 'tall' }
 ]
 
 const documented = new Set(kit.map((e) => e.name))

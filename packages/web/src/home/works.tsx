@@ -1,4 +1,4 @@
-// "It behaves like a device": one real shell, sticky, that folds, turns and
+// "Everything below is the real shell": one real shell, sticky, that folds, turns and
 // opens again as the page scrolls, then crosses to the other side for the
 // hardware and App Store steps. Nine captions take turns; the visitor keeps the
 // scroll and only the device's pose and app are linked to it.
@@ -62,8 +62,8 @@ const STEPS: Step[] = [
     app: 'Camera'
   },
   {
-    cap: '03 · The twist',
-    text: ['And then we gave it', 'an App Store.'],
+    cap: '03 · App Store',
+    text: ['It installs apps', 'from a real store.'],
     note: 'Apps install into their own isolated runtime, keep their own storage, and update on their own.',
     app: 'App Store'
   }
@@ -197,15 +197,13 @@ function Intro() {
   return (
     <Stagger gap={0.09} amount={0.4}>
       <Rise>
-        <Cap>01 · Not a mockup</Cap>
+        <Cap>01 · Live</Cap>
       </Rise>
       <Rise>
-        <Headline id="works-title" lines={['It looks like a concept.', 'It behaves like a device.']} />
+        <Headline id="works-title" lines={['Everything below', 'is the real shell.']} />
       </Rise>
       <Rise>
-        <Lede>
-          Every pose, button and gesture below is the shell itself, driven by the same code the desktop app runs.
-        </Lede>
+        <Lede>Each pose, button and gesture runs the same code as the desktop app. No video, no mockups.</Lede>
       </Rise>
     </Stagger>
   )

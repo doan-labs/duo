@@ -37,9 +37,7 @@ export function KitHero() {
             @doan-labs/duo-uikit · v{versions.uikit?.version} · {kit.length} exports
           </motion.p>
           <motion.h2 id="kit-title" {...stylex.props(styles.title)} {...rise(1)}>
-            {counts.components} components that
-            <br />
-            already know the phone folds.
+            {counts.components} components.
           </motion.h2>
         </div>
         <motion.div {...stylex.props(styles.actions)} {...rise(2)}>

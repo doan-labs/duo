@@ -1,4 +1,4 @@
-// The platform page's hero: Duo taken apart, twice over. On the left the
+// The platform page's hero: how Duo is built, drawn twice. On the left the
 // stack, one plate per layer, the trust line drawn through it. On the right
 // the real phone, rendered by the shell, pulled into the same six layers: the
 // window, the chassis, the displays, the sandbox, the app, the kit. Picking
@@ -21,44 +21,44 @@ const APP = 4
 // The page's own words for each layer. The blog's figure names the stack it is
 // built on; this page is for anyone, so it says what each layer is for.
 const PLAIN = [
-  'the frame it lives in',
-  'the body you can turn',
-  'a home screen on each display',
-  'the guard at the door',
-  "a stranger's code, walled off",
-  'what an app is given'
+  'native window or browser tab',
+  'the 3D phone you fold and rotate',
+  'one home screen per display',
+  'loads, checks and isolates apps',
+  'third-party code, sandboxed',
+  'the APIs and components apps use'
 ]
-// What opens beside a layer once it is clicked: three plain facts, still no technology names.
+// What opens beside a layer once it is clicked: three short facts, light on technology names.
 const FACTS: [string, string][][] = [
   [
-    ['Where', 'a desktop window or a browser tab'],
-    ['Looks', 'no frame, see-through'],
-    ['Knows', 'which computer it is on']
+    ['Runs in', 'a desktop app or a browser tab'],
+    ['Frame', 'none, transparent background'],
+    ['Detects', 'the host OS']
   ],
   [
-    ['Drawn', 'a real 3D phone, live'],
-    ['Moves', 'fold it, turn it, press its buttons'],
-    ['Screens', 'both displays, painted on the glass']
+    ['Renders', 'a 3D model in real time'],
+    ['Input', 'fold, rotate, press the buttons'],
+    ['Screens', 'both displays, drawn onto the glass']
   ],
   [
-    ['Copies', 'two, one for each display'],
-    ['Holds', 'the home grid and Control Center'],
-    ['Built in', 'Camera, Clock and the rest']
+    ['Instances', 'two, one per display'],
+    ['Includes', 'home screen and Control Center'],
+    ['Ships with', 'Camera, Clock and other built-in apps']
   ],
   [
-    ['Checks', 'every app before it opens'],
-    ['Keeps', "each app's data apart"],
-    ['Talks', 'through one port, nothing else']
+    ['Verifies', 'every app before launch'],
+    ['Isolates', 'storage, per app'],
+    ['Exposes', 'one message port, nothing else']
   ],
   [
-    ['Is', 'one file, everything inside it'],
-    ['Cannot', 'reach the internet or the page'],
-    ['Runs', 'twice, once per display']
+    ['Format', 'a single self-contained file'],
+    ['No access to', 'the network or the host page'],
+    ['Instances', 'two, one per display']
   ],
   [
-    ['Knows', 'the hinge angle, which display'],
-    ['Hears', 'the buttons and the sensors'],
-    ['Looks', 'iOS parts that already fold']
+    ['Reports', 'hinge angle and current display'],
+    ['Events', 'hardware buttons and sensors'],
+    ['Components', 'iOS-style, fold-aware']
   ]
 ]
 
@@ -160,10 +160,10 @@ export function Architecture() {
         <div {...stylex.props(styles.head)}>
           <div>
             <Cap>Platform · SDK · UI kit</Cap>
-            <Headline as="h1" id="arch-title" lines={['Duo,', 'taken apart.']} />
+            <Headline as="h1" id="arch-title" lines={['How Duo', 'is built.']} />
           </div>
           <div>
-            <Lede>Six layers. Hover to find one, click to open it.</Lede>
+            <Lede>The stack has six layers. Hover a layer to highlight it and click it for details.</Lede>
             <div {...stylex.props(styles.actions)}>
               <Button href="#kit">The UI kit</Button>
               <Button href="#sdk" outline>
@@ -179,7 +179,9 @@ export function Architecture() {
               <Stack {...sides} />
             </div>
             <div {...stylex.props(styles.panel)}>
-              <p {...stylex.props(styles.caption, styles.back, zoom !== null && styles.away)}>The phone, in parts</p>
+              <p {...stylex.props(styles.caption, styles.back, zoom !== null && styles.away)}>
+                The same stack on the phone
+              </p>
               <Phone {...sides} />
             </div>
           </div>
@@ -214,7 +216,7 @@ function Detail({ i, onStep }: { i: number; onStep: (d: number) => void }) {
       <motion.p {...rise(0)} {...stylex.props(styles.count)}>
         {String(i + 1).padStart(2, '0')} / {String(LAYERS.length).padStart(2, '0')}
         <span {...stylex.props(styles.trust, own ? styles.trustOwn : styles.trustApp)}>
-          {own ? "Duo's own" : 'walled off'}
+          {own ? "Duo's own" : 'sandboxed'}
         </span>
       </motion.p>
       <motion.h3 {...rise(1)} {...stylex.props(styles.name)}>

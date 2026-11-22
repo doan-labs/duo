@@ -43,7 +43,7 @@ export function Principles() {
         <div {...stylex.props(styles.head)}>
           <div>
             <Cap>How we build it</Cap>
-            <Headline id="rules-title" size="md" lines={['Four rules,', 'no exceptions.']} />
+            <Headline id="rules-title" size="md" lines={['Four rules', 'every app follows.']} />
           </div>
           <div {...stylex.props(styles.actions)}>
             <Button to="/guidelines">Read the guidelines</Button>

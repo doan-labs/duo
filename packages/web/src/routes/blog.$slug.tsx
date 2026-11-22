@@ -146,7 +146,7 @@ function Page() {
       <aside {...stylex.props(styles.end)}>
         <div {...stylex.props(styles.endInner)}>
           <p {...stylex.props(styles.eyebrow)}>Try it</p>
-          <h2 {...stylex.props(styles.endTitle)}>Fold it. Then build something that notices.</h2>
+          <h2 {...stylex.props(styles.endTitle)}>Try the simulator and build an app for it.</h2>
           <div {...stylex.props(styles.actions)}>
             <Button to="/simulator">Open the simulator</Button>
             <Button to="/docs" outline>

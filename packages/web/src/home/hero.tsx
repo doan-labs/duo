@@ -56,12 +56,12 @@ export function Hero() {
             </motion.div>
           )}
           <motion.h1 id="hero-title" {...stylex.props(styles.title)} {...rise(1)}>
-            Apple’s folding iPhone, simulated.
+            Simulate Apple’s folding iPhone
             <br />
-            Build apps for it.
+            and build apps for it.
           </motion.h1>
           <motion.p {...stylex.props(styles.sub)} {...rise(2)}>
-            Hold it. Fold it. Build for it.
+            A 3D simulator with a real app runtime, in the browser or on your desktop.
           </motion.p>
           <motion.div {...stylex.props(styles.actions)} {...rise(3)}>
             <Button to="/simulator">Try Duo</Button>

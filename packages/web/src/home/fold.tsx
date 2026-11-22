@@ -37,11 +37,11 @@ export function Fold() {
 
   return (
     <Block cinema labelledBy="fold-title">
-      <Cap>04 · The core idea</Cap>
-      <Headline id="fold-title" lines={['The fold is not a breakpoint.', 'It is input.']} />
+      <Cap>04 · The fold</Cap>
+      <Headline id="fold-title" lines={['Your app gets', 'the hinge angle.']} />
       <Lede>
-        Most responsive software asks one question: how wide is the screen? Duo also asks what shape the device is in
-        right now, and tells your app every time that changes.
+        Responsive layouts usually only check the width. Duo also tells your app which display it is on and how far the
+        phone is folded, and updates it whenever either changes.
       </Lede>
 
       <div {...stylex.props(styles.scene)}>

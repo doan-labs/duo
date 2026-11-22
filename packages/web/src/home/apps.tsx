@@ -157,7 +157,7 @@ export function Apps() {
   return (
     <Block labelledBy="apps-title">
       <Cap>06 · The apps</Cap>
-      <Headline id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
+      <Headline id="apps-title" lines={['Apps that use', 'both displays.']} />
       <Lede>
         Official apps ship in the simulator and publish to the Duo catalog; community apps arrive as pull requests.
         Every one is MIT licensed and installs through the Store.
