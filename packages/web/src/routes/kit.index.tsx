@@ -7,7 +7,7 @@ import { Principles } from '../kit/rules'
 // The platform in one page, top to bottom the way an app meets it: Duo taken
 // apart, the rules it is built by, the kit an app draws with, then the SDK's
 // buttons and sensors pressed live. Every export is documented under /kit/docs.
-const TITLE = 'Duo, taken apart.'
+const TITLE = 'How Duo is built'
 const LEAD =
   'How Duo is built, layer by layer: the native window, the Three.js shell, two operating systems, the sandbox runtime, and the SDK and UI kit every app is made from.'
 // Absolute for the crawlers; relative in dev, where the card is not deployed yet. Rendered from scripts/og/platform.html.

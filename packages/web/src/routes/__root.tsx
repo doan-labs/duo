@@ -57,7 +57,7 @@ export const Route = createRootRoute({
       { property: 'og:title', content: 'Duo - Folding iPhone simulator for app builders' },
       {
         property: 'og:description',
-        content: 'Hold it. Fold it. Build apps for a working browser simulator of Apple’s iPhone Duo.'
+        content: 'A working browser simulator of Apple’s iPhone Duo, with an SDK and an App Store.'
       },
       { property: 'og:image', content: OG_IMAGE },
       { property: 'og:image:width', content: '1200' },
@@ -67,7 +67,7 @@ export const Route = createRootRoute({
       { name: 'twitter:title', content: 'Duo - Folding iPhone simulator for app builders' },
       {
         name: 'twitter:description',
-        content: 'Hold it. Fold it. Build apps for a working browser simulator of Apple’s iPhone Duo.'
+        content: 'A working browser simulator of Apple’s iPhone Duo, with an SDK and an App Store.'
       },
       { name: 'twitter:image', content: OG_IMAGE }
     ],

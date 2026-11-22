@@ -38,7 +38,11 @@ export function Finale({ types, heard }: { types: DeviceEvent[]; heard: Record<D
           </p>
         </Rise>
         <Rise styles={styles.title}>
-          <Headline id="sdk-end-title" size="md" lines={['One call. Five events.', 'No manifest entry. No mocks.']} />
+          <Headline
+            id="sdk-end-title"
+            size="md"
+            lines={['One call handles all five events.', 'No manifest entry needed.']}
+          />
         </Rise>
         <Rise>
           <ol {...stylex.props(styles.board)} aria-label="Events this page heard">

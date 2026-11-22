@@ -8,7 +8,7 @@ const FACTS = [
   'Apps live in the repository.',
   'Every app is MIT licensed.',
   'Contributions are pull requests.',
-  'No developer account. No payments. No gatekeeping.'
+  'No developer account or fees.'
 ]
 
 const STEPS = ['fork', 'pull request', 'review', 'Duo Store']
@@ -22,13 +22,10 @@ export function Open() {
             <Cap>07 · Open</Cap>
           </Rise>
           <Rise>
-            <Headline id="open-title" lines={['The platform is open.', 'So are the apps.']} />
+            <Headline id="open-title" lines={['The platform and every app', 'are open source.']} />
           </Rise>
           <Rise>
-            <Lede>
-              Someone in Berlin can build a calculator, open a pull request, and after review it can appear in the Duo
-              Store for everyone.
-            </Lede>
+            <Lede>Build an app, open a pull request, and once it is reviewed it ships in the Duo Store.</Lede>
           </Rise>
         </Stagger>
         <div>

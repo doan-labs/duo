@@ -21,12 +21,12 @@ export function Sdk() {
           <Cap>05 · SDK</Cap>
         </Rise>
         <Rise>
-          <Headline id="sdk-title" lines={['Four primitives.', 'That is the whole surface.']} />
+          <Headline id="sdk-title" lines={['The SDK is', 'four APIs.']} />
         </Rise>
         <Rise>
           <Lede>
-            Enough to build a real app, small enough to read in a minute. The rest is React and the platform you already
-            know. <TextLink to="/docs/sdk">Read the SDK page</TextLink> for the full client.
+            Display, storage, views and links. Everything else is plain React and web APIs. The full client is on the{' '}
+            <TextLink to="/docs/sdk">SDK page</TextLink>.
           </Lede>
         </Rise>
       </Stagger>

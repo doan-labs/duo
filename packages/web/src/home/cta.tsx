@@ -17,7 +17,7 @@ export function Cta() {
     <Block labelledBy="cta-title">
       <Stagger gap={0.08} amount={0.4} styles={styles.centre}>
         <Rise>
-          <Headline id="cta-title" lines={['Build something strange', 'for a phone that folds.']} />
+          <Headline id="cta-title" lines={['Build an app', 'for Duo.']} />
         </Rise>
         {/* A plain row, not a second `Stagger`: motion carries the variant down
             through the DOM, so the three buttons are beats of the same sequence
@@ -32,7 +32,7 @@ export function Cta() {
           ))}
         </div>
         <Rise>
-          <p {...stylex.props(styles.line)}>Duo is an open experiment in what foldable software could become.</p>
+          <p {...stylex.props(styles.line)}>Duo is an open experiment in software for foldables.</p>
         </Rise>
         <Rise>
           <a href={DOAN} {...stylex.props(styles.maker)}>

@@ -472,8 +472,9 @@ export function Workspace({ upcoming = false, app, arg }: { upcoming?: boolean; 
               <div {...stylex.props(styles.intro)}>
                 <span {...stylex.props(styles.spark)}>✳</span>
                 <h1 {...stylex.props(styles.headline)}>
-                  An idea.
-                  <br />A working app.
+                  Describe an app
+                  <br />
+                  and run it on the phone.
                 </h1>
                 <p {...stylex.props(styles.description)}>
                   {upcoming

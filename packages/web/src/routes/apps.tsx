@@ -14,8 +14,8 @@ function Page() {
     <>
       <Block labelledBy="apps-title">
         <Cap>Apps</Cap>
-        <Headline as="h1" id="apps-title" lines={['Built for both displays', 'and the fold between them.']} />
-        <Lede>Official and community apps, all open source, all installed through the Store.</Lede>
+        <Headline as="h1" id="apps-title" lines={['Apps that use', 'both displays.']} />
+        <Lede>Official and community apps. All of them are open source and install through the Store.</Lede>
         <div {...stylex.props(styles.action)}>
           <Button to="/publish">Submit your app</Button>
         </div>
