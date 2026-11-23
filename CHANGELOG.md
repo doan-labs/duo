@@ -2,9 +2,44 @@
 
 ## 0.3.0 (Unreleased)
 
+### SDK & UI kit
+
+- View updates reach occluded copies, and reduced motion is honoured across the kit.
+- The token gate now covers spacing and every app, held by a baseline ratchet.
+
+### Shell
+
+- The inner live panel is culled once the fold covers it.
+- One phase value drives the state machines across shell, builder, blog and apps.
+
+### Apps
+
+- Weather: legible rain, real cloud banks and moonlight through cloudy nights.
+- Maps: recenter on tap, dark-mode labels, the iOS locate arrow and sharp face-on displays.
+- Reader back buttons announce their real destination.
+
+### Community apps
+
+- Twenty-three new: Chess (with an engine bot), Sudoku, Flashcards, Minesweeper,
+  Pixel Studio, Nonogram, Pocket Budget, Recipe Box, Music Sketchpad, Battleship,
+  Block Drop, Mind Map, Reversi, Trip Planner, Solitaire, Pantry, Color Lab,
+  Room Planner, Jigsaw, Circuit Lab, Paper Fold, Phrasebook and Tennis for Two.
+- Ten more official apps published to the catalog.
+- Jigsaw 1.0.1: recovery UI and a safe retry for settled seed/hydrate failures.
+- Chess: the LEVEL segmented control no longer overflows its rail.
+
 ### Site
 
-- `/kit` is the Platform page: Duo taken apart layer by layer, the build rules, the UI kit and the SDK's buttons and sensors on one page. `/sdk` forwards to it.
+- `/kit` is the Platform page: Duo taken apart layer by layer, the build rules, the UI kit and the SDK's buttons and sensors on one page. `/sdk` forwards to it. It has its own social card.
+- Developer profiles in the registry, developer tabs on `/apps`, and an interactive submission guide.
+- Release trees are served untransformed and immutable.
+- The blog films are seekable, stale chunks trigger a reload, and figures got phone layouts and a tappable blueprint.
+- Plainer headlines on the homepage, Platform page and blog; `twitter:creator` in the head.
+- Hosting moved off the Cloudflare Worker to OpenShip.
+
+### Dependencies
+
+- React 19.3.1, StyleX 0.19.2, Three.js 0.187, Vite 8.3.8, TanStack Router/Start, Biome 2.6.8 and Tauri 2.12.
 
 ## 0.2.0 (2026-09-26)
 
