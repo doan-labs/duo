@@ -18,6 +18,21 @@ export type CatalogApp = {
 }
 export const CATALOG: CatalogApp[] = [
   {
+    "id": "com.adrianpetkov.duo.tennisfortwo",
+    "name": "Tennis for 2",
+    "author": "adrianpetkov",
+    "developer": "adrianpetkov",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/tennis-for-two",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-11-21T02:14:16.744Z",
+    "updated": "2026-11-21T02:14:16.744Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.adrianpetkov.duo.tennisfortwo/1.0.0+c7fcc2ce/icon-1024.png",
+    "changelog": "# 1.0.0\n\nFirst community release. A side-view rally after William Higinbotham's 1958 oscilloscope\ngame: a phosphor ball under gravity, a court line and a net. Tap where the ball\nshould land to strike it, play the bot on three levels or a friend on one screen, first to 11.\nBoth displays draw the same match; only the one you look at plays. No network, no device\npermissions.\n"
+  },
+  {
     "id": "com.linhtinhvovan.duo.chess",
     "name": "Chess",
     "author": "linhtinhvovan",
@@ -78,6 +93,21 @@ export const CATALOG: CatalogApp[] = [
     "changelog": "# Changelog\n\n## 1.0.0\n\n- First release: moving and rotating pieces with kicks, gravity with lock\n  grace, line clears, scoring with combos and levels, next-three preview,\n  hold-once-per-drop, ghost piece, pause and resume, saved run and best score,\n  one gravity timer on the active display, and touch controls on both layouts.\n"
   },
   {
+    "id": "com.mnismt.duo.circuitlab",
+    "name": "Circuit Lab",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/circuit-lab",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T09:38:35.274Z",
+    "updated": "2026-10-08T09:38:35.274Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.circuitlab/1.0.0+6454db35/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\nFirst release.\n\n- Digital-logic sandbox: up to four input switches, AND/OR/NOT/XOR gates and\n  output bulbs on a pannable, zoomable canvas with a dotted perfboard grid.\n  Node cards counter-scale for legibility at fit zoom; the cover tray grows\n  on a chevron when the inspector needs room.\n- Tap an output pin, then an input pin, to wire them - every pin is a\n  constant 44pt target anchored outside its part's body so a body tap is\n  never absorbed. Crowded pads repel; the ones that still cannot land on\n  clear space retire to dots deterministically, and the inspector wire row\n  stays the always-reachable path. Landing on a wired pin replaces it.\n  Cycles are refused at write time and repaired on load.\n- Each display keeps its own camera under `view:<doc>:<display>`: pan, zoom\n  and Fit on the cover never clobber the unfolded view, stored cameras\n  restore on reopen, and a remote edit refreshes content without moving this\n  display's frame. The welcome circuit seeds with constant node and wire\n  ids, so both displays seeding the same blank store still converge on one\n  half adder. New work admits only on `os.view.visible && os.view.active`\n  read live - an occluded copy can still report active, so visibility alone\n  is not enough and every pointer, key, control, confirm, audio, focus and\n  timer path takes both flags; writes and gestures already in flight finish\n  their own completion.\n- The cover tray's Build tab pins the parts palette above the inspector's\n  own scroll, so selecting a part can never slide the grid out from under a\n  tap already in flight. Tray segments and the zoom dock meet the 44pt\n  touch bar.\n- Live evaluation: HIGH signals propagate down the wires with a travelling\n  glow and marching dashes; open input pins read LOW, stated everywhere.\n- Live truth table enumerates every input row, bounded to the first eight\n  switches so a tampered document can never ask for billions of rows, with\n  the current switch pattern highlighted.\n- Nine challenges with fixed I/O rows - from a straight wire to a half adder\n  to a four-switch door lock - validated row by row; solved stamps persist.\n- Undo/redo per structural edit, one step per drag; selection, deletion with\n  confirmation, per-part labels.\n- Saved circuits in an on-device library; the open circuit and selection\n  follow the fold through `os.session`, the library through `os.storage`.\n  Every durable write is a conditional `rev`/`gen` commit that re-derives its\n  intent on conflict instead of resubmitting a stale snapshot: deletes are\n  tombstones a stale writer cannot resurrect, a lost ack is verified by\n  reading the key back, and a failed read or corrupt blob reports failed\n  rather than seeding an empty library or claiming Saved.\n- Quiet connect, switch, undo and solve sounds with a persisted mute toggle;\n  audio unlocks on the first gesture and only the visible copy plays.\n"
+  },
+  {
     "id": "com.mnismt.duo.flappyduo",
     "name": "Flappy Duo",
     "author": "mnismt",
@@ -121,6 +151,21 @@ export const CATALOG: CatalogApp[] = [
     "permissions": [],
     "icon": "/catalog/apps/com.mnismt.duo.habitstreaks/1.1.0+71a61bff/icon-1024.png",
     "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned the app on the UI kit token scales: a dark arcade look with a\n  green glow, a glass completion chip, and Dynamic Type sizes throughout.\n- Added a wide layout for the inner display - brand, counter and hint sit\n  beside the habit list - while the cover keeps the compact stack.\n- Added motion: a staggered list entrance, a streak pulse on completion and\n  an all-done celebration, all off under reduced motion.\n- Today's checkmarks now sync through session storage, so folding the phone\n  hands the same day to the other display; history still lives in app\n  storage.\n- Bottom padding clears the home indicator.\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added three daily habits with one-tap completion.\n- Added persistent completion dates and streak counts.\n"
+  },
+  {
+    "id": "com.mnismt.duo.jigsaw",
+    "name": "Jigsaw",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/jigsaw",
+    "version": "1.0.1",
+    "releases": 2,
+    "created": "2026-10-08T09:37:19.102Z",
+    "updated": "2026-10-08T16:29:42.167Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.jigsaw/1.0.1+c8fe520b/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.1\n\n- A copy that fails to open now recovers instead of sitting on a blank\n  screen: a settled failed seed or a failed storage hydrate shows a legible\n  \"Could not open your puzzle\" state on both displays, and a quiet\n  \"Opening\" line while a load is still in flight. Retry stays hidden while\n  a seed attempt is pending or queued.\n- Retry remounts the copy, resubscribing the storage mirrors and re-reading\n  authoritative entries, so a saved library can never be replaced by a fresh\n  random game.\n- A proven pre-apply read failure re-derives the seed automatically, bounded\n  to two attempts. A dead generation or an ambiguous commit outcome is\n  terminal for that copy: no automatic or manual retry is offered in the\n  same session, only Close and reopen.\n\n## 1.0.0\n\n- First release: three original SVG illustrations (Harbour Dawn, Alpine\n  Meadow, Lantern Night) at 12, 24 and 48 pieces, each config saved\n  separately with resume.\n- Interlocking piece geometry from a seeded shared-edge grid: neighbours are\n  complementary by construction, drawn as clipped art slices.\n- Full play on the cover display via Board/Pieces switching and\n  tap-select/tap-place; the inner display shows board and tray together with\n  drag-and-drop onto the board or back to the rail.\n- Snap placement with a live target preview, tray filters (all, corners,\n  edges), picture guide toggle, pan/pinch/wheel zoom with a fit control, and\n  keyboard placement (arrows nudge, Enter drops, Backspace returns).\n- Soft lift/drop/snap/complete cues from a WebAudio synth with a persisted\n  mute; destructive reset asks first; completion detection raises the result\n  card; shared session state carries the game across a fold and os.storage\n  keeps it across relaunches.\n"
   },
   {
     "id": "com.mnismt.duo.memorymatch",
@@ -198,6 +243,51 @@ export const CATALOG: CatalogApp[] = [
     "changelog": "# Changelog\n\n## 1.0.0\n\n- First release: ten original puzzles (five 5 x 5, five 10 x 10), each verified\n  to have exactly one solution by the solver in game.ts.\n- Fill, mark and erase tools with drag strokes, a per-stroke undo stack, an\n  undoable two-tap clear, and keyboard play (arrows move, Space applies,\n  1/2/3 switch tools, Ctrl/Cmd+Z undoes).\n- Puzzle picker with live progress and per-puzzle stats: solves and best time,\n  persisted across relaunches through os.storage.\n- Cover-first layout; the wide layout adds a side rail with stats. Shared\n  session state keeps both displays on the same board through a fold.\n- Adaptive light and dark themes via the device switches, solved banner with\n  replay/next, reduced-motion aware animations.\n"
   },
   {
+    "id": "com.mnismt.duo.pantry",
+    "name": "Pantry",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/pantry",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T09:35:01.917Z",
+    "updated": "2026-10-08T09:35:01.917Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.pantry/1.0.0+a46cb6f1/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\n- Added a food inventory: name, quantity with unit (pcs, packs, g, kg, ml, l),\n  shelf (pantry, fridge, freezer) and an optional best-before date, with\n  same-batch merging when a name, unit, shelf and date already exist.\n- Added consume and restock steppers on every row (unit-sized steps clamped at\n  zero and a maximum, never negative) plus an edit sheet with save and a\n  two-step destructive delete.\n- Added a \"Use soon\" card sorting dated stock expiry-first, with textual\n  badges (Expired, Today, N days, Out) that never rely on colour alone.\n- Added inventory search, shelf/soon filter chips and a \"Use soon / A-Z\" sort,\n  mirrored across displays through `os.session`.\n- Added an independent shopping checklist with notes, tick-off, bought badges\n  and a Clear bought sweep.\n- Cover-first layout with complete feature parity; the inner display pairs the\n  entry form and use-soon card beside inventory and the shopping list through\n  `useWide`.\n- Persisted the whole document through `os.storage` behind a journaled sync\n  engine (`sync.ts`): accepted ops carry per-copy sequence stamps and\n  high-watermark coverage, replay over any adopted base, keep deletes through\n  tombstones and retry honestly on storage failures, so rapid input, two-copy\n  writes and delayed watch echoes cannot drop an accepted change. Adoption is\n  a coverage-gated causal union - a wholly-covered document contributes no\n  rows, a covered `src` provenance marks a deliberately dropped row, and a\n  repair write restores what a stale whole-blob flight erased - so a peer op\n  stays immortal in every copy that observed it; unattested blobs fold empty\n  and legacy pre-protocol documents still adopt wholesale.\n- Moved every durable write onto the SDK's conditional storage contract:\n  document and receipt commits carry the `{rev, gen}` token of the base they\n  were computed from, so a losing write rejects `E_CONFLICT` with zero\n  effects instead of clobbering a peer's confirmed rows, a dead-generation\n  token rejects `E_GONE`, and an ambiguous acknowledgement resolves by reading\n  the key back and matching the same operation's identity before retrying.\n  Conflicts rebase the same intents onto the moved base rather than\n  resubmitting a frozen document, which closes late-write and receipt-trim\n  losses (including accepted adds over-counting after a merge replay) across\n  conflicts, unknown acks, trims and cold closes.\n- Made same-batch merging exact under replay: ops stamp row provenance\n  (`src`), and merge folds batch siblings so a replayed duplicate drops and\n  genuinely concurrent adds sum onto the canonical row.\n- Added per-display operation receipts (`pantry-ops-cover` /\n  `pantry-ops-inner`): a bounded durable op log per display written before\n  its document commit, so a confirmed op survives even when every engine\n  that saw it was torn down before a stale write landed.\n- Soft synth cues on add, use, restock, check and delete, gated on the SDK's\n  synchronous `os.view` visible and active pair (timers, focus and every\n  deferred callback re-check at execution; already-admitted writes still\n  finish after a fold), with a visible persisted mute toggle.\n- Legibility pass: field labels, optional hints, sort chips and badges run at\n  12pt or more; badge urgency sits on a tone dot and edge with readable text\n  in both themes.\n- Honest status terminals: `loading` only until the first settled read,\n  `synced` once the base lands and the journal drains - including an empty\n  journal - and `retrying` while storage calls fail; confirmations describe\n  the accepted change rather than claiming a durable save.\n"
+  },
+  {
+    "id": "com.mnismt.duo.paperfold",
+    "name": "Paper Fold",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/paper-fold",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T09:39:22.060Z",
+    "updated": "2026-10-08T09:39:22.060Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.paperfold/1.0.0+88c8ae84/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\n- Six beginner models with original step diagrams: Dart, Boat, Cup, Helmet,\n  Tulip and Balloon.\n- Flat origami-diagram language: dashed blue valley folds, dash-dot orange\n  mountain folds, green motion arrows and faint landing outlines, with an\n  in-app legend sheet.\n- Back / Next / Finish transport, replay, per-model saved step progress, and\n  a result screen that suggests the next un-folded model.\n- Cover shows one large diagram plus the current instruction; the inner\n  display pairs the diagram with a tappable steps overview rail.\n- Gentle paper-step sound cues with a visible, persisted mute toggle; a\n  persisted motion toggle joins the OS reduced-motion setting.\n- Admission gate: a hidden or inactive copy rejects new user intent\n  (input, steps, prefs, legend, audio unlock) before any state moves;\n  transport resolves from the best-known step and drops intents a peer\n  switched away from.\n- Durable writes are conditional on the SDK 0.1 atomic API (`entry` +\n  `{ rev, gen }` tokens): typed conflicts rebase the intent on the exact new\n  value, ambiguous outcomes report unknown and retry through the deduped\n  reconcile instead of a blind second write, E_GONE stops a dead\n  generation, and reset tombstones carry an incarnation so max merge cannot\n  resurrect erased progress.\n- Shared step position across both displays via session state; progress and\n  preferences persist in device storage.\n- Durable progress: bounded per-model receipts are now the only written\n  record - the whole-map aggregate is never overwritten by ordinary\n  writes, so a stale writer has nothing left to clobber (peer write\n  landing late, old acknowledged flight, reload mid-flight). Every receipt\n  write is read-modify-verify: it unions the committed record, stores\n  once, and re-reads to catch a racing commit; `hi` only grows and `done`\n  never unlatches, so a regressed same-model write is a no-op. A live copy\n  unions aggregate plus receipts on every observed change and repairs\n  whichever durable side lacks the facts, deduped by observed content and\n  re-armed when a copy becomes live; an unacked write schedules one\n  deduped retry instead of silently dropping.\n"
+  },
+  {
+    "id": "com.mnismt.duo.phrasebook",
+    "name": "Phrasebook",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/phrasebook",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-17T13:04:23.917Z",
+    "updated": "2026-10-17T13:04:23.917Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.phrasebook/1.0.0+d195da9b/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\n- 41 travel phrases in five groups (Basics, Getting around, Eating out, Shopping, Help)\n  in Spanish, French, German, Italian, Portuguese, Japanese and Vietnamese. Japanese\n  carries a romanisation under every phrase.\n- Show view: the phrase set as large as its longest word allows, with the English meaning\n  below, so it can be held up to the person you are speaking to.\n- Cover-first layout: the list and the show view are two screens on the cover and sit\n  side by side on the inner display. A phrase opened on one display is the one the\n  other display shows after the fold.\n- Search across English, the chosen language and its romanisation, ignoring accents.\n- Starred phrases, the chosen language and the open phrase survive a fold and a relaunch\n  (the open phrase lasts for the session).\n- Works offline: no network, no permissions, no account.\n"
+  },
+  {
     "id": "com.mnismt.duo.pixelstudio",
     "name": "Pixel Studio",
     "author": "devin",
@@ -258,6 +348,36 @@ export const CATALOG: CatalogApp[] = [
     "changelog": "# Changelog\n\n## 1.0.0\n\n- Save, edit and delete recipes with a name, a note, ingredients and ordered\n  steps.\n- Check ingredients off while you prep; checks persist between sessions.\n- Step-by-step cooking mode with progress bar, previous/next controls and a\n  tap-to-jump step list; the current step persists so cooking can pause.\n- Fold handoff: the open screen (list, recipe, cooking or an in-progress edit)\n  syncs through session storage, so the other display continues in place.\n- Two sample recipes on first launch; a plain empty state once everything is\n  deleted.\n"
   },
   {
+    "id": "com.mnismt.duo.reversi",
+    "name": "Reversi",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/reversi",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T07:43:58.907Z",
+    "updated": "2026-10-08T07:43:58.907Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.reversi/1.0.0+3ab4daee/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\n- Added Reversi on the classic 8x8 board with the standard opening and black\n  moving first.\n- Added solo play against three real engines: Easy plays randomly, Medium\n  greedily evaluates a positional table, and Hard runs an alpha-beta negamax\n  search with iterative deepening and an endgame solve.\n- Added local pass-and-play, automatic forced passes, and game end on\n  consecutive no-moves with exact scores, draws included.\n- Added legal-move hints with a hover ghost that rings the discs a move would\n  flip, a deliberate per-direction flip cascade for captures, and a last-move\n  marker.\n- Added a move history log with pass entries, a persistent match tally, live\n  disc scores and a speaker mute switch.\n- Added undo: one ply in two-player mode, rewind-to-your-turn solo, never\n  while the bot is thinking; new game, mode and colour switches confirm before\n  discarding a live match.\n- The match persists in app storage, so folding mid-move hands the identical\n  position to the other display and relaunching resumes it; the bot thinks\n  only on the active display.\n- Keyboard play: arrows rove the board, Enter/Space places, U undoes, N asks\n  for a new game, H toggles hints, M mutes.\n"
+  },
+  {
+    "id": "com.mnismt.duo.roomplanner",
+    "name": "Room Planner",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/room-planner",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T09:35:50.916Z",
+    "updated": "2026-10-08T09:35:50.916Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.roomplanner/1.0.0+85ec5b21/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\n- Every persistence write is conditioned on the storage space's own\n  revision and generation (SDK 0.1 entry/set/del): the library merge, the\n  session doc mirror and preferences all re-read and rebase their intent on\n  E_CONFLICT instead of letting a stale whole-doc payload land\n  last-writer-wins, and report E_GONE as a terminal refusal. A timed-out\n  write reads back exactly once: byte-equal evidence reports applied and\n  any other stored value reports 'unknown' - the unresolved outcome is\n  never resolved by replaying the request, so a peer's confirmed-later\n  commit can never be overwritten by a stale intent's second flight.\n  A failed read is still 'unknown', never an implied-empty library to\n  seed over. Stored plan versions are a strict commit order: an\n  equal-version fork (two copies editing one plan in a millisecond) is a\n  second commit that binds one past the stored stamp, while a cached\n  union, a timed-out re-entry or a repair re-offer of a frozen snapshot\n  can never erase an acknowledged peer's equal-stamp commit.\n- The width callout now pins to the room's top edge in canvas space and\n  clamps below the zoom dock, so it can never slide under the dock's chrome\n  on either display or theme.\n- Plan deletes carry an incarnation tombstone: a peer still holding the\n  deleted layout moves to a surviving plan (or one shared recovery layout)\n  instead of editing a ghost whose next save would resurrect it, and stale\n  callbacks/mirrors of the dead incarnation are declined. Same-id\n  recreations born after the delete survive legitimately.\n- Initial release: scaled floor planning with a 16-piece catalogue, drag,\n  rotate and snap, wall-gap measurements, issue flags, undo/redo, named\n  layouts, metric/imperial units, quiet cues and dual-display sync.\n"
+  },
+  {
     "id": "com.mnismt.duo.snake",
     "name": "Snake",
     "author": "mnismt",
@@ -271,6 +391,21 @@ export const CATALOG: CatalogApp[] = [
     "permissions": [],
     "icon": "/catalog/apps/com.mnismt.duo.snake/1.2.3+9d3bf860/icon-1024.png",
     "changelog": "# Changelog\n\n## 1.2.3\n\n- Rebuilt the UI: on wide boxes the arrow pad sits in a control deck on the right of the board; on the cover the pad is right-aligned with New run on the left and extra edge insets keep it clear of the screen's corner mask.\n- Added a food ripple ring, an eat burst with a floating +1, a death shake with a red flash, a tapered snake tail, ready-state pulses, and a pressed-arrow flash; all gated behind reduced-motion.\n- Restyled on the UI kit token scales: radius, shadow, easing, motion press, type scale, tracking, leading, and space.\n\n## 1.2.2\n\n- Fixed the food dot rendering at the board's corner instead of its cell: the pulse animation overrode the translate used for placement, so the point could never be reached.\n- Fixed instant self-collision from quick turns: steering input now queues one turn per tick instead of applying a reversal mid-tick.\n\n## 1.2.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.2.0\n\n- Made the folded Duo mark the animated snake head using the exact product-icon geometry.\n- Added a calm breathing glow and reduced-motion fallback to the logo character.\n\n## 1.1.0\n\n- Added smooth snake movement, a breathing food animation, score feedback and a polished game-over state.\n- Added swipe steering, focus states and reduced-motion fallbacks for both displays.\n\n## 1.0.1\n\n- Constrained the board, controls, and game-over message to the active display.\n\n## 1.0.0\n\n- Added a touch-friendly Snake game with keyboard support.\n- Added responsive layouts for the inner and cover displays.\n"
+  },
+  {
+    "id": "com.mnismt.duo.solitaire",
+    "name": "Solitaire",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/solitaire",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T08:55:54.993Z",
+    "updated": "2026-10-08T08:55:54.993Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.solitaire/1.0.0+16250758/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\nFirst release.\n\n- Classic Klondike in Draw 1 or Draw 3: stock, waste, seven tableau columns\n  and four foundations, with face-down reveals and kings-only empty columns.\n- Tap-select, tap-destination play on both displays: lifted runs light their\n  legal landings, illegal drops shake and explain, double-tap sends a card to\n  its best home.\n- Full undo one move at a time, honest hints that lift the best move, an\n  Auto-finish that sweeps safe cards home, and a move counter with per-mode\n  plays, wins and bests.\n- Original vector card art drawn for this table, a staggered deal wave, 3D\n  card flips, a winning foundation hop, and quiet synthesized card sounds with\n  a persisted mute.\n- The match - deal seed plus the complete move log - persists in `os.storage`:\n  fold, relaunch or switch displays and the same table rebuilds, undo history\n  included. A corrupt record is reported, never silently reset.\n- New game and mode switches ask before abandoning a live deal; the sheet\n  traps focus, inerts the table and returns focus on close.\n"
   },
   {
     "id": "com.mnismt.duo.sudoku",
@@ -301,6 +436,21 @@ export const CATALOG: CatalogApp[] = [
     "permissions": [],
     "icon": "/catalog/apps/com.mnismt.duo.tictactoe/1.1.0+82bf1ef2/icon-1024.png",
     "changelog": "# Changelog\n\n## 1.1.0\n\n- Redesigned the app: dark arcade look with glass score chips, an inset\n  board well, glowing X and O marks, and a floating result card that clears\n  the home indicator.\n- Rebuilt the layout on `useWide`: on wide boxes the controls sit on a rail\n  beside the board; on the cover they stack under it.\n- Added a mark pop, a board-in entrance, a win-line reveal, and a reset\n  transition; every animation is one-shot, composited, and gated behind\n  reduced-motion.\n- Added synth sound cues: a woodblock tick on each placement, a rising win\n  jingle, and a soft two-note motif on a draw. A win also pops sparkles off\n  the line and makes the board rumble, with `navigator.vibrate` where the\n  hardware has it.\n- Live game state (board, turn, scores) now syncs through session storage,\n  so folding the phone hands the same in-progress match to the other\n  display. The win tally stays persisted across launches.\n- Split the source into game.ts (pure logic and wire helpers), styles.ts\n  (StyleX on the UI kit token scales), and main.tsx (wiring).\n\n## 1.0.1\n\n- Built against UI kit 1.0.0 token names.\n\n## 1.0.0\n\n- Added a two-player Tic-Tac-Toe board.\n- Added round reset and persistent win tracking.\n"
+  },
+  {
+    "id": "com.mnismt.duo.tripplanner",
+    "name": "Trip Planner",
+    "author": "devin",
+    "developer": "devin",
+    "lane": "community",
+    "repo": "https://github.com/doan-labs/duo/tree/main/community-apps/trip-planner",
+    "version": "1.0.0",
+    "releases": 1,
+    "created": "2026-10-08T08:31:23.719Z",
+    "updated": "2026-10-08T08:31:23.719Z",
+    "permissions": [],
+    "icon": "/catalog/apps/com.mnismt.duo.tripplanner/1.0.0+07eae126/icon-1024.png",
+    "changelog": "# Changelog\n\n## 1.0.0\n\n- Named trips with start/end date ranges, statuses computed from real dates,\n  and a stat overview (days, stops, legs, stays, packing progress).\n- Ordered day-by-day stops on a timeline with optional time, address and\n  notes; add, edit, delete with confirmation, Arrange-mode reorder, and a\n  \"Later\" lane for unscheduled ideas.\n- Editable travel legs (flight, train, drive, bus, ferry, walk, other) with\n  route, date, departure/arrival times and reference, plus stays with\n  check-in/check-out validation.\n- Packing checklist with progress bar, one-tap clear-packed and undo.\n- Per-stop inspector: cover pushes a full detail page, inner shows a glass\n  rail with stop details or the trip overview.\n- Editor drafts, selection, undo and mute preference survive folds and\n  relaunches; deletes offer an 8 second undo on both displays.\n- Quiet action cues (check, save, delete, undo, error) with a persisted mute\n  toggle, unlocked on first gesture and silent when audio is unavailable.\n- Light and dark themes, reduced-motion support, roving-arrow day chips and\n  44pt targets throughout.\n- Ordered storage commits with no reads, no rollback and no app-level\n  retry: record writes land first, then retained tomb markers, then the\n  index - a peer edit landing mid-commit is preserved (orphan recovery),\n  never erased by old work. Each planned write is issued once (the SDK\n  owns same-request-ID timeout retry; re-sending a payload as a new\n  request could clobber a peer's confirmed edit). Refusals report\n  'missed'; timeouts/closes/transport failures report 'unknown', so a\n  commit resolves 'applied', 'failed' (provably nothing landed) or\n  'partial' (landed or ambiguous data preserved, honestly reported).\n  Records are never deleted; tombs are ~16 bytes each but retained per\n  historical delete - the platform quota, not the trip cap, is the bound.\n  Nothing accepted silently vanishes across a fold or a storage outage,\n  and an acknowledged delete can never resurrect.\n"
   },
   {
     "id": "com.mnismt.duo.wordlemini",
@@ -344,7 +494,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.books/1.0.0+bada1e82/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.books/1.0.0+599b3878/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe library, store, reader and audiobook preview, kept in the app storage\nand shared by both displays.\n"
   },
   {
@@ -355,11 +505,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 3,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-27T09:47:04+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.1.0+a9526da8/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.calculator/1.1.0+09171861/icon-1024.png",
     "changelog": "# 1.1.0\n\nScientific keys, history, unit and currency conversion, Math Notes with variables, handwriting and graphs.\n\n# 1.0.1\n\nThe keypad shrinks to the display height, so the readout is no longer clipped at the top.\n\n# 1.0.0\n\nThe iOS calculator: one pending operator, immediate evaluation on the next.\n"
   },
   {
@@ -370,11 +520,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-21T21:34:57+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+79c5ad59/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.calendar/1.1.0+751a25e7/icon-1024.png",
     "changelog": "# 1.1.0\n\nThe tablet layout: sidebar with calendars and a mini month, Day, Week, Month and\nYear views, events that are created, edited, deleted and searched, and stored in\napp storage.\n\nMonth draws the sheet each display asks for. Inside, it is the Mac's: ruled both\nways in a hairline well under the UIKit separator, the weekend shaded, numbers\nhung on the right of their day, the picked day lifted whole. On the cover it is\nthe phone's: no rules, no shading, the number centred over its dots. Events pack\ninto lanes either way, so a multi-day event is a single bar across the days it\ncovers, and a week only draws the rows the month has instead of ruling an empty\nsixth. A day that runs out of lanes counts the rest and opens on Day.\n\nDay and Week are ruled to match, with the weekend shaded, the hours hung on\ntheir own lines, and now drawn the way Calendar draws it: pale across the week,\nsolid with a dot on today, and the time itself in the gutter. The sidebar lists\ncalendars as tinted checkboxes and its mini month follows the pane instead of\nstranding September under a February sheet. Paging slides the sheet the way the\narrow points; arriving at a view raises it.\n\nA fresh install opens on a working month around today, the keynote the\nhome-screen widget shows included.\n\n# 1.0.0\n\nMonth view with today marked, as an isolated release.\n"
   },
   {
@@ -385,11 +535,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-24T21:30:20+07:00",
+    "updated": "2026-11-22T00:18:07+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+a22b1636/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.clock/1.1.0+849dad86/icon-1024.png",
     "changelog": "# 1.1.0\n\nThe Clock app rebuilt end to end as the iPadOS Clock: a sidebar on the wide\ndisplay, a floating tab bar on the cover, and four working tabs. World Clock\nlists cities with relative-day offsets and an add-city sheet with search.\nAlarms add, edit, toggle and delete, with an iOS wheel picker for the time,\nrepeat days, sounds, snooze, and a full-screen snooze/stop alert that only the\nowning display sounds. Stopwatch runs a digital and an analog face off one\nshared timer with laps, best and worst highlights. Timers pick hours, minutes\nand seconds on wheels, run as orange-ring cards that pause, resume and cancel,\nand remember recents. All state lives in app storage, so the two display\ncopies agree while only the owner fires sounds.\n\n# 1.0.0\n\nWorld clock: local time large, six cities below, ticking once a second.\n"
   },
   {
@@ -404,7 +554,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.contacts/1.0.0+96e1d25a/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.contacts/1.0.0+58dfa31f/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe address book with favorites, blocked contacts and lists, kept in the app\nstorage and shared by both displays.\n"
   },
   {
@@ -419,7 +569,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.fitness/1.0.0+fd03bb85/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.fitness/1.0.0+f7f7c1a1/icon-1024.png",
     "changelog": "# 1.0.0\n\nActivity rings, workouts and awards over the health book, kept in the app\nstorage and shared by both displays.\n"
   },
   {
@@ -434,7 +584,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-19T22:45:01+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+71b8e05f/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.freeform/1.0.0+0b4c5a16/icon-1024.png",
     "changelog": "# 1.0.0\n\nFreehand ink on a canvas with a palette of inks.\n"
   },
   {
@@ -449,7 +599,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.health/1.0.0+4b37a169/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.health/1.0.0+5cafa752/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe health book with Summary, Browse and Sharing, kept in the app storage\nand shared by both displays.\n"
   },
   {
@@ -464,7 +614,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.home/1.0.0+260ded2f/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.home/1.0.0+eeeb9790/icon-1024.png",
     "changelog": "# 1.0.0\n\nRooms and accessories with scenes and status rows, kept in the app storage\nand shared by both displays.\n"
   },
   {
@@ -477,14 +627,14 @@ export const CATALOG: CatalogApp[] = [
     "version": "1.0.0",
     "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-29T23:12:37+07:00",
+    "updated": "2026-11-22T00:18:07+07:00",
     "permissions": [
       {
         "name": "geolocation",
         "label": "Location"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.maps/1.0.0+1663a01d/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.maps/1.0.0+e1f5d166/icon-1024.png",
     "changelog": "# 1.0.0\n\nLive search, routing and the blue dot over the declared tile, geocoder and\nrouter origins, with the running map shared by both displays.\n"
   },
   {
@@ -497,7 +647,7 @@ export const CATALOG: CatalogApp[] = [
     "version": "1.0.0",
     "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-29T23:12:37+07:00",
+    "updated": "2026-11-22T00:18:07+07:00",
     "permissions": [
       {
         "name": "microphone",
@@ -508,7 +658,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Files"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.memos/1.0.0+6d734338/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.memos/1.0.0+14c715a9/icon-1024.png",
     "changelog": "# 1.0.0\n\nRecord, trim, replace, play and organize voice memos; capture and file writes\nrun on the session owner and the audio lives in the app's file store.\n"
   },
   {
@@ -519,11 +669,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.2.0",
-    "releases": 3,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-26T21:43:15+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.news/1.2.0+9671ae83/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.news/1.2.0+69e12ca2/icon-1024.png",
     "changelog": "# 1.2.0\n\nFeeds move to DEV Community (dev.to): real articles with real cover photography instead of lettered tiles. Images are fetched through a resizer and painted as data URIs, so they work inside the app's document policy, and they fade in over each story's seeded gradient. Articles open with the cover art and the piece itself, and discussions come from the story's own comment thread. Search still reaches Hacker News via Algolia. The sidebar now clears the home-bar area, so its source card is no longer clipped.\n\n# 1.1.0\n\nRebuilt as Apple News for the Duo: a floating glass sidebar (channels, followed topics, Saved Stories, History) on the inner display and a tab bar on the cover. Today opens with a Top Story hero over a Latest wire, articles push over the whole app in a serif column with the live discussion underneath, and every list animates in staggered. Feeds cache through storage so the mirror copy paints the same stories without fetching.\n\n# 1.0.0\n\nHacker News front page dressed as Apple News, opening stories in Safari.\n"
   },
   {
@@ -534,7 +684,7 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-25T20:29:05+07:00",
     "permissions": [
@@ -547,7 +697,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Write clipboard"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.1.0+87f51269/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.notes/1.1.0+03c0a2b4/icon-1024.png",
     "changelog": "# 1.1.0\n\nRebuild Notes to match Apple's: a rich-text document model behind a block\neditor (Title, Heading, Subheading, Body, Monostyled, Block Quote, bold,\nitalic, underline, strikethrough, bulleted, dashed and numbered lists with\nindent, tappable checklists, tables with growing rows and columns, inline\nphotos and auto-linked URLs), custom undo and redo, find-in-note with live\nhighlights, and a Markup canvas with inks, widths, eraser and undo kept beside\nthe document. Notes pin, lock behind the side button's double-press, move\nbetween folders and drop into Recently Deleted with a 30-day clock, a recover\npath and media cleanup on final delete. The folders rail gains iCloud,\nuser folders with rename and delete, the bin and a #tag strip mined from the\ndocuments; the list gains a Pinned section, date groups, a gallery view,\nsort orders, search and per-note menus; and the folded phone walks\nFolders, list, note.\n\n# 1.0.0\n\nRun Notes in an isolated document with persistent text, shared session navigation\nand explicit saving and failure states.\n"
   },
   {
@@ -567,7 +717,7 @@ export const CATALOG: CatalogApp[] = [
         "label": "Photos"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+73265323/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.photos/1.0.0+817424a2/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe photos taken in Camera, read through the Photos service, with a full-bleed viewer.\n"
   },
   {
@@ -578,11 +728,11 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.1",
-    "releases": 3,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-26T00:19:40+07:00",
+    "updated": "2026-11-22T00:18:07+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.1+62213fb7/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.reminders/1.1.1+e81d4349/icon-1024.png",
     "changelog": "# 1.1.1\n\nThe cover no longer shows a blurred sliver of a pushed page over the Lists\nedge: the kit's Push draws a sheet that mounts already-open at rest instead of\nreplaying its slide on the copy the fold brings up. The destination header's\nShare button works, writing the list's name and its reminders to the clipboard\nwhere no system share sheet can reach.\n\n# 1.1.0\n\nA full Reminders rebuild after the iPad app: a glass sidebar of Today,\nScheduled, All, Flagged and Completed tiles with My Lists and tags on the inner\ndisplay, push navigation on the cover, round tinted checkboxes, inline editing,\na details sheet with dates, flags, priorities, tags and subtasks, list editing,\nsearch and a legacy tasks migration - all in the app storage, shared by both\ndisplays.\n\n# 1.0.0\n\nA checklist kept in the app storage, shared by both displays.\n"
   },
   {
@@ -597,7 +747,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.stocks/1.0.0+d7976158/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.stocks/1.0.0+ab5dea89/icon-1024.png",
     "changelog": "# 1.0.0\n\nLive quotes, charts and business headlines over the declared feeds, with the\nwatchlist kept in the app storage and shared by both displays.\n"
   },
   {
@@ -612,7 +762,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.tips/1.0.0+85f4dbce/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.tips/1.0.0+188223bf/icon-1024.png",
     "changelog": "# 1.0.0\n\nCollections, the tip of the day and saved bookmarks, kept in the app storage\nand shared by both displays.\n"
   },
   {
@@ -627,7 +777,7 @@ export const CATALOG: CatalogApp[] = [
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-29T23:12:37+07:00",
     "permissions": [],
-    "icon": "/catalog/apps/labs.doan.ipduo.wallet/1.0.0+a5c31507/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.wallet/1.0.0+f84a3607/icon-1024.png",
     "changelog": "# 1.0.0\n\nThe pass book with the card fan, double-click pay sheet and add-pass flow,\nkept in the app storage and shared by both displays.\n"
   },
   {
@@ -638,7 +788,7 @@ export const CATALOG: CatalogApp[] = [
     "lane": "official",
     "repo": "https://github.com/doan-labs/duo",
     "version": "1.1.0",
-    "releases": 2,
+    "releases": 1,
     "created": "2026-09-17T16:00:24+07:00",
     "updated": "2026-09-27T22:54:44+07:00",
     "permissions": [
@@ -647,13 +797,19 @@ export const CATALOG: CatalogApp[] = [
         "label": "Location"
       }
     ],
-    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+1ac8f6ea/icon-1024.png",
+    "icon": "/catalog/apps/labs.doan.ipduo.weather/1.1.0+0f012118/icon-1024.png",
     "changelog": "# 1.1.0\n\nLaunch now asks for the device's place on its own: the geolocation prompt runs first\nand the public IP answers when the prompt is refused, unnamed or times out, named\nthrough a free reverse geocoder. My Location files itself first in the list, cannot\nbe removed, and refreshes quietly on later launches while permission holds.\n\nThe inner display becomes the iPad layout: a floating glass sidebar carries the\nsearch field, the units and location menu, and sky-tinted location cards beside the\ndetail pane, with a sidebar toggle in the top bar. The cover display keeps the\niPhone list and bottom bar.\n\n# 1.0.0\n\nIsolated Weather with owner-only forecast requests, shared persistent preferences,\nrefresh commands, delegated geolocation and declarative widget snapshots.\n\nRedesigned after the iOS Weather app: large hero temperature, condition-driven sky\nbackgrounds with moon, stars, clouds, rain, snow and fog layers, frosted glass cards,\nSF Symbol condition glyphs, an hourly strip with sunrise and sunset, ten-day rows with\ntemperature range bars and a today marker, visual detail tiles (UV, sunrise/sunset arc,\nwind compass, feels like, 24-hour precipitation bars, humidity, visibility, pressure\ngauge, air quality from Open-Meteo), sky-card locations list, and a page-dot toolbar\nwith a bottom bar on the outer display.\n"
   }
 ]
 /** Developer profiles from the catalog index. */
 export const DEVELOPERS: Record<string, { name: string; description?: string; imageUrl: string; website?: string; github?: string }> =
   {
+  "adrianpetkov": {
+    "name": "Adrian Petkov",
+    "description": "Brought the 1958 oscilloscope classic Tennis for Two to the fold.",
+    "imageUrl": "https://avatars.githubusercontent.com/Adrianpetkov",
+    "github": "Adrianpetkov"
+  },
   "doan-labs": {
     "name": "Doan Labs",
     "description": "The team behind Duo: the folding simulator, the SDK and UI kit, and every official app.",
@@ -717,7 +873,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-27T09:47:04+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "Mail",
@@ -777,7 +933,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-19T22:45:01+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "Weather",
@@ -849,7 +1005,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-26T09:24:11+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "Safari",
@@ -857,7 +1013,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-25T21:35:13+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "Messages",
@@ -873,7 +1029,7 @@ export const SHELL: {
     "mock": false,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-27T09:47:04+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "App Store",
@@ -901,7 +1057,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-26T21:11:16+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "Podcasts",
@@ -909,7 +1065,7 @@ export const SHELL: {
     "mock": true,
     "changelog": null,
     "created": "2026-09-17T16:00:24+07:00",
-    "updated": "2026-09-26T20:46:16+07:00"
+    "updated": "2026-11-22T00:18:07+07:00"
   },
   {
     "name": "Books",

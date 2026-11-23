@@ -436,16 +436,16 @@ export const api: ApiEntry[] = [
     "file": "packages/sdk/protocol.ts",
     "line": 118,
     "doc": "",
-    "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'\n  | 'E_UNSUPPORTED'"
+    "signature": "type ErrCode =\n  | 'E_ARGS'\n  | 'E_QUOTA'\n  | 'E_RATE'\n  | 'E_CLOSED'\n  | 'E_TIMEOUT'\n  | 'E_PROTOCOL'\n  | 'E_DENIED'\n  | 'E_STALE'\n  | 'E_GONE'\n  | 'E_STORAGE'\n  | 'E_UNSUPPORTED'\n  | 'E_CONFLICT'"
   },
   {
     "pkg": "@doan-labs/duo-sdk",
     "name": "KV",
     "kind": "type",
     "file": "packages/sdk/protocol.ts",
-    "line": 173,
+    "line": 186,
     "doc": "",
-    "signature": "type KV = {\n  get(k: string): Promise<string | null>\n  set(k: string, v: string): Promise<{ rev: number }>\n  del(k: string): Promise<{ rev: number }>\n  keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>\n  snapshot(cursor?: string): Promise<Snapshot>\n  watch(since: number, cb: (e: Change) => void): () => void\n}",
+    "signature": "type KV = {\n  get(k: string): Promise<string | null>\n  /** The value and precondition token to `set`/`del` with `expect`. */\n  entry(k: string): Promise<Entry>\n  /**\n   * `expect` is the `{ rev, gen }` token the new value was computed from\n   * (from `entry`). The host checks it inside the write's own transaction:\n   * a moved space rejects `E_CONFLICT`, a dead generation rejects `E_GONE`,\n   * and either way nothing mutates. Omit it for an unconditional write.\n   */\n  set(k: string, v: string, expect?: Expect): Promise<{ rev: number }>\n  del(k: string, expect?: Expect): Promise<{ rev: number }>\n  keys(cursor?: string): Promise<{ keys: string[]; cursor?: string }>\n  snapshot(cursor?: string): Promise<Snapshot>\n  watch(since: number, cb: (e: Change) => void): () => void\n}",
     "members": []
   },
   {
@@ -1855,7 +1855,7 @@ export const api: ApiEntry[] = [
 export const versions: Record<string, { name: string; version: string; changelog: string | null }> = {
   "sdk": {
     "name": "@doan-labs/duo-sdk",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "changelog": null
   },
   "uikit": {

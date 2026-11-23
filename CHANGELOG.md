@@ -2,9 +2,30 @@
 
 ## 0.3.0 (Unreleased)
 
+### Platform
+
+- View updates reach occluded copies; reduced motion is honoured.
+- The token gate now covers spacing and every app.
+
+### Shell
+
+- The folded inner panel is culled instead of rendered.
+- One phase value drives the state machines across shell, builder, blog and apps.
+
+### Community apps
+
+- 23 new, from Chess and Reversi to Paper Fold and Tennis for Two.
+- Ten more official apps published to the catalog.
+
 ### Site
 
-- `/kit` is the Platform page: Duo taken apart layer by layer, the build rules, the UI kit and the SDK's buttons and sensors on one page. `/sdk` forwards to it.
+- `/kit` is the Platform page; `/sdk` forwards to it.
+- Developer profiles, developer tabs on `/apps`, an interactive submission guide.
+- Hosting moved off the Cloudflare Worker to OpenShip.
+
+### Dependencies
+
+- React 19.3.1, StyleX 0.19.2, Three.js 0.187, Vite 8.3.8, TanStack, Biome 2.6.8, Tauri 2.12.
 
 ## 0.2.0 (2026-09-26)
 
