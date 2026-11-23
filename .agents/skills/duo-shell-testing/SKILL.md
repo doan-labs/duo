@@ -111,3 +111,29 @@ inner copy adopted it. This exercises the os.session sync with rendering running
 `__duo.renderer.setAnimationLoop(null)` cannot be resumed (the loop is a closure in main.ts) - only a reload recovers, and a reload
 costs a 3-5 minute SwiftShader boot. Pause it last, if at all. After a reload the loop may stall (`__duo.renderer.info.render.frame`
 stops increasing while `requestAnimationFrame` still fires, boot logo stays up with iframes `ready`); reload again.
+
+## No X display on the machine (Devin boxes)
+
+The headed recipe assumes a desktop. On machines with no X socket in /tmp/.X11-unix, headed Chrome exits with "Missing X
+server or $DISPLAY" and headless Chrome 139+ fails WebGL with "xcb_connect() failed" - SwANGLE's Vulkan backend still wants
+X. Working path:
+
+```sh
+nohup Xvfb :99 -screen 0 1600x1200x24 &
+CHROME=$HOME/.agent-browser/browsers/chrome-*/chrome
+DISPLAY=:99 "$CHROME" --remote-debugging-port=9222 --user-data-dir=/tmp/duo-chrome \
+  --use-angle=swiftshader --enable-unsafe-swiftshader --no-first-run \
+  --window-size=1600,1200 --start-maximized &
+agent-browser connect 9222
+```
+
+agent-browser screenshots capture the page fine under Xvfb. No screen recording is possible - recording tools capture a
+desktop that does not exist; use screenshots as proof instead.
+
+## Stale vite deps cache after `bun install` (packages/web)
+
+A `vite dev` server that stays running across a dependency reinstall can keep an optimizeDeps cache built mid-install: SSR
+still renders but hydration dies with `SyntaxError: ... does not provide an export named 'useSyncExternalStoreWithSelector'`
+(raw CJS served via /@fs while resolution points at a different bun .bun instance). Symptom check: a page `<input>` has no
+`__reactFiber$*` keys and `window.__TSR__` is undefined. Fix: kill the dev server, `rm -rf packages/web/node_modules/.vite`,
+restart - vite re-optimizes on lockfile change.
